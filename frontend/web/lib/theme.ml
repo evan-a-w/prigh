@@ -48,7 +48,7 @@ module Accent = struct
       | Yellow -> "yellow"
     ;;
 
-    (* As in style.css's [--accent-*]. *)
+    (* As in theme.css's [--accent-*], on the dark themes. *)
     let hex = function
       | Orange -> "#f0b44c"
       | Blue -> "#6aa6f8"
@@ -78,8 +78,7 @@ module Accent = struct
       Some (Custom s)
     | Some digits when String.length digits = 3 && hex_digits digits ->
       Some
-        (Custom
-           ("#" ^ String.concat_map digits ~f:(fun c -> String.make 2 c)))
+        (Custom ("#" ^ String.concat_map digits ~f:(fun c -> String.make 2 c)))
     | Some _ -> None
     | None ->
       List.find Preset.all ~f:(fun p -> String.equal (Preset.to_string p) s)
@@ -100,10 +99,13 @@ module Accent = struct
   let ink hex =
     let channel i =
       let c =
-        Float.of_int (Int.of_string ("0x" ^ String.sub hex ~pos:(1 + (2 * i)) ~len:2))
+        Float.of_int
+          (Int.of_string ("0x" ^ String.sub hex ~pos:(1 + (2 * i)) ~len:2))
         /. 255.
       in
-      if Float.(c <= 0.03928) then c /. 12.92 else ((c +. 0.055) /. 1.055) **. 2.4
+      if Float.(c <= 0.03928)
+      then c /. 12.92
+      else ((c +. 0.055) /. 1.055) **. 2.4
     in
     let l =
       (0.2126 *. channel 0) +. (0.7152 *. channel 1) +. (0.0722 *. channel 2)

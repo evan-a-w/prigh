@@ -182,7 +182,8 @@ let%expect_test
   let stored () =
     print_s
       [%sexp
-        (Hashtbl.to_alist items |> List.sort ~compare:[%compare: string * string]
+        (Hashtbl.to_alist items
+         |> List.sort ~compare:[%compare: string * string]
          : (string * string) list)]
   in
   let load owner =
@@ -224,7 +225,8 @@ let%expect_test
   load "ws://h/ws bob";
   Pref_cache.save_theme storage { name = Light; accent = Custom "#123456" };
   print_endline (Hashtbl.find_exn items Pref_cache.theme_key);
-  [%expect {|
+  [%expect
+    {|
     ((((key history) (value ((newest older))))
       ((key web.terminal-open) (value (true)))
       ((key web.sidebar-width) (value (320)))

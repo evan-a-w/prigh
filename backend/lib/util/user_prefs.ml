@@ -32,7 +32,8 @@ let read t =
      | Ok (`Object fields) -> Ok fields
      | Ok _ ->
        Or_error.errorf
-         "%s must be a JSON object: fix it, or move it aside" t.path
+         "%s must be a JSON object: fix it, or move it aside"
+         t.path
      | Error e ->
        Or_error.errorf
          "%s is not valid JSON (%s): fix it, or move it aside"
@@ -128,9 +129,7 @@ let set t changes =
         changes
         ~init:(fields, [])
         ~f:(fun (fields, changed) ((key, value) as change) ->
-          let same =
-            Option.equal Json.exactly_equal (assoc fields key) value
-          in
+          let same = Option.equal Json.exactly_equal (assoc fields key) value in
           let fields =
             match value with
             | None -> List.Assoc.remove fields key ~equal:String.equal
@@ -141,8 +140,8 @@ let set t changes =
             then changed
             else
               change
-              :: List.filter changed ~f:(fun (k, _) ->
-                not (String.equal k key)) ))
+              :: List.filter changed ~f:(fun (k, _) -> not (String.equal k key))
+          ))
     in
     Ok (fields, List.rev changed))
 ;;

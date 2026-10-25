@@ -1440,7 +1440,8 @@ let prefs t client ~meth ~params =
        let%bind keys =
          match param params "keys" with
          | None | Some `Null -> Ok None
-         | Some _ -> Or_error.map (string_list_param params "keys") ~f:Option.some
+         | Some _ ->
+           Or_error.map (string_list_param params "keys") ~f:Option.some
        in
        let%map fields = User_prefs.get prefs ?keys in
        `Object [ "prefs", `Object fields ]
@@ -1470,7 +1471,9 @@ let prefs t client ~meth ~params =
          | None -> Or_error.error_string "missing param \"value\""
        in
        let%bind max = int_param params "max" ~default:500 in
-       let%map list = User_prefs.push prefs ~key value ~max:(Int.min max 1000) in
+       let%map list =
+         User_prefs.push prefs ~key value ~max:(Int.min max 1000)
+       in
        prefs_changed t client [ key, Some list ];
        `Object [ "value", list ])
 ;;

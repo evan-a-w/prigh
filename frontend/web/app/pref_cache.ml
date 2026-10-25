@@ -34,7 +34,7 @@ module Stored = struct
     Jsonaf.to_string
       (`Object
           [ "owner", `String t.owner
-          ; "legacy", if t.legacy then `True else `False
+          ; ("legacy", if t.legacy then `True else `False)
           ; "prefs", `Object t.prefs
           ])
   ;;
@@ -42,29 +42,36 @@ end
 
 (* What pages from before kept, by its key then, as preferences. *)
 let legacy_keys =
-  [ "prigh-web.notify", Key.notify, (function
+  [ ( "prigh-web.notify"
+    , Key.notify
+    , function
       | "off" -> Some `False
-      | _ -> Some `True)
-  ; "prigh-web.history", Key.history, (fun text ->
-      match Jsonaf.parse text with
-      | Ok (`Array items) ->
-        Some
-          (`Array
-              (List.filter items ~f:(function
-                 | `String _ -> true
-                 | _ -> false)))
-      | _ -> None)
-  ; "prigh-web.terminal-open", Key.terminal_open, (fun _ -> Some `True)
+      | _ -> Some `True )
+  ; ( "prigh-web.history"
+    , Key.history
+    , fun text ->
+        match Jsonaf.parse text with
+        | Ok (`Array items) ->
+          Some
+            (`Array
+                (List.filter items ~f:(function
+                   | `String _ -> true
+                   | _ -> false)))
+        | _ -> None )
+  ; ("prigh-web.terminal-open", Key.terminal_open, fun _ -> Some `True)
   ]
   @ List.map Prigh_web.Resize.Handle.all ~f:(fun h ->
     let pref = Prigh_web.Resize.Handle.pref_key h in
     ( "prigh-web." ^ String.chop_prefix_exn pref ~prefix:"web."
     , pref
-    , fun text -> Option.map (Int.of_string_opt text) ~f:(fun n -> `Number (Int.to_string n)) ))
+    , fun text ->
+        Option.map (Int.of_string_opt text) ~f:(fun n ->
+          `Number (Int.to_string n)) ))
 ;;
 
 let changes prefs =
-  List.map prefs ~f:(fun (key, value) -> { Prefs.Change.key; value = Some value })
+  List.map prefs ~f:(fun (key, value) ->
+    { Prefs.Change.key; value = Some value })
 ;;
 
 let load (storage : Login.Storage.t) ~owner =

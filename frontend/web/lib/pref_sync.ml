@@ -65,7 +65,8 @@ let loaded t (server : Prefs.Change.t list) =
       | Some c -> c
       | None ->
         (match
-           List.find upload ~f:(fun (c : Prefs.Change.t) -> String.equal c.key key)
+           List.find upload ~f:(fun (c : Prefs.Change.t) ->
+             String.equal c.key key)
          with
          | Some c -> c
          | None -> { Prefs.Change.key; value = None }))

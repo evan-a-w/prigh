@@ -582,7 +582,8 @@ let set_backend_history m entries =
 let push_history text =
   rpc
     "push_pref"
-    ~params:(P.Prefs.push_params ~key:history_key (`String text) ~max:history_max)
+    ~params:
+      (P.Prefs.push_params ~key:history_key (`String text) ~max:history_max)
     ~tag:Ignore
 ;;
 
@@ -4780,28 +4781,30 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (match P.Prefs.of_reply json with
         | Error _ -> m, []
         | Ok changes ->
-         match
-           List.find changes ~f:(fun c -> String.equal c.key history_key)
-           |> Option.bind ~f:(fun c -> history_of_json c.value)
-         with
-         | Some entries -> set_backend_history m entries, []
-         | None ->
-           (* The first frontend of this user to ask: this machine's. *)
-           (match List.take (Editor.history m.editor) history_max with
-            | [] -> m, []
-            | entries ->
-              ( m
-              , [ rpc
-                    "set_prefs"
-                    ~params:
-                      (P.Prefs.set_params
-                         [ { key = history_key
-                           ; value =
-                               Some (`Array (List.map entries ~f:(fun s -> `String s)))
-                           }
-                         ])
-                    ~tag:Ignore
-                ] )))
+          (match
+             List.find changes ~f:(fun c -> String.equal c.key history_key)
+             |> Option.bind ~f:(fun c -> history_of_json c.value)
+           with
+           | Some entries -> set_backend_history m entries, []
+           | None ->
+             (* The first frontend of this user to ask: this machine's. *)
+             (match List.take (Editor.history m.editor) history_max with
+              | [] -> m, []
+              | entries ->
+                ( m
+                , [ rpc
+                      "set_prefs"
+                      ~params:
+                        (P.Prefs.set_params
+                           [ { key = history_key
+                             ; value =
+                                 Some
+                                   (`Array
+                                       (List.map entries ~f:(fun s -> `String s)))
+                             }
+                           ])
+                      ~tag:Ignore
+                  ] ))))
      | History ->
        decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun lines ->
          { m with editor = Editor.set_history m.editor lines }, [])

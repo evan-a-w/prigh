@@ -425,7 +425,8 @@ module Model = struct
       (match Picker.selected_item picker with
        | Some item ->
          { t.theme with
-           name = Option.value (Theme.Name.of_string item.id) ~default:t.theme.name
+           name =
+             Option.value (Theme.Name.of_string item.id) ~default:t.theme.name
          }
        | None -> t.theme)
     | Some (Picker { kind = Accents; picker }) ->
@@ -435,7 +436,9 @@ module Model = struct
        | Some item, _ ->
          { t.theme with
            accent =
-             Option.value (Theme.Accent.of_string item.id) ~default:t.theme.accent
+             Option.value
+               (Theme.Accent.of_string item.id)
+               ~default:t.theme.accent
          }
        | None, _ -> t.theme)
     | _ -> Option.value t.theme_preview ~default:t.theme
@@ -1297,7 +1300,10 @@ let save_prefs (m : Model.t) (changes : Prefs.Change.t list) =
   then []
   else
     Command.Cache_prefs changes
-    :: (if saves_prefs m then [ rpc "set_prefs" (Prefs.set_params changes) ] else [])
+    ::
+    (if saves_prefs m
+     then [ rpc "set_prefs" (Prefs.set_params changes) ]
+     else [])
 ;;
 
 let save_pref m key value = save_prefs m [ { Prefs.Change.key; value } ]
@@ -1409,16 +1415,19 @@ let prefs_loaded (m : Model.t) changes =
   ( m
   , Command.Apply_theme (Model.look m)
     :: Command.Cache_prefs applied
-    :: (if List.is_empty upload
-        then []
-        else [ rpc "set_prefs" (Prefs.set_params upload) ]) )
+    ::
+    (if List.is_empty upload
+     then []
+     else [ rpc "set_prefs" (Prefs.set_params upload) ]) )
 ;;
 
 let theme_changes (theme : Theme.t) =
   [ { Prefs.Change.key = Key.theme
     ; value = Some (`String (Theme.Name.to_string theme.name))
     }
-  ; { key = Key.accent; value = Some (`String (Theme.Accent.to_string theme.accent)) }
+  ; { key = Key.accent
+    ; value = Some (`String (Theme.Accent.to_string theme.accent))
+    }
   ]
 ;;
 
@@ -1457,10 +1466,10 @@ let accent_picker (m : Model.t) =
           (List.map (Theme.Accent.all_presets @ custom) ~f:(fun a ->
              Picker.Item.create
                ~id:(Theme.Accent.to_string a)
-               ~detail:(Theme.Accent.hex a)
                ~marked:(Theme.Accent.equal a m.theme.accent)
                (match a with
-                | Preset p -> String.capitalize (Theme.Accent.Preset.to_string p)
+                | Preset p ->
+                  String.capitalize (Theme.Accent.Preset.to_string p)
                 | Custom hex -> "Custom " ^ hex)))
     }
 ;;
@@ -1473,7 +1482,10 @@ let theme_named (m : Model.t) name =
       { m.theme with name = n }
       ~replaces:"Theme: "
       ~notice:
-        (sprintf "Theme: %s, %s" (Theme.Name.to_string n) (Theme.Name.describe n))
+        (sprintf
+           "Theme: %s, %s"
+           (Theme.Name.to_string n)
+           (Theme.Name.describe n))
   | None ->
     error
       m
@@ -1510,7 +1522,9 @@ let open_terminal (m : Model.t) =
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
     }
-  , (if m.terminal.open_ then [] else save_pref m Key.terminal_open (Some `True))
+  , (if m.terminal.open_
+     then []
+     else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
 ;;
 
@@ -1807,7 +1821,10 @@ let set_verbosity (m : Model.t) verbosity =
          (verbosity_detail verbosity))
   in
   ( m
-  , save_pref m Key.verbosity (Some (`String (Prigh_ui.Verbosity.name verbosity)))
+  , save_pref
+      m
+      Key.verbosity
+      (Some (`String (Prigh_ui.Verbosity.name verbosity)))
     @ cmds )
 ;;
 
@@ -2422,7 +2439,9 @@ let retry_connection (m : Model.t) =
    only in response to the user. *)
 let set_notifications (m : Model.t) enabled =
   let m = { m with notifications = { m.notifications with enabled } } in
-  let save = save_pref m Key.notify (Some (if enabled then `True else `False)) in
+  let save =
+    save_pref m Key.notify (Some (if enabled then `True else `False))
+  in
   if not enabled
   then (
     let m, cmds = toast m "Notifications off: /notify on turns them on" in
@@ -4530,7 +4549,8 @@ let send (m : Model.t) ~follow_up =
                ; value =
                    Some
                      (`Array
-                         (List.map (History.to_list history) ~f:(fun s -> `String s)))
+                         (List.map (History.to_list history) ~f:(fun s ->
+                            `String s)))
                }
              ]
          ])
@@ -4539,7 +4559,10 @@ let send (m : Model.t) ~follow_up =
       then
         [ rpc
             "push_pref"
-            (Prefs.push_params ~key:Key.history (`String text) ~max:Pref_sync.history_max)
+            (Prefs.push_params
+               ~key:Key.history
+               (`String text)
+               ~max:Pref_sync.history_max)
             ~tag:Ignore
         ]
       else [] )
@@ -4919,7 +4942,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Restore_prefs { prefs; legacy } ->
     let m = apply_prefs m ~startup:true prefs in
     ( { m with
-        prefs = { m.prefs with legacy = (if legacy then prefs else m.prefs.legacy) }
+        prefs =
+          { m.prefs with legacy = (if legacy then prefs else m.prefs.legacy) }
       }
     , [ Command.Apply_theme (Model.look m) ] )
   | Set_notification_permission permission ->
@@ -5244,7 +5268,8 @@ let update_connected (m : Model.t) (action : Action.t) =
            { Prefs.Change.key; value = Option.map value ~f:Json.int })) )
   | Preview_accent colour ->
     (match Theme.Accent.of_string colour with
-     | Some accent -> { m with theme_preview = Some { m.theme with accent } }, []
+     | Some accent ->
+       { m with theme_preview = Some { m.theme with accent } }, []
      | None -> m, [])
 ;;
 

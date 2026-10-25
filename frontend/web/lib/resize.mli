@@ -2,10 +2,11 @@ open! Core
 
 (** The sizes of the page's panels, which the user drags (or moves with the
     keyboard) from a handle on their inner edge: each one's preference, kept
-    with the user's preferences, and the size it gets in the window it is in. Side panels
-    docked beside the chat share the window's width so that the chat keeps
-    [chat_min] pixels: when the window shrinks, they shrink (towards their
-    minimums) in proportion, and grow back to their preferences with it. *)
+    with the user's preferences, and the size it gets in the window it is in.
+    Side panels docked beside the chat share the window's width so that the
+    chat keeps [chat_min] pixels: when the window shrinks, they shrink
+    (towards their minimums) in proportion, and grow back to their
+    preferences with it. *)
 
 module Handle : sig
   type t =
