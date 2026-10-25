@@ -42,8 +42,12 @@ let replace agents id f =
   List.map agents ~f:(fun a -> if String.equal a.id id then f a else a)
 ;;
 
+(* An agent already listed (from the state, before its start event) keeps
+   its place. *)
 let start agents ~call_id ~agent_id ~task ~model =
-  agents @ [ create ~call_id ~agent_id ~task ~model ]
+  match find agents agent_id with
+  | Some _ -> replace agents agent_id (fun a -> { a with call_id; task; model })
+  | None -> agents @ [ create ~call_id ~agent_id ~task ~model ]
 ;;
 
 let status_of_result ~turns ~cost_usd (result : P.Event.Subagent_result.t)
