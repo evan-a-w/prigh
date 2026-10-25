@@ -17,6 +17,10 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 1)))))
     Scroll_to_bottom
     |}];
   Harness.act h (Set_draft "hello");

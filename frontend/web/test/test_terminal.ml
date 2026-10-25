@@ -149,6 +149,10 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s2)(host backend)(online true)(as_user())(generation 0))
     |}];
@@ -158,6 +162,10 @@ let%expect_test "the panel follows the session, the host and the user" =
   show ();
   [%expect
     {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nc7\
+                            \n/work") (purpose (Sidebar 3)))))
     laptop ~/proj connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s2)(host c7)(online true)(as_user())(generation 0))
     |}];
@@ -213,7 +221,13 @@ let%expect_test "an exited shell, a failure and what to do next" =
   (* The host is back: a new attempt. *)
   state_event h ~active_host:"c7" ();
   H.text h ~selector:".terminal-body";
-  [%expect {| ((session s1)(host c7)(online true)(as_user())(generation 0)) |}];
+  [%expect {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nc7\
+                            \n/work") (purpose (Sidebar 2)))))
+    ((session s1)(host c7)(online true)(as_user())(generation 0))
+    |}];
   status h (Failed "tmux not found: install tmux or set PRIGH_TMUX");
   H.text h ~selector:".terminal-notice";
   [%expect
