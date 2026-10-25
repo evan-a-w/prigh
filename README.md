@@ -451,6 +451,26 @@ valid 5 minutes, for that session's host only), then `GET
 streams the bytes, in chunks, to or from the host (uploads up to 2 GB). A
 tool host running an older prigh says to update prigh there.
 
+GitHub and Forgejo (Codeberg, or any self-hosted Forgejo or Gitea) are in
+the settings page's Git hosting section (also under `/auth`): each host
+with who is signed in and how, Connect (GitHub's device code shows big,
+with Copy and the page to open; Forgejo opens its authorize page), Use a
+token, Disconnect, and Add host… for another Forgejo; closing the sign-in
+goes back to the settings. `/login github [HOST] [token]`, `/login forgejo
+HOST [token]`, `/login HOST` and `/logout HOST` do the same, and the
+`/login`/`/logout` pickers list the hosts too. The branch in the top bar
+(or `/pr [list open|closed|all]`) opens the session's repository's pull
+requests: a list to filter by state and by typing; Enter opens one (`/pr
+view N`) with its state, author, branches, checks, description and diff,
+"Open on GitHub" and Check out (a worktree beside the repository, with
+"Work there" to `/cd` into it; `/pr checkout N` asks the same), Esc going
+back to the list. New pull request (`/pr new [title]`) is a form
+prefilled from the branch (title, description, base, draft, and "push
+first" when the remote lacks commits): Ctrl+Enter creates it, a refusal
+stays in the form with what you typed, and "#25 created: URL" says it
+worked. Errors are the backend's, saying what to do (`/login github`, `git
+remote add`…).
+
 Every panel resizes from a handle on its inner edge: the sessions
 sidebar's right edge, the file browser's and the agents panel's left
 edge, the terminal's top edge, and the line between the file list and
