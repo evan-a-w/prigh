@@ -436,6 +436,23 @@ val compact : ?instructions:string -> t -> string Or_error.t
 (** The working tree's changes on the active tool host ({!Git_diff}). *)
 val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
 
+(** {2 Worktrees}
+
+    The repository's git worktrees, run on the active tool host in the
+    session cwd's repository; new ones go under the config's
+    [worktrees_dir] ({!Worktree}). *)
+
+val worktrees : t -> Worktree.Listing.t Or_error.t
+
+val create_worktree
+  :  t
+  -> branch:string
+  -> base:string option
+  -> Worktree.Created.t Or_error.t
+
+(** Removes a worktree of the session cwd's repository ({!Worktree.remove}). *)
+val remove_worktree : t -> path:string -> force:bool -> Worktree.t Or_error.t
+
 (** [/review ARGS]: a run reviewing the uncommitted changes, or the changes
     against a base when the first word of [ARGS] names a revision; the rest
     (all of [ARGS] otherwise) is extra instructions. The message is
