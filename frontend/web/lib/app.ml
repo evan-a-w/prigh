@@ -4098,6 +4098,20 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
+  | Forge_done { host; user; method_ }, dialog ->
+    let m =
+      match dialog with
+      | Some (Login _) -> { m with dialog = None }
+      | _ -> m
+    in
+    toast
+      m
+      (sprintf
+         "Signed in to %s%s (%s)"
+         host
+         (Option.value_map user ~default:"" ~f:(fun u -> " as " ^ u))
+         method_)
+  | Forge_logged_out host, _ -> toast m (sprintf "Signed out of %s" host)
   | Prompt { prompt = Secret _ | Text _ | Manual_code _; _ }, Some (Login flow)
     ->
     ( { m with dialog = Some (Login (Login_flow.apply flow e)) }
