@@ -18,19 +18,23 @@ let%expect_test "!command, !!command and !&command" =
   send "!";
   [%expect
     {|
-    (Save_history ("!echo hi"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "!echo hi") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ shell) (params ((command "echo hi") (add_to_context true)))
      (tag Show_error))
-    (Save_history (!!ls "!echo hi"))
+    (Rpc (method_ push_pref) (params ((key history) (value !!ls) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ shell) (params ((command ls) (add_to_context false)))
      (tag Show_error))
-    (Save_history ("!&make test" !!ls "!echo hi"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "!&make test") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ shell) (params ((command "make test") (background true)))
      (tag Job_started))
-    (Save_history (! "!&make test" !!ls "!echo hi"))
+    (Rpc (method_ push_pref) (params ((key history) (value !) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     |}];
   List.iter shell_events ~f:(Harness.event h);
@@ -72,7 +76,8 @@ let%expect_test "!command, !!command and !&command" =
   Harness.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (!ls ! "!&make test" !!ls "!echo hi"))
+    (Rpc (method_ push_pref) (params ((key history) (value !ls) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     Started job j1: its result reaches the agent when it exits.
     Wait for the agent to finish (or Esc to stop it) before running !commands; !&command starts a background job now. (Dismiss)

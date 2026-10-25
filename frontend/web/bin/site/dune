@@ -11,6 +11,12 @@
   (copy ../index.html index.html)))
 
 (rule
+ (target theme.css)
+ (deps ../theme.css)
+ (action
+  (copy ../theme.css theme.css)))
+
+(rule
  (target style.css)
  (deps ../style.css)
  (action
@@ -118,6 +124,7 @@
  (files
   (index.html as web/index.html)
   (main.bc.js as web/main.bc.js)
+  (theme.css as web/theme.css)
   (style.css as web/style.css)
   (chat.css as web/chat.css)
   (agents.css as web/agents.css)

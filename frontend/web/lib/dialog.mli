@@ -25,6 +25,8 @@ module Picker_kind : sig
     | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
     | Jump (** item ids are [Jump.Target.to_string]s *)
     | Worktrees of Worktree.Listing.t (** item ids are their paths *)
+    | Themes (** item ids are [Theme.Name.to_string]s *)
+    | Accents (** item ids are [Theme.Accent.to_string]s *)
   [@@deriving sexp_of, equal]
 end
 

@@ -91,6 +91,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
+    (Rpc (method_ get_prefs) (params ((keys (history)))) (tag Prefs_history))
     |}];
   H.reply h Initial_state (state_json ());
   H.reply
@@ -131,6 +132,13 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     {|
     (Rpc (method_ prompt) (params ((text "list the files"))) (tag Show_error))
     (Append_history "list the files")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "list the files")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (user "list the files"));
@@ -184,6 +192,13 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     {|
     (Rpc (method_ steer) (params ((text "also count them"))) (tag Show_error))
     (Append_history "also count them")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "also count them")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Tool_output { call_id = "c1"; chunk = "ial\n" });
   H.event
@@ -955,6 +970,13 @@ let%expect_test "submit with @file sends attachments param" =
       (params ((text "look at @src/app.ml") (attachments (src/app.ml))))
       (tag Show_error))
     (Append_history "look at @src/app.ml")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "look at @src/app.ml")
+        (max   500)))
+      (tag Ignore))
     |}];
   (* Unknown @tokens stay plain text and produce no attachments param. *)
   H.step ~quiet:true h (Intent (Insert "check @nope"));
@@ -963,6 +985,13 @@ let%expect_test "submit with @file sends attachments param" =
     {|
     (Rpc (method_ prompt) (params ((text "check @nope"))) (tag Show_error))
     (Append_history "check @nope")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "check @nope")
+        (max   500)))
+      (tag Ignore))
     |}]
 ;;
 
@@ -2838,6 +2867,13 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     {|
     (Rpc (method_ prompt) (params ((text "run it"))) (tag Show_error))
     (Append_history "run it")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "run it")
+        (max   500)))
+      (tag Ignore))
     ✓ bash $ ls -la
         out 0
         out 1
@@ -3282,6 +3318,13 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     {|
     (Rpc (method_ prompt) (params ((text "first line\nsecond"))) (tag Show_error))
     (Append_history "first line\nsecond")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "first line\nsecond")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.key h (Key.plain Up);
   H.show h;
@@ -3401,6 +3444,13 @@ let%expect_test "abort restores queued messages" =
     {|
     (Rpc (method_ steer) (params ((text first))) (tag Show_error))
     (Append_history first)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value first)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.keys h "second";
   H.enter h;
@@ -3408,6 +3458,13 @@ let%expect_test "abort restores queued messages" =
     {|
     (Rpc (method_ steer) (params ((text second))) (tag Show_error))
     (Append_history second)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value second)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Queue_update { steer = [ "first"; "second" ]; follow_up = [] });
   H.show h;
@@ -3464,6 +3521,13 @@ let%expect_test "scroll stays anchored while streaming" =
     {|
     (Rpc (method_ prompt) (params ((text prompt))) (tag Show_error))
     (Append_history prompt)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value prompt)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Message_start (Assistant partial));
   let stream from count =
@@ -3675,6 +3739,13 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     {|
     (Rpc (method_ steer) (params ((text queued))) (tag Show_error))
     (Append_history queued)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value queued)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Queue_update { steer = [ "queued" ]; follow_up = [] });
   H.keys h "draft";
@@ -3764,6 +3835,13 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     {|
     (Rpc (method_ prompt) (params ((text go))) (tag Show_error))
     (Append_history go)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value go)
+        (max   500)))
+      (tag Ignore))
 
 
 
@@ -3798,6 +3876,13 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     {|
     (Rpc (method_ prompt) (params ((text meanwhile))) (tag Show_error))
     (Append_history meanwhile)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value meanwhile)
+        (max   500)))
+      (tag Ignore))
     ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "index the repo"
 
 
@@ -3900,6 +3985,13 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     {|
     (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
     (Append_history next)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value next)
+        (max   500)))
+      (tag Ignore))
 
     ▌ go
     ■ subagent index the repo  cancelled
@@ -3952,6 +4044,13 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     {|
     (Rpc (method_ prompt) (params ((text go))) (tag Show_error))
     (Append_history go)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value go)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (user "go"));
@@ -4368,6 +4467,13 @@ let%expect_test "new user prompt clears finished agents" =
     {|
     (Rpc (method_ prompt) (params ((text "next task"))) (tag Show_error))
     (Append_history "next task")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "next task")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.show h;
   [%expect
@@ -4554,6 +4660,13 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     {|
     (Rpc (method_ follow_up) (params ((text "after this"))) (tag Show_error))
     (Append_history "after this")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "after this")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Queue_update { steer = []; follow_up = [ "after this" ] });
   H.show h;
@@ -4575,6 +4688,13 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     {|
     (Rpc (method_ follow_up) (params ((text "and more"))) (tag Show_error))
     (Append_history "and more")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "and more")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event
     h
@@ -4604,6 +4724,13 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     {|
     (Rpc (method_ follow_up) (params ((text "queued text"))) (tag Show_error))
     (Append_history "queued text")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "queued text")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (Queue_update { steer = []; follow_up = [ "queued text" ] });
   H.keys h "draft";
@@ -4657,6 +4784,13 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
         (add_to_context true)))
       (tag Show_error))
     (Append_history "!ls -la")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "!ls -la")
+        (max   500)))
+      (tag Ignore))
     |}];
   let call = tool_call ~name:"shell" ~arguments:{|{"command":"ls -la"}|} "s1" in
   H.event h (Tool_start call);
@@ -4688,6 +4822,13 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
         (add_to_context false)))
       (tag Show_error))
     (Append_history !!pwd)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value !!pwd)
+        (max   500)))
+      (tag Ignore))
     |}];
   H.event h (State (state ~running:true ()));
   H.keys h "!echo hi";
@@ -4696,6 +4837,13 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
   [%expect
     {|
     (Append_history "!echo hi")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "!echo hi")
+        (max   500)))
+      (tag Ignore))
 
     ▌ earlier question
       earlier answer
@@ -4742,6 +4890,51 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
     |}]
 ;;
 
+let%expect_test
+    "the history is the backend's (shared with prigh-web): this machine's goes \
+     up when it has none, another frontend's prompts arrive live"
+  =
+  let h = connected ~width:100 () in
+  let recall (h : H.t) =
+    H.key h (Key.plain Up);
+    print_endline (Editor.text h.model.editor);
+    H.key h (Key.ctrl 'c')
+  in
+  H.reply h History {|["local older","local newer"]|};
+  H.reply h Prefs_history {|{"prefs":{}}|};
+  [%expect
+    {|
+    (Rpc
+      (method_ set_prefs)
+      (params ((prefs ((history ("local newer" "local older"))))))
+      (tag Ignore))
+    |}];
+  H.reply h Prefs_history {|{"prefs":{"history":["from the web","older"]}}|};
+  recall h;
+  [%expect {| from the web |}];
+  H.event
+    h
+    (Prefs_changed
+       [ { key = "history"
+         ; value = Some (`Array [ `String "newest"; `String "from the web" ])
+         }
+       ; { key = "web.theme"; value = Some (`String "dark") }
+       ]);
+  recall h;
+  [%expect {| newest |}];
+  (* While browsing it waits. *)
+  H.key h (Key.plain Up);
+  H.event h (Prefs_changed [ { key = "history"; value = Some (`Array []) } ]);
+  print_endline (Editor.text h.model.editor);
+  [%expect {| newest |}];
+  (* A backend that keeps none: this machine's stays. *)
+  let h = connected () in
+  H.reply h History {|["local"]|};
+  H.reply_error h Prefs_history "unknown method get_prefs";
+  recall h;
+  [%expect {| local |}]
+;;
+
 let%expect_test "history loads at start and is appended on submit" =
   let h = connected ~width:100 () in
   H.reply h History {|["old one","old two"]|};
@@ -4764,6 +4957,13 @@ let%expect_test "history loads at start and is appended on submit" =
     {|
     (Rpc (method_ prompt) (params ((text "fresh prompt"))) (tag Show_error))
     (Append_history "fresh prompt")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "fresh prompt")
+        (max   500)))
+      (tag Ignore))
     |}]
 ;;
 
@@ -4894,6 +5094,7 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
+    (Rpc (method_ get_prefs) (params ((keys (history)))) (tag Prefs_history))
     |}];
   H.reply
     h
@@ -6437,6 +6638,13 @@ let%expect_test "wide characters keep the editor cursor column" =
       (params ((text "\230\151\165\230\156\172\232\170\158\240\159\144\185!")))
       (tag Show_error))
     (Append_history "\230\151\165\230\156\172\232\170\158\240\159\144\185!")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key history)
+        (value "\230\151\165\230\156\172\232\170\158\240\159\144\185!")
+        (max 500)))
+      (tag Ignore))
 
       prigh in /work · /help · Esc aborts ·
       Ctrl+C twice quits
@@ -7883,6 +8091,13 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
     (Rpc (method_ prompt) (params ((text "do it"))) (tag Show_error))
     (Append_history "do it")
     (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "do it")
+        (max   500)))
+      (tag Ignore))
+    (Rpc
       (method_ tool_confirm_respond)
       (params (
         (call_id c9)
@@ -8140,6 +8355,13 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
         (background true)))
       (tag Job_started))
     (Append_history "!&make test")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "!&make test")
+        (max   500)))
+      (tag Ignore))
 
 
 
@@ -8944,6 +9166,13 @@ let%expect_test "a shell command during a turn stays in the editor" =
   [%expect
     {|
     (Append_history "!make test")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "!make test")
+        (max   500)))
+      (tag Ignore))
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
@@ -8999,12 +9228,40 @@ let%expect_test
     {|
     (Rpc (method_ steer) (params ((text a))) (tag Show_error))
     (Append_history a)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value a)
+        (max   500)))
+      (tag Ignore))
     (Rpc (method_ follow_up) (params ((text b))) (tag Show_error))
     (Append_history b)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value b)
+        (max   500)))
+      (tag Ignore))
     (Rpc (method_ follow_up) (params ((text c))) (tag Show_error))
     (Append_history c)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value c)
+        (max   500)))
+      (tag Ignore))
     (Rpc (method_ follow_up) (params ((text d))) (tag Show_error))
     (Append_history d)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value d)
+        (max   500)))
+      (tag Ignore))
 
 
 

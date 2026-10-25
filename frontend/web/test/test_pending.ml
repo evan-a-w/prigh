@@ -67,7 +67,8 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
   H.text h ~selector:".status-item.running";
   [%expect
     {|
-    (Save_history ("fix the parser"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "fix the parser") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "fix the parser")))
      (tag (Sent (text "fix the parser") (images ()))))
@@ -179,7 +180,8 @@ let%expect_test "a command that lists something opens its dialog at once" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/session))
+    (Rpc (method_ push_pref) (params ((key history) (value /session) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     Session

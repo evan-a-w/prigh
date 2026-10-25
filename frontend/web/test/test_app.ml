@@ -9,6 +9,13 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Set_url_session s1)
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 60)))
@@ -22,6 +29,14 @@ let%expect_test "startup, a prompt and its streamed reply" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 1)))))
     Scroll_to_bottom
+    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Cache_prefs
+     (((key web.theme) (value ())) ((key web.accent) (value ()))
+      ((key web.notify) (value ())) ((key web.verbosity) (value ()))
+      ((key web.terminal-open) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
     |}];
   Harness.act h (Set_draft "hello");
   Harness.act h Send;
@@ -34,7 +49,8 @@ let%expect_test "startup, a prompt and its streamed reply" =
   Harness.show h ~selector:".entries";
   [%expect
     {|
-    (Save_history (hello))
+    (Rpc (method_ push_pref) (params ((key history) (value hello) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text hello)))
      (tag (Sent (text hello) (images ()))))

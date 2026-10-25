@@ -22,6 +22,8 @@ module Picker_kind = struct
     | Mcp of Mcp_list.t
     | Jump
     | Worktrees of Worktree.Listing.t
+    | Themes
+    | Accents
   [@@deriving sexp_of, equal]
 end
 
@@ -102,7 +104,9 @@ let per_session = function
           | Verbosity
           | Confirm_tools
           | Users
-          | Accounts )
+          | Accounts
+          | Themes
+          | Accents )
       ; _
       }
   | Help | Hotkeys | Settings | Scoped_models _ | Delete _ | Login _ | Auth _ ->

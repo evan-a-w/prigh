@@ -338,8 +338,22 @@ let%expect_test "no shift: queued messages while running" =
     --- after ---
     (Rpc (method_ follow_up) (params ((text "and then this"))) (tag Show_error))
     (Append_history "and then this")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "and then this")
+        (max   500)))
+      (tag Ignore))
     (Rpc (method_ steer) (params ((text "also that"))) (tag Show_error))
     (Append_history "also that")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "also that")
+        (max   500)))
+      (tag Ignore))
 
 
 

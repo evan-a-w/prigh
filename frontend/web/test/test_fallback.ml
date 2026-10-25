@@ -59,7 +59,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())))
-    (Save_history (/fallback))
+    (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 5780))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     |}];
@@ -73,7 +74,9 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   print_config h;
   [%expect
     {|
-    (Save_history ("/fallback  gpt-6 Claude-Sonnet" /fallback))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/fallback  gpt-6 Claude-Sonnet") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (gpt-6 Claude-Sonnet))))))
      (tag Fallback_saved))
@@ -93,7 +96,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   H.text h ~selector:".toast:last-child";
   [%expect
     {|
-    (Save_history (/fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
+    (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 2) (after_ms 4460))
     Fallback: openai/gpt-6 → anthropic/claude-sonnet-5 (now on openai/gpt-6)
     |}];
@@ -107,7 +111,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   H.text h ~selector:".toast:last-child";
   [%expect
     {|
-    (Save_history (/fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
+    (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 3) (after_ms 3660))
     Fallback: deepseek/deepseek-chat (now on openai/gpt-6)
     |}];
@@ -117,8 +122,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   print_config h;
   [%expect
     {|
-    (Save_history
-     ("/fallback off" /fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/fallback off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((fallback_models ())))))
      (tag Fallback_saved))
     (Expire_toast (id 4) (after_ms 5260))
@@ -143,7 +148,9 @@ let%expect_test
   print_config h;
   [%expect
     {|
-    (Save_history ("/fallback gpt-6 nope"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/fallback gpt-6 nope") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (gpt-6 nope)))))) (tag Fallback_saved))
     Couldn't set the fallback models: fallback_models: unknown model "nope"; did you mean: openai/gpt-6 (GPT-6) (Dismiss)
@@ -158,7 +165,9 @@ let%expect_test
   print_s [%sexp (List.map m.toasts ~f:(fun t -> t.text) : string list)];
   [%expect
     {|
-    ((Save_history ("/fallback gpt-6")))
+    ((Cache_prefs (((key history) (value (("/fallback gpt-6"))))))
+     (Rpc (method_ push_pref)
+      (params ((key history) (value "/fallback gpt-6") (max 500))) (tag Ignore)))
     ("Not connected yet: wait for the backend.")
     |}]
 ;;
@@ -197,7 +206,11 @@ let%expect_test "/fallback completes a model key per word" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history ("/fallback openai/gpt-6 anthropic/claude-sonnet-5"))
+    (Rpc (method_ push_pref)
+     (params
+      ((key history) (value "/fallback openai/gpt-6 anthropic/claude-sonnet-5")
+       (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params
       ((config ((fallback_models (openai/gpt-6 anthropic/claude-sonnet-5))))))
@@ -209,9 +222,9 @@ let%expect_test "/fallback completes a model key per word" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history
-     ("/fallback openai/gpt-6"
-      "/fallback openai/gpt-6 anthropic/claude-sonnet-5"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/fallback openai/gpt-6") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (openai/gpt-6)))))) (tag Fallback_saved))
     |}];
@@ -235,9 +248,8 @@ let%expect_test "/fallback completes a model key per word" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history
-     ("/fallback off" "/fallback openai/gpt-6"
-      "/fallback openai/gpt-6 anthropic/claude-sonnet-5"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/fallback off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((fallback_models ())))))
      (tag Fallback_saved))
     |}]
@@ -249,7 +261,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
   toasts h;
   [%expect
     {|
-    (Save_history (/default-dir))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /default-dir) (max 500))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 5620))
     No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     |}];
@@ -261,7 +274,9 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix ~/proj) (host backend)))
      (tag (Paths ~/proj)))
-    (Save_history ("/default-dir ~/proj" /default-dir))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir ~/proj") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd ~/proj)))))
      (tag Default_dir_saved))
     (Expire_toast (id 1) (after_ms 4700))
@@ -275,7 +290,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
   H.text h ~selector:".toast:last-child";
   [%expect
     {|
-    (Save_history (/default-dir "/default-dir ~/proj" /default-dir))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /default-dir) (max 500))) (tag Ignore))
     (Expire_toast (id 2) (after_ms 4700))
     Default directory: ~/proj (new sessions start there; /default-dir off clears it) ×2
     |}];
@@ -286,8 +302,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix off) (host backend)))
      (tag (Paths off)))
-    (Save_history
-     ("/default-dir off" /default-dir "/default-dir ~/proj" /default-dir))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd null)))))
      (tag Default_dir_saved))
     (Expire_toast (id 3) (after_ms 4700))
@@ -300,9 +316,9 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /etc/passwd) (host backend)))
      (tag (Paths /etc/passwd)))
-    (Save_history
-     ("/default-dir /etc/passwd" "/default-dir off" /default-dir
-      "/default-dir ~/proj" /default-dir))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir /etc/passwd") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd /etc/passwd)))))
      (tag Default_dir_saved))
     Couldn't set the default directory: config.default_cwd must be a directory (Dismiss)
@@ -346,12 +362,15 @@ let%expect_test "/default-dir: a relative path is the backend host's" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix proj/../src/) (host backend)))
      (tag (Paths proj/../src/)))
-    (Save_history ("/default-dir proj/../src/"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir proj/../src/") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd /work/src)))))
      (tag Default_dir_saved))
     (Rpc (method_ list_dirs) (params ((prefix .) (host backend)))
      (tag (Paths .)))
-    (Save_history ("/default-dir ." "/default-dir proj/../src/"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir .") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd /work)))))
      (tag Default_dir_saved))
     |}];
@@ -379,13 +398,17 @@ let%expect_test "/default-dir: a relative path is the backend host's" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix repos) (host backend)))
      (tag (Paths repos)))
-    (Save_history ("/default-dir repos"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir repos") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params ((config ((default_cwd /srv/prigh/repos)))))
      (tag Default_dir_saved))
     (Rpc (method_ list_dirs) (params ((prefix ~/repos) (host backend)))
      (tag (Paths ~/repos)))
-    (Save_history ("/default-dir ~/repos" "/default-dir repos"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir ~/repos") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((default_cwd ~/repos)))))
      (tag Default_dir_saved))
     |}];
@@ -399,7 +422,9 @@ let%expect_test "/default-dir: a relative path is the backend host's" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix repos) (host backend)))
      (tag (Paths repos)))
-    (Save_history ("/default-dir repos"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/default-dir repos") (max 500)))
+     (tag Ignore))
     Relative to what? The backend's directory isn't known yet: give an absolute path (/default-dir /path/to/repos) (Dismiss)
     |}]
 ;;
@@ -486,7 +511,8 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   H.text h ~selector:".toast:last-child";
   [%expect
     {|
-    (Save_history (/fallback))
+    (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 4980))
     Fallback: openai/gpt-6 → anthropic/claude-opus-5-5 (now on anthropic/claude-opus-5-5)
     |}]
@@ -507,7 +533,8 @@ let%expect_test "a hand-over in /fork and /tree" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
@@ -522,7 +549,8 @@ let%expect_test "a hand-over in /fork and /tree" =
     {|
     Close_dialog
     (Focus editor)
-    (Save_history (/tree /fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /tree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
@@ -538,9 +566,12 @@ let%expect_test "/help fallback and default-dir" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/help fallback"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help fallback") (max 500))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 5500))
-    (Save_history ("/help /default-dir" "/help fallback"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help /default-dir") (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 4380))
     /fallback [model...|off]: show or set the models that take over, in order, when one's usage runs out
     /default-dir [path|off]: show or set the directory new sessions start in

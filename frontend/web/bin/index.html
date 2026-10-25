@@ -4,6 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>prigh</title>
+  <script>
+    // The theme the page last showed, before the first paint
+    // (app/pref_cache.ml); the backend's arrives later.
+    try {
+      const theme = JSON.parse(localStorage.getItem("prigh-web.theme"));
+      const root = document.documentElement;
+      for (const [k, v] of Object.entries(theme?.attrs ?? {})) root.setAttribute(k, v);
+      for (const [k, v] of Object.entries(theme?.vars ?? {})) root.style.setProperty(k, v);
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="chat.css">
   <link rel="stylesheet" href="agents.css">

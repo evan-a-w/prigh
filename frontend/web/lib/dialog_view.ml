@@ -24,6 +24,8 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
   | Worktrees _ -> "Worktrees"
+  | Themes -> "Themes"
+  | Accents -> "Colours"
 ;;
 
 (* What is wrong with the MCP configuration, under its servers. *)
@@ -124,7 +126,19 @@ let picker ~kind (p : Picker.t) ~inject =
                   ; Attr.on_click (fun _ ->
                       inject (Action.Picker_choose item.id))
                   ]
-                ([ span ~cls:"picker-label" item.label
+                ((match kind with
+                  | Accents ->
+                    Option.to_list
+                      (Option.map
+                         (Theme.Accent.of_string item.id)
+                         ~f:Theme_view.swatch)
+                  | Themes ->
+                    Option.to_list
+                      (Option.map
+                         (Theme.Name.of_string item.id)
+                         ~f:Theme_view.sample)
+                  | _ -> [])
+                 @ [ span ~cls:"picker-label" item.label
                  ; (if String.is_empty item.detail
                     then Node.none
                     else span ~cls:"picker-detail" item.detail)

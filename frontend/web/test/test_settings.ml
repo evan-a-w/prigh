@@ -17,7 +17,13 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
-    In this browser
+    Appearance
+    Theme Follows you to every browser you sign in on.
+    (Original) (Dark) (Light)
+    Accent Your turns, the selection, focus and work in progress.
+    (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
+    [#f0b44c] Custom
+    Preferences
     Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
     (Allow) (Turn notifications off (/notify off))
     Transcript detail How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
@@ -57,7 +63,8 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   H.elements h ~selector:".settings-dialog";
   [%expect
     {|
-    (Save_history (/settings))
+    (Rpc (method_ push_pref) (params ((key history) (value /settings) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     <div class="modal settings-dialog">
     Close_dialog
@@ -94,10 +101,12 @@ let%expect_test "notifications: the switch, and what the browser allows" =
   [%expect
     {|
     (Run "/notify on")
-    (Save_notifications true)
+    (Cache_prefs (((key web.notify) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify true)))))
+     (tag Show_error))
     Request_notification_permission
     |}];
-  H.act h (Set_notifications { enabled = true; permission = "granted" });
+  H.act h (Set_notification_permission "granted");
   notify ();
   H.show h ~selector:".setting.notify .switch";
   [%expect
@@ -121,7 +130,9 @@ let%expect_test "notifications: the switch, and what the browser allows" =
   [%expect
     {|
     (Run "/notify off")
-    (Save_notifications false)
+    (Cache_prefs (((key web.notify) (value (false)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify false)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 3220))
     Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
     (Turn notifications on (/notify on))
@@ -132,14 +143,16 @@ let%expect_test "notifications: the switch, and what the browser allows" =
   [%expect
     {|
     (Run "/notify on")
-    (Save_notifications true)
+    (Cache_prefs (((key web.notify) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify true)))))
+     (tag Show_error))
     (Expire_toast (id 1) (after_ms 6000))
     Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
     (Turn notifications off (/notify off))
     |}];
-  H.act h (Set_notifications { enabled = true; permission = "denied" });
+  H.act h (Set_notification_permission "denied");
   notify ();
-  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
+  H.act h (Set_notification_permission "unsupported");
   notify ();
   [%expect
     {|
@@ -167,6 +180,9 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     <button class="on segment">
     <button class="segment">
     (Run "/verbosity quiet")
+    (Cache_prefs (((key web.verbosity) (value (quiet)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 4660))
     <button class="on segment">
     <button class="segment">
@@ -230,6 +246,16 @@ let%expect_test "the names of the settings' controls" =
   [%expect
     {|
     button "Close" -- Close (Esc)
+    [radio] button "Original" -- graphite, warm greys (/theme original)
+    [radio] button "Dark" -- neutral greys, only the accent in colour (/theme dark)
+    [radio] button "Light" -- paper white (/theme light)
+    [radio] button "Orange" -- Orange (/accent orange)
+    [radio] button "Blue" -- Blue (/accent blue)
+    [radio] button "Green" -- Green (/accent green)
+    [radio] button "Purple" -- Purple (/accent purple)
+    [radio] button "Pink" -- Pink (/accent pink)
+    [radio] button "Teal" -- Teal (/accent teal)
+    [radio] button "Yellow" -- Yellow (/accent yellow)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     button "Quiet" -- /verbosity quiet
@@ -239,6 +265,18 @@ let%expect_test "the names of the settings' controls" =
     button "Manage providers" -- /auth (/login, /logout)
     button "Keyboard shortcuts" -- /hotkeys
     button "Done"
+    [radiogroup] div "Theme"
+    [radio] button "Original" -- graphite, warm greys (/theme original)
+    [radio] button "Dark" -- neutral greys, only the accent in colour (/theme dark)
+    [radio] button "Light" -- paper white (/theme light)
+    [radiogroup] div "Accent colour"
+    [radio] button "Orange" -- Orange (/accent orange)
+    [radio] button "Blue" -- Blue (/accent blue)
+    [radio] button "Green" -- Green (/accent green)
+    [radio] button "Purple" -- Purple (/accent purple)
+    [radio] button "Pink" -- Pink (/accent pink)
+    [radio] button "Teal" -- Teal (/accent teal)
+    [radio] button "Yellow" -- Yellow (/accent yellow)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     [group] div "Transcript detail"
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
