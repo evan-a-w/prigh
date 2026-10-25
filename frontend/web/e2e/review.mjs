@@ -1,6 +1,7 @@
 // The review against `prigh serve -faux-script` in a git repository with
 // changes: the file browser marking them and showing a changed file's diff,
-// comments on lines sent to the agent, its replies (one proposing a change,
+// comments on code selected with the mouse (within a line, across lines, on
+// a removed line) sent to the agent, its replies (one proposing a change,
 // accepted), the review page beside the chat (approvals, the keys, the
 // whole-file layout, edit mode saving a file), live updates as the agent
 // edits, and a phone. Run by prigh_web.sh; prints normalised snapshots (the
@@ -112,7 +113,35 @@ const show = async (label, selector) => {
   await screenshot(label);
 };
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
-const line = n => page.locator(`.review-page tr[data-line="${n}"] td.ln.pick`);
+// Where the [offset]th character of a row's text starts (or, past its end,
+// where its last one ends), on screen.
+const charAt = (row, offset) => page.evaluate(([row, offset]) => {
+  const td = document.querySelector(`${row} td.text`);
+  const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+  const total = nodes.reduce((a, n) => a + n.length, 0);
+  const end = offset >= total;
+  let left = end ? total - 1 : offset;
+  const node = nodes.find(n => (left < n.length ? true : ((left -= n.length), false)));
+  const range = document.createRange();
+  range.setStart(node, left);
+  range.setEnd(node, left + 1);
+  const rect = range.getBoundingClientRect();
+  return { x: end ? rect.right - 1 : rect.left + 1, y: rect.top + rect.height / 2 };
+}, [row, offset]);
+// A mouse drag from one character to another, as a person selects code.
+const drag = async (from, to) => {
+  const a = await charAt(...from);
+  const b = await charAt(...to);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 4 });
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up();
+};
+const selected = () => page.evaluate(() => String(getSelection()));
+const row = (scope, side, n) => `${scope} tr[data-side="${side}"][data-line="${n}"]`;
 
 try {
   await page.goto(url);
@@ -139,16 +168,26 @@ try {
   console.log(`rows: ${await page.locator(".files-preview .review-diff tr").count()}`);
   await screenshot("files: the whole file");
   await page.locator(".files-preview .segment", { hasText: "Changes" }).click();
+  await page.locator('.files-preview tr[data-line="31"]').waitFor({ state: "detached" });
 
-  // 2. A comment on a range of lines, from the file browser.
-  await page.locator('.files-preview tr[data-line="12"] td.ln.pick').click();
-  await page.locator('.files-preview tr[data-line="13"] td.ln.pick').click({ modifiers: ["Shift"] });
-  await page.locator(".review-select-bar .btn", { hasText: "Comment on lines 12–13" }).click();
+  // 2. A comment on code selected within a line, from the file browser:
+  //    dragging across "12 * 2" floats a Comment button by it.
+  await drag([row(".files-preview", "new", 12), 10], [row(".files-preview", "new", 12), 16]);
+  await page.locator(".files-preview .review-pop").waitFor();
+  section("files: text selected");
+  console.log(`selected: ${JSON.stringify(await selected())}`);
+  console.log(clean(await page.locator(".files-preview .review-pop").innerText()));
+  await page.waitForTimeout(200);
+  await screenshot("files: text selected");
+  await page.locator(".files-preview .review-pop .btn").click();
+  await page.locator("#review-draft").waitFor();
   await page.locator("#review-draft").fill("Why double it here?");
-  await screenshot("files: writing a comment");
-  await page.locator("#review-draft").press("Control+Enter");
+  await show("files: writing a comment", ".files-preview .review-thread.draft");
+  await page.locator("#review-draft").press("Enter");
   await page.locator(".files-preview .review-thread:not(.draft)").waitFor();
-  await show("files: the comment under its lines", ".files-preview .review-thread");
+  await show("files: the comment under its code", ".files-preview .review-thread");
+  section("files: its code marked");
+  console.log(await page.locator(".files-preview .review-diff mark.review-mark").allInnerTexts());
 
   // 3. The review page, from the browser's button: the chat goes beside it.
   await page.locator(".files-panel .files-head .review-open").click();
@@ -160,12 +199,14 @@ try {
   console.log(`chat still shown: ${await page.locator(".main .composer").isVisible()}`);
   console.log(`file browser hidden: ${!(await page.locator(".files-panel").isVisible())}`);
 
-  // 4. Keys: ] and [ go through the files; a comments the new file.
+  // 4. Keys: ] and [ go through the files; c comments on a word selected in
+  //    the new file.
   await page.locator(".review-page").focus();
   await page.keyboard.press("]");
   await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/util.ml");
-  await line(3).waitFor();
-  await line(3).click();
+  await page.locator(row(".review-page", "new", 3)).waitFor();
+  await drag([row(".review-page", "new", 3), 4], [row(".review-page", "new", 3), 9]);
+  await page.locator(".review-page .review-pop").waitFor();
   await page.keyboard.press("c");
   await page.locator("#review-draft").fill("Name it for what it does.");
   await page.locator(".review-draft-actions .btn.primary").click();
@@ -175,6 +216,43 @@ try {
   await page.keyboard.press("[");
   await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/main.ml");
 
+  // 4b. Across lines: from "* 2" into the next line; and a removed line,
+  //     its old text. Pointing at a thread lights its code.
+  await page.locator(row(".review-page", "new", 13)).waitFor();
+  await drag([row(".review-page", "new", 12), 13], [row(".review-page", "new", 13), 11]);
+  await page.locator(".review-page .review-pop").waitFor();
+  section("page: text selected across lines");
+  console.log(`selection ends with: ${JSON.stringify((await selected()).slice(-11))}`);
+  await page.waitForTimeout(200);
+  await screenshot("page: text selected across lines");
+  await page.locator(".review-page .review-pop .btn").click();
+  await page.locator("#review-draft").fill("One line for both?");
+  await show("page: writing a comment across lines", ".review-page .review-thread.draft");
+  await page.locator("#review-draft").press("Control+Enter");
+  await page.locator('.review-page .review-thread[data-comment="c3"]').waitFor();
+  await drag([row(".review-page", "old", 12), 4], [row(".review-page", "old", 12), 7]);
+  await page.locator(".review-page .review-pop").waitFor();
+  await page.keyboard.press("c");
+  await page.locator("#review-draft").fill("Was v12 used elsewhere?");
+  // Esc drops it; selecting again and Enter adds it.
+  await page.locator("#review-draft").press("Escape");
+  await page.locator(".review-page .review-thread.draft").waitFor({ state: "detached" });
+  section("page: Esc dropped the comment");
+  console.log(`threads: ${await page.locator(".review-page .review-thread").count()}`);
+  await drag([row(".review-page", "old", 12), 4], [row(".review-page", "old", 12), 7]);
+  await page.locator(".review-page .review-pop").waitFor();
+  await page.keyboard.press("c");
+  await page.locator("#review-draft").fill("Was v12 used elsewhere?");
+  await page.locator("#review-draft").press("Enter");
+  await page.locator('.review-page .review-thread[data-comment="c4"]').waitFor();
+  await page.locator('.review-page .review-thread[data-comment="c3"]').hover();
+  await page.locator('.review-page mark.review-mark.hot[data-comment="c3"]').first().waitFor();
+  await show("page: comments on selections", ".review-current");
+  section("page: the marked code");
+  console.log((await page.locator(".review-page .review-diff mark.review-mark").evaluateAll(marks =>
+    marks.map(m => `${m.dataset.comment}${m.classList.contains("hot") ? " (lit)" : ""}: ${m.textContent}`))).join("\n"));
+  await page.mouse.move(5, 5);
+
   // 5. Approving: a, and the button.
   await page.keyboard.press("a");
   await page.locator(".review-file.current.approved").waitFor();
@@ -182,7 +260,7 @@ try {
 
   // 6. Sending the comments: the agent replies to each, proposes a change
   //    and edits the README meanwhile, which shows up live.
-  await page.locator(".review-controls .btn", { hasText: "Send 2 comments" }).click();
+  await page.locator(".review-controls .btn", { hasText: "Send 4 comments" }).click();
   await idle();
   await page.locator(".review-file[data-path='README.md']").waitFor();
   await page.locator(".review-page .review-post.agent").waitFor();
@@ -196,9 +274,11 @@ try {
   await show("page: a proposed change", ".review-current");
   await page.locator(".review-proposal-actions .btn", { hasText: "Accept" }).click();
   await page.locator(".review-proposal-state.done").waitFor();
-  // The file read again: the comment's line is not what it was, so it
-  // shows above the file.
-  await page.locator(".review-thread.outdated").waitFor();
+  // The file read again: the comment's line is not what it was, but the
+  // word it is on is still there, so it follows it.
+  await page.locator('mark.review-mark[data-comment="c2"]').waitFor();
+  await page.waitForFunction(() =>
+    document.querySelector('mark.review-mark[data-comment="c2"]')?.closest("tr").textContent.includes("apply_twice"));
   await show("page: accepted, the file changed", ".review-current");
   console.log(`util.ml on disk: ${JSON.stringify(readFileSync(join(cwd, "src", "util.ml"), "utf8"))}`);
 
@@ -225,6 +305,16 @@ try {
   await page.locator(".review-controls .segment", { hasText: "Whole file" }).click();
   await page.locator(".review-page tr[data-line='33']").waitFor();
   await screenshot("page: the whole file with its changes");
+
+  // 8b. The diff in each theme.
+  await page.locator(".review-controls .segment", { hasText: "Changes" }).click();
+  await page.locator('.review-page tr[data-side="old"]').first().waitFor();
+  for (const theme of ["original", "dark", "light"]) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+    await page.waitForTimeout(100);
+    await screenshot(`page: the diff, ${theme} theme`);
+  }
+  await page.evaluate(() => { document.documentElement.dataset.theme = "original"; });
 
   // 9. Esc closes it; /review opens it again.
   await page.locator(".review-page").focus();

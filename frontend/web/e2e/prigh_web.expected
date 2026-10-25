@@ -320,10 +320,10 @@ notes.txt
 +2
 −1
 @@ -1,3 +1,4 @@
-1	1		one
-2		-	two
+1		one
+2	-	two
 2	+	2
-3	3		three
+3		three
 4	+	four
 todo.md
 new
@@ -574,10 +574,10 @@ Changes
 Whole file
 Review
 @@ -1,3 +1,4 @@
-1	1		one
-2		-	two
+1		one
+2	-	two
 2	+	2
-3	3		three
+3		three
 4	+	four
 === chromium: files: an image preview ===
  24x16
@@ -1048,25 +1048,38 @@ Changes
 Whole file
 Review
 @@ -9,7 +9,8 @@ let v8 = 8
-9	9		let v9 = 9
-10	10		let v10 = 10
-11	11		let v11 = 11
-12		-	let v12 = 12
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
 12	+	let v12 = 12 * 2
 13	+	let doubled = true
-13	14		let v13 = 13
-14	15		let v14 = 14
-15	16		let v15 = 15
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
 === chromium: review: files: the whole file ===
 rows: 32
-=== chromium: review: files: the comment under its lines ===
+=== chromium: review: files: text selected ===
+selected: "12 * 2"
+Comment
+c
+=== chromium: review: files: writing a comment ===
+Comment on line 12
+12 * 2
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== chromium: review: files: the comment under its code ===
 c1
-lines 12–13
+line 12
 Resolve
+12 * 2
 You
 <TIME>
 not sent yet
 Why double it here?
+=== chromium: review: files: its code marked ===
+[ '12 * 2' ]
 === chromium: review: page: opened ===
 Review
 0/2 approved
@@ -1096,10 +1109,66 @@ Approve
 c2
 line 3
 Resolve
+twice
 You
 <TIME>
 not sent yet
 Name it for what it does.
+=== chromium: review: page: text selected across lines ===
+selection ends with: "let doubled"
+=== chromium: review: page: writing a comment across lines ===
+Comment on lines 12–13
+* 2
+let doubled
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== chromium: review: page: Esc dropped the comment ===
+threads: 2
+=== chromium: review: page: comments on selections ===
+src/main.ml
+Approve
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+not sent yet
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+not sent yet
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== chromium: review: page: the marked code ===
+c4: v12
+c1: 12 
+c1 (lit): * 2
+c3 (lit): let doubled
 === chromium: review: page: main.ml approved ===
 Review
 1/2 approved
@@ -1107,13 +1176,13 @@ Comment
 Edit
 Changes
 Whole file
-Send 2 comments
+Send 4 comments
 === chromium: review: page: the files after the agent's edit ===
 README.md
 +1 −1
 src/
 main.ml
-1
+3
 +2 −1
 src/
 util.ml
@@ -1124,24 +1193,41 @@ util.ml
 src/main.ml
 Approved
 @@ -9,7 +9,8 @@ let v8 = 8
-9	9		let v9 = 9
-10	10		let v10 = 10
-11	11		let v11 = 11
-12		-	let v12 = 12
-12	+	let v12 = 12 * 2
-13	+	let doubled = true
-c1
-lines 12–13
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
 Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
 You
 <TIME>
 Why double it here?
 prigh
 <TIME>
 Doubling is intended: v12 feeds the scale.
-13	14		let v13 = 13
-14	15		let v14 = 14
-15	16		let v15 = 15
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
 === chromium: review: chat: what the agent did ===
 Agreed, a clearer name:
 -	let twice f x
@@ -1151,9 +1237,9 @@ README.md
 +1
 −1
 @@ -1,3 +1,3 @@
-1	1		# Demo
-2	2
-3		-	A small project.
+1		# Demo
+2
+3	-	A small project.
 3	+	A small project, reviewed.
 Replied to both comments and updated the README.
 <TIME>
@@ -1167,6 +1253,7 @@ Approve
 c2
 line 3
 Resolve
+twice
 You
 <TIME>
 Name it for what it does.
@@ -1180,10 +1267,14 @@ Reject
 === chromium: review: page: accepted, the file changed ===
 src/util.mlnew
 Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
 c2
 line 3
-its lines changed
 Resolve
+twice
 You
 <TIME>
 Name it for what it does.
@@ -1197,10 +1288,6 @@ You
 <TIME>
 not sent yet
 Accepted your proposed change: it is applied.
-@@ -0,0 +1,3 @@
-1	+	let id x = x
-2	+
-3	+	let apply_twice f x = f (f x)
 util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
 === chromium: review: page: changed since approved ===
 src/main.ml
@@ -1536,10 +1623,10 @@ notes.txt
 +2
 −1
 @@ -1,3 +1,4 @@
-1	1		one
-2		-	two
+1		one
+2	-	two
 2	+	2
-3	3		three
+3		three
 4	+	four
 todo.md
 new
@@ -1790,10 +1877,10 @@ Changes
 Whole file
 Review
 @@ -1,3 +1,4 @@
-1	1		one
-2		-	two
+1		one
+2	-	two
 2	+	2
-3	3		three
+3		three
 4	+	four
 === firefox: files: an image preview ===
  24x16
@@ -2265,25 +2352,38 @@ Changes
 Whole file
 Review
 @@ -9,7 +9,8 @@ let v8 = 8
-9	9		let v9 = 9
-10	10		let v10 = 10
-11	11		let v11 = 11
-12		-	let v12 = 12
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
 12	+	let v12 = 12 * 2
 13	+	let doubled = true
-13	14		let v13 = 13
-14	15		let v14 = 14
-15	16		let v15 = 15
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
 === firefox: review: files: the whole file ===
 rows: 32
-=== firefox: review: files: the comment under its lines ===
+=== firefox: review: files: text selected ===
+selected: "12 * 2"
+Comment
+c
+=== firefox: review: files: writing a comment ===
+Comment on line 12
+12 * 2
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== firefox: review: files: the comment under its code ===
 c1
-lines 12–13
+line 12
 Resolve
+12 * 2
 You
 <TIME>
 not sent yet
 Why double it here?
+=== firefox: review: files: its code marked ===
+[ '12 * 2' ]
 === firefox: review: page: opened ===
 Review
 0/2 approved
@@ -2313,10 +2413,66 @@ Approve
 c2
 line 3
 Resolve
+twice
 You
 <TIME>
 not sent yet
 Name it for what it does.
+=== firefox: review: page: text selected across lines ===
+selection ends with: "let doubled"
+=== firefox: review: page: writing a comment across lines ===
+Comment on lines 12–13
+* 2
+let doubled
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== firefox: review: page: Esc dropped the comment ===
+threads: 2
+=== firefox: review: page: comments on selections ===
+src/main.ml
+Approve
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+not sent yet
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+not sent yet
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== firefox: review: page: the marked code ===
+c4: v12
+c1: 12 
+c1 (lit): * 2
+c3 (lit): let doubled
 === firefox: review: page: main.ml approved ===
 Review
 1/2 approved
@@ -2324,13 +2480,13 @@ Comment
 Edit
 Changes
 Whole file
-Send 2 comments
+Send 4 comments
 === firefox: review: page: the files after the agent's edit ===
 README.md
 +1 −1
 src/
 main.ml
-1
+3
 +2 −1
 src/
 util.ml
@@ -2341,24 +2497,41 @@ util.ml
 src/main.ml
 Approved
 @@ -9,7 +9,8 @@ let v8 = 8
-9	9		let v9 = 9
-10	10		let v10 = 10
-11	11		let v11 = 11
-12		-	let v12 = 12
-12	+	let v12 = 12 * 2
-13	+	let doubled = true
-c1
-lines 12–13
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
 Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
 You
 <TIME>
 Why double it here?
 prigh
 <TIME>
 Doubling is intended: v12 feeds the scale.
-13	14		let v13 = 13
-14	15		let v14 = 14
-15	16		let v15 = 15
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
 === firefox: review: chat: what the agent did ===
 Agreed, a clearer name:
 -	let twice f x
@@ -2368,9 +2541,9 @@ README.md
 +1
 −1
 @@ -1,3 +1,3 @@
-1	1		# Demo
-2	2
-3		-	A small project.
+1		# Demo
+2
+3	-	A small project.
 3	+	A small project, reviewed.
 Replied to both comments and updated the README.
 <TIME>
@@ -2384,6 +2557,7 @@ Approve
 c2
 line 3
 Resolve
+twice
 You
 <TIME>
 Name it for what it does.
@@ -2397,10 +2571,14 @@ Reject
 === firefox: review: page: accepted, the file changed ===
 src/util.mlnew
 Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
 c2
 line 3
-its lines changed
 Resolve
+twice
 You
 <TIME>
 Name it for what it does.
@@ -2414,10 +2592,6 @@ You
 <TIME>
 not sent yet
 Accepted your proposed change: it is applied.
-@@ -0,0 +1,3 @@
-1	+	let id x = x
-2	+
-3	+	let apply_twice f x = f (f x)
 util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
 === firefox: review: page: changed since approved ===
 src/main.ml

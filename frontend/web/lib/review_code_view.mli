@@ -2,13 +2,16 @@ open! Core
 open! Import
 
 (** A file of the review: its changes (the hunks, or the whole file with
-    them inline, as [Code_review.layout] says), highlighted, with line
-    numbers to click (Shift+click: a range) to select lines and comment on
-    them, and the comments' threads under the lines they are about (found
-    again by their text when the file moved: [Prigh_ui.Comment_anchor]):
-    replies, the agent's proposed changes to accept or reject, resolving.
-    The review page and the file browser's preview of a changed file show
-    it. *)
+    them inline, as [Code_review.layout] says), highlighted, one line
+    number per row (the old one for removed lines). Text selected in it
+    (the page's glue reports it: [Code_review.Action.Select_text]) gets a
+    floating Comment button by its end, which opens the comment box under
+    it, the selection quoted; a line's number selects the line (Shift+click:
+    to there). The comments' threads show under their code (found again by
+    its text when the file moved: [Prigh_ui.Comment_anchor]), which stays
+    marked; pointing at either lights both. A thread has replies, the
+    agent's proposed changes to accept or reject, resolving. The review
+    page and the file browser's preview of a changed file show it. *)
 val view
   :  App.Model.t
   -> path:string
@@ -17,7 +20,7 @@ val view
 
 (** A comment's thread, as [view] shows it under its lines. *)
 val thread
-  :  ?at:int * int (** where its lines are now *)
+  :  ?at:Review_comment.Range.t (** where its code is now *)
   -> App.Model.t
   -> Review_comment.t
   -> outdated:bool

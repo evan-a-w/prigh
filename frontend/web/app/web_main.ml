@@ -395,6 +395,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
+    | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
@@ -816,6 +817,7 @@ let install_listeners ~schedule ~current =
   Paging_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();
+  Selection_listeners.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
   let reported = ref true in

@@ -18,6 +18,7 @@ let act t action =
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
      | Reconnect _
      | Set_url_session _
+     | Clear_text_selection
      | Expire_toast _
      | Focus _
      | Set_caret _

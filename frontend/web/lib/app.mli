@@ -204,6 +204,7 @@ module Command : sig
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
     | Focus of string (** the element with this id, once rendered *)
+    | Clear_text_selection (** the page's selected text, unselected *)
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)

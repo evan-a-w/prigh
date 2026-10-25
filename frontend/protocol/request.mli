@@ -57,8 +57,7 @@ module Method : sig
     | Review_comment of
         { root : string
         ; path : string (** relative to [root] *)
-        ; first : int
-        ; last : int
+        ; range : Review_comment.Range.t
         ; anchor : string (** the lines' text *)
         ; text : string
         } (** a new comment: the {!Review_comment} *)

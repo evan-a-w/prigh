@@ -165,6 +165,7 @@ let editor (m : App.Model.t) (e : Code_review.Editor.t) ~inject =
                           m.review
                           ~field:`Editor
                           ~key
+                          ~shift:(Js_of_ocaml.Js.to_bool ev##.shiftKey)
                           ~ctrl:(Js_of_ocaml.Js.to_bool ev##.ctrlKey)
                           ~meta:(Js_of_ocaml.Js.to_bool ev##.metaKey)
                       with
@@ -353,7 +354,7 @@ let view (m : App.Model.t) ~inject =
             [ segmented
                 ~label:"Mode"
                 [ ( "Comment"
-                  , "Select lines and comment on them (e)"
+                  , "Select code and comment on it (e)"
                   , Code_review.Mode.equal t.mode Comment
                   , inject (review (Set_mode Comment)) )
                 ; ( "Edit"

@@ -1,21 +1,61 @@
 open! Core
 open! Import
 
-(** A review comment the user left on lines of a file, with its thread: the
+(** A review comment the user left on lines of a file (or on text selected
+    in them), with its thread: the
     user's posts and the agent's replies ([reply_to_comment]), which may
     propose a change for the user to accept or reject. Recorded in the
     session ({!Review_state}). *)
 
+module Side : sig
+  (** Which text the lines are of: the file as it is ([New]), or what the
+      change removed ([Old]), numbered as in the file before it. *)
+  type t =
+    | Old
+    | New
+  [@@deriving sexp, jsonaf, equal]
+
+  (** [old], [new]. *)
+  val to_string : t -> string
+
+  val of_string : string -> t Or_error.t
+end
+
+module Columns : sig
+  (** A selection within the lines: where it starts in the first line and
+      ends in the last, as byte offsets into them (the end exclusive). *)
+  type t =
+    { start_col : int
+    ; end_col : int
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Range : sig
-  (** Lines of the file as it was when commented on, 1-based, inclusive. *)
+  (** Lines of the file as it was when commented on, 1-based, inclusive;
+      with [columns], the text selected in them. Comments saved before
+      selections have neither [side] (they are [New]) nor [columns]. *)
   type t =
     { first : int
     ; last : int
+    ; side : Side.t
+    ; columns : Columns.t option
     }
   [@@deriving sexp, jsonaf, equal]
 
-  (** [12] or [12-14]. *)
+  (** Whole lines of the file as it is. *)
+  val lines : first:int -> last:int -> t
+
+  (** [12] or [12-14], [old 12] for removed lines. *)
   val to_string : t -> string
+
+  (** The selected text of [anchor] (the lines' text): all of it without
+      [columns]. *)
+  val selected : t -> anchor:string -> string
+
+  (** Whether it is a range of lines, and its columns fit [anchor]; the
+      error says what is wrong. *)
+  val validate : t -> anchor:string -> unit Or_error.t
 end
 
 module Author : sig
@@ -98,7 +138,8 @@ val unsent : t -> bool
 (** [root/path]. *)
 val file : t -> string
 
-(** The comment as the agent reads it: id, file, lines, the commented code
-    with line numbers, and the thread, the posts it has not seen marked
-    [new]. *)
+(** The comment as the agent reads it: id, file, lines (and where the
+    selection is in them, as 1-based character columns), the commented code
+    with line numbers (a selection marked [⟦like this⟧], and quoted whole),
+    and the thread, the posts it has not seen marked [new]. *)
 val to_prompt : t -> string
