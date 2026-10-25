@@ -895,7 +895,9 @@ two can share one.
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
-  `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
+  `fallback_models` (model keys), `default_cwd`, `worktrees_dir` (where
+  `Worktree` puts new worktrees on the tool host; default
+  `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
   validated by `Snippet`), loaded at agent
@@ -1014,6 +1016,27 @@ two can share one.
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
+- `Worktree` — a repository's git worktrees, as the pseudo-tools
+  `$worktree_list`, `$worktree_create` and `$worktree_remove` on the
+  active tool host (`Host_ops`), in the repository of the session cwd
+  (`Agent.worktrees`, `create_worktree`, `remove_worktree`; the functions
+  also run directly on a host, for other features that need a worktree).
+  A listing parses `git worktree list --porcelain` (the main worktree
+  first), counts each one's uncommitted files (`git status --porcelain`,
+  untracked included) and its branch's ahead/behind from one `git
+  for-each-ref`. New worktrees go to `<worktrees_dir>/<project>/<slug>`:
+  `project` is the main worktree's directory name, and the project
+  directory holds `.prigh-repo` with the repository's git common dir, so a
+  different repository with the same name takes the first of `<project>-2`,
+  `-3`, ... that is free or its own (a directory without the file is never
+  taken); `slug` is the branch with `/` and unusual characters as `-`,
+  with `-2`, ... when taken. `create` checks an existing local branch out
+  as it is, else creates the branch from the base (default `HEAD`) or,
+  without one, tracks the single remote branch of that name; it refuses a
+  branch checked out in another worktree. `remove` refuses the main
+  worktree and, without force, one with changes or locked (`--force`
+  twice for a locked one), prunes one whose directory is gone, and keeps
+  the branch. Errors say what to do, like `Git_diff`'s.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -1148,7 +1171,16 @@ two can share one.
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
   `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
-  [instructions]`) and `init`, and the file browser's `fs_list`,
+  [instructions]`) and `init`, `list_worktrees` (`{root, project_dir,
+  worktrees}`), `create_worktree {branch, base?}` (`{worktree,
+  new_branch}`) and `remove_worktree {path, force?}` (`{worktree}`, as it
+  was; refused for the worktree the client's session is in), where a
+  worktree is `Worktree.t` (`path, branch, head, main, managed, locked,
+  prunable, changes, upstream, ahead, behind`) plus `current` (the
+  session's cwd is in it) and `sessions` (`{id, path, name, live,
+  running}`: the sessions whose cwd is in it on that host, live ones where
+  they are now, saved ones by `Session.Summary`'s last cwd and host,
+  archived ones only while loaded), and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
   `fs_upload` (`Files_rpc`, above).
   `get_messages_page {limit, before?, from?, session?}` (`Message_page`,
@@ -1404,7 +1436,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
     tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
     in the editor and takes it off the queue. `Autocomplete`'s `Skill`
-    source completes names from `Skill_cache`, which is keyed by session,
+    source completes names from `Location_cache` (shared with the
+    worktree listing `/worktree` completes from), which is keyed by session,
     tool host and directory (a stale key or reply fetches again or is
     dropped) and emptied on reloads, `/setusr` and reconnects.
     `Skill_message` parses the backend's expansion (`<skill name=…
@@ -1463,6 +1496,14 @@ terminal frontend and `web/` prigh-web, the browser one.
     `Note` lines (`Injected_note`'s glyph and title, e.g. `↪ Handed over
     from A to B`), the raw text only in verbose, and the user's turn with
     only what they wrote; `/fork` and `/tree` label messages the same way.
+  - `/worktree` is parsed by the shared `Worktree_command` (`frontend/ui`,
+    with the target lookup, row descriptions, confirmation text, notices
+    and argument completion prigh-web uses too): a picker over
+    `list_worktrees` (Enter sends `set_cwd`, Ctrl+N `new_session` then
+    `set_cwd`, Ctrl+D a confirmation `Mode` then `remove_worktree`), and
+    `new`/`open`/`rm` replies tagged so a refusal goes back to the editor
+    (a removal refused for uncommitted changes puts `/worktree rm -f`
+    there).
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
     shows coloured; `/review` and `/init` send `review`/`init` tagged so
@@ -1986,6 +2027,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Session_tree` labels them like the TUI. `/diff` opens
       `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
       its counts).
+    - Worktrees: `Worktrees` keeps the listing of the session's place
+      (session, tool host, directory; reset on a session or user switch,
+      stale after a turn, a create or remove, or other sessions moving)
+      for the sidebar's section in `Sidebar_view`, `/worktree`'s picker
+      (`Dialog.Picker_kind.Worktrees`) and `Completion`
+      (`Worktree_command.complete`); `New_worktree` is the create dialog's
+      state, and the remove confirmation is a dialog offering the forced
+      removal when it has changes.
     - The user's preferences: `Pref_sync` (the keys and when they go to the
       backend) and `Theme`. At startup the page restores the browser's copy
       (`Restore_prefs`, applied at once: the theme, sizes, the terminal) and
