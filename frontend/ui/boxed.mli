@@ -1,9 +1,11 @@
 open! Core
 
 (** A titled frame around the body, [width] columns wide; body lines are
-    truncated to fit. *)
+    truncated to fit. [footer] is set in the bottom border, on the right (key
+    hints, a scroll position). *)
 val render
   :  ?border:Style.t (** default: gray *)
+  -> ?footer:string
   -> title:string
   -> width:int
   -> Content.t

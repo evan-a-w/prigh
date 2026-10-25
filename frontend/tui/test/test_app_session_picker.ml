@@ -42,6 +42,7 @@ let%expect_test "the picker lists active sessions first, whatever the order" =
       ── archived ──
     ▸* build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
        (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
+    >
     |}]
 ;;
 
@@ -71,6 +72,7 @@ let%expect_test
       ── archived ──
      * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
        (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
+    >
     |}];
   (* A highlighted session the filter hides gives way to the next one shown. *)
   H.key h (Key.plain Up);
@@ -84,6 +86,7 @@ let%expect_test
     ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
       ── archived ──
      * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+    >
     |}];
   (* The hidden mark still counts, and is deleted with the others. *)
   H.key h (Key.plain Tab);
@@ -111,12 +114,12 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    > /switch
     ▸ deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
       build fix    archived · fix the build · /work
       try a spike  archived · /old
+    > /switch
     |}];
   (* By name, and the id goes in, which every session command accepts. *)
   H.keys h "rel";
@@ -127,9 +130,9 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    > /switch rel
     ▸ release      cut it · /work
       try a spike  archived · /old
+    > /switch rel
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     > /switch 5
@@ -148,22 +151,22 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    > /archive
     ▸ deploy   deploy it · /work
       scratch  /tmp
       release  cut it · /work
+    > /archive
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    > /unarchive
     ▸ build fix    archived · fix the build · /work
       try a spike  archived · /old
+    > /unarchive
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    > /delete
     ▸ deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
       try a spike  archived · /old
+    > /delete
     |}]
 ;;
 
@@ -186,14 +189,14 @@ let%expect_test
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      session "build fix" is the session you are in: switch to another one first, or
-      leave it out
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ session "build fix" is the session you are in: switch to another one first,  │
+    │ or leave it out                                                              │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > /delete 1 2▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
@@ -209,18 +212,18 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Archived_to_delete))
 
 
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      session "build fix" is the session you are in: switch to another one first, or
-      leave it out
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
     │ Delete the archived session 3a (1.4 MB)? Enter deletes, Esc keeps it         │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
     (Rpc
       (method_ delete_sessions)
       (params ((paths (/s/3a.jsonl))))

@@ -692,6 +692,36 @@ backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp    
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 ```
 
+### The screen
+
+The terminal UI is the transcript (starting with `prigh in DIR · /help · Esc
+aborts · Ctrl+C twice quits`), a gray rule, the editor, which grows with
+multi-line input up to a cap and then scrolls, and the status line (below).
+Alt+L shows an agents **sidebar** left of the transcript on terminals of
+120 columns and more (it is off by default, and the choice holds for the
+run): the main agent, the subagents and the background jobs, each with a
+dot (green running, yellow waiting for you, red failed, gray done or idle)
+and a dim line of what it is doing; the focused agent is marked.
+
+Pickers, the completion popup, confirmations, questions, the sign-in and
+login dialogs, `/btw`, the queued messages and long command output
+(`/help`, `/diff`, `/stats`, `/mcp`, job output, ...) take the bottom of
+the transcript's area, just above the rule, the transcript's end showing
+above them: opening or closing them
+never moves the editor, the cursor (unless typing goes into them) or the
+status line, and only the editor's own growth resizes the transcript. Long
+output is a box that scrolls with Up/Down/PageUp/PageDown; Esc or Enter
+closes it, and typing closes it into the editor.
+
+Acknowledgements (`view: verbose`, `copied 120 chars`, `model: x`, usage
+errors, `cancelled`, a failed command) are not transcript content: they show
+on the right of the rule (in a box above it when too long) until the next
+key press, Esc, or a few seconds pass. What belongs to the session's history
+stays in the transcript: your messages, the agent's replies, tool calls and
+results, the agent's errors, tool approvals (`allowed bash`), the backend's
+notices (compaction, hand-overs, retries), a lost connection and a session
+that no longer exists.
+
 ### Keys
 
 | Key | Action |
@@ -734,6 +764,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
 | Alt+1…9 | focus agent N |
+| Alt+L | show or hide the agents sidebar (off by default; 120 columns and more) |
 | Ctrl+C | clear the editor, or abort the running turn; again to quit |
 | Ctrl+D | quit |
 
@@ -782,12 +813,14 @@ open dialog, in yellow), `retry:2/6` (the model failed transiently and is
 asked again; the transcript notes why), agents, jobs, the tool host — with
 the current mode's keys and what the agent is doing (`⠋ thinking · Esc
 aborts · Enter steers`, with `waiting for the model`, `writing`, `running
-tools` or `retrying in 4s`; a picker's keys) in yellow. `think:` and `mode:` are always there
-(at narrow widths they outlast the cost and the cwd; `view:` gives way to
-the cwd first). Queued steers and follow-ups (whichever frontend queued
-them) are listed above the editor, one per line, until they are delivered:
-Alt+Up takes the last back into the editor, and `/queue` picks any of them
-(Enter edits it, Ctrl+D removes it). An unknown command
+tools` or `retrying in 4s`; a picker's keys) in yellow. The order is fixed;
+at narrow widths whole parts give way, the least important first, and the
+model is never cut. `think:` and `mode:` are always there (at narrow widths
+they outlast the cost and the cwd; `view:` gives way to the cwd first).
+Queued steers and follow-ups (whichever frontend queued them) are listed
+above the rule, one per line, until they are delivered: Alt+Up takes the
+last back into the editor, and `/queue` picks any of them (Enter edits it,
+Ctrl+D removes it). An unknown command
 goes back into the editor as typed, the error naming the closest command
 (`/modle gpt`: did you mean `/model`?), and a failed `/switch` or `/cd` puts
 the command back with what to try next.
@@ -1228,7 +1261,7 @@ text. Sessions written before this are recognised by their wording and
 shown the same way.
 
 `/btw` works while a turn is running: one extra model call (no tools) answers
-from the session's current context, streaming into a box above the editor
+from the session's current context, streaming into a box above the composer
 that Esc dismisses (without aborting the run). The question and answer are
 never added to the conversation; their cost counts towards the session's.
 

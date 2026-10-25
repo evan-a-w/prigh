@@ -228,6 +228,10 @@ module Model : sig
     ; utc_offset : Time_ns.Span.t
     ; terminal_focus : Focus.t (** whether the terminal or page has the focus *)
     ; server : Server_link.t option (** [None] until the platform reports it *)
+    ; notice : Notice.t option
+      (** the latest acknowledgement, until it expires (Esc dismisses it) *)
+    ; sidebar : bool
+      (** whether the agents sidebar shows on wide terminals (Alt+L) *)
     }
   [@@deriving sexp_of]
 
@@ -249,8 +253,11 @@ module Model : sig
   val acting_as : t -> string option
 end
 
-(** Wrapped transcript lines currently visible, mirroring [Render.screen] for
-    [Editing] mode; approximate for dialog modes. *)
+(** The screen's zones for the model's size and editor. *)
+val layout : Model.t -> Layout.t
+
+(** Wrapped transcript lines currently visible, mirroring [Render.screen]
+    (overlays cover some of them). *)
 val transcript_rows : Model.t -> int
 
 val init : Model.t
@@ -259,7 +266,8 @@ val format_tokens : int -> string
 (** [path] with the home directory shown as [~]. *)
 val tilde : Model.t -> string -> string
 
-(** Rows a picker lists at once (its page size), capped by the screen. *)
-val picker_rows : height:int -> int
+(** Rows a picker lists at once (its page size), capped by the transcript
+    area it is drawn over. *)
+val picker_rows : Model.t -> int
 
 val update : Model.t -> Action.t -> Model.t * Command.t list

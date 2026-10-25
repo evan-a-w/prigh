@@ -106,10 +106,10 @@ let%expect_test "/remind stop and /remind every add one, acknowledged by name" =
 
     ▌ earlier question
       earlier answer
-      reminder r4 added (every 20 turns): Check the disk space. · /remind rm r4
-      removes it
-      reminder r5 added (when the agent ends its turn, up to 5 in a row): Keep
-      going. · /remind rm r5 removes it
+    ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
+    │ reminder r5 added (when the agent ends its turn, up to 5 in a row): Keep     │
+    │ going. · /remind rm r5 removes it                                            │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
@@ -164,26 +164,26 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times
-      in a row (default 3)
-      usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times
-      in a row (default 3)
-      N must be 1 or more: /remind stop N TEXT
-      usage: /remind every N TEXT: reminded every N turns, e.g. /remind every 20
-      check the disk space
-      N must be 1 or more: /remind every N TEXT
-      usage: /remind every N TEXT: reminded every N turns, e.g. /remind every 20
-      check the disk space
-      unknown /remind "stp"; did you mean stop? usage: /remind [stop [N] TEXT|every
-      N TEXT|rm NAME|off]
-      usage: /remind rm NAME (/remind lists them)
-      no reminder "r2"; did you mean r1, r3? (/remind lists them)
-      no reminder "zz"; the session's are r1, r3 (/remind lists them)
-      usage: /remind off (removes every reminder)
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
@@ -203,28 +203,28 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times
-      in a row (default 3)
-      usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times
-      in a row (default 3)
-      N must be 1 or more: /remind stop N TEXT
-      usage: /remind every N TEXT: reminded every N turns, e.g. /remind every 20
-      check the disk space
-      N must be 1 or more: /remind every N TEXT
-      usage: /remind every N TEXT: reminded every N turns, e.g. /remind every 20
-      check the disk space
-      unknown /remind "stp"; did you mean stop? usage: /remind [stop [N] TEXT|every
-      N TEXT|rm NAME|off]
-      usage: /remind rm NAME (/remind lists them)
-      no reminder "r2"; did you mean r1, r3? (/remind lists them)
-      no reminder "zz"; the session's are r1, r3 (/remind lists them)
-      usage: /remind off (removes every reminder)
-      the session is gone
-    ────────────────────────────────────────────────────────────────────────────────
+    ──────────────────────────────────────────────────────── the session is gone ───
     > /remind every 2 x▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}]
@@ -274,16 +274,16 @@ let%expect_test "/remind rm and /remind off, with none, and before the state" =
         (hint    "")
         (then_ (Notice_on_success "all 2 reminders removed")))))
 
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      reminder r3 removed
-      all 2 reminders removed
-      no reminders yet: /remind stop TEXT or /remind every N TEXT adds one
-      no reminders to clear
-      no reminder "r1"; no reminders yet: /remind stop TEXT or /remind every N TEXT
-      adds one
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ no reminder "r1"; no reminders yet: /remind stop TEXT or /remind every N     │
+    │ TEXT adds one                                                                │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > /remind rm r1▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
@@ -296,9 +296,7 @@ let%expect_test "/remind rm and /remind off, with none, and before the state" =
   H.show h;
   [%expect
     {|
-      the session has not loaded yet; try again in a moment
-      the session has not loaded yet; try again in a moment
-    ────────────────────────────────────────────────────────────
+    ── the session has not loaded yet; try again in a moment ───
     > /remind rm r1▏
     connecting…
     |}]
@@ -319,7 +317,8 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
     ▸  r1  on stop 1/3 · Don't stop until the tests pass.
        r3  every 20 turns · Check the disk space.
     ────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
+    >
+    deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
     |}];
   H.keys h "disk";
   H.show h;
@@ -333,7 +332,8 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
     / disk▏
     ▸  r3  every 20 turns · Check the disk space.
     ────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
+    >
+    deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
     |}];
   H.enter h;
   H.show h;
@@ -343,8 +343,7 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
 
     ▌ earlier question
       earlier answer
-      r3 (every 20 turns): Check the disk space. · /remind rm r3 removes it
-    ────────────────────────────────────────────────────────────────────────────────
+    ────── r3 (every 20 turns): Check the disk space. · /remind rm r3 removes it ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}];
@@ -437,10 +436,10 @@ let%expect_test
 
 
 
-      cloned session
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      no reminders yet: /remind stop TEXT or /remind every N TEXT adds one
-    ────────────────────────────────────────────────────────────────────────────────
+    ─────── no reminders yet: /remind stop TEXT or /remind every N TEXT adds one ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]

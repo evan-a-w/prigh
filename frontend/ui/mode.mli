@@ -97,6 +97,9 @@ type t =
       ; matches : int list (** wrapped transcript line indexes *)
       ; current : int (** index into [matches] *)
       }
+  | Output of Output_box.t
+  (** long command output over the transcript; not a dialog: a confirmation
+      or a picker replaces it *)
 [@@deriving sexp_of]
 
 val is_dialog : t -> bool

@@ -484,7 +484,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
     … web_search "ocaml eio"
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  $0.01  ⠋ running tools · Esc aborts · Enter steers
+    deepseek-flash  think:off  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.event h search_result;
   H.event h (text_delta "Eio is an effects-based ");
@@ -509,7 +509,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
       Eio is an effects-based IO library.
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ writing · Esc aborts · Enter steers
+    deepseek-flash  ctx:0.1%/1.0M  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.event
     h
@@ -557,7 +557,7 @@ let%expect_test "streamed: a search whose message ended without a result" =
     ■ web_search "ocaml eio"  no result
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -644,8 +644,7 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
         }
         web search failed: too many requests
       Eio is an effects-based IO library.
-      view: verbose — everything is shown
-    ──────────────────────────────────────────────────────────────────────
+    ────────────────────────────── view: verbose — everything is shown ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]

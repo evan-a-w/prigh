@@ -104,6 +104,10 @@ let bindings =
   ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
   ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
   ; b
+      [ Key.alt (Char "l") ]
+      Toggle_sidebar
+      "show or hide the agents sidebar (terminals of 120 columns and more)"
+  ; b
       [ { (Key.plain Tab) with shift = true } ]
       Next_agent
       "cycle focus: main → agent 1 → … → main"
