@@ -451,8 +451,9 @@ valid 5 minutes, for that session's host only), then `GET
 streams the bytes, in chunks, to or from the host (uploads up to 2 GB). A
 tool host running an older prigh says to update prigh there.
 
-GitHub and Forgejo (Codeberg, or any self-hosted Forgejo or Gitea) are in
-the settings page's Git hosting section (also under `/auth`): each host
+GitHub and Forgejo (Codeberg, or any self-hosted Forgejo or Gitea; setting
+them up: [Git hosting](#git-hosting)) are in the settings page's Git hosting
+section (also under `/auth`): each host
 with who is signed in and how, Connect (GitHub's device code shows big,
 with Copy and the page to open; Forgejo opens its authorize page), Use a
 token, Disconnect, and Add host… for another Forgejo; closing the sign-in
@@ -1254,6 +1255,52 @@ another host…", which asks for the host), `/logout` the signed-in ones, and
 `/auth` shows each host's user and method, and why OAuth is unavailable.
 Accounts belong to the user, like model credentials.
 
+Setting up the sign-in (once per backend):
+
+- **GitHub** signs in with the OAuth device flow, which needs only the client
+  id of an OAuth app (no secret), so it works the same from a terminal and a
+  browser, local or remote. prigh ships no client id of its own: register one
+  at <https://github.com/settings/applications/new> (any name, e.g. "prigh";
+  homepage and callback URL can be `http://127.0.0.1`, they are not used),
+  tick **Enable Device Flow**, and give prigh its client id, either in
+  `~/.prigh/config.json`
+
+  ```json
+  { "forges": { "github.com": { "client_id": "Ov23li…" } } }
+  ```
+
+  or as `$PRIGH_GITHUB_CLIENT_ID` for the backend (the config wins). It
+  asks for the `repo` scope. GitHub Enterprise: `"ghe.example.com": {"kind":
+  "github", "client_id": "…"}` (API at `https://HOST/api/v3`). Without a
+  client id, `/login github` asks for a personal access token instead
+  (classic with `repo`, or fine-grained with Contents and Pull requests
+  read/write).
+- **Forgejo / Gitea** sign in with OAuth's authorization code flow with PKCE
+  as a public client. Every stock Forgejo and Gitea instance pre-registers
+  git-credential-oauth's public client (redirect `http://127.0.0.1`, any
+  port), so this works with no setup, but the consent page names
+  git-credential-oauth, and on Forgejo the token is not limited to scopes
+  (Forgejo does not implement OAuth scopes yet; Gitea limits it to the
+  requested `read:user write:repository`). An instance whose admin disabled
+  the default applications, or to see your own app's name, needs a public
+  OAuth2 application (Settings → Applications, untick "Confidential client",
+  redirect URI `http://127.0.0.1`) and `"git.example.com": {"kind":
+  "forgejo", "client_id": "…"}` in `forges`. The browser is sent back to a
+  one-shot server on the backend's `127.0.0.1`; when prigh runs on another
+  machine that page fails to load: paste its address into the login box.
+  `"url": "http://git.lan:3000"` sets an instance's address when it is not
+  `https://HOST`. Unknown hosts are taken for Forgejo; `"kind"` says
+  otherwise.
+- Either: `token` after the host (`/login forgejo codeberg.org token`) asks
+  for a personal access token (Forgejo: scopes `read:user` and
+  `write:repository`).
+
+Sign-ins are stored with the model credentials, in `auth.json` under
+`forge:HOST` (0600, written atomically under the same lock; per user with
+`-tokens`). Forgejo's OAuth tokens last an hour and are refreshed when
+needed; a failed refresh says to sign in again. Tokens never appear in
+errors or logs.
+
 `/pr` works on the repository of the session's directory on its tool host
 (found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
 picker of pull requests (`#24 Git hosting · lloyd · feat/x → main · draft`);
@@ -1263,8 +1310,15 @@ prefilled from the branch (title, body, base, draft, and "push first" when
 the branch is not on the remote yet): Tab or ↑↓ move between fields, Space
 toggles, Ctrl+J starts a new line in the body, Enter creates it and the
 notice gives its URL. `/pr checkout 24` makes a git worktree next to the
-repository (`<repo>-wt/pr-24`) and asks whether to `/cd` there. Errors say
-what to do (`/login github signs in`, `git remote add origin URL`, ...).
+repository (`<repo>-wt/pr-24`, the branch `pr-24` from `refs/pull/24/head`)
+and asks whether to `/cd` there; again later it fast-forwards it. The
+repository is the current branch's remote, else `origin`, else the first
+remote on a known host; pull requests from forks are listed as
+`owner:branch`, but `/pr new` opens one from the current branch of that
+remote's repository. "Push first" runs `git push -u REMOTE HEAD:BRANCH` on
+the tool host with its own git credentials (never prompting). On Forgejo a
+draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
+`git remote add origin URL`, ...).
 
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the
