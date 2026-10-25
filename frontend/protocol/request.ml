@@ -68,8 +68,7 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
-    | List_worktrees -> []
+    | Delete_archived | List_worktrees -> []
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -102,7 +101,8 @@ module Method = struct
       [ "branch", Json.str branch ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
     | Remove_worktree { path; force } ->
-      [ "path", Json.str path ] @ if force then [ "force", Json.bool true ] else []
+      [ "path", Json.str path ]
+      @ if force then [ "force", Json.bool true ] else []
   ;;
 end
 
