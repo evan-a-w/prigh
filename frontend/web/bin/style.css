@@ -439,21 +439,25 @@ kbd {
 
 /* Top bar */
 
-/* It steps down with the chat column's width, not the window's (the
-   sidebar and the panels take their share): full labels, then short ones,
-   then icons, then one menu. The title and the cwd keep their room. */
+/* Three regions: the session on the left, what the agent is doing in the
+   middle of the bar, the panels and the settings on the right. It steps
+   down with the chat column's width, not the window's (see the container
+   queries at the end). Its height is fixed: what the status says never
+   moves the page. */
 .topbar {
   container: topbar / inline-size;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px 8px 16px;
-  min-height: 54px;
+  gap: 16px;
+  padding: 0 12px 0 16px;
+  height: 54px;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--rule);
 }
-.topbar > * { flex-shrink: 0; }
+.topbar-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .app.sidebar-open:not(.narrow) .topbar .toggle-sidebar { display: none; }
-.topbar > .title { flex: 1 1 0; min-width: clamp(140px, 30cqi, 300px); display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
+.topbar .title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
 .session-name {
   display: inline-flex;
   align-items: center;
@@ -487,44 +491,6 @@ kbd {
 .branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--muted); flex-shrink: 0; max-width: 45%; }
 .branch .icon { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; }
 .branch-name { overflow: hidden; text-overflow: ellipsis; }
-
-/* A popover only when folded into the menu (below). */
-.topbar .controls {
-  position: static;
-  inset: auto;
-  width: auto;
-  height: auto;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  overflow: visible;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.controls > .chip-button { flex-shrink: 0; }
-.controls > .model-chip { flex-shrink: 1; min-width: 0; }
-.controls-more { display: none; anchor-name: --topbar-more; }
-.chip-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  border-radius: var(--r-control);
-  padding: 0 8px 0 9px;
-  font-size: 12.5px;
-  font-weight: 500;
-  background: transparent;
-  border-color: var(--rule);
-}
-.chip-button:hover { background: var(--slate-2); }
-.chip-button .icon { width: 14px; height: 14px; color: var(--faint); }
-.chip-button .chevron { width: 12px; height: 12px; }
-.chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .banner {
   display: flex;
@@ -615,38 +581,67 @@ kbd {
   flex-direction: column;
   gap: 6px;
 }
+/* One instrument: what you write on top, and along its bottom edge what it
+   goes to (model, thinking, mode) and what to do with it (attach, stop,
+   send). */
 .composer-box {
   background: var(--slate);
   border: 1px solid var(--rule-2);
   border-radius: var(--r-surface);
-  padding: 7px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   transition: border-color 0.12s;
 }
 .composer-box:focus-within { border-color: var(--sodium); }
-.composer-row { display: flex; gap: 8px; align-items: flex-end; }
 .editor {
-  flex: 1;
   resize: none;
   border: 0;
   outline: 0;
   background: transparent;
   font-size: 15px;
   line-height: 1.5;
-  padding: 4px 6px;
-  min-height: 32px;
+  padding: 6px 8px 4px;
+  min-height: 34px;
   max-height: 40vh;
   overflow-y: auto;
 }
+.composer-bar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; }
+/* Quiet until pointed at: the box's border is theirs. */
+.chip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  min-width: 0;
+  flex-shrink: 0;
+  border-radius: var(--r-control);
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.chip-button:hover { background: var(--slate-2); color: var(--chalk); }
+.chip-button:focus-visible { outline-offset: 0; }
+.chip-button .icon { width: 14px; height: 14px; color: var(--faint); flex-shrink: 0; }
+.chip-button:hover .icon { color: var(--muted); }
+.chip-button .chevron { width: 12px; height: 12px; }
+.chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer-controls > .model-chip { flex-shrink: 1; }
+.composer-controls > .model-chip .chip-label { min-width: 4ch; }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer-buttons { display: flex; gap: 6px; }
-.composer-buttons .btn { width: 32px; height: 32px; padding: 0; border-radius: var(--r-control); transition: none; }
-.composer-buttons .send .icon { color: var(--sodium-ink); }
-.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--rule); opacity: 1; }
+/* Send is the one bold thing: a sodium disc, unlit until there is
+   something to send. */
+.composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.composer-buttons .btn { width: 32px; height: 32px; padding: 0; border-radius: 50%; transition: none; }
+.composer-buttons .send .icon { color: var(--sodium-ink); width: 17px; height: 17px; stroke-width: 2.5; }
+.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--slate-2); opacity: 1; }
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-buttons .stop { background: var(--brick-wash); }
 .composer-buttons .stop .icon { width: 12px; height: 12px; }
@@ -708,28 +703,30 @@ kbd {
 .popup-item.dimmed, .picker-item.dimmed { opacity: 0.5; }
 .popup-item > .mark.picked { --mark-size: 13px; align-self: center; margin-left: -6px; }
 
-/* Status line */
+/* The status, in the middle of the top bar: one line that gives way rather
+   than wraps (the padding keeps its links' focus rings inside). */
 
 .status {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 16px;
-  padding: 0 8px;
+  gap: 0 14px;
+  min-width: 0;
+  max-width: 56cqi;
+  padding: 4px;
+  overflow: hidden;
   font-size: 12px;
   color: var(--faint);
-  min-height: 18px;
   font-variant-numeric: tabular-nums;
 }
 .status .context, .status .tokens, .status .cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); gap: 7px; }
-.status-item.running > .label { overflow: hidden; text-overflow: ellipsis; max-width: 56ch; }
+.status-item.running { flex-shrink: 1; min-width: 0; }
+.status-item.running > .label { overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
 .status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
 .idle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint-line); }
-.status-spacer { flex: 1; }
 .meter { width: 40px; height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; }
 .meter-fill { display: block; height: 100%; background: var(--muted); }
 .context.warm { color: var(--sodium); }
@@ -962,12 +959,10 @@ kbd {
 .app.narrow .scrim { display: block; position: fixed; inset: 0; background: #0009; z-index: 25; }
 
 @media (max-width: 760px) {
-  .topbar { padding: 6px 8px; gap: 6px; min-height: 50px; }
+  .topbar { padding: 0 8px; gap: 8px; height: 50px; }
   .session-name { font-size: 14px; }
   .composer { padding: 6px 8px 8px; }
   .popup { left: 8px; right: 8px; }
-  .status { gap: 2px 10px; }
-  .status .tokens, .status .account { display: none; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
   .modal-backdrop { padding-top: 8vh; }
   .help-table td:first-child { white-space: normal; }
@@ -1032,8 +1027,6 @@ kbd {
 .menu-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-detail { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-keys { color: var(--faint); font-size: 11.5px; padding: 6px 10px 4px; border-top: 1px solid var(--rule); }
-.status-item.account { color: var(--muted); }
-.status-item.account:hover { color: var(--fg); }
 
 .btw-panel {
   margin: 0 auto 8px;
@@ -1236,7 +1229,7 @@ kbd {
 @keyframes jump-in { from { opacity: 0; transform: translate(-50%, 6px); } }
 
 /* Choices and actions the backend has still to confirm. */
-.chip-button.awaiting { opacity: 1; color: var(--muted); border-style: dashed; }
+.chip-button.awaiting { opacity: 1; color: var(--muted); border: 1px dashed var(--rule-2); }
 
 .new-session.opening:disabled { opacity: 1; color: var(--muted); }
 .new-session .lamp { margin: 0 4px; }
@@ -1249,13 +1242,6 @@ kbd {
 .status-item.connecting.offline { color: var(--brick); }
 .loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
 
-/* Notifications: a quiet bell when on, struck through when off. */
-.status-item.notify { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -4px 0; }
-.status-item.notify .icon { width: 14px; height: 14px; }
-.status-item.notify.off { color: var(--faint); }
-.status-item.notify.warm { color: var(--sodium); }
-.status-item.notify:hover { text-decoration: none; }
-
 /* Out of touch with the backend, nothing is known to be working: the lamps
    go dark but for the one that says it is reconnecting. */
 .app.offline .lamp { animation: none; opacity: 0.35; box-shadow: var(--lamp-ring); }
@@ -1264,12 +1250,13 @@ kbd {
   .app.offline :is(.banner, .status) .lamp { animation: none !important; }
 }
 
+.panel-toggles { display: flex; align-items: center; justify-self: end; gap: 6px; }
+
 /* The thinking level and what asks first, beside the model: always shown,
    each opening its picker. Plan mode holds the agent back, so it is lit. */
-.panel-toggles { display: flex; align-items: center; gap: 6px; }
-.chip-key { color: var(--muted); font-weight: 400; }
-.thinking-chip.unsupported { color: var(--faint); border-style: dashed; }
-.mode-chip.plan-mode { color: var(--sodium); border-color: var(--sodium-line); background: var(--sodium-wash); }
+.chip-key { color: var(--faint); font-weight: 400; }
+.thinking-chip.unsupported { color: var(--faint); }
+.mode-chip.plan-mode { color: var(--sodium); background: var(--sodium-wash); }
 .mode-chip.plan-mode .icon { color: var(--sodium); }
 
 /* Queued steers and follow-ups, above the composer while they wait. */
@@ -1325,79 +1312,110 @@ kbd {
   .queued-edit.btn { width: 26px; padding: 0; }
 }
 
-/* The top bar's steps (see .topbar), by its content's width (the chat
-   column's less 28px of padding). Short labels: the level alone, the
+/* The composer's steps, by its width. Short labels: the level alone, the
    mode's name. */
-@container topbar (532px <= width < 932px) {
-  .controls .chip-key, .controls .chevron { display: none; }
-  .controls .mode-chip .chip-label { display: none; }
-  .controls .mode-chip::after { content: attr(data-short); }
+@container composer (width < 600px) {
+  .composer-controls .chip-key, .composer-controls .chevron { display: none; }
+  .composer-controls .mode-chip:not(.awaiting) .chip-label { display: none; }
+  .composer-controls .mode-chip:not(.awaiting)::after { content: attr(data-short); }
+  .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
 }
-/* Then the thinking level and the mode as icons (their tooltips and labels
-   say which), the model's name as long as it fits. */
-@container topbar (532px <= width < 732px) {
-  .controls :is(.thinking-chip, .mode-chip) { width: 30px; padding: 0; justify-content: center; }
-  .controls :is(.thinking-chip, .mode-chip) .chip-label,
-  .controls .mode-chip::after { display: none; }
-  .controls .model-chip > .icon:first-child { display: none; }
+/* Then the model's name gives way before the level and the mode do. */
+@container composer (width < 400px) {
+  .composer-controls > .model-chip > .icon:first-child { display: none; }
 }
-/* Then one menu for all three. */
-@container topbar (width < 532px) {
-  .controls-more { display: inline-flex; }
-  .topbar .controls:not(:popover-open) { display: none; }
+
+/* The top bar's steps. A narrower bar drops the counters (the context's
+   link has them, in the session's details), then says what applies with
+   icons alone (their tooltips and names say the rest). */
+@container topbar (width < 760px) {
+  .status { gap: 0 12px; }
+  .status .tokens, .status .cost:not(.budget) { display: none; }
 }
-/* The status line in a narrow chat column keeps to one line. */
-@container composer (width < 448px) {
-  .status { gap: 2px 12px; }
-  .status .tokens { display: none; }
+@container topbar (width < 600px) {
+  .status .status-text, .status .mode { display: none; }
+  .status-item.running > .label { max-width: 14ch; }
 }
-.controls-more:has(+ .controls:popover-open) { background: var(--slate-2); color: var(--fg); }
-.controls-more.plan-mode { color: var(--sodium); background: var(--sodium-wash); }
-.topbar .controls:popover-open {
-  position: fixed;
-  inset: auto;
-  top: 56px;
-  right: 8px;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  min-width: 220px;
-  max-width: calc(100vw - 16px);
-  padding: 4px;
-  background: var(--slate);
+/* A phone: the session gets the room, the status follows it. */
+.app.narrow .topbar { grid-template-columns: minmax(0, 1fr) auto auto; }
+@container topbar (width < 480px) {
+  .status { gap: 0 10px; padding: 4px 0; }
+  .status-item.running > .label, .status-item.idle > .label { display: none; }
+  .status .meter { display: none; }
+}
+
+/* Settings: a row per setting, its name, a line on what it does, and its
+   control at the end. The headings say where the setting lives. */
+.settings-dialog { width: min(600px, 100%); max-height: 84vh; }
+.settings-dialog .modal-body { padding-top: 4px; }
+.settings-section + .settings-section { margin-top: 14px; }
+.settings-section h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0; padding: 6px 0; }
+.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.setting-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setting-name { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.setting-about { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.setting-about.host { font: 11.5px var(--mono); color: var(--faint); }
+.setting-note { font-size: 12.5px; line-height: 1.45; }
+.setting-note.warm { color: var(--sodium); }
+.setting-note.muted { color: var(--faint); }
+.setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+.account-setting { flex-wrap: nowrap; }
+.account-setting .setting-text { flex-basis: 0; }
+.account-setting .avatar { align-self: flex-start; }
+@media (max-width: 760px) {
+  .settings-dialog { max-height: 88vh; }
+  .account-setting { flex-wrap: wrap; }
+  .account-setting .setting-text { flex-basis: calc(100% - 54px); }
+}
+.btn.sign-out:hover { color: var(--brick); border-color: var(--brick-line); background: var(--brick-wash); }
+.settings-dialog .modal-buttons .shortcuts { margin-right: auto; padding-left: 8px; padding-right: 8px; }
+
+.switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 10px;
   border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
-  color: var(--fg);
-  animation: drop 0.12s ease-out;
+  background: var(--well);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
-@keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
-@supports (anchor-name: --a) {
-  .topbar .controls:popover-open {
-    position-anchor: --topbar-more;
-    top: anchor(bottom);
-    right: anchor(right);
-    margin-top: 6px;
-  }
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease-out, background 0.12s;
 }
-.controls:popover-open > .chip-button { justify-content: flex-start; border-color: transparent; height: 32px; }
-.controls:popover-open > .chip-button.awaiting { border-color: var(--rule); }
-.controls:popover-open .chip-label { max-width: none; }
-.controls:popover-open .chevron { display: none; }
-@media (prefers-reduced-motion: reduce) { .topbar .controls:popover-open { animation: none; } }
+.switch:hover .switch-knob { background: var(--chalk); }
+.switch.on { background: var(--sodium); border-color: var(--sodium); }
+.switch.on .switch-knob { transform: translateX(14px); background: var(--sodium-ink); }
+.switch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.switch:disabled { opacity: 0.45; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .switch, .switch-knob { transition: none; } }
+
+.segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); }
+.segment { border: 0; background: none; color: var(--muted); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
+.segment:hover { color: var(--chalk); }
+.segment.on { background: var(--slate-2); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--rule-2); }
+.segment:focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
 
 /* Fingers: every control takes at least 32px (44 where the row has room).
    The small round ones keep their look and grow an invisible margin. */
 @media (pointer: coarse) {
   .remove-image::after,
   .attach-chip-remove::after,
-  .status-item.notify::after,
   .toast .btn.icon.toast-close::after {
     content: "";
     position: absolute;
     inset: -8px;
   }
-  .attach-chip-remove, .status-item.notify, .toast .btn.icon.toast-close { position: relative; }
+  .attach-chip-remove, .toast .btn.icon.toast-close { position: relative; }
   .status-item.link { padding: 8px 6px; margin: -8px -6px; }
   .copy { min-height: 32px; padding: 6px 12px; }
   .fold { min-height: 40px; }

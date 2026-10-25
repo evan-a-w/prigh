@@ -32,20 +32,21 @@ let%expect_test "the names of the controls" =
     button "Commands & keys" -- Commands and keys (/help)
     button "Sessions" -- Sessions (Ctrl+B)
     button "New session" -- Rename (/name)
-    button "Model, thinking and approvals" -- Claude Opus 5.5, thinking on, auto: never asks
+    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "Files" -- Files (Ctrl+Shift+F)
+    button "Terminal" -- Terminal (Ctrl+`)
+    button "Settings" -- Settings (Ctrl+, or /settings)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Files" -- Files (Ctrl+Shift+F)
-    button "Terminal" -- Terminal (Ctrl+`)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
-    button "Notifications not allowed yet" -- Notifications not allowed yet: click to ask the browser
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
-    [region] div "Transcript"
     [status] span "Ready"
+    [region] div "Transcript"
+    [group] div "Model, thinking and mode"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -136,11 +137,13 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Show all 30 lines"
     [img] span "Done"
     button "Remove image"
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
-    button "Notifications not allowed yet" -- Notifications not allowed yet: click to ask the browser
     textarea "Message"
-    [status] span "Ready"
+    [group] div "Model, thinking and mode"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

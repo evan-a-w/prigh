@@ -102,7 +102,9 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
   fuzzy filtering, or the argument accepts what was displayed.
 - Every error tells you what to do next (closest matches, the command to run).
 - State is always visible: the status line shows model, thinking, context,
-  cost, user, queued messages, agents, and any mode the UI is in.
+  cost, user, queued messages, agents, and any mode the UI is in (prigh-web
+  spreads these over the composer's chips and the top bar, and shows the
+  user in the sidebar and its settings page).
 - Dialogs own the keyboard until closed; Esc closes without side effects,
   Enter accepts. Every binding is in the keymap, `/help` and a test.
 - Every action is acknowledged within one frame.

@@ -25,10 +25,9 @@ Ctrl+K find a session
 === chromium: signed in: top bar ===
 New session
 <CWD>
-DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
+Ready
+↑0 ↓0
+$<COST>
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -113,16 +112,14 @@ three lines
 === chromium: top bar after a run ===
 count some lines
 <CWD>
-DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
+Ready
+↑0 ↓0
+$<COST>
 === chromium: a budget in the status line ===
 Ready
 0%
 ↑0 ↓0
 $<COST>/$<COST>
-token
 === chromium: long output, folded ===
 bash
 seq 1 30
@@ -208,8 +205,8 @@ switched back: true
 count some lines
 <TIME>
 === chromium: backend gone ===
-Connection lost: reconnecting…
 Reconnecting…
+Connection lost: reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
@@ -439,7 +436,6 @@ Ready
 0%
 ↑0 ↓0
 $<COST>
-token
 === chromium: a plan to approve ===
 Plan
 Approve the plan and start implementing?
@@ -462,7 +458,6 @@ Ready
 ↑0 ↓0
 $<COST>
 plan 0/2: Write the schema
-token
 === chromium: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -684,24 +679,46 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: top bar: a 700px chat column ===
-chat 700; controls: DeepSeek V4.1 Flash, icon, icon; title at least 140px: true
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: Ready, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: top bar: a 520px chat column ===
-chat 520; controls: in a menu; title at least 140px: true
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: Ready, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: top bar: a 400px chat column ===
-chat 400; controls: in a menu; title at least 140px: true
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
-=== chromium: top bar: the controls' menu ===
-DeepSeek V4.1 Flash | Thinking on | Auto: never asks
-under its button: true, in the window: true
-a choice opens its picker, the menu closes: true
-Esc closes it: true
+=== chromium: settings ===
+Settings
+In this browser
+Notifications
+Tell you when a turn ends or something waits for you while this tab is hidden.
+The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+Transcript detail
+How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+Quiet
+Normal
+Verbose
+On the backend
+Tool confirmation
+Ask before bash, edits and MCP tools run, in this session and new ones.
+Model providers
+Not logged in to any: log in to one to use its models.
+Manage providers
+Account
+T
+Signed in as token
+127.0.0.1:<PORT>
+Switch account
+Sign out
+Keyboard shortcuts
+Done
+a choice keeps it open: true
+Esc closes it, the editor has the focus: true
 === chromium: top bar: a 400px chat column without the sidebar ===
-chat 400; controls: in a menu; title at least 140px: true
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: errors ===
@@ -942,10 +959,9 @@ Ctrl+K find a session
 === firefox: signed in: top bar ===
 New session
 <CWD>
-DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
+Ready
+↑0 ↓0
+$<COST>
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -1030,16 +1046,14 @@ three lines
 === firefox: top bar after a run ===
 count some lines
 <CWD>
-DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
+Ready
+↑0 ↓0
+$<COST>
 === firefox: a budget in the status line ===
 Ready
 0%
 ↑0 ↓0
 $<COST>/$<COST>
-token
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -1125,8 +1139,8 @@ switched back: true
 count some lines
 <TIME>
 === firefox: backend gone ===
-Connection lost: reconnecting…
 Reconnecting…
+Connection lost: reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
@@ -1356,7 +1370,6 @@ Ready
 0%
 ↑0 ↓0
 $<COST>
-token
 === firefox: a plan to approve ===
 Plan
 Approve the plan and start implementing?
@@ -1379,7 +1392,6 @@ Ready
 ↑0 ↓0
 $<COST>
 plan 0/2: Write the schema
-token
 === firefox: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -1601,24 +1613,47 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: top bar: a 700px chat column ===
-chat 700; controls: DeepSeek V4.1 Flash, icon, icon; title at least 140px: true
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: Ready, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: top bar: a 520px chat column ===
-chat 520; controls: in a menu; title at least 140px: true
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: Ready, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: top bar: a 400px chat column ===
-chat 400; controls: in a menu; title at least 140px: true
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
-=== firefox: top bar: the controls' menu ===
-DeepSeek V4.1 Flash | Thinking on | Auto: never asks
-under its button: true, in the window: true
-a choice opens its picker, the menu closes: true
-Esc closes it: true
+=== firefox: settings ===
+Settings
+In this browser
+Notifications
+Tell you when a turn ends or something waits for you while this tab is hidden.
+The browser has not been asked yet: Allow asks it.
+Allow
+Transcript detail
+How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+Quiet
+Normal
+Verbose
+On the backend
+Tool confirmation
+Ask before bash, edits and MCP tools run, in this session and new ones.
+Model providers
+Not logged in to any: log in to one to use its models.
+Manage providers
+Account
+T
+Signed in as token
+127.0.0.1:<PORT>
+Switch account
+Sign out
+Keyboard shortcuts
+Done
+a choice keeps it open: true
+Esc closes it, the editor has the focus: true
 === firefox: top bar: a 400px chat column without the sidebar ===
-chat 400; controls: in a menu; title at least 140px: true
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: errors ===

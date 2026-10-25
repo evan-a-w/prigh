@@ -302,6 +302,7 @@ module Action : sig
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
     | Open_thinking_picker
     | Open_help
+    | Open_settings (** the gear, Ctrl+, *)
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
