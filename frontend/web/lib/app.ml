@@ -137,6 +137,7 @@ module Reply_tag = struct
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
         ; images : Image.t list
@@ -387,6 +388,7 @@ module Action = struct
         ; status : Terminal.Status.t
         }
     | Files of Files.Action.t
+    | Review of Code_review.Action.t
     | Resize of Resize.Action.t
     | Load_older
     | Prefetch_session of string (** a path *)
@@ -445,6 +447,7 @@ module Model = struct
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; review : Code_review.t
     ; layout : Resize.t
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
@@ -596,6 +599,7 @@ let init =
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
   ; files = Files.closed
+  ; review = Code_review.empty
   ; layout = Resize.empty
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
@@ -729,7 +733,43 @@ let files_out (m : Model.t) (outs : Files.Out.t list) =
     | Focus_editor -> m, cmds @ [ focus_editor ])
 ;;
 
-let with_files (m : Model.t) (files, outs) = files_out { m with files } outs
+let review_out (m : Model.t) (outs : Code_review.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_review.Out.t) ->
+    match out with
+    | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
+    | Get_diff -> m, cmds @ [ rpc "git_diff" [] ~tag:(Review Diff) ]
+    | Toast { text; error } ->
+      let m, more = toast m ~error text in
+      m, cmds @ more
+    | Focus id -> m, cmds @ [ Command.Focus id ])
+;;
+
+let with_review (m : Model.t) (review, outs) = review_out { m with review } outs
+
+(* What the agent may have changed in the working tree: an edit, a write, a
+   command, its own or a subagent's; and a run's end. *)
+let rec touches_files (e : Event.t) =
+  match e with
+  | Tool_end { call; _ } ->
+    List.mem
+      [ "edit"; "write"; "apply_patch"; "bash" ]
+      call.name
+      ~equal:String.equal
+  | Subagent { event; _ } -> touches_files event
+  | Agent_end _ -> true
+  | _ -> false
+;;
+
+let with_files (m : Model.t) (files, outs) =
+  let was_open = m.files.open_ in
+  let m, cmds = files_out { m with files } outs in
+  (* The browser marks what changed: it reads the changes when it opens. *)
+  if m.files.open_ && not was_open
+  then (
+    let m, more = with_review m (Code_review.refresh m.review) in
+    m, cmds @ more)
+  else m, cmds
+;;
 
 let files_where (m : Model.t) =
   Option.map m.state ~f:(fun (state : State.t) ->
@@ -895,7 +935,15 @@ let set_state_without_files (m : Model.t) (state : State.t) =
 let set_state (m : Model.t) (state : State.t) =
   let m, cmds = set_state_without_files m state in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
-  m, cmds @ more
+  let m, review =
+    with_review
+      m
+      (Code_review.set_session
+         m.review
+         (Some state.session_id)
+         ~watching:m.files.open_)
+  in
+  m, cmds @ more @ review
 ;;
 
 let logged_in (m : Model.t) provider =
@@ -3318,6 +3366,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
             (if String.is_empty path then [] else [ "path", str path ])
             ~tag:Git_diff
         ] )
+  | "review", "" -> with_review m (Code_review.update m.review (Open None))
   | "review", args ->
     let m, cmds = toast m reading_review in
     ( m
@@ -4024,7 +4073,19 @@ let gone_from_session = "is not in the session any more"
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
+  | Files (Previewed path as reply), (Ok json as result) ->
+    let m =
+      match File_preview.of_json json with
+      | Ok { content = Text { text; truncated = false; md5 }; _ } ->
+        { m with
+          review = Code_review.preview_text m.review ~abs:path ~text ~md5
+        }
+      | Ok _ | Error _ -> m
+    in
+    with_files m (Files.reply m.files reply result)
   | Files reply, result -> with_files m (Files.reply m.files reply result)
+  | Review reply, result ->
+    with_review m (Code_review.reply m.review reply result)
   | Sent_with_files { text; images; attachments }, result ->
     let m, cmds = reply_to m (Sent { text; images }) result in
     (match result with
@@ -4867,6 +4928,8 @@ let main_event (m : Model.t) (event : Event.t) =
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
+  | Review review ->
+    { m with review = Code_review.set_review m.review review }, []
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
@@ -4897,7 +4960,12 @@ let event (m : Model.t) (e : Event.t) =
     }
   in
   let m, cmds = main_event m e in
-  m, cmds @ if Agents.starts_or_ends e then [ list_subagents ] else []
+  let m, review =
+    if touches_files e
+    then with_review m (Code_review.changed m.review ~watching:m.files.open_)
+    else m, []
+  in
+  m, cmds @ review @ if Agents.starts_or_ends e then [ list_subagents ] else []
 ;;
 
 let image_json (image : Image.t) =
@@ -5702,6 +5770,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
+  | Review action -> with_review m (Code_review.update m.review action)
   | Resize action ->
     let layout, saves = Resize.update m.layout (Model.shown m) action in
     ( { m with layout }
