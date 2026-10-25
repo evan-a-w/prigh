@@ -21,7 +21,8 @@ let act t action =
      | Expire_toast _
      | Focus _
      | Set_caret _
-     | Save_history _
+     | Cache_prefs _
+     | Apply_theme _
      | Sign_out
      | Reveal _
      | Copy _
@@ -31,13 +32,10 @@ let act t action =
      | Jump_to_user_message _
      | Scroll_to_bottom
      | Focus_terminal
-     | Remember_terminal _
      | Notify _
      | Request_notification_permission
-     | Save_notifications _
      | Set_title _
      | Files _
-     | Save_size _
      | Keep_scroll_position
      | Scroll_to_entry _
      | Probe_connection
@@ -288,9 +286,23 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
     "get_pending"
     {|{"steer_texts":[],"follow_up_texts":[],"confirms":[],"questions":[]}|};
   reply t "list_sessions" sessions;
+  reply t "get_prefs" {|{"prefs":{"web.migrated":true}}|};
   act t (Tick now);
   t.quiet <- false;
   t
+;;
+
+let restore_history t entries =
+  act
+    t
+    (Restore_prefs
+       { prefs =
+           [ { key = Pref_sync.Key.history
+             ; value = Some (`Array (List.map entries ~f:(fun s -> `String s)))
+             }
+           ]
+       ; legacy = false
+       })
 ;;
 
 let node ?(inject = fun _ -> Virtual_dom.Vdom.Effect.Ignore) t ?selector () =

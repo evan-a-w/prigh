@@ -483,6 +483,13 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
       (params ((text "# Title #123 x#rev ##rev")))
       (tag Show_error))
     (Append_history "# Title #123 x#rev ##rev")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "# Title #123 x#rev ##rev")
+        (max   500)))
+      (tag Ignore))
     |}];
   let h = connected ~config:{|{"snippets":[]}|} () in
   H.keys h "#rev";
@@ -502,5 +509,12 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
     {|
     (Rpc (method_ prompt) (params ((text #rev))) (tag Show_error))
     (Append_history #rev)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value #rev)
+        (max   500)))
+      (tag Ignore))
     |}]
 ;;

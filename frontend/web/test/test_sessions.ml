@@ -296,7 +296,8 @@ let%expect_test "new session" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history (/new))
+    (Rpc (method_ push_pref) (params ((key history) (value /new) (max 500)))
+     (tag Ignore))
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
     |}]
 ;;
@@ -426,7 +427,8 @@ let%expect_test "renaming the current session" =
   [%expect
     {|
     Send
-    (Save_history ("/name Lexer"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/name Lexer") (max 500))) (tag Ignore))
     (Rpc (method_ set_session_name) (params ((name Lexer)))
      (tag Refresh_sessions))
     |}]

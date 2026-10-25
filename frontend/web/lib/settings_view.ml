@@ -329,7 +329,8 @@ let view (m : App.Model.t) ~inject =
           ~on_click:(inject Action.Close_dialog)
           [ Node.text "Done" ]
       ]
-    [ section "In this browser" [ notifications m ~inject; verbosity m ~inject ]
+    [ section "Appearance" (Theme_view.rows m ~inject)
+    ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
     ; section "Account" (account m ~inject)

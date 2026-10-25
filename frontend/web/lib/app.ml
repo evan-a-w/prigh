@@ -153,6 +153,7 @@ module Reply_tag = struct
         ; session : string
         } (** reconnected, but the backend no longer has [session] *)
     | Forge of Forge_reply.t
+    | Prefs
   [@@deriving sexp_of, equal]
 end
 
@@ -177,7 +178,6 @@ module Command = struct
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
-    | Save_history of string list
     | Sign_out
     | Reveal of string list
     (** scroll the main chat to a subagent's card: the call ids from the
@@ -190,13 +190,12 @@ module Command = struct
     | Scroll_to_entry of int
     | Scroll_to_bottom
     | Focus_terminal
-    | Remember_terminal of bool
     | Notify of Prigh_ui.Notify.t
     | Request_notification_permission
-    | Save_notifications of bool
     | Set_title of string
     | Files of Files.Page.t
-    | Save_size of Resize.Save.t
+    | Cache_prefs of Prefs.Change.t list
+    | Apply_theme of Theme.t
     | Keep_scroll_position
     (** older messages are being added above: what shows stays in place *)
     | Probe_connection
@@ -243,12 +242,12 @@ module Action = struct
     | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
     | Page_hidden of bool
-    | Set_notifications of
-        { enabled : bool
-        ; permission : string
+    | Restore_prefs of
+        { prefs : Prefs.Change.t list
+        ; legacy : bool
         }
+    | Set_notification_permission of string
     | Notification_permission of string
-    | Load_history of string list
     | Set_draft of string
     | Edit of
         { text : string
@@ -365,7 +364,6 @@ module Action = struct
     | Jump_to_bottom
     | Run of string
     | Toggle_terminal
-    | Reopen_terminal
     | Close_terminal
     | New_shell
     | Terminal_status of
@@ -383,6 +381,7 @@ module Action = struct
     | Pr_checkout of int
     | New_pr
     | Pr_form of Pr_create.Action.t
+    | Preview_accent of string
   [@@deriving sexp_of]
 end
 
@@ -443,8 +442,36 @@ module Model = struct
           transcript stays on show, read-only *)
     ; forges : Forges.t
     ; return_to_settings : bool
+    ; theme : Theme.t
+    ; theme_preview : Theme.t option
+    ; prefs : Pref_sync.t
     }
   [@@deriving sexp_of]
+
+  let look t =
+    match t.dialog with
+    | Some (Picker { kind = Themes; picker }) ->
+      (match Picker.selected_item picker with
+       | Some item ->
+         { t.theme with
+           name =
+             Option.value (Theme.Name.of_string item.id) ~default:t.theme.name
+         }
+       | None -> t.theme)
+    | Some (Picker { kind = Accents; picker }) ->
+      let typed = Theme.Accent.of_string (Picker.query picker) in
+      (match Picker.selected_item picker, typed with
+       | _, Some (Custom _ as accent) -> { t.theme with accent }
+       | Some item, _ ->
+         { t.theme with
+           accent =
+             Option.value
+               (Theme.Accent.of_string item.id)
+               ~default:t.theme.accent
+         }
+       | None, _ -> t.theme)
+    | _ -> Option.value t.theme_preview ~default:t.theme
+  ;;
 
   let shown t =
     { Resize.Shown.sidebar = t.sidebar_open
@@ -564,6 +591,9 @@ let init =
   ; session_gone = None
   ; forges = Forges.empty
   ; return_to_settings = false
+  ; theme = Theme.default
+  ; theme_preview = None
+  ; prefs = Pref_sync.init
   }
 ;;
 
@@ -648,9 +678,9 @@ let field json name =
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | true, Some (Login _ | Forge_host _) ->
-    ( { m with dialog = Some Settings; return_to_settings = false }
+    ( { m with dialog = Some Settings; return_to_settings = false; theme_preview = None }
     , [ Command.Focus "dialog" ] )
-  | _ -> { m with dialog = None; return_to_settings = false }, [ focus_editor ]
+  | _ -> { m with dialog = None; return_to_settings = false; theme_preview = None }, [ focus_editor ]
 ;;
 
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
@@ -1379,6 +1409,235 @@ let open_rename (m : Model.t) =
   open_dialog m ~focus:"dialog-input" (Rename name)
 ;;
 
+(* ---- the user's preferences (Pref_sync) *)
+
+module Key = Pref_sync.Key
+
+(* Acting as another user, theirs are not ours: ours stay, in this browser
+   only, until we are back. *)
+let acting_as (m : Model.t) = Option.bind m.hello ~f:Hello_reply.acting_as
+
+let saves_prefs (m : Model.t) =
+  Pref_sync.saving m.prefs && Option.is_none (acting_as m)
+;;
+
+(* Kept in the browser, and on the backend unless it keeps none for us. *)
+let save_prefs (m : Model.t) (changes : Prefs.Change.t list) =
+  if List.is_empty changes
+  then []
+  else
+    Command.Cache_prefs changes
+    ::
+    (if saves_prefs m
+     then [ rpc "set_prefs" (Prefs.set_params changes) ]
+     else [])
+;;
+
+let save_pref m key value = save_prefs m [ { Prefs.Change.key; value } ]
+
+let fetch_prefs (m : Model.t) =
+  match acting_as m with
+  | Some _ -> []
+  | None -> [ rpc "get_prefs" (Prefs.get_params ~keys:Key.all) ~tag:Prefs ]
+;;
+
+(* A preference from the browser's cache, the backend or another of the
+   user's frontends. Whether the terminal is open follows only at [startup]:
+   another browser opening its own is no reason to open ours. *)
+let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
+  let string =
+    match value with
+    | Some (`String s) -> Some s
+    | _ -> None
+  in
+  if String.equal key Key.theme
+  then
+    { m with
+      theme =
+        { m.theme with
+          name =
+            Option.value
+              (Option.bind string ~f:Theme.Name.of_string)
+              ~default:Theme.default.name
+        }
+    }
+  else if String.equal key Key.accent
+  then
+    { m with
+      theme =
+        { m.theme with
+          accent =
+            Option.value
+              (Option.bind string ~f:Theme.Accent.of_string)
+              ~default:Theme.default.accent
+        }
+    }
+  else if String.equal key Key.verbosity
+  then (
+    let verbosity =
+      Option.value
+        (List.find Prigh_ui.Verbosity.all ~f:(fun v ->
+           Option.equal String.equal string (Some (Prigh_ui.Verbosity.name v))))
+        ~default:Normal
+    in
+    if Prigh_ui.Verbosity.equal verbosity m.verbosity
+    then m
+    else { m with verbosity; folds = String.Set.empty })
+  else if String.equal key Key.notify
+  then (
+    let enabled =
+      match value with
+      | Some `False -> false
+      | _ -> true
+    in
+    { m with notifications = { m.notifications with enabled } })
+  else if String.equal key Key.history
+  then
+    if History.browsing m.history
+    then m
+    else (
+      let entries =
+        match value with
+        | Some (`Array items) ->
+          List.filter_map items ~f:(function
+            | `String s -> Some s
+            | _ -> None)
+        | _ -> []
+      in
+      { m with history = History.of_list entries })
+  else if String.equal key Key.terminal_open
+  then
+    if startup
+    then (
+      let open_ = Option.exists value ~f:(Json.equal `True) in
+      { m with terminal = { m.terminal with open_ } })
+    else m
+  else (
+    match
+      List.find Resize.Handle.all ~f:(fun h ->
+        String.equal (Resize.Handle.pref_key h) key)
+    with
+    | Some h ->
+      let size =
+        match value with
+        | Some (`Number n) -> Int.of_string_opt n
+        | _ -> None
+      in
+      let layout, _ =
+        Resize.update m.layout (Model.shown m) (Restore [ h, size ])
+      in
+      { m with layout }
+    | None -> m)
+;;
+
+let apply_prefs m ~startup changes =
+  List.fold changes ~init:m ~f:(apply_pref ~startup)
+;;
+
+let prefs_loaded (m : Model.t) changes =
+  let startup = Pref_sync.Remote.equal m.prefs.remote Unknown in
+  let prefs, applied, upload = Pref_sync.loaded m.prefs changes in
+  let m = apply_prefs { m with prefs } ~startup applied in
+  (* The page may show another account's, from the browser's cache. *)
+  ( m
+  , Command.Apply_theme (Model.look m)
+    :: Command.Cache_prefs applied
+    ::
+    (if List.is_empty upload
+     then []
+     else [ rpc "set_prefs" (Prefs.set_params upload) ]) )
+;;
+
+let theme_changes (theme : Theme.t) =
+  [ { Prefs.Change.key = Key.theme
+    ; value = Some (`String (Theme.Name.to_string theme.name))
+    }
+  ; { key = Key.accent
+    ; value = Some (`String (Theme.Accent.to_string theme.accent))
+    }
+  ]
+;;
+
+let set_theme (m : Model.t) (theme : Theme.t) ~replaces ~notice =
+  let m = { m with theme; theme_preview = None } in
+  let m, cmds = toast m ~replaces notice in
+  m, save_prefs m (theme_changes theme) @ cmds
+;;
+
+let theme_picker (m : Model.t) =
+  Dialog.Picker
+    { kind = Themes
+    ; picker =
+        Picker.create
+          ~title:"Theme"
+          (List.map Theme.Name.all ~f:(fun n ->
+             Picker.Item.create
+               ~id:(Theme.Name.to_string n)
+               ~detail:(Theme.Name.describe n)
+               ~marked:(Theme.Name.equal n m.theme.name)
+               (String.capitalize (Theme.Name.to_string n))))
+    }
+;;
+
+let accent_picker (m : Model.t) =
+  let custom =
+    match m.theme.accent with
+    | Custom _ as accent -> [ accent ]
+    | Preset _ -> []
+  in
+  Dialog.Picker
+    { kind = Accents
+    ; picker =
+        Picker.create
+          ~title:"Accent colour (or type #rrggbb)"
+          (List.map (Theme.Accent.all_presets @ custom) ~f:(fun a ->
+             Picker.Item.create
+               ~id:(Theme.Accent.to_string a)
+               ~marked:(Theme.Accent.equal a m.theme.accent)
+               (match a with
+                | Preset p ->
+                  String.capitalize (Theme.Accent.Preset.to_string p)
+                | Custom hex -> "Custom " ^ hex)))
+    }
+;;
+
+let theme_named (m : Model.t) name =
+  match Theme.Name.of_string name with
+  | Some n ->
+    set_theme
+      m
+      { m.theme with name = n }
+      ~replaces:"Theme: "
+      ~notice:
+        (sprintf
+           "Theme: %s, %s"
+           (Theme.Name.to_string n)
+           (Theme.Name.describe n))
+  | None ->
+    error
+      m
+      (sprintf
+         "Unknown theme “%s”: use original, dark or light (/theme picks one)."
+         name)
+;;
+
+let accent_named (m : Model.t) name =
+  match Theme.Accent.of_string name with
+  | Some accent ->
+    set_theme
+      m
+      { m.theme with accent }
+      ~replaces:"Accent: "
+      ~notice:(sprintf "Accent: %s" (Theme.Accent.to_string accent))
+  | None ->
+    error
+      m
+      (sprintf
+         "Unknown accent “%s”: use orange, blue, green, purple, pink, teal, \
+          yellow or a colour like #3b82f6 (/accent picks one)."
+         name)
+;;
+
 (* ---- the terminal panel *)
 
 let with_terminal (m : Model.t) ~f = { m with terminal = f m.terminal }
@@ -1390,13 +1649,15 @@ let open_terminal (m : Model.t) =
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
     }
-  , (if m.terminal.open_ then [] else [ Command.Remember_terminal true ])
+  , (if m.terminal.open_
+     then []
+     else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
 ;;
 
 let close_terminal (m : Model.t) =
   ( with_terminal m ~f:(fun t -> { t with open_ = false })
-  , [ Command.Remember_terminal false; focus_editor ] )
+  , save_pref m Key.terminal_open None @ [ focus_editor ] )
 ;;
 
 let new_shell (m : Model.t) =
@@ -1677,13 +1938,21 @@ let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
 ;;
 
 let set_verbosity (m : Model.t) verbosity =
-  toast
-    { m with verbosity; folds = String.Set.empty }
-    ~replaces:"Transcript: "
-    (sprintf
-       "Transcript: %s, %s (Ctrl+O cycles)"
-       (Prigh_ui.Verbosity.name verbosity)
-       (verbosity_detail verbosity))
+  let m, cmds =
+    toast
+      { m with verbosity; folds = String.Set.empty }
+      ~replaces:"Transcript: "
+      (sprintf
+         "Transcript: %s, %s (Ctrl+O cycles)"
+         (Prigh_ui.Verbosity.name verbosity)
+         (verbosity_detail verbosity))
+  in
+  ( m
+  , save_pref
+      m
+      Key.verbosity
+      (Some (`String (Prigh_ui.Verbosity.name verbosity)))
+    @ cmds )
 ;;
 
 let verbosity_picker (m : Model.t) =
@@ -2297,20 +2566,22 @@ let retry_connection (m : Model.t) =
    only in response to the user. *)
 let set_notifications (m : Model.t) enabled =
   let m = { m with notifications = { m.notifications with enabled } } in
-  let save = Command.Save_notifications enabled in
+  let save =
+    save_pref m Key.notify (Some (if enabled then `True else `False))
+  in
   if not enabled
   then (
     let m, cmds = toast m "Notifications off: /notify on turns them on" in
-    m, save :: cmds)
+    m, save @ cmds)
   else (
     match m.notifications.permission with
-    | Default -> m, [ save; Command.Request_notification_permission ]
+    | Default -> m, save @ [ Command.Request_notification_permission ]
     | Granted ->
       let m, cmds = toast m (Page_notify.describe m.notifications) in
-      m, save :: cmds
+      m, save @ cmds
     | Denied | Unsupported ->
       let m, cmds = error m (Page_notify.describe m.notifications) in
-      m, save :: cmds)
+      m, save @ cmds)
 ;;
 
 (* ---- accounts ---------------------------------------------------------- *)
@@ -2446,7 +2717,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
        | None, Some own -> sprintf "Back to %s" own
        | None, None -> "Switched user")
   in
-  m, cancel @ cmds @ [ focus_editor ] @ startup
+  m, cancel @ cmds @ [ focus_editor ] @ startup @ fetch_prefs m
 ;;
 
 let account_chosen (m : Model.t) id =
@@ -2716,6 +2987,10 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
            level
            (String.concat ~sep:", " thinking_levels))
   | "change_default", _ -> m, [ rpc "change_default" [] ~tag:Default_saved ]
+  | "theme", "" -> open_picker m (theme_picker m)
+  | "theme", name -> theme_named m name
+  | "accent", "" -> open_picker m (accent_picker m)
+  | "accent", name -> accent_named m name
   | "verbosity", "" -> open_picker m (verbosity_picker m)
   | "verbosity", name ->
     (match
@@ -3370,7 +3645,7 @@ let start_commands (m : Model.t) =
     | Some _ -> [ rpc "list_users" [] ~tag:(Users Probe) ]
     | None -> []
   in
-  (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
+  (if m.narrow then [] else [ focus_editor ]) @ startup @ fetch_prefs m @ probe
 ;;
 
 (* The state of a session clicked before the one being opened (A, then B
@@ -3447,6 +3722,7 @@ module Rejoin = struct
     | Some state ->
       ( m
       , startup
+        @ fetch_prefs m
         @ [ resync_rpc m state
           ; rpc "get_pending" [] ~tag:Resync_pending
           ; rpc "list_sessions" [] ~tag:Sessions
@@ -3750,6 +4026,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
+  (* A backend that keeps none: this browser keeps them. *)
+  | Prefs, Error _ -> { m with prefs = { m.prefs with remote = Local } }, []
   | Skills { place; purpose = Complete }, Error _ ->
     (* Complete nothing rather than ask again at every key. *)
     if Option.equal String.equal (Skills.place m.state) (Some place)
@@ -4235,6 +4513,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Error _ -> m, [])
   | Users Picker, Ok json ->
     decode m json strings ~f:(fun users -> users_picker m users)
+  | Prefs, Ok json -> decode m json Prefs.of_reply ~f:(prefs_loaded m)
   | User_switched, Ok json ->
     decode m json Hello_reply.of_json ~f:(user_switched m)
   (* Listed for another session, directory or host. *)
@@ -4439,6 +4718,9 @@ let main_event (m : Model.t) (event : Event.t) =
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
   | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  (* Another of the user's frontends changed their preferences. *)
+  | Prefs_changed changes ->
+    apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
   | Auth e -> auth_event m e
@@ -4528,8 +4810,35 @@ let send (m : Model.t) ~follow_up =
   let m = { m with toasts = List.filter m.toasts ~f:(fun t -> not t.error) } in
   let sent (m : Model.t) =
     let history = History.add m.history text in
-    ( { (set_draft m "") with history; completion = None }
-    , [ Command.Save_history (History.to_list history) ] )
+    let m = { (set_draft m "") with history; completion = None } in
+    (* The backend's is the one that counts: once it has answered, ours
+       waits for the next page load. *)
+    ( m
+    , (match m.prefs.remote, acting_as m with
+       | Kept, None -> []
+       | (Unknown | Local), _ | Kept, Some _ ->
+         [ Command.Cache_prefs
+             [ { key = Key.history
+               ; value =
+                   Some
+                     (`Array
+                         (List.map (History.to_list history) ~f:(fun s ->
+                            `String s)))
+               }
+             ]
+         ])
+      @
+      if saves_prefs m
+      then
+        [ rpc
+            "push_pref"
+            (Prefs.push_params
+               ~key:Key.history
+               (`String text)
+               ~max:Pref_sync.history_max)
+            ~tag:Ignore
+        ]
+      else [] )
   in
   let attached = not (List.is_empty m.files.attachments) in
   match Slash.parse text with
@@ -4686,6 +4995,8 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
        | Some v -> set_verbosity m v
        | None -> m, [])
     | Confirm_tools -> set_confirm m (String.equal item.id "on")
+    | Themes -> theme_named m item.id
+    | Accents -> accent_named m item.id
     | Modes -> mode_by_name m item.id
     | Fork entries ->
       let m =
@@ -4792,6 +5103,10 @@ let respond_login (m : Model.t) (flow : Login_flow.t) =
 let dialog_accept (m : Model.t) =
   match m.dialog with
   | None -> m, []
+  | Some (Picker { kind = Accents; picker })
+    when Option.is_some (Theme.Accent.of_string (Picker.query picker)) ->
+    accent_named { m with dialog = None } (Picker.query picker)
+    |> fun (m, cmds) -> m, focus_editor :: cmds
   | Some (Picker { kind; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind item
@@ -4950,12 +5265,18 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match m.connection with
      | Connected -> m, [ Command.Drop_connection ]
      | Reconnecting _ -> m, [])
-  | Set_notifications { enabled; permission } ->
+  | Restore_prefs { prefs; legacy } ->
+    let m = apply_prefs m ~startup:true prefs in
+    ( { m with
+        prefs =
+          { m.prefs with legacy = (if legacy then prefs else m.prefs.legacy) }
+      }
+    , [ Command.Apply_theme (Model.look m) ] )
+  | Set_notification_permission permission ->
     ( { m with
         notifications =
           { m.notifications with
-            enabled
-          ; permission = Page_notify.Permission.of_string permission
+            permission = Page_notify.Permission.of_string permission
           }
       }
     , [] )
@@ -5005,7 +5326,6 @@ let update_connected (m : Model.t) (action : Action.t) =
     if Bool.equal narrow m.narrow
     then m, []
     else { m with narrow; sidebar_open = not narrow }, []
-  | Load_history entries -> { m with history = History.of_list entries }, []
   | Set_draft draft -> edit m draft
   | Edit { text; cursor } -> edit m ~cursor text
   | Send -> sent_to_bottom (send m ~follow_up:false)
@@ -5271,7 +5591,6 @@ let update_connected (m : Model.t) (action : Action.t) =
      | None -> m, [])
   | Toggle_terminal ->
     if m.terminal.open_ then close_terminal m else open_terminal m
-  | Reopen_terminal -> with_terminal m ~f:(fun t -> { t with open_ = true }), []
   | Close_terminal -> close_terminal m
   | New_shell -> new_shell m
   | Terminal_status { key; status } ->
@@ -5279,7 +5598,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Files action -> with_files m (Files.update m.files action)
   | Resize action ->
     let layout, saves = Resize.update m.layout (Model.shown m) action in
-    { m with layout }, List.map saves ~f:(fun s -> Command.Save_size s)
+    ( { m with layout }
+    , save_prefs
+        m
+        (List.map saves ~f:(fun ({ key; value } : Resize.Save.t) ->
+           { Prefs.Change.key; value = Option.map value ~f:Json.int })) )
   | Pr_filter filter ->
     let query =
       match m.dialog with
@@ -5301,6 +5624,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Pr_create f) when not f.busy ->
        { m with dialog = Some (Pr_create (Pr_create.update f action)) }, []
      | _ -> m, [])
+  | Preview_accent colour ->
+    (match Theme.Accent.of_string colour with
+     | Some accent ->
+       { m with theme_preview = Some { m.theme with accent } }, []
+     | None -> m, [])
 ;;
 
 (* Once a connection has brought the session back (its state and messages),
@@ -5321,6 +5649,12 @@ let settle (m : Model.t) cmds =
 ;;
 
 let update (m : Model.t) (action : Action.t) =
-  let m, cmds = update_connected m action in
-  settle m cmds
+  let m', cmds = update_connected m action in
+  let m', cmds = settle m' cmds in
+  let look = Model.look m' in
+  if
+    Theme.equal look (Model.look m)
+    || List.mem cmds (Command.Apply_theme look) ~equal:Command.equal
+  then m', cmds
+  else m', cmds @ [ Command.Apply_theme look ]
 ;;

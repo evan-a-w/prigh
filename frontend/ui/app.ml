@@ -58,6 +58,7 @@ module Reply_tag = struct
     | Abort_done
     | Notice_on_success of string
     | History
+    | Prefs_history
     | Dequeued
     | Editor_text
     | Reload_messages_notice of string
@@ -555,7 +556,45 @@ let refill_commands =
   ]
 ;;
 
-let start_commands = refill_commands @ [ Command.Load_history ]
+(* The user's prompt history is the backend's ([get_prefs], [push_pref]),
+   shared with prigh-web; [~/.prigh/history] is this machine's, read first
+   and for when the backend keeps none or is out of reach. *)
+let history_key = "history"
+let history_max = 500
+
+let start_commands =
+  refill_commands
+  @ [ Command.Load_history
+    ; rpc
+        "get_prefs"
+        ~params:(P.Prefs.get_params ~keys:[ history_key ])
+        ~tag:Prefs_history
+    ]
+;;
+
+(* Newest first, as the backend keeps it. *)
+let history_of_json = function
+  | Some (`Array items) ->
+    Some
+      (List.filter_map items ~f:(function
+         | `String s -> Some s
+         | _ -> None))
+  | _ -> None
+;;
+
+let set_backend_history m entries =
+  if Editor.browsing_history m.editor
+  then m
+  else { m with editor = Editor.set_history m.editor (List.rev entries) }
+;;
+
+let push_history text =
+  rpc
+    "push_pref"
+    ~params:
+      (P.Prefs.push_params ~key:history_key (`String text) ~max:history_max)
+    ~tag:Ignore
+;;
 
 let decode_list json ~f =
   match json with
@@ -2966,7 +3005,7 @@ let send_prompt m text =
       ( prune_agents m
       , [ rpc "prompt" ~params:(user_params m text) ~tag:(prompt_tag text) ] )
   in
-  m, cmds @ [ Command.Append_history text ]
+  m, cmds @ [ Command.Append_history text; push_history text ]
 ;;
 
 let submit m =
@@ -2996,6 +3035,7 @@ let queue_follow_up m =
       ( m
       , [ rpc "follow_up" ~params:(user_params m text) ~tag:(prompt_tag text)
         ; Command.Append_history text
+        ; push_history text
         ] )))
 ;;
 
@@ -4491,6 +4531,13 @@ let event m (e : P.Event.t) =
   | Terminal_frame _
   | Terminal_close _
   | Terminal_kill _ -> m, []
+  | Prefs_changed changes ->
+    (match
+       List.find changes ~f:(fun c -> String.equal c.key history_key)
+       |> Option.bind ~f:(fun c -> history_of_json c.value)
+     with
+     | Some entries -> set_backend_history m entries, []
+     | None -> m, [])
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
@@ -4601,7 +4648,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with editor }
            (if String.is_empty hint then e else sprintf "%s; %s" e hint)
        , [] )
-     | Ignore -> m, []
+     | Ignore | Prefs_history -> m, []
      | Forge_refresh ->
        (* A backend without git hosting: the hosts stay unlisted. *)
        m, []
@@ -5024,6 +5071,35 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions ->
             refresh_autocomplete { m with sessions = Some sessions })
+     | Prefs_history ->
+       (* Not worth a word when it is not what we expect. *)
+       (match P.Prefs.of_reply json with
+        | Error _ -> m, []
+        | Ok changes ->
+          (match
+             List.find changes ~f:(fun c -> String.equal c.key history_key)
+             |> Option.bind ~f:(fun c -> history_of_json c.value)
+           with
+           | Some entries -> set_backend_history m entries, []
+           | None ->
+             (* The first frontend of this user to ask: this machine's. *)
+             (match List.take (Editor.history m.editor) history_max with
+              | [] -> m, []
+              | entries ->
+                ( m
+                , [ rpc
+                      "set_prefs"
+                      ~params:
+                        (P.Prefs.set_params
+                           [ { key = history_key
+                             ; value =
+                                 Some
+                                   (`Array
+                                       (List.map entries ~f:(fun s -> `String s)))
+                             }
+                           ])
+                      ~tag:Ignore
+                  ] ))))
      | History ->
        decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun lines ->
          { m with editor = Editor.set_history m.editor lines }, [])

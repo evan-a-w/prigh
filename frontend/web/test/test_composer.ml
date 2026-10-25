@@ -38,8 +38,10 @@ let%expect_test
   [%expect
     {|
     Send
-    (Save_history ( "line one\
-                   \nline two"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value  "line one\
+                                   \nline two") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text  "line one\
                                          \nline two")))
@@ -70,15 +72,16 @@ let%expect_test
   [%expect
     {|
     Send
-    (Save_history ("use the other file"  "line one\
-                                        \nline two"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "use the other file") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ steer) (params ((text "use the other file")))
      (tag (Sent (text "use the other file") (images ()))))
     Send_follow_up
-    (Save_history
-     ("then run the tests" "use the other file"  "line one\
-                                                \nline two"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "then run the tests") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ follow_up) (params ((text "then run the tests")))
      (tag (Sent (text "then run the tests") (images ()))))
@@ -155,7 +158,8 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
   H.act h Send;
   [%expect
     {|
-    (Save_history (/help))
+    (Rpc (method_ push_pref) (params ((key history) (value /help) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt)
      (params
@@ -166,7 +170,7 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
 
 let%expect_test "prompt history: Up and Down at the first and last line" =
   let h = H.create () in
-  H.act h (Load_history [ "newest"; "older\ntwo lines"; "oldest" ]);
+  H.restore_history h [ "newest"; "older\ntwo lines"; "oldest" ];
   (* Down does nothing until browsing. *)
   H.key h "ArrowDown";
   H.type_ h "my draft";
@@ -174,6 +178,7 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
   print_s [%sexp ((H.model h).draft : string)];
   [%expect
     {|
+    (Apply_theme ((name Original) (accent (Preset Orange))))
     (browser default)
     History_older
     newest
@@ -222,13 +227,13 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
   H.act h Send;
   [%expect
     {|
-    (Save_history ("my draft" newest  "older\
-                                     \ntwo lines" oldest))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "my draft") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "my draft")))
      (tag (Sent (text "my draft") (images ()))))
-    (Save_history ("my draft" newest  "older\
-                                     \ntwo lines" oldest))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "my draft") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "my draft")))
      (tag (Sent (text "my draft") (images ()))))
@@ -320,7 +325,8 @@ let%expect_test "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
   [%expect
     {|
     Send
-    (Save_history ("/cd new"))
+    (Rpc (method_ push_pref) (params ((key history) (value "/cd new") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path new) (if_missing ask)))
      (tag (Dir_changed Cwd)))
     ("" false)
@@ -332,7 +338,8 @@ let%expect_test "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
     {|
     (Rpc (method_ list_paths) (params ((prefix src/ma))) (tag (Paths src/ma)))
     Send
-    (Save_history ("look at @src/ma" "/cd new"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "look at @src/ma") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "look at @src/ma")))
      (tag (Sent (text "look at @src/ma") (images ()))))
@@ -343,7 +350,8 @@ let%expect_test "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
   [%expect
     {|
     Send
-    (Save_history (hello "look at @src/ma" "/cd new"))
+    (Rpc (method_ push_pref) (params ((key history) (value hello) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text hello)))
      (tag (Sent (text hello) (images ()))))
@@ -359,7 +367,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -367,6 +375,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /theme [original|dark|light] pick or set the theme, for you in every browser
+    /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
@@ -405,8 +415,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
-    /abort stop the current run
-    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
@@ -428,7 +436,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history ("/model openai/gpt-6"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/model openai/gpt-6") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
     (Expire_toast (id 0) (after_ms 4140))
     |}];
@@ -438,7 +448,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history (/compact "/model openai/gpt-6"))
+    (Rpc (method_ push_pref) (params ((key history) (value /compact) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 2700))
     (Rpc (method_ compact) (params ())
      (tag (Notice "Compacted the conversation")))
@@ -469,10 +480,12 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/compcat /compact "/model openai/gpt-6"))
+    (Rpc (method_ push_pref) (params ((key history) (value /compcat) (max 500)))
+     (tag Ignore))
     /compcat
     Unknown command /compcat. Did you mean /compact? (/help lists them) (Dismiss)
-    (Save_history (/frobnicate /compcat /compact "/model openai/gpt-6"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /frobnicate) (max 500))) (tag Ignore))
     /frobnicate
     Unknown command /frobnicate: /help lists the commands. (Dismiss)
     |}];
@@ -481,9 +494,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   H.act h Send;
   [%expect
     {|
-    (Save_history
-     ("/etc/hosts has a typo?" /frobnicate /compcat /compact
-      "/model openai/gpt-6"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/etc/hosts has a typo?") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "/etc/hosts has a typo?")))
      (tag (Sent (text "/etc/hosts has a typo?") (images ()))))
@@ -494,9 +507,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history
-     (/help "/etc/hosts has a typo?" /frobnicate /compcat /compact
-      "/model openai/gpt-6"))
+    (Rpc (method_ push_pref) (params ((key history) (value /help) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     Commands and keys
     |}]
@@ -522,7 +534,8 @@ let%expect_test "/cd completes directories" =
   [%expect
     {|
     Send
-    (Save_history ("/cd src/"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/cd src/") (max 500))) (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path src/) (if_missing ask)))
      (tag (Dir_changed Cwd)))
     |}];
@@ -531,7 +544,8 @@ let%expect_test "/cd completes directories" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/cd "/cd src/"))
+    (Rpc (method_ push_pref) (params ((key history) (value /cd) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
      (tag (Prompt_paths /work)))
@@ -552,7 +566,8 @@ let%expect_test "a message that cannot be sent comes back to the editor" =
   [%expect
     {|
     Send
-    (Save_history ("look at this"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "look at this") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt)
      (params

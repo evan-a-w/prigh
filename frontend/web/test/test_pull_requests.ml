@@ -86,7 +86,8 @@ let%expect_test "/pr: loading, the list, filtering, a pull request and back" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/pr))
+    (Rpc (method_ push_pref) (params ((key history) (value /pr) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     (Rpc (method_ pr_list) (params ((state open)))
      (tag (Forge (List (session s1) (filter Open)))))
@@ -358,7 +359,9 @@ let%expect_test "/pr new: prefilled, edited, refused, then created" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history ("/pr new Add the x feature"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/pr new Add the x feature") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ pr_defaults) (params ()) (tag (Forge (Defaults s1))))
     New pull request

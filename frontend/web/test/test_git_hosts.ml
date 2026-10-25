@@ -35,7 +35,7 @@ let device_code =
     {|"kind":"auth_url","url":"https://github.com/login/device","instructions":"Enter the code ABCD-1234 at https://github.com/login/device"|}
 ;;
 
-let section h = H.text h ~selector:".settings-section:nth-child(3)"
+let section h = H.text h ~selector:".settings-section:nth-child(4)"
 
 let%expect_test
     "settings: the git hosts, connecting with the device code, back to \
@@ -268,7 +268,8 @@ let%expect_test "another Forgejo host: from settings, or /login forgejo" =
   [%expect
     {|
     (Focus editor)
-    (Save_history ("/login forgejo"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/login forgejo") (max 500))) (tag Ignore))
     (Focus dialog-input)
     Close_dialog
     (Focus editor)
@@ -323,20 +324,20 @@ let%expect_test "/login and /logout with git hosts" =
     ];
   [%expect
     {|
-    /login github; login dialog for github.com; forge_login {"host":"github.com","kind":"github"}
-    /login github token; login dialog for github.com; forge_login {"host":"github.com","kind":"github","method":"token"}
-    /login github ghe.corp.com token; login dialog for ghe.corp.com; forge_login {"host":"ghe.corp.com","kind":"github","method":"token"}
-    /login forgejo codeberg.org; login dialog for codeberg.org; forge_login {"host":"codeberg.org","kind":"forgejo"}
-    /login codeberg.org token; login dialog for codeberg.org; forge_login {"host":"codeberg.org","kind":"forgejo","method":"token"}
-    /login git.example.com; login dialog for git.example.com; forge_login {"host":"git.example.com","kind":"forgejo"}
-    /login forgejo; which host?
-    /login unknown.host; error: No git host unknown.host is set up: /login forgejo unknown.host signs in to a Forgejo or Gitea there, /login github unknown.host to GitHub Enterprise.
-    /login github later; error: Usage: /login github [HOST] [token]
-    /login anthropic; login dialog for anthropic; login {"provider":"anthropic"}
-    /login openai api_key; login dialog for openai; login {"provider":"openai","method":"api_key"}
-    /logout github; forge_logout {"host":"github.com"}
-    /logout codeberg.org; forge_logout {"host":"codeberg.org"}
-    /logout anthropic; logout {"provider":"anthropic"}
+    /login github; login dialog for github.com; push_pref {"key":"history","value":"/login github","max":500}; forge_login {"host":"github.com","kind":"github"}
+    /login github token; login dialog for github.com; push_pref {"key":"history","value":"/login github token","max":500}; forge_login {"host":"github.com","kind":"github","method":"token"}
+    /login github ghe.corp.com token; login dialog for ghe.corp.com; push_pref {"key":"history","value":"/login github ghe.corp.com token","max":500}; forge_login {"host":"ghe.corp.com","kind":"github","method":"token"}
+    /login forgejo codeberg.org; login dialog for codeberg.org; push_pref {"key":"history","value":"/login forgejo codeberg.org","max":500}; forge_login {"host":"codeberg.org","kind":"forgejo"}
+    /login codeberg.org token; login dialog for codeberg.org; push_pref {"key":"history","value":"/login codeberg.org token","max":500}; forge_login {"host":"codeberg.org","kind":"forgejo","method":"token"}
+    /login git.example.com; login dialog for git.example.com; push_pref {"key":"history","value":"/login git.example.com","max":500}; forge_login {"host":"git.example.com","kind":"forgejo"}
+    /login forgejo; which host?; push_pref {"key":"history","value":"/login forgejo","max":500}
+    /login unknown.host; error: No git host unknown.host is set up: /login forgejo unknown.host signs in to a Forgejo or Gitea there, /login github unknown.host to GitHub Enterprise.; push_pref {"key":"history","value":"/login unknown.host","max":500}
+    /login github later; error: Usage: /login github [HOST] [token]; push_pref {"key":"history","value":"/login github later","max":500}
+    /login anthropic; login dialog for anthropic; push_pref {"key":"history","value":"/login anthropic","max":500}; login {"provider":"anthropic"}
+    /login openai api_key; login dialog for openai; push_pref {"key":"history","value":"/login openai api_key","max":500}; login {"provider":"openai","method":"api_key"}
+    /logout github; push_pref {"key":"history","value":"/logout github","max":500}; forge_logout {"host":"github.com"}
+    /logout codeberg.org; push_pref {"key":"history","value":"/logout codeberg.org","max":500}; forge_logout {"host":"codeberg.org"}
+    /logout anthropic; push_pref {"key":"history","value":"/logout anthropic","max":500}; logout {"provider":"anthropic"}
     |}]
 ;;
 
@@ -469,7 +470,9 @@ let%expect_test "completion offers the git hosts" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history ("/login forgejo codeberg.org"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/login forgejo codeberg.org") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ forge_login) (params ((host codeberg.org) (kind forgejo)))
      (tag Login_started))

@@ -122,6 +122,8 @@ type t =
       } (** streamed answer to our own [btw] request *)
   | Sessions_changed
   (** something [list_sessions] shows changed, in any session *)
+  | Prefs_changed of Prefs.Change.t list
+  (** another frontend of the user changed their preferences *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

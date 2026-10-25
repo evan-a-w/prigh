@@ -8,9 +8,12 @@ type t
 (** Started and connected: [state] (a fresh session, default [state_json ()]),
     the models ([models_json]), the providers ([auth_json]), the git hosts
     ([forges_json]), the config
-    ([config_json]) and [sessions] answered, and the clock at [now]. The startup commands are printed only
+    ([config_json]), [sessions] and the user's preferences (none) answered, and the clock at [now]. The startup commands are printed only
     when [verbose]. *)
 val create : ?verbose:bool -> ?sessions:string -> ?state:string -> unit -> t
+
+(** The prompt history, newest first, as the browser's cache restores it. *)
+val restore_history : t -> string list -> unit
 
 (** Started, with nothing answered yet. *)
 val connecting : unit -> t

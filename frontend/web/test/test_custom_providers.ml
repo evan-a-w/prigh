@@ -81,7 +81,8 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/login))
+    (Rpc (method_ push_pref) (params ((key history) (value /login) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
@@ -249,7 +250,8 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/model /login))
+    (Rpc (method_ push_pref) (params ((key history) (value /model) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     Claude Opus 5.5 anthropic, 200k ctx ✓
     Claude Sonnet 5 anthropic, 200k ctx
@@ -283,7 +285,8 @@ let%expect_test
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history ("/login custom"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/login custom") (max 500))) (tag Ignore))
     (Focus dialog)
     (Rpc (method_ login) (params ((provider custom))) (tag Login_started))
     Add a custom provider
@@ -319,7 +322,8 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /auth) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
@@ -391,7 +395,8 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   [%expect
     {|
     (Focus editor)
-    (Save_history (/login /auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /login) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
@@ -431,7 +436,8 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/logout /login /auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /logout) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)

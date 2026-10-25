@@ -48,7 +48,9 @@ let%expect_test
   [%expect
     {|
     Toggle_terminal
-    (Remember_terminal true)
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     |}];
   H.show h ~selector:".terminal-panel";
@@ -113,7 +115,9 @@ let%expect_test
   [%expect
     {|
     Toggle_terminal
-    (Remember_terminal false)
+    (Cache_prefs (((key web.terminal-open) (value ()))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open null)))))
+     (tag Show_error))
     (Focus editor)
     |}];
   H.text h ~selector:".terminal-panel";
@@ -126,7 +130,9 @@ let%expect_test "the panel follows the session, the host and the user" =
   status h Connected;
   [%expect
     {|
-    (Remember_terminal true)
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     |}];
   let show () = H.text h ~selector:".terminal-panel" in
@@ -185,6 +191,13 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
      (tag (Resync (session s2) (from ()))))
@@ -204,7 +217,9 @@ let%expect_test "an exited shell, a failure and what to do next" =
   H.text h ~selector:".terminal-panel";
   [%expect
     {|
-    (Remember_terminal true)
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     c9 (offline) /work unavailable (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s1)(host c9)(online false)(as_user())(generation 0))
@@ -251,8 +266,11 @@ let%expect_test "/terminal, the top bar's button and the height" =
   H.act h Send;
   [%expect
     {|
-    (Save_history (/terminal))
-    (Remember_terminal true)
+    (Rpc (method_ push_pref) (params ((key history) (value /terminal) (max 500)))
+     (tag Ignore))
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     |}];
   (* Already open: back to it. *)
@@ -263,9 +281,11 @@ let%expect_test "/terminal, the top bar's button and the height" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/terminal))
+    (Rpc (method_ push_pref) (params ((key history) (value /terminal) (max 500)))
+     (tag Ignore))
     Focus_terminal
-    (Save_history ("/terminal now" /terminal))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/terminal now") (max 500))) (tag Ignore))
     Usage: /terminal (Ctrl+` opens and closes it; × in its header too) (Dismiss)
     |}];
   H.show h ~selector:".terminal-toggle";
@@ -287,7 +307,9 @@ let%expect_test "/terminal, the top bar's button and the height" =
   H.show h ~selector:"#terminal-panel";
   [%expect
     {|
-    (Save_size ((key prigh-web.terminal-height) (value (120))))
+    (Cache_prefs (((key web.terminal-height) (value (120)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 120)))))
+     (tag Show_error))
     <div role="separator"
          tabindex="0"
          aria-label="Resize the terminal"
@@ -303,7 +325,9 @@ let%expect_test "/terminal, the top bar's button and the height" =
          data-resize-target="#terminal-panel"
          class="resizer resizer-terminal"
          @on_dblclick> </div>
-    (Save_size ((key prigh-web.terminal-height) (value (300))))
+    (Cache_prefs (((key web.terminal-height) (value (300)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 300)))))
+     (tag Show_error))
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
       <div role="separator"
            tabindex="0"
@@ -342,7 +366,9 @@ let%expect_test "/terminal, the top bar's button and the height" =
   H.act h Close_terminal;
   [%expect
     {|
-    (Remember_terminal false)
+    (Cache_prefs (((key web.terminal-open) (value ()))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open null)))))
+     (tag Show_error))
     (Focus editor)
     |}];
   (* On a phone it is a sheet over the page, the sidebar's drawer closed. *)
@@ -352,7 +378,9 @@ let%expect_test "/terminal, the top bar's button and the height" =
   print_s [%sexp ((H.model h).sidebar_open : bool)];
   [%expect
     {|
-    (Remember_terminal true)
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     false
     |}]
@@ -370,7 +398,9 @@ let%expect_test "keys inside the terminal stay out of dialogs and confirmations"
   H.key h "Enter";
   [%expect
     {|
-    (Remember_terminal true)
+    (Cache_prefs (((key web.terminal-open) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
+     (tag Show_error))
     Focus_terminal
     (Focus confirm)
     (browser default)
@@ -392,17 +422,25 @@ let%expect_test "keys inside the terminal stay out of dialogs and confirmations"
     Close_dialog
     (Focus editor)
     Toggle_terminal
-    (Remember_terminal false)
+    (Cache_prefs (((key web.terminal-open) (value ()))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open null)))))
+     (tag Show_error))
     (Focus editor)
     |}]
 ;;
 
 let%expect_test "after a reload the panel reopens without taking the keyboard" =
   let h = H.create ~state:(state ()) () in
-  H.act h Reopen_terminal;
+  H.act
+    h
+    (Restore_prefs
+       { prefs = [ { key = Pref_sync.Key.terminal_open; value = Some `True } ]
+       ; legacy = false
+       });
   H.text h ~selector:".terminal-panel";
   [%expect
     {|
+    (Apply_theme ((name Original) (accent (Preset Orange))))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s1)(host backend)(online true)(as_user())(generation 0))
     |}]
