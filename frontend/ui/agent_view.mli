@@ -44,6 +44,12 @@ val start
   -> model:string
   -> t list
 
+val status_of_result
+  :  turns:int
+  -> cost_usd:float
+  -> P.Event.Subagent_result.t
+  -> Status.t
+
 val finish
   :  t list
   -> agent_id:string

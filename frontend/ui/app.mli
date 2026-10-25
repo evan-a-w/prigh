@@ -84,6 +84,8 @@ module Reply_tag : sig
     | Pending (** [get_pending]: confirmations and questions to show *)
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Subagent_loaded
+    (** [get_subagent], for a subagent whose events we missed *)
     | Dir_changed of P.Dir_change.Target.t
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker (** [list_worktrees] for [/worktree] *)
