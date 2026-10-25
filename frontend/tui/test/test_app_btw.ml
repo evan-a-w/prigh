@@ -28,11 +28,11 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      Working on it
     ┌─ btw ────────────────────────────────────────────────────┐
     │ ? which file are you editing?                            │
     │ answering… · Esc to dismiss                              │
@@ -47,6 +47,11 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      Working on it
     ┌─ btw ────────────────────────────────────────────────────┐
     │ ? which file are you editing?                            │
     │ It is app.ml, around line 40.                            │
@@ -118,6 +123,10 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
     │ ? second?                                                │
     │ Second answer.                                           │
@@ -150,10 +159,10 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
     │ ? broken?                                                │
     │ error: no credentials for deepseek; /login deepseek      │
@@ -202,10 +211,10 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
         (btw_id   btw-1)))
       (tag (Btw btw-1)))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
     │ ? count                                                  │
     │ … 20 lines above                                         │
@@ -226,6 +235,10 @@ let%expect_test "/bt autocompletes to /btw" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ /btw <question>                 ask a side question witho…
       /budget [dollars|off]           show or set the session's…
       /abort                          abort the current run

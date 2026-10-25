@@ -1496,6 +1496,16 @@ let screen (m : App.Model.t) : Screen.t =
     | Some agent -> agent.transcript
     | None -> m.transcript
   in
+  let overlays = overlays m ~width:area ~rows in
+  let overlay_lines = List.concat_map overlays ~f:(fun o -> o.lines) in
+  let overlay_top = rows - List.length overlay_lines in
+  (* Following, the transcript's tail ends above the overlays, as it did
+     above the old dialogs; scrolled back, they cover its bottom rows. *)
+  let body_rows =
+    match m.viewport with
+    | Viewport.Follow -> Int.max 0 (body_rows - List.length overlay_lines)
+    | Viewport.Anchored _ -> body_rows
+  in
   let transcript =
     match m.viewport with
     | Viewport.Follow ->
@@ -1523,9 +1533,6 @@ let screen (m : App.Model.t) : Screen.t =
     List.init (Int.max 0 (body_rows - List.length transcript)) ~f:(fun _ -> [])
   in
   let transcript = Option.to_list agent_header @ padding @ transcript in
-  let overlays = overlays m ~width:area ~rows in
-  let overlay_lines = List.concat_map overlays ~f:(fun o -> o.lines) in
-  let overlay_top = rows - List.length overlay_lines in
   let transcript = exactly rows transcript in
   let main =
     List.take transcript overlay_top

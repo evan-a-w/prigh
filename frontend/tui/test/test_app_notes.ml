@@ -214,10 +214,10 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Fork at  (3)
     / ▏
        fix the build                    #1
@@ -333,10 +333,6 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
   [%expect
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
-
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
 
@@ -346,6 +342,10 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
 
     ◇ Plan mode off: the model was told it can change files
       editing
+
+    ◇ Plan mode on: the model was told to plan, not change files
+    ◎ Goal: ship it
+      planning the goal
     Fork at  (2)
     / ▏
        look around                           #1
@@ -453,8 +453,8 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
   [%expect
     {|
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Changes ────────────────────────────────────────────────────────────┐
     │ diff /work against HEAD  2 files changed, +2 −1                      │
     │ src/a.ml  +1 −1                                                      │
@@ -616,6 +616,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
     │ notifications: the bell when a turn ends, a tool waits for you or background work finishes,      │
     │ while this terminal is not focused (it has not reported focus yet: in tmux, set -g focus-events  │

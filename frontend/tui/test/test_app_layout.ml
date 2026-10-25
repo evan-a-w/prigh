@@ -71,10 +71,10 @@ let%expect_test "no shift: opening the command autocomplete" =
     > ▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ▸ /help                              show commands and keys
       /hotkeys                           show keyboard shortcuts
       /model [name|id|provider/id]       pick or switch the model
@@ -116,10 +116,10 @@ let%expect_test "no shift: a confirmation dialog arrives" =
     --- after ---
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ──────────────────────────────────────────────────────────┐
     │ Run bash: rm -rf _build?                                           │
     │ y  allow once                                                      │
@@ -156,10 +156,10 @@ let%expect_test "no shift: a picker opens over the transcript" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  $10/$50 p…
@@ -343,13 +343,13 @@ let%expect_test "no shift: queued messages while running" =
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
+
+    ▌ go
+      Working on it, step one
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  and then this
       steer      also that
@@ -369,6 +369,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ /hotkeys  show keyboard shortcuts
     ──────────────────────────────────────────────────────────────────────
     > /hotkeys▏
@@ -434,6 +435,10 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ /mcp [reconnect]                 list MCP servers (Enter approves o…
       /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks fi…
       /model [name|id|provider/id]     pick or switch the model
@@ -571,16 +576,16 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
-
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
 
+    ▌ list the files
+    ✓ bash $ ls
+        a.ml
+        b.ml
+      Two files: a.ml and b.ml.
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Al…
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
@@ -653,16 +658,16 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
-
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
 
+    ▌ list the files
+    ✓ bash $ ls
+        a.ml
+        b.ml
+      Two files: a.ml and b.ml.
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through

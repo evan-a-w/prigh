@@ -34,6 +34,8 @@ let%expect_test "the picker lists active sessions first, whatever the order" =
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
        (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
        release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
@@ -62,6 +64,8 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
      ✓ (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
     ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
@@ -76,6 +80,8 @@ let%expect_test
   rows h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
     ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
       ── archived ──
@@ -106,6 +112,8 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
     ▸ deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
@@ -121,6 +129,7 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
     ▸ release      cut it · /work
       try a spike  archived · /old
     > /switch rel
@@ -141,14 +150,18 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
     ▸ deploy   deploy it · /work
       scratch  /tmp
       release  cut it · /work
     > /archive
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
     ▸ build fix    archived · fix the build · /work
       try a spike  archived · /old
     > /unarchive
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
     ▸ deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
@@ -176,10 +189,10 @@ let%expect_test
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ session "build fix" is the session you are in: switch to another one first,  │
     │ or leave it out                                                              │
@@ -201,10 +214,10 @@ let%expect_test
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
     │ Delete the archived session 3a (1.4 MB)? Enter deletes, Esc keeps it         │
     └──────────────────────────────────────────────────────────────────────────────┘

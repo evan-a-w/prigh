@@ -647,6 +647,7 @@ scenario_connect_signin() {
 	capture connect_signin "the token, masked"
 	keys Enter
 	wait_for "connected to 127.0.0.1"
+	wait_for "tools now run on"
 	settle
 	capture connect_signin "signed in"
 	saved_connection
@@ -681,6 +682,7 @@ scenario_startup_signin() {
 	type_text "s3cret"
 	keys Enter
 	wait_for "connected to 127.0.0.1"
+	wait_for "tools now run on"
 	settle
 	capture startup_signin "signed in"
 	saved_connection

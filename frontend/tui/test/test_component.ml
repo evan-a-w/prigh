@@ -198,7 +198,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     {|
     rpc set_thinking ((thinking zzz))
     spinner=1 running=false
-
+      quits
     ┌─ Error ────────────────────────────────────────┐
     │ thinking must be one of: off, on, low, high,   │
     │ max                                            │
@@ -223,7 +223,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
   [%expect
     {|
     spinner=2 running=true
-
+      quits
     ┌─ Error ────────────────────────────────────────┐
     │ thinking must be one of: off, on, low, high,   │
     │ max                                            │

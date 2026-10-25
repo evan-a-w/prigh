@@ -258,6 +258,8 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -272,6 +274,10 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Model  (2)
     / fable▏
     ▸  Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $1…
@@ -372,6 +378,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -389,6 +397,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -412,6 +422,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ off
       low
       on
@@ -436,6 +450,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -507,6 +524,8 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -548,6 +567,9 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ model set to anthropic/claude-fable-5; /model to change  │
     └────────────────────────────────────────── Esc dismisses ─┘
@@ -575,6 +597,10 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Choose a login method  (2)
     / ▏
     ▸  Claude Pro/Max  oauth
@@ -792,6 +818,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ ask
       auto-edit
       auto
@@ -823,6 +853,10 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: wh…
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
@@ -892,6 +926,8 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ src/
       src/app.ml
     ────────────────────────────────────────────────────────────
@@ -943,6 +979,8 @@ let%expect_test "/switch fetches sessions then reopens completion" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ fix the build please  /work
       (empty)               /other
     ────────────────────────────────────────────────────────────
@@ -968,6 +1006,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ src/
     ────────────────────────────────────────────────────────────
     > /cd sr▏
@@ -1005,6 +1044,7 @@ let%expect_test
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ newer/
     ────────────────────────────────────────────────────────────
     > /cd new▏
@@ -1062,6 +1102,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Change directory to ────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ▸ newer/
@@ -1090,6 +1133,10 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
@@ -1132,6 +1179,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
+    ▌ in the other session
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -1155,7 +1203,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
 
 
 
-
+    ▌ in the other session
     Log out of  (1)
     / ▏
     ▸  DeepSeek  api_key via auth.json
@@ -1202,6 +1250,8 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Session name ───────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -1273,10 +1323,10 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions (named)  (1)  Alt+A (un)archives
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
@@ -1293,6 +1343,9 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Delete session 2 (0 B)? Enter deletes, Esc keeps it      │
     └──────────────────────────────────────────────────────────┘
@@ -1318,6 +1371,9 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (1)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
@@ -1367,10 +1423,10 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
     ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1385,6 +1441,8 @@ let%expect_test
     |}];
   picker_rows h;
   [%expect {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
     [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it[dim]  /work[/]
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
@@ -1397,6 +1455,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / spike▏
       ── archived ──
@@ -1420,10 +1482,10 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1445,6 +1507,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1468,6 +1534,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1485,10 +1555,10 @@ let%expect_test
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete 2 sessions (1.0 MB)? Enter deletes, Esc keeps them                                        │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1500,6 +1570,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1524,6 +1598,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1543,6 +1621,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Warning ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Deleted 1 session (1.0 MB)                                                                       │
     │ Not deleted: session "deploy" is running: wait for it, or switch to it and /abort                │
@@ -1566,6 +1646,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete session 5 (100 B)? Enter deletes, Esc keeps it                                            │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1602,10 +1685,10 @@ let%expect_test
         (name     "session 5")
         (archived true))))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1628,10 +1711,10 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1664,10 +1747,10 @@ let%expect_test
         (name     "session \"old spike\"")
         (archived false))))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -1697,10 +1780,10 @@ let%expect_test
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete all 2 archived sessions (2.4 MB)? Enter deletes, Esc keeps them                           │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1732,10 +1815,10 @@ let%expect_test
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete all 2 archived sessions (2.4 MB)? Enter deletes, Esc keeps them                           │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1800,6 +1883,8 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ try a spike  archived · /old
       old spike    archived · another spike · /old
     ────────────────────────────────────────────────────────────
@@ -1883,10 +1968,10 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
         (arg      deploy)
         (archived true))))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ session "deploy" is running: wait for it or /abort it    │
     │ before archiving                                         │
@@ -1931,10 +2016,10 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
       (tag (Sessions_to_delete (3b deploy))))
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete 2 sessions (1.0 MB)? Enter deletes, Esc keeps them                                        │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -2004,6 +2089,9 @@ let%expect_test "/delete completes session after session" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ (empty)      /tmp
       try a spike  archived · /old
       old spike    archived · another spike · /old
@@ -2039,10 +2127,10 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -2073,6 +2161,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
      ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
@@ -2101,10 +2193,10 @@ let%expect_test "/tree skips archived and other settings entries" =
     {|
     (Rpc (method_ get_entries) (params ((all true))) (tag Entries_for_tree))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Session tree  (2)
     / ▏
     ▸* > root question
@@ -2126,6 +2218,10 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Fork at  (2)
     / ▏
        first question   #1
@@ -2160,10 +2256,10 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_rewind))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Rewind to  (2)
     / ▏
        first question   #1
@@ -2177,6 +2273,9 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Rewind to "second question"? Later messages are abandon… │
     └──────────────────────────────────────────────────────────┘
@@ -2199,6 +2298,8 @@ let%expect_test "/tree renders branches with the active path marked" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Session tree  (5)
     / ▏
     ▸* > root question
@@ -2291,10 +2392,10 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Export to ──────────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -2338,10 +2439,10 @@ let%expect_test "/import imports a path or prompts for one" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Import from ────────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -2387,10 +2488,10 @@ let%expect_test "/cd changes the directory or prompts for a path" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Change directory to ────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -2447,10 +2548,10 @@ let%expect_test "/cd to a missing directory asks to create it; /mkdir creates" =
         (then_ (Dir_changed Cwd)))))
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Create /work/new? (y/n)                                  │
     └──────────────────────────────────────────────────────────┘
@@ -2601,10 +2702,10 @@ let%expect_test "/cd to a missing directory asks to create it; /mkdir creates" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Create and change to directory ─────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -2648,10 +2749,10 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Logins ─────────────────────────────────────────────────┐
     │ anthropic  not configured  [oauth (Claude Pro/Max),      │
     │ api_key (API key)]                                       │
@@ -2775,10 +2876,12 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
+
+    ▌ run it
+    ✓ bash $ ls -la  20 lines
+      all done
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -2882,12 +2985,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
 
     ▌ what is in these?
+    ▌ [image: image/png, 34.2 KB]
+    ▌ [image: image/jpeg, 512 B]
+    ✓ read shot.png  1 image
+      A cat.
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -2924,6 +3029,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ [image: image/gif, 14 B]
+    ✓ read a.webp  2 images
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -2946,8 +3053,8 @@ let%expect_test
 
 
 
-
-
+    ▌ [image: image/gif, 14 B]
+    ✓ read a.webp  2 images
     Rewind to  (1)
     / ▏
     ▸* [image: image/gif, 14 B]  #1
@@ -2965,6 +3072,9 @@ let%expect_test "/verbosity with no argument opens argument completion" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ Quiet
       Normal
       Verbose
@@ -3010,11 +3120,13 @@ let%expect_test "quiet hides intermediate text and thinking" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
 
+    ▌ hi
+      let me look at the files
+    ✓ bash $ ls  2 lines
+      all done
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -3044,11 +3156,11 @@ let%expect_test "tool error is always visible in Quiet" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
     ✕ bash $ cat missing
+        no such file
+        second line
+        third line
+        … 1 more line
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -3302,6 +3414,9 @@ let%expect_test "abort restores queued messages" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       steer      first
       steer      second
@@ -3709,8 +3824,6 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.mode h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
 
@@ -3718,6 +3831,9 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     … subagent index the repo  1 turn
         ↳ bash $ ls -R
       started it
+
+    ▌ meanwhile
+      sure
     Subagents  (1)
     / ▏
     ▸  index the repo  a1  running  claude-haiku
@@ -4177,6 +4293,10 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Subagents  (2)
     / ▏
     ▸  find auth  c1  running  claude-haiku
@@ -4441,6 +4561,8 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     queued (1) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  after this
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -4461,6 +4583,9 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  after this
       follow-up  and more
@@ -4490,6 +4615,8 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     queued (1) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  queued text
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -4570,11 +4697,11 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
     {|
     (Append_history "!echo hi")
 
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
+    ✓ shell ls -la
+        a.ml
+        b.ml
     ┌─ Warning ────────────────────────────────────────────────────────────────────────────────────────┐
     │ !echo hi waits for the turn to end (kept in the editor); !&echo hi runs it in the background now │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
@@ -4724,6 +4851,8 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ src/
       src/app.ml
     ────────────────────────────────────────────────────────────
@@ -4737,6 +4866,8 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -4820,6 +4951,8 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[ ] Claude Fable 5       Claude Fable 5
@@ -4834,6 +4967,8 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[x] Claude Fable 5       Claude Fable 5
@@ -4848,6 +4983,8 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[x] Claude Fable 5       Claude Fable 5
@@ -4862,6 +4999,8 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[ ] Claude Fable 5       Claude Fable 5
@@ -5149,6 +5288,8 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -5164,6 +5305,9 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Model (logged in)  (1)
     / ▏
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
@@ -5197,8 +5341,8 @@ let%expect_test "login dialog is a bordered block with url, progress and prompt"
   [%expect
     {|
     (Open_browser https://claude.ai/oauth?x=1)
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -5220,6 +5364,9 @@ let%expect_test "confirm dialog is a bordered block" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -5238,6 +5385,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     / ▏
     ────────────────────────────────────────────────────────────
     >
@@ -5477,6 +5625,9 @@ let%expect_test "/help model prints one command's usage" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ /model ─────────────────────────────────────────────────┐
     │ /model [name|id|provider/id]  pick or switch the model   │
     └───────────────────────────────────────────── Esc closes ─┘
@@ -5493,6 +5644,10 @@ let%expect_test "/help with an unknown command suggests the closest name" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ unknown command /modle (back in the editor); did you     │
     │ mean /mode?                                              │
@@ -5518,6 +5673,8 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Run bash: rm -rf build?                                  │
     │ y  allow once                                            │
@@ -5615,6 +5772,8 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Run bash: rm -rf build?                                  │
     │ y  allow once                                            │
@@ -5635,9 +5794,9 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
         (call_id c1)
         (allow   true)))
       (tag Show_error))
-
-
-
+    ▌ earlier question
+      earlier answer
+      allowed bash
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Write /work/a.txt?                                       │
     │ y  allow once                                            │
@@ -5658,9 +5817,9 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
         (call_id c2)
         (allow   true)))
       (tag Show_error))
-
-
-
+      earlier answer
+      allowed bash
+      allowed write
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Edit /work/b.txt?                                        │
     │ y  allow once                                            │
@@ -5684,7 +5843,9 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      allowed bash
+      allowed write
+      denied edit
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Apply patch to src/a.ml, src/b.ml?                       │
     │ y  allow once                                            │
@@ -5819,6 +5980,10 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ mode: auto — tools run without asking (/confirm on|off   │
     │ sets ask or auto; /mode has all)                         │
@@ -5905,6 +6070,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
     │ Run bash: rm -rf build?                                                                                              │
     │ y  allow once                                                                                                        │
@@ -5919,6 +6088,11 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────┐
     │ Run bash: rm -rf build?              │
     │ y  allow once                        │
@@ -5942,10 +6116,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
@@ -5959,6 +6133,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Sessions  (2)  Alt+A (un)archives
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
@@ -6052,6 +6230,8 @@ let%expect_test "login end to end includes a prompt_cancelled" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -6093,10 +6273,10 @@ let%expect_test "login end to end includes a prompt_cancelled" =
       (tag (Set_model_done anthropic/claude-fable-5)))
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ model set to anthropic/claude-fable-5; /model to change  │
     └────────────────────────────────────────── Esc dismisses ─┘
@@ -6451,6 +6631,10 @@ let%expect_test "Alt+N: the snippet picker inserts at the cursor" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Snippets  (2)
     / ▏
     ▸  review  review the diff
@@ -6825,6 +7009,9 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
+      backend connection lost; reconnecting (/retry-backend-connection to
+      retry now, Ctrl+C quits)
     ┌─ Warning ──────────────────────────────────────────────────────────┐
     │ reconnect failed: connection refused; retrying in 60s (attempt 9)  │
     └──────────────────────────────────────────────────── Esc dismisses ─┘
@@ -7068,6 +7255,8 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -7091,6 +7280,9 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ▸ /work/
@@ -7115,6 +7307,9 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ▸ /work/src/
@@ -7149,6 +7344,9 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ──────────────────────────────────────────────────────────┐
     │ Create /work/src on laptop? (y/n)                                  │
     └────────────────────────────────────────────────────────────────────┘
@@ -7192,10 +7390,10 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -7255,6 +7453,10 @@ let%expect_test "the hello's host id marks this frontend, also after a \
   picker ();
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Tool host  (3)
     / ▏
        srv            /work
@@ -7287,7 +7489,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
 
 
 
-
+      prigh in /home/me · /help · Esc aborts · Ctrl+C twice quits
     Tool host  (3)
     / ▏
        srv            /work
@@ -7315,6 +7517,8 @@ let%expect_test "the host picker shows which session other frontends are in" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Tool host  (4)
     / ▏
        srv                    /work
@@ -7333,6 +7537,8 @@ let%expect_test "the host picker shows which session other frontends are in" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on desktop (in refactor) ───────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -7354,6 +7560,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ Claude Fable 5       anthropic/claude-fable-5
       Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
@@ -7370,8 +7580,8 @@ let%expect_test
     {|
     picker
 
-
-
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -7389,6 +7599,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
       Claude Fable 5       anthropic/claude-fable-5
     ▸ Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
@@ -7444,10 +7658,10 @@ let%expect_test
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ src/
     ────────────────────────────────────────────────────────────
     > /cd ▏
@@ -7504,6 +7718,8 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -7521,6 +7737,8 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -7556,10 +7774,10 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
     picker
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Model  (0)
     / zzz▏
       no matches
@@ -7755,6 +7973,8 @@ let%expect_test "/thinking lists levels in cycling order with the default \
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     Thinking level  (5)
     / ▏
     ▸* off
@@ -7951,10 +8171,10 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Jobs  (2)
     / ▏
     ▸  make test       j1  running  1m15s  PASS parser
@@ -8092,6 +8312,9 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   H.enter h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
+      protocol error: expected array, got {"oops":1}
     ┌─ Users ──────────────────────────────────────────────────────────────────────┐
     │ users (/setusr NAME to act as one):                                          │
     │   a                                                                          │
@@ -8192,10 +8415,10 @@ let%expect_test
     (Rpc (method_ auth_status) (params ()) (tag Auth_login_picker))
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Log in to  (3)
     / ▏
     ▸* DeepSeek (api_key)              API key  logged in via a…
@@ -8233,6 +8456,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ "AI Proxy" is not a valid name: use lowercase letters    │
     │ Name of the provider                                     │
@@ -8272,6 +8499,10 @@ let%expect_test
   H.enter h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Base URL of aiproxy's API                                │
     │ e.g. http://localhost:3000/v1                            │
@@ -8302,6 +8533,10 @@ let%expect_test
   H.enter h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ API key for aiproxy (leave empty if the server needs     │
     │ none)                                                    │
@@ -8362,6 +8597,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Model  (1)
     / ▏
     ▸  gpt-4o  aiproxy/gpt-4o  ctx 128k  price unknown
@@ -8418,10 +8656,10 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Logins ───────────────────────────────────────────────────────────────────────────────┐
     │ deepseek  logged in via auth.json  [api_key (API key)]                                 │
     │ ollama    custom http://localhost:11434/v1 (chat)  no key                              │
@@ -8704,10 +8942,10 @@ let%expect_test "a shell command during a turn stays in the editor" =
     {|
     (Append_history "!make test")
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Warning ────────────────────────────────────────────────────────────────────┐
     │ !make test waits for the turn to end (kept in the editor); !&make test runs  │
     │ it in the background now                                                     │
@@ -8768,10 +9006,10 @@ let%expect_test
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     queued (4) · Alt+Up: edit the last · /queue: edit or remove
       steer      a
       follow-up  b
@@ -8789,6 +9027,10 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
+
+    ▌ a
     queued (3) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  b
       follow-up  c
@@ -8809,12 +9051,12 @@ let%expect_test
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
+
+    ▌ a
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  b
       follow-up  c
@@ -8855,6 +9097,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Queued  (3)
     / ▏
     ▸  steer me     steers the current turn
@@ -8885,6 +9131,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       steer      steer me
       follow-up  second line
@@ -8913,6 +9162,8 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     queued (1) · Alt+Up: edit the last · /queue: edit or remove
       steer      steer me
     ────────────────────────────────────────────────────────────────────────────────

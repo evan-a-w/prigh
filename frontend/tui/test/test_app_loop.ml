@@ -154,8 +154,8 @@ let%expect_test "/goal sets, shows, clears and resumes the goal" =
       (params ())
       (tag (Notice_on_success "goal resumed")))
 
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
     │ goal: all tests pass — stopped (it used all 20 automatic continuations); /goal resume continues  │
     │ it, /goal off clears it                                                                          │
@@ -190,8 +190,8 @@ let%expect_test "a refused /goal goes back into the editor" =
         (hint    "")
         (then_ (Notice_on_success "goal set: the agent works until it is met")))))
 
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
     │ the session's budget of $1.00 is spent ($1.20 so far): /budget 3 raises it, /budget off removes  │
     │ it                                                                                               │
@@ -250,6 +250,8 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ off     clear the goal
       resume  make a stopped goal active again
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -257,10 +259,10 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ resume  make a stopped goal active again
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal re▏
@@ -276,10 +278,10 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /goal refactor▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ now     retry the run at once
       cancel  stay stopped until you send a message
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -287,10 +289,10 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ off  no budget: turns start whatever the session has cost
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /budget o▏
