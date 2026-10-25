@@ -88,6 +88,7 @@ let methods =
   ; "push_pref"
   ]
   @ Files_rpc.methods
+  @ Review_rpc.methods
 ;;
 
 let param params name =
@@ -2149,12 +2150,14 @@ let handle t client (request : Json.t) : Json.t =
            match dispatch_server t client ~meth ~params with
            | Some result -> result
            | None ->
+             let agent = agent_of_client t client in
              (match
-                Files_rpc.dispatch (agent_of_client t client) ~meth ~params
+                Option.first_some
+                  (Files_rpc.dispatch agent ~meth ~params)
+                  (Review_rpc.dispatch agent ~meth ~params)
               with
               | Some result -> result
-              | None ->
-                dispatch (agent_of_client t client) t.login ~meth ~params))
+              | None -> dispatch agent t.login ~meth ~params))
        with
        | result -> result
        | exception exn ->

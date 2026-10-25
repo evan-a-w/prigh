@@ -48,8 +48,12 @@ let point index ({ message; at } : Timed_message.t) =
     (match Injected.of_message ~origin:u.origin u.text with
      | None -> point User u.text
      | Some { source = Some Summary; _ } -> point Compaction ""
-     | Some { source = Some ((Goal_start _ | Review _ | Init) as source); _ } ->
-       point User (Injected.Source.title source)
+     | Some
+         { source =
+             Some
+               ((Goal_start _ | Review _ | Init | Review_comments _) as source)
+         ; _
+         } -> point User (Injected.Source.title source)
      | Some { source = Some _; _ } -> None
      | Some ({ source = None; _ } as origin) ->
        let body = Injected.body origin u.text in

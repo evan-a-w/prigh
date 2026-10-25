@@ -43,6 +43,8 @@ let int_member json key =
   | _ -> None
 ;;
 
+let md5 data = Md5.to_hex (Md5.digest_string data)
+
 let preview agent ~path ~image_url =
   let open Or_error.Let_syntax in
   let%bind read =
@@ -90,7 +92,47 @@ let preview agent ~path ~image_url =
            common "text"
            @ [ "text", `String (Utf8.sanitize text)
              ; ("truncated", if eof then `False else `True)
-             ]))
+             ]
+           @ if eof then [ "md5", `String (md5 data) ] else []))
+;;
+
+let write agent ~path ~text ~expected =
+  let open Or_error.Let_syntax in
+  let%bind () =
+    match expected with
+    | None -> Ok ()
+    | Some expected ->
+      let%bind read =
+        call
+          agent
+          Host_files.read_op
+          [ "path", `String path
+          ; "offset", number 0
+          ; "length", number max_preview
+          ]
+      in
+      (match Json.member "data" read, Json.member "eof" read with
+       | Some (`String data), Some `True ->
+         (match Base64.decode data with
+          | Ok data when String.equal (md5 data) expected -> Ok ()
+          | Ok _ ->
+            Or_error.errorf
+              "%s changed since you opened it: reload it (your edits are lost) \
+               or save again to overwrite it"
+              path
+          | Error (`Msg m) ->
+            Or_error.error_string ("bad data from the host: " ^ m))
+       | _ -> Or_error.errorf "%s is too large to edit here" path)
+  in
+  let result =
+    Agent.host_call
+      agent
+      ~name:"write"
+      (`Object [ "path", `String path; "content", `String text ])
+  in
+  if result.is_error
+  then Or_error.error_string (String.strip result.text)
+  else Ok (`Object [ "path", `String path; "md5", `String (md5 text) ])
 ;;
 
 (* Runs [name] in a fiber, its output and its result arriving on one stream
