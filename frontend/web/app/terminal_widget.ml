@@ -99,23 +99,63 @@ module Assets = struct
 end
 
 module Handle = struct
-  type t = < focus : unit Js.meth ; dispose : unit Js.meth > Js.t
+  type t =
+    < focus : unit Js.meth
+    ; dispose : unit Js.meth
+    ; setTheme : Js.Unsafe.any -> unit Js.meth >
+      Js.t
 end
 
-(* prigh-web's palette (bin/style.css). *)
-let theme () =
+(* xterm.js wants colours, not variables: the page's, as the theme on show
+   computes them (bin/style.css), and ANSI colours that read on its ground. *)
+let look = ref Prigh_web.Theme.default
+
+let theme_js () =
+  let style = Dom_html.window##getComputedStyle Dom_html.document##.documentElement in
+  let var name =
+    String.strip (Js.to_string (style##getPropertyValue (Js.string name)))
+  in
+  let accent = var "--sodium" in
+  let ansi : (string * string) list =
+    match !look.name with
+    | Light ->
+      [ "black", "#2b2f36"
+      ; "red", "#b42318"
+      ; "green", "#1d7a3e"
+      ; "yellow", "#8a6100"
+      ; "blue", "#1f5fbf"
+      ; "magenta", "#8e3fb5"
+      ; "cyan", "#0f7a80"
+      ; "white", "#6b7280"
+      ; "brightBlack", "#5c6370"
+      ; "brightRed", "#d0362b"
+      ; "brightGreen", "#23914a"
+      ; "brightYellow", "#a67600"
+      ; "brightBlue", "#2b73e0"
+      ; "brightMagenta", "#a650cf"
+      ; "brightCyan", "#138f96"
+      ; "brightWhite", "#1b1e23"
+      ]
+    | Original | Dark ->
+      [ "blue", "#7c9cff"
+      ; "brightBlue", "#9db4ff"
+      ; "green", var "--sage"
+      ; "red", var "--brick"
+      ; "yellow", "#f0b44c"
+      ]
+  in
   Js.Unsafe.obj
-    [| "background", Js.Unsafe.inject (Js.string "#15171b")
-     ; "foreground", Js.Unsafe.inject (Js.string "#e3e5e1")
-     ; "cursor", Js.Unsafe.inject (Js.string "#f0b44c")
-     ; "cursorAccent", Js.Unsafe.inject (Js.string "#15171b")
-     ; "selectionBackground", Js.Unsafe.inject (Js.string "#f0b44c40")
-     ; "blue", Js.Unsafe.inject (Js.string "#7c9cff")
-     ; "brightBlue", Js.Unsafe.inject (Js.string "#9db4ff")
-     ; "green", Js.Unsafe.inject (Js.string "#8cc7a1")
-     ; "red", Js.Unsafe.inject (Js.string "#e8806f")
-     ; "yellow", Js.Unsafe.inject (Js.string "#f0b44c")
-    |]
+    (Array.of_list
+       (List.map
+          ([ "background", var "--well"
+           ; "foreground", var "--chalk"
+           ; "cursor", accent
+           ; "cursorAccent", var "--well"
+           ; ( "selectionBackground"
+             , if String.length accent = 7 then accent ^ "55" else accent )
+           ]
+           @ ansi)
+          ~f:(fun (k, v) -> k, Js.Unsafe.inject (Js.string v))))
 ;;
 
 let status_of_js state message : Status.t =
@@ -176,7 +216,7 @@ let mount (input : Input.t) (mounted : Mounted.t) host =
         Js.Unsafe.obj
           [| "onStatus", Js.Unsafe.inject on_status
            ; "focus", Js.Unsafe.inject (Js.bool !focus_owed)
-           ; "theme", Js.Unsafe.inject (theme ())
+           ; "theme", Js.Unsafe.inject (theme_js ())
           |]
       in
       focus_owed := false;
@@ -235,13 +275,11 @@ end
 
 let widget = Staged.unstage (Vdom.Node.widget_of_module (module Widget))
 let view ~url ~key ~on_status = widget { Input.url; key; on_status }
-let open_key = "prigh-web.terminal-open"
-
-let remember open_ =
-  if open_ then Browser.set_item open_key "1" else Browser.remove_item open_key
-;;
-
-let install ~schedule =
-  if Option.is_some (Browser.get_item open_key)
-  then schedule Prigh_web.App.Action.Reopen_terminal
+let set_theme theme =
+  if not (Prigh_web.Theme.equal theme !look)
+  then (
+    look := theme;
+    match !current with
+    | Some { handle = Some handle; _ } -> handle##setTheme (theme_js ())
+    | Some { handle = None; _ } | None -> ())
 ;;
