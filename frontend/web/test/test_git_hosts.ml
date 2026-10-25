@@ -55,7 +55,7 @@ let%expect_test
     Not signed in.
     (Use a token) (Connect)
     Forgejo git.example.com
-    Not signed in. No OAuth here: no OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
+    Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
     Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
@@ -104,7 +104,7 @@ let%expect_test
     Not signed in.
     (Use a token) (Connect)
     Forgejo git.example.com
-    Not signed in. No OAuth here: no OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
+    Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
     Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
@@ -127,7 +127,7 @@ let%expect_test
     Not signed in.
     (Use a token) (Connect)
     Forgejo git.example.com
-    Not signed in. No OAuth here: no OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
+    Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
     |}];
   H.reply h "forge_logout" "{}";
@@ -430,7 +430,7 @@ let%expect_test "/auth lists the git hosts with the providers" =
     Not signed in.
     (Use a token) (Connect)
     Forgejo git.example.com
-    Not signed in. No OAuth here: no OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
+    Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
     Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)

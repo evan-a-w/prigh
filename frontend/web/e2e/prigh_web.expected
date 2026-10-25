@@ -718,6 +718,21 @@ Ask before bash, edits and MCP tools run, in this session and new ones.
 Model providers
 Not logged in to any: log in to one to use its models.
 Manage providers
+Git hosting
+GitHub
+github.com
+Not signed in.
+No OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
+Connect with a token
+Forgejo
+codeberg.org
+Not signed in.
+Signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges."codeberg.org".client_id sets your own
+Use a token
+Connect
+Another Forgejo host
+A self-hosted Forgejo or Gitea, by its host name.
+Add host…
 Account
 T
 Signed in as token
@@ -1701,6 +1716,21 @@ Ask before bash, edits and MCP tools run, in this session and new ones.
 Model providers
 Not logged in to any: log in to one to use its models.
 Manage providers
+Git hosting
+GitHub
+github.com
+Not signed in.
+No OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
+Connect with a token
+Forgejo
+codeberg.org
+Not signed in.
+Signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges."codeberg.org".client_id sets your own
+Use a token
+Connect
+Another Forgejo host
+A self-hosted Forgejo or Gitea, by its host name.
+Add host…
 Account
 T
 Signed in as token
