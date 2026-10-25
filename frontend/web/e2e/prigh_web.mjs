@@ -1054,7 +1054,7 @@ try {
   await page.waitForTimeout(300); // its fade in
   await show("/cd: the directory popup", ".popup");
   await composer().press("Control+Enter");
-  await page.waitForFunction(c => document.querySelector(".session-card .where")?.title === c, cwd);
+  await page.waitForFunction(c => document.querySelector(".session.selected .session-cwd")?.title === c, cwd);
   await page.keyboard.press("Control+Shift+F");
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();
@@ -1308,7 +1308,7 @@ try {
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);
-      const titleFits = title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
+      const titleFits = !title ? "none" : title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
       return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
     console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; title whole or at least 100px: ${where.titleFits}; ${where.height}px high`);

@@ -4,8 +4,9 @@ module H = Harness
 
 (* The model, the thinking level and the approval mode beside each other
    along the bottom of the composer's box: always shown, each opening the
-   picker its command opens. The session and its status are in the docked
-   sidebar's card, else in a slim bar over the chat. *)
+   picker its command opens. The session's status is in the docked
+   sidebar's card, with the panels' toggles over the chat's corner, else in
+   a slim bar over the chat. *)
 
 let controls h = H.text h ~selector:".composer-controls"
 
@@ -136,7 +137,8 @@ let%expect_test "every approval mode, as the chip names it" =
 ;;
 
 let%expect_test
-    "the docked sidebar's card: title, cwd and branch, host, status, panels"
+    "the docked sidebar's card: status, host and branch; the panels' toggles \
+     over the chat"
   =
   let h =
     H.create
@@ -155,9 +157,11 @@ let%expect_test
            ())
       ()
   in
-  (* Above the account, at the foot of the sidebar; nothing over the chat. *)
+  (* Above the account, at the foot of the sidebar; over the chat only the
+     panels' toggles. *)
   H.elements h ~selector:".sidebar > *";
   H.elements h ~selector:".main > *";
+  H.show h ~selector:".chat-frame > .chat-tools";
   [%expect
     {|
     <div class="sidebar-head">
@@ -175,55 +179,32 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <footer class="composer">
     <Vdom.Node.none-widget class="">
+    <div class="chat-tools">
+      <div class="panel-toggles">
+        <button type="button"
+                title="Files (Ctrl+Shift+F)"
+                aria-label="Files"
+                aria-expanded="false"
+                class="btn files-toggle ghost icon"
+                @on_click>
+          <icon class="folder"> </icon>
+        </button>
+        <button type="button"
+                title="Terminal (Ctrl+`)"
+                aria-label="Terminal"
+                aria-expanded="false"
+                class="btn ghost icon terminal-toggle"
+                @on_click>
+          <icon class="terminal"> </icon>
+        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
+    </div>
     |}];
   H.show h ~selector:".session-card";
   [%expect
     {|
     <section aria-label="This session" class="session-card">
-      <div class="card-head">
-        <button type="button" title="Rename (/name)" class="session-name" @on_click>
-          <span dir="auto"> New session </span>
-          <icon class="pencil"> </icon>
-        </button>
-        <div class="panel-toggles">
-          <button type="button"
-                  title="Files (Ctrl+Shift+F)"
-                  aria-label="Files"
-                  aria-expanded="false"
-                  class="btn files-toggle ghost icon"
-                  @on_click>
-            <icon class="folder"> </icon>
-          </button>
-          <button type="button"
-                  title="Terminal (Ctrl+`)"
-                  aria-label="Terminal"
-                  aria-expanded="false"
-                  class="btn ghost icon terminal-toggle"
-                  @on_click>
-            <icon class="terminal"> </icon>
-          </button>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-      </div>
-      <div class="session-where">
-        <span title="/home/ada/projects/prigh/tui" class="where">
-          <span class="where-head"> ~/projects/prigh </span>
-          <span class="where-tail"> /tui </span>
-        </span>
-        <span title="feature/narrow-top-bar" class="branch">
-          <icon class="branch"> </icon>
-          <span class="branch-name"> feature/narrow-top-bar </span>
-        </span>
-      </div>
-      <div class="card-host">
-        <button type="button"
-                title="Tools run on desktop, in /home/ada/projects/prigh/tui (/host switches)"
-                class="host link status-item"
-                @on_click>
-          <icon class="server"> </icon>
-          <span class="status-text"> desktop </span>
-        </button>
-      </div>
       <div class="status-extras">
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -235,34 +216,47 @@ let%expect_test
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div class="status">
-        <button type="button"
-                title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
-                aria-label="Context 0% full"
-                class="context link status-item"
-                @on_click>
-          <span class="meter">
-            <span class="meter-fill" style={ width: 0.00%; }> </span>
+      <div class="card-status">
+        <div class="status">
+          <button type="button"
+                  title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
+                  aria-label="Context 0% full"
+                  class="context link status-item"
+                  @on_click>
+            <span class="meter">
+              <span class="meter-fill" style={ width: 0.00%; }> </span>
+            </span>
+            <span class="percent"> 0% </span>
+          </button>
+          <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
+          <span title="Session cost" class="cost status-item"> $0.0000 </span>
+          <span role="status" aria-atomic="true" class="activity idle status-item">
+            <span class="idle-dot"> </span>
+            <span class="label"> Ready </span>
           </span>
-          <span class="percent"> 0% </span>
-        </button>
-        <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
-        <span title="Session cost" class="cost status-item"> $0.0000 </span>
-        <span role="status" aria-atomic="true" class="activity idle status-item">
-          <span class="idle-dot"> </span>
-          <span class="label"> Ready </span>
-        </span>
+        </div>
+        <div class="card-where">
+          <button type="button"
+                  title="Tools run on desktop, in /home/ada/projects/prigh/tui (/host switches)"
+                  class="host link status-item"
+                  @on_click>
+            <icon class="server"> </icon>
+            <span class="status-text"> desktop </span>
+          </button>
+          <span title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui"
+                class="branch">
+            <icon class="branch"> </icon>
+            <span class="branch-name"> feature/narrow-top-bar </span>
+          </span>
+        </div>
       </div>
     </section>
     |}];
   H.text h ~selector:".session-card";
   [%expect
     {|
-    (New session)
-    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
-    ~/projects/prigh /tui feature/narrow-top-bar
-    (desktop)
     (0%) ↑0 ↓0 $0.0000 Ready
+    (desktop) feature/narrow-top-bar
     |}]
 ;;
 
@@ -275,7 +269,7 @@ let%expect_test "the host opens the host picker, as /host does" =
       ~state:(H.state_json ~fields:[ "hosts", Jsonaf.of_string hosts ] ())
       ()
   in
-  H.click h ~selector:".card-host .host";
+  H.click h ~selector:".card-where .host";
   let clicked = (H.model h).dialog in
   H.text h ~selector:".modal";
   H.key h "Escape" ~target:Field;
@@ -306,7 +300,7 @@ let%expect_test "the host opens the host picker, as /host does" =
           ~fields:
             [ "hosts", Jsonaf.of_string hosts; "active_host", `String "c7" ]
           ()));
-  H.text h ~selector:".card-host";
+  H.text h ~selector:".card-where";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.names h ~selector:".session-bar .host";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
@@ -317,15 +311,15 @@ let%expect_test "the host opens the host picker, as /host does" =
        (H.state_json
           ~fields:[ "hosts", `Array []; "active_host", `String "" ]
           ()));
-  H.text h ~selector:".card-host";
-  H.elements h ~selector:".card-host .host";
+  H.text h ~selector:".card-where";
+  H.elements h ~selector:".card-where .host";
   [%expect
     {|
     Close_dialog
     (Focus editor)
-    (laptop)
+    (laptop) main
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
-    (No host)
+    (No host) main
     <button class="host link status-item warm">
     |}]
 ;;
@@ -344,6 +338,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   in
   H.key h "b" ~ctrl:true;
   H.elements h ~selector:".session-card";
+  H.elements h ~selector:".chat-tools";
   H.elements h ~selector:".main > *";
   H.show h ~selector:".session-bar";
   [%expect
@@ -458,39 +453,6 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
     <header class="session-bar">
     <div class="chat-frame">
     <footer class="composer">
-    |}]
-;;
-
-let%expect_test "the cwd's last directory is kept apart: the rest is elided" =
-  List.iter
-    [ "/work"; "/"; "/home/ada"; "/home/ada/src/a/b/c"; "relative/path" ]
-    ~f:(fun cwd ->
-      let h =
-        H.create ~state:(H.state_json ~fields:[ "cwd", `String cwd ] ()) ()
-      in
-      H.show h ~selector:".session-card .where");
-  [%expect
-    {|
-    <span title="/work" class="where">
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <span class="where-tail"> /work </span>
-    </span>
-    <span title="/" class="where">
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <span class="where-tail"> / </span>
-    </span>
-    <span title="/home/ada" class="where">
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <span class="where-tail"> ~ </span>
-    </span>
-    <span title="/home/ada/src/a/b/c" class="where">
-      <span class="where-head"> ~/src/a/b </span>
-      <span class="where-tail"> /c </span>
-    </span>
-    <span title="relative/path" class="where">
-      <span class="where-head"> relative </span>
-      <span class="where-tail"> /path </span>
-    </span>
     |}]
 ;;
 

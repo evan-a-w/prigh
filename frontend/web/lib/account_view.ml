@@ -60,6 +60,8 @@ let item_icon (id : string) : Icon.t =
   | "signout" -> Logout
   | "notify on" -> Bell
   | "notify off" -> Bell_off
+  | "settings" -> Gear
+  | "help" -> Help
   | _ -> User
 ;;
 

@@ -1565,7 +1565,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (A alice acting as bob) (Commands and keys (/help)) (Settings (Ctrl+, or /settings))
+    (A alice acting as bob) (Settings (Ctrl+, or /settings))
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};

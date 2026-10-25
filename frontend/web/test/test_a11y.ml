@@ -26,16 +26,16 @@ let%expect_test "the names of the controls" =
     button "New session" -- Start a new session (/new)
     button "Select" -- Select sessions to delete (/delete)
     button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
+    button "Rename Fix the build" -- Rename (/name)
     button "Archive Fix the build" -- Archive (A)
     button "Delete Fix the build" -- Delete session (Delete)
     button "Archived 1" -- Show the archived sessions
-    button "New session" -- Rename (/name)
-    button "Files" -- Files (Ctrl+Shift+F)
-    button "Terminal" -- Terminal (Ctrl+`)
-    button "backend" -- Tools run on the backend (/host switches)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
+    button "Files" -- Files (Ctrl+Shift+F)
+    button "Terminal" -- Terminal (Ctrl+`)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
@@ -58,11 +58,8 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
-    button "New session" -- Rename (/name)
-    button "Files" -- Files (Ctrl+Shift+F)
-    button "Terminal" -- Terminal (Ctrl+`)
-    button "backend" -- Tools run on the backend (/host switches)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"
