@@ -314,6 +314,7 @@ let load ~home =
 
 let known_fields =
   "providers"
+  :: "forges"
   :: "confirm_tools"
   ::
   (match to_json default with

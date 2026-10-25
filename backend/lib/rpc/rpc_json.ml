@@ -425,6 +425,14 @@ let login_event (e : Login_manager.Event.t) =
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)
       ]
+    | Forge_done { host; user; method_ } ->
+      [ "kind", str "forge_done"
+      ; "host", str host
+      ; "user", Option.value_map user ~default:`Null ~f:str
+      ; "method", str (Forge_credential.Method.to_string method_)
+      ]
+    | Forge_logged_out host ->
+      [ "kind", str "forge_logged_out"; "host", str host ]
   in
   `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;

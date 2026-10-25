@@ -22,6 +22,12 @@ module Event = struct
         ; error : string
         }
     | Logged_out of Provider_id.t
+    | Forge_done of
+        { host : string
+        ; user : string option
+        ; method_ : Forge_credential.Method.t
+        }
+    | Forge_logged_out of string
   [@@deriving sexp_of]
 end
 
@@ -222,3 +228,16 @@ let logout t (provider : Provider_id.t) =
     Or_error.map (Provider_auth.logout t.store provider) ~f:(fun () ->
       emit t (Logged_out provider))
 ;;
+
+let start_forge t ~host ~run =
+  run_flow t ~run ~finish:(function
+    | Ok (credential : Forge_credential.t) ->
+      emit
+        t
+        (Forge_done
+           { host; user = credential.user; method_ = credential.method_ })
+    | Error e ->
+      emit t (Failed { provider = host; error = Error.to_string_hum e }))
+;;
+
+let forge_logged_out t host = emit t (Forge_logged_out host)

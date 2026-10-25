@@ -26,6 +26,12 @@ module Event : sig
         ; error : string
         }
     | Logged_out of Provider_id.t
+    | Forge_done of
+        { host : string
+        ; user : string option
+        ; method_ : Forge_credential.Method.t
+        } (** signed in to a git host; [Failed] names the host otherwise *)
+    | Forge_logged_out of string
   [@@deriving sexp_of]
 end
 
@@ -64,3 +70,14 @@ val wait : t -> unit
     its prompt asks whether to remove the definition too) ending in
     [Logged_out], or nothing when the user keeps everything or cancels. *)
 val logout : t -> Provider_id.t -> unit Or_error.t
+
+(** Signs in to a git host with [run] (see {!Forges.login}), as a flow
+    like [start]'s ending in [Forge_done] or [Failed]. *)
+val start_forge
+  :  t
+  -> host:string
+  -> run:(Auth_interaction.t -> Forge_credential.t Or_error.t)
+  -> unit Or_error.t
+
+(** Tells the subscribers that [host]'s sign-in was removed. *)
+val forge_logged_out : t -> string -> unit

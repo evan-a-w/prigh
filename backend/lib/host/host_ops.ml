@@ -395,6 +395,8 @@ let execute
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name Git_diff.op
   then Git_diff.run ~env ~cancel ~cwd ~arguments
+  else if String.equal name Git_forge.op
+  then Git_forge.run ~env ~cancel ~cwd ~arguments
   else if Host_files.is_op name
   then
     Host_files.execute ~env ?stdin ~cancel ~on_output ~cwd ~name ~arguments ()
