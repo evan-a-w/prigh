@@ -259,6 +259,8 @@ module Summary : sig
     ; name : string option
     ; description : string option
     ; cwd : string
+    ; host : string option
+      (** the id of the tool host [cwd] is on, when the session records it *)
     ; created_at : string
     ; updated_at : string
     ; first_prompt : string option

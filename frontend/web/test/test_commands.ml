@@ -94,6 +94,7 @@ let%expect_test "every command does something (none is unknown)" =
     /tree                      loading Session tree: rpc push_pref, rpc get_entries
     /cd                        path prompt
     /mkdir                     path prompt
+    /worktree                  loading Worktrees: rpc push_pref, rpc list_worktrees
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
@@ -173,6 +174,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    Alt+Enter / Delete (/worktree) start a new session in the highlighted worktree / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
@@ -305,7 +307,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (archive_after_days 7) (notify bell) (snippets ())))
+      (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
+      (snippets ())))
     |}]
 ;;
 
@@ -1627,6 +1630,10 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "b1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     (A alice acting as bob) (Commands and keys (/help))
     |}];
   run h "/setusr alice";

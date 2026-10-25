@@ -2569,6 +2569,43 @@ let git_diff ?path ?base t =
   |> Git_diff.of_tool_result
 ;;
 
+(* ---- worktrees ------------------------------------------------------ *)
+
+let worktree_call t ~name ~arguments =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"worktree"
+    ~cwd:t.cwd
+    ~name
+    ~arguments
+;;
+
+let worktrees t =
+  worktree_call
+    t
+    ~name:Worktree.list_op
+    ~arguments:(Worktree.list_args ~dir:t.config.worktrees_dir)
+  |> Worktree.listing_of_result
+;;
+
+let create_worktree t ~branch ~base =
+  worktree_call
+    t
+    ~name:Worktree.create_op
+    ~arguments:(Worktree.create_args ~dir:t.config.worktrees_dir ~branch ~base)
+  |> Worktree.created_of_result
+;;
+
+let remove_worktree t ~path ~force =
+  worktree_call
+    t
+    ~name:Worktree.remove_op
+    ~arguments:(Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force)
+  |> Worktree.removed_of_result
+;;
+
 (* A command's prompt: sent now when idle, otherwise after the current run
    like a follow-up. *)
 let command_prompt t ~text ~expanded ~source =

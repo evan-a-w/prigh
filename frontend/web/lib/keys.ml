@@ -54,6 +54,8 @@ let help =
        transcript's right edge)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
+  ; ( "Alt+Enter / Delete (/worktree)"
+    , "start a new session in the highlighted worktree / remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
   ; ( "Space (selecting)"
@@ -134,6 +136,12 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Reminders; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Remove_reminder item.id)
+  | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Ask_remove_worktree item.id)
+  | "Enter", Picker { kind = Worktrees _; picker } when alt_only t ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Open_worktree { path = item.id; new_session = true })
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete

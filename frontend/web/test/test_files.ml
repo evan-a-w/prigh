@@ -708,6 +708,10 @@ let%expect_test "another session or host resets the browser and drops the chips"
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Files (Abort_upload 9))
     (Rpc (method_ fs_list) (params ((hidden false))) (tag (Files (Listed ""))))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nc7\
+                            \n/home/me/proj") (purpose (Sidebar 2)))))
     |}];
   H.text h ~selector:".attach-chips";
   H.text h ~selector:".files-panel .files-crumbs";

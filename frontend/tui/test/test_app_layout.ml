@@ -83,7 +83,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]           show or set the models that take…
       /default-dir [off|path]            show or set the directory new se…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      ↕ 1–8 of 62
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed

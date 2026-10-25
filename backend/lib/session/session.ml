@@ -775,6 +775,7 @@ module Summary = struct
     ; name : string option
     ; description : string option
     ; cwd : string
+    ; host : string option
     ; created_at : string
     ; updated_at : string
     ; first_prompt : string option
@@ -879,6 +880,7 @@ let summarise t ~path ~mtime =
   ; name = name t
   ; description = description t
   ; cwd = t.cwd
+  ; host = Option.map t.host ~f:(fun (h : Host.t) -> h.id)
   ; created_at = created_at t
   ; updated_at =
       Time_float.to_string_utc

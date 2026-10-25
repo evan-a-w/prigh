@@ -37,6 +37,15 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
+    | List_worktrees
+    | Create_worktree of
+        { branch : string
+        ; base : string option
+        }
+    | Remove_worktree of
+        { path : string
+        ; force : bool
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -51,10 +60,15 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
+    | List_worktrees -> "list_worktrees"
+    | Create_worktree _ -> "create_worktree"
+    | Remove_worktree _ -> "remove_worktree"
   ;;
 
   let params = function
-    | List_skills | List_mcp { reconnect = false } | Delete_archived -> []
+    | List_skills
+    | List_mcp { reconnect = false }
+    | Delete_archived | List_worktrees -> []
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -83,6 +97,12 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
+    | Create_worktree { branch; base } ->
+      [ "branch", Json.str branch ]
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+    | Remove_worktree { path; force } ->
+      [ "path", Json.str path ]
+      @ if force then [ "force", Json.bool true ] else []
   ;;
 end
 

@@ -895,6 +895,7 @@ let%expect_test
       "default_thinking": null,
       "fallback_models": [],
       "default_cwd": null,
+      "worktrees_dir": "~/.prigh/worktrees",
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,

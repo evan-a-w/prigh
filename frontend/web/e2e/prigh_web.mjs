@@ -626,7 +626,7 @@ try {
   await show("sidebar after reload", ".sidebar");
 
   // 6. A new session, then back to the first from the sidebar.
-  await page.locator(".sidebar").getByRole("button", { name: /new session/i }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();
   await bodyLacks("three lines");
   await page.locator(".chat .empty").waitFor();
   await show("new session", ".chat");
@@ -969,7 +969,7 @@ try {
   const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
   const sessionFiles = () =>
     readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl")).length;
-  await page.locator(".sidebar").getByRole("button", { name: /new session/i }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();
   await page.locator(".chat .empty").waitFor();
   await send("one more");
   await bodyHas("Noted.");
