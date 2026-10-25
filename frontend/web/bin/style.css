@@ -761,7 +761,10 @@ kbd {
   color: var(--faint);
   transition: color 0.12s, background-color 0.12s;
 }
-.composer-controls .chip-button:not(.awaiting):is(:hover, :focus-visible) { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+.composer-controls .chip-button:not(.awaiting):focus-visible { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+@media (hover: hover) {
+  .composer-controls .chip-button:not(.awaiting):hover { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+}
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
 .composer-controls .chip-button > .icon:first-child { display: none; }
@@ -770,8 +773,9 @@ kbd {
 .composer-box:focus-within .chip-button:not(:hover, :focus-visible) { color: var(--muted); }
 .model-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer-controls > .model-chip { flex-shrink: 1; }
-.composer-controls > .model-chip .chip-label { min-width: 4ch; }
+.chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
+.chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
+.chip-anchor.model .chip-label { min-width: 4ch; }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1138,6 +1142,14 @@ kbd {
 .avatar.large { width: 38px; height: 38px; font-size: 16px; }
 
 .menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+/* What a menu floats on: the account's, a composer chip's. */
+.menu-surface {
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+  outline: none;
+}
 .account-menu {
   position: fixed;
   left: 10px;
@@ -1145,12 +1157,7 @@ kbd {
   width: 300px;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
   padding: 6px;
-  outline: none;
   animation: appear 0.12s ease-out;
 }
 .account-current { display: flex; align-items: center; gap: 10px; padding: 8px 8px 10px; border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
@@ -1625,4 +1632,115 @@ kbd {
   .tool-head .open-agent { min-height: 32px; padding: 0 10px; }
   .queued-remove.btn.icon, .queued-edit.btn { min-width: 40px; min-height: 40px; }
   .btn.icon { min-width: 36px; min-height: 36px; }
+}
+
+/* A composer chip's menu: a small surface standing on its chip, opening
+   upward over the chat (below the chip only when there is no room above:
+   web_main's place_popover, which also gives the height it may take). Its
+   chip stays lit while it is open, and only the chips stay above the
+   backdrop, so a click on another chip opens that one's menu. */
+.composer-controls { position: relative; z-index: 41; }
+.chip-anchor.open > .chip-button,
+.composer-box:focus-within .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
+.chip-anchor.open > .chip-button .chevron { opacity: 1; transform: rotate(180deg); }
+.chip-popover {
+  position: absolute;
+  left: calc(var(--popover-shift, 0px) - 2px);
+  bottom: calc(100% + var(--popover-lift, 0px) + 8px);
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: min(26rem, var(--popover-room, 70vh));
+  display: flex;
+  flex-direction: column;
+  border-bottom-left-radius: 4px;
+  animation: popover-rise 0.12s ease-out;
+  overflow: hidden;
+}
+.chip-popover[data-placement="below"] {
+  bottom: auto;
+  top: calc(100% + 8px);
+  border-bottom-left-radius: var(--r-surface);
+  border-top-left-radius: 4px;
+}
+.chip-popover[data-chip="model"] { width: 340px; }
+.chip-popover[data-chip="mode"] { width: 360px; }
+@keyframes popover-rise { from { opacity: 0; transform: translateY(4px); } }
+.popover-head, .popover-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.popover-title { flex: 1; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.popover-shortcut { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.popover-search > .icon { width: 14px; height: 14px; color: var(--faint); flex-shrink: 0; }
+.popover-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--chalk);
+  font-size: 13.5px;
+}
+.popover-search input::placeholder { color: var(--faint); }
+.popover-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  outline: none;
+  scrollbar-width: thin;
+}
+.popover-group + .popover-group { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px; }
+.popover-group > .menu-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 4px 10px 3px 32px; }
+.popover-note { color: var(--faint); font-size: 11.5px; font-weight: 400; }
+.popover-item { gap: 8px; padding: 6px 10px 6px 8px; border-radius: 0 var(--r-control) var(--r-control) 0; }
+.popover-item.selected { box-shadow: inset 2px 0 0 var(--sodium); }
+.popover-item.dimmed .menu-text { opacity: 0.55; }
+.popover-item .menu-text { flex: 1; }
+.popover-item .menu-label { font-size: 13.5px; }
+.chip-popover[data-chip="thinking"] .menu-label { text-transform: capitalize; }
+.chip-popover[data-chip="mode"] .menu-detail { white-space: normal; }
+.popover-check { --mark-size: 14px; width: 16px; }
+.popover-aside { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.popover-empty { padding: 14px 12px; color: var(--muted); font-size: 12.5px; }
+.chip-popover > .menu-keys { flex-shrink: 0; padding: 6px 12px 7px; }
+/* Thinking's effort, as rising bars: lit up to the level. */
+.thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
+.thinking-meter > .bar { width: 3px; border-radius: 1px; background: var(--rule-2); }
+.thinking-meter > .bar:nth-child(1) { height: 4px; }
+.thinking-meter > .bar:nth-child(2) { height: 6.5px; }
+.thinking-meter > .bar:nth-child(3) { height: 9px; }
+.thinking-meter > .bar:nth-child(4) { height: 12px; }
+.thinking-meter > .bar.on { background: var(--muted); }
+.popover-item.marked .thinking-meter > .bar.on { background: var(--sodium); }
+@media (prefers-reduced-motion: reduce) {
+  .chip-popover { animation: none; }
+  .chip-anchor.open > .chip-button .chevron { transition: none; }
+}
+/* A phone: the menu is as wide as the composer's box, over it, the page
+   behind dimmed. */
+@media (max-width: 760px) {
+  .composer-box { position: relative; }
+  .composer-controls, .chip-anchor { position: static; }
+  .chip-popover { z-index: 42; bottom: calc(100% + 8px); }
+  .chip-popover,
+  .chip-popover[data-chip] {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+    border-radius: var(--r-surface);
+  }
+  .chip-popover { max-height: min(70dvh, var(--popover-room, 70dvh)); }
+  .popover-item { padding-top: 10px; padding-bottom: 10px; }
+}
+/* No keyboard to speak of: no keys to tell of. */
+@media (pointer: coarse) {
+  .chip-popover > .menu-keys, .popover-shortcut { display: none; }
 }

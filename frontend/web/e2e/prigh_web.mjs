@@ -313,12 +313,27 @@ const layoutProblems = selector => page.evaluate(selector => {
 // The composer's chips as shown: each chip's text, or "icon" for an icon
 // alone.
 const controlsShown = () => page.evaluate(() => {
-  return [...document.querySelectorAll(".composer-controls > .chip-button")].map(chip => {
+  return [...document.querySelectorAll(".composer-controls .chip-button")].map(chip => {
     const after = getComputedStyle(chip, "::after");
     const extra = after.display !== "none" && after.content.startsWith('"') ? after.content.slice(1, -1) : "";
     const text = (chip.innerText.trim().replace(/\s+/g, " ") + " " + extra).trim();
     return text || "icon";
   }).join(", ");
+});
+
+// Where a chip's menu stands: above the composer's box or below its chip,
+// at the chip's left edge (or as wide as the box), inside the window.
+const popoverPlace = () => page.evaluate(() => {
+  const menu = document.querySelector("#chip-popover");
+  const r = menu.getBoundingClientRect();
+  const chip = menu.parentNode.querySelector(".chip-button").getBoundingClientRect();
+  const box = document.querySelector(".composer-box").getBoundingClientRect();
+  const near = (a, b) => Math.abs(a - b) <= 4;
+  const where = r.bottom <= box.top ? "above the composer" : r.top >= chip.bottom ? "below the chip" : "over the composer";
+  const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? "shifted inside the composer" : "out of line";
+  const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+  return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
 
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
@@ -897,17 +912,45 @@ try {
   await page.locator(".thinking-chip").hover();
   await page.waitForTimeout(300);
   await screenshot("a chip pointed at");
+  // A chip opens a menu standing on it, not a dialog: above the composer's
+  // box, from the chip's left edge, inside the window, the keyboard in it.
   await page.locator(".thinking-chip").click();
-  await page.locator(".modal .picker-item", { hasText: "high" }).waitFor();
-  await page.waitForTimeout(300); // its fade in
-  await show("the thinking picker", ".modal");
-  await page.locator(".modal .picker-item", { hasText: "high" }).click();
+  await page.locator("#chip-popover .popover-item", { hasText: "high" }).waitFor();
+  await page.waitForTimeout(300); // its rise
+  await show("the thinking chip's menu", "#chip-popover");
+  console.log(await popoverPlace());
+  await page.locator("#chip-popover .popover-item", { hasText: "high" }).click();
   await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
+  console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
+  // The model's: a filter, the models under their providers.
+  await page.keyboard.press("Control+l");
+  await page.locator("#chip-popover[data-chip=model]").waitFor();
+  await page.waitForTimeout(300);
+  console.log(await popoverPlace());
+  await screenshot("the model chip's menu");
+  await page.keyboard.type("v4.1 flash");
+  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .popover-item").length === 1);
+  await show("the model chip's menu, filtered", "#chip-popover .popover-items");
+  // Esc closes it unchanged; ← → go along the chips.
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
+  await page.locator(".model-chip").click();
+  await page.locator("#chip-popover[data-chip=model]").waitFor();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("ArrowRight");
+  await page.locator("#chip-popover[data-chip=thinking]").waitFor();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("ArrowRight");
+  await page.locator("#chip-popover[data-chip=mode]").waitFor();
+  await page.waitForTimeout(300); // its rise
+  await show("the mode chip's menu, from the model's with → →", "#chip-popover");
+  console.log(await popoverPlace());
+  // A click beside it closes it.
+  await page.mouse.click(700, 200);
+  await page.waitForSelector("#chip-popover", { state: "detached" });
   await page.locator(".mode-chip").click();
-  await page.locator(".modal .picker-item").first().waitFor();
-  await page.waitForTimeout(300); // its fade in
-  await show("the mode picker", ".modal");
-  await page.locator(".modal .picker-item", { hasText: "Asks: edits & commands" }).click();
+  await page.locator("#chip-popover .popover-item").first().waitFor();
+  await page.locator("#chip-popover .popover-item", { hasText: "Asks: edits & commands" }).click();
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
   await page.locator(".mode-chip:not(.awaiting)", { hasText: "Asks: edits & commands" }).waitFor();
   await show("mode ask", ".composer-controls");
@@ -984,6 +1027,15 @@ try {
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
+  // A chip's menu is as wide as the composer's box there.
+  await page.locator(".thinking-chip").click();
+  await page.locator("#chip-popover").waitFor();
+  await page.waitForTimeout(300);
+  section("phone: a chip's menu");
+  console.log(await popoverPlace());
+  await screenshot("phone: a chip's menu");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 

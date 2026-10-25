@@ -91,3 +91,7 @@ val mark : ?cls:string -> ?label:string -> Icon.t -> Node.t
 
 (** The caret of the [<textarea>] or [<input>] an input event came from. *)
 val caret : Js_of_ocaml.Dom_html.event Js_of_ocaml.Js.t -> int option
+
+(** Under a dialog the page is inert: Tab and clicks cannot reach it, so the
+    dialog owns the keyboard until it closes. *)
+val inert : Node.t -> Node.t

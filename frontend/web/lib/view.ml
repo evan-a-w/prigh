@@ -198,19 +198,6 @@ let echoes (m : Model.t) =
            ]))
 ;;
 
-(* Under a dialog the page is inert: Tab and clicks cannot reach it, so the
-   dialog owns the keyboard until it closes. *)
-let rec inert (node : Node.t) : Node.t =
-  match node with
-  | Element e ->
-    Element
-      (Node.Element.map_attrs e ~f:(fun a ->
-         Attr.many [ a; Attr.create "inert" "" ]))
-  | Lazy { key; t } -> Lazy { key; t = lazy (inert (Lazy.force t)) }
-  | Fragment nodes -> Fragment (List.map nodes ~f:inert)
-  | (None | Text _ | Widget _) as node -> node
-;;
-
 (* What is loaded of the transcript, after how much is not. *)
 let transcript (m : Model.t) ~inject =
   Node.fragment
@@ -225,16 +212,25 @@ let view (m : Model.t) ~inject ~terminal =
     then inert
     else Fn.id
   in
+  (* A chip's menu is in the composer, which keeps its chips live (the
+     composer makes the rest of itself inert). *)
+  let behind_composer =
+    match m.dialog with
+    | Some (Popover _) when not (Model.waiting m || Files.asking m.files) ->
+      Fn.id
+    | _ -> behind
+  in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)
   let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
-  let under_sheet = if sheet then Fn.compose inert behind else behind in
   (* So is the drawer, over the page. *)
-  let under_drawer =
-    if m.narrow && m.sidebar_open
-    then Fn.compose inert under_sheet
-    else under_sheet
+  let drawer = m.narrow && m.sidebar_open in
+  let layered behind =
+    let under_sheet = if sheet then Fn.compose inert behind else behind in
+    if drawer then Fn.compose inert under_sheet else under_sheet
   in
+  let under_sheet = if sheet then Fn.compose inert behind else behind in
+  let under_drawer = layered behind in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with
     | Some text, _, _ -> placeholder text
@@ -312,12 +308,10 @@ let view (m : Model.t) ~inject ~terminal =
                ]
            ]
          @ [ toasts m ~inject ]
-         @ List.map
-             ~f:under_drawer
-             [ Btw_view.view m ~inject
-             ; Composer_view.view m ~inject
-             ; Terminal_view.view m ~inject ~widget:terminal
-             ])
+         @ [ under_drawer (Btw_view.view m ~inject)
+           ; layered behind_composer (Composer_view.view m ~inject)
+           ; under_drawer (Terminal_view.view m ~inject ~widget:terminal)
+           ])
     ; behind (Files_view.view m ~inject)
     ; behind (Agents_view.view m ~inject)
     ; Dialog_view.view m ~inject

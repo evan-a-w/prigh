@@ -163,7 +163,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Deny" -- n or Esc
     button "Deny, saying why" -- r
     |}];
-  H.quiet h (fun () -> H.act h Open_model_picker);
+  H.quiet h (fun () -> H.act h (Run "/model"));
   names ~within:".modal " h;
   [%expect
     {|

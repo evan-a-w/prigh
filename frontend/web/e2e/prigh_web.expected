@@ -379,21 +379,30 @@ Where tools run
 <HOSTNAME>
 <CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
-=== chromium: the thinking picker ===
-Thinking level
-off
+=== chromium: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
 answer straight away
-low
+Low
 a little
-on
+On
 the provider's default budget
-high
+High
 more
-max
+Max
 as much as the model allows
-↑↓ to move, Enter to choose, Esc to close
-=== chromium: the mode picker ===
-When tools ask first (Alt+M cycles)
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== chromium: the mode chip's menu, from the model's with → → ===
+When tools ask first
+Alt+M cycles
 Asks: edits & commands
 bash, job_input, edits and MCP tools ask first
 Asks: commands
@@ -402,7 +411,8 @@ Auto: never asks
 tools run without asking
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
-↑↓ to move, Enter to choose, Esc to close
+Enter chooses, ← → the next setting, Esc closes
+mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: mode ask ===
 DeepSeek V4.1 Flash
 Thinking
@@ -520,6 +530,8 @@ also check the docs
 <TIME>
 Done waiting.
 <TIME>
+=== chromium: phone: a chip's menu ===
+thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -1632,21 +1644,30 @@ Where tools run
 <HOSTNAME>
 <CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
-=== firefox: the thinking picker ===
-Thinking level
-off
+=== firefox: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
 answer straight away
-low
+Low
 a little
-on
+On
 the provider's default budget
-high
+High
 more
-max
+Max
 as much as the model allows
-↑↓ to move, Enter to choose, Esc to close
-=== firefox: the mode picker ===
-When tools ask first (Alt+M cycles)
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== firefox: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== firefox: the mode chip's menu, from the model's with → → ===
+When tools ask first
+Alt+M cycles
 Asks: edits & commands
 bash, job_input, edits and MCP tools ask first
 Asks: commands
@@ -1655,7 +1676,8 @@ Auto: never asks
 tools run without asking
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
-↑↓ to move, Enter to choose, Esc to close
+Enter chooses, ← → the next setting, Esc closes
+mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: mode ask ===
 DeepSeek V4.1 Flash
 Thinking
@@ -1773,6 +1795,8 @@ also check the docs
 <TIME>
 Done waiting.
 <TIME>
+=== firefox: phone: a chip's menu ===
+thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === firefox: archived, folded ===
 one more
 <AGE>

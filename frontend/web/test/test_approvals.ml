@@ -44,6 +44,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     <button type="button"
             title="Tools run without asking (Alt+M cycles, /mode picks)"
             data-short="auto"
+            aria-haspopup="dialog"
+            aria-expanded="false"
             class="btn chip-button mode-chip"
             @on_click>
       <icon class="shield"> </icon>
@@ -81,6 +83,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     <button type="button"
             title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             data-short="plan"
+            aria-haspopup="dialog"
+            aria-expanded="false"
             class="btn chip-button mode-chip plan-mode"
             @on_click>
       <icon class="shield"> </icon>
@@ -114,25 +118,24 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
     Couldn't set the mode: no session (Dismiss)
     |}];
-  (* Clicking the chip picks the mode: what each asks first. *)
+  (* Clicking the chip opens its menu over it: what each asks first. *)
   H.click h ~selector:".mode-chip";
-  modal h;
+  H.text h ~selector:"#chip-popover";
   [%expect
     {|
-    (Run /mode)
-    (Focus picker-input)
-    When tools ask first (Alt+M cycles)
-    (Close (Esc))
-    []
+    (Open_chip Mode)
+    (Focus popover-list)
+    Place_popover
+    When tools ask first Alt+M cycles
     Asks: edits & commands bash, job_input, edits and MCP tools ask first
     Asks: commands file edits run; bash, job_input and MCP tools ask first
     Auto: never asks tools run without asking
-    Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first ✓
-    ↑↓ to move, Enter to choose, Esc to close
+    ✓ Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
+    Enter chooses, ← → the next setting, Esc closes
     |}];
   (* The filter knows the short names too. *)
   H.act h (Picker_query "auto-e");
-  H.text h ~selector:".picker-items";
+  H.text h ~selector:".popover-items";
   [%expect
     {| Asks: commands file edits run; bash, job_input and MCP tools ask first |}];
   H.key h "Enter" ~target:Field;

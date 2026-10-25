@@ -39,6 +39,10 @@ type t =
       { kind : Picker_kind.t
       ; picker : Picker.t
       }
+  | Popover of
+      { chip : Chip.t
+      ; picker : Picker.t
+      }
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -79,6 +83,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 let per_session = function
+  | Popover _
   | Rename _
   | Prompt _
   | Rewind_confirm _

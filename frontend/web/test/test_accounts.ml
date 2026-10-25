@@ -407,7 +407,7 @@ let%expect_test "switching user resets everything that was the old user's" =
        ));
   H.act h (Run "/btw what was that?");
   H.act h (Set_session_query "ali");
-  H.act h Open_model_picker;
+  H.act h (Run "/model");
   H.act h (Run "/setusr bob");
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
   let m = H.model h in

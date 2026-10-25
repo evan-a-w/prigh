@@ -549,11 +549,19 @@ The composer is one box: the editor on top and, along its bottom edge in
 the box's own quiet text, the model, the thinking level ("Thinking high",
 "No thinking" for a model without levels) and the approval mode ("Asks:
 edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
-lit), each lit with a chevron when pointed at and opening the same picker
-as its command (`/model`, `/thinking`, `/mode`: the modes with what each
-asks first; it filters as you type, Enter takes the choice, Esc closes it
-unchanged), then attach, stop and send on the right. Ctrl+L, Alt+T and
-Alt+M switch or cycle them; in a narrow composer the labels get short
+lit), each lit with a chevron when pointed at, then attach, stop and send
+on the right. A chip opens a small menu standing on it, above the composer
+(below it only when there is no room above), with its command's choices
+(`/model`, `/thinking`, `/mode`), the current one checked: the models under
+their providers with their context windows and a filter field to type in
+(the list scrolls; filtered, best match first), the thinking levels with
+how hard each thinks, the modes with what each asks first. ↑↓ move, Enter
+or a click takes the choice, Esc or a click beside the menu closes it
+unchanged and gives the editor back the focus; ← →, Tab and a click on
+another chip open the next chip's menu, one at a time. On a phone the menu
+is as wide as the composer. The commands themselves open the larger
+picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
+other two; in a narrow composer the labels get short
 (`high`, `ask`, `plan`, after an icon). There is no bar over the chat
 while the sidebar is open: the files, terminal and agents buttons sit
 quietly in the chat's top right corner (lit while their panel is open),
