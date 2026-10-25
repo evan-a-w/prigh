@@ -29,6 +29,7 @@ module Argument : sig
     | Snippet (** a snippet name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
     | Server (** [/connect]: [local], the current or the saved address *)
+    | Pr (** [/pr]'s subcommands *)
   [@@deriving sexp_of, equal]
 end
 
