@@ -16,6 +16,12 @@ module Reply_tag : sig
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Forge_refresh (** [forge_status]: the git hosts, and what lists them *)
+    | Prs_picker of string option (** [/pr list]'s state *)
+    | Pr_shown
+    | Pr_form_defaults of string option (** the title after [/pr new] *)
+    | Pr_created (** errors go to the form *)
+    | Pr_checked_out of int (** offers to [/cd] to the worktree *)
     | Models_for_picker of string (** initial filter *)
     | Models_for_switch of string (** the argument to resolve *)
     | Models_after_login of string (** provider *)
@@ -192,6 +198,7 @@ module Model : sig
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; forge : P.Forge_account.t list (** the user's git hosts *)
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
     ; focus : [ `Main | `Agent of string ]
