@@ -116,13 +116,15 @@ let%expect_test
         </summary>
         <div class="thinking-text">
           <div class="markdown">
-            <p dir="auto">
-              Let me look.
-              <br/>
-              First the
-              <strong> files </strong>
-              .
-            </p>
+            <div class="md-part">
+              <p dir="auto">
+                Let me look.
+                <br/>
+                First the
+                <strong> files </strong>
+                .
+              </p>
+            </div>
           </div>
         </div>
       </details>
@@ -158,25 +160,29 @@ let%expect_test
         </summary>
         <div class="thinking-text">
           <div class="markdown">
-            <p dir="auto">
-              Let me look.
-              <br/>
-              First the
-              <strong> files </strong>
-              .
-            </p>
+            <div class="md-part">
+              <p dir="auto">
+                Let me look.
+                <br/>
+                First the
+                <strong> files </strong>
+                .
+              </p>
+            </div>
           </div>
         </div>
       </details>
       <div class="markdown">
-        <p dir="auto">
-          Here
-          <strong>
-            is the
-            <code> plan </code>
-          </strong>
-          .
-        </p>
+        <div class="md-part">
+          <p dir="auto">
+            Here
+            <strong>
+              is the
+              <code> plan </code>
+            </strong>
+            .
+          </p>
+        </div>
       </div>
       <div class="meta">
         <span> claude-opus-5-5 </span>
@@ -210,7 +216,9 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
       </div>
       <div class="assistant msg">
         <div class="markdown">
-          <p dir="auto"> I was saying </p>
+          <div class="md-part">
+            <p dir="auto"> I was saying </p>
+          </div>
         </div>
         <div class="aborted stop">
           <span aria-hidden="true" class="mark stopped">
@@ -221,7 +229,9 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
       </div>
       <div class="assistant msg">
         <div class="markdown">
-          <p dir="auto"> A long </p>
+          <div class="md-part">
+            <p dir="auto"> A long </p>
+          </div>
         </div>
         <div class="length stop">
           <span aria-hidden="true" class="mark warn">
@@ -380,11 +390,13 @@ let%expect_test "deliveries of background work: compact cards" =
                 <span class="preview"> src/app.ml has 5 lines. </span>
               </summary>
               <div class="markdown">
-                <p dir="auto">
-                  src/app.ml has
-                  <strong> 5 lines </strong>
-                  .
-                </p>
+                <div class="md-part">
+                  <p dir="auto">
+                    src/app.ml has
+                    <strong> 5 lines </strong>
+                    .
+                  </p>
+                </div>
               </div>
             </details>
           </div>
@@ -428,7 +440,9 @@ let%expect_test "deliveries of background work: compact cards" =
                 <span class="preview"> subagent failed: 529 overloaded </span>
               </summary>
               <div class="markdown">
-                <p dir="auto"> subagent failed: 529 overloaded </p>
+                <div class="md-part">
+                  <p dir="auto"> subagent failed: 529 overloaded </p>
+                </div>
               </div>
             </details>
           </div>
@@ -454,13 +468,17 @@ let%expect_test "compaction" =
           <span class="preview"> Goal </span>
         </summary>
         <div class="markdown">
-          <h2 dir="auto"> Goal </h2>
-          <p dir="auto">
-            Ship the
-            <strong> web </strong>
-             UI.
-          </p>
-          <p dir="auto"> Done so far: chat view. </p>
+          <div class="md-part">
+            <h2 dir="auto"> Goal </h2>
+            <p dir="auto">
+              Ship the
+              <strong> web </strong>
+               UI.
+            </p>
+          </div>
+          <div class="md-part">
+            <p dir="auto"> Done so far: chat view. </p>
+          </div>
         </div>
       </details>
     </div>

@@ -896,6 +896,25 @@ newest answer on show: true
 "Reconnected" said: 1
 === chromium: resilience: errors ===
 none
+=== chromium: stability: idle ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and top bar: none
+=== chromium: stability: a reply streamed ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and top bar: none
+=== chromium: stability: the streamed reply once ended ===
+its parts kept: true
+selection kept: true
+=== chromium: stability: the editor ===
+frames sampled: true
+frames with lines out of view: 0
+frames empty but still tall: 0
+=== chromium: stability: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1793,4 +1812,23 @@ banner: none
 newest answer on show: true
 "Reconnected" said: 1
 === firefox: resilience: errors ===
+none
+=== firefox: stability: idle ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and top bar: none
+=== firefox: stability: a reply streamed ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and top bar: none
+=== firefox: stability: the streamed reply once ended ===
+its parts kept: true
+selection kept: true
+=== firefox: stability: the editor ===
+frames sampled: true
+frames with lines out of view: 0
+frames empty but still tall: 0
+=== firefox: stability: errors ===
 none
