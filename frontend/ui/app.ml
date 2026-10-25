@@ -123,7 +123,7 @@ module Connection = struct
         ; generation : int
         ; delay_ms : int
         ; session : string option
-          (** the session to resume; dropped once the backend says it no longer
+        (** the session to resume; dropped once the backend says it no longer
             exists (a never-persisted session has no file) *)
         }
     | Switching of
@@ -273,15 +273,12 @@ let str = P.Json.str
 
 let editor_row_count m =
   let inner = Int.max 1 (m.width - 2) in
-  List.sum
-    (module Int)
-    (Editor.lines m.editor)
-    ~f:(fun line ->
-      let rec count text acc =
-        let _, rest = Text_width.take text ~width:inner in
-        if String.is_empty rest then acc + 1 else count rest (acc + 1)
-      in
-      count line 0)
+  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
+    let rec count text acc =
+      let _, rest = Text_width.take text ~width:inner in
+      if String.is_empty rest then acc + 1 else count rest (acc + 1)
+    in
+    count line 0)
 ;;
 
 let layout m =
@@ -1153,8 +1150,8 @@ let job_output m id =
 (* ---- skills and MCP servers ------------------------------------------ *)
 
 let skills_hint =
-  "add one as .prigh/skills/<name>/SKILL.md (or .claude/skills/<name>/) in the \
-   project, or under ~/.prigh/skills/"
+  "add one as .prigh/skills/<name>/SKILL.md (or .claude/skills/<name>/) in \
+   the project, or under ~/.prigh/skills/"
 ;;
 
 (* [/abs/proj/.claude/skills/x/SKILL.md] as [~/proj/.claude/skills/x]. *)
@@ -1190,8 +1187,8 @@ let skills_picker m (skills : P.Skill.t list) =
 let open_skills m = m, [ call List_skills ~tag:Skills_picker ]
 
 let mcp_config_hint =
-  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a project's \
-   .mcp.json"
+  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a \
+   project's .mcp.json"
 ;;
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
@@ -3931,7 +3928,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Tool_confirm c -> answer_confirm m c Deny
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
-    | Logout _ | Rewind _ | Delete_sessions _ -> notice m "cancelled", []
+    | Logout _ | Rewind _ | Delete_sessions _ ->
+      notice m "cancelled", []
   in
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
@@ -4729,13 +4727,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(fun json -> P.Json.string_field json "job_id")
          (fun id ->
-            ( notice
-                m
-                (sprintf
-                   "started job %s; /jobs shows it, and its exit is reported \
-                    to the agent"
-                   id)
-            , [] ))
+           ( notice
+               m
+               (sprintf
+                  "started job %s; /jobs shows it, and its exit is reported to \
+                   the agent"
+                  id)
+           , [] ))
      | Sessions_picker ->
        decode
          json
