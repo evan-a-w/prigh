@@ -3763,30 +3763,17 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
 
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
-  let open Or_error.Let_syntax in
-  let%bind summary = Json.object_field json "subagent" in
-  let%bind agent_id = Json.string_field summary "id" in
-  let%bind call_id = Json.string_field summary "call_id" in
-  let%bind parent = Json.string_opt_field summary "parent" in
-  let%bind task = Json.string_field summary "task" in
-  let%bind model = Json.string_field summary "model" in
-  let%bind turns = Json.int_field summary "turns" in
-  let%bind result =
-    match Json.field summary "result" with
-    | None -> Ok None
-    | Some r -> Or_error.map (Event.Subagent_result.of_json r) ~f:Option.some
-  in
-  let%map messages = Json.list_field json "messages" ~f:Message.of_json in
-  ( { Chat.Subagent.agent_id
-    ; task
-    ; model
-    ; chat = Chat.of_messages ~running:(Option.is_none result) messages
-    ; turns
-    ; cost_usd = None
-    ; result
-    }
-  , `Parent parent
-  , `Call call_id )
+  Or_error.map (Subagent_detail.of_json json) ~f:(fun (d : Subagent_detail.t) ->
+    ( { Chat.Subagent.agent_id = d.id
+      ; task = d.task
+      ; model = d.model
+      ; chat = Chat.of_messages ~running:(Option.is_none d.result) d.messages
+      ; turns = d.turns
+      ; cost_usd = None
+      ; result = d.result
+      }
+    , `Parent d.parent
+    , `Call d.call_id ))
 ;;
 
 (* ---- pages of the transcript, cached transcripts, whole outputs *)
