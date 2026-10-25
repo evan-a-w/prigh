@@ -21,7 +21,9 @@ let changes_of_json = function
   | _ -> Or_error.error_string "prefs: expected an object"
 ;;
 
-let of_reply json = Or_error.bind (Json.object_field json "prefs") ~f:changes_of_json
+let of_reply json =
+  Or_error.bind (Json.object_field json "prefs") ~f:changes_of_json
+;;
 
 let get_params ~keys =
   [ "keys", `Array (List.map keys ~f:(fun key -> `String key)) ]

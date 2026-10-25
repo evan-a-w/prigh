@@ -87,7 +87,9 @@ let%expect_test "a page from before uploads the browser's once" =
   restore
     h
     ~legacy:true
-    [ change Key.notify `False; change Key.history (`Array [ str "old prompt" ]) ];
+    [ change Key.notify `False
+    ; change Key.history (`Array [ str "old prompt" ])
+    ];
   (* The TUI's history is already there: it stays. *)
   H.reply h "get_prefs" {|{"prefs":{"history":["tui prompt"]}}|};
   show_prefs h;
@@ -172,7 +174,9 @@ let%expect_test "changes go to the backend; another browser's arrive live" =
     |}];
   (* Browsing the history is not disturbed. *)
   H.key h "ArrowUp";
-  H.event h {|{"event":"prefs_changed","prefs":{"history":["new","there","hello"]}}|};
+  H.event
+    h
+    {|{"event":"prefs_changed","prefs":{"history":["new","there","hello"]}}|};
   print_s [%sexp (History.to_list (H.model h).history : string list)];
   [%expect
     {|
@@ -182,11 +186,14 @@ let%expect_test "changes go to the backend; another browser's arrive live" =
     |}]
 ;;
 
-let%expect_test "acting as another user, or on a backend that keeps none, \
-                 changes stay in the browser"
+let%expect_test
+    "acting as another user, or on a backend that keeps none, changes stay in \
+     the browser"
   =
   let h = H.create () in
-  H.act h (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
   run h "/accent teal";
   [%expect
     {|
@@ -197,7 +204,13 @@ let%expect_test "acting as another user, or on a backend that keeps none, \
     (Apply_theme ((name Original) (accent (Preset Teal))))
     |}];
   (* Switched: theirs are not fetched, ours are not sent. *)
-  H.act h (Reply (User_switched, Ok (Jsonaf.of_string {|{"client_id":"c1","namespace":"bob","user":"alice"}|})));
+  H.act
+    h
+    (Reply
+       ( User_switched
+       , Ok
+           (Jsonaf.of_string
+              {|{"client_id":"c1","namespace":"bob","user":"alice"}|}) ));
   run h "/accent green";
   [%expect
     {|
@@ -218,12 +231,13 @@ let%expect_test "acting as another user, or on a backend that keeps none, \
     h
     (Reply
        ( User_switched
-       , Ok (Jsonaf.of_string {|{"client_id":"c1","namespace":"alice","user":"alice"}|})
-       ));
+       , Ok
+           (Jsonaf.of_string
+              {|{"client_id":"c1","namespace":"alice","user":"alice"}|}) ));
   print_s
-    [%sexp
-      (List.map (H.model h).toasts ~f:(fun t -> t.text) : string list)];
-  [%expect {|
+    [%sexp (List.map (H.model h).toasts ~f:(fun t -> t.text) : string list)];
+  [%expect
+    {|
     (Expire_toast (id 3) (after_ms 2500))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
@@ -322,14 +336,14 @@ let%expect_test "/theme and /accent: pickers that preview what is highlighted" =
     (Rpc (method_ push_pref) (params ((key history) (value /accent) (max 500)))
      (tag Ignore))
     (Focus picker-input)
-    Orange #f0b44c
-    Blue #6aa6f8
-    Green #62c27a
-    Purple #b08cf2
-    Pink #ee86b8
-    Teal #45c4bb
-    Yellow #e6d04a
-    Custom #cc00ff #cc00ff ✓
+    Orange
+    Blue
+    Green
+    Purple
+    Pink
+    Teal
+    Yellow
+    Custom #cc00ff ✓
     |}];
   (* Wrong names say what would do. *)
   H.key h "Escape" ~target:Page;
@@ -352,8 +366,9 @@ let%expect_test "/theme and /accent: pickers that preview what is highlighted" =
     |}]
 ;;
 
-let%expect_test "the settings' appearance: a click saves, the colour input \
-                 previews while it is dragged"
+let%expect_test
+    "the settings' appearance: a click saves, the colour input previews while \
+     it is dragged"
   =
   let h = H.create () in
   H.act h Open_settings;
@@ -411,7 +426,15 @@ let%expect_test "the settings' appearance: a click saves, the colour input \
 
 let%expect_test "accents: names and colours" =
   List.iter
-    [ "Blue"; " teal "; "#ABC"; "#a1b2c3"; "#1e3a8a"; "#12345"; "#gggggg"; "red" ]
+    [ "Blue"
+    ; " teal "
+    ; "#ABC"
+    ; "#a1b2c3"
+    ; "#1e3a8a"
+    ; "#12345"
+    ; "#gggggg"
+    ; "red"
+    ]
     ~f:(fun s ->
       print_s
         [%message

@@ -4,7 +4,8 @@
 # reconnect.mjs, losing the connection on a phone, then paging.mjs, a long
 # session loaded a page at a time, then resilience.mjs, a long session on a
 # connection that cannot keep up, then stability.mjs, nothing redrawn or
-# shifted that did not change) in each
+# shifted that did not change, then themes.mjs, the themes and the user's
+# preferences on the backend) in each
 # browser and diffs the output with prigh_web.expected. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
 # PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
@@ -40,6 +41,7 @@ for engine in ${ENGINES:-chromium firefox}; do
 	TEST_DIR="$tmp/$engine" node "$here/paging.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/resilience.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/stability.mjs" "$engine" >>"$actual"
+	TEST_DIR="$tmp/$engine" node "$here/themes.mjs" "$engine" >>"$actual"
 done
 
 if [ "${UPDATE:-}" = 1 ]; then

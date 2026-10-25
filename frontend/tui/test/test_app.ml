@@ -4915,7 +4915,9 @@ let%expect_test
   H.event
     h
     (Prefs_changed
-       [ { key = "history"; value = Some (`Array [ `String "newest"; `String "from the web" ]) }
+       [ { key = "history"
+         ; value = Some (`Array [ `String "newest"; `String "from the web" ])
+         }
        ; { key = "web.theme"; value = Some (`String "dark") }
        ]);
   recall h;

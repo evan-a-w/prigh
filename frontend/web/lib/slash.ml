@@ -85,8 +85,8 @@ let all =
       ~argument:Accent
       ~args:"[name|#rrggbb]"
       "accent"
-      "pick or set the accent colour: orange, blue, green, purple, pink, \
-       teal, yellow or any #rrggbb"
+      "pick or set the accent colour: orange, blue, green, purple, pink, teal, \
+       yellow or any #rrggbb"
   ; c
       ~argument:Confirm
       ~args:"[on|off]"

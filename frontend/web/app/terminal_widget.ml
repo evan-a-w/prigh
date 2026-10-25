@@ -111,7 +111,9 @@ end
 let look = ref Prigh_web.Theme.default
 
 let theme_js () =
-  let style = Dom_html.window##getComputedStyle Dom_html.document##.documentElement in
+  let style =
+    Dom_html.window##getComputedStyle Dom_html.document##.documentElement
+  in
   let var name =
     String.strip (Js.to_string (style##getPropertyValue (Js.string name)))
   in

@@ -15,9 +15,16 @@ open! Core
 val key : string
 
 (** [owner]'s preferences, and whether they are legacy. *)
-val load : Login.Storage.t -> owner:string -> Prigh_protocol.Prefs.Change.t list * bool
+val load
+  :  Login.Storage.t
+  -> owner:string
+  -> Prigh_protocol.Prefs.Change.t list * bool
 
-val save : Login.Storage.t -> owner:string -> Prigh_protocol.Prefs.Change.t list -> unit
+val save
+  :  Login.Storage.t
+  -> owner:string
+  -> Prigh_protocol.Prefs.Change.t list
+  -> unit
 
 (** [prigh-web.theme]: the document's attributes and variables, which
     [index.html] puts back before the first paint. *)

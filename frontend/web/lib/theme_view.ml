@@ -98,8 +98,10 @@ let accents (m : App.Model.t) ~inject =
             ; Attr.id "accent-input"
             ; Attr.create "aria-label" "Custom accent colour"
             ; Attr.value (Theme.Accent.hex current)
-            ; Attr.on_input (fun _ value -> inject (Action.Preview_accent value))
-            ; Attr.on_change (fun _ value -> inject (Action.Run ("/accent " ^ value)))
+            ; Attr.on_input (fun _ value ->
+                inject (Action.Preview_accent value))
+            ; Attr.on_change (fun _ value ->
+                inject (Action.Run ("/accent " ^ value)))
             ]
           ()
       ; span ~cls:"accent-custom-label" "Custom"

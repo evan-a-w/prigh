@@ -23,7 +23,8 @@ let%expect_test "set, get and remove keys; the file is replaced whole" =
   let changes c = User_prefs.Change.to_json c in
   show (Ok (`Object (Or_error.ok_exn (User_prefs.get prefs))));
   print_file t;
-  [%expect {|
+  [%expect
+    {|
     {}
     (no file)
     |}];
@@ -59,8 +60,9 @@ let%expect_test "set, get and remove keys; the file is replaced whole" =
           ])
        ~f:changes);
   show
-    (Or_error.map (User_prefs.get prefs ~keys:[ "web.theme"; "nope" ]) ~f:(fun f ->
-       `Object f));
+    (Or_error.map
+       (User_prefs.get prefs ~keys:[ "web.theme"; "nope" ])
+       ~f:(fun f -> `Object f));
   print_file t;
   [%expect
     {|
@@ -80,7 +82,8 @@ let%expect_test "bad keys and values change nothing" =
   @@ fun t ->
   let prefs = User_prefs.create ~path:(file t) in
   let set changes =
-    show (Or_error.map (User_prefs.set prefs changes) ~f:User_prefs.Change.to_json)
+    show
+      (Or_error.map (User_prefs.set prefs changes) ~f:User_prefs.Change.to_json)
   in
   let show_error = function
     | Ok _ -> print_endline "ok"
@@ -116,7 +119,9 @@ let%expect_test "push keeps a bounded history, newest first" =
   with_sandbox
   @@ fun t ->
   let prefs = User_prefs.create ~path:(file t) in
-  let push value = show (User_prefs.push prefs ~key:"history" (`String value) ~max:3) in
+  let push value =
+    show (User_prefs.push prefs ~key:"history" (`String value) ~max:3)
+  in
   push "one";
   push "two";
   push "two";
@@ -137,7 +142,8 @@ let%expect_test "push keeps a bounded history, newest first" =
   let big c = String.make (100 * 1024) c in
   List.iter [ 'a'; 'b'; 'c' ] ~f:(fun c ->
     ignore
-      (User_prefs.push prefs ~key:"long" (`String (big c)) ~max:10 : _ Or_error.t));
+      (User_prefs.push prefs ~key:"long" (`String (big c)) ~max:10
+       : _ Or_error.t));
   (match User_prefs.get prefs ~keys:[ "long" ] with
    | Ok [ (_, `Array items) ] ->
      print_s
@@ -147,7 +153,8 @@ let%expect_test "push keeps a bounded history, newest first" =
             | _ -> "?")
           : string list)]
    | _ -> print_endline "?");
-  [%expect {|
+  [%expect
+    {|
     ["again"]
     (c b)
     |}]
@@ -212,16 +219,27 @@ let%expect_test "the RPC methods; the user's other clients hear the changes" =
     | Some `True, Some result -> print_endline (Json.to_string result)
     | _ ->
       print_endline
-        (mask t (Json.to_string (Option.value_exn (Json.member "error" response))))
+        (mask
+           t
+           (Json.to_string (Option.value_exn (Json.member "error" response))))
   in
   call a "hello" (`Object []);
   call _b "hello" (`Object []);
   ignore ([%expect.output] : string);
   call a "get_prefs" (`Object []);
-  call a "set_prefs" (`Object [ "prefs", `Object [ "web.theme", `String "dark" ] ]);
+  call
+    a
+    "set_prefs"
+    (`Object [ "prefs", `Object [ "web.theme", `String "dark" ] ]);
   (* Nothing changes: nobody hears it. *)
-  call a "set_prefs" (`Object [ "prefs", `Object [ "web.theme", `String "dark" ] ]);
-  call a "push_pref" (`Object [ "key", `String "history"; "value", `String "hi" ]);
+  call
+    a
+    "set_prefs"
+    (`Object [ "prefs", `Object [ "web.theme", `String "dark" ] ]);
+  call
+    a
+    "push_pref"
+    (`Object [ "key", `String "history"; "value", `String "hi" ]);
   call a "get_prefs" (`Object [ "keys", `Array [ `String "web.theme" ] ]);
   call a "set_prefs" (`Object [ "prefs", `Object [ "web.theme", `Null ] ]);
   call a "set_prefs" (`Object [ "prefs", `Array [] ]);

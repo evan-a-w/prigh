@@ -120,7 +120,7 @@ let argument_items
   | Accent ->
     simple
       (List.map Theme.Accent.Preset.all ~f:(fun p ->
-         Theme.Accent.Preset.to_string p, Theme.Accent.Preset.hex p))
+         Theme.Accent.Preset.to_string p, ""))
   | Verbosity ->
     simple
       [ "quiet", "hide tool output and thinking"

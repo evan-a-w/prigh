@@ -59,4 +59,7 @@ val saving : t -> bool
 
 (** [get_prefs]' reply arrived: the changes to apply, and to upload (the
     legacy ones, when the backend has never had this browser's). *)
-val loaded : t -> Prefs.Change.t list -> t * Prefs.Change.t list * Prefs.Change.t list
+val loaded
+  :  t
+  -> Prefs.Change.t list
+  -> t * Prefs.Change.t list * Prefs.Change.t list

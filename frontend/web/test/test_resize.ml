@@ -191,7 +191,8 @@ let%expect_test "the kept sizes come back; dragging commits once, clamped" =
     |}];
   H.act h (Resize (Reset Terminal));
   H.act h (Resize (Reset Terminal));
-  [%expect {|
+  [%expect
+    {|
     (Cache_prefs (((key web.terminal-height) (value ()))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height null)))))
      (tag Show_error))
