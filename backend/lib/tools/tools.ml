@@ -73,6 +73,7 @@ let main_agent_only =
   ; Tool_ask_user.name
   ; Tool_exit_plan_mode.name
   ; Goal.tool_name
+  ; Tool_review_reply.name
   ]
 ;;
 

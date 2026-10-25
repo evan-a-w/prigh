@@ -215,7 +215,7 @@ let argument_items
       ; "new", "new [title]: create one from this branch"
       ; "checkout", "checkout N: its branch in a worktree"
       ]
-  | Models | Directory | Backend_directory | Path | Remind -> []
+  | Models | Directory | Backend_directory | Path | Remind | Worktree -> []
 ;;
 
 let word_at text ~cursor =
@@ -238,6 +238,17 @@ let word_at text ~cursor =
   start, String.sub text ~pos:start ~len:(stop - start)
 ;;
 
+(* A worktree's description starts with the label the row already shows. *)
+let without_label (id, detail) =
+  let drop prefix =
+    String.chop_prefix detail ~prefix:(prefix ^ id ^ " · ")
+    |> Option.map ~f:(fun rest -> prefix ^ rest)
+  in
+  ( id
+  , Option.first_some (drop "") (drop "base: ") |> Option.value ~default:detail
+  )
+;;
+
 let make source ~prefix ~start items =
   { source; prefix; start; items; selected = 0 }
 ;;
@@ -250,6 +261,7 @@ let compute
       ?(snippets = [])
       ?(reminders = [])
       ?(forges = [])
+      ?(worktrees = [])
       ~text
       ~cursor
       ~models
@@ -323,10 +335,15 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | Remind ->
+             | (Remind | Worktree) as kind ->
                let rest = String.lstrip rest in
                Option.bind
-                 (Prigh_ui.Remind_command.complete ~reminders rest)
+                 (match kind with
+                  | Worktree ->
+                    Prigh_ui.Worktree_command.complete ~worktrees rest
+                    |> Option.map ~f:(fun (offset, candidates) ->
+                      offset, List.map candidates ~f:without_label)
+                  | _ -> Prigh_ui.Remind_command.complete ~reminders rest)
                  ~f:(fun (offset, candidates) ->
                    let prefix = String.drop_prefix rest offset in
                    match
@@ -456,6 +473,16 @@ let move t delta =
   { t with selected = Int.max 0 (Int.min (n - 1) (t.selected + delta)) }
 ;;
 
+(* [/worktree]'s subcommands but [list], and its flags, come before the
+   rest of the command. *)
+let takes_more t =
+  match t.source, selected_item t with
+  | Argument Worktree, Some { id; _ } ->
+    List.mem [ "new"; "open"; "rm"; "remove" ] id ~equal:String.equal
+    || String.is_prefix id ~prefix:"-"
+  | _ -> false
+;;
+
 let accept t ~text =
   match selected_item t with
   | None -> text, String.length text
@@ -470,6 +497,9 @@ let accept t ~text =
       | Path when not (String.is_suffix item.id ~suffix:"/") -> item.id ^ " "
       | Argument (Skill | Models) when not (String.is_prefix after ~prefix:" ")
         -> item.id ^ " "
+      | Argument Worktree
+        when takes_more t && not (String.is_prefix after ~prefix:" ") ->
+        item.id ^ " "
       | Path | Argument _ | Snippet -> item.id
     in
     ( before ^ replacement ^ after

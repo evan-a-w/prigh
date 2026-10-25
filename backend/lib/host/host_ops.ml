@@ -397,6 +397,8 @@ let execute
   then Git_diff.run ~env ~cancel ~cwd ~arguments
   else if String.equal name Git_forge.op
   then Git_forge.run ~env ~cancel ~cwd ~arguments
+  else if Worktree.is_op name
+  then Worktree.run ~env ~cancel ~cwd ~name ~arguments
   else if Host_files.is_op name
   then
     Host_files.execute ~env ?stdin ~cancel ~on_output ~cwd ~name ~arguments ()

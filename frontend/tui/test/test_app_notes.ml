@@ -599,6 +599,66 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test "/review alone: the files' approvals and the review comments" =
+  let h = Test_app.connected ~width:84 ~height:22 () in
+  let hash path =
+    let diff =
+      P.Git_diff.of_json (P.Json.parse diff_json |> Or_error.ok_exn)
+      |> Or_error.ok_exn
+    in
+    (List.find_exn (Diff_files.parse diff.diff) ~f:(fun f ->
+       String.equal f.path path))
+      .hash
+  in
+  H.keys h "/review";
+  H.step ~quiet:true h (Key (Key.plain Enter));
+  H.enter h;
+  let review_json =
+    sprintf
+      {|{"comments":[
+          {"id":"c1","root":"/work","path":"src/a.ml","first":2,"last":2,"anchor":"let y = 3","status":"open",
+           "thread":[{"author":"user","text":"Why 3?","at_ms":1,"delivered":true},
+                     {"author":"agent","text":"It was off by one.","at_ms":2,"delivered":true,
+                      "proposal":{"edits":[{"old_text":"3","new_text":"4"}],"state":"pending"}}]},
+          {"id":"c2","root":"/work","path":"gone.ml","first":1,"last":3,"anchor":"x","status":"resolved",
+           "thread":[{"author":"user","text":"Drop it","at_ms":3,"delivered":false}]}],
+         "approvals":[{"path":"src/a.ml","hash":%S},{"path":"new file.txt","hash":"older"}]}|}
+      (hash "src/a.ml")
+  in
+  H.reply ~quiet:true h Review_comments review_json;
+  H.reply
+    h
+    (Review_status
+       (P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
+        |> Or_error.ok_exn))
+    diff_json;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Review ─────────────────────────────────────────────────────────────────────────┐
+    │ review /work  1 of 2 files approved                                              │
+    │   ✓ src/a.ml  +1 −1  approved                                                    │
+    │     c1 line 2, open                                                              │
+    │       you: Why 3?                                                                │
+    │       prigh: It was off by one. [proposes a change]                              │
+    │   ● new file.txt  +1 −0  changed since approved                                  │
+    │   on files no longer changed:                                                    │
+    │   gone.ml                                                                        │
+    │     c2 lines 1–3, resolved                                                       │
+    │       you: Drop it                                                               │
+    │ approve files and comment on lines in prigh-web's review page; /review HEAD has  │
+    │ prigh review the changes itself                                                  │
+    └───────────────────────────────────────────────────────────────────── Esc closes ─┘
+    ────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}]
+;;
+
 let%expect_test
     "/notify: the setting, and notifications only while the terminal is not \
      focused"

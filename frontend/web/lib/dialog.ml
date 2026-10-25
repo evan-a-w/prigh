@@ -21,6 +21,7 @@ module Picker_kind = struct
     | Reminders
     | Mcp of Mcp_list.t
     | Jump
+    | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
   [@@deriving sexp_of, equal]
@@ -79,6 +80,13 @@ type t =
       { input : string
       ; error : string option
       }
+  | New_worktree of New_worktree.t
+  | Remove_worktree of
+      { worktree : Worktree.t
+      ; force : bool
+      ; busy : bool
+      ; error : string option
+      }
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -95,11 +103,13 @@ let per_session = function
   | Pull _
   | Pr_create _
   | Pr_checked_out _
+  | New_worktree _
+  | Remove_worktree _
   | Picker
       { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
       ; _
       }
-  | Picker { kind = Snippets | Reminders; _ } -> true
+  | Picker { kind = Snippets | Reminders | Worktrees _; _ } -> true
   | Picker
       { kind =
           ( Models

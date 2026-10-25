@@ -361,6 +361,20 @@ or the one you are in): those are not asked for, and with nothing left to
 delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes.
 
+Below the sessions, when the session is in a git repository, a
+"Worktrees" section lists the repository's worktrees (`/worktree`, above):
+each with its branch, `● 3 changed` when it has uncommitted changes, ↑↓
+commits against its upstream, its path (the full one on hover) and the
+sessions working in it as chips (click one to switch to it); the one the
+session is in has an accent edge. Clicking a worktree moves the session
+there, its hover "+" starts a new session there and its bin asks to remove
+it ("Discard changes and remove" when it has changes); the header folds
+the section, refreshes it and has "+" for a "New worktree" dialog (branch,
+and a base that defaults to where the session is; Enter creates it and
+moves the session there, Esc cancels). It is listed again when the
+session, its directory or its tool host changes, when a turn ends and
+after creating or removing one.
+
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
@@ -431,6 +445,13 @@ replaces a file; New folder makes one. Every error says what to do next,
 dialogs own the keyboard (Enter accepts, Esc cancels without doing
 anything), and switching session or host starts the browser afresh.
 
+In a git repository the browser marks what changed (against `HEAD`,
+untracked files too): a changed file has a dot (a sage tick once you
+approved it, sodium when it changed after that), a directory the number
+of changed files inside. A changed file previews as its diff, the hunks
+or the whole file with the changes inline, highlighted; any text file of
+the repository can be commented on.
+
 Files go into a message too: drop them on the composer, paste them, or
 pick them with its paperclip. Images (PNG, JPEG, GIF, WebP) go as images,
 as before; any other file is uploaded to `.prigh/uploads/` in the
@@ -463,8 +484,9 @@ HOST [token]`, `/login HOST` and `/logout HOST` do the same, and the
 (or `/pr [list open|closed|all]`) opens the session's repository's pull
 requests: a list to filter by state and by typing; Enter opens one (`/pr
 view N`) with its state, author, branches, checks, description and diff,
-"Open on GitHub" and Check out (a worktree beside the repository, with
-"Work there" to `/cd` into it; `/pr checkout N` asks the same), Esc going
+"Open on GitHub" and Check out (its branch in a worktree, as `/worktree`
+makes them, with "Work there" to `/cd` into it; `/pr checkout N` asks the
+same), Esc going
 back to the list. New pull request (`/pr new [title]`) is a form
 prefilled from the branch (title, description, base, draft, and "push
 first" when the remote lacks commits): Ctrl+Enter creates it, a refusal
@@ -626,6 +648,42 @@ backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
 across the reconnect: their results wait for the backend to be back.
+
+### Reviewing the changes
+
+`/review` (or Alt+R, or the Review button of the file browser and of
+`/diff`) opens the review page in the chat's place; the chat narrows to a
+column beside it and keeps working. Down its left are the changed files,
+each with its approval; the strip in its head shows them all at a glance
+(sage approved, sodium changed since approved). The current file shows
+its hunks or, with Whole file (v), all of it with the changes inline.
+`]` / `[` (or n / p, j / k) go to the next and previous file, `a`
+approves the file (again), Esc closes. It follows the agent: every edit,
+write or command of the agent or its subagents, and every run's end,
+reads the changes again; the arrow button reads them now.
+
+Click a line's number to select it, Shift+click another to select the
+lines between, then Comment (or `c`): write it and Ctrl+Enter adds it
+under the lines. Comments collect until you send them (Send, or `s`):
+the agent then gets one message with each comment's file, lines, the code
+they hold and the thread (`✎ 2 review comments` in the transcript), and
+answers each with the `reply_to_comment` tool. Its replies show threaded
+under the comment; a reply may propose a change (exact replacements, like
+`edit`'s), which Accept applies to the file where the tools run and
+Reject declines, and the agent hears of either with the next comments you
+send. Reply in a thread to go on with it, Resolve it when it is done, or
+delete it. A comment keeps its lines' text, so when the file changes
+around them it moves with them; one whose lines are gone shows above the
+file, marked so.
+
+Edit (e) switches to the file's text: edit it in place (highlighted) and
+Save (Ctrl+S) writes it on the tool host; a file that changed since you
+opened it is not overwritten (save again to overwrite it, or Reload).
+Approving keys each file by a hash of its change, so a file approved and
+then changed is no longer approved, and says so. Comments and approvals
+are kept with the session (also across rewinds, reloads and restarts).
+In the TUI, `/review` alone lists the changed files with their approvals
+and the comments with their threads.
 
 ## In Neovim
 
@@ -1079,6 +1137,8 @@ it is replaced by `approval_mode` when prigh saves the file),
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`),
+`worktrees_dir` (default `~/.prigh/worktrees`, on the tool host: where
+`/worktree new` puts git worktrees, below),
 `ask_user_timeout_seconds` (default 300, `0` = never: how long a question
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
@@ -1226,7 +1286,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [base] [instructions]` | have the model review the uncommitted changes, or those against `base`'s merge base, for prioritised findings with file and line |
+| `/review [base] [instructions]` | alone: the review page (prigh-web) or the files' approvals and the comments (TUI), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
@@ -1243,6 +1303,7 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
@@ -1340,9 +1401,10 @@ branches, URL, description, checks and diff. `/pr new [title]` opens a form
 prefilled from the branch (title, body, base, draft, and "push first" when
 the branch is not on the remote yet): Tab or ↑↓ move between fields, Space
 toggles, Ctrl+J starts a new line in the body, Enter creates it and the
-notice gives its URL. `/pr checkout 24` makes a git worktree next to the
-repository (`<repo>-wt/pr-24`, the branch `pr-24` from `refs/pull/24/head`)
-and asks whether to `/cd` there; again later it fast-forwards it. The
+notice gives its URL. `/pr checkout 24` checks the branch `pr-24` (from
+`refs/pull/24/head`) out in a worktree where `/worktree` makes them
+(`worktrees_dir`, `~/.prigh/worktrees/<project>/pr-24`) and asks whether to
+`/cd` there; again later it fast-forwards that worktree. The
 repository is the current branch's remote, else `origin`, else the first
 remote on a known host; pull requests from forks are listed as
 `owner:branch`, but `/pr new` opens one from the current branch of that
@@ -1354,12 +1416,33 @@ draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the
 transcript, prigh-web in a dialog); a diff over 1 MB is cut short.
-`/review` and `/init` start a run with a prompt the backend writes (the
+`/review BASE` and `/init` start a run with a prompt the backend writes (the
 review prompt includes the diff when it is small enough, else tells the
 model how to read it); like a prompt they queue while a run is going, and
 an error (nothing to review, an unknown base, not a repository) says what
 to do. The transcript shows them as notes (`⚑ Review of uncommitted
 changes`, `▤ Write or improve AGENTS.md`), not as the long prompt.
+
+`/worktree` works with the git worktrees of the repository the session is
+in, on the active tool host. `/worktree new BRANCH [BASE]` puts a new one
+at `<worktrees_dir>/<project>/<branch>` (`~/.prigh/worktrees/prigh/feat-x`
+for the branch `feat/x` of a checkout named `prigh`; `/` and unusual
+characters become `-`): a new branch from BASE (default: where the session
+is), an existing local branch checked out as it is (no BASE then), or,
+without BASE, the one remote branch of that name, tracked. The project
+directory records which repository it belongs to (`.prigh-repo`), so
+another checkout with the same name gets `prigh-2`, and a branch whose
+directory is taken gets `-2`. A branch already checked out elsewhere is
+refused with where it is. The list shows each worktree's branch, path,
+uncommitted changes (`*`), commits ahead of and behind its upstream, and
+the sessions working in it; `TARGET` is a branch, a path or a directory
+name, completed with Tab, and an unknown one gets the closest matches.
+Removing asks first (saying what would be lost and which sessions work
+there), keeps the branch, and is refused for the main checkout, for the
+worktree the session itself is in (open another first) and, without
+`-f`, for one with uncommitted changes or locked; a worktree whose
+directory was deleted is pruned. prigh-web also has a Worktrees section in
+the sidebar (below).
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:

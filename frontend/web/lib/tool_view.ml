@@ -658,6 +658,24 @@ let present
                   Node.li [ Node.text q.question ]))
            ]
        })
+  | "reply_to_comment" ->
+    let edits = Tool_args.edits args in
+    let resolve = Option.value (Tool_args.bool args "resolve") ~default:false in
+    { arg =
+        Option.some_if
+          (not (String.is_empty (str "id")))
+          (span "arg" (str "id"))
+    ; chips =
+        ((if List.is_empty edits then [] else [ chip "proposes a change" ])
+         @ if resolve then [ chip ~cls:"ok" "resolved" ] else [])
+    ; body =
+        [ div "comment-reply" [ Markdown_view.render ~streaming (str "text") ]
+        ; (if List.is_empty edits
+           then Node.none
+           else Diff_view.edits ~fold edits)
+        ; error_body
+        ]
+    }
   | "exit_plan_mode" ->
     let plan = str "plan" in
     { arg = None

@@ -28,6 +28,8 @@ module Argument : sig
     | Resume (** [now] or [cancel] *)
     | Snippet (** a snippet name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
+    | Worktree
+    (** a [/worktree] subcommand, then a worktree, flag or base branch *)
     | Server (** [/connect]: [local], the current or the saved address *)
     | Pr (** [/pr]'s subcommands *)
   [@@deriving sexp_of, equal]

@@ -31,6 +31,7 @@ val compute
   -> ?snippets:Snippet.t list
   -> ?reminders:Reminder.t list (** the session's, for [/remind rm] *)
   -> ?forges:Forge_account.t list (** for [/login] and [/logout] *)
+  -> ?worktrees:Worktree.t list (** the repository's, for [/worktree] *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list
@@ -51,6 +52,10 @@ val request : t -> (string * (string * Json.t) list) option
 val set_results : t -> prefix:string -> string list -> t
 
 val move : t -> int -> t
+
+(** The highlighted item is followed by more words ([/worktree open], say):
+    accepting it does not run the command. *)
+val takes_more : t -> bool
 
 (** The text with the highlighted item in place of [prefix], and the caret
     after it. Commands get a trailing space (but [skill:], whose skill name

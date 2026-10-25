@@ -21,6 +21,7 @@ module Picker_kind = struct
     | Skills
     | Snippets
     | Reminders
+    | Worktrees of Worktree.Listing.t
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string
@@ -71,6 +72,11 @@ module Confirm_action = struct
         } (** a missing directory given to [/cd] or [/host] *)
     | Cd_to_checkout of string
     (** the worktree [/pr checkout] made: change the session's directory *)
+    | Remove_worktree of
+        { worktree : Worktree.t
+        ; force : bool
+        ; back : Open_picker.t option (** where Esc returns *)
+        }
   [@@deriving sexp_of, equal]
 end
 

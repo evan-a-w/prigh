@@ -17,6 +17,7 @@ module File = struct
     ; added : int
     ; removed : int
     ; hunks : string list
+    ; hash : string
     }
   [@@deriving sexp_of, equal]
 end
@@ -64,6 +65,9 @@ let file_of_lines header lines =
   ; added = !added
   ; removed = !removed
   ; hunks = List.rev !hunks
+  ; hash =
+      Stdlib.Digest.to_hex
+        (Stdlib.Digest.string (String.concat ~sep:"\n" (header :: lines)))
   }
 ;;
 

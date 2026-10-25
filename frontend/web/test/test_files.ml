@@ -56,6 +56,7 @@ let%expect_test
     (Files Toggle)
     (Rpc (method_ fs_list) (params ((hidden false))) (tag (Files (Listed ""))))
     (Files (Focus files-list))
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     |}];
   (* Acknowledged at once: where, and that it is listing. *)
   H.text h ~selector:".files-panel";
@@ -708,6 +709,12 @@ let%expect_test "another session or host resets the browser and drops the chips"
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Files (Abort_upload 9))
     (Rpc (method_ fs_list) (params ((hidden false))) (tag (Files (Listed ""))))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nc7\
+                            \n/home/me/proj") (purpose (Sidebar 2)))))
     |}];
   H.text h ~selector:".attach-chips";
   H.text h ~selector:".files-panel .files-crumbs";

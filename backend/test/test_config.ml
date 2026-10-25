@@ -14,10 +14,10 @@ let%expect_test "a missing file yields the default" =
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
-      (archive_after_days 7) (notify Bell) (snippets ())
-      (auto_background_seconds 30)))
+      (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
+      (goal_max_continuations 20) (resume_on_limit_reset true)
+      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
+      (snippets ()) (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -32,6 +32,7 @@ let%expect_test "save then load round trips" =
     ; default_thinking = Some (On (Some High))
     ; fallback_models = []
     ; default_cwd = None
+    ; worktrees_dir = "~/work/trees"
     ; max_budget_usd = None
     ; goal_max_continuations = 20
     ; resume_on_limit_reset = true
@@ -59,6 +60,7 @@ let%expect_test "save then load round trips" =
       "default_thinking": "high",
       "fallback_models": [],
       "default_cwd": null,
+      "worktrees_dir": "~/work/trees",
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
@@ -77,9 +79,10 @@ let%expect_test "save then load round trips" =
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
       (approval_mode Ask) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
-      (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-      (goal_max_continuations 20) (resume_on_limit_reset true)
-      (ask_user_timeout_seconds 600) (archive_after_days 7) (notify Bell)
+      (fallback_models ()) (default_cwd ()) (worktrees_dir ~/work/trees)
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true) (ask_user_timeout_seconds 600)
+      (archive_after_days 7) (notify Bell)
       (snippets
        (((name review) (text  "Review the diff for bugs.\
                              \nBe brief."))))
@@ -101,10 +104,10 @@ let%expect_test "unknown fields are ignored" =
      ((scoped_models (x)) (approval_mode Ask)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
-      (archive_after_days 7) (notify Bell) (snippets ())
-      (auto_background_seconds 30)))
+      (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
+      (goal_max_continuations 20) (resume_on_limit_reset true)
+      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
+      (snippets ()) (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -157,7 +160,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -191,18 +194,19 @@ let%expect_test "null defaults are unset" =
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
-      (archive_after_days 7) (notify Bell) (snippets ())
-      (auto_background_seconds 30)))
+      (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
+      (goal_max_continuations 20) (resume_on_limit_reset true)
+      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
+      (snippets ()) (auto_background_seconds 30)))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
-      (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-      (goal_max_continuations 20) (resume_on_limit_reset true)
-      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
-      (snippets ()) (auto_background_seconds 30)))
+      (fallback_models ()) (default_cwd ()) (worktrees_dir ~/.prigh/worktrees)
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
+      (archive_after_days 7) (notify Bell) (snippets ())
+      (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -251,9 +255,9 @@ let%expect_test "a leftover reminders setting says where reminders went" =
     "reminders" in $DIR/.prigh/config.json is ignored: reminders are per session now; /remind adds one
     Off
     (reminders notify scoped_models approval_mode default_model default_thinking
-     fallback_models default_cwd max_budget_usd goal_max_continuations
-     resume_on_limit_reset ask_user_timeout_seconds archive_after_days snippets
-     auto_background_seconds)
+     fallback_models default_cwd worktrees_dir max_budget_usd
+     goal_max_continuations resume_on_limit_reset ask_user_timeout_seconds
+     archive_after_days snippets auto_background_seconds)
     |}]
 ;;
 

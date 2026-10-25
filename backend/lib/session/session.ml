@@ -45,6 +45,7 @@ module Entry = struct
           }
       | Resume_at of { at : float option }
       | Told_environment of Told_environment.t
+      | Review of Review_state.Change.t
     [@@deriving sexp, jsonaf]
   end
 
@@ -140,7 +141,7 @@ let header t =
 
 let worth_saving (line : Line.t) =
   match line with
-  | Entry { payload = Message _ | Name _; _ } -> true
+  | Entry { payload = Message _ | Name _ | Review _; _ } -> true
   | Entry
       { payload =
           ( Model _
@@ -284,7 +285,8 @@ let add_entry t (entry : Entry.t) =
   | Archived _
   | Spend _
   | Resume_at _
-  | Told_environment _ -> ()
+  | Told_environment _
+  | Review _ -> ()
 ;;
 
 let read_lines path =
@@ -431,6 +433,14 @@ let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let set_archived t ~archived = append t (Archived { archived })
 let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
 let set_told_environment t told = append t (Told_environment told)
+let record_review t change = append t (Review change)
+
+let review t =
+  List.fold (entries t) ~init:Review_state.empty ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Review change -> Review_state.apply acc change
+    | _ -> acc)
+;;
 
 let spend t =
   List.fold
@@ -473,7 +483,8 @@ let name t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None)
+    | Told_environment _
+    | Review _ -> None)
 ;;
 
 let description t =
@@ -494,7 +505,8 @@ let description t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None)
+    | Told_environment _
+    | Review _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -574,7 +586,8 @@ let context t =
       | Archived _
       | Spend _
       | Resume_at _
-      | Told_environment _ -> acc)
+      | Told_environment _
+      | Review _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -594,7 +607,8 @@ let context t =
       | Archived _
       | Spend _
       | Resume_at _
-      | Told_environment _ -> None)
+      | Told_environment _
+      | Review _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -636,7 +650,8 @@ let system_prompt t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Review _ -> acc)
 ;;
 
 let goal t =
@@ -657,7 +672,8 @@ let goal t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Review _ -> acc)
 ;;
 
 let reminders t =
@@ -693,7 +709,8 @@ let budget t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Review _ -> acc)
 ;;
 
 let model t =
@@ -714,7 +731,8 @@ let model t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Review _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -775,6 +793,7 @@ module Summary = struct
     ; name : string option
     ; description : string option
     ; cwd : string
+    ; host : string option
     ; created_at : string
     ; updated_at : string
     ; first_prompt : string option
@@ -860,7 +879,8 @@ let archived_and_activity t ~mtime =
         | Allow_rule _
         | Spend _
         | Resume_at _
-        | Told_environment _ -> last_message, marker)
+        | Told_environment _
+        | Review _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
   let activity =
@@ -879,6 +899,7 @@ let summarise t ~path ~mtime =
   ; name = name t
   ; description = description t
   ; cwd = t.cwd
+  ; host = Option.map t.host ~f:(fun (h : Host.t) -> h.id)
   ; created_at = created_at t
   ; updated_at =
       Time_float.to_string_utc
@@ -1135,7 +1156,8 @@ let to_markdown t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None
+    | Told_environment _
+    | Review _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"
