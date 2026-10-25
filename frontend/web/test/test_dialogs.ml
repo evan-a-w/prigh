@@ -178,7 +178,7 @@ let%expect_test "help lists every key and command" =
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -186,6 +186,8 @@ let%expect_test "help lists every key and command" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /theme [original|dark|light] pick or set the theme, for you in every browser
+    /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
@@ -262,7 +264,8 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/login))
+    (Rpc (method_ push_pref) (params ((key history) (value /login) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
@@ -414,7 +417,8 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   H.text h ~selector:".modal-body";
   [%expect
     {|
-    (Save_history (/auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /auth) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
@@ -454,7 +458,8 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   [%expect
     {|
     (Focus editor)
-    (Save_history (/logout /auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /logout) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)
@@ -472,7 +477,8 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/logout /auth))
+    (Rpc (method_ push_pref) (params ((key history) (value /logout) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Expire_toast (id 1) (after_ms 3900))
@@ -542,6 +548,13 @@ let%expect_test
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
      (tag (Resync (session s1) (from ()))))
@@ -597,7 +610,7 @@ let%expect_test "signing out" =
   [%expect
     {|
     Sign_out
-    (Save_history (/signout))
+    (Cache_prefs (((key history) (value ((/signout))))))
     Sign_out
     |}]
 ;;

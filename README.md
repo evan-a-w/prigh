@@ -482,9 +482,9 @@ the arrow keys move it (Shift: four times as far), Home and End make the
 panel as small or as large as it goes. The chat always keeps 400px: when
 the window narrows, the side panels beside it shrink in proportion (down
 to their minimums) and grow back to the sizes you chose when it widens
-again. The sizes are kept in the browser (`prigh-web.sidebar-width`,
-`files-width`, `files-split`, `agents-width`, `terminal-height` in
-localStorage). On a phone the panels are sheets, without handles.
+again. The sizes are kept with your preferences on the backend (below), so
+every browser you sign in on has them. On a phone the panels are sheets,
+without handles.
 
 Code is highlighted: fenced code blocks in replies (by the fence's
 language, also while the reply streams), the file browser's text preview
@@ -565,12 +565,38 @@ that runs `/todos`. A narrower chat column drops the tokens and cost, then
 says what applies with icons alone; the bar never changes height.
 
 The settings page (the gear, `/settings` or Ctrl+,) holds what is not
-about the session: notifications (on or off, and what to do when the
-browser has not been asked, blocks them or cannot show them), transcript
-detail (`/verbosity`), tool confirmation (`/confirm`), the providers
-(`/auth`), who you are signed in (and acting) as with Switch account and
-Sign out, and the keyboard shortcuts. Esc closes it; its controls keep it
-open. Steers and follow-ups sent while the agent works wait above
+about the session: the theme and accent, notifications (on or off, and
+what to do when the browser has not been asked, blocks them or cannot show
+them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),
+the providers (`/auth`), who you are signed in (and acting) as with Switch
+account and Sign out, and the keyboard shortcuts. Esc closes it; its
+controls keep it open.
+
+Themes: `original` (graphite with the warm sodium accent, the default),
+`dark` (neutral greys: the accent is the only colour but diffs' and
+outcomes' green and red) and `light`. Every theme takes an accent: orange
+(the original's), blue, green, purple, pink, teal, yellow or any colour.
+The settings page shows each theme as a small picture of the page with
+your accent on it, the accents as swatches and a colour picker for any
+other, which previews as you drag it; `/theme [original|dark|light]` and
+`/accent [name|#rrggbb]` set them, and without an argument are pickers
+that show what is highlighted (Esc puts yours back). Washes, lines, focus
+rings, the work lamp, code highlighting and the terminal follow the
+accent and the theme.
+
+Your preferences live on the backend, per user (`~/.prigh/prefs.json` in
+your home, or your namespace's with `-tokens`): the theme and accent,
+notifications, transcript detail, the panels' sizes, whether the terminal
+is open, and the prompt history, which the TUI shares. Every browser you
+sign in on gets them, and a change in one shows at once in the others
+(the history too). The browser keeps a copy so that a reload paints your
+theme before the backend answers, and for a backend that keeps none. A
+browser that kept them before the backend did uploads its own when it
+first signs in (unless the backend already has the user's). What stays in
+the browser: the saved sign-ins (needed before there is a user to ask), and
+per tab the draft and where the chat was scrolled. Acting as another user
+(`-superusers`) you keep your own preferences, which are not saved on the
+backend meanwhile. Steers and follow-ups sent while the agent works wait above
 the composer, each tagged "Steers this turn" or "After this turn", with
 Edit (back into the editor) and remove buttons; one leaving the queue says
 so ("Steer delivered: …") when it reaches the transcript. A tool confirmation is a dialog with a
@@ -1039,7 +1065,11 @@ the images; DeepSeek's cannot see them and are told one was left out. Images
 are stored in the session file.
 
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
-last 500) and loaded on start; secrets from login prompts are never recorded.
+last 500) and loaded on start, and on the backend with your preferences
+(above), shared with prigh-web: the backend's history replaces this
+machine's once it answers (a backend that has none gets this machine's),
+and prompts sent from another frontend arrive as you type. Secrets from
+login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
 through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
 or `auto`: the mode new sessions start in, see below; `/confirm on|off`
@@ -1188,6 +1218,7 @@ it.
 | `/pr [list [open\|closed\|all]\|view N\|new [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch, or check one out in a git worktree |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
+| `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
 | `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you approve the plan) |
@@ -1360,7 +1391,7 @@ whether the terminal reports focus. prigh-web uses the browser's
 notifications while the tab is hidden: `/notify on` (or the settings page's
 switch, or the account menu's "Turn notifications on") asks the browser for
 permission, `/notify off`
-turns them off (kept in localStorage, `prigh-web.notify`); the tab's title
+turns them off (kept with your preferences on the backend); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
 named with what to do in the settings page, whose switch shows whether

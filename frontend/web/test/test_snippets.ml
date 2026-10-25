@@ -33,7 +33,8 @@ let%expect_test "/snippet: a fuzzy picker; Enter inserts, Esc changes nothing" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/snippet))
+    (Rpc (method_ push_pref) (params ((key history) (value /snippet) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     Snippets
     (Close (Esc))
@@ -76,7 +77,8 @@ let%expect_test "/snippet NAME inserts; unknown names say the closest" =
   draft h;
   [%expect
     {|
-    (Save_history ("/snippet tests"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet tests") (max 500))) (tag Ignore))
     (Set_caret 31)
     ((m.draft "Run the tests and fix failures.") (m.cursor 31))
     |}];
@@ -86,7 +88,8 @@ let%expect_test "/snippet NAME inserts; unknown names say the closest" =
   draft h;
   [%expect
     {|
-    (Save_history ("/snippet revew" "/snippet tests"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet revew") (max 500))) (tag Ignore))
     unknown snippet "revew"; did you mean review? (/snippet lists them) (Dismiss)
     ((m.draft "/snippet revew") (m.cursor 14))
     |}]
@@ -102,8 +105,13 @@ let%expect_test "/snippet add and rm save only snippets, acknowledged" =
   toasts h;
   [%expect
     {|
-    (Save_history ( "/snippet add fix Fix the failing test.\
-                   \nThen rerun."))
+    (Rpc (method_ push_pref)
+     (params
+      ((key history)
+       (value  "/snippet add fix Fix the failing test.\
+              \nThen rerun.")
+       (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_config)
      (params
       ((config
@@ -126,9 +134,8 @@ let%expect_test "/snippet add and rm save only snippets, acknowledged" =
   toasts h;
   [%expect
     {|
-    (Save_history
-     ("/snippet rm fix"  "/snippet add fix Fix the failing test.\
-                        \nThen rerun."))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet rm fix") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((snippets ())))))
      (tag (Config_saved "snippet fix removed")))
     (Rpc (method_ get_config) (params ()) (tag Config))
@@ -140,10 +147,8 @@ let%expect_test "/snippet add and rm save only snippets, acknowledged" =
   draft h;
   [%expect
     {|
-    (Save_history
-     ("/snippet rm nope" "/snippet rm fix"
-       "/snippet add fix Fix the failing test.\
-      \nThen rerun."))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet rm nope") (max 500))) (tag Ignore))
     snippet fix saved: Fix the failing test. (/snippet fix inserts it)
     unknown snippet "nope"; /snippet lists the 2 saved (Dismiss)
     ((m.draft "/snippet rm nope") (m.cursor 16))
@@ -156,7 +161,8 @@ let%expect_test "/snippet add without TEXT saves the last prompt" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/snippet add ask"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet add ask") (max 500))) (tag Ignore))
     no TEXT and no prompt sent yet: /snippet add ask TEXT (Dismiss)
     |}];
   run h "what changed?";
@@ -166,11 +172,13 @@ let%expect_test "/snippet add without TEXT saves the last prompt" =
   run h "/snippet add ask";
   [%expect
     {|
-    (Save_history ("what changed?" "/snippet add ask"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "what changed?") (max 500))) (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "what changed?")))
      (tag (Sent (text "what changed?") (images ()))))
-    (Save_history ("/snippet add ask" "what changed?" "/snippet add ask"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/snippet add ask") (max 500))) (tag Ignore))
     (Rpc (method_ set_config)
      (params ((config ((snippets (((name ask) (text "what changed?"))))))))
      (tag
@@ -272,7 +280,9 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
   [%expect
     {|
     Send
-    (Save_history ("# Title #123 x#rev ##rev"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "# Title #123 x#rev ##rev") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "# Title #123 x#rev ##rev")))
      (tag (Sent (text "# Title #123 x#rev ##rev") (images ()))))
@@ -284,7 +294,8 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
   [%expect
     {|
     Send
-    (Save_history (#rev))
+    (Rpc (method_ push_pref) (params ((key history) (value #rev) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text #rev)))
      (tag (Sent (text #rev) (images ()))))

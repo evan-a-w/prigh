@@ -95,6 +95,13 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
       (params ((text "/skill:release v1.2")))
       (tag (Skill_prompt "/skill:release v1.2")))
     (Append_history "/skill:release v1.2")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "/skill:release v1.2")
+        (max   500)))
+      (tag Ignore))
     |}]
 ;;
 
@@ -271,6 +278,13 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       (params ((text "/skill:frontend-design make it bold")))
       (tag (Skill_prompt "/skill:frontend-design make it bold")))
     (Append_history "/skill:frontend-design make it bold")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "/skill:frontend-design make it bold")
+        (max   500)))
+      (tag Ignore))
     |}];
   (* Enter on a completion sends the skill without arguments. *)
   H.keys h "/skill:rev";
@@ -282,6 +296,13 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       (params ((text /skill:review)))
       (tag (Skill_prompt /skill:review)))
     (Append_history /skill:review)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value /skill:review)
+        (max   500)))
+      (tag Ignore))
     |}];
   (* Another session (or directory, or tool host) fetches them again; a late
      reply for the old one is dropped. *)
@@ -457,6 +478,13 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
       (params ((text "/skill:fronted make it bold")))
       (tag (Skill_prompt "/skill:fronted make it bold")))
     (Append_history "/skill:fronted make it bold")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "/skill:fronted make it bold")
+        (max   500)))
+      (tag Ignore))
     |}];
   H.reply_error
     h
@@ -500,10 +528,24 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
       (tag (Skill_prompt "/skill:revew now")))
     (Append_history "/skill:revew now")
     (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "/skill:revew now")
+        (max   500)))
+      (tag Ignore))
+    (Rpc
       (method_ follow_up)
       (params ((text "/skill:review later")))
       (tag (Skill_prompt "/skill:review later")))
     (Append_history "/skill:review later")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "/skill:review later")
+        (max   500)))
+      (tag Ignore))
 
 
 

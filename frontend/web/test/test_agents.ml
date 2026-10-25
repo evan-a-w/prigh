@@ -601,16 +601,20 @@ let%expect_test "/agents and its argument" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    (Save_history ("/agents 9"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents 9") (max 500))) (tag Ignore))
     No subagent or job 9: none has run in this session. (Dismiss)
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Save_history ("/agents 2" "/agents 9"))
-    (Save_history ("/agents a1" "/agents 2" "/agents 9"))
-    (Save_history ("/agents n1" "/agents a1" "/agents 2" "/agents 9"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents a1") (max 500))) (tag Ignore))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents n1") (max 500))) (tag Ignore))
     ((Agent a1/n1))
-    (Save_history
-     ("/agents nope" "/agents n1" "/agents a1" "/agents 2" "/agents 9"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents nope") (max 500))) (tag Ignore))
     No subagent or job nope: give its number (1-2) or id; /agents lists them. (Dismiss)
     |}]
 ;;
@@ -759,7 +763,8 @@ let%expect_test
   H.text h ~selector:".agents-body";
   [%expect
     {|
-    (Save_history (next))
+    (Rpc (method_ push_pref) (params ((key history) (value next) (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text next)))
      (tag (Sent (text next) (images ()))))

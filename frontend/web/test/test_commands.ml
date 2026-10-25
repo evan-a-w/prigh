@@ -49,8 +49,9 @@ let%expect_test "every command does something (none is unknown)" =
       | None, (_ :: _ as toasts), _ -> "toast: " ^ (List.last_exn toasts).text
       | None, [], _ ->
         List.filter_map commands ~f:(function
+          | Rpc { method_ = "push_pref"; _ } -> None
           | Rpc { method_; _ } -> Some ("rpc " ^ method_)
-          | Save_history _ | Focus _ -> None
+          | Cache_prefs _ | Focus _ -> None
           | c -> Some (Sexp.to_string (App.Command.sexp_of_t c)))
         |> String.concat ~sep:", "
         |> fun s ->
@@ -69,6 +70,8 @@ let%expect_test "every command does something (none is unknown)" =
     /thinking                  picker: Thinking level
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
+    /theme                     picker: Theme
+    /accent                    picker: Accent colour (or type #rrggbb)
     /confirm                   picker: Tool confirmation
     /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
@@ -80,7 +83,7 @@ let%expect_test "every command does something (none is unknown)" =
     /review                    toast: Reading the changes to review…
     /init                      rpc init
     /name                      (Rename"")
-    /session                   loading Session: rpc session_stats
+    /session                   loading Session: rpc push_pref, rpc session_stats
     /sessions                  sidebar
     /switch                    sidebar
     /archive                   toast: This session isn't saved yet: send a message first.
@@ -88,9 +91,9 @@ let%expect_test "every command does something (none is unknown)" =
     /delete                    toast: Click the sessions to delete (Shift+click for a range), then Delete.
     /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
-    /fork                      loading Fork from: rpc get_entries
-    /rewind                    loading Rewind to: rpc get_entries
-    /tree                      loading Session tree: rpc get_entries
+    /fork                      loading Fork from: rpc push_pref, rpc get_entries
+    /rewind                    loading Rewind to: rpc push_pref, rpc get_entries
+    /tree                      loading Session tree: rpc push_pref, rpc get_entries
     /cd                        path prompt
     /mkdir                     path prompt
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
@@ -98,9 +101,9 @@ let%expect_test "every command does something (none is unknown)" =
     /export                    path prompt
     /import                    path prompt
     /snippet                   toast: no snippets yet: /snippet add NAME TEXT saves one
-    /skills                    loading Skills: rpc list_skills
-    /skill:                    loading Skills: rpc list_skills
-    /mcp                       loading MCP servers: rpc list_mcp
+    /skills                    loading Skills: rpc push_pref, rpc list_skills
+    /skill:                    loading Skills: rpc push_pref, rpc list_skills
+    /mcp                       loading MCP servers: rpc push_pref, rpc list_mcp
     /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     /remind                    toast: No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
@@ -108,15 +111,15 @@ let%expect_test "every command does something (none is unknown)" =
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
-    /terminal                  (Remember_terminal true), Focus_terminal
+    /terminal                  rpc set_prefs, Focus_terminal
     /files                     rpc fs_list, (Files(Focus files-list))
     /agents                    agents panel
     /jobs                      agents panel
-    /login                     loading Log in: rpc auth_status
-    /logout                    loading Log out: rpc auth_status
-    /auth                      loading Providers: rpc auth_status, rpc forge_status
-    /pr                        pull requests: rpc pr_list
-    /setusr                    loading Act as: rpc list_users
+    /login                     loading Log in: rpc push_pref, rpc auth_status
+    /logout                    loading Log out: rpc push_pref, rpc auth_status
+    /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
+    /pr                        pull requests: rpc push_pref, rpc pr_list
+    /setusr                    loading Act as: rpc push_pref, rpc list_users
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
     /state                     text: Session state
@@ -133,11 +136,14 @@ let%expect_test "/help <command> and /hotkeys" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/help compact"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help compact") (max 500))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 4100))
-    (Save_history ("/help /tree" "/help compact"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help /tree") (max 500))) (tag Ignore))
     (Expire_toast (id 1) (after_ms 3820))
-    (Save_history ("/help compcat" "/help /tree" "/help compact"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help compcat") (max 500))) (tag Ignore))
     /tree: show the session tree and move to any message in it
     No command /compcat. Did you mean /compact? (Dismiss)
     |}];
@@ -145,7 +151,8 @@ let%expect_test "/help <command> and /hotkeys" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/hotkeys "/help compcat" "/help /tree" "/help compact"))
+    (Rpc (method_ push_pref) (params ((key history) (value /hotkeys) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     Keyboard shortcuts
     (Close (Esc))
@@ -223,7 +230,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/scoped-models))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /scoped-models) (max 500))) (tag Ignore))
     (Focus picker-input)
     Scoped models
     (Close (Esc))
@@ -286,7 +294,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   H.key h "p" ~ctrl:true ~target:Field;
   [%expect
     {|
-    (Save_history (/scoped-models))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /scoped-models) (max 500))) (tag Ignore))
     (Focus picker-input)
     (browser default)
     |}];
@@ -357,7 +366,8 @@ let%expect_test "/change_default" =
   toasts h;
   [%expect
     {|
-    (Save_history (/change_default))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /change_default) (max 500))) (tag Ignore))
     (Rpc (method_ change_default) (params ()) (tag Default_saved))
     (Expire_toast (id 0) (after_ms 3980))
     New sessions start with anthropic/claude-opus-5-5, thinking on
@@ -372,7 +382,8 @@ let%expect_test "/verbosity and Ctrl+O" =
   [%expect
     {|
     Scroll_to_bottom
-    (Save_history (/verbosity))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /verbosity) (max 500))) (tag Ignore))
     (Focus picker-input)
     Quiet tool calls without their output; no thinking
     Normal tool output and thinking folded ✓
@@ -388,6 +399,9 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Dialog_move -1)
     Dialog_accept
     (Focus editor)
+    (Cache_prefs (((key web.verbosity) (value (quiet)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 4660))
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -424,10 +438,17 @@ let%expect_test "/verbosity and Ctrl+O" =
   [%expect
     {|
     Cycle_verbosity
+    (Cache_prefs (((key web.verbosity) (value (normal)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity normal)))))
+     (tag Show_error))
     (Expire_toast (id 1) (after_ms 4180))
     Cycle_verbosity
+    (Cache_prefs (((key web.verbosity) (value (verbose)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity verbose)))))
+     (tag Show_error))
     (Expire_toast (id 2) (after_ms 3740))
-    (Save_history ("/verbosity loud" /verbosity))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/verbosity loud") (max 500))) (tag Ignore))
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
@@ -446,7 +467,8 @@ let%expect_test "/confirm" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/confirm))
+    (Rpc (method_ push_pref) (params ((key history) (value /confirm) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     On ask before bash, write and edit run
     Off run tools without asking ✓
@@ -469,12 +491,14 @@ let%expect_test "/confirm" =
        "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 5580))
     (Asks: edits & commands)
-    (Save_history ("/confirm off" /confirm))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/confirm off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag
       (Config_saved
        "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
-    (Save_history ("/confirm maybe" "/confirm off" /confirm))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/confirm maybe") (max 500))) (tag Ignore))
     Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first
     Unknown setting “maybe”: use on or off. (Dismiss)
     |}]
@@ -485,7 +509,9 @@ let%expect_test "/compact with instructions" =
   run h "/compact keep the file names";
   [%expect
     {|
-    (Save_history ("/compact keep the file names"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/compact keep the file names") (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 2700))
     (Rpc (method_ compact) (params ((instructions "keep the file names")))
      (tag (Notice "Compacted the conversation")))
@@ -495,7 +521,8 @@ let%expect_test "/compact with instructions" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history (/compact "/compact keep the file names"))
+    (Rpc (method_ push_pref) (params ((key history) (value /compact) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 2700))
     (Rpc (method_ compact) (params ())
      (tag (Notice "Compacted the conversation")))
@@ -512,7 +539,8 @@ let%expect_test "/session" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/session))
+    (Rpc (method_ push_pref) (params ((key history) (value /session) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     (Focus dialog)
@@ -551,7 +579,9 @@ let%expect_test "/switch" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history ("/switch /sessions/s2.jsonl"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/switch /sessions/s2.jsonl") (max 500)))
+     (tag Ignore))
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
     (Rpc (method_ get_messages_page)
@@ -564,7 +594,8 @@ let%expect_test "/switch" =
   print_s [%sexp ((H.model h).sidebar_open : bool)];
   [%expect
     {|
-    (Save_history (/switch "/switch /sessions/s2.jsonl"))
+    (Rpc (method_ push_pref) (params ((key history) (value /switch) (max 500)))
+     (tag Ignore))
     (Focus session-search)
     true
     |}]
@@ -609,7 +640,8 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
@@ -638,7 +670,8 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   toasts h;
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Expire_toast (id 1) (after_ms 3420))
@@ -657,7 +690,8 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/rewind))
+    (Rpc (method_ push_pref) (params ((key history) (value /rewind) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
@@ -691,7 +725,8 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   H.key h "Escape" ~target:Page;
   [%expect
     {|
-    (Save_history (/rewind))
+    (Rpc (method_ push_pref) (params ((key history) (value /rewind) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
@@ -724,7 +759,8 @@ let%expect_test "/tree shows branches and moves the head" =
   H.show h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/tree))
+    (Rpc (method_ push_pref) (params ((key history) (value /tree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
@@ -827,7 +863,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/cd))
+    (Rpc (method_ push_pref) (params ((key history) (value /cd) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
      (tag (Prompt_paths /work)))
@@ -894,7 +931,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.text h ~selector:".dialog-error";
   [%expect
     {|
-    (Save_history (/cd))
+    (Rpc (method_ push_pref) (params ((key history) (value /cd) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
      (tag (Prompt_paths /work)))
@@ -925,7 +963,8 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/host))
+    (Rpc (method_ push_pref) (params ((key history) (value /host) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     backend /work ✓
     laptop (this browser) /home/me/proj
@@ -976,14 +1015,16 @@ let%expect_test "/host: pick a host, then the directory there" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/host ci" /host))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/host ci") (max 500))) (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host c9)))
      (tag (Prompt_paths /work)))
     ((Prompt
       ((action (Host_cwd (host c9) (name "ci (in nightly)"))) (input /work)
        (suggestions ()) (selected ()) (error ()) (busy false))))
-    (Save_history ("/host mainframe" "/host ci" /host))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/host mainframe") (max 500))) (tag Ignore))
     Tools run on laptop (this browser), in /home/me/proj
     No tool host “mainframe”: one of backend, laptop, ci (/host picks one). (Dismiss)
     |}]
@@ -999,7 +1040,8 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /work/new)))
      (tag (Paths /work/new)))
-    (Save_history ("/cd /work/new"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/cd /work/new") (max 500))) (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing ask)))
      (tag (Dir_changed Cwd)))
     (Focus dialog)
@@ -1029,7 +1071,8 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /work/new)))
      (tag (Paths /work/new)))
-    (Save_history ("/cd /work/new"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/cd /work/new") (max 500))) (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing ask)))
      (tag (Dir_changed Cwd)))
     (Focus dialog)
@@ -1070,7 +1113,8 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/host ci" "/cd /work/new"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/host ci") (max 500))) (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host c9)))
      (tag (Prompt_paths /work)))
@@ -1105,10 +1149,12 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /elsewhere)))
      (tag (Paths /elsewhere)))
-    (Save_history ("/cd /elsewhere" "/host ci" "/cd /work/new"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/cd /elsewhere") (max 500))) (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path /elsewhere) (if_missing ask)))
      (tag (Dir_changed Cwd)))
-    (Save_history (/name "/cd /elsewhere" "/host ci" "/cd /work/new"))
+    (Rpc (method_ push_pref) (params ((key history) (value /name) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     Created /build/x: tools run on ci (in nightly), in it
     /elsewhere doesn't exist: /mkdir /elsewhere creates it. (Dismiss)
@@ -1131,12 +1177,14 @@ let%expect_test "/mkdir creates a directory and changes to it" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /work/a/b)))
      (tag (Paths /work/a/b)))
-    (Save_history ("/mkdir /work/a/b"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mkdir /work/a/b") (max 500))) (tag Ignore))
     (Rpc (method_ set_cwd) (params ((path /work/a/b) (if_missing create)))
      (tag (Dir_changed Cwd)))
     (Expire_toast (id 0) (after_ms 2940))
     Created /work/a/b and switched to it
-    (Save_history (/mkdir "/mkdir /work/a/b"))
+    (Rpc (method_ push_pref) (params ((key history) (value /mkdir) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work/) (host backend)))
      (tag (Prompt_paths /work/)))
@@ -1205,7 +1253,8 @@ let%expect_test "/export and /import" =
   toasts h;
   [%expect
     {|
-    (Save_history (/export))
+    (Rpc (method_ push_pref) (params ((key history) (value /export) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_paths) (params ((prefix ""))) (tag (Prompt_paths "")))
     Dialog_accept
@@ -1214,7 +1263,9 @@ let%expect_test "/export and /import" =
     (Expire_toast (id 0) (after_ms 3500))
     (Rpc (method_ list_paths) (params ((prefix /tmp/s1.jsonl)))
      (tag (Paths /tmp/s1.jsonl)))
-    (Save_history ("/export /tmp/s1.jsonl" /export))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/export /tmp/s1.jsonl") (max 500)))
+     (tag Ignore))
     (Rpc (method_ export) (params ((format jsonl) (path /tmp/s1.jsonl)))
      (tag Exported))
     (Expire_toast (id 1) (after_ms 2500))
@@ -1228,7 +1279,8 @@ let%expect_test "/export and /import" =
   H.text h ~selector:".dialog-error";
   [%expect
     {|
-    (Save_history (/import "/export /tmp/s1.jsonl" /export))
+    (Rpc (method_ push_pref) (params ((key history) (value /import) (max 500)))
+     (tag Ignore))
     (Focus dialog-input)
     (Rpc (method_ list_paths) (params ((prefix ""))) (tag (Prompt_paths "")))
     (Rpc (method_ list_paths) (params ((prefix old.jsonl)))
@@ -1247,8 +1299,9 @@ let%expect_test "/export and /import" =
     (Focus editor)
     (Rpc (method_ list_paths) (params ((prefix /tmp/s1.jsonl)))
      (tag (Paths /tmp/s1.jsonl)))
-    (Save_history
-     ("/import /tmp/s1.jsonl" /import "/export /tmp/s1.jsonl" /export))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/import /tmp/s1.jsonl") (max 500)))
+     (tag Ignore))
     (Rpc (method_ import) (params ((path /tmp/s1.jsonl))) (tag Imported))
     (Expire_toast (id 2) (after_ms 2700))
     (Rpc (method_ get_state) (params ()) (tag State))
@@ -1263,7 +1316,8 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   toasts h;
   [%expect
     {|
-    (Save_history (/copy))
+    (Rpc (method_ push_pref) (params ((key history) (value /copy) (max 500)))
+     (tag Ignore))
     Nothing to copy yet: no reply in this session. (Dismiss)
     |}];
   with_messages h;
@@ -1271,7 +1325,8 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   [%expect
     {|
     Scroll_to_bottom
-    (Save_history (/copy))
+    (Rpc (method_ push_pref) (params ((key history) (value /copy) (max 500)))
+     (tag Ignore))
     (Copy "Fixed: the **flag** was wrong.")
     (Expire_toast (id 1) (after_ms 3020))
     |}];
@@ -1296,8 +1351,11 @@ let%expect_test "/btw: a side answer streams into a panel" =
   H.text h ~selector:"#btw";
   [%expect
     {|
-    (Save_history (/btw))
-    (Save_history ("/btw what does make check run?" /btw))
+    (Rpc (method_ push_pref) (params ((key history) (value /btw) (max 500)))
+     (tag Ignore))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/btw what does make check run?") (max 500)))
+     (tag Ignore))
     (Rpc (method_ btw)
      (params ((question "what does make check run?") (btw_id btw-1)))
      (tag (Btw btw-1)))
@@ -1323,7 +1381,8 @@ let%expect_test "/btw: a side answer streams into a panel" =
   H.key h "Escape";
   [%expect
     {|
-    (Save_history ("/btw and lint?" "/btw what does make check run?" /btw))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/btw and lint?") (max 500))) (tag Ignore))
     (Rpc (method_ btw) (params ((question "and lint?") (btw_id btw-2)))
      (tag (Btw btw-2)))
     Close_btw
@@ -1338,8 +1397,8 @@ let%expect_test "/btw: a side answer streams into a panel" =
   H.text h ~selector:"#btw";
   [%expect
     {|
-    (Save_history
-     ("/btw again?" "/btw and lint?" "/btw what does make check run?" /btw))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/btw again?") (max 500))) (tag Ignore))
     (Rpc (method_ btw) (params ((question again?) (btw_id btw-3)))
      (tag (Btw btw-3)))
     btw again? (Close (Esc))
@@ -1384,9 +1443,11 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
   H.text h ~selector:".agents-panel";
   [%expect
     {|
-    (Save_history ("/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel 1") (max 500))) (tag Ignore))
     No subagent or job 1: none has run in this session. (Dismiss)
-    (Save_history (/agents "/agents cancel 1"))
+    (Rpc (method_ push_pref) (params ((key history) (value /agents) (max 500)))
+     (tag Ignore))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Agents
@@ -1409,7 +1470,8 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history ("/agents cancel 2" /agents "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel 2") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
      (tag (Subagent a2)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
@@ -1419,28 +1481,24 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Loading the transcript…
     lint
     (Stopping…) (Show in chat) Running 30s m  1 turn
-    (Save_history
-     ("/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel a1") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
      (tag (Subagent a1)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
-    (Save_history
-     ("/agents cancel a3" "/agents cancel a1" "/agents cancel 2" /agents
-      "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel a3") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
      (tag (Subagent a3)))
     Subagent a3 has already finished. (Dismiss)
-    (Save_history
-     ("/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
-      "/agents cancel 2" /agents "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel 7") (max 500))) (tag Ignore))
     No subagent or job 7: give its number (1-3) or id; /agents lists them. (Dismiss)
-    (Save_history
-     ("/agents cancel" "/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
-      "/agents cancel 2" /agents "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents cancel") (max 500))) (tag Ignore))
     Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
-    (Save_history
-     ("/agents 2" "/agents cancel" "/agents cancel 7" "/agents cancel a3"
-      "/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
      (tag (Subagent a2)))
     |}]
@@ -1463,9 +1521,11 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
   H.text h ~selector:".agents-panel";
   [%expect
     {|
-    (Save_history ("/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs j1") (max 500))) (tag Ignore))
     No job j1: none has run in this session (!&command starts one). (Dismiss)
-    (Save_history (/jobs "/jobs j1"))
+    (Rpc (method_ push_pref) (params ((key history) (value /jobs) (max 500)))
+     (tag Ignore))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Agents
@@ -1481,7 +1541,8 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
   H.text h ~selector:".agents-panel";
   [%expect
     {|
-    (Save_history ("/jobs j2" /jobs "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs j2") (max 500))) (tag Ignore))
     (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
     (All agents (Esc))
     Job j2
@@ -1489,7 +1550,8 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     No output yet.
     ✓ sleep 1
     Done 1s
-    (Save_history ("/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs kill j1") (max 500))) (tag Ignore))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
     (All agents (Esc))
@@ -1506,19 +1568,18 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
       toasts h);
   [%expect
     {|
-    (Save_history ("/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs kill j2") (max 500))) (tag Ignore))
     (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
     Job j2 has already finished. (Dismiss)
-    (Save_history
-     ("/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs j9") (max 500))) (tag Ignore))
     No job j9: give its id (j1, j2); /jobs lists them. (Dismiss)
-    (Save_history
-     ("/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs
-      "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs kill") (max 500))) (tag Ignore))
     Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
-    (Save_history
-     ("/jobs a b" "/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1"
-      "/jobs j2" /jobs "/jobs j1"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/jobs a b") (max 500))) (tag Ignore))
     Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
     |}]
 ;;
@@ -1533,7 +1594,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/setusr))
+    (Rpc (method_ push_pref) (params ((key history) (value /setusr) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus picker-input)
@@ -1578,7 +1640,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/setusr alice" /setusr))
+    (Cache_prefs (((key history) (value (("/setusr alice" /setusr))))))
     (Rpc (method_ set_user) (params ((user alice))) (tag User_switched))
     (Expire_toast (id 1) (after_ms 2500))
     (Focus editor)
@@ -1587,6 +1649,13 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     Acting as bob
     Back to alice
     |}];
@@ -1595,7 +1664,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   toasts h;
   [%expect
     {|
-    (Save_history (/setusr "/setusr alice" /setusr))
+    (Rpc (method_ push_pref) (params ((key history) (value /setusr) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus editor)
@@ -1611,10 +1681,14 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   run h "/retry-backend-connection";
   [%expect
     {|
-    (Save_history (/retry-backend-connection))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /retry-backend-connection) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 2500))
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    (Save_history (/retry-backend-connection))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /retry-backend-connection) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 2500))
     (Reconnect (generation 2) (delay_ms 0) (session (s1)))
     |}];
@@ -1628,6 +1702,13 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
      (tag (Resync (session s1) (from ()))))
@@ -1641,7 +1722,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/state /retry-backend-connection))
+    (Rpc (method_ push_pref) (params ((key history) (value /state) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     Session state
     (Close (Esc))
@@ -1669,7 +1751,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     Close_dialog
     (Focus editor)
     Scroll_to_bottom
-    (Save_history (/clear /state /retry-backend-connection))
+    (Rpc (method_ push_pref) (params ((key history) (value /clear) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 2) (after_ms 4780))
     What are we building?
     /work
@@ -1678,7 +1761,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     ! run a command
     Ctrl+L switch model
     Ctrl+K find a session
-    (Save_history (/quit /clear /state /retry-backend-connection))
+    (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 3) (after_ms 4620))
     Cleared the view; the conversation is kept (a reload shows it, /new starts afresh)
     Close the tab to leave: the session stays in the backend (/signout signs out).

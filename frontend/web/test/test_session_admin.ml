@@ -237,7 +237,8 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
   run "/archive";
   [%expect
     {|
-    (Save_history (/archive))
+    (Rpc (method_ push_pref) (params ((key history) (value /archive) (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_archived)
      (params ((path /sessions/s1.jsonl) (archived true)))
      (tag (Archived_set (title "fix the parser bug") (archived true))))
@@ -245,7 +246,9 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
   run "/unarchive Old lexer";
   [%expect
     {|
-    (Save_history ("/unarchive Old lexer" /archive))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/unarchive Old lexer") (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_archived)
      (params ((path /sessions/s4.jsonl) (archived false)))
      (tag (Archived_set (title "Old lexer") (archived false))))
@@ -256,7 +259,8 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
   H.text h ~selector:".composer textarea";
   [%expect
     {|
-    (Save_history ("/archive s" "/unarchive Old lexer" /archive))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/archive s") (max 500))) (tag Ignore))
     “s” matches 5 sessions (s1, s2, s3): give more of the id. (Dismiss)
     [/archive s]
     |}]
@@ -453,7 +457,8 @@ let%expect_test "deleting every archived session" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/delete-archived))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /delete-archived) (max 500))) (tag Ignore))
     (Expire_toast (id 1) (after_ms 2740))
     Deleted 2 sessions (1.4 MB)
     There are no archived sessions.
@@ -467,7 +472,9 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    (Save_history ("/delete s4 Older docs"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/delete s4 Older docs") (max 500)))
+     (tag Ignore))
     No session “Older”: give its name, id or path (Ctrl+K searches them). (Dismiss)
     |}];
   H.type_ h "/delete s4 s5";
@@ -475,7 +482,8 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
   H.text h ~selector:".modal .delete-list";
   [%expect
     {|
-    (Save_history ("/delete s4 s5" "/delete s4 Older docs"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/delete s4 s5") (max 500))) (tag Ignore))
     (Focus dialog)
     Old lexer 195.3 KB
     Older docs 1.2 MB
@@ -487,7 +495,8 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
   [%expect
     {|
     (Focus editor)
-    (Save_history (/delete "/delete s4 s5" "/delete s4 Older docs"))
+    (Rpc (method_ push_pref) (params ((key history) (value /delete) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 4220))
     Select sessions Shift for a range
     |}]

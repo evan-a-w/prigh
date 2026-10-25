@@ -134,6 +134,14 @@ let argument_items
            ~detail:(Forges.name a ^ ", " ^ Forges.describe a)
            ~search:(a.label ^ " " ^ a.host)
            a.host))
+  | Theme ->
+    simple
+      (List.map Theme.Name.all ~f:(fun n ->
+         Theme.Name.to_string n, Theme.Name.describe n))
+  | Accent ->
+    simple
+      (List.map Theme.Accent.Preset.all ~f:(fun p ->
+         Theme.Accent.Preset.to_string p, ""))
   | Verbosity ->
     simple
       [ "quiet", "hide tool output and thinking"

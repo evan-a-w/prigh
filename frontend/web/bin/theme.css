@@ -1,0 +1,179 @@
+/* Every colour of the page. The original theme is :root's; the others
+   override it from [data-theme] on <html>, which app/page_theme.ml sets
+   (and index.html, before the first paint, from what the page last showed).
+   The accent is a preset's ([data-accent]) or a custom colour (--sodium and
+   --sodium-ink set on <html>); its washes, lines and glows derive from it,
+   so they follow it. The other stylesheets only use these variables. */
+
+:root,
+[data-theme="original"] {
+  /* Workbench: graphite ground, chalk text, one sodium accent for whatever
+     wants the user's attention (their turns, selection, focus, work in
+     progress). Sage and brick only for outcomes. */
+  --graphite: #1b1e23;
+  --slate: #23272e;
+  --slate-2: #2b3038;
+  --well: #15171b;
+  --rule: #343a44;
+  --rule-2: #464d59;
+  --chalk: #e3e5e1;
+  --muted: #9aa1ab;
+  /* Quiet text (meta lines, counts, hints): still 4.5:1 on the ground. */
+  --faint: #8a919c;
+  /* Quieter, for what is not read: rules, scrollbars, dots. */
+  --faint-line: #6b727d;
+  --panel-3: #333943;
+
+  --sage: #8cc7a1;
+  --sage-line: #8cc7a155;
+  --brick: #e8806f;
+  --brick-wash: #e8806f17;
+  --brick-line: #e8806f59;
+
+  /* The accent presets, as they read on this ground. */
+  --accent-orange: #f0b44c;
+  --accent-blue: #6aa6f8;
+  --accent-green: #62c27a;
+  --accent-purple: #b08cf2;
+  --accent-pink: #ee86b8;
+  --accent-teal: #45c4bb;
+  --accent-yellow: #e6d04a;
+
+  /* Text on the accent. */
+  --sodium-ink: #1b1608;
+  --sodium-hover: color-mix(in srgb, var(--sodium) 88%, white);
+
+  /* What floats or covers: dialogs' shadows, the backdrops behind them. */
+  --float-shadow: 0 18px 48px #00000080, 0 0 0 1px #00000033;
+  --edge-shadow: #0000008c;
+  --backdrop: #0b0c0fb8;
+  --scrim: #0009;
+  --lightbox: #000000e0;
+  /* The squares behind a transparent image. */
+  --checker: #ffffff0a;
+
+  /* Diffs. */
+  --add-bg: #8cc7a11a;
+  --add-fg: #a9d9b9;
+  --del-bg: #e8806f1a;
+  --del-fg: #f2a497;
+
+  /* Syntax highlighting: strings are sage, types and numbers take a little
+     of the accent; plain code stays chalk. */
+  --hl-keyword: var(--muted);
+  --hl-type: color-mix(in srgb, var(--sodium) 25%, var(--chalk));
+  --hl-string: var(--sage);
+  --hl-number: color-mix(in srgb, var(--sodium) 60%, var(--chalk));
+  --hl-comment: color-mix(in srgb, var(--faint) 50%, var(--muted));
+
+  /* Older names, kept as aliases. */
+  --bg: var(--graphite);
+  --panel: var(--slate);
+  --fg: var(--chalk);
+}
+
+/* The accent and what derives from it, on <html> only: a theme's sample
+   (Theme_view) shows the user's accent on its own ground. */
+:root {
+  --sodium: var(--accent-orange);
+  --sodium-wash: color-mix(in srgb, var(--sodium) 12.16%, transparent);
+  --sodium-line: color-mix(in srgb, var(--sodium) 40%, transparent);
+  --sodium-glow: color-mix(in srgb, var(--sodium) 25.1%, transparent);
+  --sodium-glow-bright: color-mix(in srgb, var(--sodium) 34.9%, transparent);
+}
+
+/* Dark: the same workbench in neutral greys, without the blue in the
+   graphite. The accent is the only colour but diffs' and outcomes' green
+   and red; code is shades of grey and the accent. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --graphite: #1d1d1d;
+  --slate: #252525;
+  --slate-2: #2d2d2d;
+  --well: #161616;
+  --rule: #373737;
+  --rule-2: #4a4a4a;
+  --chalk: #e6e6e6;
+  --muted: #a3a3a3;
+  --faint: #909090;
+  --faint-line: #6e6e6e;
+  --panel-3: #363636;
+
+  --backdrop: #0e0e0eb8;
+  --scrim: #000a;
+
+  /* Without the graphite's blue, the diffs' tints need more to show. */
+  --add-bg: #8cc7a126;
+  --del-bg: #e8806f24;
+
+  --hl-keyword: var(--muted);
+  --hl-type: color-mix(in srgb, var(--sodium) 20%, var(--chalk));
+  --hl-string: color-mix(in srgb, var(--sodium) 45%, var(--chalk));
+  --hl-number: color-mix(in srgb, var(--sodium) 75%, var(--chalk));
+  --hl-comment: var(--faint);
+}
+
+/* Light: paper and graphite ink. The presets darken to read on white and
+   take white text; outcomes keep their meaning in deeper green and red. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --graphite: #f4f5f7;
+  --slate: #ffffff;
+  --slate-2: #eaecf0;
+  --well: #eceef2;
+  --rule: #dcdfe5;
+  --rule-2: #c2c7cf;
+  --chalk: #1c2026;
+  --muted: #535a65;
+  --faint: #646b76;
+  --faint-line: #9aa0a9;
+  --panel-3: #e1e4e9;
+
+  --sage: #23784a;
+  --sage-line: #23784a55;
+  --brick: #c0392a;
+  --brick-wash: #c0392a12;
+  --brick-line: #c0392a59;
+
+  --accent-orange: #b56a00;
+  --accent-blue: #1f5fc4;
+  --accent-green: #23854a;
+  --accent-purple: #7344cb;
+  --accent-pink: #bd3478;
+  --accent-teal: #0b7f76;
+  --accent-yellow: #876f00;
+
+  --sodium-ink: #ffffff;
+  --sodium-wash: color-mix(in srgb, var(--sodium) 10%, transparent);
+  --sodium-line: color-mix(in srgb, var(--sodium) 45%, transparent);
+  --sodium-hover: color-mix(in srgb, var(--sodium) 86%, black);
+
+  --float-shadow: 0 18px 48px #1c202629, 0 0 0 1px #1c20261f;
+  --edge-shadow: #1c202629;
+  --backdrop: #1c20264d;
+  --scrim: #1c202666;
+  --checker: #0000000d;
+
+  --add-bg: #2f9a5c1f;
+  --add-fg: #17603a;
+  --del-bg: #d0402e17;
+  --del-fg: #9a2a1d;
+
+  --hl-keyword: var(--muted);
+  --hl-type: color-mix(in srgb, var(--sodium) 40%, var(--chalk));
+  --hl-string: var(--sage);
+  --hl-number: color-mix(in srgb, var(--sodium) 80%, var(--chalk));
+  --hl-comment: var(--faint);
+}
+
+/* The presets, on <html> and on swatches; a custom accent is set on <html>
+   itself, which wins. */
+[data-accent="orange"] { --sodium: var(--accent-orange); }
+[data-accent="blue"] { --sodium: var(--accent-blue); }
+[data-accent="green"] { --sodium: var(--accent-green); }
+[data-accent="purple"] { --sodium: var(--accent-purple); }
+[data-accent="pink"] { --sodium: var(--accent-pink); }
+[data-accent="teal"] { --sodium: var(--accent-teal); }
+[data-accent="yellow"] { --sodium: var(--accent-yellow); }

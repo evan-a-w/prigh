@@ -21,6 +21,8 @@ module Picker_kind = struct
     | Reminders
     | Mcp of Mcp_list.t
     | Jump
+    | Themes
+    | Accents
   [@@deriving sexp_of, equal]
 end
 
@@ -107,7 +109,9 @@ let per_session = function
           | Verbosity
           | Confirm_tools
           | Users
-          | Accounts )
+          | Accounts
+          | Themes
+          | Accents )
       ; _
       }
   | Help

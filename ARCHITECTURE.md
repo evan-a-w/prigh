@@ -966,6 +966,24 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   resolves `fallback_models` like `set_model` (stored as keys). A new
   session starts in `default_cwd` (on the backend host) and on
   `default_model`, else the first of `fallback_models`.
+- `User_prefs` — a user's preferences and data that frontends keep on the
+  backend, `~/.prigh/prefs.json` under the user's home (per namespace with
+  `-tokens`): a JSON object of keys the backend gives no meaning
+  (prigh-web's `web.*`, the shared prompt `history`). `set` sets or removes
+  keys and returns those that changed; `push` puts a value at the front of
+  a list unless it is already first, keeping the newest `max` (and the
+  newest within 256 KiB), so that frontends adding to the history at once
+  lose nothing. Every change re-reads the file and replaces it (a
+  temporary file renamed over it) under an `Eio.Mutex` and a `Lock_dir`,
+  so backends sharing a home (a TUI's own and `prigh serve`) keep each
+  other's changes. Keys are at most 200 bytes, values 256 KiB, the file
+  4 MiB; a broken file is reported with what to do, never overwritten.
+  `Rpc_server` serves it as `get_prefs {keys?}` (`{prefs}`), `set_prefs
+  {prefs: {key: value | null}}` (`{prefs}`: what changed) and `push_pref
+  {key, value, max?}` (`{value}`, `max` 500 by default, at most 1000), and
+  sends what changed to the server's other clients (the user's other
+  browsers and terminals) as `{"event": "prefs_changed", "prefs": {key:
+  value | null}}`; a server without a home (tests) keeps none.
 - Model hand-over — `Usage_limit.unavailable` recognises errors meaning a
   model cannot be used for now: an exhausted allowance or balance (`HTTP
   402`, quota codes such as `usage_limit_reached`/`insufficient_quota`,
@@ -1391,7 +1409,11 @@ terminal frontend and `web/` prigh-web, the browser one.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
     -> Model.t * Command.t list`. Actions are keys/intents, backend events,
     RPC replies (tagged with `Reply_tag.t` so they stay sexpable), clock
-    ticks and resizes. Commands (`Rpc`, `List_paths`, `Load_history`,
+    ticks and resizes. The prompt history is the backend's (`get_prefs`
+    of `history` at startup, `push_pref` per prompt, `prefs_changed`
+    while not browsing it), shared with prigh-web; `~/.prigh/history`
+    is read first, kept as well, and uploaded when the backend has none.
+    Commands (`Rpc`, `List_paths`, `Load_history`,
     `Append_history`, `Copy_to_clipboard`, `Suspend`, `Edit_externally`,
     `Open_browser`, `Quit`) are executed by the platform and answered through
     `Action.Reply`.
@@ -1916,14 +1938,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       its dialog open, Enter and Esc.
     - Panel sizes: `Resize` (pure: per `Handle` — the sidebar, the file
       browser, its list/preview split in percent, the agents panel, the
-      terminal — the preference kept in the browser, and the window's
+      terminal — the user's preference (`web.<var>`, see below), and the window's
       `Viewport`; `bounds` gives a handle's size, minimum and maximum in
       that window given what is open (`App.Model.shown`): the side panels
       docked beside the chat (the file browser floats over it below
       1100px, the agents panel below 1180px, as in the CSS) share its
       width less `chat_min` (400px), shrinking in proportion to what they
       have above their minimums when they would not fit, while the
-      preferences stay; `update` returns the `Save`s for local storage)
+      preferences stay; `update` returns the `Save`s, preferences to keep)
       and `Resize_view` (the handles: `role=separator`, focusable, with
       `aria-valuenow/min/max` and `data-resize-*` for the page's drag
       code, a double click resetting; none on a phone; and the sizes as
@@ -1989,7 +2011,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       `extras`, kept out of the centred status so that they never move it:
       the plan chip, queued messages, the transfers in progress from
       `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
-      gear, `/settings` or Ctrl+,: notifications, verbosity, `/confirm`,
+      gear, `/settings` or Ctrl+,: the theme and accent (`Theme_view`),
+      notifications, verbosity, `/confirm`,
       providers, the account; its controls are `Action.Run` commands, which
       leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
@@ -2073,6 +2096,32 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Change_dir` in `Dialog.Pr_checked_out`. The top bar's branch runs
       `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
       new line, Ctrl/⌘+Enter accepts.
+    - The user's preferences: `Pref_sync` (the keys and when they go to the
+      backend) and `Theme`. At startup the page restores the browser's copy
+      (`Restore_prefs`, applied at once: the theme, sizes, the terminal) and
+      `get_prefs` follows `hello` (and every reconnection and return from
+      acting as another user); its reply wins, what it lacks being the
+      default, and is cached again (`Command.Cache_prefs`). A browser whose
+      copy predates the backend's (`legacy`, moved from the old
+      localStorage keys) uploads it once, unless the backend has the
+      user's already (`web.migrated`; the TUI's `history` stays). Changes
+      go to the cache and `set_prefs` (the history is `push_pref`, cached
+      only while the backend has not answered), not while acting as
+      another user (theirs are not ours: nothing is fetched or sent, ours
+      stay in this browser), nor to a backend that refused `get_prefs`
+      (`Pref_sync.Remote.Local`). `prefs_changed` applies another
+      frontend's at once, except opening or closing the terminal, and the
+      history only while not browsing it. `Theme` (`original`, `dark`,
+      `light`; the accent a `Preset` or a `Custom` `#rrggbb`, with the ink
+      that reads on it by WCAG luminance) and `Model.look`, the theme on
+      show: the `/theme` or `/accent` picker's highlighted item (or a
+      colour typed into the latter), the settings' colour input being
+      dragged (`Preview_accent`), else the user's. `update` emits
+      `Command.Apply_theme` whenever it changes, so pickers preview and
+      Esc puts the user's back. `Theme_view` draws each theme as a small
+      picture of the page (`data-theme` on it takes that theme's
+      variables) and the accents as swatches, for the settings' Appearance
+      section and the pickers.
     - Notifications: `Page_notify` (pure) tracks `/notify on|off`, the
       browser's permission, whether the tab is hidden and how many things
       happened unseen; events raise `Command.Notify` only while hidden,
@@ -2080,8 +2129,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       `/notify on` (or the account menu) emits
       `Request_notification_permission` from the user's action. `app/`'s
       `Page_notifications` does the browser side: the Notification API,
-      `visibilitychange`, localStorage (`prigh-web.notify`) and the favicon
-      with a sodium dot while something is unseen.
+      `visibilitychange` and the favicon with a sodium dot while something
+      is unseen; whether they are on is a preference (`web.notify`).
   - `app/` (`prigh_web_app`) — the page. `Ws_transport` (a browser
     WebSocket as a `Transport.t`), `Browser` (localStorage, the query
     string, the clipboard, the visual viewport, and `after_render`: work
@@ -2131,9 +2180,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     new one. `terminal.js` connects with the size, resets on open (the first
     message is the replay), reconnects with backoff, pings, and a key after
     the shell exits starts a new one; it reports its state through
-    `onStatus`, which becomes `Action.Terminal_status`. It also remembers whether the panel
-    is open, so a reload reopens it, and focuses the shell for
-    `Focus_terminal`. The document listeners leave keys (a capture
+    `onStatus`, which becomes `Action.Terminal_status`, focuses the shell for
+    `Focus_terminal` and takes the theme's colours (`setTheme`, read from
+    the computed CSS variables, with ANSI colours per theme). The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
     the panel to it, and the chat's and agents panel's mutation observers
     ignore xterm.js redrawing. `Files_widget` keeps the browser's `File`s
@@ -2151,13 +2200,21 @@ terminal frontend and `web/` prigh-web, the browser one.
     commits `Resize (Set _)` once and, after that render, removes the
     panel's own variable (Esc while dragging puts it back). It also
     sends the window's size (`Resize (Viewport _)`, again on every
-    viewport change), restores the kept sizes from local storage at
-    startup and performs `Save_size`.
-  - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
-    `agents.css`, `terminal.css`, `files.css`, `highlight.css` (the
-    tokens' colours), `resize.css` (the handles) and `forge.css` (git
-    hosting and the pull request dialogs) (design tokens in
-    `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    viewport change). `Pref_cache` is the browser's copy of the user's
+    preferences (`prigh-web.prefs`: `{owner, legacy, prefs}`, restored
+    only for the backend and user it belongs to) and `prigh-web.theme`,
+    the document's theme attributes and variables, which `index.html`'s
+    inline script puts back before the first paint (also before signing
+    in); `Page_theme` applies `Apply_theme` to `<html>`, that cache and the
+    terminal.
+  - `bin/` — `main.bc.js` plus `index.html`, `theme.css` (every colour,
+    as variables: the original theme on `:root`, `[data-theme=dark]` and
+    `[data-theme=light]` overriding them, the accent presets
+    `[data-accent=...]` and what derives from the accent by `color-mix`),
+    `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
+    `highlight.css` (which tokens take which colours), `resize.css`
+    (the handles) and `forge.css` (git hosting and the pull request
+    dialogs) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
@@ -2224,7 +2281,10 @@ re-records); the flake check `nvim-plugin` runs them.
   `["Message",{id,at,turns,tool_calls,message}]`,
   `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
 - `~/.prigh/sessions/exports/` — default `/export` output.
-- `~/.prigh/history` — prompt history (one JSON string per line, last 500).
+- `~/.prigh/history` — the TUI's prompt history on its machine (one JSON
+  string per line, last 500).
+- `~/.prigh/prefs.json` — the user's preferences and data kept for the
+  frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

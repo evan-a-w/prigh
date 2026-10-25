@@ -32,6 +32,9 @@ module Settings = struct
     }
   ;;
 
+  (* Whose preferences the browser keeps ([Pref_cache]). *)
+  let owner t = t.backend ^ " " ^ Option.value t.login.user ~default:""
+
   (* This page, for as long as it is loaded: its newer connections take
      over from its older ones on the backend. *)
   let tab =
@@ -136,26 +139,6 @@ let refused_key = "prigh-web.refused"
 let auth_failed message =
   Browser.set_item refused_key message;
   Dom_html.window##.location##reload
-;;
-
-let history_key = "prigh-web.history"
-
-let load_history () =
-  match Browser.get_item history_key with
-  | None -> []
-  | Some text ->
-    (match Jsonaf.parse text with
-     | Ok (`Array items) ->
-       List.filter_map items ~f:(function
-         | `String s -> Some s
-         | _ -> None)
-     | _ -> [])
-;;
-
-let save_history entries =
-  Browser.set_item
-    history_key
-    (Jsonaf.to_string (`Array (List.map entries ~f:(fun s -> `String s))))
 ;;
 
 let focus id =
@@ -413,7 +396,6 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
-    | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
     | Copy text -> Effect.of_sync_fun Browser.copy_to_clipboard text
@@ -438,7 +420,6 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       else inject App.Action.Jump_older
     | Scroll_to_entry n -> Effect.of_sync_fun scroll_to_entry n
     | Focus_terminal -> Effect.of_sync_fun Terminal_widget.focus ()
-    | Remember_terminal open_ -> Effect.of_sync_fun Terminal_widget.remember open_
     | Notify notification ->
       Effect.of_sync_fun Page_notifications.show notification
     | Request_notification_permission ->
@@ -446,11 +427,13 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         Effect.of_deferred_fun Page_notifications.request_permission ()
       in
       inject (App.Action.Notification_permission permission)
-    | Save_notifications enabled ->
-      Effect.of_sync_fun Page_notifications.save enabled
     | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
     | Files page -> Effect.of_sync_fun Files_widget.perform page
-    | Save_size save -> Effect.of_sync_fun Resize_widget.save save
+    | Cache_prefs changes ->
+      Effect.of_sync_fun
+        (Pref_cache.save Login.Storage.browser ~owner:(Settings.owner settings))
+        changes
+    | Apply_theme theme -> Effect.of_sync_fun Page_theme.apply theme
     | Keep_scroll_position ->
       Effect.of_sync_fun Paging_listeners.keep_position ()
   in
@@ -825,7 +808,6 @@ let install_listeners ~schedule ~current =
   Paging_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();
-  Terminal_widget.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
   let reported = ref true in
@@ -1145,14 +1127,15 @@ let run_app (settings : Settings.t) =
             });
        schedule (App.Action.Set_narrow (narrow ()));
        schedule
-         (App.Action.Set_notifications
-            { enabled = Page_notifications.saved ()
-            ; permission = Page_notifications.permission ()
-            });
+         (App.Action.Set_notification_permission
+            (Page_notifications.permission ()));
+       (let prefs, legacy =
+          Pref_cache.load Login.Storage.browser ~owner:(Settings.owner settings)
+        in
+        schedule (App.Action.Restore_prefs { prefs; legacy }));
        Page_notifications.set_title "prigh";
        Page_notifications.on_visibility_change (fun hidden ->
          schedule (App.Action.Page_hidden hidden));
-       schedule (App.Action.Load_history (load_history ()));
        Option.iter (Tab_memory.saved_draft ()) ~f:(fun draft ->
          schedule (App.Action.Set_draft draft));
        (match result with

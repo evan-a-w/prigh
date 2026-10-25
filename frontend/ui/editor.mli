@@ -71,5 +71,11 @@ val insert_paste : t -> string -> t
 (** Returns the text and the editor reset; records history unless [secret]. *)
 val submit : ?secret:bool -> t -> string * t
 
+(** The prompts submitted or set, most recent first. *)
+val history : t -> string list
+
+(** Whether Up has gone into the history (until submitted or cleared). *)
+val browsing_history : t -> bool
+
 val history_prev : t -> t option
 val history_next : t -> t option

@@ -75,22 +75,29 @@ let%expect_test "/remind stop and every add one, acknowledged by name" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/remind stop Don't stop until the tests pass."))
+    (Rpc (method_ push_pref)
+     (params
+      ((key history) (value "/remind stop Don't stop until the tests pass.")
+       (max 500)))
+     (tag Ignore))
     (Rpc (method_ add_reminder)
      (params ((text "Don't stop until the tests pass.") (on stop)))
      (tag
       (Reminder (command "/remind stop Don't stop until the tests pass.")
        (notice ()))))
-    (Save_history
-     ("/remind stop 5 Keep going."
-      "/remind stop Don't stop until the tests pass."))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind stop 5 Keep going.") (max 500)))
+     (tag Ignore))
     (Rpc (method_ add_reminder)
      (params ((text "Keep going.") (on stop) (max_repeats 5)))
      (tag (Reminder (command "/remind stop 5 Keep going.") (notice ()))))
-    (Save_history
-     ( "/remind every 20 Check the disk space.\
-      \nAnd the logs." "/remind stop 5 Keep going."
-      "/remind stop Don't stop until the tests pass."))
+    (Rpc (method_ push_pref)
+     (params
+      ((key history)
+       (value  "/remind every 20 Check the disk space.\
+              \nAnd the logs.")
+       (max 500)))
+     (tag Ignore))
     (Rpc (method_ add_reminder)
      (params ((text  "Check the disk space.\
                     \nAnd the logs.") (every_turns 20)))
@@ -125,27 +132,28 @@ let%expect_test "/remind's mistakes say what to type; a refusal goes back" =
   print_s [%sexp ((H.model h).draft : string)];
   [%expect
     {|
-    (Save_history ("/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind stop") (max 500))) (tag Ignore))
     Usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times in a row (default 3) (Dismiss)
     "/remind stop"
-    (Save_history ("/remind every 0 x" "/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind every 0 x") (max 500))) (tag Ignore))
     N must be 1 or more: /remind every N TEXT (Dismiss)
     "/remind every 0 x"
-    (Save_history ("/remind stp x" "/remind every 0 x" "/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind stp x") (max 500))) (tag Ignore))
     Unknown /remind "stp"; did you mean stop? usage: /remind [stop [N] TEXT|every N TEXT|rm NAME|off] (Dismiss)
     "/remind stp x"
-    (Save_history
-     ("/remind rm r2" "/remind stp x" "/remind every 0 x" "/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind rm r2") (max 500))) (tag Ignore))
     No reminder "r2"; did you mean r1, r3? (/remind lists them) (Dismiss)
     "/remind rm r2"
-    (Save_history
-     ("/remind rm zz" "/remind rm r2" "/remind stp x" "/remind every 0 x"
-      "/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind rm zz") (max 500))) (tag Ignore))
     No reminder "zz"; the session's are r1, r3 (/remind lists them) (Dismiss)
     "/remind rm zz"
-    (Save_history
-     ("/remind every 2 x" "/remind rm zz" "/remind rm r2" "/remind stp x"
-      "/remind every 0 x" "/remind stop"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind every 2 x") (max 500))) (tag Ignore))
     (Rpc (method_ add_reminder) (params ((text x) (every_turns 2)))
      (tag (Reminder (command "/remind every 2 x") (notice ()))))
     "/remind every 2 x"
@@ -164,18 +172,22 @@ let%expect_test "/remind rm and /remind off; with none, it says how to add one" 
   toasts h;
   [%expect
     {|
-    (Save_history ("/remind rm r3"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind rm r3") (max 500))) (tag Ignore))
     (Rpc (method_ remove_reminder) (params ((name r3)))
      (tag (Reminder (command "/remind rm r3") (notice ("reminder r3 removed")))))
     (Expire_toast (id 0) (after_ms 2500))
-    (Save_history ("/remind off" "/remind rm r3"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind off") (max 500))) (tag Ignore))
     (Rpc (method_ clear_reminders) (params ())
      (tag
       (Reminder (command "/remind off") (notice ("all 2 reminders removed")))))
     (Expire_toast (id 1) (after_ms 2500))
-    (Save_history (/remind "/remind off" "/remind rm r3"))
+    (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 2) (after_ms 4220))
-    (Save_history ("/remind off" /remind "/remind off" "/remind rm r3"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/remind off") (max 500))) (tag Ignore))
     (Expire_toast (id 3) (after_ms 2500))
     No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
     No reminders to clear
@@ -199,7 +211,8 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Delete removes it" =
   toasts h;
   [%expect
     {|
-    (Save_history (/remind))
+    (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     Reminders
     (Close (Esc))
@@ -212,14 +225,16 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Delete removes it" =
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4300))
     r3 (every 20 turns): Check the disk space. · /remind rm r3 removes it
-    (Save_history (/remind))
+    (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     (Remove_reminder r1)
     (Focus editor)
     (Rpc (method_ remove_reminder) (params ((name r1)))
      (tag (Reminder (command "/remind rm r1") (notice ("reminder r1 removed")))))
     ()
-    (Save_history (/remind))
+    (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     (Remove_reminder r3)
     (Focus editor)
@@ -272,7 +287,8 @@ let%expect_test
   H.text h ~selector:".status-extras .reminders";
   [%expect
     {|
-    (Save_history (/remind))
+    (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))
+     (tag Ignore))
     (Focus picker-input)
     ()
     |}]
