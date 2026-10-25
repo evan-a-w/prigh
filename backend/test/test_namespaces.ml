@@ -524,6 +524,7 @@ let%expect_test "/terminal looks the namespace up by token" =
         ; "/terminal", Web_server.serve_terminal router terminals
         ]
       ~on_lines:(Rpc_router.serve_lines router)
+      ()
   in
   let browser = open_websocket t ~sw ~port in
   let first target =
@@ -921,6 +922,7 @@ let%expect_test "/terminal: as_user needs a superuser" =
         ; "/terminal", Web_server.serve_terminal router terminals
         ]
       ~on_lines:(Rpc_router.serve_lines router)
+      ()
   in
   let first target =
     let ws = open_websocket t ~sw ~port target in

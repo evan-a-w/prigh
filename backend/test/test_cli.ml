@@ -74,8 +74,70 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -web :99999: the port must be a number from 0 to 65535
     [exit 2]
     $ prigh tool-host -connect 7777
-    -connect must be HOST:PORT (the backend's -listen or -web address), got "7777"
+    -connect: "7777" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
     [exit 2]
+    |}]
+;;
+
+(* Each stops before serving anything, saying what to do; nothing is saved. *)
+let%expect_test "web: no backend, a bad address, an unreachable one" =
+  with_sandbox
+  @@ fun t ->
+  write t "site/index.html" "";
+  let site = Filename.concat t.dir "site" in
+  prigh t [ "web" ];
+  prigh t [ "web"; "-connect"; "server" ];
+  prigh t [ "web"; "-connect"; "127.0.0.1:1"; "-tools"; "elsewhere" ];
+  prigh
+    t
+    [ "web"
+    ; "-connect"
+    ; "127.0.0.1:1"
+    ; "-web-root"
+    ; site
+    ; "-cwd"
+    ; "/nonexistent"
+    ];
+  prigh
+    t
+    [ "web"; "-connect"; "127.0.0.1:1"; "-token"; "sekrit"; "-web-root"; site ];
+  printf
+    "saved: %b\n"
+    (Sys_unix.file_exists_exn (Saved_connection.file ~home:t.dir));
+  write t ".prigh/tui-connection.sexp" "((connect 127.0.0.1:1)";
+  prigh t [ "web"; "-web-root"; site ];
+  write t ".prigh/tui-connection.sexp" "((connect 127.0.0.1:1))";
+  prigh t [ "web"; "-remote"; "-web-root"; site ];
+  [%expect
+    {|
+    $ prigh web
+    prigh web: no backend to connect to: pass -connect HOST:PORT (or a prigh-web URL such as wss://host/ws), which is saved for next time.
+    For prigh-web with a backend on this machine, run prigh serve -web 127.0.0.1:7790 (./prigh -web without -connect or -remote).
+    [exit 2]
+    $ prigh web -connect server
+    prigh web: -connect: "server" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
+    [exit 2]
+    $ prigh web -connect 127.0.0.1:1 -tools elsewhere
+    prigh web: -tools elsewhere: local (run tools on this machine) or remote (on the backend)
+    [exit 2]
+    $ prigh web -connect 127.0.0.1:1 -web-root $DIR/site -cwd /nonexistent
+    prigh web: -cwd /nonexistent: no such directory (mkdir -p it first)
+    [exit 2]
+    $ prigh web -connect 127.0.0.1:1 -token sekrit -web-root $DIR/site
+    prigh web: cannot reach the backend at 127.0.0.1:1: connection refused
+    Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address given to -connect: HOST:PORT, or a prigh-web URL such as wss://host/ws.
+    [exit 1]
+    saved: false
+    $ prigh web -web-root $DIR/site
+    prigh web: cannot read the saved connection: ($DIR/.prigh/tui-connection.sexp
+     (Failure
+      "Sexplib.Sexp.gen_load_sexp: EOF in $DIR/.prigh/tui-connection.sexp while in state Parsing_list"))
+    Fix or delete $DIR/.prigh/tui-connection.sexp, or pass -connect HOST:PORT.
+    [exit 2]
+    $ prigh web -remote -web-root $DIR/site
+    prigh web: cannot reach the backend at 127.0.0.1:1: connection refused
+    Is it running there (prigh serve -web HOST:PORT, or -listen)? The address is the saved connection ($DIR/.prigh/tui-connection.sexp): pass -connect HOST:PORT to replace it.
+    [exit 1]
     |}]
 ;;
 

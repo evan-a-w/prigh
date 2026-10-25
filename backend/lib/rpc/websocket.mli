@@ -74,6 +74,17 @@ val read : t -> [ `Text of string | `Binary of string ] option
 (** [read], skipping binary messages. *)
 val read_text : t -> string option
 
+(** The client's side of the opening handshake over [flow] (a [GET] of
+    [target] from [host]), then [create ~role:`Client]. [Error] says what the
+    server answered instead of switching protocols. Raises what reading and
+    writing [flow] raise. *)
+val connect
+  :  reader:Eio.Buf_read.t
+  -> flow:_ Eio.Flow.sink
+  -> host:string
+  -> target:string
+  -> (t, string) Result.t
+
 val send_text : t -> string -> unit
 val send_binary : t -> string -> unit
 val close : ?code:int -> t -> unit

@@ -181,6 +181,7 @@ let with_fixture ?(idle_timeout = 0.3) ?(heartbeat_timeout = 3.) f =
           , Web_server.serve_terminal (Rpc_router.single server) terminals )
         ]
       ~on_lines:(fun ~read_line:_ ~write_line:_ -> ())
+      ()
   in
   let fixture = { Fixture.sandbox; sw; socket; port; terminals } in
   Exn.protect
@@ -569,6 +570,7 @@ let%expect_test "a terminal on a network tool host, relayed end to end" =
               backend_terminals )
         ]
       ~on_lines:(Rpc_router.serve_lines (Rpc_router.single h.server))
+      ()
   in
   let f =
     { Fixture.sandbox

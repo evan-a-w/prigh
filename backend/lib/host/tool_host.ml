@@ -307,7 +307,7 @@ module Outbox = struct
         match Eio.Stream.take t.lines with
         | None -> ()
         | Some line ->
-          (match write (line ^ "\n") with
+          (match write line with
            | () -> loop ()
            | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
            | exception _ -> t.closed <- true)
@@ -354,7 +354,8 @@ let run ~env ?terminals ~input ~output () =
   in
   let mcp = Mcp_hub.create ~env ~sw () in
   let outbox =
-    Outbox.create ~sw ~write:(fun s -> Eio.Flow.copy_string s output)
+    Outbox.create ~sw ~write:(fun line ->
+      Eio.Flow.copy_string (line ^ "\n") output)
   in
   let worker =
     Worker.create
@@ -395,19 +396,18 @@ let serve_connection
       ~worker
       ~link
       ~log
+      ~on_connect
       ~address
       ~token
       ~user
       ~host_id
       ~name
       ~cwd
-      flow
+      socket
   =
   Switch.run
   @@ fun sw ->
-  let outbox =
-    Outbox.create ~sw ~write:(fun s -> Eio.Flow.copy_string s flow)
-  in
+  let outbox = Outbox.create ~sw ~write:(Backend_socket.write_line socket) in
   (* Requests by id until answered, with the replies they carry: those
      unanswered when the connection ends go again on the next one. *)
   let pending = Int.Table.create () in
@@ -450,14 +450,13 @@ let serve_connection
                  ]) )
         ]);
   let outcome = ref (`Failed (sprintf "disconnected from %s" address)) in
-  let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   let rec loop () =
-    match Eio.Buf_read.line reader with
-    | exception (End_of_file | Eio.Io _) ->
+    match Backend_socket.read_line socket with
+    | None ->
       (match !outcome with
        | `Served -> log (sprintf "disconnected from %s" address)
        | `Failed _ | `Refused _ -> ())
-    | line ->
+    | Some line ->
       let continue =
         match Json.parse line with
         | Error _ -> true
@@ -469,6 +468,7 @@ let serve_connection
               | Some (`String "hello"), Some `True ->
                 outcome := `Served;
                 Link.connect link request;
+                on_connect ();
                 log
                   (sprintf
                      "connected to %s as %s"
@@ -530,8 +530,8 @@ let connect
       ?(log = fun line -> eprintf "prigh tool-host: %s\n%!" line)
       ?(initial_backoff = Time_ns.Span.of_sec 0.5)
       ?(max_backoff = Time_ns.Span.of_sec 10.)
-      ~host
-      ~port
+      ?(on_connect = fun () -> ())
+      ~backend
       ~token
       ?user
       ?(host_id = Host_id.generate ())
@@ -555,26 +555,25 @@ let connect
       ~default_cwd:cwd
       ~send:(Link.send link)
   in
-  let address = sprintf "%s:%d" host port in
-  let net = Eio.Stdenv.net env in
+  let address = Backend_address.to_string backend in
   let attempt () =
-    match Eio.Net.getaddrinfo_stream net host ~service:(Int.to_string port) with
-    | [] -> `Failed (sprintf "cannot resolve %s" host)
-    | addr :: _ ->
-      Switch.run (fun sw ->
-        let flow = Eio.Net.connect ~sw net addr in
-        Web_server.keepalive flow;
-        serve_connection
-          ~worker
-          ~link
-          ~log
-          ~address
-          ~token
-          ~user
-          ~host_id
-          ~name
-          ~cwd
-          flow)
+    Switch.run (fun sw ->
+      let socket = Backend_socket.connect ~env ~sw backend in
+      Exn.protect
+        ~finally:(fun () -> Backend_socket.close socket)
+        ~f:(fun () ->
+          serve_connection
+            ~worker
+            ~link
+            ~log
+            ~on_connect
+            ~address
+            ~token
+            ~user
+            ~host_id
+            ~name
+            ~cwd
+            socket))
   in
   let rec loop backoff =
     let retry backoff =
@@ -596,7 +595,9 @@ let connect
         (sprintf
            "cannot connect to %s: %s"
            address
-           (Net_error.to_string_hum exn));
+           (match exn with
+            | Failure message | Backend_address.Not_upgraded message -> message
+            | exn -> Net_error.to_string_hum exn));
       retry backoff
   in
   loop initial_backoff

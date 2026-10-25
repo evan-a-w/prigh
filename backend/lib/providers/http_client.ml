@@ -56,6 +56,13 @@ let https uri raw =
   Tls_eio.client_of_flow (force tls_config) ?host raw
 ;;
 
+let tls_client ~host raw =
+  let host =
+    Result.ok (Result.bind (Domain_name.of_string host) ~f:Domain_name.host)
+  in
+  Tls_eio.client_of_flow (force tls_config) ?host raw
+;;
+
 exception Read_failed of string
 exception Stalled_exn
 

@@ -51,6 +51,7 @@ let http_port t ~sw (h : Test_rpc.H.t) =
     ~root:None
     ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single h.server) ]
     ~on_lines:(Rpc_router.serve_lines (Rpc_router.single h.server))
+    ()
 ;;
 
 module Response = struct
