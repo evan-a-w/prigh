@@ -437,43 +437,54 @@ kbd {
 
 .scrim { display: none; }
 
-/* The session: a card in the docked sidebar, else a slim bar over the
+/* The session: in the docked sidebar a card of its status, with the
+   panels' toggles floating over the chat's corner; else a slim bar over the
    chat (one of them at a time). The bar steps down with the chat column's
    width, not the window's (see the container queries at the end). Its
    height is fixed: what the status says never moves the page. */
 .session-card {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 10px;
   margin: 0 -10px;
-  padding: 10px 10px 10px 18px;
+  padding: 12px 14px 12px 18px;
   border-top: 1px solid var(--rule);
 }
-.card-head { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; }
-.card-head > .session-name { flex: 0 1 auto; min-width: 0; font-size: 13.5px; }
-.card-head > .panel-toggles { margin-left: auto; gap: 0; }
-.panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
-.panel-toggles > .btn.icon:hover { color: var(--chalk); }
-.card-host { display: flex; min-width: 0; }
-.card-host > .host { font: 11.5px/1.4 var(--mono); color: var(--muted); min-width: 0; }
-.card-host > .host .status-text { overflow: hidden; text-overflow: ellipsis; }
-/* The status stacked: what the agent is doing, the context across the
-   card, then the counters. */
-.session-card .status {
+/* The status on a grid: what the agent is doing beside where tools run,
+   the context across, then the counters, each pair on the same edges. */
+.card-status {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "activity activity" "context context" "tokens cost";
-  gap: 6px 12px;
-  margin-top: 8px;
-  padding: 0;
-  overflow: visible;
+  grid-template-columns: minmax(0, 1fr) fit-content(62%);
+  grid-template-areas: "activity where" "context context" "tokens cost";
+  align-items: center;
+  gap: 7px 12px;
 }
-.session-card .status > .activity { grid-area: activity; width: auto; }
-.session-card .status > .context { grid-area: context; gap: 10px; }
-.session-card .status > .tokens { grid-area: tokens; }
-.session-card .status > .cost { grid-area: cost; justify-self: end; }
-.session-card .context .meter { flex: 1; width: auto; }
-.session-card .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; margin-top: 4px; padding: 0; overflow: visible; }
+.card-status > .status { display: contents; }
+.card-status .activity { grid-area: activity; width: auto; font-size: 12.5px; }
+.card-status .activity, .card-where { margin-bottom: 3px; }
+.card-status .context { grid-area: context; gap: 10px; }
+.card-status .context .meter { flex: 1; width: auto; }
+.card-status .tokens { grid-area: tokens; }
+.card-status .cost { grid-area: cost; justify-self: end; }
+.card-where { grid-area: where; display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; font: 11.5px var(--mono); }
+.card-where > .status-item.host { min-width: 0; color: var(--muted); font: inherit; }
+.card-where > .host .status-text { overflow: hidden; text-overflow: ellipsis; }
+.card-where > .host .icon { color: var(--faint); }
+.card-where > .branch { max-width: 50%; }
+.session-card .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
+
+.chat-tools {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 4;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--graphite);
+}
+.chat-tools > .panel-toggles { gap: 2px; }
+.chat-tools .btn.icon { width: 30px; height: 30px; }
+.chat-frame:has(> .chat-tools) > .jump-nav { top: 50px; }
 
 .session-bar {
   container: bar / inline-size;
@@ -511,18 +522,11 @@ kbd {
 .session-name.muted { color: var(--muted); font-weight: 400; }
 .session-name .edit-hint { width: 13px; height: 13px; color: var(--faint); opacity: 0; transition: opacity 0.15s; }
 .session-name:hover .edit-hint, .session-name:focus-visible .edit-hint { opacity: 1; }
-.session-where { display: flex; gap: 12px; color: var(--faint); font: 11.5px/1.4 var(--mono); min-width: 0; max-width: 100%; }
-/* A long cwd loses its middle: the directory it ends in stays. */
-.where { display: flex; min-width: 6ch; white-space: nowrap; overflow: hidden; }
-.where-head { min-width: 1ch; overflow: hidden; text-overflow: ellipsis; }
-.where-tail { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.where-head + .where-tail { max-width: calc(100% - 1ch); }
 /* Long paths lose their start, not the directory they end in (the mark
    keeps the leading "/" in place). */
 .session-cwd { direction: rtl; text-align: left; }
 .session-cwd::before { content: "\200E"; }
-/* A branch keeps its name up to almost half the line; the cwd gives way. */
-.branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--muted); flex-shrink: 0; max-width: 45%; }
+.branch { display: inline-flex; align-items: center; gap: 3px; min-width: 0; white-space: nowrap; color: var(--muted); }
 .branch .icon { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; }
 .branch-name { overflow: hidden; text-overflow: ellipsis; }
 
@@ -1297,6 +1301,8 @@ kbd {
 }
 
 .panel-toggles { display: flex; align-items: center; gap: 2px; }
+.panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
+.panel-toggles > .btn.icon:hover { color: var(--chalk); }
 
 /* The thinking level and what asks first, beside the model: always shown,
    each opening its picker. Plan mode holds the agent back, so it is lit. */

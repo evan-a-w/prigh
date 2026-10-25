@@ -24,21 +24,6 @@ let session_title (m : App.Model.t) (state : State.t) =
        |> Option.value ~default:"New session")
 ;;
 
-(* The cwd, elided in the middle when narrow: the directory it ends in stays. *)
-let where cwd =
-  let path = Sidebar_view.home_relative cwd in
-  let head, tail =
-    match String.rsplit2 path ~on:'/' with
-    | Some (dir, base) when not (String.is_empty base) -> dir, "/" ^ base
-    | _ -> "", path
-  in
-  Node.span
-    ~attrs:[ Attr.class_ "where"; Attr.title cwd ]
-    [ (if String.is_empty head then Node.none else span ~cls:"where-head" head)
-    ; span ~cls:"where-tail" tail
-    ]
-;;
-
 let rename (m : App.Model.t) (state : State.t) ~inject =
   Node.button
     ~attrs:
@@ -63,34 +48,40 @@ let panel_toggles (m : App.Model.t) ~inject =
     ]
 ;;
 
-let card (m : App.Model.t) ~inject =
-  let section children =
-    Node.section
-      ~attrs:
-        [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
-      children
-  in
+(* Over the chat's top right corner, quietly: no bar under them. *)
+let tools (m : App.Model.t) ~inject =
   match m.state with
-  | None -> section [ Status_view.view m ~inject ]
-  | Some state ->
-    section
-      [ div ~cls:"card-head" [ rename m state ~inject; panel_toggles m ~inject ]
-      ; div
-          ~cls:"session-where"
-          [ where state.cwd
-          ; (match state.git_branch with
-             | Some branch ->
-               Node.span
-                 ~attrs:[ Attr.class_ "branch"; Attr.title branch ]
-                 [ icon Branch; span ~cls:"branch-name" branch ]
-             | None -> Node.none)
-          ]
-      ; div ~cls:"card-host" [ Status_view.host m ~always:true ~inject ]
-        (* The status last, at the foot of the sidebar: it stays put as
-           what applies comes and goes above it. *)
-      ; Status_view.extras m ~host:false ~inject
-      ; Status_view.view m ~inject
-      ]
+  | None -> Node.none
+  | Some _ -> div ~cls:"chat-tools" [ panel_toggles m ~inject ]
+;;
+
+let branch (state : State.t) =
+  match state.git_branch with
+  | Some branch ->
+    Node.span
+      ~attrs:
+        [ Attr.class_ "branch"
+        ; Attr.title (sprintf "On branch %s, in %s" branch state.cwd)
+        ]
+      [ icon Branch; span ~cls:"branch-name" branch ]
+  | None -> Node.none
+;;
+
+let card (m : App.Model.t) ~inject =
+  Node.section
+    ~attrs:[ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
+    [ Status_view.extras m ~host:false ~inject
+    ; div
+        ~cls:"card-status"
+        [ Status_view.view m ~inject
+        ; (match m.state with
+           | None -> Node.none
+           | Some state ->
+             div
+               ~cls:"card-where"
+               [ Status_view.host m ~always:true ~inject; branch state ])
+        ]
+    ]
 ;;
 
 let bar (m : App.Model.t) ~inject =

@@ -212,14 +212,14 @@ let%expect_test
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
   H.text h ~selector:".status";
   H.text h ~selector:".status-extras";
-  H.text h ~selector:".card-host";
+  H.text h ~selector:".card-where";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (75%) ↑123k ↓7.9k $1.2345 Working
     (3 queued)
-    (laptop)
+    (laptop) main
     |}];
   H.show h ~selector:".context";
   [%expect

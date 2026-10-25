@@ -33,6 +33,7 @@ module Row = struct
     ; marked : bool
     ; loading : bool
     ; age : string
+    ; cwd : string
     }
   [@@deriving equal]
 end
@@ -40,7 +41,8 @@ end
 let rows : (Session_summary.t, Row.t) View_cache.t = View_cache.create ()
 
 let row ~inject (s : Session_summary.t) (row : Row.t) =
-  let { Row.selected; running; background; selecting; marked; loading; age } =
+  let { Row.selected; running; background; selecting; marked; loading; age; cwd }
+    =
     row
   in
   let action ~cls ~title ~label ~icon:i effect =
@@ -126,7 +128,9 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div
                 ~cls:"session-meta"
                 [ span ~cls:"session-age" age
-                ; span ~cls:"session-cwd" (home_relative s.cwd)
+                ; Node.span
+                    ~attrs:[ Attr.class_ "session-cwd"; Attr.title cwd ]
+                    [ Node.text (home_relative cwd) ]
                 ; (if selecting
                    then
                      span ~cls:"session-size" (Session_summary.size_string s.bytes)
@@ -139,7 +143,16 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
        else
          Node.span
            ~attrs:[ Attr.class_ "session-actions" ]
-           [ (if s.archived
+           [ (if selected
+              then
+                action
+                  ~cls:"rename"
+                  ~title:"Rename (/name)"
+                  ~label:("Rename " ^ title)
+                  ~icon:Pencil
+                  (inject Action.Open_rename)
+              else Node.none)
+           ; (if s.archived
               then
                 action
                   ~cls:"unarchive"
@@ -177,6 +190,11 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
          | Some (Switching path) -> String.equal path s.path
          | Some Starting | None -> false)
     ; age = age m s
+    ; cwd =
+        (* The current session's as it is now: [/cd] moves it. *)
+        (match m.state with
+         | Some state when selected -> state.cwd
+         | _ -> s.cwd)
     }
   in
   View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
@@ -277,13 +295,6 @@ let settings ~inject =
 ;;
 
 let user_footer (m : App.Model.t) ~inject =
-  let help =
-    button
-      ~cls:"icon ghost"
-      ~title:"Commands and keys (/help)"
-      ~on_click:(inject Action.Open_help)
-      [ icon Help ]
-  in
   let sign_out =
     button
       ~cls:"icon ghost"
@@ -293,7 +304,7 @@ let user_footer (m : App.Model.t) ~inject =
   in
   match Account_view.trigger m ~inject with
   | Some account ->
-    div ~cls:"sidebar-footer" [ account; help; settings ~inject ]
+    div ~cls:"sidebar-footer" [ account; settings ~inject ]
   | None ->
     div
       ~cls:"sidebar-footer"

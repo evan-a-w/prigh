@@ -2245,6 +2245,14 @@ let account_menu (m : Model.t) =
                     ~detail:"when a turn ends or something waits for you"
                     "Turn notifications on")
              ; Picker.Item.create
+                 ~id:"settings"
+                 ~detail:"Ctrl+,"
+                 "Settings"
+             ; Picker.Item.create
+                 ~id:"help"
+                 ~detail:"/help"
+                 "Commands and keys"
+             ; Picker.Item.create
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
                  "Sign out"
@@ -2332,6 +2340,8 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, "settings" -> open_dialog m Settings
+  | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
     let m, close = close_dialog m in
     let m, cmds = set_notifications m (String.equal id "notify on") in
