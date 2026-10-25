@@ -223,7 +223,7 @@ let toolbar (m : App.Model.t) ~inject =
   else
     div
       ~cls:"sessions-toolbar"
-      [ span ~cls:"sessions-label" "Sessions"
+      [ span ~cls:"sessions-label" "Projects"
       ; button
           ~cls:"small ghost"
           ~title:"Select sessions to delete (/delete)"

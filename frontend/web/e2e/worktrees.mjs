@@ -185,6 +185,23 @@ try {
   await page.waitForFunction(() => document.querySelector(".worktree-changes"));
   await page.mouse.move(1000, 400);
   await tree("the project tree");
+  // How it looks, with a project's and a worktree's actions at hand, in the
+  // dark and light themes (screenshots only).
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  const started = await theme();
+  for (const look of ["dark", "light"]) {
+    await run(`/theme ${look}`);
+    await page.waitForFunction(t => document.documentElement.dataset.theme === t, look);
+    await project("prigh").locator(".project-row").first().hover();
+    await page.waitForTimeout(200);
+    await screenshot(`the project tree, ${look}, a project's actions`);
+    await worktree("feat/login").locator(".worktree-row").hover();
+    await page.waitForTimeout(200);
+    await screenshot(`the project tree, ${look}, a worktree's actions`);
+  }
+  await run(`/theme ${started}`);
+  await page.waitForFunction(t => document.documentElement.dataset.theme === t, started);
+  await page.mouse.move(1000, 400);
 
   // Folding a project: its count stays on its row.
   await project("site").locator(".project-toggle").click();
