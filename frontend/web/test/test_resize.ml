@@ -92,19 +92,31 @@ let%expect_test "the arrow keys on a handle resize its panel and keep the size" 
   [%expect
     {|
     (Resize (Nudge Sidebar 1))
-    (Save_size ((key prigh-web.sidebar-width) (value (296))))
+    (Cache_prefs (((key web.sidebar-width) (value (296)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 296)))))
+     (tag Show_error))
     (Resize (Nudge Sidebar 4))
-    (Save_size ((key prigh-web.sidebar-width) (value (360))))
+    (Cache_prefs (((key web.sidebar-width) (value (360)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 360)))))
+     (tag Show_error))
     (Resize (Nudge Sidebar -1))
-    (Save_size ((key prigh-web.sidebar-width) (value (344))))
+    (Cache_prefs (((key web.sidebar-width) (value (344)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 344)))))
+     (tag Show_error))
     (browser default)
     (Resize (Largest Sidebar))
-    (Save_size ((key prigh-web.sidebar-width) (value (520))))
+    (Cache_prefs (((key web.sidebar-width) (value (520)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 520)))))
+     (tag Show_error))
     (Resize (Smallest Sidebar))
-    (Save_size ((key prigh-web.sidebar-width) (value (200))))
+    (Cache_prefs (((key web.sidebar-width) (value (200)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 200)))))
+     (tag Show_error))
     (Resize (Smallest Sidebar))
     (Resize (Reset Sidebar))
-    (Save_size ((key prigh-web.sidebar-width) (value ())))
+    (Cache_prefs (((key web.sidebar-width) (value ()))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width null)))))
+     (tag Show_error))
     (Resize (Reset Sidebar))
     |}];
   (* The file browser's edge is on its left: left makes it wider. *)
@@ -116,9 +128,13 @@ let%expect_test "the arrow keys on a handle resize its panel and keep the size" 
   [%expect
     {|
     (Resize (Nudge Files 1))
-    (Save_size ((key prigh-web.files-width) (value (416))))
+    (Cache_prefs (((key web.files-width) (value (416)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 416)))))
+     (tag Show_error))
     (Resize (Nudge Files -4))
-    (Save_size ((key prigh-web.files-width) (value (352))))
+    (Cache_prefs (((key web.files-width) (value (352)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 352)))))
+     (tag Show_error))
     (browser default)
     (browser default)
     |}];
@@ -143,11 +159,11 @@ let%expect_test "the kept sizes come back; dragging commits once, clamped" =
     h
     (Resize
        (Restore
-          [ Sidebar, 333
-          ; Files, 5000
-          ; Agents, 10
-          ; Terminal, 2000
-          ; Files_split, 60
+          [ Sidebar, Some 333
+          ; Files, Some 5000
+          ; Agents, Some 10
+          ; Terminal, Some 2000
+          ; Files_split, Some 60
           ]));
   [%expect {| |}];
   sizes h;
@@ -166,12 +182,20 @@ let%expect_test "the kept sizes come back; dragging commits once, clamped" =
   H.act h (Resize (Set (Terminal, 50)));
   [%expect
     {|
-    (Save_size ((key prigh-web.sidebar-width) (value (520))))
-    (Save_size ((key prigh-web.terminal-height) (value (120))))
+    (Cache_prefs (((key web.sidebar-width) (value (520)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-width 520)))))
+     (tag Show_error))
+    (Cache_prefs (((key web.terminal-height) (value (120)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 120)))))
+     (tag Show_error))
     |}];
   H.act h (Resize (Reset Terminal));
   H.act h (Resize (Reset Terminal));
-  [%expect {| (Save_size ((key prigh-web.terminal-height) (value ()))) |}]
+  [%expect {|
+    (Cache_prefs (((key web.terminal-height) (value ()))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height null)))))
+     (tag Show_error))
+    |}]
 ;;
 
 let%expect_test "docked panels shrink with the window, keeping the chat usable" =
@@ -180,7 +204,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
   H.quiet h (fun () ->
     H.act h (Files Toggle);
     H.act h Toggle_subagents);
-  H.act h (Resize (Restore [ Files, 600; Agents, 500 ]));
+  H.act h (Resize (Restore [ Files, Some 600; Agents, Some 500 ]));
   sizes h;
   [%expect
     {|
@@ -277,9 +301,13 @@ let%expect_test "the file list and the preview split; the terminal's top edge" =
     <div class="resizer resizer-files-split">
     <section class="files-preview">
     (Resize (Nudge Files_split 1))
-    (Save_size ((key prigh-web.files-split) (value (50))))
+    (Cache_prefs (((key web.files-split) (value (50)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.files-split 50)))))
+     (tag Show_error))
     (Resize (Nudge Files_split -4))
-    (Save_size ((key prigh-web.files-split) (value (30))))
+    (Cache_prefs (((key web.files-split) (value (30)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.files-split 30)))))
+     (tag Show_error))
     (browser default)
     |}];
   H.quiet h (fun () -> H.act h Toggle_terminal);
@@ -288,9 +316,13 @@ let%expect_test "the file list and the preview split; the terminal's top edge" =
   [%expect
     {|
     (Resize (Nudge Terminal 1))
-    (Save_size ((key prigh-web.terminal-height) (value (358))))
+    (Cache_prefs (((key web.terminal-height) (value (358)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 358)))))
+     (tag Show_error))
     (Resize (Largest Terminal))
-    (Save_size ((key prigh-web.terminal-height) (value (640))))
+    (Cache_prefs (((key web.terminal-height) (value (640)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 640)))))
+     (tag Show_error))
     |}];
   sizes h;
   [%expect

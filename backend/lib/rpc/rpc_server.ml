@@ -80,6 +80,9 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "get_prefs"
+  ; "set_prefs"
+  ; "push_pref"
   ]
   @ Files_rpc.methods
 ;;
@@ -277,6 +280,7 @@ type t =
     (** the client running the current login flow *)
   ; terminals : Terminal_relay.t
   ; home : string option (** for the current [config.json] *)
+  ; prefs : User_prefs.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -481,6 +485,9 @@ let create
     ; terminals = Terminal_relay.create ()
     ; loaded = File_cache.create ~max_bytes:(128 * 1024 * 1024) ()
     ; home
+    ; prefs =
+        Option.map home ~f:(fun home ->
+          User_prefs.create ~path:(User_prefs.path ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -1407,6 +1414,67 @@ let request_params request =
   Option.value (param request "params") ~default:(`Object [])
 ;;
 
+(* The other clients of the server: the user's other browsers and terminals
+   follow at once. *)
+let prefs_changed t (from : Client.t) changes =
+  if not (List.is_empty changes)
+  then (
+    let json =
+      `Object
+        [ "type", `String "event"
+        ; "event", `String "prefs_changed"
+        ; "prefs", User_prefs.Change.to_json changes
+        ]
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+      if not (String.equal c.id from.id) then c.send json))
+;;
+
+let prefs t client ~meth ~params =
+  match t.prefs with
+  | None -> Or_error.error_string "this backend keeps no preferences"
+  | Some prefs ->
+    let open Or_error.Let_syntax in
+    (match meth with
+     | "get_prefs" ->
+       let%bind keys =
+         match param params "keys" with
+         | None | Some `Null -> Ok None
+         | Some _ -> Or_error.map (string_list_param params "keys") ~f:Option.some
+       in
+       let%map fields = User_prefs.get prefs ?keys in
+       `Object [ "prefs", `Object fields ]
+     | "set_prefs" ->
+       let%bind changes =
+         match param params "prefs" with
+         | Some (`Object fields) ->
+           Ok
+             (List.map fields ~f:(fun (key, value) ->
+                ( key
+                , match value with
+                  | `Null -> None
+                  | value -> Some value )))
+         | _ ->
+           Or_error.error_string
+             "param \"prefs\" must be an object of keys to values (null \
+              removes one)"
+       in
+       let%map changed = User_prefs.set prefs changes in
+       prefs_changed t client changed;
+       `Object [ "prefs", User_prefs.Change.to_json changed ]
+     | _ ->
+       let%bind key = string_param params "key" in
+       let%bind value =
+         match param params "value" with
+         | Some value -> Ok value
+         | None -> Or_error.error_string "missing param \"value\""
+       in
+       let%bind max = int_param params "max" ~default:500 in
+       let%map list = User_prefs.push prefs ~key value ~max:(Int.min max 1000) in
+       prefs_changed t client [ key, Some list ];
+       `Object [ "value", list ])
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -1450,6 +1518,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
               agent
               ~exec_id
               { Tool_result.text; is_error; images })))
+  | "get_prefs" | "set_prefs" | "push_pref" ->
+    Some (prefs t client ~meth ~params)
   | "btw" -> Some (btw t client params)
   | "btw_cancel" ->
     Some

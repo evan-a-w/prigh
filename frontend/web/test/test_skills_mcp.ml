@@ -46,7 +46,8 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/skills))
+    (Rpc (method_ push_pref) (params ((key history) (value /skills) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
@@ -93,7 +94,8 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   draft h;
   [%expect
     {|
-    (Save_history ("/skills front" /skills))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/skills front") (max 500))) (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
@@ -117,7 +119,8 @@ let%expect_test "/skills with none, and when listing fails" =
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
     {|
-    (Save_history (/skills))
+    (Rpc (method_ push_pref) (params ((key history) (value /skills) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
@@ -125,7 +128,8 @@ let%expect_test "/skills with none, and when listing fails" =
                          \n/work") (purpose (Picker "")))))
     (Expire_toast (id 0) (after_ms 6000))
     (Focus editor)
-    (Save_history (/skill: /skills))
+    (Rpc (method_ push_pref) (params ((key history) (value /skill:) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
@@ -189,7 +193,9 @@ let%expect_test "/skill: completes skill names, fetched once" =
   [%expect
     {|
     Send
-    (Save_history ("/skill:release 2.0 to npm"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/skill:release 2.0 to npm") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "/skill:release 2.0 to npm")))
      (tag (Sent (text "/skill:release 2.0 to npm") (images ()))))
@@ -217,7 +223,10 @@ let%expect_test "/skill:name while running steers; an unknown skill fails back" 
      (tag (Skills (place  "s1\
                          \nbackend\
                          \n/work") (purpose Complete))))
-    (Save_history ("/skill:frontend-design the pricing page"))
+    (Rpc (method_ push_pref)
+     (params
+      ((key history) (value "/skill:frontend-design the pricing page") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ steer)
      (params ((text "/skill:frontend-design the pricing page")))
@@ -234,9 +243,9 @@ let%expect_test "/skill:name while running steers; an unknown skill fails back" 
   H.text h ~selector:".toasts .error";
   [%expect
     {|
-    (Save_history
-     ("/skill:fronted the pricing page"
-      "/skill:frontend-design the pricing page"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/skill:fronted the pricing page") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "/skill:fronted the pricing page")))
      (tag (Sent (text "/skill:fronted the pricing page") (images ()))))
@@ -448,7 +457,13 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
   [%expect
     {|
     Scroll_to_bottom
+    (Cache_prefs (((key web.verbosity) (value (verbose)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity verbose)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 3740))
+    (Cache_prefs (((key web.verbosity) (value (quiet)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
+     (tag Show_error))
     (Expire_toast (id 1) (after_ms 4660))
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -497,7 +512,8 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
   draft h;
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
@@ -538,7 +554,8 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/mcp))
+    (Rpc (method_ push_pref) (params ((key history) (value /mcp) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
@@ -614,7 +631,8 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
   H.key h "Enter" ~target:Field;
   [%expect
     {|
-    (Save_history (/mcp))
+    (Rpc (method_ push_pref) (params ((key history) (value /mcp) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
@@ -631,7 +649,8 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
   [%expect
     {|
-    (Save_history (/hotkeys /mcp))
+    (Rpc (method_ push_pref) (params ((key history) (value /hotkeys) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     Restarting the failed MCP servers…
     web failed: spawn uvx: not found. Fix it in /home/u/.prigh/mcp.json, then /mcp reconnect. (Dismiss)
@@ -646,7 +665,8 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
   [%expect
     {|
     (Focus editor)
-    (Save_history (/mcp /hotkeys /mcp))
+    (Rpc (method_ push_pref) (params ((key history) (value /mcp) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
@@ -666,7 +686,8 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
   H.text h ~selector:".toasts";
   [%expect
     {|
-    (Save_history ("/mcp reconnect"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mcp reconnect") (max 500))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 2940))
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag (Mcp Reconnect)))
     Restarting the failed MCP servers…
@@ -711,7 +732,8 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Save_history (/mcp))
+    (Rpc (method_ push_pref) (params ((key history) (value /mcp) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
@@ -746,9 +768,11 @@ let%expect_test "/help /skill: and /help mcp" =
   toasts h;
   [%expect
     {|
-    (Save_history ("/help skill:"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help skill:") (max 500))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 4820))
-    (Save_history ("/help mcp" "/help skill:"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/help mcp") (max 500))) (tag Ignore))
     (Expire_toast (id 1) (after_ms 4980))
     /skill:<name> [args]: send a skill's instructions to the agent, with your arguments
     /mcp [reconnect]: MCP servers: their tools, approve a project's, or restart failed ones
