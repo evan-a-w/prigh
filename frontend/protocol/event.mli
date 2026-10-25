@@ -70,6 +70,8 @@ type t =
       ; task : string
       ; model : string
       ; tools : string list
+      ; worktree : Agent_worktree.t option
+        (** a worktree made for it, which it works in *)
       }
   | Subagent of
       { call_id : string

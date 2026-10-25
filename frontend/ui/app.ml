@@ -2433,16 +2433,20 @@ let worktree_command m rest =
   let command = String.strip ("/worktree " ^ rest) in
   match Worktree_command.parse rest with
   | Error text -> error (restore_command m command) text, []
-  | List -> m, [ call List_worktrees ~tag:Worktrees_picker ]
+  | List -> m, [ call (List_worktrees { cwd = None }) ~tag:Worktrees_picker ]
   | New { branch; base } ->
     ( notice m (sprintf "creating a worktree for %s…" branch)
     , [ call
-          (Create_worktree { branch; base })
+          (Create_worktree { branch; base; cwd = None })
           ~tag:
             (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
       ] )
   | (Open _ | Remove _) as action ->
-    m, [ call List_worktrees ~tag:(Worktree_target { command; action }) ]
+    ( m
+    , [ call
+          (List_worktrees { cwd = None })
+          ~tag:(Worktree_target { command; action })
+      ] )
 ;;
 
 let worktree_target m ~command (action : Worktree_command.Action.t) listing =
@@ -3095,7 +3099,10 @@ let fetch_autocomplete m ac =
      | None -> { m with autocomplete = Some ac }, []
      | Some worktrees ->
        ( { m with autocomplete = Some ac; worktrees }
-       , [ call List_worktrees ~tag:(Worktrees_for_autocomplete key) ] ))
+       , [ call
+             (List_worktrees { cwd = None })
+             ~tag:(Worktrees_for_autocomplete key)
+         ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some (Commands.Argument.Sessions | Session_list) ->
@@ -4156,7 +4163,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
-            (Remove_worktree { path = worktree.path; force })
+            (Remove_worktree { path = worktree.path; force; cwd = None })
             ~tag:
               (Worktree_removed
                  { target = Worktree_command.target worktree; force })

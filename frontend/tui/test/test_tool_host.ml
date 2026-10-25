@@ -410,9 +410,9 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
   print_endline (hex_masked (Option.value_exn !host_id));
   [%expect
     {|
-    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}}
+    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}}
     true
-    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"],"session":"s1"}}
+    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"],"session":"s1"}}
     true
     host-xxxxxxxxxxxxxxxx
     |}];

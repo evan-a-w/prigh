@@ -167,11 +167,36 @@ let session_json
       ?(clients = 0)
       ?(archived = false)
       ?(bytes = 0)
+      ?repo
+      ?(agent_worktrees = [])
       id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
+  let repo =
+    match repo with
+    | None -> ""
+    | Some (root, worktree, branch) ->
+      sprintf
+        {|"repo":{"root":%S,"worktree":%S,"branch":%s,"main":%b},|}
+        root
+        worktree
+        (opt branch)
+        (String.equal root worktree)
+  in
+  let agent_worktrees =
+    String.concat
+      ~sep:","
+      (List.map agent_worktrees ~f:(fun (agent, task, path, branch, root) ->
+         sprintf
+           {|{"agent":%S,"task":%S,"path":%S,"branch":%S,"root":%S}|}
+           agent
+           task
+           path
+           branch
+           root))
+  in
   sprintf
-    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
+    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s"agent_worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
     id
     id
     (opt name)
@@ -180,6 +205,8 @@ let session_json
     updated_at
     (opt first_prompt)
     messages
+    repo
+    agent_worktrees
     live
     running
     background
