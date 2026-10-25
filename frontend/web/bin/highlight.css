@@ -1,14 +1,6 @@
 /* Syntax highlighting (lib/highlight.ml): quiet. Keywords recede in muted
-   (weight carries them), strings are sage, comments step back, types and
-   numbers take a little of the sodium; plain code stays chalk. */
-
-:root {
-  --hl-keyword: var(--muted);
-  --hl-type: color-mix(in srgb, var(--sodium) 25%, var(--chalk));
-  --hl-string: var(--sage);
-  --hl-number: color-mix(in srgb, var(--sodium) 60%, var(--chalk));
-  --hl-comment: color-mix(in srgb, var(--faint) 50%, var(--muted));
-}
+   (weight carries them), comments step back; the tokens' colours are
+   theme.css's ([--hl-*]). */
 
 .hl-kw { color: var(--hl-keyword); font-weight: 600; }
 .hl-ty, .hl-tag { color: var(--hl-type); }

@@ -13,6 +13,8 @@ module Argument : sig
     | Directory
     | Backend_directory (** directories on the backend's host *)
     | Verbosity
+    | Theme (** [original], [dark] or [light] *)
+    | Accent (** the presets' names, or a colour *)
     | Confirm
     | Mode
     | Plan

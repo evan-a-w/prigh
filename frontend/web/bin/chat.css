@@ -4,10 +4,6 @@
 
 :root {
   --code-bg: var(--well);
-  --add-bg: #8cc7a11a;
-  --add-fg: #a9d9b9;
-  --del-bg: #e8806f1a;
-  --del-fg: #f2a497;
   --err-bg: var(--brick-wash);
   --err-border: var(--brick-line);
   /* The spine sits at the left edge of the log; the agent's work is set
@@ -804,7 +800,7 @@ details.image > summary:focus-visible { outline: 2px solid var(--sodium); outlin
   object-fit: contain;
   border-radius: var(--r-control);
   border: 1px solid var(--rule);
-  background: repeating-conic-gradient(#ffffff0a 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  background: repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
 }
 .thumb:hover { border-color: var(--rule-2); }
 .lightbox { display: none; }
@@ -815,7 +811,7 @@ details.image[open] .lightbox {
   inset: 0;
   z-index: 30;
   padding: 24px;
-  background: #000000e0;
+  background: var(--lightbox);
   cursor: zoom-out;
   animation: fade 0.15s;
 }

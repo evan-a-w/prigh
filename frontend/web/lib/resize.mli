@@ -2,10 +2,11 @@ open! Core
 
 (** The sizes of the page's panels, which the user drags (or moves with the
     keyboard) from a handle on their inner edge: each one's preference, kept
-    in the browser, and the size it gets in the window it is in. Side panels
-    docked beside the chat share the window's width so that the chat keeps
-    [chat_min] pixels: when the window shrinks, they shrink (towards their
-    minimums) in proportion, and grow back to their preferences with it. *)
+    with the user's preferences, and the size it gets in the window it is in.
+    Side panels docked beside the chat share the window's width so that the
+    chat keeps [chat_min] pixels: when the window shrinks, they shrink
+    (towards their minimums) in proportion, and grow back to their
+    preferences with it. *)
 
 module Handle : sig
   type t =
@@ -21,8 +22,9 @@ module Handle : sig
 
   val of_name : string -> t option
 
-  (** Where the preference is kept ([prigh-web.sidebar-width]...). *)
-  val storage_key : t -> string
+  (** The user's preference's key ([web.sidebar-width]...), see
+      {!Pref_sync}. *)
+  val pref_key : t -> string
 
   (** The CSS variable ([--sidebar-width]...). *)
   val var : t -> string
@@ -101,12 +103,13 @@ module Action : sig
     | Largest of Handle.t
     | Reset of Handle.t (** back to the default *)
     | Viewport of Viewport.t (** the window resized *)
-    | Restore of (Handle.t * int) list (** the preferences kept *)
+    | Restore of (Handle.t * int option) list
+    (** the preferences kept ([None]: none, the default) *)
   [@@deriving sexp_of]
 end
 
 module Save : sig
-  (** A preference to keep in the browser ([None]: forget it). *)
+  (** A preference to keep ([None]: forget it), by its [Handle.pref_key]. *)
   type t =
     { key : string
     ; value : int option

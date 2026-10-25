@@ -113,6 +113,14 @@ let argument_items
              | None -> sprintf "%s via %s" c.method_ c.source)
           ~search:(s.name ^ " " ^ s.provider)
           s.name))
+  | Theme ->
+    simple
+      (List.map Theme.Name.all ~f:(fun n ->
+         Theme.Name.to_string n, Theme.Name.describe n))
+  | Accent ->
+    simple
+      (List.map Theme.Accent.Preset.all ~f:(fun p ->
+         Theme.Accent.Preset.to_string p, ""))
   | Verbosity ->
     simple
       [ "quiet", "hide tool output and thinking"

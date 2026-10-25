@@ -229,21 +229,7 @@ let viewport () =
        })
 ;;
 
-let save ({ key; value } : Resize.Save.t) =
-  match value with
-  | Some v -> Browser.set_item key (Int.to_string v)
-  | None -> Browser.remove_item key
-;;
-
 let install ~schedule =
   schedule (viewport ());
-  schedule
-    (Action.Resize
-       (Restore
-          (List.filter_map Resize.Handle.all ~f:(fun h ->
-             Option.bind
-               (Browser.get_item (Resize.Handle.storage_key h))
-               ~f:Int.of_string_opt
-             |> Option.map ~f:(fun v -> h, v)))));
   install_drag ~schedule
 ;;
