@@ -51,19 +51,7 @@ let agent_marker text ~active =
 let agents_part (m : App.Model.t) : Content.Line.t option =
   let background = (not (App.Model.running m)) && App.Model.agents_running m in
   if List.is_empty m.agents
-  then (
-    (* Running agents whose events this client missed (e.g. it reconnected). *)
-    let running =
-      Option.value_map m.state ~default:0 ~f:(fun s ->
-        List.count s.subagents ~f:(fun a -> a.running))
-    in
-    if running = 0
-    then None
-    else
-      Some
-        [ span ~style:(Style.bold Style.plain) "agents:"
-        ; span (sprintf "%d running" running)
-        ])
+  then None
   else (
     let main =
       agent_marker
@@ -1370,20 +1358,6 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
         ~state
         ~meta)
   in
-  (* Running subagents whose events this client missed (it reconnected). *)
-  let missed =
-    Option.value_map m.state ~default:[] ~f:(fun s ->
-      List.filter s.subagents ~f:(fun (a : P.State.Subagent.t) ->
-        not (List.exists m.agents ~f:(fun v -> String.equal v.id a.id))))
-    |> List.concat_map ~f:(fun (a : P.State.Subagent.t) ->
-      sidebar_entry
-        ~width
-        ~focused:false
-        ~dot:(if a.running then running_dot else dot gray)
-        ~name:(first_line a.task)
-        ~state:(if a.running then "running" else "done")
-        ~meta:a.id)
-  in
   let jobs =
     Option.value_map m.state ~default:[] ~f:(fun s -> s.jobs)
     |> List.concat_map ~f:(fun (j : P.State.Job.t) ->
@@ -1399,7 +1373,6 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
   let body =
     (heading "Agents" :: main)
     @ agents
-    @ missed
     @ if List.is_empty jobs then [] else [] :: heading "Jobs" :: jobs
   in
   let footer =

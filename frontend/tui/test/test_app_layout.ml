@@ -483,9 +483,10 @@ let%expect_test "status line: whole segments give way, the model never" =
     printf "%3d |%s|\n" width (Content.Line.to_plain (Render.status h.model)));
   [%expect
     {|
-    160 |/work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
-    120 |deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
-    100 |deepseek-flash  ctx:0.1%/1.0M  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
+    (Rpc (method_ get_subagent) (params ((id a1))) (tag Subagent_loaded))
+    160 |/work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋  jobs:1  ⠋ working · Esc aborts · Enter steers|
+    120 |deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:[main] 1⠋  jobs:1  ⠋ working · Esc aborts · Enter steers|
+    100 |deepseek-flash  ctx:0.1%/1.0M  agents:[main] 1⠋  jobs:1  ⠋ working · Esc aborts · Enter steers|
      80 |deepseek-flash  ctx:0.1%/1.0M  jobs:1  ⠋ working · Esc aborts · Enter steers|
      60 |deepseek-flash  $0.01  ⠋ working · Esc aborts · Enter steers|
      40 |deepseek-flash  ctx:0.1%/1.0M  jobs:1|
