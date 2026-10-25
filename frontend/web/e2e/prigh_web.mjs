@@ -1049,7 +1049,8 @@ try {
   console.log(clean(await page.locator(".files-crumb.current").innerText()));
   await showFiles("files: listed");
   await row("notes.txt").click();
-  await page.locator(".files-code").waitFor();
+  // In a git repository a text file previews as its changes.
+  await page.locator(".files-preview .review-code").waitFor();
   section("files: a text preview");
   console.log(clean(await page.locator(".files-preview").innerText()));
   await screenshot("files: a text preview");
@@ -1168,7 +1169,7 @@ try {
   await page.waitForTimeout(400); // the sheet's slide
   await showFiles("files on a phone");
   await row("todo.md").click();
-  await page.locator(".files-code").waitFor();
+  await page.locator(".files-preview .review-code").waitFor();
   await page.waitForTimeout(200);
   await screenshot("files: a preview on a phone");
   await page.locator(".files-close").click();
@@ -1207,10 +1208,10 @@ try {
   await page.locator(".files-panel").waitFor();
   await page.locator(".files-tool[title='Refresh']").click();
   await row("sample.py").click();
-  await page.locator(".files-code .hl-kw").first().waitFor();
+  await page.locator(".files-preview .review-code .hl-kw").first().waitFor();
   await page.waitForTimeout(200);
   section("resize: a highlighted preview");
-  console.log(await tokens(".files-code"));
+  console.log(await tokens(".files-preview .review-code"));
   await screenshot("resize: a highlighted preview");
   section("resize: the file browser's edge");
   console.log(`handles: ${await page.evaluate(() => [...document.querySelectorAll(".resizer")].map(h => `${h.dataset.resize} ${h.getAttribute("aria-valuenow")}`).join(", "))}`);

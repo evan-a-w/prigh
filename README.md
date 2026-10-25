@@ -445,6 +445,13 @@ replaces a file; New folder makes one. Every error says what to do next,
 dialogs own the keyboard (Enter accepts, Esc cancels without doing
 anything), and switching session or host starts the browser afresh.
 
+In a git repository the browser marks what changed (against `HEAD`,
+untracked files too): a changed file has a dot (a sage tick once you
+approved it, sodium when it changed after that), a directory the number
+of changed files inside. A changed file previews as its diff, the hunks
+or the whole file with the changes inline, highlighted; any text file of
+the repository can be commented on.
+
 Files go into a message too: drop them on the composer, paste them, or
 pick them with its paperclip. Images (PNG, JPEG, GIF, WebP) go as images,
 as before; any other file is uploaded to `.prigh/uploads/` in the
@@ -619,6 +626,42 @@ backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
 across the reconnect: their results wait for the backend to be back.
+
+### Reviewing the changes
+
+`/review` (or Alt+R, or the Review button of the file browser and of
+`/diff`) opens the review page in the chat's place; the chat narrows to a
+column beside it and keeps working. Down its left are the changed files,
+each with its approval; the strip in its head shows them all at a glance
+(sage approved, sodium changed since approved). The current file shows
+its hunks or, with Whole file (v), all of it with the changes inline.
+`]` / `[` (or n / p, j / k) go to the next and previous file, `a`
+approves the file (again), Esc closes. It follows the agent: every edit,
+write or command of the agent or its subagents, and every run's end,
+reads the changes again; the arrow button reads them now.
+
+Click a line's number to select it, Shift+click another to select the
+lines between, then Comment (or `c`): write it and Ctrl+Enter adds it
+under the lines. Comments collect until you send them (Send, or `s`):
+the agent then gets one message with each comment's file, lines, the code
+they hold and the thread (`✎ 2 review comments` in the transcript), and
+answers each with the `reply_to_comment` tool. Its replies show threaded
+under the comment; a reply may propose a change (exact replacements, like
+`edit`'s), which Accept applies to the file where the tools run and
+Reject declines, and the agent hears of either with the next comments you
+send. Reply in a thread to go on with it, Resolve it when it is done, or
+delete it. A comment keeps its lines' text, so when the file changes
+around them it moves with them; one whose lines are gone shows above the
+file, marked so.
+
+Edit (e) switches to the file's text: edit it in place (highlighted) and
+Save (Ctrl+S) writes it on the tool host; a file that changed since you
+opened it is not overwritten (save again to overwrite it, or Reload).
+Approving keys each file by a hash of its change, so a file approved and
+then changed is no longer approved, and says so. Comments and approvals
+are kept with the session (also across rewinds, reloads and restarts).
+In the TUI, `/review` alone lists the changed files with their approvals
+and the comments with their threads.
 
 ## In Neovim
 
@@ -1219,7 +1262,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [base] [instructions]` | have the model review the uncommitted changes, or those against `base`'s merge base, for prioritised findings with file and line |
+| `/review [base] [instructions]` | alone: the review page (prigh-web) or the files' approvals and the comments (TUI), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
@@ -1270,7 +1313,7 @@ there are none.
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the
 transcript, prigh-web in a dialog); a diff over 1 MB is cut short.
-`/review` and `/init` start a run with a prompt the backend writes (the
+`/review BASE` and `/init` start a run with a prompt the backend writes (the
 review prompt includes the diff when it is small enough, else tells the
 model how to read it); like a prompt they queue while a run is going, and
 an error (nothing to review, an unknown base, not a repository) says what

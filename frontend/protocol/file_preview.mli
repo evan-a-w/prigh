@@ -7,6 +7,8 @@ module Content : sig
     | Text of
         { text : string (** at most 256 KiB, valid UTF-8 *)
         ; truncated : bool
+        ; md5 : string option
+          (** of the whole file's bytes, for [fs_write]'s [expected] *)
         }
     | Image of
         { mime : string
