@@ -169,6 +169,8 @@ let%expect_test "help lists every key and command" =
     Alt+0 close the agents panel
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
@@ -227,9 +229,10 @@ let%expect_test "help lists every key and command" =
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
-    /login [provider] log in to a model provider (or /login custom)
-    /logout [provider] remove a provider's login
-    /auth show which providers are logged in
+    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /logout [provider|HOST] remove a provider's login, or sign out of a git host (github: github.com)
+    /auth show which providers and git hosts are logged in
+    /pr [list [open|closed|all]|view N|new [title]|checkout N] the repository's pull requests: list and filter them, open one with its checks and diff, create one, or check one out in a worktree
     /setusr [user] act as another user (superusers); without a user, pick one
     /signout sign out of this account
     /retry-backend-connection reconnect to the backend now
@@ -268,6 +271,9 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     OpenAI API key
     DeepSeek API key
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
+    GitHub (github.com) not signed in
+    Forgejo (codeberg.org) not signed in
+    Forgejo: another host… a self-hosted Forgejo or Gitea: type its host
     |}];
   H.act h (Picker_query "open");
   H.key h "Enter" ~target:Field;
@@ -411,6 +417,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Save_history (/auth))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
     (Log out)
@@ -418,6 +425,15 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Log in)
     DeepSeek not logged in
     (Log in)
+    Git hosting
+    GitHub github.com
+    Not signed in.
+    (Use a token) (Connect)
+    Forgejo codeberg.org
+    Not signed in.
+    (Use a token) (Connect)
+    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    (Add host…)
     |}];
   H.act h (Logout "anthropic");
   [%expect
@@ -459,10 +475,10 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Save_history (/logout /auth))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
-    (Expire_toast (id 1) (after_ms 3420))
+    (Expire_toast (id 1) (after_ms 3900))
     (Focus editor)
     Logged out of anthropic
-    No provider is logged in: /login logs in to one.
+    No provider or git host is logged in: /login logs in to one.
     |}]
 ;;
 
@@ -525,6 +541,7 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
      (tag (Resync (session s1) (from ()))))

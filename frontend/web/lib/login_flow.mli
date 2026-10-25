@@ -20,10 +20,17 @@ type t =
   ; input : string (** the answer being typed; a [Text] prompt's default *)
   ; selected : int (** the highlighted option of a [Select] prompt *)
   ; failed : string option
+  ; forge : string option
+    (** a git host's sign-in ([provider] is the host): the [/login]
+        arguments that try again *)
   }
 [@@deriving sexp_of, equal]
 
-val start : ?purpose:Purpose.t -> string -> t
+val start : ?purpose:Purpose.t -> ?forge:string -> string -> t
+
+(** A device code in the instructions ([Enter the code ABCD-1234 at ...]),
+    to show big and copy. *)
+val device_code : t -> string option
 
 (** [Done] and [Logged_out] are for the caller: they leave [t] unchanged. *)
 val apply : t -> Auth_event.t -> t

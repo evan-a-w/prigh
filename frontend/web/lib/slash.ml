@@ -24,6 +24,7 @@ module Argument = struct
     | Resume
     | Snippet
     | Remind
+    | Pr
   [@@deriving sexp_of, equal]
 end
 
@@ -237,11 +238,23 @@ let all =
       "background jobs in the agents panel: list them, show or kill one"
   ; c
       ~argument:Login
-      ~args:"[provider]"
+      ~args:"[provider|github [HOST]|forgejo HOST|HOST] [token]"
       "login"
-      "log in to a model provider (or /login custom)"
-  ; c ~argument:Logout ~args:"[provider]" "logout" "remove a provider's login"
-  ; c "auth" "show which providers are logged in"
+      "log in to a model provider (or /login custom), or sign in to GitHub or \
+       a Forgejo or Gitea host (token: paste one instead of OAuth)"
+  ; c
+      ~argument:Logout
+      ~args:"[provider|HOST]"
+      "logout"
+      "remove a provider's login, or sign out of a git host (github: \
+       github.com)"
+  ; c "auth" "show which providers and git hosts are logged in"
+  ; c
+      ~argument:Pr
+      ~args:"[list [open|closed|all]|view N|new [title]|checkout N]"
+      "pr"
+      "the repository's pull requests: list and filter them, open one with its \
+       checks and diff, create one, or check one out in a worktree"
   ; c
       ~argument:User
       ~args:"[user]"

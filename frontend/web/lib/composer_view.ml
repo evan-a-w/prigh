@@ -31,6 +31,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Remind -> "Reminders"
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
+      | Argument Pr -> "Pull requests"
     in
     div
       ~cls:"popup"

@@ -31,6 +31,10 @@ let file ~fold (f : Diff_files.File.t) =
     ]
 ;;
 
+let files ~fold ~scope (d : Git_diff.t) =
+  List.map (Diff_files.parse d.diff) ~f:(file ~fold:(Fold.scoped fold scope))
+;;
+
 let view ~fold (d : Git_diff.t) ~inject =
   let files = Diff_files.parse d.diff in
   Modal.view

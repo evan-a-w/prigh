@@ -436,5 +436,16 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
-  | Picker _ | Help | Settings | Rename _ | Delete _ | Login _ | Auth _ -> None
+  | Picker _
+  | Help
+  | Settings
+  | Rename _
+  | Delete _
+  | Login _
+  | Auth _
+  | Forge_host _
+  | Pulls _
+  | Pull _
+  | Pr_create _
+  | Pr_checked_out _ -> None
 ;;
