@@ -49,7 +49,7 @@ let apply t (event : Auth_event.t) =
      | _ -> t)
   | Progress message -> { t with progress = t.progress @ [ message ] }
   | Failed { error; _ } -> { t with failed = Some error; prompt = None }
-  | Done _ | Logged_out _ -> t
+  | Done _ | Logged_out _ | Forge_done _ | Forge_logged_out _ -> t
 ;;
 
 let options t =
