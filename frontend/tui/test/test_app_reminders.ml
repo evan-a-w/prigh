@@ -39,8 +39,8 @@ let%expect_test "the status line counts the reminders" =
   status h;
   [%expect
     {|
-    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}]
 ;;
 
@@ -99,20 +99,20 @@ let%expect_test "/remind stop and /remind every add one, acknowledged by name" =
         (command "/remind every 20 Check the disk space.")
         (hint    "")
         (then_   Reminder_added))))
-    prigh  new session                                                         /work
 
 
 
 
 
 
-    ╭─ Notice ─────────────────────────────────────────────────────────────────────╮
+
+    ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
     │ reminder r5 added (when the agent ends its turn, up to 5 in a row): Keep     │
     │ going. · /remind rm r5 removes it                                            │
-    ╰────────────────────────────────────────────────────────────── Esc dismisses ─╯
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}]
 ;;
 
@@ -157,7 +157,6 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
     /remind rm r2
     /remind rm zz
     /remind off now
-    prigh  new session                                                         /work
 
 
 
@@ -181,12 +180,13 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
+    ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     (Rpc
       (method_ add_reminder)
       (params (
@@ -197,7 +197,6 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
         (command "/remind every 2 x")
         (hint    "")
         (then_   Reminder_added))))
-    prigh  new session                                                         /work
 
 
 
@@ -221,12 +220,13 @@ let%expect_test "/remind's mistakes say what to type, the command kept to fix" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up ─────────── the session is gone ──
+    ──────────────────────────────────────────────────────── the session is gone ───
     > /remind every 2 x▏
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}]
 ;;
 
@@ -273,20 +273,20 @@ let%expect_test "/remind rm and /remind off, with none, and before the state" =
         (command "/remind off")
         (hint    "")
         (then_ (Notice_on_success "all 2 reminders removed")))))
-    prigh  new session                                                         /work
 
 
 
 
 
 
-    ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ no reminder "r1"; no reminders yet: /remind stop TEXT or /remind every N     │
     │ TEXT adds one                                                                │
-    ╰────────────────────────────────────────────────────────────── Esc dismisses ─╯
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
     > /remind rm r1▏
-    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   let h = H.create () in
   H.step ~quiet:true h Start;
@@ -296,16 +296,7 @@ let%expect_test "/remind rm and /remind off, with none, and before the state" =
   H.show h;
   [%expect
     {|
-    prigh  connecting…
-
-
-
-
-
-
-
-
-    ─── the session has not loaded yet; try again in a moment ──
+    ── the session has not loaded yet; try again in a moment ───
     > /remind rm r1▏
     connecting…
     |}]
@@ -317,58 +308,37 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
   H.show h;
   [%expect
     {|
-    prigh  new session                                                         /work
-
-
-
-
-
-    ╭─ Reminders (2) ──────────────────────────────────────────────────────────────╮
-    │ / ▏                                                                          │
-    │ ▸  r1  on stop 1/3 · Don't stop until the tests pass.                        │
-    │    r3  every 20 turns · Check the disk space.                                │
-    ╰──────────────────────────────────────────────────────────────────────────────╯
-    ── Enter shows it · Esc closes · Ctrl+D removes ────────────────────────────────
+    Reminders  (2)
+    / ▏
+    ▸  r1  on stop 1/3 · Don't stop until the tests pass.
+       r3  every 20 turns · Check the disk space.
+    ────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
     |}];
   H.keys h "disk";
   H.show h;
   [%expect
     {|
-    prigh  new session                                                         /work
-
-
-
-
-
-
-    ╭─ Reminders (1) ──────────────────────────────────────────────────────────────╮
-    │ / disk▏                                                                      │
-    │ ▸  r3  every 20 turns · Check the disk space.                                │
-    ╰──────────────────────────────────────────────────────────────────────────────╯
-    ── Enter shows it · Esc closes · Ctrl+D removes ────────────────────────────────
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Reminders  (1)
+    / disk▏
+    ▸  r3  every 20 turns · Check the disk space.
+    ────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ctx:0.1%/1.0M  Enter shows it · Esc closes · Ctrl+D removes
     |}];
   H.enter h;
   H.show h;
   [%expect
     {|
-    prigh  new session                                                         /work
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ─────── r3 (every 20 turns): Check the disk space. · /remind rm r3 removes it ──
+    ────── r3 (every 20 turns): Check the disk space. · /remind rm r3 removes it ───
     > ▏
-    deepseek-flash  think:off  mode:auto  remind:2        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  remind:2
     |}];
   run h "/remind";
   H.key h (Key.ctrl 'd');
@@ -450,8 +420,7 @@ let%expect_test
     {|
     picker
     editing
-    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    prigh  new session                                                         /work
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
 
 
 
@@ -462,8 +431,9 @@ let%expect_test
 
 
 
-    ──────── no reminders yet: /remind stop TEXT or /remind every N TEXT adds one ──
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ─────── no reminders yet: /remind stop TEXT or /remind every N TEXT adds one ───
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

@@ -22,10 +22,10 @@ let render ?(border = Style.fg Gray) ?footer ~title ~width (body : Content.t)
   let title = Text_width.truncate title ~width:(Int.max 1 (width - 6)) in
   let title_w = Text_width.string title in
   let top : Content.Line.t =
-    [ span ~style:border "╭─ "
+    [ span ~style:border "┌─ "
     ; span ~style:(Style.bold Style.plain) title
     ; span ~style:border (" " ^ rule (width - 5 - title_w))
-    ; span ~style:border "╮"
+    ; span ~style:border "┐"
     ]
   in
   let rows =
@@ -39,11 +39,11 @@ let render ?(border = Style.fg Gray) ?footer ~title ~width (body : Content.t)
     match footer with
     | Some footer when Text_width.string footer + 6 <= width ->
       let footer_w = Text_width.string footer in
-      [ span ~style:border ("╰" ^ rule (width - 5 - footer_w) ^ " ")
+      [ span ~style:border ("└" ^ rule (width - 5 - footer_w) ^ " ")
       ; span ~style:(Style.dim Style.plain) footer
-      ; span ~style:border " ─╯"
+      ; span ~style:border " ─┘"
       ]
-    | _ -> [ span ~style:border ("╰" ^ rule (width - 2) ^ "╯") ]
+    | _ -> [ span ~style:border ("└" ^ rule (width - 2) ^ "┘") ]
   in
   (top :: rows) @ [ bottom ]
 ;;

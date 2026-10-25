@@ -1,17 +1,15 @@
 open! Core
 
-(** The fixed zones of the screen, top to bottom: the header bar, the main
-    area (the optional agent sidebar beside the transcript, overlays drawn
-    over the transcript's bottom rows), the composer's rule, the editor and
-    the status bar. Only the editor's height moves the others. Pure. *)
+(** The fixed zones of the screen, top to bottom: the main area (the
+    optional agent sidebar beside the transcript, overlays drawn over the
+    transcript's bottom rows), the composer's rule, the editor and the status
+    line. Only the editor's height moves the others. Pure. *)
 
 type t =
   { width : int
   ; height : int
-  ; header : bool (** a header row on top (not on tiny screens) *)
   ; sidebar : int
     (** columns of the sidebar, its border included; 0 if hidden *)
-  ; main_top : int
   ; main_rows : int
   ; main_width : int (** the transcript's columns *)
   ; rule_row : int

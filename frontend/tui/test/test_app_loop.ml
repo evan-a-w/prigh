@@ -66,12 +66,12 @@ let%expect_test
   status h;
   [%expect
     {|
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    deepseek-flash  think:off  mode:auto  view:normal                   ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01/$5.00
-    deepseek-flash  think:off  mode:auto  view:normal                   ctx ▱▱▱▱▱ 0.1%/1.0M  $4.20/$5.00
-    deepseek-flash  think:off  mode:auto  view:normal  goal:3/20        ctx ▱▱▱▱▱ 0.1%/1.0M  $5.01/$5.00
-    deepseek-flash  think:off  mode:auto  goal:done  resumes 14:05            ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    deepseek-flash  think:off  mode:auto  goal:done  resumes 16:05            ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $4.20/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $5.01/$5.00  goal:3/20
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  goal:done  resumes 14:05
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  goal:done  resumes 16:05
     |}]
 ;;
 
@@ -102,16 +102,16 @@ let%expect_test
       (method_ set_budget)
       (params ((usd null)))
       (tag (Notice_on_success "budget removed")))
-    prigh  new session                                                                             /work
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help ────────── budget $5.00, $0.01 spent: /budget DOLLARS changes it, /budget off removes it ──
+    ────────────────── budget $5.00, $0.01 spent: /budget DOLLARS changes it, /budget off removes it ───
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal                   ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
     |}]
 ;;
 
@@ -153,16 +153,16 @@ let%expect_test "/goal sets, shows, clears and resumes the goal" =
       (method_ resume_goal)
       (params ())
       (tag (Notice_on_success "goal resumed")))
-    prigh  new session                                                                             /work
 
-                                                      ╭─ Notice ───────────────────────────────────────╮
-                                                      │ goal: all tests pass — stopped (it used all 20 │
-                                                      │ automatic continuations); /goal resume         │
-    ▌ earlier question                                │ continues it, /goal off clears it              │
-      earlier answer                                  ╰──────────────────────────────── Esc dismisses ─╯
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
+
+
+    ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
+    │ goal: all tests pass — stopped (it used all 20 automatic continuations); /goal resume continues  │
+    │ it, /goal off clears it                                                                          │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal  goal:stopped           ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  goal:stopped
     |}]
 ;;
 
@@ -189,16 +189,16 @@ let%expect_test "a refused /goal goes back into the editor" =
         (command "/goal ship it")
         (hint    "")
         (then_ (Notice_on_success "goal set: the agent works until it is met")))))
-    prigh  new session                                                                             /work
 
-                                                      ╭─ Error ────────────────────────────────────────╮
-                                                      │ the session's budget of $1.00 is spent ($1.20  │
-                                                      │ so far): /budget 3 raises it, /budget off      │
-    ▌ earlier question                                │ removes it                                     │
-      earlier answer                                  ╰──────────────────────────────── Esc dismisses ─╯
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
+
+
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ the session's budget of $1.00 is spent ($1.20 so far): /budget 3 raises it, /budget off removes  │
+    │ it                                                                                               │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal ship it▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -221,16 +221,16 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
       (method_ cancel_resume)
       (params ())
       (tag (Notice_on_success "automatic resume cancelled")))
-    prigh  new session                                                                             /work
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ── usage: /resume [now|cancel] ──
+    ──────────────────────────────────────────────────────────────────── usage: /resume [now|cancel] ───
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal  resumes 14:05          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  resumes 14:05
     |}]
 ;;
 
@@ -248,55 +248,52 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
   complete "/budget o";
   [%expect
     {|
-    prigh  new session                                                                             /work
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-    ╭─ /goal ──────────────────────────────────────────────────────────────────────────────────────────╮
-    │ ▸ off     clear the goal                                                                         │
-    │   resume  make a stopped goal active again                                                       │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab accepts · Enter as typed · Esc hides ────────────────────────────────────────────────────────
+    ▸ off     clear the goal
+      resume  make a stopped goal active again
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal ▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    prigh  new session                                                                             /work
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
 
-    ╭─ /goal ──────────────────────────────────────────────────────────────────────────────────────────╮
-    │ ▸ resume  make a stopped goal active again                                                       │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab/Enter accept · Alt+S as typed ───────────────────────────────────────────────────────────────
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+    ▸ resume  make a stopped goal active again
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal re▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    prigh  new session                                                                             /work
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal refactor▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    prigh  new session                                                                             /work
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
 
 
-    ╭─ /resume ────────────────────────────────────────────────────────────────────────────────────────╮
-    │ ▸ now     retry the run at once                                                                  │
-    │   cancel  stay stopped until you send a message                                                  │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab accepts · Enter as typed · Esc hides ────────────────────────────────────────────────────────
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▸ now     retry the run at once
+      cancel  stay stopped until you send a message
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /resume ▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    prigh  new session                                                                             /work
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
 
-    ╭─ /budget ────────────────────────────────────────────────────────────────────────────────────────╮
-    │ ▸ off  no budget: turns start whatever the session has cost                                      │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab/Enter accept · Alt+S as typed ───────────────────────────────────────────────────────────────
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+    ▸ off  no budget: turns start whatever the session has cost
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /budget o▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;

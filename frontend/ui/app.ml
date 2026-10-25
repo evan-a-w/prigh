@@ -475,6 +475,19 @@ let tilde m path =
   | _ -> path
 ;;
 
+let banner m (state : P.State.t) : Content.Line.t =
+  let where =
+    match state.session_name with
+    | Some name -> sprintf "%s %S" (tilde m state.cwd) name
+    | None -> tilde m state.cwd
+  in
+  [ { text =
+        sprintf "prigh in %s · /help · Esc aborts · Ctrl+C twice quits" where
+    ; style = Style.fg Gray
+    }
+  ]
+;;
+
 let set_verbosity m verbosity =
   follow (notice { m with verbosity } (verbosity_notice verbosity))
 ;;
@@ -518,7 +531,7 @@ let init =
   ; terminal_focus = Unknown
   ; server = None
   ; notice = None
-  ; sidebar = true
+  ; sidebar = false
   }
 ;;
 
@@ -3021,9 +3034,9 @@ let interrupt m =
 
 let page_size m = Int.max 1 (m.height / 2)
 
-(* Ten rows, fewer when the transcript area is short: the box's borders and
-   the filter take three. *)
-let picker_rows m = Int.max 1 (Int.min 10 ((layout m).main_rows - 3))
+(* Ten rows, fewer when the transcript area is short: the title and the
+   filter take two. *)
+let picker_rows m = Int.max 1 (Int.min 10 ((layout m).main_rows - 2))
 let wheel_lines = 3
 
 let scroll_up m ~lines =
@@ -4469,7 +4482,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
-         { m with state = Some state }, [])
+         let m = { m with state = Some state } in
+         log_block m [ banner m state ], [])
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
          let transcript =
