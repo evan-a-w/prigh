@@ -765,7 +765,9 @@ let%expect_test "subagent: running shows its latest step" =
             </div>
             <div class="assistant msg">
               <div class="markdown">
-                <p dir="auto"> Counting. </p>
+                <div class="md-part">
+                  <p dir="auto"> Counting. </p>
+                </div>
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
@@ -806,11 +808,13 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
         <span class="preview"> src/app.ml has 5 lines. </span>
       </summary>
       <div class="markdown">
-        <p dir="auto">
-          src/app.ml has
-          <strong> 5 lines </strong>
-          .
-        </p>
+        <div class="md-part">
+          <p dir="auto">
+            src/app.ml has
+            <strong> 5 lines </strong>
+            .
+          </p>
+        </div>
       </div>
     </details>
     Transcript 3 messages Count the lines in src/app.ml and report back.
@@ -865,7 +869,9 @@ let%expect_test
             </div>
             <div class="assistant msg">
               <div class="markdown">
-                <p dir="auto"> Counting. </p>
+                <div class="md-part">
+                  <p dir="auto"> Counting. </p>
+                </div>
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
@@ -973,7 +979,9 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
             <span class="preview"> There are 5 lines. </span>
           </summary>
           <div class="markdown">
-            <p dir="auto"> There are 5 lines. </p>
+            <div class="md-part">
+              <p dir="auto"> There are 5 lines. </p>
+            </div>
           </div>
         </details>
       </div>

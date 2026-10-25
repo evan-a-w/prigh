@@ -382,13 +382,19 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
           <div class="skill-body">
             <div class="skill-location"> /work/.claude/skills/frontend-design/SKILL.md </div>
             <div class="markdown">
-              <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
-              <h1 dir="auto"> Frontend design </h1>
-              <p dir="auto">
-                Use
-                <strong> bold </strong>
-                 typography.
-              </p>
+              <div class="md-part">
+                <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
+              </div>
+              <div class="md-part">
+                <h1 dir="auto"> Frontend design </h1>
+              </div>
+              <div class="md-part">
+                <p dir="auto">
+                  Use
+                  <strong> bold </strong>
+                   typography.
+                </p>
+              </div>
             </div>
           </div>
         </details>
@@ -403,8 +409,12 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
           <div class="skill-body">
             <div class="skill-location"> /home/u/.prigh/skills/release/SKILL.md </div>
             <div class="markdown">
-              <p dir="auto"> References are relative to /home/u/.prigh/skills/release. </p>
-              <p dir="auto"> Tag it. </p>
+              <div class="md-part">
+                <p dir="auto"> References are relative to /home/u/.prigh/skills/release. </p>
+              </div>
+              <div class="md-part">
+                <p dir="auto"> Tag it. </p>
+              </div>
             </div>
           </div>
         </details>
@@ -452,13 +462,19 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
             <div class="skill-body">
               <div class="skill-location"> /work/.claude/skills/frontend-design/SKILL.md </div>
               <div class="markdown">
-                <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
-                <h1 dir="auto"> Frontend design </h1>
-                <p dir="auto">
-                  Use
-                  <strong> bold </strong>
-                   typography.
-                </p>
+                <div class="md-part">
+                  <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
+                </div>
+                <div class="md-part">
+                  <h1 dir="auto"> Frontend design </h1>
+                </div>
+                <div class="md-part">
+                  <p dir="auto">
+                    Use
+                    <strong> bold </strong>
+                     typography.
+                  </p>
+                </div>
               </div>
             </div>
           </details>

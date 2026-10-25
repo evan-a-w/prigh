@@ -1760,11 +1760,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Toggle_fold`; folded text is not rendered. Running calls show only
       their last 6 lines (`Output_view.live`, no toggle), and `Chat` keeps
       only the last 32-64 KB of streamed output with a count of its lines,
-      so a long stream costs the same per chunk. While a reply streams,
-      `Markdown_view` cuts it at `Markdown.block_starts` (top-level blocks
-      after a blank line that cannot continue a list or quote): the
-      complete parts are parsed once and reused as lazy nodes, and only the
-      last is parsed again per delta. Messages' times (`at`; the page stamps live events
+      so a long stream costs the same per chunk. `Markdown_view` cuts
+      text at `Markdown.block_starts` (top-level blocks after a blank line
+      that cannot continue a list or quote) into `.md-part`s, each parsed
+      once and reused as a lazy node: while a reply streams only the last is
+      parsed again per delta, and a reply that ends is drawn in the same
+      parts, so its DOM is patched, not drawn again (the selection and
+      everything else on it stay). Messages' times (`at`; the page stamps live events
       without one, from an older backend, with when it received them,
       `Chat.received`) show under user messages and in a reply's footer, as
       `Message_time` formats them: in the browser's time zone
@@ -1964,8 +1966,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       with a sodium dot while something is unseen.
   - `app/` (`prigh_web_app`) — the page. `Ws_transport` (a browser
     WebSocket as a `Transport.t`), `Browser` (localStorage, the query
-    string, the clipboard, the visual viewport, running after the next
-    render), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
+    string, the clipboard, the visual viewport, and `after_render`: work
+    on the patched DOM, run by an `after_display` lifecycle in the frame
+    that shows it, so that the editor's height, scrolling and focus never
+    show a frame late), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
     `Terminal_panel` (the `/terminal` URL; whether an event is inside the
     panel). `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active

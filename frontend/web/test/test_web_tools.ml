@@ -97,7 +97,9 @@ let%expect_test "web search streamed between text: running, then its results" =
     {|
     <div class="assistant msg streaming">
       <div class="markdown">
-        <p dir="auto"> Let me look that up. </p>
+        <div class="md-part">
+          <p dir="auto"> Let me look that up. </p>
+        </div>
       </div>
       <div class="running tool tool-web_search">
         <div class="tool-head">
@@ -125,7 +127,9 @@ let%expect_test "web search streamed between text: running, then its results" =
     {|
     <div class="assistant msg">
       <div class="markdown">
-        <p dir="auto"> Let me look that up. </p>
+        <div class="md-part">
+          <p dir="auto"> Let me look that up. </p>
+        </div>
       </div>
       <div class="ok tool tool-web_search">
         <div class="tool-head">
@@ -169,7 +173,9 @@ let%expect_test "web search streamed between text: running, then its results" =
         </div>
       </div>
       <div class="markdown">
-        <p dir="auto"> Eio is an effects-based IO library. </p>
+        <div class="md-part">
+          <p dir="auto"> Eio is an effects-based IO library. </p>
+        </div>
       </div>
     </div>
     |}]

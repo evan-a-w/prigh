@@ -14,34 +14,36 @@ let%expect_test "inline spans" =
   [%expect
     {|
     <div class="markdown">
-      <p dir="auto">
-        Some
-        <strong> bold </strong>
-        ,
-        <em> italic </em>
-        ,
-        <em> also </em>
-        ,
-        <strong>
-          <em> both </em>
-        </strong>
-        ,
-        <del> gone </del>
-         and
-        <code> code **not bold** </code>
-        .
-        <br/>
-        snake_case_name stays, 2 * 3 * 4 too, and *escaped*.
-        <br/>
-        <strong>
-          outer
-          <em> inner </em>
-           outer
-        </strong>
-         and line end
-        <br/>
-        next
-      </p>
+      <div class="md-part">
+        <p dir="auto">
+          Some
+          <strong> bold </strong>
+          ,
+          <em> italic </em>
+          ,
+          <em> also </em>
+          ,
+          <strong>
+            <em> both </em>
+          </strong>
+          ,
+          <del> gone </del>
+           and
+          <code> code **not bold** </code>
+          .
+          <br/>
+          snake_case_name stays, 2 * 3 * 4 too, and *escaped*.
+          <br/>
+          <strong>
+            outer
+            <em> inner </em>
+             outer
+          </strong>
+           and line end
+          <br/>
+          next
+        </p>
+      </div>
     </div>
     |}]
 ;;
@@ -54,21 +56,23 @@ let%expect_test "links: safe ones open in a new tab, others are text" =
   [%expect
     {|
     <div class="markdown">
-      <p dir="auto">
-        <a href="https://example.com/a_(b)" target="_blank" rel="noopener noreferrer"> docs </a>
+      <div class="md-part">
+        <p dir="auto">
+          <a href="https://example.com/a_(b)" target="_blank" rel="noopener noreferrer"> docs </a>
 
-        <a href="https://x.org" target="_blank" rel="noopener noreferrer"> https://x.org </a>
+          <a href="https://x.org" target="_blank" rel="noopener noreferrer"> https://x.org </a>
 
-        <a href="https://bare.example/path" target="_blank" rel="noopener noreferrer"> https://bare.example/path </a>
-        .
-        <a href="mailto:a@b.c" target="_blank" rel="noopener noreferrer"> mail </a>
+          <a href="https://bare.example/path" target="_blank" rel="noopener noreferrer"> https://bare.example/path </a>
+          .
+          <a href="mailto:a@b.c" target="_blank" rel="noopener noreferrer"> mail </a>
 
-        bad
+          bad
 
-        file
+          file
 
-        <a href="https://i/p.png" target="_blank" rel="noopener noreferrer"> shot </a>
-      </p>
+          <a href="https://i/p.png" target="_blank" rel="noopener noreferrer"> shot </a>
+        </p>
+      </div>
     </div>
     |}]
 ;;
@@ -86,22 +90,26 @@ let%expect_test "headings, rules, quotes" =
   [%expect
     {|
     <div class="markdown">
-      <h1 dir="auto"> Title </h1>
-      <h2 dir="auto"> Sub </h2>
-      <h6 dir="auto"> Six </h6>
-      <p dir="auto"> #hashtag </p>
-      <hr/>
-      <blockquote dir="auto">
-        <p dir="auto">
-          quoted
-          <em> text </em>
-          <br/>
-          lazy line
-        </p>
+      <div class="md-part">
+        <h1 dir="auto"> Title </h1>
+        <h2 dir="auto"> Sub </h2>
+        <h6 dir="auto"> Six </h6>
+        <p dir="auto"> #hashtag </p>
+      </div>
+      <div class="md-part">
+        <hr/>
         <blockquote dir="auto">
-          <p dir="auto"> nested </p>
+          <p dir="auto">
+            quoted
+            <em> text </em>
+            <br/>
+            lazy line
+          </p>
+          <blockquote dir="auto">
+            <p dir="auto"> nested </p>
+          </blockquote>
         </blockquote>
-      </blockquote>
+      </div>
     </div>
     |}]
 ;;
@@ -126,58 +134,64 @@ let%expect_test "lists: nested, ordered, tasks, loose" =
   [%expect
     {|
     <div class="markdown">
-      <ul>
-        <li dir="auto">
-          one
-          <ul>
-            <li dir="auto">
-              nested
-              <ul>
-                <li dir="auto"> deeper </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-        <li dir="auto">
-          two
-          <br/>
-          continued
-        </li>
-      </ul>
-      <ol start="3">
-        <li dir="auto"> three </li>
-        <li dir="auto">
-          four
-          <div class="code copyable">
-            <div class="code-head">
-              <span class="code-lang"> sh </span>
-              <button type="button" title="Copy" class="copy"> Copy </button>
+      <div class="md-part">
+        <ul>
+          <li dir="auto">
+            one
+            <ul>
+              <li dir="auto">
+                nested
+                <ul>
+                  <li dir="auto"> deeper </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li dir="auto">
+            two
+            <br/>
+            continued
+          </li>
+        </ul>
+        <ol start="3">
+          <li dir="auto"> three </li>
+          <li dir="auto">
+            four
+            <div class="code copyable">
+              <div class="code-head">
+                <span class="code-lang"> sh </span>
+                <button type="button" title="Copy" class="copy"> Copy </button>
+              </div>
+              <pre class="copy-text">
+                <code class="language-sh"> make </code>
+              </pre>
             </div>
-            <pre class="copy-text">
-              <code class="language-sh"> make </code>
-            </pre>
-          </div>
-        </li>
-      </ol>
-      <ul>
-        <li dir="auto" class="task">
-          <input type="checkbox" disabled=""/>
-          todo
-        </li>
-        <li dir="auto" class="task">
-          <input type="checkbox" disabled="" checked=""/>
-          done
-        </li>
-      </ul>
-      <p dir="auto"> Loose: </p>
-      <ul>
-        <li dir="auto">
-          <p dir="auto"> loose </p>
-        </li>
-        <li dir="auto">
-          <p dir="auto"> items </p>
-        </li>
-      </ul>
+          </li>
+        </ol>
+        <ul>
+          <li dir="auto" class="task">
+            <input type="checkbox" disabled=""/>
+            todo
+          </li>
+          <li dir="auto" class="task">
+            <input type="checkbox" disabled="" checked=""/>
+            done
+          </li>
+        </ul>
+      </div>
+      <div class="md-part">
+        <p dir="auto"> Loose: </p>
+      </div>
+      <div class="md-part">
+        <ul>
+          <li dir="auto">
+            <p dir="auto"> loose </p>
+          </li>
+          <li dir="auto">
+            <p dir="auto"> items </p>
+          </li>
+        </ul>
+      </div>
     </div>
     |}]
 ;;
@@ -208,32 +222,34 @@ let%expect_test "tables" =
   [%expect
     {|
     <div class="markdown">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="left"> Name </th>
-              <th class="right"> Count </th>
-              <th class="center"> Note </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="left"> a </td>
-              <td class="right"> 1 </td>
-              <td class="center">
-                <code> x \| y </code>
-              </td>
-            </tr>
-            <tr>
-              <td class="left"> b </td>
-              <td class="right"> 22 </td>
-              <td class="center"> </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="md-part">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="left"> Name </th>
+                <th class="right"> Count </th>
+                <th class="center"> Note </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="left"> a </td>
+                <td class="right"> 1 </td>
+                <td class="center">
+                  <code> x \| y </code>
+                </td>
+              </tr>
+              <tr>
+                <td class="left"> b </td>
+                <td class="right"> 22 </td>
+                <td class="center"> </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p dir="auto"> after </p>
       </div>
-      <p dir="auto"> after </p>
     </div>
     |}]
 ;;
@@ -243,30 +259,32 @@ let%expect_test "fenced code, with and without a language" =
   [%expect
     {|
     <div class="markdown">
-      <div class="code copyable">
-        <div class="code-head">
-          <span class="code-lang"> ocaml </span>
-          <button type="button" title="Copy" class="copy"> Copy </button>
-        </div>
-        <pre class="copy-text">
-          <code class="language-ocaml">
-            <span class="hl-kw"> let </span>
-             x =
-            <span class="hl-num"> 1 </span>
+      <div class="md-part">
+        <div class="code copyable">
+          <div class="code-head">
+            <span class="code-lang"> ocaml </span>
+            <button type="button" title="Copy" class="copy"> Copy </button>
+          </div>
+          <pre class="copy-text">
+            <code class="language-ocaml">
+              <span class="hl-kw"> let </span>
+               x =
+              <span class="hl-num"> 1 </span>
 
 
       indented
-          </code>
-        </pre>
-      </div>
-      <div class="code copyable">
-        <div class="code-head">
-          <span class="code-lang"> text </span>
-          <button type="button" title="Copy" class="copy"> Copy </button>
+            </code>
+          </pre>
         </div>
-        <pre class="copy-text">
-          <code> plain <b>not html</b> </code>
-        </pre>
+        <div class="code copyable">
+          <div class="code-head">
+            <span class="code-lang"> text </span>
+            <button type="button" title="Copy" class="copy"> Copy </button>
+          </div>
+          <pre class="copy-text">
+            <code> plain <b>not html</b> </code>
+          </pre>
+        </div>
       </div>
     </div>
     |}]
@@ -298,7 +316,9 @@ let%expect_test "html is text" =
   [%expect
     {|
     <div class="markdown">
-      <p dir="auto"> <script>alert(1)</script> & <b>x</b> </p>
+      <div class="md-part">
+        <p dir="auto"> <script>alert(1)</script> & <b>x</b> </p>
+      </div>
     </div>
     |}]
 ;;
@@ -407,6 +427,48 @@ let%expect_test "streaming: a part per complete block, then the rest" =
         <p dir="auto"> Para th </p>
       </div>
     </div>
+    |}]
+;;
+
+let%expect_test
+    "a streamed reply, once ended, is drawn as it was while streaming"
+  =
+  let text = "Para one.\n\n```ocaml\nlet x = 1\n```\n\nPara two." in
+  Render.html (Markdown_view.render ~streaming:true text);
+  let streaming = [%expect.output] in
+  Render.html (Markdown_view.render text);
+  let ended = [%expect.output] in
+  (* The same parts: the page patches the reply's DOM rather than drawing it
+     again (which lost the selection). *)
+  print_endline ended;
+  print_s [%message (String.equal streaming ended : bool)];
+  [%expect
+    {|
+    <div class="markdown">
+      <div class="md-part">
+        <p dir="auto"> Para one. </p>
+      </div>
+      <div class="md-part">
+        <div class="code copyable">
+          <div class="code-head">
+            <span class="code-lang"> ocaml </span>
+            <button type="button" title="Copy" class="copy"> Copy </button>
+          </div>
+          <pre class="copy-text">
+            <code class="language-ocaml">
+              <span class="hl-kw"> let </span>
+               x =
+              <span class="hl-num"> 1 </span>
+            </code>
+          </pre>
+        </div>
+      </div>
+      <div class="md-part">
+        <p dir="auto"> Para two. </p>
+      </div>
+    </div>
+
+    ("String.equal streaming ended" true)
     |}]
 ;;
 
