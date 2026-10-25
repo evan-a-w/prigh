@@ -38,6 +38,8 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
         Some (sprintf "state: running=%b messages=%d" s.running s.message_count)
       | Compacted { summary } -> Some ("compacted: " ^ summary)
       | Config_changed _ -> None
+      | Review_changed r ->
+        Some (sprintf "review: %d comments" (List.length r.comments))
       | Notice n -> Some ("notice: " ^ n)
       | Queue_update { steer; follow_up } ->
         Some
@@ -470,8 +472,8 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
     ((scoped_models (a)) (approval_mode Auto)
      (permissions ((allow ()) (ask ()) (deny ())))
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
-     (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-     (goal_max_continuations 20) (resume_on_limit_reset true)
+     (fallback_models ()) (default_cwd ()) (worktrees_dir ~/.prigh/worktrees)
+     (max_budget_usd ()) (goal_max_continuations 20) (resume_on_limit_reset true)
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
      (snippets ()) (auto_background_seconds 30))
     {
@@ -483,6 +485,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "default_thinking": "high",
       "fallback_models": [],
       "default_cwd": null,
+      "worktrees_dir": "~/.prigh/worktrees",
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,

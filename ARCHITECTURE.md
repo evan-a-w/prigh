@@ -442,10 +442,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   their configured and rewritten URLs), `log` (commits on HEAD not on the
   remote's base, and whether the remote-tracking branch has them all; no
   fetch), `push` (`git push --set-upstream REMOTE HEAD:refs/heads/BRANCH`,
-  never prompting) and `checkout` (fetches `refs/pull/N/head` into the
-  branch `pr-N` in a worktree `<main worktree>-wt/pr-N`, fast-forwarding an
-  existing one). It is the simple `git worktree add` until the worktree
-  module (#25) is there.
+  never prompting) and `checkout` (fetches `refs/pull/N/head` and checks
+  the branch `pr-N` out with `Worktree.create` at the config's
+  `worktrees_dir`, or fast-forwards the worktree that has it already).
 - `Forges` — the per-user service the RPC server holds: `accounts`
   (github.com, codeberg.org, configured and signed-in hosts), `login`,
   `logout`, `api` (refreshing an expiring token under the store lock,
@@ -582,6 +581,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   size)` and a `Title:` line; long text is cut like `bash` output with the
   full text saved (`Tool_bash.save_output`). HTTP errors keep the start of
   the body. Not destructive.
+- `Tool_review_reply` — `reply_to_comment {id, text, edits?, resolve?}`,
+  the main agent's answer to one of the user's review comments (see
+  `Review_state` in the harness): threaded under it, `edits`
+  (`{old_text, new_text}`, like `edit`'s, on the comment's file) proposing
+  a change for the user to accept, `resolve` closing the thread. Not on
+  the host; offered only while the session has comments, never to
+  subagents (`Tools.main_agent_only`).
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -951,7 +957,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
-  `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
+  `fallback_models` (model keys), `default_cwd`, `worktrees_dir` (where
+  `Worktree` puts new worktrees on the tool host; default
+  `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
   validated by `Snippet`), loaded at agent
@@ -1015,7 +1023,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
   cancelled; `resume_at`, also in `Summary`) — these three are ignored by
-  `messages` and not copied by `fork` — and `Told_environment` (what the
+  `messages` and not copied by `fork` — `Review` (a `Review_state.Change`,
+  read from every branch; a comment is worth creating the file for) and
+  `Told_environment` (what the
   model was last told about its environment, see the harness);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
@@ -1070,6 +1080,51 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
+- `Worktree` — a repository's git worktrees, as the pseudo-tools
+  `$worktree_list`, `$worktree_create` and `$worktree_remove` on the
+  active tool host (`Host_ops`), in the repository of the session cwd
+  (`Agent.worktrees`, `create_worktree`, `remove_worktree`; the functions
+  also run directly on a host, for other features that need a worktree).
+  A listing parses `git worktree list --porcelain` (the main worktree
+  first), counts each one's uncommitted files (`git status --porcelain`,
+  untracked included) and its branch's ahead/behind from one `git
+  for-each-ref`. New worktrees go to `<worktrees_dir>/<project>/<slug>`:
+  `project` is the main worktree's directory name, and the project
+  directory holds `.prigh-repo` with the repository's git common dir, so a
+  different repository with the same name takes the first of `<project>-2`,
+  `-3`, ... that is free or its own (a directory without the file is never
+  taken); `slug` is the branch with `/` and unusual characters as `-`,
+  with `-2`, ... when taken. `create` checks an existing local branch out
+  as it is, else creates the branch from the base (default `HEAD`) or,
+  without one, tracks the single remote branch of that name; it refuses a
+  branch checked out in another worktree. `remove` refuses the main
+  worktree and, without force, one with changes or locked (`--force`
+  twice for a locked one), prunes one whose directory is gone, and keeps
+  the branch. Errors say what to do, like `Git_diff`'s.
+- `Review_comment`, `Review_state` — the session's review of the working
+  tree: comments (`c1`, `c2`, ... never reused) on a line range of a file
+  (relative to the repository's `root`, as `git_diff` names it) with the
+  lines' text as `anchor` (frontends find the lines again with it when the
+  file moved), `Open | Resolved`, and a thread of posts (the user's, the
+  agent's; each `delivered` once the agent has seen it), an agent's post
+  possibly carrying a `Proposal` (`edits`, `Pending | Accepted | Rejected
+  | Failed`); and the approvals, a hash per path (the frontends' hash of
+  the file's section of the diff, so a file changed after it was approved
+  is not approved any more). It is recorded as `Review` session entries,
+  each a `Change` (a comment whole, a deletion, an approval or its
+  withdrawal), and `Session.review` folds those of every branch in file
+  order: rewinding keeps the review, `fork` copies the active path's.
+  `Agent` caches it, applies changes through `update_review` (recording
+  them, then a `Review_changed` event with the whole review) and offers
+  `reply_to_comment` while there are comments. `submit_review` turns the
+  user's undelivered posts into one message (instructions on replying,
+  then each comment with them as `<comment id file lines status>` with its
+  numbered `<code>` and `<post from new>`s; `Injected.Source.Review_comments
+  {count}`), queued as a steer (it starts a run when idle) and marks them
+  delivered; `decide_proposal` runs the proposal's `edit` on the active
+  host (`Failed` with its error when it no longer applies) and adds the
+  user's undelivered post saying what became of it, so the agent hears it
+  with the next comments.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -1218,9 +1273,29 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
   `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
-  [instructions]`) and `init`, and the file browser's `fs_list`,
+  [instructions]`) and `init`, `list_worktrees` (`{root, project_dir,
+  worktrees}`), `create_worktree {branch, base?}` (`{worktree,
+  new_branch}`) and `remove_worktree {path, force?}` (`{worktree}`, as it
+  was; refused for the worktree the client's session is in), where a
+  worktree is `Worktree.t` (`path, branch, head, main, managed, locked,
+  prunable, changes, upstream, ahead, behind`) plus `current` (the
+  session's cwd is in it) and `sessions` (`{id, path, name, live,
+  running}`: the sessions whose cwd is in it on that host, live ones where
+  they are now, saved ones by `Session.Summary`'s last cwd and host,
+  archived ones only while loaded), and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
-  `fs_upload` (`Files_rpc`, above).
+  `fs_upload` (`Files_rpc`, above), `fs_write {path, text, expected?}`
+  (the review page's editor: the `write` tool on the active host, refused
+  when the file's MD5, which `fs_preview` gives a whole text file as
+  `md5`, is no longer `expected`), and the review's (`Review_rpc`, on the
+  calling client's session): `get_review` (`{comments, approvals}`),
+  `review_comment {root, path, first, last, anchor, text}`, `review_reply
+  {id, text}`, `review_set_status {id, status}` (each answering the
+  comment), `review_delete {id}`, `review_submit` (`{count}`),
+  `review_decide {id, post, accept}`, `review_approve {path, hash}` and
+  `review_unapprove {path}` (answering the review); every change is also
+  sent to the session's clients as a `review` event with the whole
+  review.
   `get_messages_page {limit, before?, from?, session?}` (`Message_page`,
   for frontends that open a session at its end) answers `{messages,
   older, before}`: the newest `limit` messages (a page never starts with
@@ -1386,9 +1461,11 @@ terminal frontend and `web/` prigh-web, the browser one.
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
   `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
   `Mcp_server`, `Mcp_list`, `Delete_result`, the file browser's
-  `File_listing` and `File_preview`) and the `Request` encoder
-  (`Request.Method` has typed constructors for `list_skills`, `list_mcp`,
-  `mcp_approve`, `set_archived`, `delete_sessions` and `delete_archived`).
+  `File_listing` and `File_preview`, the review's `Review` and
+  `Review_comment`) and the `Request` encoder (`Request.Method` has typed
+  constructors for `list_skills`, `list_mcp`, `mcp_approve`,
+  `set_archived`, `delete_sessions`, `delete_archived`, the review's
+  methods, `fs_preview` and `fs_write`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
   tests) and `Client` (created with a `connect` thunk and
@@ -1474,7 +1551,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
     tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
     in the editor and takes it off the queue. `Autocomplete`'s `Skill`
-    source completes names from `Skill_cache`, which is keyed by session,
+    source completes names from `Location_cache` (shared with the
+    worktree listing `/worktree` completes from), which is keyed by session,
     tool host and directory (a stale key or reply fetches again or is
     dropped) and emptied on reloads, `/setusr` and reconnects.
     `Skill_message` parses the backend's expansion (`<skill name=…
@@ -1533,6 +1611,14 @@ terminal frontend and `web/` prigh-web, the browser one.
     `Note` lines (`Injected_note`'s glyph and title, e.g. `↪ Handed over
     from A to B`), the raw text only in verbose, and the user's turn with
     only what they wrote; `/fork` and `/tree` label messages the same way.
+  - `/worktree` is parsed by the shared `Worktree_command` (`frontend/ui`,
+    with the target lookup, row descriptions, confirmation text, notices
+    and argument completion prigh-web uses too): a picker over
+    `list_worktrees` (Enter sends `set_cwd`, Ctrl+N `new_session` then
+    `set_cwd`, Ctrl+D a confirmation `Mode` then `remove_worktree`), and
+    `new`/`open`/`rm` replies tagged so a refusal goes back to the editor
+    (a removal refused for uncommitted changes puts `/worktree rm -f`
+    there).
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
     shows coloured; `/review` and `/init` send `review`/`init` tagged so
@@ -1553,6 +1639,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     its error in it). `/pr checkout` confirms a `Change_dir` to the new
     worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
     form and checkout question (`reset_session`).
+    shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
+    so a refusal goes back to the editor. `/review` alone reads
+    `get_review`, then `git_diff`, and shows `File_approval.render`: each
+    changed file with its approval and its comments' threads, then the
+    comments on files no longer changed. `File_approval` (an approval
+    counts while its hash is the file's `Diff_files.File.hash`, the MD5
+    of its section of the diff) and `Comment_anchor` (a comment's lines
+    now: where its anchor text is, nearest to where it was, else
+    outdated) are shared with prigh-web.
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
@@ -2096,6 +2191,51 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Change_dir` in `Dialog.Pr_checked_out`. The top bar's branch runs
       `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
       new line, Ctrl/⌘+Enter accepts.
+      its counts, and a button to the review page).
+    - The review: `Code_review` (pure, like `Files`: the session's
+      `Review`, kept by the `review` event and read with `get_review` when
+      the session changes; the diff, read again with `git_diff` while the
+      review page or the file browser shows (on opening, on choosing a
+      file, after any `edit`/`write`/`apply_patch`/`bash` of the agent or
+      a subagent and at every run's end), one request at a time with
+      another wanted once it is in; the page's file, mode (`Comment |
+      Edit`) and layout (`Unified | Full`); a selection of lines, the
+      comment being written on them and the replies being typed; the
+      files' texts (`fs_preview`, read again when their change does, and
+      taken from the browser's preview); the editor's text with the MD5 it
+      was read with). Its `update`/`reply` return `Out.t`s that `App`
+      turns into requests (`Reply_tag.Review`), toasts and focus.
+      `Review_code_view` draws a file: the hunks, or the whole file with
+      them inline (`full_rows` fills the lines between hunks from its
+      text), highlighted, the rows and their tokens made once per file
+      version and layout and each row a `View_cache` node; new line
+      numbers select (Shift: a range), a bar under the selection offers
+      Comment, and each comment's thread (posts, an agent's proposal as a
+      diff with Accept and Reject, the reply field, Resolve and Delete)
+      sits under the line its anchor is on now, those whose lines are gone
+      or not shown above the file. `Review_page_view` is the page: in
+      `.app.reviewing` it comes before `.main`, which narrows to a column
+      (`review.css`); its head (the approvals strip, refresh, the mode and
+      layout, Send N comments, close), the files with their approval
+      marks and open comment counts, and the current file (previous and
+      next, Approve / Approved / Approve again, the code or the editor: a
+      transparent `textarea` over its own highlighted text, Ctrl+S saving
+      with `fs_write`; after a conflict the next save overwrites). Keys
+      (`Keys.Target.Review`, the page focused but not its fields): `]`
+      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere. `Files_view`
+      marks changed entries (a dot, a sage tick once approved, sodium once
+      changed after; a directory's count) and previews a text file of the
+      repository with `Review_code_view`, under a bar with its approval,
+      counts, the layout and Review. `Tool_view` draws `reply_to_comment`
+      as its reply and proposed diff.
+    - Worktrees: `Worktrees` keeps the listing of the session's place
+      (session, tool host, directory; reset on a session or user switch,
+      stale after a turn, a create or remove, or other sessions moving)
+      for the sidebar's section in `Sidebar_view`, `/worktree`'s picker
+      (`Dialog.Picker_kind.Worktrees`) and `Completion`
+      (`Worktree_command.complete`); `New_worktree` is the create dialog's
+      state, and the remove confirmation is a dialog offering the forced
+      removal when it has changes.
     - The user's preferences: `Pref_sync` (the keys and when they go to the
       backend) and `Theme`. At startup the page restores the browser's copy
       (`Restore_prefs`, applied at once: the theme, sizes, the terminal) and
@@ -2212,7 +2352,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     `[data-theme=light]` overriding them, the accent presets
     `[data-accent=...]` and what derives from the accent by `color-mix`),
     `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
-    `highlight.css` (which tokens take which colours), `resize.css`
+    `review.css`, `highlight.css` (which tokens take which colours), `resize.css`
     (the handles) and `forge.css` (git hosting and the pull request
     dialogs) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
@@ -2482,6 +2622,14 @@ opened 900 in 30s), then "Retry now" once the connection holds. Then
 `stability.mjs`: nothing redrawn or shifted that did not change while the
 page idles and a reply streams, the editor's height in every frame, and the
 top bar's status in the same place in every frame as turns start, run a
-tool, queue a steer and end, on a desktop and on a phone.
+tool, queue a steer and end, on a desktop and on a phone. Then
+`review.mjs`, in a git repository with an edited and a new file: the file
+browser's marks and a changed file's diff (hunks, whole file), a comment
+on a range of lines from it, the review page beside the chat (the files,
+`]`/`[`, `c` on a selected line, `a`), sending the comments (the faux
+agent replies to both, proposing a change to one, and edits the README,
+which shows up), accepting the proposal (the file on disk), a file
+changed after its approval, edit mode saving with Ctrl+S, Esc and
+`/review`, and the phone sheet.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

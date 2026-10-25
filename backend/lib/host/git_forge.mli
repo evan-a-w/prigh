@@ -8,11 +8,10 @@ open! Import
       the branch is on the remote with all of them (from the remote-tracking
       refs: nothing is fetched);
     - [push {remote, branch}]: [git push -u] (never prompts);
-    - [checkout {remote, number}]: fetches [refs/pull/N/head] (GitHub and
-      Forgejo both publish it) into the branch [pr-N] in a worktree next to
-      the main one, [<repo>-wt/pr-N]. *)
-
-(* TODO(#25): create worktrees through the worktree module once it lands. *)
+    - [checkout {remote, number, worktrees_dir}]: fetches
+      [refs/pull/N/head] (GitHub and Forgejo both publish it) into the
+      branch [pr-N], in its {!Worktree} (made where prigh makes them, or
+      the one it is checked out in already, fast-forwarded). *)
 
 module Remote : sig
   type t =
@@ -66,6 +65,7 @@ module Request : sig
     | Checkout of
         { remote : string
         ; number : int
+        ; worktrees_dir : string (** {!Config.t.worktrees_dir} *)
         }
   [@@deriving sexp_of]
 

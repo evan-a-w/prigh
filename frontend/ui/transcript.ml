@@ -113,6 +113,7 @@ type t =
 
 let empty = { items_rev = []; stream = None }
 let items t = List.rev t.items_rev
+
 let add t (item : Item.t) =
   let item : Item.t =
     match item, t.items_rev with
@@ -121,6 +122,7 @@ let add t (item : Item.t) =
   in
   { t with items_rev = item :: t.items_rev }
 ;;
+
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
 
@@ -513,7 +515,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Btw_delta _
   | P.Event.Sessions_changed
   | P.Event.Prefs_changed _
-  | P.Event.Config_changed _ -> t
+  | P.Event.Config_changed _
+  | P.Event.Review _ -> t
 ;;
 
 let gray = Style.fg Gray

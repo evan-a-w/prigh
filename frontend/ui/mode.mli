@@ -23,6 +23,8 @@ module Picker_kind : sig
     | Skills
     | Snippets (** [/snippet]: Enter inserts the text *)
     | Reminders (** [/remind]: the session's; Ctrl+D removes one *)
+    | Worktrees of Worktree.Listing.t
+    (** [/worktree]: Ctrl+N opens one in a new session, Ctrl+D removes one *)
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string (** login prompt id *)
@@ -74,6 +76,11 @@ module Confirm_action : sig
         } (** a missing directory given to [/cd] or [/host] *)
     | Cd_to_checkout of string
     (** the worktree [/pr checkout] made: change the session's directory *)
+    | Remove_worktree of
+        { worktree : Worktree.t
+        ; force : bool
+        ; back : Open_picker.t option (** where Esc returns *)
+        }
   [@@deriving sexp_of, equal]
 end
 

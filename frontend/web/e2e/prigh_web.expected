@@ -334,6 +334,7 @@ new
 2	+
 3	+	- ship it
 /diff PATH shows one file or directory
+Review
 Done
 === chromium: a missing directory ===
 Create folder?
@@ -549,9 +550,11 @@ Directories
 <CWD>/sub/
 === chromium: files: the session's directory ===
 <HOSTNAME>
+Review
 cwd
 === chromium: files: listed ===
 sub/
+1
 <TIME>
 flag.png
 88 B
@@ -566,14 +569,16 @@ todo.md
 notes.txt
 17 B
 <TIME>
-1
-2
-3
-4
-one
-2
-three
-four
++2 −1
+Changes
+Whole file
+Review
+@@ -1,3 +1,4 @@
+1	1		one
+2		-	two
+2	+	2
+3	3		three
+4	+	four
 === chromium: files: an image preview ===
  24x16
 toast: Uploaded "hello.txt"
@@ -607,6 +612,7 @@ toast: Deleted "renamed"
 renamed on the host: false
 === chromium: files: after the changes ===
 sub/
+1
 <TIME>
 flag.png
 88 B
@@ -650,6 +656,7 @@ dropped text
 [binary file, 7 bytes: not shown; inspect it with tools]
 === chromium: files on a phone ===
 sub/
+1
 flag.png
 88 B
 hello.txt
@@ -995,6 +1002,233 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
 none
+=== chromium: worktrees: the sidebar ===
+main | <DIR>/repo [current]
+docs | 2 changed | <DIR>/docs [dirty]
+=== chromium: worktrees: the section's buttons ===
+Worktrees 2, Refresh worktrees, New worktree
+=== chromium: worktrees: the new worktree dialog ===
+New worktree
+Branch
+A new branch, or an existing one to check out
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== chromium: worktrees: created and moved there ===
+main | <DIR>/repo
+docs | 2 changed | <DIR>/docs [dirty]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== chromium: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: removed ===
+main | <DIR>/repo
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== chromium: worktrees: the /worktree picker ===
+Worktrees of <DIR>/repo
+main
+<DIR>/repo · main worktree
+feat/login
+<DIR>/home/.prigh/worktrees/repo/feat-login · here
+Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+=== chromium: worktrees: back in main ===
+main | <DIR>/repo [current]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== chromium: worktrees: errors ===
+none
+=== chromium: review: files: changes marked ===
+src (changed: 2)
+README.md
+=== chromium: review: files: a changed file's diff ===
+main.ml
+395 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -9,7 +9,8 @@ let v8 = 8
+9	9		let v9 = 9
+10	10		let v10 = 10
+11	11		let v11 = 11
+12		-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+13	14		let v13 = 13
+14	15		let v14 = 14
+15	16		let v15 = 15
+=== chromium: review: files: the whole file ===
+rows: 32
+=== chromium: review: files: the comment under its lines ===
+c1
+lines 12–13
+Resolve
+You
+<TIME>
+not sent yet
+Why double it here?
+=== chromium: review: page: opened ===
+Review
+0/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 1 comment
+=== chromium: review: page: the files ===
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
++3 −0
+2 files changed, +5 −1
+chat still shown: true
+file browser hidden: true
+=== chromium: review: page: a second comment, not sent yet ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+You
+<TIME>
+not sent yet
+Name it for what it does.
+=== chromium: review: page: main.ml approved ===
+Review
+1/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 2 comments
+=== chromium: review: page: the files after the agent's edit ===
+README.md
++1 −1
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +6 −2
+=== chromium: review: page: the agent's reply ===
+src/main.ml
+Approved
+@@ -9,7 +9,8 @@ let v8 = 8
+9	9		let v9 = 9
+10	10		let v10 = 10
+11	11		let v11 = 11
+12		-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+c1
+lines 12–13
+Resolve
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+13	14		let v13 = 13
+14	15		let v14 = 14
+15	16		let v15 = 15
+=== chromium: review: chat: what the agent did ===
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+edit
+README.md
++1
+−1
+@@ -1,3 +1,3 @@
+1	1		# Demo
+2	2
+3		-	A small project.
+3	+	A small project, reviewed.
+Replied to both comments and updated the README.
+<TIME>
+=== chromium: review: page: a proposed change ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accept
+Reject
+=== chromium: review: page: accepted, the file changed ===
+src/util.mlnew
+Approve
+c2
+line 3
+its lines changed
+Resolve
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
+util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
+=== chromium: review: page: changed since approved ===
+src/main.ml
+Changed since you approved it
+Approve again
+main.ml ends: "let late = 0\nlet edited = 1\n"
+Esc closed it: true
+/review opened it: true
+=== chromium: review: phone ===
+sheet: fixed
+Alt+R closed it
+=== chromium: review: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1331,6 +1565,7 @@ new
 2	+
 3	+	- ship it
 /diff PATH shows one file or directory
+Review
 Done
 === firefox: a missing directory ===
 Create folder?
@@ -1546,9 +1781,11 @@ Directories
 <CWD>/sub/
 === firefox: files: the session's directory ===
 <HOSTNAME>
+Review
 cwd
 === firefox: files: listed ===
 sub/
+1
 <TIME>
 flag.png
 88 B
@@ -1563,14 +1800,16 @@ todo.md
 notes.txt
 17 B
 <TIME>
-1
-2
-3
-4
-one
-2
-three
-four
++2 −1
+Changes
+Whole file
+Review
+@@ -1,3 +1,4 @@
+1	1		one
+2		-	two
+2	+	2
+3	3		three
+4	+	four
 === firefox: files: an image preview ===
  24x16
 toast: Uploaded "hello.txt"
@@ -1604,6 +1843,7 @@ toast: Deleted "renamed"
 renamed on the host: false
 === firefox: files: after the changes ===
 sub/
+1
 <TIME>
 flag.png
 88 B
@@ -1647,6 +1887,7 @@ dropped text
 [binary file, 7 bytes: not shown; inspect it with tools]
 === firefox: files on a phone ===
 sub/
+1
 flag.png
 88 B
 hello.txt
@@ -1992,4 +2233,231 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 === firefox: themes: back ===
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === firefox: themes: errors ===
+none
+=== firefox: worktrees: the sidebar ===
+main | <DIR>/repo [current]
+docs | 2 changed | <DIR>/docs [dirty]
+=== firefox: worktrees: the section's buttons ===
+Worktrees 2, Refresh worktrees, New worktree
+=== firefox: worktrees: the new worktree dialog ===
+New worktree
+Branch
+A new branch, or an existing one to check out
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== firefox: worktrees: created and moved there ===
+main | <DIR>/repo
+docs | 2 changed | <DIR>/docs [dirty]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== firefox: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== firefox: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== firefox: worktrees: removed ===
+main | <DIR>/repo
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== firefox: worktrees: the /worktree picker ===
+Worktrees of <DIR>/repo
+main
+<DIR>/repo · main worktree
+feat/login
+<DIR>/home/.prigh/worktrees/repo/feat-login · here
+Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+=== firefox: worktrees: back in main ===
+main | <DIR>/repo [current]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== firefox: worktrees: errors ===
+none
+=== firefox: review: files: changes marked ===
+src (changed: 2)
+README.md
+=== firefox: review: files: a changed file's diff ===
+main.ml
+395 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -9,7 +9,8 @@ let v8 = 8
+9	9		let v9 = 9
+10	10		let v10 = 10
+11	11		let v11 = 11
+12		-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+13	14		let v13 = 13
+14	15		let v14 = 14
+15	16		let v15 = 15
+=== firefox: review: files: the whole file ===
+rows: 32
+=== firefox: review: files: the comment under its lines ===
+c1
+lines 12–13
+Resolve
+You
+<TIME>
+not sent yet
+Why double it here?
+=== firefox: review: page: opened ===
+Review
+0/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 1 comment
+=== firefox: review: page: the files ===
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
++3 −0
+2 files changed, +5 −1
+chat still shown: true
+file browser hidden: true
+=== firefox: review: page: a second comment, not sent yet ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+You
+<TIME>
+not sent yet
+Name it for what it does.
+=== firefox: review: page: main.ml approved ===
+Review
+1/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 2 comments
+=== firefox: review: page: the files after the agent's edit ===
+README.md
++1 −1
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +6 −2
+=== firefox: review: page: the agent's reply ===
+src/main.ml
+Approved
+@@ -9,7 +9,8 @@ let v8 = 8
+9	9		let v9 = 9
+10	10		let v10 = 10
+11	11		let v11 = 11
+12		-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+c1
+lines 12–13
+Resolve
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+13	14		let v13 = 13
+14	15		let v14 = 14
+15	16		let v15 = 15
+=== firefox: review: chat: what the agent did ===
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+edit
+README.md
++1
+−1
+@@ -1,3 +1,3 @@
+1	1		# Demo
+2	2
+3		-	A small project.
+3	+	A small project, reviewed.
+Replied to both comments and updated the README.
+<TIME>
+=== firefox: review: page: a proposed change ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accept
+Reject
+=== firefox: review: page: accepted, the file changed ===
+src/util.mlnew
+Approve
+c2
+line 3
+its lines changed
+Resolve
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
+util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
+=== firefox: review: page: changed since approved ===
+src/main.ml
+Changed since you approved it
+Approve again
+main.ml ends: "let late = 0\nlet edited = 1\n"
+Esc closed it: true
+/review opened it: true
+=== firefox: review: phone ===
+sheet: fixed
+Alt+R closed it
+=== firefox: review: errors ===
 none

@@ -72,6 +72,18 @@ module Forge_reply : sig
   [@@deriving sexp_of, equal]
 end
 
+module Worktrees_purpose : sig
+  (** Why we asked for [list_worktrees]. *)
+  type t =
+    | Sidebar of int (** the [Worktrees] request's number *)
+    | Picker (** [/worktree] *)
+    | Target of
+        { command : string (** as typed: back to the editor if it fails *)
+        ; action : Prigh_ui.Worktree_command.Action.t
+        } (** [/worktree open] or [rm]: the worktree it names *)
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -141,12 +153,29 @@ module Reply_tag : sig
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Worktrees of
+        { place : string (** [Worktrees.place] *)
+        ; purpose : Worktrees_purpose.t
+        }
+    | Worktree_created of string
+    (** [create_worktree], as typed: the session moves into it *)
+    | Worktree_entered of string
+    (** [set_cwd] into a worktree: the notice shown once there *)
+    | Worktree_session of
+        { path : string
+        ; notice : string
+        } (** [new_session] to work in the worktree at [path] *)
+    | Worktree_removed of
+        { target : string
+        ; force : bool
+        }
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
     | Model_set (** [set_model]: the choice is no longer pending *)
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
         ; images : Image.t list
@@ -362,6 +391,20 @@ module Action : sig
     | Edit_queued of Queued.Message.t (** back into the editor *)
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string (** by name, from the [/remind] picker *)
+    | Toggle_worktrees (** fold or unfold the sidebar's worktrees *)
+    | Refresh_worktrees
+    | New_worktree (** its dialog *)
+    | New_worktree_input of
+        { field : New_worktree.Field.t
+        ; text : string
+        }
+    | Open_worktree of
+        { path : string
+        ; new_session : bool
+        } (** the session moves there, or a new one starts there *)
+    | Ask_remove_worktree of string (** its path: confirmed first *)
+    | Remove_worktree of { force : bool }
+    (** the confirmation's answer; [force]: with uncommitted changes *)
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -421,6 +464,8 @@ module Action : sig
         ; status : Terminal.Status.t
         } (** from the page's widget *)
     | Files of Files.Action.t (** the file browser and the attachments *)
+    | Review of Code_review.Action.t
+    (** the review page, comments and approvals *)
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
@@ -488,10 +533,13 @@ module Model : sig
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
+    ; worktrees : Worktrees.t (** the sidebar's, [/worktree]'s completion *)
+    ; worktrees_open : bool (** the sidebar's section is unfolded *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; review : Code_review.t
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t

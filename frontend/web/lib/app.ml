@@ -61,6 +61,17 @@ module Forge_reply = struct
   [@@deriving sexp_of, equal]
 end
 
+module Worktrees_purpose = struct
+  type t =
+    | Sidebar of int
+    | Picker
+    | Target of
+        { command : string
+        ; action : Prigh_ui.Worktree_command.Action.t
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -127,12 +138,27 @@ module Reply_tag = struct
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Worktrees of
+        { place : string
+        ; purpose : Worktrees_purpose.t
+        }
+    | Worktree_created of string
+    | Worktree_entered of string
+    | Worktree_session of
+        { path : string
+        ; notice : string
+        }
+    | Worktree_removed of
+        { target : string
+        ; force : bool
+        }
     | Mode_set of string
     | Model_set
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
         ; images : Image.t list
@@ -319,6 +345,19 @@ module Action = struct
     | Edit_queued of Queued.Message.t
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string
+    | Toggle_worktrees
+    | Refresh_worktrees
+    | New_worktree
+    | New_worktree_input of
+        { field : New_worktree.Field.t
+        ; text : string
+        }
+    | Open_worktree of
+        { path : string
+        ; new_session : bool
+        }
+    | Ask_remove_worktree of string
+    | Remove_worktree of { force : bool }
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -371,6 +410,7 @@ module Action = struct
         ; status : Terminal.Status.t
         }
     | Files of Files.Action.t
+    | Review of Code_review.Action.t
     | Resize of Resize.Action.t
     | Load_older
     | Prefetch_session of string (** a path *)
@@ -428,10 +468,13 @@ module Model = struct
     ; users : string list option
     ; terminal : Terminal.t
     ; skills : Skills.t
+    ; worktrees : Worktrees.t
+    ; worktrees_open : bool
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; review : Code_review.t
     ; layout : Resize.t
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
@@ -579,10 +622,13 @@ let init =
   ; users = None
   ; terminal = Terminal.closed
   ; skills = Skills.empty
+  ; worktrees = Worktrees.empty
+  ; worktrees_open = true
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
   ; files = Files.closed
+  ; review = Code_review.empty
   ; layout = Resize.empty
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
@@ -634,6 +680,11 @@ let drop_toast (m : Model.t) text =
   { m with
     toasts = List.filter m.toasts ~f:(fun t -> not (String.equal t.text text))
   }
+;;
+
+(* What a call made while the connection is down says. *)
+let not_connected =
+  "Not connected to the backend: try again once it reconnects."
 ;;
 
 let reading_changes = "Reading the changes…"
@@ -718,7 +769,43 @@ let files_out (m : Model.t) (outs : Files.Out.t list) =
     | Focus_editor -> m, cmds @ [ focus_editor ])
 ;;
 
-let with_files (m : Model.t) (files, outs) = files_out { m with files } outs
+let review_out (m : Model.t) (outs : Code_review.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_review.Out.t) ->
+    match out with
+    | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
+    | Get_diff -> m, cmds @ [ rpc "git_diff" [] ~tag:(Review Diff) ]
+    | Toast { text; error } ->
+      let m, more = toast m ~error text in
+      m, cmds @ more
+    | Focus id -> m, cmds @ [ Command.Focus id ])
+;;
+
+let with_review (m : Model.t) (review, outs) = review_out { m with review } outs
+
+(* What the agent may have changed in the working tree: an edit, a write, a
+   command, its own or a subagent's; and a run's end. *)
+let rec touches_files (e : Event.t) =
+  match e with
+  | Tool_end { call; _ } ->
+    List.mem
+      [ "edit"; "write"; "apply_patch"; "bash" ]
+      call.name
+      ~equal:String.equal
+  | Subagent { event; _ } -> touches_files event
+  | Agent_end _ -> true
+  | _ -> false
+;;
+
+let with_files (m : Model.t) (files, outs) =
+  let was_open = m.files.open_ in
+  let m, cmds = files_out { m with files } outs in
+  (* The browser marks what changed: it reads the changes when it opens. *)
+  if m.files.open_ && not was_open
+  then (
+    let m, more = with_review m (Code_review.refresh m.review) in
+    m, cmds @ more)
+  else m, cmds
+;;
 
 let files_where (m : Model.t) =
   Option.map m.state ~f:(fun (state : State.t) ->
@@ -864,6 +951,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; completion = None
       ; scrolled_up = false
       ; skills = Skills.empty
+      ; worktrees = Worktrees.reset m.worktrees
       ; toasts = List.filter m.toasts ~f:(fun t -> not t.error)
       ; session_gone = None
       }
@@ -883,7 +971,15 @@ let set_state_without_files (m : Model.t) (state : State.t) =
 let set_state (m : Model.t) (state : State.t) =
   let m, cmds = set_state_without_files m state in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
-  m, cmds @ more
+  let m, review =
+    with_review
+      m
+      (Code_review.set_session
+         m.review
+         (Some state.session_id)
+         ~watching:m.files.open_)
+  in
+  m, cmds @ more @ review
 ;;
 
 let logged_in (m : Model.t) provider =
@@ -1221,6 +1317,11 @@ let complete_draft (m : Model.t) ~skills =
       ~snippets:(Option.value_map m.config ~default:[] ~f:(fun c -> c.snippets))
       ~reminders:
         (Option.value_map m.state ~default:[] ~f:(fun s -> s.reminders))
+      ~worktrees:
+        (Option.value_map
+           (Worktrees.listing m.worktrees)
+           ~default:[]
+           ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
       ~sessions:m.sessions
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
@@ -2701,6 +2802,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; btw = None
     ; images = []
     ; skills = Skills.empty
+    ; worktrees = Worktrees.reset m.worktrees
     ; pending = In_flight.none
     ; session_gone = None
     ; outputs_loading = String.Set.empty
@@ -2881,6 +2983,14 @@ let snippet_action (m : Model.t) (action : Prigh_ui.Snippet_command.Action.t) =
 
 let reminders (m : Model.t) = Option.map m.state ~f:(fun s -> s.reminders)
 
+(* A command that could not run, back in the editor to correct rather than
+   retype, unless something else is being written there. *)
+let back_in_editor (m : Model.t) command =
+  if String.is_empty m.draft && List.is_empty m.images
+  then set_draft m command
+  else m
+;;
+
 let remind_action
       (m : Model.t)
       ~command
@@ -2907,14 +3017,7 @@ let remind_action
                     r.name))
          })
   | Info text -> toast m (String.capitalize text)
-  | Error text ->
-    (* Back in the editor, to correct rather than retype. *)
-    let m =
-      if String.is_empty m.draft && List.is_empty m.images
-      then set_draft m command
-      else m
-    in
-    error m (String.capitalize text)
+  | Error text -> error (back_in_editor m command) (String.capitalize text)
   | Add _ | Remove _ | Clear _ ->
     (match Prigh_ui.Remind_command.rpc action with
      | None -> m, []
@@ -2929,6 +3032,310 @@ let remind_action
          if Option.is_some m.dialog then close_dialog m else m, []
        in
        m, focus @ [ rpc method_ params ~tag:(Reminder { command; notice }) ])
+;;
+
+(* ---- worktrees *)
+
+module Worktree_command = Prigh_ui.Worktree_command
+
+let list_worktrees (m : Model.t) purpose =
+  match Worktrees.place m.state with
+  | Some place ->
+    loading
+      m
+      "Worktrees"
+      [ call List_worktrees ~tag:(Worktrees { place; purpose }) ]
+  | None -> error m "No session yet: wait for it to load, then try again."
+;;
+
+let worktrees_picker (m : Model.t) (listing : Worktree.Listing.t) =
+  let items =
+    List.map listing.worktrees ~f:(fun w ->
+      let label = Worktree.label w in
+      let describe = Worktree_command.describe w in
+      Picker.Item.create
+        ~id:w.path
+        ~detail:
+          (Option.value
+             (String.chop_prefix describe ~prefix:(label ^ " · "))
+             ~default:describe)
+        ~search:(Worktree_command.target w ^ " " ^ w.path)
+        ~marked:w.current
+        ~dimmed:w.prunable
+        label)
+  in
+  open_picker
+    m
+    (Picker
+       { kind = Worktrees listing
+       ; picker = Picker.create ~title:("Worktrees of " ^ listing.root) items
+       })
+;;
+
+let enter_worktree ~notice path =
+  call
+    (Change_dir { target = Cwd; path; if_missing = Fail })
+    ~tag:(Worktree_entered notice)
+;;
+
+let with_entering (m : Model.t) entering =
+  { m with worktrees = Worktrees.set_entering m.worktrees entering }
+;;
+
+let open_worktree (m : Model.t) (w : Worktree.t) ~new_session =
+  if w.prunable
+  then
+    error
+      m
+      (sprintf
+         "The worktree %s is gone (%s was deleted): /worktree rm %s forgets it."
+         (Worktree.label w)
+         w.path
+         (Worktree_command.target w))
+  else (
+    let where = sprintf "the worktree %s (%s)" (Worktree.label w) w.path in
+    let m = with_entering m (Some w.path) in
+    if new_session
+    then
+      ( { (starting m) with sidebar_open = m.sidebar_open && not m.narrow }
+      , [ rpc
+            "new_session"
+            []
+            ~tag:
+              (Worktree_session
+                 { path = w.path; notice = "New session in " ^ where })
+        ] )
+    else m, [ enter_worktree ~notice:("Working in " ^ where) w.path ])
+;;
+
+let ask_remove_worktree (m : Model.t) (w : Worktree.t) ~force =
+  match Worktree_command.cannot_remove w with
+  | Some reason -> error m (String.capitalize reason ^ ".")
+  | None ->
+    open_dialog
+      m
+      (Remove_worktree { worktree = w; force; busy = false; error = None })
+;;
+
+(* The worktree a sidebar row or the picker names, by its path. *)
+let shown_worktree (m : Model.t) path =
+  match m.dialog with
+  | Some (Picker { kind = Worktrees listing; _ }) ->
+    List.find listing.worktrees ~f:(fun w -> String.equal w.path path)
+  | _ -> Worktrees.find m.worktrees path
+;;
+
+let with_worktree (m : Model.t) path ~f =
+  match shown_worktree m path with
+  | Some w -> f w
+  | None ->
+    error m (sprintf "No worktree at %s any more: /worktree lists them." path)
+;;
+
+let remove_worktree (m : Model.t) ~force =
+  match m.dialog with
+  | Some (Remove_worktree ({ busy = false; worktree; _ } as d)) ->
+    let force = force || d.force in
+    ( { m with
+        dialog =
+          Some (Remove_worktree { d with force; busy = true; error = None })
+      }
+    , [ call
+          (Remove_worktree { path = worktree.path; force })
+          ~tag:
+            (Worktree_removed
+               { target = Worktree_command.target worktree; force })
+      ] )
+  | _ -> m, []
+;;
+
+let remove_command ~force target =
+  sprintf "/worktree rm %s%s" (if force then "-f " else "") target
+;;
+
+(* One with uncommitted changes is kept unless forced: say how. *)
+let worktree_remove_failed (m : Model.t) ~target ~force e =
+  let refused = (not force) && String.is_substring e ~substring:"force" in
+  match m.dialog with
+  | Some (Remove_worktree ({ busy = true; _ } as d)) ->
+    let e =
+      if refused
+      then
+        sprintf
+          "%s: “%s” removes it anyway."
+          (String.capitalize e)
+          (Worktrees.force_label d.worktree)
+      else String.capitalize e ^ "."
+    in
+    ( { m with
+        dialog = Some (Remove_worktree { d with busy = false; error = Some e })
+      }
+    , [] )
+  | _ ->
+    let command = remove_command ~force:refused target in
+    error
+      (back_in_editor m command)
+      (if refused
+       then sprintf "%s: %s removes it anyway." (String.capitalize e) command
+       else String.capitalize e ^ ".")
+;;
+
+let creating = "Creating the worktree "
+
+let new_worktree_dialog (m : Model.t) =
+  current_state m ~f:(fun state ->
+    open_dialog
+      m
+      ~focus:(New_worktree.Field.id Branch)
+      (New_worktree
+         (New_worktree.create
+            ~head:state.git_branch
+            ~project_dir:
+              (Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
+                 l.project_dir)))))
+;;
+
+let create_worktree (m : Model.t) (d : New_worktree.t) =
+  if d.busy
+  then m, []
+  else (
+    match New_worktree.request d with
+    | Error e ->
+      { m with dialog = Some (New_worktree { d with error = Some e }) }, []
+    | Ok (branch, base) ->
+      ( { m with
+          dialog = Some (New_worktree { d with busy = true; error = None })
+        }
+      , [ call
+            (Create_worktree { branch; base })
+            ~tag:(Worktree_created (New_worktree.command ~branch ~base))
+        ] ))
+;;
+
+let worktree_created (m : Model.t) (c : Worktree.Created.t) =
+  let m, close =
+    match m.dialog with
+    | Some (New_worktree { busy = true; _ }) -> close_dialog m
+    | _ -> m, []
+  in
+  let m =
+    with_entering
+      { m with worktrees = Worktrees.stale m.worktrees }
+      (Some c.worktree.path)
+  in
+  let m, cmds =
+    toast m ~replaces:creating (String.capitalize (Worktree_command.created c))
+  in
+  ( m
+  , close
+    @ cmds
+    @ [ enter_worktree
+          ~notice:
+            (sprintf
+               "Working in the worktree %s (%s)"
+               (Worktree.label c.worktree)
+               c.worktree.path)
+          c.worktree.path
+      ] )
+;;
+
+let worktree_create_failed (m : Model.t) ~command e =
+  match m.dialog with
+  | Some (New_worktree ({ busy = true; _ } as d)) ->
+    ( { m with
+        dialog =
+          Some
+            (New_worktree
+               { d with busy = false; error = Some (String.capitalize e ^ ".") })
+      }
+    , [] )
+  | _ ->
+    toast
+      (back_in_editor m command)
+      ~error:true
+      ~replaces:creating
+      (sprintf "Couldn't create the worktree: %s." e)
+;;
+
+let worktree_target
+      (m : Model.t)
+      ~command
+      (action : Worktree_command.Action.t)
+      listing
+  =
+  let resolve target ~f =
+    match Worktree_command.find listing target with
+    | Error e -> error (back_in_editor m command) (String.capitalize e ^ ".")
+    | Ok w -> f w
+  in
+  match action with
+  | List | New _ | Error _ -> m, []
+  | Open { target; new_session } ->
+    resolve target ~f:(open_worktree m ~new_session)
+  | Remove { target; force } ->
+    resolve target ~f:(fun w ->
+      let m =
+        if Option.is_some (Worktree_command.cannot_remove w)
+        then back_in_editor m command
+        else m
+      in
+      ask_remove_worktree m w ~force)
+;;
+
+let worktree_command (m : Model.t) rest =
+  let command = String.strip ("/worktree " ^ rest) in
+  match Worktree_command.parse rest with
+  | Error text -> error (back_in_editor m command) (String.capitalize text ^ ".")
+  | List -> list_worktrees m Picker
+  | New { branch; base } ->
+    let m, cmds = toast m (sprintf "%s%s…" creating branch) in
+    ( m
+    , cmds
+      @ [ call
+            (Create_worktree { branch; base })
+            ~tag:(Worktree_created command)
+        ] )
+  | (Open _ | Remove _) as action ->
+    list_worktrees m (Target { command; action })
+;;
+
+(* The sidebar's listing follows the session, its directory and host, and
+   the sessions' directories. *)
+let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
+  let moved =
+    (not (phys_equal before.sessions m.sessions))
+    && not
+         ([%equal: (string * string) list]
+            (List.map before.sessions ~f:(fun s -> s.id, s.cwd))
+            (List.map m.sessions ~f:(fun s -> s.id, s.cwd)))
+  in
+  let m =
+    if moved
+    then { m with worktrees = Worktrees.sessions_moved m.worktrees }
+    else m
+  in
+  (* A turn may have changed files, branches or worktrees. *)
+  let turn_ended =
+    Model.running before
+    && (not (Model.running m))
+    && Option.equal
+         String.equal
+         (Option.map before.state ~f:(fun s -> s.session_id))
+         (Option.map m.state ~f:(fun s -> s.session_id))
+  in
+  let m =
+    if turn_ended
+    then { m with worktrees = Worktrees.stale ~quiet:true m.worktrees }
+    else m
+  in
+  match m.connection, m.state, Worktrees.wanted m.worktrees m.state with
+  | Connected, Some state, Some place when Option.is_none m.session_gone ->
+    let worktrees, seq = Worktrees.requested m.worktrees state in
+    ( { m with worktrees }
+    , cmds
+      @ [ call List_worktrees ~tag:(Worktrees { place; purpose = Sidebar seq })
+        ] )
+  | _ -> m, cmds
 ;;
 
 let open_snippets (m : Model.t) ~cursor =
@@ -3087,6 +3494,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
             (if String.is_empty path then [] else [ "path", str path ])
             ~tag:Git_diff
         ] )
+  | "review", "" -> with_review m (Code_review.update m.review (Open None))
   | "review", args ->
     let m, cmds = toast m reading_review in
     ( m
@@ -3175,6 +3583,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
               if String.is_suffix s.cwd ~suffix:"/" then s.cwd else s.cwd ^ "/"))
          Mkdir)
   | "mkdir", path -> m, [ change_dir ~if_missing:Create ~target:Cwd path ]
+  | "worktree", rest -> worktree_command m rest
   | "default-dir", "" ->
     with_config m ~f:(fun c -> toast m (default_dir_summary c))
   | "default-dir", "off" -> set_default_dir m None
@@ -3909,7 +4318,19 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
   | Forge tag, result -> forge_reply m tag result
+  | Files (Previewed path as reply), (Ok json as result) ->
+    let m =
+      match File_preview.of_json json with
+      | Ok { content = Text { text; truncated = false; md5 }; _ } ->
+        { m with
+          review = Code_review.preview_text m.review ~abs:path ~text ~md5
+        }
+      | Ok _ | Error _ -> m
+    in
+    with_files m (Files.reply m.files reply result)
   | Files reply, result -> with_files m (Files.reply m.files reply result)
+  | Review reply, result ->
+    with_review m (Code_review.reply m.review reply result)
   | Sent_with_files { text; images; attachments }, result ->
     let m, cmds = reply_to m (Sent { text; images }) result in
     (match result with
@@ -4026,6 +4447,26 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
+  (* Lost with the connection: listed again once back. *)
+  | Worktrees { purpose = Sidebar _; _ }, Error e
+    when String.equal e "backend closed" || String.equal e not_connected ->
+    { m with worktrees = Worktrees.stale m.worktrees }, []
+  (* Not a repository, say: the sidebar shows nothing. *)
+  | Worktrees { purpose = Sidebar seq; _ }, Error _ ->
+    { m with worktrees = Worktrees.failed m.worktrees ~seq }, []
+  | Worktrees { purpose = Picker; _ }, Error e ->
+    error m (sprintf "Couldn't list the worktrees: %s." e)
+  | Worktrees { purpose = Target { command; _ }; _ }, Error e ->
+    error
+      (back_in_editor m command)
+      (sprintf "Couldn't list the worktrees: %s." e)
+  | Worktree_created command, Error e -> worktree_create_failed m ~command e
+  | Worktree_entered _, Error e ->
+    error (with_entering m None) (sprintf "Couldn't open the worktree: %s." e)
+  | Worktree_session _, Error e ->
+    reply_to (with_entering m None) Reload_state (Error e)
+  | Worktree_removed { target; force }, Error e ->
+    worktree_remove_failed m ~target ~force e
   (* A backend that keeps none: this browser keeps them. *)
   | Prefs, Error _ -> { m with prefs = { m.prefs with remote = Local } }, []
   | Skills { place; purpose = Complete }, Error _ ->
@@ -4533,6 +4974,47 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         | Picker query, skills -> open_picker m (Skills.picker ~query skills))
   | Mcp purpose, Ok json ->
     decode m json Mcp_list.of_json ~f:(mcp_listed m purpose)
+  | Worktrees { place; purpose }, Ok json ->
+    decode m json Worktree.Listing.of_json ~f:(fun listing ->
+      let seq =
+        match purpose with
+        | Sidebar seq -> Some seq
+        | Picker | Target _ -> None
+      in
+      let m =
+        { m with worktrees = Worktrees.loaded m.worktrees ~place ?seq listing }
+      in
+      match purpose with
+      | Sidebar _ ->
+        if String.is_prefix m.draft ~prefix:"/worktree "
+        then refresh_completion { m with completion = None }
+        else m, []
+      | Picker -> worktrees_picker m listing
+      | Target { command; action } -> worktree_target m ~command action listing)
+  | Worktree_created _, Ok json ->
+    decode m json Worktree.Created.of_json ~f:(worktree_created m)
+  | Worktree_entered notice, Ok json ->
+    let m = with_entering m None in
+    decode m json Dir_change.Outcome.of_json ~f:(function
+      | Changed _ -> toast m notice
+      | Missing path ->
+        error m (sprintf "%s is gone: /worktree lists the others." path))
+  | Worktree_session { path; notice }, Ok json ->
+    let m, cmds = reply_to m Reload_state (Ok json) in
+    with_entering m (Some path), cmds @ [ enter_worktree ~notice path ]
+  | Worktree_removed _, Ok json ->
+    decode m json Worktree.removed_of_json ~f:(fun w ->
+      let m, close =
+        match m.dialog with
+        | Some (Remove_worktree { busy = true; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, cmds =
+        toast
+          { m with worktrees = Worktrees.stale m.worktrees }
+          (String.capitalize (Worktree_command.removed w))
+      in
+      m, close @ cmds)
 ;;
 
 (* The replies that a [loading] dialog waits for. *)
@@ -4541,13 +5023,9 @@ let loads : Reply_tag.t -> bool = function
   | Session_stats | Entries _
   | Users Picker
   | Skills { purpose = Picker _; _ }
+  | Worktrees { purpose = Picker | Target _; _ }
   | Mcp Picker -> true
   | _ -> false
-;;
-
-(* What a call made while the connection is down says. *)
-let not_connected =
-  "Not connected to the backend: try again once it reconnects."
 ;;
 
 (* Back: a dialog's error from while it was down no longer applies. *)
@@ -4723,6 +5201,8 @@ let main_event (m : Model.t) (event : Event.t) =
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
+  | Review review ->
+    { m with review = Code_review.set_review m.review review }, []
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
@@ -4753,7 +5233,12 @@ let event (m : Model.t) (e : Event.t) =
     }
   in
   let m, cmds = main_event m e in
-  m, cmds @ if Agents.starts_or_ends e then [ list_subagents ] else []
+  let m, review =
+    if touches_files e
+    then with_review m (Code_review.changed m.review ~watching:m.files.open_)
+    else m, []
+  in
+  m, cmds @ review @ if Agents.starts_or_ends e then [ list_subagents ] else []
 ;;
 
 let image_json (image : Image.t) =
@@ -4960,6 +5445,7 @@ let accept_completion (m : Model.t) ~run =
       | Argument (Directory | Backend_directory | Path | Skill), _ -> false
       (* Their number comes next. *)
       | Argument Pr, Some { id = "view" | "checkout"; _ } -> false
+      | Argument Worktree, _ when Completion.takes_more c -> false
       | Argument _, _ -> true
       | (Command | Path | Snippet), _ -> false
     in
@@ -5056,6 +5542,12 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Jump ->
       (match Jump.Target.of_string item.id with
        | Some target -> jump_to m target
+       | None -> m, [])
+    | Worktrees listing ->
+      (match
+         List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id)
+       with
+       | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
@@ -5161,6 +5653,8 @@ let dialog_accept (m : Model.t) =
   | Some (Create_dir ({ target; path; _ } as d)) ->
     ( { m with dialog = Some (Create_dir { d with busy = true; error = None }) }
     , [ change_dir ~if_missing:Create ~target path ] )
+  | Some (New_worktree d) -> create_worktree m d
+  | Some (Remove_worktree _) -> remove_worktree m ~force:false
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -5483,6 +5977,23 @@ let update_connected (m : Model.t) (action : Action.t) =
       m
       ~command:("/remind rm " ^ name)
       (Prigh_ui.Remind_command.Action.Remove name)
+  | Toggle_worktrees -> { m with worktrees_open = not m.worktrees_open }, []
+  | Refresh_worktrees -> { m with worktrees = Worktrees.stale m.worktrees }, []
+  | New_worktree -> new_worktree_dialog m
+  | New_worktree_input { field; text } ->
+    (match m.dialog with
+     | Some (New_worktree d) ->
+       ( { m with dialog = Some (New_worktree (New_worktree.set d field text)) }
+       , [] )
+     | _ -> m, [])
+  | Open_worktree { path; new_session } ->
+    with_worktree m path ~f:(fun w ->
+      let m = { m with dialog = None } in
+      let m, cmds = open_worktree m w ~new_session in
+      m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds)
+  | Ask_remove_worktree path ->
+    with_worktree m path ~f:(fun w -> ask_remove_worktree m w ~force:false)
+  | Remove_worktree { force } -> remove_worktree m ~force
   | Remove_queued q ->
     ( { m with queue = Queued.remove m.queue q }
     , [ rpc
@@ -5596,6 +6107,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
+  | Review action -> with_review m (Code_review.update m.review action)
   | Resize action ->
     let layout, saves = Resize.update m.layout (Model.shown m) action in
     ( { m with layout }
@@ -5650,6 +6162,7 @@ let settle (m : Model.t) cmds =
 
 let update (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
+  let m', cmds = follow_worktrees m (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
   if

@@ -415,12 +415,14 @@ let create_pull t ~git ~title ~body ~base ~head ~draft ~push =
       pr_json repo pr)
 ;;
 
-let checkout_pull t ~git number =
+let checkout_pull t ~git ~worktrees_dir number =
   let open Or_error.Let_syntax in
   let%bind repo, _ = repo t ~git in
   let%map checkout =
     host_result
-      (git (Git_forge.Request.Checkout { remote = repo.remote; number }))
+      (git
+         (Git_forge.Request.Checkout
+            { remote = repo.remote; number; worktrees_dir }))
       ~of_json:[%of_jsonaf: Git_forge.Checkout.t]
   in
   [%jsonaf_of: Git_forge.Checkout.t] checkout

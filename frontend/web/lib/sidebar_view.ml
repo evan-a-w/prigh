@@ -2,6 +2,7 @@ open! Core
 open! Import
 open Html
 module Action = App.Action
+module Worktree_command = Prigh_ui.Worktree_command
 
 let home_relative cwd =
   match String.chop_prefix cwd ~prefix:"/home/" with
@@ -266,6 +267,227 @@ let delete_archived ~inject archived =
     [ Node.text "Delete archived" ]
 ;;
 
+(* ---- the repository's worktrees *)
+
+let worktree_session (m : App.Model.t) ~inject (ref_ : Worktree.Session_ref.t) =
+  let summary = List.find m.sessions ~f:(fun s -> String.equal s.id ref_.id) in
+  let here =
+    Option.exists m.state ~f:(fun s -> String.equal s.session_id ref_.id)
+  in
+  let name =
+    match summary, ref_.name with
+    | Some s, _ -> Session_list.title s
+    | None, Some name -> name
+    | None, None -> ref_.id
+  in
+  let running = ref_.running || Option.exists summary ~f:(fun s -> s.running) in
+  Node.button
+    ~attrs:
+      [ classes [ "worktree-session" ] [ "here", here; "running", running ]
+      ; Attr.type_ "button"
+      ; Attr.title (if here then "This session" else "Switch to this session")
+      ; (if here then Attr.create "aria-current" "true" else Attr.empty)
+      ; Attr.on_click (fun _ -> inject (Action.Switch_session ref_.path))
+      ]
+    [ (if running then lamp ~title:"Running" () else Node.none)
+    ; Node.span
+        ~attrs:[ Attr.class_ "worktree-session-name"; Attr.create "dir" "auto" ]
+        [ Node.text name ]
+    ]
+;;
+
+let worktree (m : App.Model.t) ~inject (w : Worktree.t) =
+  let label = Worktree.label w in
+  let entering =
+    Option.equal String.equal (Worktrees.entering m.worktrees) (Some w.path)
+  in
+  let action ~cls ~title ~label ~icon:i effect =
+    Node.button
+      ~attrs:
+        [ Attr.class_ ("btn icon ghost " ^ cls)
+        ; Attr.type_ "button"
+        ; Attr.title title
+        ; Attr.create "aria-label" label
+        ; Attr.on_click (fun ev ->
+            Js_of_ocaml.Dom_html.stopPropagation ev;
+            effect)
+        ]
+      [ icon i ]
+  in
+  let changes =
+    match w.changes with
+    | Some n when n > 0 ->
+      Node.span
+        ~attrs:
+          [ Attr.class_ "worktree-changes"
+          ; Attr.title
+              (sprintf
+                 "%d file%s with uncommitted changes"
+                 n
+                 (if n = 1 then "" else "s"))
+          ]
+        [ Node.textf "%d changed" n ]
+    | _ -> Node.none
+  in
+  let sync =
+    match
+      List.filter_opt
+        [ Option.some_if (w.ahead > 0) (sprintf "↑%d" w.ahead)
+        ; Option.some_if (w.behind > 0) (sprintf "↓%d" w.behind)
+        ]
+    with
+    | [] -> Node.none
+    | parts ->
+      Node.span
+        ~attrs:
+          [ Attr.class_ "worktree-sync"
+          ; Attr.title
+              (sprintf
+                 "%d ahead of and %d behind %s"
+                 w.ahead
+                 w.behind
+                 (Option.value w.upstream ~default:"its upstream"))
+          ]
+        [ Node.text (String.concat ~sep:" " parts) ]
+  in
+  let tag text = span ~cls:"worktree-tag" text in
+  Node.div
+    ~attrs:
+      [ classes
+          [ "worktree" ]
+          [ "current", w.current
+          ; "dirty", Worktree.dirty w
+          ; "gone", w.prunable
+          ; "opening", entering
+          ]
+      ]
+    [ Node.button
+        ~attrs:
+          [ Attr.class_ "worktree-open"
+          ; Attr.type_ "button"
+          ; Attr.create "data-worktree" w.path
+          ; Attr.title
+              (String.concat
+                 ~sep:" · "
+                 (List.filter_opt
+                    [ Some w.path
+                    ; Option.some_if w.main "the repository's main worktree"
+                    ; Some
+                        (if w.current
+                         then "this session works here"
+                         else "work here (/worktree open)")
+                    ]))
+          ; (if w.current
+             then Attr.create "aria-current" "true"
+             else Attr.empty)
+          ; (if entering then Attr.create "aria-busy" "true" else Attr.empty)
+          ; Attr.on_click (fun _ ->
+              inject
+                (Action.Open_worktree { path = w.path; new_session = false }))
+          ]
+        [ div
+            ~cls:"worktree-mark"
+            [ (if entering
+               then lamp ~title:"Opening…" ()
+               else icon ~cls:"worktree-icon" Branch)
+            ]
+        ; div
+            ~cls:"worktree-main"
+            [ div
+                ~cls:"worktree-line"
+                [ span ~cls:"worktree-branch" label
+                ; changes
+                ; sync
+                ; (if w.locked then tag "locked" else Node.none)
+                ; (if w.prunable then tag "gone" else Node.none)
+                ]
+            ; span ~cls:"worktree-path" (home_relative w.path)
+            ]
+        ]
+    ; Node.span
+        ~attrs:[ Attr.class_ "worktree-actions" ]
+        [ (if w.prunable
+           then Node.none
+           else
+             action
+               ~cls:"new-here"
+               ~title:"New session in this worktree (/worktree open -n)"
+               ~label:("New session in " ^ label)
+               ~icon:Plus
+               (inject
+                  (Action.Open_worktree { path = w.path; new_session = true })))
+        ; (if Option.is_some (Worktree_command.cannot_remove w)
+           then Node.none
+           else
+             action
+               ~cls:"delete"
+               ~title:"Remove this worktree (/worktree rm)"
+               ~label:("Remove " ^ label)
+               ~icon:Trash
+               (inject (Action.Ask_remove_worktree w.path)))
+        ]
+    ; (match w.sessions with
+       | [] -> Node.none
+       | sessions ->
+         div
+           ~cls:"worktree-sessions"
+           (List.map sessions ~f:(worktree_session m ~inject)))
+    ]
+;;
+
+(* Shown only in a repository: nothing elsewhere. *)
+let worktrees (m : App.Model.t) ~inject =
+  match Worktrees.listing m.worktrees with
+  | None -> Node.none
+  | Some listing ->
+    let shown = m.worktrees_open in
+    Node.section
+      ~attrs:[ Attr.class_ "worktrees"; Attr.create "aria-label" "Worktrees" ]
+      [ div
+          ~cls:"worktrees-head"
+          [ Node.button
+              ~attrs:
+                [ Attr.class_ "worktrees-toggle"
+                ; Attr.type_ "button"
+                ; Attr.create "aria-expanded" (Bool.to_string shown)
+                ; Attr.title
+                    (sprintf
+                       "Git worktrees of %s (%s)"
+                       (home_relative listing.root)
+                       (if shown then "hide them" else "show them"))
+                ; Attr.on_click (fun _ -> inject Action.Toggle_worktrees)
+                ]
+              [ span ~cls:"sessions-label" "Worktrees"
+              ; span
+                  ~cls:"divider-count"
+                  (Int.to_string (List.length listing.worktrees))
+              ; Node.span ~attrs:[ Attr.class_ "chev" ] []
+              ]
+          ; (if Worktrees.loading m.worktrees
+             then lamp ~title:"Listing the worktrees…" ()
+             else Node.none)
+          ; button
+              ~cls:"icon ghost small"
+              ~title:"List the worktrees again"
+              ~label:"Refresh worktrees"
+              ~on_click:(inject Action.Refresh_worktrees)
+              [ icon Restart ]
+          ; button
+              ~cls:"icon ghost small"
+              ~title:"New worktree (/worktree new BRANCH [BASE])"
+              ~label:"New worktree"
+              ~on_click:(inject Action.New_worktree)
+              [ icon Plus ]
+          ]
+      ; (if shown
+         then
+           div
+             ~cls:"worktrees-list"
+             (List.map listing.worktrees ~f:(worktree m ~inject))
+         else Node.none)
+      ]
+;;
+
 let user_footer (m : App.Model.t) ~inject =
   let help =
     button
@@ -383,6 +605,7 @@ let view (m : App.Model.t) ~inject =
                  else [ delete_archived ~inject archived ]
                else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
+    ; worktrees m ~inject
     ; user_footer m ~inject
     ]
 ;;

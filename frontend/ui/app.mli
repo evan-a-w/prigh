@@ -59,6 +59,8 @@ module Reply_tag : sig
     | Models_for_scoped
     | Compact_done
     | Git_diff
+    | Review_comments (** [/review]: then the diff *)
+    | Review_status of P.Review.t
     | Review_started
     | Abort_done
     | Notice_on_success of string
@@ -79,7 +81,7 @@ module Reply_tag : sig
     | Skills_picker
     | Snippets_saved of string (** the notice once [set_config] succeeds *)
     | Reminder_added (** acknowledged with the name the backend gave it *)
-    | Skills_for_autocomplete of string (** the [Skill_cache] key *)
+    | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
     | Mcp_picker
@@ -90,6 +92,22 @@ module Reply_tag : sig
     | Refresh_state
     | Dir_changed of P.Dir_change.Target.t
     (** [Missing]: confirm creating it; otherwise acknowledge *)
+    | Worktrees_picker (** [list_worktrees] for [/worktree] *)
+    | Worktrees_for_autocomplete of string (** the [Location_cache] key *)
+    | Worktree_target of
+        { command : string (** back in the editor when there is none *)
+        ; action : Worktree_command.Action.t (** [Open] or [Remove] *)
+        } (** [list_worktrees] to find the worktree [action] names *)
+    | Worktree_created (** then [set_cwd] there *)
+    | Worktree_entered of string (** [set_cwd] into one; the notice *)
+    | Worktree_session_started of
+        { path : string
+        ; notice : string
+        } (** [new_session], then [set_cwd] to [path] *)
+    | Worktree_removed of
+        { target : string
+        ; force : bool
+        } (** a refusal over uncommitted changes offers [rm -f] *)
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -209,7 +227,8 @@ module Model : sig
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
-    ; skills : Skill_cache.t
+    ; skills : P.Skill.t list Location_cache.t
+    ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
     ; login_lines : string list

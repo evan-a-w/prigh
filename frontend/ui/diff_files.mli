@@ -21,6 +21,10 @@ module File : sig
     ; added : int
     ; removed : int
     ; hunks : string list (** from the first [@@] line *)
+    ; hash : string
+      (** of the file's whole section of the diff (MD5, hex): it changes
+          whenever the file's content does, so approvals are keyed by it
+          ({!File_approval}) *)
     }
   [@@deriving sexp_of, equal]
 end

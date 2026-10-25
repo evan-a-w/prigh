@@ -94,6 +94,7 @@ module Event : sig
     | Compacted of { summary : string }
     | Notice of string
     | Config_changed of Config.t
+    | Review_changed of Review_state.t (** after every change *)
     | Queue_update of
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
@@ -436,6 +437,23 @@ val compact : ?instructions:string -> t -> string Or_error.t
 (** The working tree's changes on the active tool host ({!Git_diff}). *)
 val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
 
+(** {2 Worktrees}
+
+    The repository's git worktrees, run on the active tool host in the
+    session cwd's repository; new ones go under the config's
+    [worktrees_dir] ({!Worktree}). *)
+
+val worktrees : t -> Worktree.Listing.t Or_error.t
+
+val create_worktree
+  :  t
+  -> branch:string
+  -> base:string option
+  -> Worktree.Created.t Or_error.t
+
+(** Removes a worktree of the session cwd's repository ({!Worktree.remove}). *)
+val remove_worktree : t -> path:string -> force:bool -> Worktree.t Or_error.t
+
 (** [/review ARGS]: a run reviewing the uncommitted changes, or the changes
     against a base when the first word of [ARGS] names a revision; the rest
     (all of [ARGS] otherwise) is extra instructions. The message is
@@ -446,6 +464,35 @@ val review : t -> args:string -> unit Or_error.t
 (** [/init]: a run asking the model to write or improve [AGENTS.md]
     ({!Init_prompt}), queued like [review]. *)
 val init : t -> unit Or_error.t
+
+(** {2 Review: comments and approvals}
+
+    The session's {!Review_state}, recorded in it. While it has comments the
+    main agent has [reply_to_comment] ({!Tool_review_reply}). Each change
+    emits [Review_changed]. *)
+
+val review_state : t -> Review_state.t
+
+(** Applies and records the changes [f] returns, giving back its result. *)
+val update_review
+  :  t
+  -> f:(Review_state.t -> ('a * Review_state.Change.t list) Or_error.t)
+  -> 'a Or_error.t
+
+(** Sends the posts of the user's the agent has not seen
+    ({!Review_state.submit}) as a message with the [Review_comments] source,
+    steering a running agent or starting a run; the comments it covers. *)
+val submit_review : t -> int Or_error.t
+
+(** Accepts (applies the edits to the comment's file on the active tool host,
+    with [edit]) or rejects a pending proposal; one that no longer applies is
+    [Failed]. *)
+val decide_proposal
+  :  t
+  -> id:string
+  -> post:int
+  -> accept:bool
+  -> Review_comment.t Or_error.t
 
 (** {2 Budget, goal and resume} *)
 

@@ -159,6 +159,7 @@ module Source = struct
     | Summary
     | Review of { target : string }
     | Init
+    | Review_comments of { count : int }
   [@@deriving sexp, jsonaf, equal]
 
   let kind = function
@@ -172,6 +173,7 @@ module Source = struct
     | Summary -> "summary"
     | Review _ -> "review"
     | Init -> "init"
+    | Review_comments _ -> "review_comments"
   ;;
 
   let title = function
@@ -191,6 +193,8 @@ module Source = struct
     | Summary -> "Summary of the earlier conversation"
     | Review { target } -> "Review of " ^ target
     | Init -> "Write or improve AGENTS.md"
+    | Review_comments { count = 1 } -> "1 review comment"
+    | Review_comments { count } -> sprintf "%d review comments" count
   ;;
 
   (* [\[subagent a1 finished\] task] or [\[job j1 exited 0\] command]. *)

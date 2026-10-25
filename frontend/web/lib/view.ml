@@ -256,6 +256,7 @@ let view (m : Model.t) ~inject ~terminal =
               | Reconnecting _ -> true
               | Connected -> false )
           ; "files-open", m.files.open_
+          ; "reviewing", m.review.open_
           ]
       ; Resize_view.vars m
       ]
@@ -274,6 +275,7 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
+    ; under_drawer (Review_page_view.view m ~inject)
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         (List.map

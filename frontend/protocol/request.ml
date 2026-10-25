@@ -56,6 +56,50 @@ module Method = struct
         ; push : bool
         }
     | Pr_checkout of int
+    | List_worktrees
+    | Create_worktree of
+        { branch : string
+        ; base : string option
+        }
+    | Remove_worktree of
+        { path : string
+        ; force : bool
+        }
+    | Get_review
+    | Review_comment of
+        { root : string
+        ; path : string
+        ; first : int
+        ; last : int
+        ; anchor : string
+        ; text : string
+        }
+    | Review_reply of
+        { id : string
+        ; text : string
+        }
+    | Review_set_status of
+        { id : string
+        ; status : Review_comment.Status.t
+        }
+    | Review_delete of { id : string }
+    | Review_submit
+    | Review_decide of
+        { id : string
+        ; post : int
+        ; accept : bool
+        }
+    | Review_approve of
+        { path : string
+        ; hash : string
+        }
+    | Review_unapprove of { path : string }
+    | Fs_preview of { path : string }
+    | Fs_write of
+        { path : string
+        ; text : string
+        ; expected : string option
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -78,12 +122,55 @@ module Method = struct
     | Pr_defaults -> "pr_defaults"
     | Pr_create _ -> "pr_create"
     | Pr_checkout _ -> "pr_checkout"
+    | List_worktrees -> "list_worktrees"
+    | Create_worktree _ -> "create_worktree"
+    | Remove_worktree _ -> "remove_worktree"
+    | Get_review -> "get_review"
+    | Review_comment _ -> "review_comment"
+    | Review_reply _ -> "review_reply"
+    | Review_set_status _ -> "review_set_status"
+    | Review_delete _ -> "review_delete"
+    | Review_submit -> "review_submit"
+    | Review_decide _ -> "review_decide"
+    | Review_approve _ -> "review_approve"
+    | Review_unapprove _ -> "review_unapprove"
+    | Fs_preview _ -> "fs_preview"
+    | Fs_write _ -> "fs_write"
   ;;
 
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | Forge_status | Pr_defaults -> []
+    | Delete_archived
+    | Forge_status
+    | Pr_defaults
+    | List_worktrees
+    | Get_review
+    | Review_submit -> []
+    | Review_comment { root; path; first; last; anchor; text } ->
+      [ "root", Json.str root
+      ; "path", Json.str path
+      ; "first", Json.int first
+      ; "last", Json.int last
+      ; "anchor", Json.str anchor
+      ; "text", Json.str text
+      ]
+    | Review_reply { id; text } -> [ "id", Json.str id; "text", Json.str text ]
+    | Review_set_status { id; status } ->
+      [ "id", Json.str id
+      ; "status", Json.str (Review_comment.Status.to_string status)
+      ]
+    | Review_delete { id } -> [ "id", Json.str id ]
+    | Review_decide { id; post; accept } ->
+      [ "id", Json.str id; "post", Json.int post; "accept", Json.bool accept ]
+    | Review_approve { path; hash } ->
+      [ "path", Json.str path; "hash", Json.str hash ]
+    | Review_unapprove { path } | Fs_preview { path } ->
+      [ "path", Json.str path ]
+    | Fs_write { path; text; expected } ->
+      [ "path", Json.str path; "text", Json.str text ]
+      @ Option.value_map expected ~default:[] ~f:(fun e ->
+        [ "expected", Json.str e ])
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -126,6 +213,12 @@ module Method = struct
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
       @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
       @ [ "draft", Json.bool draft; "push", Json.bool push ]
+    | Create_worktree { branch; base } ->
+      [ "branch", Json.str branch ]
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+    | Remove_worktree { path; force } ->
+      [ "path", Json.str path ]
+      @ if force then [ "force", Json.bool true ] else []
   ;;
 end
 

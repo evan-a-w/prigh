@@ -10,6 +10,7 @@ module Target = struct
     | Session of string
     | Terminal
     | Files
+    | Review
     | Resize of Resize.Handle.t
     | Page
   [@@deriving sexp_of]
@@ -55,6 +56,8 @@ let help =
        transcript's right edge)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
+  ; ( "Alt+Enter / Delete (/worktree)"
+    , "start a new session in the highlighted worktree / remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
   ; ( "Space (selecting)"
@@ -72,6 +75,17 @@ let help =
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
+  ; ( "Alt+R"
+    , "open or close the review page (/review): the changes file by file, \
+       beside the chat" )
+  ; "] / [ (reviewing; also n p, j k)", "the next / previous changed file"
+  ; ( "a / c / e / v / s (reviewing)"
+    , "approve the file; comment on the selected lines (click a line number, \
+       Shift+click for a range); edit or comment; the whole file or the \
+       changes; send the new comments to prigh" )
+  ; "Esc (reviewing)", "drop the comment or selection, then close the review"
+  ; ( "Ctrl+Enter / Ctrl+S (reviewing)"
+    , "add the comment or reply; save the file being edited" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
@@ -121,6 +135,7 @@ let on_control t =
   | Session _
   | Terminal
   | Files
+  | Review
   | Resize _
   | Page -> false
 ;;
@@ -140,6 +155,12 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Reminders; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Remove_reminder item.id)
+  | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Ask_remove_worktree item.id)
+  | "Enter", Picker { kind = Worktrees _; picker } when alt_only t ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Open_worktree { path = item.id; new_session = true })
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete
@@ -201,7 +222,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
          && (m.narrow
              ||
              match t.target with
-             | Editor _ | Terminal | Files -> false
+             | Editor _ | Terminal | Files | Review -> false
              | Field
              | Multiline
              | Control
@@ -307,6 +328,7 @@ let question_key t : Question_dialog.Action.t option =
     | Session _
     | Terminal
     | Files
+    | Review
     | Resize _
     | Page -> false
   in
@@ -347,6 +369,13 @@ let handle (m : App.Model.t) t : App.Action.t option =
               ~ctrl:t.ctrl
               ~alt:t.alt
               ~meta:t.meta -> Some (Files Toggle)
+     | _
+       when Code_review.toggle_key
+              ~code:t.code
+              ~shift:t.shift
+              ~ctrl:t.ctrl
+              ~alt:t.alt
+              ~meta:t.meta -> Some (Review Toggle)
      | ("l" | "L") when command t -> Some Open_model_picker
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
@@ -388,6 +417,22 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Files ->
           Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
           |> Option.map ~f:(fun a -> App.Action.Files a)
+        | None, Page when m.review.open_ ->
+          Code_review.key
+            m.review
+            ~key:t.key
+            ~shift:t.shift
+            ~ctrl:t.ctrl
+            ~alt:t.alt
+          |> Option.map ~f:(fun a -> App.Action.Review a)
+        | None, Review ->
+          Code_review.key
+            m.review
+            ~key:t.key
+            ~shift:t.shift
+            ~ctrl:t.ctrl
+            ~alt:t.alt
+          |> Option.map ~f:(fun a -> App.Action.Review a)
         | None, Resize h ->
           resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
         | None, (Field | Multiline | Control | Terminal | Page) -> None))

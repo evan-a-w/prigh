@@ -79,4 +79,9 @@ val create_pull
   -> push:bool
   -> Json.t Or_error.t
 
-val checkout_pull : t -> git:git -> int -> Json.t Or_error.t
+val checkout_pull
+  :  t
+  -> git:git
+  -> worktrees_dir:string
+  -> int
+  -> Json.t Or_error.t

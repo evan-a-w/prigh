@@ -102,6 +102,10 @@ let with_server f =
   Eio.Switch.run
   @@ fun sw ->
   let repo = set_up_repos t in
+  write
+    t
+    ".prigh/config.json"
+    (sprintf {|{"worktrees_dir": %S}|} (Filename.concat t.dir "worktrees"));
   let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
   let login =
     Login_manager.create ~env:t.env ~sw ~getenv:(fun _ -> None) ~store ()
@@ -314,15 +318,15 @@ let%expect_test
       {"title":"Elsewhere","body":"","head":"not-pushed","base":"dev","draft":false}
     |}];
   call "pr_checkout" ~params:{|{"number": 7}|};
-  let worktree = Filename.concat t.dir "r-wt/pr-7" in
+  let worktree = Filename.concat t.dir "worktrees/r/pr-7" in
   print_endline (git_out worktree "log --format=%s -1");
   call "pr_checkout" ~params:{|{"number": 7}|};
   call "pr_checkout" ~params:{|{"number": 3}|};
   [%expect
     {|
-    {"path":"$DIR/r-wt/pr-7","branch":"pr-7","created":true}
+    {"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","created":true}
     From a contributor
-    {"path":"$DIR/r-wt/pr-7","branch":"pr-7","created":false}
+    {"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","created":false}
     error: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? /pr lists them): fatal: couldn't find remote ref refs/pull/3/head
     |}];
   sh repo "git checkout -q --detach";

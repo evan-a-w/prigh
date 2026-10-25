@@ -52,6 +52,7 @@ module Request = struct
     | Checkout of
         { remote : string
         ; number : int
+        ; worktrees_dir : string
         }
   [@@deriving sexp_of]
 
@@ -68,10 +69,11 @@ module Request = struct
          ]
        | Push { remote; branch } ->
          [ "action", s "push"; "remote", s remote; "branch", s branch ]
-       | Checkout { remote; number } ->
+       | Checkout { remote; number; worktrees_dir } ->
          [ "action", s "checkout"
          ; "remote", s remote
          ; "number", `Number (Int.to_string number)
+         ; "worktrees_dir", s worktrees_dir
          ])
   ;;
 end
@@ -238,25 +240,14 @@ let push ~(runner : Runner.t) ~cwd ~remote ~branch =
             branch))
 ;;
 
-let checkout ~(runner : Runner.t) ~cwd ~remote ~number =
+let checkout ~env ~cancel ~(runner : Runner.t) ~cwd ~remote ~number ~dir =
   let git = runner.git in
   let root = (info ~runner ~cwd).root in
-  let common =
-    git ~dir:root [ "rev-parse"; "--path-format=absolute"; "--git-common-dir" ]
-    |> ok_or_fail ~what:"git rev-parse"
-    |> String.strip
-  in
-  let main =
-    if String.equal (Filename.basename common) ".git"
-    then Filename.dirname common
-    else root
+  let or_fail = function
+    | Ok v -> v
+    | Error e -> raise (Failed (Error.to_string_hum e))
   in
   let branch = sprintf "pr-%d" number in
-  let path =
-    Filename.concat
-      (Filename.concat (Filename.dirname main) (Filename.basename main ^ "-wt"))
-      branch
-  in
   let _ : string =
     git
       ~timeout:(Time_ns.Span.of_sec 120.)
@@ -277,48 +268,42 @@ let checkout ~(runner : Runner.t) ~cwd ~remote ~number =
     |> ok_or_fail ~what:"git rev-parse FETCH_HEAD"
     |> String.strip
   in
-  let created =
-    match Sys_unix.file_exists path with
-    | `Yes ->
-      let _ : string =
-        git ~dir:path [ "merge"; "--ff-only"; fetched ]
-        |> ok_or_fail
-             ~what:
-               (sprintf
-                  "%s exists but cannot fast-forward to the pull request \
-                   (commit or drop its changes there, or remove it with git \
-                   worktree remove %s)"
-                  path
-                  path)
-      in
-      false
-    | `No | `Unknown ->
-      if verify ~runner ~dir:root ("refs/heads/" ^ branch)
-      then (
-        let _ : string =
-          git ~dir:root [ "worktree"; "add"; path; branch ]
-          |> ok_or_fail ~what:"git worktree add"
-        in
-        let _ : string =
-          git ~dir:path [ "merge"; "--ff-only"; fetched ]
-          |> ok_or_fail
-               ~what:
-                 (sprintf
-                    "the branch %s exists and cannot fast-forward to the pull \
-                     request (rename it with git branch -m %s OTHER)"
-                    branch
-                    branch)
-        in
-        ())
-      else (
-        let _ : string =
-          git ~dir:root [ "worktree"; "add"; "-b"; branch; path; fetched ]
-          |> ok_or_fail ~what:"git worktree add"
-        in
-        ());
-      true
+  let fast_forward path =
+    let _ : string =
+      git ~dir:path [ "merge"; "--ff-only"; fetched ]
+      |> ok_or_fail
+           ~what:
+             (sprintf
+                "%s cannot fast-forward to the pull request (commit or drop \
+                 its changes there, or rename the branch: git branch -m %s \
+                 OTHER)"
+                path
+                branch)
+    in
+    ()
   in
-  { Checkout.path; branch; created }
+  let listing = Worktree.list ~env ~cancel ~cwd:root ~dir |> or_fail in
+  match
+    List.find listing.worktrees ~f:(fun (w : Worktree.t) ->
+      Option.equal String.equal w.branch (Some branch))
+  with
+  | Some existing ->
+    fast_forward existing.path;
+    { Checkout.path = existing.path; branch; created = false }
+  | None ->
+    let existed = verify ~runner ~dir:root ("refs/heads/" ^ branch) in
+    let created =
+      Worktree.create
+        ~env
+        ~cancel
+        ~cwd:root
+        ~dir
+        ~branch
+        ~base:(if existed then None else Some fetched)
+      |> or_fail
+    in
+    if existed then fast_forward created.worktree.path;
+    { path = created.worktree.path; branch; created = true }
 ;;
 
 let run ~env ~cancel ~cwd ~arguments =
@@ -353,7 +338,14 @@ let run ~env ~cancel ~cwd ~arguments =
           | None -> raise (Failed (sprintf "%s: missing \"number\"" op))
         in
         [%jsonaf_of: Checkout.t]
-          (checkout ~runner ~cwd ~remote:(str "remote") ~number)
+          (checkout
+             ~env
+             ~cancel
+             ~runner
+             ~cwd
+             ~remote:(str "remote")
+             ~number
+             ~dir:(str "worktrees_dir"))
       | _ -> raise (Failed (sprintf "%s: unknown action" op))
     in
     Tool_result.ok (Json.to_string json)
