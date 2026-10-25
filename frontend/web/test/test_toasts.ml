@@ -162,7 +162,6 @@ let%expect_test "toasts are not under a dialog's inert page" =
     Open_model_picker
     (Focus picker-input)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     <div class="toast">

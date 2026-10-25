@@ -437,27 +437,61 @@ kbd {
 
 .scrim { display: none; }
 
-/* Top bar */
-
-/* Three regions: the session on the left, what the agent is doing in the
-   middle of the bar, the panels and the settings on the right. It steps
-   down with the chat column's width, not the window's (see the container
-   queries at the end). Its height is fixed: what the status says never
-   moves the page. */
-.topbar {
-  container: topbar / inline-size;
+/* The session: a card in the docked sidebar, else a slim bar over the
+   chat (one of them at a time). The bar steps down with the chat column's
+   width, not the window's (see the container queries at the end). Its
+   height is fixed: what the status says never moves the page. */
+.session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0 -10px;
+  padding: 10px 10px 10px 18px;
+  border-top: 1px solid var(--rule);
+}
+.card-head { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; }
+.card-head > .session-name { flex: 0 1 auto; min-width: 0; font-size: 13.5px; }
+.card-head > .panel-toggles { margin-left: auto; gap: 0; }
+.panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
+.panel-toggles > .btn.icon:hover { color: var(--chalk); }
+.card-host { display: flex; min-width: 0; }
+.card-host > .host { font: 11.5px/1.4 var(--mono); color: var(--muted); min-width: 0; }
+.card-host > .host .status-text { overflow: hidden; text-overflow: ellipsis; }
+/* The status stacked: what the agent is doing, the context across the
+   card, then the counters. */
+.session-card .status {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "activity activity" "context context" "tokens cost";
+  gap: 6px 12px;
+  margin-top: 8px;
+  padding: 0;
+  overflow: visible;
+}
+.session-card .status > .activity { grid-area: activity; width: auto; }
+.session-card .status > .context { grid-area: context; gap: 10px; }
+.session-card .status > .tokens { grid-area: tokens; }
+.session-card .status > .cost { grid-area: cost; justify-self: end; }
+.session-card .context .meter { flex: 1; width: auto; }
+.session-card .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; margin-top: 4px; padding: 0; overflow: visible; }
+
+.session-bar {
+  container: bar / inline-size;
+  display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 12px 0 16px;
-  height: 54px;
+  gap: 12px;
+  height: 44px;
+  padding: 0 8px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--rule);
 }
-.topbar-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.app.sidebar-open:not(.narrow) .topbar .toggle-sidebar { display: none; }
-.topbar .title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
+.session-bar > .toggle-sidebar { margin-right: -6px; color: var(--muted); }
+.session-bar > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--muted); font-size: 13.5px; }
+.session-bar > .session-name:hover { color: var(--chalk); }
+.session-bar > .status-extras { flex: 1 1 0; justify-content: flex-end; }
+.session-bar > .status { flex-shrink: 0; margin-left: auto; }
+.session-bar > .settings-toggle { color: var(--faint); }
+.session-bar > .settings-toggle:hover { color: var(--chalk); }
 .session-name {
   display: inline-flex;
   align-items: center;
@@ -608,28 +642,35 @@ kbd {
   overflow-y: auto;
 }
 .composer-bar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
-.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; }
-/* Quiet until pointed at: the box's border is theirs. */
+.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
+/* Settings of the message, written in the box's own voice: plain words
+   that line up with the text above them, until pointed at. Their chevrons
+   (and a hover's wash) say they open something; the pickers are the
+   commands' own. */
 .chip-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
+  gap: 4px;
+  height: 28px;
   min-width: 0;
   flex-shrink: 0;
   border-radius: var(--r-control);
   padding: 0 8px;
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 400;
   background: transparent;
   border-color: transparent;
-  color: var(--muted);
+  color: var(--faint);
+  transition: color 0.12s, background-color 0.12s;
 }
-.chip-button:hover { background: var(--slate-2); color: var(--chalk); }
+.composer-controls .chip-button:not(.awaiting):is(:hover, :focus-visible) { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
 .chip-button:focus-visible { outline-offset: 0; }
-.chip-button .icon { width: 14px; height: 14px; color: var(--faint); flex-shrink: 0; }
-.chip-button:hover .icon { color: var(--muted); }
-.chip-button .chevron { width: 12px; height: 12px; }
+.chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
+.composer-controls .chip-button > .icon:first-child { display: none; }
+.chip-button .chevron { width: 11px; height: 11px; opacity: 0; transition: opacity 0.12s; }
+.chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
+.composer-box:focus-within .chip-button:not(:hover, :focus-visible) { color: var(--muted); }
+.model-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer-controls > .model-chip { flex-shrink: 1; }
 .composer-controls > .model-chip .chip-label { min-width: 4ch; }
@@ -703,12 +744,10 @@ kbd {
 .popup-item.dimmed, .picker-item.dimmed { opacity: 0.5; }
 .popup-item > .mark.picked { --mark-size: 13px; align-self: center; margin-left: -6px; }
 
-/* The status, in the middle of the top bar, and what applies after it at
-   the start of the bar's end: one line that gives way rather than wraps
+/* The status and what applies: one line that gives way rather than wraps
    (the padding keeps its links' focus rings inside). Nothing in the status
-   moves as the agent starts and stops: the activity comes last, in a slot
-   of its own width, and what applies is outside the status (before it on a
-   phone, where the status is at the end). */
+   moves as the agent starts and stops: the activity has a slot of its own
+   width, and what applies is outside the status, before it in the bar. */
 
 .status, .status-extras {
   display: flex;
@@ -721,12 +760,10 @@ kbd {
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
-.topbar-end { display: flex; align-items: center; gap: 10px; min-width: 0; }
-/* Its width does not count in the bar's end column, so it never pushes the
-   status off the centre: it takes what is left beside the panels. */
-.status-extras { flex: 1 1 0; contain: inline-size; }
+/* Its width does not count in the bar, so it never pushes the status: it
+   takes what is left beside the title. */
+.status-extras { contain: inline-size; }
 .status-extras:empty { display: none; }
-.topbar-end > .panel-toggles { margin-left: auto; }
 .status .context, .status .tokens, .status .cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
@@ -969,8 +1006,7 @@ kbd {
 .app.narrow .scrim { display: block; position: fixed; inset: 0; background: #0009; z-index: 25; }
 
 @media (max-width: 760px) {
-  .topbar { padding: 0 8px; gap: 8px; height: 50px; }
-  .session-name { font-size: 14px; }
+  .session-bar { gap: 8px; }
   .composer { padding: 6px 8px 8px; }
   .popup { left: 8px; right: 8px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
@@ -1260,14 +1296,13 @@ kbd {
   .app.offline :is(.banner, .status) .lamp { animation: none !important; }
 }
 
-.panel-toggles { display: flex; align-items: center; justify-self: end; gap: 6px; }
+.panel-toggles { display: flex; align-items: center; gap: 2px; }
 
 /* The thinking level and what asks first, beside the model: always shown,
    each opening its picker. Plan mode holds the agent back, so it is lit. */
-.chip-key { color: var(--faint); font-weight: 400; }
+.chip-key { opacity: 0.75; }
 .thinking-chip.unsupported { color: var(--faint); }
-.mode-chip.plan-mode { color: var(--sodium); background: var(--sodium-wash); }
-.mode-chip.plan-mode .icon { color: var(--sodium); }
+.mode-chip.plan-mode, .composer-box:focus-within .mode-chip.plan-mode:not(:hover) { color: var(--sodium); background: var(--sodium-wash); }
 
 /* Queued steers and follow-ups, above the composer while they wait. */
 .queue {
@@ -1326,34 +1361,25 @@ kbd {
    mode's name. */
 @container composer (width < 600px) {
   .composer-controls .chip-key, .composer-controls .chevron { display: none; }
+  .composer-controls .chip-button > .icon:first-child { display: inline-block; }
   .composer-controls .mode-chip:not(.awaiting) .chip-label { display: none; }
   .composer-controls .mode-chip:not(.awaiting)::after { content: attr(data-short); }
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
 }
-/* Then the model's name gives way before the level and the mode do. */
-@container composer (width < 400px) {
-  .composer-controls > .model-chip > .icon:first-child { display: none; }
-}
 
-/* The top bar's steps. A narrower bar drops the counters (the context's
-   link has them, in the session's details), then says what applies with
-   icons alone (their tooltips and names say the rest). */
-@container topbar (width < 760px) {
+/* The bar's steps. A narrower bar drops the counters (the context's link
+   has them, in the session's details), then says what applies with icons
+   alone (their tooltips and names say the rest), then the activity is a
+   dot. */
+@container bar (width < 760px) {
   .status { gap: 0 12px; }
   .status .tokens, .status .cost:not(.budget) { display: none; }
 }
-@container topbar (width < 600px) {
+@container bar (width < 600px) {
   .status-extras .status-text, .status-extras .status-item.mode { display: none; }
   .status-item.activity { width: 14ch; }
 }
-/* A phone: the session gets the room, the status follows it, and what
-   applies comes before the status. */
-.app.narrow .topbar { grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
-.app.narrow .topbar-end { display: contents; }
-.app.narrow .status-extras { order: 1; contain: none; max-width: 40cqi; }
-.app.narrow .status { order: 2; }
-.app.narrow .panel-toggles { order: 3; }
-@container topbar (width < 480px) {
+@container bar (width < 480px) {
   .status, .status-extras { gap: 0 10px; padding: 4px 0; }
   .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
   .status-item.activity:is(.running, .idle) > .label { display: none; }

@@ -261,7 +261,11 @@ let view (m : Model.t) ~inject ~terminal =
       ]
     [ (* A phone's closed drawer is only out of sight. *)
       (if m.narrow && not m.sidebar_open then inert else under_sheet)
-        (Sidebar_view.view m ~inject)
+        (Sidebar_view.view
+           m
+           ~inject
+           ~session:
+             (if Model.docked m then Session_view.card m ~inject else Node.none))
     ; (if m.sidebar_open
        then Resize_view.handle m ~inject Sidebar
        else Node.none)
@@ -278,7 +282,7 @@ let view (m : Model.t) ~inject ~terminal =
         ~attrs:[ Attr.class_ "main" ]
         (List.map
            ~f:under_drawer
-           [ Topbar_view.view m ~inject
+           [ (if Model.docked m then Node.none else Session_view.bar m ~inject)
            ; banner m ~inject
            ; div
                ~cls:"chat-frame"

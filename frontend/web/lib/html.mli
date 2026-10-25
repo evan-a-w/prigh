@@ -44,7 +44,6 @@ module Icon : sig
     | Brain
     | Folder
     | Branch
-    | Cpu
     | Logout
     | Undo
     | External

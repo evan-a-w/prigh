@@ -106,8 +106,8 @@ let chat_min = 400
 let files_floats_below = 1100
 let agents_floats_below = 1180
 
-(* Room under the terminal's top edge's highest position: the top bar, the
-   composer and a few lines of chat. *)
+(* Room under the terminal's top edge's highest position: the session's bar,
+   the composer and a few lines of chat. *)
 let terminal_room = 260
 let viewport t = t.viewport
 let preference t h = Map.find t.sizes h
