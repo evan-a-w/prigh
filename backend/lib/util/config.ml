@@ -32,6 +32,7 @@ type t =
   ; default_thinking : Thinking.t option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; worktrees_dir : string
   ; max_budget_usd : float option
   ; goal_max_continuations : int
   ; resume_on_limit_reset : bool
@@ -43,6 +44,8 @@ type t =
   }
 [@@deriving sexp_of]
 
+let default_worktrees_dir = "~/.prigh/worktrees"
+
 let default =
   { scoped_models = []
   ; approval_mode = Auto
@@ -51,6 +54,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; worktrees_dir = default_worktrees_dir
   ; max_budget_usd = None
   ; goal_max_continuations = Goal.default_max_continuations
   ; resume_on_limit_reset = true
@@ -94,6 +98,7 @@ let to_json t =
     ; ( "fallback_models"
       , `Array (List.map t.fallback_models ~f:(fun s -> `String s)) )
     ; "default_cwd", option (fun s -> `String s) t.default_cwd
+    ; "worktrees_dir", `String t.worktrees_dir
     ; ( "max_budget_usd"
       , option
           (fun usd -> `Number (Float.to_string_hum ~strip_zero:true usd))
@@ -137,6 +142,12 @@ let of_json json =
       | Some (`String "") -> Ok None
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_cwd must be a string"
+    in
+    let%bind worktrees_dir =
+      match find "worktrees_dir" with
+      | None | Some `Null | Some (`String "") -> Ok default_worktrees_dir
+      | Some (`String s) -> Ok s
+      | Some _ -> Or_error.error_string "config.worktrees_dir must be a string"
     in
     (* [confirm_tools] is what [approval_mode] replaced: on is [ask], off
        is [auto]. *)
@@ -266,6 +277,7 @@ let of_json json =
     ; default_thinking
     ; fallback_models
     ; default_cwd
+    ; worktrees_dir
     ; max_budget_usd
     ; goal_max_continuations
     ; resume_on_limit_reset

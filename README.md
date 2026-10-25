@@ -361,6 +361,20 @@ or the one you are in): those are not asked for, and with nothing left to
 delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes.
 
+Below the sessions, when the session is in a git repository, a
+"Worktrees" section lists the repository's worktrees (`/worktree`, above):
+each with its branch, `● 3 changed` when it has uncommitted changes, ↑↓
+commits against its upstream, its path (the full one on hover) and the
+sessions working in it as chips (click one to switch to it); the one the
+session is in has an accent edge. Clicking a worktree moves the session
+there, its hover "+" starts a new session there and its bin asks to remove
+it ("Discard changes and remove" when it has changes); the header folds
+the section, refreshes it and has "+" for a "New worktree" dialog (branch,
+and a base that defaults to where the session is; Enter creates it and
+moves the session there, Esc cancels). It is listed again when the
+session, its directory or its tool host changes, when a turn ends and
+after creating or removing one.
+
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
@@ -1058,6 +1072,8 @@ it is replaced by `approval_mode` when prigh saves the file),
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`),
+`worktrees_dir` (default `~/.prigh/worktrees`, on the tool host: where
+`/worktree new` puts git worktrees, below),
 `ask_user_timeout_seconds` (default 300, `0` = never: how long a question
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
@@ -1220,6 +1236,7 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
@@ -1259,6 +1276,27 @@ model how to read it); like a prompt they queue while a run is going, and
 an error (nothing to review, an unknown base, not a repository) says what
 to do. The transcript shows them as notes (`⚑ Review of uncommitted
 changes`, `▤ Write or improve AGENTS.md`), not as the long prompt.
+
+`/worktree` works with the git worktrees of the repository the session is
+in, on the active tool host. `/worktree new BRANCH [BASE]` puts a new one
+at `<worktrees_dir>/<project>/<branch>` (`~/.prigh/worktrees/prigh/feat-x`
+for the branch `feat/x` of a checkout named `prigh`; `/` and unusual
+characters become `-`): a new branch from BASE (default: where the session
+is), an existing local branch checked out as it is (no BASE then), or,
+without BASE, the one remote branch of that name, tracked. The project
+directory records which repository it belongs to (`.prigh-repo`), so
+another checkout with the same name gets `prigh-2`, and a branch whose
+directory is taken gets `-2`. A branch already checked out elsewhere is
+refused with where it is. The list shows each worktree's branch, path,
+uncommitted changes (`*`), commits ahead of and behind its upstream, and
+the sessions working in it; `TARGET` is a branch, a path or a directory
+name, completed with Tab, and an unknown one gets the closest matches.
+Removing asks first (saying what would be lost and which sessions work
+there), keeps the branch, and is refused for the main checkout, for the
+worktree the session itself is in (open another first) and, without
+`-f`, for one with uncommitted changes or locked; a worktree whose
+directory was deleted is pruned. prigh-web also has a Worktrees section in
+the sidebar (below).
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:

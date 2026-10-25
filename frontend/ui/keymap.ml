@@ -96,7 +96,8 @@ let bindings =
   ; b
       [ Key.ctrl 'n' ]
       Picker_toggle_filter
-      "picker: toggle the named-only / logged-in-only filter"
+      "picker: toggle the named-only / logged-in-only filter; /worktree: open \
+       in a new session"
   ; b
       [ Key.alt (Char "a") ]
       Toggle_archived
@@ -150,11 +151,13 @@ let list_help =
     ; "Enter / Esc", "accept the highlighted item / close without changes"
     ; ( "Ctrl+D"
       , "/sessions: delete the marked or highlighted sessions · /agents: \
-         cancel · /jobs: kill · /queue, /remind: remove" )
+         cancel · /jobs: kill · /queue, /remind, /worktree: remove" )
     ; "Tab", "/sessions: mark or unmark the highlighted session"
     ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
     ; "Alt+D", "/sessions: delete every archived session"
-    ; "Ctrl+N", "/sessions: named only · /model: logged-in only"
+    ; ( "Ctrl+N"
+      , "/sessions: named only · /model: logged-in only · /worktree: open in a \
+         new session" )
     ; "Space / Ctrl+A / Ctrl+X", "/scoped-models: toggle / all / none"
     ]
 ;;

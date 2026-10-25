@@ -1048,6 +1048,10 @@ let%expect_test "switching session drops what the old one waited for" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     ((confirms 0) (reason ()) (questions 0))
     |}]
 ;;

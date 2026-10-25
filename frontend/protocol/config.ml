@@ -36,6 +36,7 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; worktrees_dir : string option
   ; archive_after_days : float
   ; notify : string
   ; snippets : Snippet.t list
@@ -50,6 +51,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; worktrees_dir = None
   ; archive_after_days = 7.
   ; notify = "bell"
   ; snippets = []
@@ -89,6 +91,7 @@ let of_json j =
   let%bind default_thinking = optional_string "default_thinking" in
   let%bind fallback_models = strings "fallback_models" in
   let%bind default_cwd = optional_string "default_cwd" in
+  let%bind worktrees_dir = optional_string "worktrees_dir" in
   let%bind archive_after_days =
     match Json.field j "archive_after_days" with
     | None | Some `Null -> Ok default.archive_after_days
@@ -106,6 +109,7 @@ let of_json j =
   ; default_thinking
   ; fallback_models
   ; default_cwd
+  ; worktrees_dir
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
   ; snippets
@@ -116,15 +120,18 @@ let to_json t =
   let optional = Option.value_map ~default:`Null ~f:(fun s -> `String s) in
   let strings l = `Array (List.map l ~f:(fun s -> `String s)) in
   `Object
-    [ "scoped_models", strings t.scoped_models
-    ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
-    ; "permissions", Permissions.to_json t.permissions
-    ; "default_model", optional t.default_model
-    ; "default_thinking", optional t.default_thinking
-    ; "fallback_models", strings t.fallback_models
-    ; "default_cwd", optional t.default_cwd
-    ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
-    ; "notify", `String t.notify
-    ; "snippets", Snippet.list_to_json t.snippets
-    ]
+    ([ "scoped_models", strings t.scoped_models
+     ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+     ; "permissions", Permissions.to_json t.permissions
+     ; "default_model", optional t.default_model
+     ; "default_thinking", optional t.default_thinking
+     ; "fallback_models", strings t.fallback_models
+     ; "default_cwd", optional t.default_cwd
+     ]
+     @ Option.value_map t.worktrees_dir ~default:[] ~f:(fun dir ->
+       [ "worktrees_dir", `String dir ])
+     @ [ "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
+       ; "notify", `String t.notify
+       ; "snippets", Snippet.list_to_json t.snippets
+       ])
 ;;
