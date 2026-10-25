@@ -471,18 +471,18 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
 
 
 
-
-
-
-
-
-
-
-
-
         [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
 
       [yellow]▌ [/][bold]earlier question[/]
+        earlier [bold]answer[/]
+        See the docs (https://example.com).
+      [green]✓ [/][bold]bash[/]
+          [gray]--- a/x.c[/]
+          [gray]+++ b/x.c[/]
+          [cyan]@@ -1,2 +1,2 @@[/]
+          [red]-old[/]
+          [green]+new[/]
+          [gray] context[/]
       [invert]▸ [/][bold][invert]/help[/][gray][invert]                              show commands and keys[/]
         [bold]/hotkeys[/][gray]                           show keyboard shortcuts[/]
         [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]

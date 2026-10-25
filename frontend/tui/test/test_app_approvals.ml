@@ -119,6 +119,10 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Mode (Alt+M cycles)  (4)
     / ▏
        ask        bash, job_input, edits and MCP tools ask first
@@ -190,10 +194,10 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ unknown argument "maybe"; use on or off (or nothing to   │
     │ toggle)                                                  │
@@ -224,6 +228,10 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Permissions ──────────────────────────────────────────────────────────────────────────┐
     │ mode: ask — bash, job_input, edits and MCP tools ask first                             │
     │ allowed this session: edit                                                             │
@@ -277,6 +285,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Run bash: git status -s?                                 │
     │ y  allow once                                            │
@@ -305,6 +317,10 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      allowed bash; always: bash(git status:*)
     ┌─ Why not? (the model sees it) ───────────────────────────┐
     │ [a1] Run bash: make?                                     │
     │ › ▏                                                      │
@@ -318,6 +334,11 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      allowed bash; always: bash(git status:*)
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ [a1] Run bash: make?                                     │
     │ y  allow once                                            │
@@ -406,6 +427,10 @@ let%expect_test "the plan to approve" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Plan ───────────────────────────────────────────────────┐
     │ Approve the plan and start implementing?                 │
     │ 1. Add the flag to main.ml                               │
@@ -469,6 +494,10 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Storage (1/3) ──────────────────────────────────────────┐
     │ Which database?                                          │
     │ › ( ) Postgres▏ what prod uses                           │
@@ -491,6 +520,10 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Question 2/3 ───────────────────────────────────────────┐
     │ Which features?                                          │
     │   [x] auth                                               │
@@ -513,6 +546,10 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.enter h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Storage (1/3) ──────────────────────────────────────────┐
     │ Which database?                                          │
     │   ( ) Postgres  what prod uses                           │
@@ -710,6 +747,10 @@ let%expect_test "job_input's confirmation says which job gets what" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Send to job j1: "y\n"?                                   │
     │ y  allow once                                            │
@@ -735,6 +776,11 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Why not? (the model sees it) ─────────────────┐
     │ Run bash: rm -rf _build && dune build          │
     │ @runtest?                                      │
@@ -765,6 +811,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Question ───────────────────────────────────────────────┐
     │ Anything else?                                           │
     │ › ▏                                                      │
@@ -833,6 +883,11 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Question ─────────────────────────────────────┐
     │ Which database?                                │
     │   ( ) Postgres                                 │
@@ -847,11 +902,11 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
     >
     deepseek-flash  Enter accepts · Esc declines
 
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
 
-
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Question ─────────────────────────────────────┐
     │ Which database?                                │
     │   ( ) Postgres                                 │

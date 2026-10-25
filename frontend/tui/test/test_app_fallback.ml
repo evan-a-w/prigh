@@ -86,6 +86,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ fallback: anthropic/claude-fable-5-1 →                   │
     │ deepseek/deepseek-flash (now on deepseek/deepseek-flash) │
@@ -105,6 +109,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ off                  no fallback: a model whose usage run…
       Claude Fable 5       anthropic/claude-fable-5
       Claude Fable 5.1     anthropic/claude-fable-5-1
@@ -121,6 +129,9 @@ let%expect_test
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ Claude Fable 5       anthropic/claude-fable-5
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
@@ -152,6 +163,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ fallback: anthropic/claude-fable-5-1 →                   │
     │ deepseek/deepseek-flash (now on deepseek/deepseek-flash) │
@@ -177,6 +192,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ fallback_models: unknown model "zzz"; did you mean:      │
     │ openai/gpt-5.5 (GPT-5.5)                                 │
@@ -220,6 +239,10 @@ let%expect_test "/fallback off clears the chain" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ no fallback models: /fallback MODEL [MODEL...] sets the  │
     │ chain that takes over when a model's usage runs out      │
@@ -254,6 +277,8 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ ~/proj/
       ~/play/
     ────────────────────────────────────────────────────────────
@@ -307,10 +332,10 @@ let%expect_test
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ cannot save /home/u/.prigh/config.json: Permission       │
     │ denied                                                   │
@@ -428,13 +453,13 @@ let%expect_test
     ──────────────────── view: verbose — everything is shown ───
     > ▏
     claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
-
-    ▌ earlier question
-      earlier answer
-
     ▌ fix the bug
       error: HTTP 429: The usage limit has been reached (usage
       limit reached)
+
+    ↪ Handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ view: quiet — intermediate output and thinking are       │
     │ hidden                                                   │
@@ -484,13 +509,13 @@ let%expect_test "a hand-over in the history and in /fork's list" =
     > ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
       earlier answer
 
     ▌ fix the bug
+
+    ↪ Handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     Fork at  (2)
     / ▏
        fix the bug                     #1

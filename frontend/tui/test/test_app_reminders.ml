@@ -102,10 +102,10 @@ let%expect_test "/remind stop and /remind every add one, acknowledged by name" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
     │ reminder r5 added (when the agent ends its turn, up to 5 in a row): Keep     │
     │ going. · /remind rm r5 removes it                                            │
@@ -276,10 +276,10 @@ let%expect_test "/remind rm and /remind off, with none, and before the state" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ no reminder "r1"; no reminders yet: /remind stop TEXT or /remind every N     │
     │ TEXT adds one                                                                │
@@ -308,6 +308,10 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Reminders  (2)
     / ▏
     ▸  r1  on stop 1/3 · Don't stop until the tests pass.
@@ -321,6 +325,9 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Ctrl+D removes it" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Reminders  (1)
     / disk▏
     ▸  r3  every 20 turns · Check the disk space.

@@ -72,6 +72,8 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ 10.0.0.5:7777  the current server
       local          a backend started here, like prigh-tui -local
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -84,6 +86,8 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Connect to HOST:PORT or local (now: 10.0.0.5:7777) ─────────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -125,6 +129,8 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ┌─ Connect to HOST:PORT or local (now: a local backend) ───────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -141,6 +147,9 @@ let%expect_test "/connect completes local, the current and the saved address" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ 10.0.0.5:7777  the current server
       10.0.0.9:7000  the saved server
       local          a backend started here, like prigh-tui -local
@@ -165,6 +174,10 @@ let%expect_test "/connect: a bad address says what to type" =
   connection h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
     │ "a b:1" is not HOST:PORT (e.g. 127.0.0.1:7777); /connect HOST:PORT (of prigh serve -listen), or  │
     │ /connect local                                                                                   │
@@ -215,10 +228,10 @@ let%expect_test
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     queued (1) · Alt+Up: edit the last · /queue: edit or remove
       steer      steer on the old server
     ────────────────────────────────────────────────────────────────────────────── not connected yet ───
@@ -288,10 +301,10 @@ let%expect_test
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
     │ cannot reach 10.0.0.6:1: Connection refused; still on 10.0.0.5:7777 (is prigh serve -listen      │
     │ running there?)                                                                                  │
@@ -368,6 +381,7 @@ let%expect_test "/connect local" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
     │ prigh-tui started this backend: there is nothing to sign out of (/connect HOST:PORT for a remote │
     │ one)                                                                                             │
@@ -416,6 +430,10 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
@@ -435,6 +453,10 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
     │ user   lloyd                                                                                     │
     │ token  *****▏                                                                                    │
@@ -455,6 +477,10 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
     │ user   bob▏                                                                                      │
     │ token  *****                                                                                     │
@@ -489,6 +515,10 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.enter h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
     │ user   bob                                                                                       │
     │ token  ******▏                                                                                   │
@@ -573,10 +603,10 @@ let%expect_test "a sign-in to a server gone meanwhile: said in the dialog" =
     {|
     (Relink (generation 1) (change (Sign_in (user (lloyd)) (token <opaque>))))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
@@ -765,10 +795,10 @@ let%expect_test "in the browser the platform owns the connection" =
     Sign_out
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
     │ /signin is for the terminal UI (prigh-tui); here, /signout signs in again or to another backend  │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘

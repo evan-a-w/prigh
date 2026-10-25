@@ -29,6 +29,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Snippets  (3)
     / ▏
     ▸  review  Review the diff for bugs.
@@ -42,6 +46,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Snippets  (2)
     / tst▏
     ▸  tests   Run the tests and fix failures.
@@ -102,6 +110,10 @@ let%expect_test "/snippet NAME inserts; an unknown name says the closest" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ usage: /snippet [NAME] · /snippet add NAME [TEXT] ·      │
     │ /snippet rm NAME                                         │
@@ -122,6 +134,10 @@ let%expect_test "/snippet with none saved, or before the config loads" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ unknown snippet "foo"; no snippets yet: /snippet add     │
     │ NAME TEXT saves one                                      │
@@ -159,6 +175,10 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ snippet fix saved: Fix the failing test. (/snippet fix   │
     │ inserts it)                                              │
@@ -264,6 +284,10 @@ let%expect_test "/snippet completes names, add and rm" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ review  Review the diff for bugs.
       tests   Run the tests and fix failures.
       plan    Plan first; change nothing yet.
@@ -277,6 +301,10 @@ let%expect_test "/snippet completes names, add and rm" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ review  Review the diff for bugs.
       tests   Run the tests and fix failures.
       rm      rm NAME: delete a snippet
@@ -307,6 +335,8 @@ let%expect_test "#name: completes snippets fuzzily; Tab inserts their text" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ #tests   Run the tests and fix failures.
       #review  Review the diff for bugs.
     ────────────────────────────────────────────────────────────
@@ -320,6 +350,7 @@ let%expect_test "#name: completes snippets fuzzily; Tab inserts their text" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ #tests  Run the tests and fix failures.
     ────────────────────────────────────────────────────────────
     > please #es▏
@@ -351,6 +382,7 @@ let%expect_test "#name: Enter inserts multi-line text mid-line, cursor after it"
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ #review  Review the diff for bugs.
     ────────────────────────────────────────────────────────────
     > a #rev▏b
@@ -407,6 +439,7 @@ let%expect_test "#name: Enter inserts multi-line text mid-line, cursor after it"
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ #plan  Plan first; change nothing yet.
     ────────────────────────────────────────────────────────────
     > a Review the diff for bugs.

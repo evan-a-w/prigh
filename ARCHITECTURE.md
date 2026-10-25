@@ -1514,8 +1514,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     Overlays (the mode's rows: picker, completion, confirmation, question,
     sign-in, login, text prompt, search, output; in `Editing` also `/btw`,
     the queue and a notice too long for the rule) are stacked bottom-up
-    over the transcript's last rows, the optional ones giving way first when
-    the area is short. The cursor stays in the editor unless typing goes
+    in the transcript's area, the optional ones giving way first when the
+    area is short; the transcript's tail ends above them (scrolled back,
+    they cover its bottom rows). The cursor stays in the editor unless typing goes
     into an overlay (picker filter, search, question, sign-in, the deny
     reason). The rule is plain; a short notice sits on its right. The
     status line keeps the cwd and model, then fills remaining width by

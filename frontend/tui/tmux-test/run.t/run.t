@@ -236,6 +236,11 @@ prints the captured panes.
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh confirm
   === dialog
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    running
+  … bash $ echo ran-it
   ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
   │ Run bash: echo ran-it?                                                                           │
   │ y  allow once                                                                                    │
@@ -279,6 +284,11 @@ prints the captured panes.
   $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh approvals
   === dialog with always
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    one
+  … bash $ echo first-run
   ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
   │ Run bash: echo first-run?                                                                        │
   │ y  allow once                                                                                    │
@@ -362,6 +372,15 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ◇ Plan mode on: the model was told to plan, not change files
+  ▌ add a.txt
+    looking
+  ✕ write a.txt  1 line
+      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
+      then call exit_plan_mode with the plan for the user to approve.
+    planned
+  … exit_plan_mode  waiting for your approval
+      1. Write a.txt
+      2. Check it
   ┌─ Plan ───────────────────────────────────────────────────────────────────────────────────────────┐
   │ Approve the plan and start implementing?                                                         │
   │ 1. Write a.txt                                                                                   │
@@ -396,6 +415,13 @@ prints the captured panes.
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh question
   === first question
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … ask_user  waiting for your answer
+      ? Which database?
+      ? Anything else?
   ┌─ Storage (1/2) ──────────────────────────────────────────────────────────────────────────────────┐
   │ Which database?                                                                                  │
   │ › ( ) Postgres  what prod uses                                                                   │
@@ -409,6 +435,11 @@ prints the captured panes.
   === second question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▌ go
+    asking
+  … ask_user  waiting for your answer
+      ? Which database?
+      ? Anything else?
   ┌─ Question 2/2 ───────────────────────────────────────────────────────────────────────────────────┐
   │ Anything else?                                                                                   │
   │ › keep it small                                                                                  │
@@ -480,6 +511,7 @@ prints the captured panes.
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh fallback
   === chain and default directory set
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
   │ default directory: $TMP/cwd (new sessions start there; /default-dir off clears │
   │ it)                                                                                              │
@@ -502,6 +534,7 @@ prints the captured panes.
   $TMP/cwd  claude-fable-5-1  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh send_raw
   === the popup highlights a directory
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ▸ $TMP/cwd/sub/deeper/
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > /cd $TMP/cwd/sub/
@@ -516,6 +549,10 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ go
+    waiting
+  ✓ bash $ sleep 2
+    now
+  … bash $ rm -rf build
   Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
   /
    * ▶ (unnamed) ∣ <time> ∣ 2 msgs ∣ go   $TMP/cwd
@@ -532,6 +569,13 @@ prints the captured panes.
   >
   $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
   === back: its confirmation again
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    waiting
+  ✓ bash $ sleep 2
+    now
+  … bash $ rm -rf build
   ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
   │ Run bash: rm -rf build?                                                                          │
   │ y  allow once                                                                                    │
@@ -558,6 +602,10 @@ prints the captured panes.
   $ bash ./harness.sh reconnect_dialog
   === typing the reason
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … bash $ make deploy
   ┌─ Why not? (the model sees it) ───────────────────────────────────────────────────────────────────┐
   │ Run bash: make deploy?                                                                           │
   │ › not on a Fri                                                                                   │

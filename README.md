@@ -705,8 +705,9 @@ and a dim line of what it is doing; the focused agent is marked.
 
 Pickers, the completion popup, confirmations, questions, the sign-in and
 login dialogs, `/btw`, the queued messages and long command output
-(`/help`, `/diff`, `/stats`, `/mcp`, job output, ...) are drawn over the
-bottom of the transcript, just above the rule: opening or closing them
+(`/help`, `/diff`, `/stats`, `/mcp`, job output, ...) take the bottom of
+the transcript's area, just above the rule, the transcript's end showing
+above them: opening or closing them
 never moves the editor, the cursor (unless typing goes into them) or the
 status line, and only the editor's own growth resizes the transcript. Long
 output is a box that scrolls with Up/Down/PageUp/PageDown; Esc or Enter

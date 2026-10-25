@@ -44,6 +44,10 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Skills  (3)
     / ▏
     ▸  frontend-design  Build distinctive, production-grade UIs…
@@ -57,6 +61,10 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Skills  (3)
     / rel▏
     ▸  release          Cut a release  ~/.prigh/skills/release …
@@ -137,10 +145,10 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ no skills here; add one as .prigh/skills/<name>/SKILL.md │
     │ (or .claude/skills/<name>/) in the project, or under     │
@@ -184,6 +192,8 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
     ▸ /skills             pick a skill to run (Enter puts /skil…
       /skill:NAME [args]  run a skill, with what follows as its…
     ────────────────────────────────────────────────────────────
@@ -216,6 +226,9 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ▸ frontend-design  Build distinctive, production-grade UIs
       release          Cut a release
       review           Review a diff
@@ -231,6 +244,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
+      earlier answer
     ▸ frontend-design  Build distinctive, production-grade UIs
     ────────────────────────────────────────────────────────────
     > /skill:fr▏
@@ -315,10 +329,10 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
     │ no skills here; add one as .prigh/skills/<name>/SKILL.md │
     │ (or .claude/skills/<name>/) in the project, or under     │
@@ -452,6 +466,10 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────┐
     │ unknown skill "fronted"; did you mean: frontend-design   │
     │ (/skills lists them all)                                 │
@@ -492,10 +510,10 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
 
 
 
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     queued (2) · Alt+Up: edit the last · /queue: edit or remove
       steer      /skill:revew now
       follow-up  /skill:review later
@@ -510,6 +528,10 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     queued (1) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  /skill:review later
     ┌─ Error ──────────────────────────────────────────────────┐
@@ -568,10 +590,12 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
+
+    ▌ skill frontend-design
+    ▌ make it bold
+    ▌ and blue
 
     ▌ skill frontend-design
     ┌─ Notice ─────────────────────────────────────────────────┐
@@ -648,10 +672,10 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     Fork at  (2)
     / ▏
        hello                           #1
@@ -702,6 +726,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Warning ────────────────────────────────────────────────────────────────────┐
     │ MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url" │
     │ (http)                                                                       │
@@ -719,6 +747,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ MCP: fs ────────────────────────────────────────────────────────────────────┐
     │ fs  2 tools  /home/u/.prigh/mcp.json                                         │
     │   mcp__fs__read_file  Read a file                                            │
@@ -743,10 +775,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ gh failed: exited with 1: gh-mcp: command not found; check its entry in      │
     │ /work/.mcp.json, then /mcp reconnect                                         │
@@ -800,6 +832,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     MCP servers  (3)
     / ▏
     ▸  fs  ready, 2 tools  /home/u/.prigh/mcp.json
@@ -826,6 +862,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ approved db, but it failed: connection refused; check its entry in           │
     │ /work/.mcp.json, then /mcp reconnect                                         │
@@ -848,8 +888,8 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
     {|
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag Mcp_reconnected))
 
-
-
+    ▌ earlier question
+      earlier answer
     ┌─ Warning ────────────────────────────────────────────────┐
     │ MCP config: /work/.mcp.json: server "x": give a          │
     │ "command" (stdio) or a "url" (http)                      │
@@ -902,6 +942,10 @@ let%expect_test "/help lists the skill and MCP commands" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ┌─ /mcp ───────────────────────────────────────────────────┐
     │ /mcp [reconnect]  list MCP servers (Enter approves one   │
     │ or lists its tools); reconnect restarts failed ones      │
