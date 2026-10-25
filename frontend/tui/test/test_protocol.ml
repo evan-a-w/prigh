@@ -851,6 +851,7 @@ let%expect_test "config round trip and config_changed event" =
          ; fallback_models =
              [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
          ; default_cwd = Some "~/proj"
+         ; worktrees_dir = Some "~/trees"
          ; archive_after_days = 7.
          ; notify = "desktop"
          ; snippets =
@@ -871,6 +872,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ())
+     (worktrees_dir    ())
      (archive_after_days 7)
      (notify             bell)
      (snippets ()))
@@ -884,6 +886,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ())
+     (worktrees_dir    ())
      (archive_after_days 7)
      (notify             bell)
      (snippets ()))
@@ -897,6 +900,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking (low))
      (fallback_models ())
      (default_cwd     ())
+     (worktrees_dir   ())
      (archive_after_days 7)
      (notify             bell)
      (snippets ()))
@@ -911,6 +915,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
      (default_cwd (/srv/work))
+     (worktrees_dir ())
      (archive_after_days 7)
      (notify             bell)
      (snippets ()))
@@ -926,6 +931,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ())
+     (worktrees_dir    ())
      (archive_after_days 7)
      (notify             bell)
      (snippets ((
@@ -942,6 +948,7 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking max)
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
      (default_cwd        ~/proj)
+     (worktrees_dir      ~/trees)
      (archive_after_days 7)
      (notify             desktop)
      (snippets ((
@@ -959,6 +966,7 @@ let%expect_test "config round trip and config_changed event" =
         (default_thinking ())
         (fallback_models  ())
         (default_cwd      ())
+        (worktrees_dir    ())
         (archive_after_days 7)
         (notify             bell)
         (snippets ()))))
@@ -1269,5 +1277,104 @@ let%expect_test "reminders in the state, as the backend sends them" =
      (trigger (Every_turns 40)))
     every 40 turns
     (error (e "missing field \"max_repeats\""))
+    |}]
+;;
+
+let%expect_test "worktree requests and replies" =
+  List.iter
+    [ Request.Method.List_worktrees
+    ; Create_worktree { branch = "feat/a"; base = None }
+    ; Create_worktree { branch = "b"; base = Some "main" }
+    ; Remove_worktree { path = "/t/repo/b"; force = false }
+    ; Remove_worktree { path = "/t/repo/b"; force = true }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    {"id":1,"method":"list_worktrees","params":{}}
+    {"id":1,"method":"create_worktree","params":{"branch":"feat/a"}}
+    {"id":1,"method":"create_worktree","params":{"branch":"b","base":"main"}}
+    {"id":1,"method":"remove_worktree","params":{"path":"/t/repo/b"}}
+    {"id":1,"method":"remove_worktree","params":{"path":"/t/repo/b","force":true}}
+    |}];
+  let show of_json sexp_of json =
+    match Or_error.bind (Json.parse json) ~f:of_json with
+    | Ok v -> print_s (sexp_of v)
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  show
+    Worktree.Listing.of_json
+    Worktree.Listing.sexp_of_t
+    {|{"root":"/r/repo","project_dir":"/h/.prigh/worktrees/repo","worktrees":[{"path":"/r/repo","branch":"main","head":"0123456789abcdef0123456789abcdef01234567","main":true,"managed":false,"locked":false,"prunable":false,"changes":0,"upstream":"origin/main","ahead":1,"behind":2,"current":true,"sessions":[{"id":"s1","path":"/s/s1.jsonl","name":"in main","live":true,"running":false}]},{"path":"/h/.prigh/worktrees/repo/x","branch":null,"head":"89abcdef0123456789abcdef0123456789abcdef","main":false,"managed":true,"locked":true,"prunable":false,"changes":3,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]},{"path":"/gone","branch":"g","head":null,"prunable":true,"changes":null}]}|};
+  show
+    Worktree.Created.of_json
+    Worktree.Created.sexp_of_t
+    {|{"worktree":{"path":"/w/b","branch":"b","head":null,"main":false,"managed":true},"new_branch":true}|};
+  show Worktree.removed_of_json Worktree.sexp_of_t {|{"worktree":{"branch":"b"}}|};
+  [%expect
+    {|
+    ((root        /r/repo)
+     (project_dir /h/.prigh/worktrees/repo)
+     (worktrees (
+       ((path /r/repo)
+        (branch (main))
+        (head   (0123456789abcdef0123456789abcdef01234567))
+        (main     true)
+        (managed  false)
+        (locked   false)
+        (prunable false)
+        (changes  (0))
+        (upstream (origin/main))
+        (ahead   1)
+        (behind  2)
+        (current true)
+        (sessions ((
+          (id   s1)
+          (path /s/s1.jsonl)
+          (name ("in main"))
+          (live    true)
+          (running false)))))
+       ((path /h/.prigh/worktrees/repo/x)
+        (branch ())
+        (head (89abcdef0123456789abcdef0123456789abcdef))
+        (main     false)
+        (managed  true)
+        (locked   true)
+        (prunable false)
+        (changes (3))
+        (upstream ())
+        (ahead   0)
+        (behind  0)
+        (current false)
+        (sessions ()))
+       ((path /gone)
+        (branch (g))
+        (head ())
+        (main     false)
+        (managed  false)
+        (locked   false)
+        (prunable true)
+        (changes  ())
+        (upstream ())
+        (ahead   0)
+        (behind  0)
+        (current false)
+        (sessions ())))))
+    ((worktree (
+       (path /w/b)
+       (branch (b))
+       (head ())
+       (main     false)
+       (managed  true)
+       (locked   false)
+       (prunable false)
+       (changes  ())
+       (upstream ())
+       (ahead   0)
+       (behind  0)
+       (current false)
+       (sessions ())))
+     (new_branch true))
+    (error (e "missing field \"path\""))
     |}]
 ;;
