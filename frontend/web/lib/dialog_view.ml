@@ -23,6 +23,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Reminders -> "Reminders"
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
+  | Worktrees _ -> "Worktrees"
 ;;
 
 (* What is wrong with the MCP configuration, under its servers. *)
@@ -51,6 +52,9 @@ let picker ~kind (p : Picker.t) ~inject =
           (match kind with
            | Reminders ->
              "↑↓ to move, Enter to show, Delete to remove, Esc to close"
+           | Worktrees _ ->
+             "Enter works there, Alt+Enter in a new session, Delete removes, \
+              Esc closes"
            | _ -> "↑↓ to move, Enter to choose, Esc to close")
       ]
     [ div

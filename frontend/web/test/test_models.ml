@@ -216,6 +216,10 @@ let%expect_test
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nc7\
+                            \n/work") (purpose (Sidebar 2)))))
     (75%) ↑123k ↓7.9k $1.2345 Working
     (3 queued) laptop
     |}];
@@ -265,6 +269,10 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nc7\
+                            \n/work") (purpose (Sidebar 2)))))
     (Attach files (or drop them here)) (Stop (Esc)) (Steer (Enter))
     |}];
   H.type_ h "half-written";

@@ -27,6 +27,8 @@ module Argument : sig
     | Resume (** [now] or [cancel] *)
     | Snippet (** a snippet's name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder's name after [rm] *)
+    | Worktree
+    (** a [/worktree] subcommand, then a worktree, flag or base branch *)
   [@@deriving sexp_of, equal]
 end
 

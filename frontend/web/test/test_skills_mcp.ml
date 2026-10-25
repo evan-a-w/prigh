@@ -234,6 +234,10 @@ let%expect_test "/skill:name while running steers; an unknown skill fails back" 
   H.text h ~selector:".toasts .error";
   [%expect
     {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     (Save_history
      ("/skill:fronted the pricing page"
       "/skill:frontend-design the pricing page"))
@@ -268,6 +272,10 @@ let%expect_test
   complete ();
   [%expect
     {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/other") (purpose (Sidebar 2)))))
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
                          \nbackend\
@@ -287,6 +295,10 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 3)))))
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s2\
                          \nbackend\
@@ -329,6 +341,10 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 4)))))
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s2\
                          \nbackend\
@@ -735,6 +751,10 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     ()
     |}]
 ;;

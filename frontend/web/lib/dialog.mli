@@ -24,6 +24,7 @@ module Picker_kind : sig
     | Reminders (** the session's ([/remind]); item ids are their names *)
     | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
     | Jump (** item ids are [Jump.Target.to_string]s *)
+    | Worktrees of Worktree.Listing.t (** item ids are their paths *)
   [@@deriving sexp_of, equal]
 end
 
@@ -72,6 +73,13 @@ type t =
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)
   | Diff of Git_diff.t (** [/diff] *)
+  | New_worktree of New_worktree.t
+  | Remove_worktree of
+      { worktree : Worktree.t
+      ; force : bool (** also with uncommitted changes ([rm -f]) *)
+      ; busy : bool (** removing: waiting for the backend *)
+      ; error : string option
+      } (** asked before removing it *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

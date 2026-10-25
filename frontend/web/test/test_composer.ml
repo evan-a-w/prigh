@@ -92,7 +92,13 @@ let%expect_test
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ()));
   H.key h "Escape";
-  [%expect {| (browser default) |}]
+  [%expect {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
+    (browser default)
+    |}]
 ;;
 
 let image =
@@ -391,6 +397,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
+    /worktree [list|new|open|rm ...] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
     /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
@@ -406,7 +413,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
-    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

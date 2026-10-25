@@ -942,6 +942,55 @@ places of the status's items: one
 layout shift in the status: none
 === chromium: stability: errors ===
 none
+=== chromium: worktrees: the sidebar ===
+main | <DIR>/repo [current]
+docs | 2 changed | <DIR>/docs [dirty]
+=== chromium: worktrees: the section's buttons ===
+Worktrees 2, Refresh worktrees, New worktree
+=== chromium: worktrees: the new worktree dialog ===
+New worktree
+Branch
+A new branch, or an existing one to check out
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== chromium: worktrees: created and moved there ===
+main | <DIR>/repo
+docs | 2 changed | <DIR>/docs [dirty]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== chromium: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: removed ===
+main | <DIR>/repo
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== chromium: worktrees: the /worktree picker ===
+Worktrees of <DIR>/repo
+main
+<DIR>/repo · main worktree
+feat/login
+<DIR>/home/.prigh/worktrees/repo/feat-login · here
+Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+=== chromium: worktrees: back in main ===
+main | <DIR>/repo [current]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== chromium: worktrees: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1886,4 +1935,53 @@ activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
 === firefox: stability: errors ===
+none
+=== firefox: worktrees: the sidebar ===
+main | <DIR>/repo [current]
+docs | 2 changed | <DIR>/docs [dirty]
+=== firefox: worktrees: the section's buttons ===
+Worktrees 2, Refresh worktrees, New worktree
+=== firefox: worktrees: the new worktree dialog ===
+New worktree
+Branch
+A new branch, or an existing one to check out
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== firefox: worktrees: created and moved there ===
+main | <DIR>/repo
+docs | 2 changed | <DIR>/docs [dirty]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== firefox: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== firefox: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== firefox: worktrees: removed ===
+main | <DIR>/repo
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+=== firefox: worktrees: the /worktree picker ===
+Worktrees of <DIR>/repo
+main
+<DIR>/repo · main worktree
+feat/login
+<DIR>/home/.prigh/worktrees/repo/feat-login · here
+Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+=== firefox: worktrees: back in main ===
+main | <DIR>/repo [current]
+feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== firefox: worktrees: errors ===
 none
