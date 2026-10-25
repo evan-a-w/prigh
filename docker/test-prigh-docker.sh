@@ -13,7 +13,7 @@ r="$work/root"
 # A fresh fake root: the image's accounts and skeleton, empty volumes.
 fake_root() {
 	rm -rf "$r"
-	mkdir -p "$r/etc/skel" "$r/home" "$r/workspace" "$r/run"
+	mkdir -p "$r/etc/skel" "$r/home" "$r/run"
 	cat >"$r/etc/passwd" <<'EOF'
 root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
@@ -97,7 +97,7 @@ files() {
 	done
 }
 
-# Directories under /home and /workspace with their mode and (fake) owner.
+# Directories under /home with their mode and (fake) owner.
 dirs() {
 	local p owner
 	echo "--- dirs (mode owner path)"
@@ -105,7 +105,7 @@ dirs() {
 		p="${p#"$r"}"
 		owner=$(awk -v p="$p" '$1 == p { u = $2 } END { print (u == "" ? 0 : u) }' "$r/owners")
 		printf '%s %s %s\n' "$(stat -c %a "$r$p")" "$owner" "$p"
-	done < <(find "$r/home" "$r/workspace" -maxdepth 1 \( -type d -o -type l \) | sort)
+	done < <(find "$r/home" -maxdepth 1 \( -type d -o -type l \) | sort)
 }
 
 run_tests() {
@@ -177,10 +177,8 @@ run_tests() {
 	sed -i '$a svc:x:10000:10000::/:/bin/false' "$r/etc/passwd"
 	owned /home/prigh 1000
 	owned /home/alice 1000
-	owned /workspace/bob 10007
 	owned /home/carol 65534
 	owned /home/dave 10003
-	owned /workspace/dave 10003
 	owned /home/erin 10003
 	pd PRIGH_TOKENS=alice=a,bob=b,carol=c,dave=d,erin=e PRIGH_NO_BACKEND_HOST=1
 	files /run/prigh/users
@@ -191,11 +189,18 @@ run_tests() {
 	owned /home 1000
 	mkdir -p "$r/home/.prigh/sessions" "$r/home/.config/prigh" "$r/home/.ssh"
 	touch "$r/home/.bashrc" "$r/home/.config/prigh/auth.json" "$r/home/.ssh/id_ed25519"
-	owned /workspace/proj 1000
-	owned /workspace/default 1000
 	pd PRIGH_TOKEN=tok PRIGH_MODE=web
 	(cd "$r/home" && find . | LC_ALL=C sort)
 	dirs
+
+	section "an old /workspace still bound: its directories are not used (nor their owners as uids), and the log says how to move them"
+	fake_root
+	owned /home/prigh 1000
+	owned /workspace/bob 10007
+	owned /workspace/proj 1000
+	pd PRIGH_TOKENS=alice=a,bob=b
+	owned /workspace/prigh 1000
+	pd PRIGH_MODE=tui
 
 	section "old layout and /home/prigh both present"
 	fake_root
@@ -221,7 +226,7 @@ run_tests() {
 	fake_root
 	owned /home/prigh 1000
 	pd PRIGH_MODE=tui PRIGH_TUI_ARGS="-model m" PRIGH_GIT_EMAIL=me@example.com GH_TOKEN=gh
-	pd PRIGH_MODE=tui PRIGH_CWD=/workspace/proj
+	pd PRIGH_MODE=tui PRIGH_CWD=/home/prigh/proj
 	pd PRIGH_MODE=tui tui
 	pd PRIGH_MODE=tui ssh-key
 	pd PRIGH_MODE=tui login default anthropic
@@ -252,10 +257,7 @@ run_tests() {
 	pd PRIGH_TOKEN=tok PRIGH_MODE=tui,web
 	pd PRIGH_TOKEN=tok PRIGH_MODE=bogus
 	pd PRIGH_TOKEN=tok PRIGH_MODE=,
-	ln -s /home/prigh "$r/workspace/default"
-	pd PRIGH_TOKEN=tok
-	rm "$r/workspace/default"
-	chmod 750 "$r/workspace"
+	ln -s /home/prigh "$r/home/default"
 	pd PRIGH_TOKEN=tok
 }
 
