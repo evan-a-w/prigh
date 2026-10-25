@@ -142,10 +142,6 @@ let picker_keys (kind : Mode.Picker_kind.t) =
 
 let sign_in_keys = "Tab next field · Enter signs in · Esc closes"
 
-let idle_keys =
-  "/help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits"
-;;
-
 let disconnected_hint (m : App.Model.t) =
   match m.mode with
   | Sign_in _ -> sign_in_keys
@@ -318,7 +314,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                      (spinner_frames.(m.spinner % Array.length spinner_frames)
                       ^ sprintf " %s · Esc aborts · Enter steers" (doing m))
                  ]
-             else Some [ span ~style:dim idle_keys ])
+             else None)
         | Output _ ->
           Some
             [ span
@@ -327,40 +323,6 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
             ]))
 ;;
 
-let drop_left_text s ~width =
-  let rec go remaining pieces =
-    match pieces with
-    | [] -> []
-    | (p, w) :: rest ->
-      if remaining >= w then go (remaining - w) rest else (p, w) :: rest
-  in
-  String.concat (List.map (go width (Text_width.uchars s)) ~f:fst)
-;;
-
-let rec drop_left_spans spans to_drop acc =
-  match spans with
-  | [] -> List.rev acc
-  | (s : Content.Span.t) :: rest ->
-    let sw = Text_width.string s.text in
-    if sw <= to_drop
-    then drop_left_spans rest (to_drop - sw) acc
-    else (
-      let text = drop_left_text s.text ~width:to_drop in
-      List.rev_append acc ({ s with text } :: rest))
-;;
-
-let truncate_line_left line ~width =
-  let w = Content.Line.width line in
-  if w <= width
-  then line
-  else (
-    let keep = Int.max 0 (width - 1) in
-    span "…" :: drop_left_spans line (w - keep) [])
-;;
-
-(* [tools:laptop] when tools run on another host, [tools:offline] (error style)
-   when the active host is gone. Nothing when they run on the backend or here,
-   the two ordinary cases. *)
 let tools_part (m : App.Model.t) (s : P.State.t) =
   let is_me id =
     Option.value_map m.client_id ~default:false ~f:(String.equal id)
@@ -724,132 +686,81 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
   ]
 ;;
 
-(* ---- the status bar ---------------------------------------------------- *)
+(* ---- the status line --------------------------------------------------- *)
 
-let meter_cells = 5
+let format_cwd (m : App.Model.t) (s : P.State.t) =
+  let cwd =
+    match s.git_branch with
+    | Some branch -> sprintf "%s (%s)" (App.tilde m s.cwd) branch
+    | None -> App.tilde m s.cwd
+  in
+  match s.session_name with
+  | Some name -> sprintf "%s %S" cwd name
+  | None -> cwd
+;;
 
-(* [ctx ▰▱▱▱▱ 0.2%/1.0M]: a tenth of a percent shows early growth in a large
-   window. *)
-let context_part (s : P.State.t) : Content.Line.t =
+(* [ctx:0.2%/1.0M] like pi: a tenth of a percent shows early growth in a
+   large window. *)
+let context_text (s : P.State.t) =
   let window = s.model.context_window in
-  if window <= 0
-  then [ span ~style:gray ("ctx " ^ format_tokens s.context_tokens) ]
-  else (
-    let fraction = Float.of_int s.context_tokens /. Float.of_int window in
-    let percent = 100. *. fraction in
-    let filled =
-      Int.max
-        0
-        (Int.min
-           meter_cells
-           (Float.iround_nearest_exn (fraction *. Float.of_int meter_cells)))
+  if window > 0
+  then (
+    let percent =
+      100. *. Float.of_int s.context_tokens /. Float.of_int window
     in
-    let style = context_style (Float.iround_down_exn percent) in
-    let cells n glyph = String.concat (List.init n ~f:(fun _ -> glyph)) in
-    [ span ~style:gray "ctx "
-    ; span ~style (cells filled "▰")
-    ; span ~style:dim (cells (meter_cells - filled) "▱")
-    ; span
-        ~style
-        (sprintf
-           " %s%%"
-           (if Float.( < ) percent 10.
-            then sprintf "%.1f" percent
-            else sprintf "%.0f" (Float.round_down percent)))
-    ; span ~style:gray ("/" ^ format_tokens window)
-    ])
+    sprintf
+      "ctx:%s%%/%s"
+      (if Float.( < ) percent 10.
+       then sprintf "%.1f" percent
+       else sprintf "%.0f" (Float.round_down percent))
+      (format_tokens window))
+  else "ctx:" ^ format_tokens s.context_tokens
 ;;
 
-let connection_part (m : App.Model.t) =
-  match m.connection with
-  | Connected -> []
-  | Disconnected _ -> [ 0, [ span ~style:attention "offline" ] ]
-  | Switching _ -> [ 0, [ span ~style:attention "connecting…" ] ]
-  | Reconnecting _ -> [ 0, [ span ~style:(Style.fg Red) "reconnecting" ] ]
-;;
-
-(* Whole segments give way, the least important first (the highest number;
-   among equals the rightmost); the model stays. The left group starts at
-   the left edge, the right group ends at the right one. *)
-let fit_bar ~width ~left ~right : Content.Line.t =
-  let indexed =
-    List.mapi (left @ right) ~f:(fun i (prio, part) -> i, prio, part)
-  in
-  let n_left = List.length left in
-  let total kept =
-    let parts = List.map kept ~f:(fun (_, _, part) -> part) in
-    List.sum (module Int) parts ~f:Content.Line.width
-    + (2 * Int.max 0 (List.length parts - 1))
-  in
-  let rec fit kept =
-    if total kept <= width
-    then kept
-    else (
-      let droppable =
-        List.filter kept ~f:(fun (_, prio, _) -> prio >= 0)
-        |> List.max_elt ~compare:(fun (i1, p1, _) (i2, p2, _) ->
-          match Int.compare p1 p2 with
-          | 0 -> Int.compare i1 i2
-          | c -> c)
-      in
-      match droppable with
-      | None -> kept
-      | Some (i, _, _) -> fit (List.filter kept ~f:(fun (j, _, _) -> j <> i)))
-  in
-  let kept = fit indexed in
-  let join parts =
-    List.concat
-      (List.intersperse
-         (List.map parts ~f:(fun (_, _, part) -> part))
-         ~sep:[ span "  " ])
-  in
-  let left, right = List.partition_tf kept ~f:(fun (i, _, _) -> i < n_left) in
-  let left = join left
-  and right = join right in
-  let gap = width - Content.Line.width left - Content.Line.width right in
-  let line =
-    if List.is_empty right
-    then left
-    else left @ [ span (String.make (Int.max 2 gap) ' ') ] @ right
-  in
-  Content.Line.truncate line ~width
+let server_part (m : App.Model.t) =
+  match Option.bind m.server ~f:(fun s -> s.address) with
+  | Some address -> [ 6, [ span ~style:gray ("server:" ^ address) ] ]
+  | None -> []
 ;;
 
 let status (m : App.Model.t) : Content.Line.t =
-  let width = Int.max 1 m.width in
-  match m.state with
-  | None ->
-    let text =
-      match m.connection, m.mode with
-      | Disconnected _, _ -> "offline"
-      | _, Sign_in _ -> "not signed in"
-      | _ -> "connecting…"
-    in
-    fit_bar ~width ~left:[ -1, [ span ~style:gray text ] ] ~right:[]
-  | Some s ->
+  match m.state, m.connection with
+  | _, Disconnected _ -> [ span ~style:attention (disconnected_hint m) ]
+  | None, Switching _ -> [ span ~style:gray "connecting…" ]
+  | None, _ ->
+    (match m.mode with
+     | Sign_in _ -> [ span ~style:attention sign_in_keys ]
+     | _ -> [ span ~style:gray "connecting…" ])
+  | Some s, _ ->
+    let max_width = Int.max 1 m.width in
     let base = gray in
-    let left =
-      connection_part m
-      @ [ -1, [ span s.model.id ] ]
-      @ [ ( 5
-          , [ span
-                ~style:base
-                (sprintf
-                   "think:%s"
-                   (if s.model.supports_thinking then s.thinking else "n/a"))
-            ] )
-        ]
+    let context =
+      if s.model.context_window > 0
+      then 100 * s.context_tokens / s.model.context_window
+      else 0
+    in
+    (* Each part after the model carries a priority: at narrow widths the mode
+       hint and context survive before think, the mode and the cost, those
+       before view. Display order is fixed. *)
+    let cwd = [ span ~style:base (format_cwd m s) ] in
+    let model = [ span ~style:base s.model.id ] in
+    let after_model =
+      [ ( 4
+        , [ span
+              ~style:base
+              (sprintf
+                 "think:%s"
+                 (if s.model.supports_thinking then s.thinking else "n/a"))
+          ] )
+      ]
       @ mode_part s
-      @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ] ]
-      @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
-        let text =
-          match App.Model.acting_as m, m.user with
-          | Some _, Some user -> sprintf "user:%s as %s" user namespace
-          | _ -> "user:" ^ namespace
-        in
-        [ 6, [ span ~style:base text ] ])
-      @ tools_part m s
-      @ plan_part s
+      @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
+        ; 2, [ span ~style:(context_style context) (context_text s) ]
+        ; ( 4
+          , match Loop_status.budget_part s with
+            | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+            | Some (text, level) -> [ span ~style:(level_style level) text ] )
+        ]
       @ Option.value_map s.goal ~default:[] ~f:(fun goal ->
         let text, level = Loop_status.goal_part goal in
         [ 3, [ span ~style:(level_style level) text ] ])
@@ -864,7 +775,18 @@ let status (m : App.Model.t) : Content.Line.t =
                 (Loop_status.resume_part at ~utc_offset:m.utc_offset)
             ] )
         ])
-      (* A model that keeps failing. *)
+      @ server_part m
+      @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
+        let text =
+          match App.Model.acting_as m, m.user with
+          | Some _, Some user -> sprintf "user:%s as %s" user namespace
+          | _ -> "user:" ^ namespace
+        in
+        [ 6, [ span ~style:base text ] ])
+      @ tools_part m s
+      @ plan_part s
+      (* A model that keeps failing: shown even with a dialog over the
+         hint. *)
       @ (match Activity.retry (App.Model.activity m) with
          | Some { attempt; max_attempts; _ } ->
            [ ( 1
@@ -874,120 +796,98 @@ let status (m : App.Model.t) : Content.Line.t =
                ] )
            ]
          | None -> [])
-      (* Confirmations and questions waiting behind a dialog. *)
-      @
-      let waiting =
-        List.length m.pending_confirms + List.length m.pending_questions
-      in
-      if waiting > 0
-      then [ 0, [ span ~style:attention (sprintf "to answer:%d" waiting) ] ]
-      else []
-    in
-    let right =
-      (match m.viewport with
-       | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
-         [ 1, [ span ~style:attention (sprintf "↓ %d new" new_lines) ] ]
-       | Viewport.Anchored _ -> [ 1, [ span ~style:attention "↑ scrolled" ] ]
-       | Viewport.Follow -> [])
       @ (let queued = List.length m.queued_messages in
          if queued > 0
-         then [ 3, [ span ~style:attention (sprintf "queued:%d" queued) ] ]
+         then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
+         else [])
+      (* Confirmations and questions waiting behind a dialog: before
+         anything but the model. *)
+      @ (let waiting =
+           List.length m.pending_confirms + List.length m.pending_questions
+         in
+         if waiting > 0
+         then [ 0, [ span ~style:attention (sprintf "to answer:%d" waiting) ] ]
          else [])
       @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
       @ Option.to_list (Option.map (jobs_part m) ~f:(fun p -> 3, p))
-      @ [ 2, context_part s
-        ; ( 3
-          , match Loop_status.budget_part s with
-            | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
-            | Some (text, level) -> [ span ~style:(level_style level) text ] )
-        ]
+      @ (match m.viewport with
+         | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
+           [ 1, [ span ~style:attention (sprintf "↓ %d new" new_lines) ] ]
+         | Viewport.Anchored _ -> [ 1, [ span ~style:attention "↑ scrolled" ] ]
+         | Viewport.Follow -> [])
+      @ Option.to_list (Option.map (mode_hint m) ~f:(fun p -> 0, p))
     in
-    fit_bar ~width ~left ~right
+    let hint_index =
+      match List.last after_model with
+      | Some (0, _) -> List.length after_model - 1
+      | _ -> -1
+    in
+    let cwd_width = Content.Line.width cwd in
+    let model_width = Content.Line.width model in
+    (* Keep whole parts by priority until the width is exhausted, then
+       restore the display order. *)
+    let fill ?(max_prio = Int.max_value) used0 =
+      (* A mode hint too wide to fit whole is cut short after the context
+         (priority 2) has its place, rather than hidden. *)
+      let indexed =
+        List.mapi after_model ~f:(fun i (prio, part) ->
+          let whole = used0 + 2 + Content.Line.width part <= max_width in
+          if prio = 0 && not whole then 2, i, part else prio, i, part)
+        |> List.filter ~f:(fun (prio, _, _) -> prio <= max_prio)
+      in
+      let by_priority =
+        List.sort indexed ~compare:(fun (p1, i1, _) (p2, i2, _) ->
+          match Int.compare p1 p2 with
+          | 0 -> Int.compare i1 i2
+          | c -> c)
+      in
+      let kept, used =
+        List.fold
+          by_priority
+          ~init:([], used0)
+          ~f:(fun (kept, used) (_, i, part) ->
+            let w = Content.Line.width part in
+            let room = max_width - used - 2 in
+            if w <= room
+            then (i, part) :: kept, used + 2 + w
+            else if i = hint_index && room >= 12
+            then (
+              let part =
+                match part with
+                | [ (hint : Content.Span.t) ] ->
+                  [ { hint with text = fit_keys hint.text ~width:room } ]
+                | part -> Content.Line.truncate part ~width:room
+              in
+              (i, part) :: kept, max_width)
+            else kept, used)
+      in
+      ( List.map
+          (List.sort kept ~compare:(fun (i1, _) (i2, _) -> Int.compare i1 i2))
+          ~f:snd
+      , used )
+    in
+    let fits (_, used) = used + 2 + cwd_width <= max_width in
+    (* The view (priority 7) gives way to the directory, the directory to
+       everything else; the model stays. *)
+    let right, cwd_fits =
+      match
+        List.find [ fill model_width; fill ~max_prio:6 model_width ] ~f:fits
+      with
+      | Some (right, _) -> right, true
+      | None -> fst (fill model_width), false
+    in
+    let line =
+      (if cwd_fits then cwd @ [ span "  " ] else [])
+      @ model
+      @ List.concat_map right ~f:(fun part -> span "  " :: part)
+    in
+    Content.Line.truncate line ~width:max_width
 ;;
-
-(* ---- the header bar ---------------------------------------------------- *)
 
 let first_line text =
   match String.split_lines (String.strip text) with
   | line :: _ -> line
   | [] -> ""
-;;
-
-(* […/dir/sub]: whole trailing components that fit. *)
-let shorten_path (line : Content.Line.t) ~width : Content.Line.t =
-  match line with
-  | [ (s : Content.Span.t) ] ->
-    let parts = List.rev (String.split s.text ~on:'/') in
-    let rec take acc = function
-      | [] -> acc
-      | part :: rest ->
-        let next = if String.is_empty acc then part else part ^ "/" ^ acc in
-        if Text_width.string ("…/" ^ next) <= width then take next rest else acc
-    in
-    (match take "" parts with
-     | "" -> [ { s with text = Text_width.truncate s.text ~width } ]
-     | tail -> [ { s with text = "…/" ^ tail } ])
-  | line -> truncate_line_left line ~width
-;;
-
-let header (m : App.Model.t) ~width : Content.Line.t =
-  let title =
-    match m.state with
-    | None ->
-      (match m.connection with
-       | Disconnected _ -> [ span ~style:dim "not signed in" ]
-       | _ -> [ span ~style:dim "connecting…" ])
-    | Some s ->
-      (match s.session_name, s.session_description with
-       | Some name, _ -> [ span name ]
-       | None, Some description -> [ span ~style:gray (first_line description) ]
-       | None, None -> [ span ~style:dim "new session" ])
-  in
-  let left =
-    [ span ~style:(Style.bold Style.plain) "prigh"; span "  " ] @ title
-  in
-  let cwd =
-    match m.state with
-    | None -> []
-    | Some s ->
-      [ span
-          ~style:gray
-          (match s.git_branch with
-           | Some branch -> sprintf "%s (%s)" (App.tilde m s.cwd) branch
-           | None -> App.tilde m s.cwd)
-      ]
-  in
-  let server =
-    match m.connection with
-    | Connected ->
-      (match Option.bind m.server ~f:(fun s -> s.address) with
-       | Some address -> [ span ~style:gray address ]
-       | None -> [])
-    | Reconnecting _ -> [ span ~style:(Style.fg Red) "reconnecting" ]
-    | Switching _ -> [ span ~style:attention "connecting…" ]
-    | Disconnected _ -> [ span ~style:attention "offline" ]
-  in
-  let sep a b =
-    match a, b with
-    | [], x | x, [] -> x
-    | a, b -> a @ [ span ~style:dim " · " ] @ b
-  in
-  let fits right =
-    Content.Line.width left + 2 + Content.Line.width right <= width
-  in
-  let right =
-    if fits (sep cwd server)
-    then sep cwd server
-    else if fits cwd
-    then cwd
-    else (
-      let room = width - Content.Line.width left - 2 in
-      if room >= 12 then shorten_path cwd ~width:room else [])
-  in
-  let gap = width - Content.Line.width left - Content.Line.width right in
-  Content.Line.truncate
-    (left @ [ span (String.make (Int.max 0 gap) ' ') ] @ right)
-    ~width
 ;;
 
 (* ---- the composer's rule ----------------------------------------------- *)
@@ -1006,79 +906,67 @@ let notice_inline (n : Notice.t) ~width =
 
 let rule_glyphs n = String.concat (List.init (Int.max 0 n) ~f:(fun _ -> "─"))
 
-(* [── keys ───────── notice ──]: the mode's keys on the left, the latest
-   notice on the right; the keys give way to it. *)
+(* A plain rule; the latest notice, when short, sits on its right. *)
 let composer_rule (m : App.Model.t) ~width : Content.Line.t =
-  let right =
-    match m.notice with
-    | Some n when notice_inline n ~width ->
-      [ span ~style:gray "─ "
-      ; span ~style:(notice_style n.severity) n.text
-      ; span ~style:gray " ──"
-      ]
-    | _ -> [ span ~style:gray "──" ]
-  in
-  let room = width - Content.Line.width right - 4 in
-  let hint =
-    match mode_hint m with
-    | Some [ (hint : Content.Span.t) ] when room >= 12 ->
-      let text = fit_keys hint.text ~width:room in
-      if Text_width.string text <= room then [ { hint with text } ] else []
-    | Some hint when room >= 12 && Content.Line.width hint <= room -> hint
-    | _ -> []
-  in
-  let left =
-    if List.is_empty hint
-    then [ span ~style:gray "─" ]
-    else (span ~style:gray "── " :: hint) @ [ span " " ]
-  in
-  let fill = width - Content.Line.width left - Content.Line.width right in
-  Content.Line.truncate
-    (left @ [ span ~style:gray (rule_glyphs fill) ] @ right)
-    ~width
+  match m.notice with
+  | Some n when notice_inline n ~width ->
+    let notice = Text_width.string n.text in
+    [ span ~style:gray (rule_glyphs (width - notice - 5) ^ " ")
+    ; span ~style:(notice_style n.severity) n.text
+    ; span ~style:gray " ───"
+    ]
+  | _ -> [ span ~style:gray (rule_glyphs width) ]
 ;;
 
-(* ---- overlays: boxes over the transcript's bottom rows ------------------ *)
+(* ---- overlays: drawn over the transcript's bottom rows ------------------ *)
 
 module Overlay = struct
   type t =
     { lines : Content.t
-    ; cursor : (int * int) option (** relative to the box *)
-    ; right : bool
-      (** narrower than the area, on its right: the transcript shows on the
-          left *)
+    ; cursor : (int * int) option (** relative to its first row *)
     }
 
-  let box ?cursor ?(right = false) lines = { lines; cursor; right }
+  let create ?cursor lines = { lines; cursor }
 end
 
 let max_queued_shown = 3
 
-let queued_box (m : App.Model.t) ~width : Overlay.t option =
+(** The queued steers and follow-ups, oldest first. *)
+let queued_block (m : App.Model.t) ~width : Overlay.t option =
   let total = List.length m.queued_messages in
   if total = 0
   then None
   else (
+    let header =
+      [ span
+          ~style:dim
+          (sprintf
+             "queued (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             total)
+      ]
+    in
     let shown = List.take m.queued_messages max_queued_shown in
     let rows =
       List.map shown ~f:(fun (q : Queued_message.t) ->
         [ span
             ~style:attention
-            (Text_width.pad_right (Queued_message.Kind.name q.kind) ~width:11)
+            (Text_width.pad_right
+               ("  " ^ Queued_message.Kind.name q.kind)
+               ~width:13)
         ; span ~style:dim (Queued_message.one_line q)
         ])
     in
     let more = total - List.length shown in
     let more =
-      if more > 0 then [ [ span ~style:dim (sprintf "+%d more" more) ] ] else []
+      if more > 0 && not (List.is_empty shown)
+      then [ [ span ~style:dim (sprintf "  +%d more" more) ] ]
+      else []
     in
     Some
-      (Overlay.box
-         (Boxed.render
-            ~title:(sprintf "Queued (%d)" total)
-            ~footer:"Alt+Up edits the last · /queue edits or removes"
-            ~width
-            (rows @ more))))
+      (Overlay.create
+         (List.map
+            ((header :: rows) @ more)
+            ~f:(Content.Line.truncate ~width))))
 ;;
 
 let notice_box (m : App.Model.t) ~width : Overlay.t option =
@@ -1103,13 +991,12 @@ let notice_box (m : App.Model.t) ~width : Overlay.t option =
       | Info | Debug -> "Notice", gray
     in
     Some
-      (Overlay.box
+      (Overlay.create
          (Boxed.render ~border ~title ~footer:"Esc dismisses" ~width body))
   | _ -> None
 ;;
 
-let picker_box ?keys (p : Picker.t) ~width ~rows : Overlay.t =
-  let inner = Boxed.inner_width ~width in
+let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
   let visible = Picker.visible p in
   let selected = Picker.selected p in
   let start =
@@ -1118,44 +1005,37 @@ let picker_box ?keys (p : Picker.t) ~width ~rows : Overlay.t =
   let shown = List.take (List.drop visible start) rows in
   let total = List.length visible in
   let title =
-    if total <= rows
-    then sprintf "%s (%d)" (Picker.title p) total
-    else
-      sprintf
-        "%s (%d–%d of %d)"
-        (Picker.title p)
-        (start + 1)
-        (start + List.length shown)
-        total
+    [ span ~style:(Style.bold Style.plain) (Picker.title p)
+    ; span
+        ~style:dim
+        (if total <= rows
+         then sprintf "  (%d)" total
+         else
+           sprintf
+             "  (%d–%d of %d)"
+             (start + 1)
+             (start + List.length shown)
+             total)
+    ]
+  in
+  let title =
+    match keys with
+    | None -> title
+    | Some keys ->
+      let room = width - Content.Line.width title - 2 in
+      if room < 12
+      then title
+      else title @ [ span ~style:dim ("  " ^ fit_keys keys ~width:room) ]
   in
   let filter =
     [ span ~style:(Style.bold (Style.fg Yellow)) "/ "; span (Picker.query p) ]
   in
-  let filter =
-    match keys with
-    | None -> filter
-    | Some keys ->
-      let room = inner - Content.Line.width filter - 2 in
-      if room < 12
-      then filter
-      else (
-        let keys = fit_keys keys ~width:room in
-        filter
-        @ [ span
-              (String.make
-                 (Int.max
-                    2
-                    (inner - Content.Line.width filter - Text_width.string keys))
-                 ' ')
-          ; span ~style:dim keys
-          ])
-  in
   let label_width =
     List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
       Int.max acc (Text_width.string item.label))
-    |> Int.min (inner / 2)
+    |> Int.min (width / 2)
   in
-  let rows_ =
+  let lines =
     List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
       let is_selected = start + i = selected in
       let mark =
@@ -1191,45 +1071,41 @@ let picker_box ?keys (p : Picker.t) ~width ~rows : Overlay.t =
         | _ when String.is_empty item.section -> []
         | Some (previous : Picker.Item.t)
           when String.equal previous.section item.section -> []
-        | _ -> [ [ span ~style:dim ("── " ^ item.section ^ " ──") ] ]
+        | _ -> [ [ span ~style:dim ("  ── " ^ item.section ^ " ──") ] ]
       in
-      divider @ [ Content.Line.truncate line ~width:inner ])
+      divider @ [ Content.Line.truncate line ~width ])
     |> List.concat
   in
-  let rows_ =
-    if List.is_empty rows_
+  let lines =
+    if List.is_empty lines
     then [ [ span ~style:dim "  no matches" ] ]
-    else rows_
+    else lines
   in
-  let query_width = Text_width.string (Picker.query p) in
-  Overlay.box
-    ~cursor:(1, Int.min (2 + 2 + query_width) (width - 2))
-    (Boxed.render ~title ~width (filter :: List.take rows_ (rows + 1)))
+  Overlay.create
+    ~cursor:(1, 2 + Text_width.string (Picker.query p))
+    (title :: filter :: lines)
 ;;
 
-let autocomplete_title (ac : Autocomplete.t) =
-  match Autocomplete.source ac with
-  | Command -> "Commands"
-  | Argument spec -> "/" ^ spec.name
-  | Path -> "Files"
-  | Directory _ -> "Directories"
-  | Skill -> "Skills"
-  | Snippet -> "Snippets"
-;;
-
-let autocomplete_box (ac : Autocomplete.t) ~width ~rows : Overlay.t =
-  let inner = Boxed.inner_width ~width in
+let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
   let items = Autocomplete.items ac in
   let selected = Autocomplete.selected ac in
   let total = List.length items in
   let rows = Int.max 1 (Int.min 8 rows) in
   let start = Int.max 0 (Int.min (selected - (rows / 2)) (total - rows)) in
   let shown = List.take (List.drop items start) rows in
-  let footer =
+  let overflow =
     if total <= rows
-    then None
+    then []
     else
-      Some (sprintf "%d–%d of %d" (start + 1) (start + List.length shown) total)
+      [ [ span
+            ~style:dim
+            (sprintf
+               "  ↕ %d–%d of %d"
+               (start + 1)
+               (start + List.length shown)
+               total)
+        ]
+      ]
   in
   let lines =
     match Autocomplete.source ac with
@@ -1243,7 +1119,7 @@ let autocomplete_box (ac : Autocomplete.t) ~width ~rows : Overlay.t =
       let usage_width =
         List.fold shown ~init:0 ~f:(fun acc item ->
           Int.max acc (Text_width.string (usage item)))
-        |> Int.min (inner / 2)
+        |> Int.min (width / 2)
       in
       List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
         let is_selected = start + i = selected in
@@ -1258,69 +1134,68 @@ let autocomplete_box (ac : Autocomplete.t) ~width ~rows : Overlay.t =
             (String.drop_prefix (usage item) (String.length name))
             ~width:(usage_width - Text_width.string name)
         in
-        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
-        ; span ~style:(style (Style.bold Style.plain)) name
-        ; span ~style:(style dim) args
-        ; span ~style:(style dim) ("  " ^ help)
-        ])
+        Content.Line.truncate
+          [ span
+              ~style:(style Style.plain)
+              (if is_selected then "▸ " else "  ")
+          ; span ~style:(style (Style.bold Style.plain)) name
+          ; span ~style:(style dim) args
+          ; span ~style:(style dim) ("  " ^ help)
+          ]
+          ~width)
     | Autocomplete.Source.Argument _ | Path | Directory _ | Skill | Snippet ->
       let label_width =
         List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
           Int.max acc (Text_width.string item.label))
-        |> Int.min (inner / 2)
+        |> Int.min (width / 2)
       in
       List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
-        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
-        ; span
-            ~style:(style (Style.bold Style.plain))
-            (Text_width.pad_right item.label ~width:label_width)
-        ; span
-            ~style:(style dim)
-            (if String.is_empty item.detail then "" else "  " ^ item.detail)
-        ])
+        Content.Line.truncate
+          [ span
+              ~style:(style Style.plain)
+              (if is_selected then "▸ " else "  ")
+          ; span
+              ~style:(style (Style.bold Style.plain))
+              (Text_width.pad_right item.label ~width:label_width)
+          ; span
+              ~style:(style dim)
+              (if String.is_empty item.detail then "" else "  " ^ item.detail)
+          ]
+          ~width)
   in
-  Overlay.box (Boxed.render ?footer ~title:(autocomplete_title ac) ~width lines)
+  Overlay.create (lines @ overflow)
 ;;
 
 let output_box (box : Output_box.t) ~width ~rows : Overlay.t =
   let lines, footer =
     Output_box.window box ~width:(Boxed.inner_width ~width) ~rows:(rows - 2)
   in
-  Overlay.box (Boxed.render ~footer ~title:box.title ~width lines)
+  Overlay.create (Boxed.render ~footer ~title:box.title ~width lines)
 ;;
 
-let search_box ~query ~width : Overlay.t =
-  Overlay.box
-    ~cursor:(1, Int.min (4 + Text_width.string query) (width - 2))
-    (Boxed.render
-       ~title:"Search"
-       ~width
-       [ [ span ~style:(Style.bold (Style.fg Yellow)) "/ "; span query ] ])
-;;
-
-(* The mode's boxes, top to bottom, nearest the composer last. *)
+(* The mode's own rows, top to bottom, nearest the composer last. *)
 let mode_overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
   let autocomplete () =
     match m.autocomplete with
-    | Some ac -> [ autocomplete_box ac ~width ~rows:(rows - 2) ]
+    | Some ac -> [ autocomplete_block ac ~width ~rows:(rows - 1) ]
     | None -> []
   in
   match m.mode with
   | Editing -> autocomplete ()
   | Output box -> [ output_box box ~width ~rows ]
   | Picker { picker; kind } ->
-    [ picker_box
+    [ picker_block
         ?keys:(picker_keys kind)
         picker
         ~width
-        ~rows:(Int.min (App.picker_rows m) (rows - 3))
+        ~rows:(Int.min (App.picker_rows m) (rows - 2))
     ]
   | Confirm { action = Tool_confirm c; _ } ->
-    [ Overlay.box (confirm_dialog ~width c) ]
+    [ Overlay.create (confirm_dialog ~width c) ]
   | Confirm { question; _ } ->
-    [ Overlay.box
+    [ Overlay.create
         (Boxed.render
            ~title:"Confirm"
            ~width
@@ -1328,12 +1203,12 @@ let mode_overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
     ]
   | Question { form; _ } ->
     let lines, cursor = question_dialog ~width ~utc_offset:m.utc_offset form in
-    [ Overlay.box ~cursor lines ]
+    [ Overlay.create ~cursor lines ]
   | Sign_in form ->
     let lines, cursor = sign_in_dialog ~width form in
-    [ Overlay.box ~cursor lines ]
+    [ Overlay.create ~cursor lines ]
   | Login_prompt _ ->
-    [ Overlay.box
+    [ Overlay.create
         (Boxed.render
            ~title:"Log in"
            ~width
@@ -1343,39 +1218,34 @@ let mode_overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
     ]
   | Text_prompt { question; action = Deny_reason { confirm; _ } } ->
     let lines, cursor = deny_reason_dialog m ~width ~question confirm in
-    [ Overlay.box ~cursor lines ]
+    [ Overlay.create ~cursor lines ]
   | Text_prompt { question; _ } ->
-    Overlay.box
-      (Boxed.render
-         ~title:question
-         ~width
-         [ [ span ~style:dim "↓ type the answer in the editor" ] ])
-    :: autocomplete ()
-  | Search { query; _ } -> [ search_box ~query ~width ]
+    Overlay.create (Boxed.render ~title:question ~width []) :: autocomplete ()
+  | Search { query; _ } ->
+    [ Overlay.create
+        ~cursor:(0, 2 + Text_width.string query)
+        [ [ span ~style:(Style.bold (Style.fg Yellow)) "/ "; span query ] ]
+    ]
 ;;
 
-(* Boxes that come and go with Editing (btw, queued messages) give way first
-   when the area is short, then the notice; the mode's own box is cut to
-   fit. *)
+(* What comes and goes with Editing (btw, queued messages) gives way first
+   when the area is short, then the notice; the mode's own rows are cut to
+   fit, the top first. *)
 let overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
-  (* On wide screens these leave the left half of the transcript showing. *)
-  let side = if width >= 100 then width / 2 else width in
-  let right (o : Overlay.t) = { o with right = side < width } in
   let optional =
     (match m.mode, m.btw with
      | Editing, Some box ->
-       [ Overlay.box
+       [ Overlay.create
            (Btw_box.render
               box
-              ~width:side
+              ~width
               ~max_rows:(Int.min rows (Btw_box.max_rows ~height:m.height)))
        ]
      | _ -> [])
     @ (match m.mode with
-       | Editing -> Option.to_list (queued_box m ~width:side)
+       | Editing -> Option.to_list (queued_block m ~width)
        | _ -> [])
-    @ Option.to_list (notice_box m ~width:side)
-    |> List.map ~f:right
+    @ Option.to_list (notice_box m ~width)
   in
   let primary = mode_overlays m ~width ~rows in
   let height (o : Overlay.t list) =
@@ -1388,7 +1258,6 @@ let overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
   in
   let optional = fit optional in
   let room = rows - height optional in
-  (* Cut the primary boxes to the room left, the top first. *)
   let rec cut boxes room =
     match boxes with
     | [] -> []
@@ -1580,9 +1449,10 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
       ~marker:"> "
       ~marker_style:elsewhere
       ~mask:false
-  | Text_prompt _ -> editor_rows m ~marker:"? " ~marker_style ~mask:false
+  | Text_prompt _ | Confirm _ ->
+    editor_rows m ~marker:"? " ~marker_style ~mask:false
   | Editing | Output _ -> editor_rows m ~marker:"> " ~marker_style ~mask:false
-  | Picker _ | Confirm _ | Question _ | Sign_in _ | Search _ ->
+  | Picker _ | Question _ | Sign_in _ | Search _ ->
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false
 ;;
 
@@ -1654,20 +1524,12 @@ let screen (m : App.Model.t) : Screen.t =
   in
   let transcript = Option.to_list agent_header @ padding @ transcript in
   let overlays = overlays m ~width:area ~rows in
-  let overlay_lines =
-    List.concat_map overlays ~f:(fun (o : Overlay.t) ->
-      List.map o.lines ~f:(fun line -> line, o.right))
-  in
+  let overlay_lines = List.concat_map overlays ~f:(fun o -> o.lines) in
   let overlay_top = rows - List.length overlay_lines in
   let transcript = exactly rows transcript in
   let main =
     List.take transcript overlay_top
-    @ List.mapi overlay_lines ~f:(fun i (line, right) ->
-      if right
-      then (
-        let left = area - Content.Line.width line in
-        pad (List.nth_exn transcript (overlay_top + i)) ~width:left @ line)
-      else Content.Line.truncate line ~width:area)
+    @ List.map overlay_lines ~f:(Content.Line.truncate ~width:area)
   in
   let main =
     if layout.sidebar = 0
@@ -1682,8 +1544,7 @@ let screen (m : App.Model.t) : Screen.t =
           @ line)
   in
   let lines =
-    (if layout.header then [ header m ~width ] else [])
-    @ main
+    main
     @ [ composer_rule m ~width ]
     @ List.map editor ~f:(Content.Line.truncate ~width)
     @ [ status m ]
@@ -1701,7 +1562,7 @@ let screen (m : App.Model.t) : Screen.t =
   in
   let cursor =
     match overlay_cursor with
-    | Some (r, c) -> layout.main_top + r, layout.sidebar + c
+    | Some (r, c) -> r, layout.sidebar + c
     | None -> layout.rule_row + 1 + (cursor_row - editor_start), cursor_col
   in
   let row, col = cursor in

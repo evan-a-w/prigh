@@ -5,7 +5,7 @@ open Fixtures
 module H = Test_app.H
 
 (* The rows that must never move: the composer's rule, the editor and the
-   status bar, found in the plain screen. *)
+   status line, found in the plain screen. *)
 module Fixed = struct
   type t =
     { rule : int
@@ -19,13 +19,13 @@ module Fixed = struct
   let of_ (h : H.t) =
     let screen = Render.screen h.model in
     let rows = List.map screen.lines ~f:Content.Line.to_plain in
-    let find prefix =
+    let editor =
       Option.value_map
-        (List.findi rows ~f:(fun _ row -> String.is_prefix row ~prefix))
+        (List.findi rows ~f:(fun _ row ->
+           String.is_prefix row ~prefix:"> " || String.is_prefix row ~prefix:"? "))
         ~default:(-1)
         ~f:fst
     in
-    let editor = find "> " in
     { rule = editor - 1
     ; editor
     ; status = List.length rows - 1
@@ -36,7 +36,7 @@ module Fixed = struct
 end
 
 (* Shows the screen before and after [f], then whether anything that must
-   stay put moved. The status bar's text may change: it shows state. *)
+   stay put moved. The status line's text may change: it shows state. *)
 let no_shift ?(cursor_moves = false) (h : H.t) ~f =
   let before = Fixed.of_ h in
   H.show h;
@@ -63,39 +63,30 @@ let%expect_test "no shift: opening the command autocomplete" =
   no_shift h ~cursor_moves:true ~f:(fun () -> H.key h (Key.plain Tab));
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
-    prigh  new session                                               /work
 
 
-    ╭─ Commands ─────────────────────────────────────────────────────────╮
-    │ ▸ /help                              show commands and keys        │
-    │   /hotkeys                           show keyboard shortcuts       │
-    │   /model [name|id|provider/id]       pick or switch the model      │
-    │   /scoped-models                     pick the models Ctrl+P cycle… │
-    │   /change_default                    save the current model and t… │
-    │   /fallback [off|model...]           show or set the models that … │
-    │   /default-dir [off|path]            show or set the directory ne… │
-    │   /login [provider] [api_key|oauth]  log in to a provider          │
-    ╰──────────────────────────────────────────────────────── 1–8 of 61 ─╯
-    ── Tab/Enter accept · Alt+S as typed ─────────────────────────────────
+
+
+    ▸ /help                              show commands and keys
+      /hotkeys                           show keyboard shortcuts
+      /model [name|id|provider/id]       pick or switch the model
+      /scoped-models                     pick the models Ctrl+P cycles th…
+      /change_default                    save the current model and think…
+      /fallback [off|model...]           show or set the models that take…
+      /default-dir [off|path]            show or set the directory new se…
+      /login [provider] [api_key|oauth]  log in to a provider
+      ↕ 1–8 of 61
+    ──────────────────────────────────────────────────────────────────────
     > /▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
     fixed rows unchanged
     |}]
 ;;
@@ -115,39 +106,30 @@ let%expect_test "no shift: a confirmation dialog arrives" =
          }));
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > half-typed▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
-    prigh  new session                                               /work
 
 
 
 
 
-    ╭─ Confirm ──────────────────────────────────────────────────────────╮
+
+    ┌─ Confirm ──────────────────────────────────────────────────────────┐
     │ Run bash: rm -rf _build?                                           │
     │ y  allow once                                                      │
     │ a  always allow bash(rm:*) this session                            │
     │ n  deny                                                            │
     │ r  deny, saying why                                                │
-    ╰────────────────────────────────────────────────────────────────────╯
-    ── confirm: y/a/n/r ──────────────────────────────────────────────────
-    > half-typed▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? half-typed▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  confirm: y/a/n/r
     fixed rows unchanged
     |}];
   H.mode h;
@@ -162,62 +144,44 @@ let%expect_test "no shift: a picker opens over the transcript" =
     H.reply ~quiet:true h (Models_for_picker "") models_json);
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    prigh  new session                                               /work
 
 
 
 
 
-    ╭─ Model (4) ────────────────────────────────────────────────────────╮
-    │ / ▏                                                                │
-    │    Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  $10/$… │
-    │    Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M  $10… │
-    │    GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 per M  … │
-    │ ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M  $10/… │
-    ╰────────────────────────────────────────────────────────────────────╯
-    ── Enter selects · Esc closes · Ctrl+N logged-in only ────────────────
+
+
+    Model  (4)
+    / ▏
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  $10/$50 p…
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M  $10/$50…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 per M  not …
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M  $10/$50 …
+    ──────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
     fixed rows unchanged
     |}];
   H.esc h;
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -228,24 +192,14 @@ let%expect_test
   no_shift h ~f:(fun () -> H.key h (Key.ctrl 'o'));
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
-    prigh  new session                                               /work
 
 
 
@@ -255,12 +209,13 @@ let%expect_test
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands ─────── view: verbose — everything is shown ──
+    ────────────────────────────── view: verbose — everything is shown ───
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     fixed rows unchanged
     |}];
   (* Eight seconds of ticks later it is gone (or at the next key press). *)
@@ -270,22 +225,13 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -295,24 +241,14 @@ let%expect_test "no shift: Ctrl+C once, and a usage error too long for the rule"
   no_shift h ~f:(fun () -> H.key h (Key.ctrl 'c'));
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     --- after ---
-    prigh  new session                                               /work
 
 
 
@@ -322,12 +258,13 @@ let%expect_test "no shift: Ctrl+C once, and a usage error too long for the rule"
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── Ctrl+C again quits ────────────────────────────────────────────────
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  Ctrl+C again quits
     fixed rows unchanged
     |}];
   H.esc h;
@@ -336,44 +273,26 @@ let%expect_test "no shift: Ctrl+C once, and a usage error too long for the rule"
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands ───────── usage: /notify [off|bell|desktop] ──
+    ──────────────────────────────── usage: /notify [off|bell|desktop] ───
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* Esc dismisses it at once. *)
   H.esc h;
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* So does the next key press. *)
   H.keys h "/notify sometimes";
@@ -382,22 +301,13 @@ let%expect_test "no shift: Ctrl+C once, and a usage error too long for the rule"
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
+    ──────────────────────────────────────────────────────────────────────
     > x▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -415,43 +325,37 @@ let%expect_test "no shift: queued messages while running" =
     H.enter h);
   [%expect
     {|
-    prigh  new session                                                                                       /work
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
 
     ▌ go
       Working on it, step one
-    ── ⠋ writing · Esc aborts · Enter steers ─────────────────────────────────────────────────────────────────────
+    ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal                                   ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ writing · Esc aborts · Enter steers
     --- after ---
     (Rpc (method_ follow_up) (params ((text "and then this"))) (tag Show_error))
     (Append_history "and then this")
     (Rpc (method_ steer) (params ((text "also that"))) (tag Show_error))
     (Append_history "also that")
-    prigh  new session                                                                                       /work
 
 
 
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
-      earlier answer                                       ╭─ Queued (2) ────────────────────────────────────────╮
-                                                           │ follow-up  and then this                            │
-    ▌ go                                                   │ steer      also that                                │
-      Working on it, step one                              ╰─── Alt+Up edits the last · /queue edits or removes ─╯
-    ── ⠋ writing · Esc aborts · Enter steers ─────────────────────────────────────────────────────────────────────
+      earlier answer
+    queued (2) · Alt+Up: edit the last · /queue: edit or remove
+      follow-up  and then this
+      steer      also that
+    ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal                         queued:2  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  queued:2  ⠋ writing · Esc aborts · Enter steers
     fixed rows unchanged
     |}]
 ;;
@@ -462,25 +366,15 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
   no_shift h ~f:(fun () -> H.enter h) ~cursor_moves:true;
   [%expect
     {|
-    prigh  new session                                               /work
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-
-
-
-
-
-
-
-    ╭─ Commands ─────────────────────────────────────────────────────────╮
-    │ ▸ /hotkeys  show keyboard shortcuts                                │
-    ╰────────────────────────────────────────────────────────────────────╯
-    ── Tab/Enter accept · Alt+S as typed ─────────────────────────────────
+    ▌ earlier question
+    ▸ /hotkeys  show keyboard shortcuts
+    ──────────────────────────────────────────────────────────────────────
     > /hotkeys▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
     --- after ---
-    prigh  new session                                               /work
-    ╭─ Keys ─────────────────────────────────────────────────────────────╮
+    ┌─ Keys ─────────────────────────────────────────────────────────────┐
     │ Keys                                                               │
     │ Enter                   send the prompt / accept the highlighted   │
     │ item                                                               │
@@ -491,19 +385,18 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ Ctrl+J / Alt+J          insert a newline                           │
     │ Esc                     close the dialog, or abort the running     │
     │ turn                                                               │
-    ╰──────────────────── 1–10 of 79 · ↑↓ PgUp PgDn scroll · Esc closes ─╯
-    ── ↑↓ scroll · Esc closes · typing goes to the editor ────────────────
+    │ Tab                     complete a slash command, @path or         │
+    └──────────────────── 1–11 of 79 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor
     fixed rows unchanged
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-    ╭─ Keys ─────────────────────────────────────────────────────────────╮
-    │ Tab                     complete a slash command, @path or         │
+    ┌─ Keys ─────────────────────────────────────────────────────────────┐
     │ #snippet / open the command picker / the next field of the sign-in │
     │ dialog                                                             │
     │ Up                      move up (editor line, history, or list     │
@@ -513,10 +406,12 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ Alt+Up                  pop the last queued steer/follow-up back   │
     │ into the editor                                                    │
     │ Left                    move the cursor left                       │
-    ╰─────────────────── 11–20 of 79 · ↑↓ PgUp PgDn scroll · Esc closes ─╯
-    ── ↑↓ scroll · Esc closes · typing goes to the editor ────────────────
+    │ Right                   move the cursor right                      │
+    │ Alt+B / Ctrl+Left       move the cursor back one word              │
+    └─────────────────── 12–22 of 79 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor
     |}];
   (* Esc closes it, nothing else changes. *)
   H.esc h;
@@ -539,26 +434,22 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
   H.show h;
   [%expect
     {|
-    prigh  new session                                               /work
-
-
-    ╭─ Commands ─────────────────────────────────────────────────────────╮
-    │ ▸ /mcp [reconnect]                 list MCP servers (Enter approv… │
-    │   /mode [ask|auto-edit|auto|plan]  pick or set the mode: what ask… │
-    │   /model [name|id|provider/id]     pick or switch the model        │
-    │   /mkdir [path]                    create a directory (and its pa… │
-    │   /scoped-models                   pick the models Ctrl+P cycles … │
-    │   /name [text]                     set the session name            │
-    │   /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agen… │
-    │   /resume [now|cancel]             show, run now or cancel the au… │
-    ╰──────────────────────────────────────────────────────── 1–8 of 12 ─╯
-    ── Tab/Enter accept · Alt+S as typed ─────────────────────────────────
+    ▸ /mcp [reconnect]                 list MCP servers (Enter approves o…
+      /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks fi…
+      /model [name|id|provider/id]     pick or switch the model
+      /mkdir [path]                    create a directory (and its parent…
+      /scoped-models                   pick the models Ctrl+P cycles thro…
+      /name [text]                     set the session name
+      /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agent wh…
+      /resume [now|cancel]             show, run now or cancel the automa…
+      ↕ 1–8 of 12
+    ──────────────────────────────────────────────────────────────────────
     > /m▏
-    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
     |}]
 ;;
 
-let%expect_test "status bar: whole segments give way, the model never" =
+let%expect_test "status line: whole segments give way, the model never" =
   let h = Test_app.connected () in
   H.event
     h
@@ -573,18 +464,21 @@ let%expect_test "status bar: whole segments give way, the model never" =
     printf "%3d |%s|\n" width (Content.Line.to_plain (Render.status h.model)));
   [%expect
     {|
-    160 |deepseek-flash  think:off  mode:auto  view:normal                                                           agents:1 running  jobs:1  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01|
-    120 |deepseek-flash  think:off  mode:auto  view:normal                   agents:1 running  jobs:1  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01|
-    100 |deepseek-flash  think:off  mode:auto            agents:1 running  jobs:1  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01|
-     80 |deepseek-flash  mode:auto   agents:1 running  jobs:1  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01|
-     60 |deepseek-flash         agents:1 running  ctx ▱▱▱▱▱ 0.1%/1.0M|
-     40 |deepseek-flash       ctx ▱▱▱▱▱ 0.1%/1.0M|
-     24 |deepseek-flash|
+    160 |/work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
+    120 |deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
+    100 |deepseek-flash  ctx:0.1%/1.0M  agents:1 running  jobs:1  ⠋ working · Esc aborts · Enter steers|
+     80 |deepseek-flash  ctx:0.1%/1.0M  jobs:1  ⠋ working · Esc aborts · Enter steers|
+     60 |deepseek-flash  $0.01  ⠋ working · Esc aborts · Enter steers|
+     40 |deepseek-flash  ctx:0.1%/1.0M  jobs:1|
+     24 |deepseek-flash  jobs:1|
      12 |deepseek-fl…|
     |}]
 ;;
 
-let%expect_test "header: session title, home-relative cwd, the server" =
+let%expect_test
+    "welcome line: home-relative cwd and session name; the server in the \
+     status line"
+  =
   let h = H.create ~width:80 ~height:8 () in
   H.step ~quiet:true h (Set_home "/home/me");
   H.step
@@ -604,38 +498,22 @@ let%expect_test "header: session title, home-relative cwd, the server" =
   H.show h;
   [%expect
     {|
-    prigh  tui redesign                                ~/src/prigh (main) · box:7000
-
-
-
-
-    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
+      prigh in ~/src/prigh "tui redesign" · /help · Esc aborts · Ctrl+C twice quits
+    ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-    |}];
-  List.iter [ 50; 30 ] ~f:(fun width ->
-    H.step ~quiet:true h (Resize { width; height = 8 });
-    print_endline
-      (List.hd_exn
-         (String.split_lines (Screen.to_plain (Render.screen h.model)))));
-  [%expect
-    {|
-    prigh  tui redesign  ~/src/prigh (main) · box:7000
-    prigh  tui redesign
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:box:7000
     |}];
   H.step ~quiet:true h Backend_closed;
   H.step ~quiet:true h (Resize { width = 80; height = 8 });
   H.show h;
   [%expect
     {|
-    prigh  tui redesign                            ~/src/prigh (main) · reconnecting
-
-
+      prigh in ~/src/prigh "tui redesign" · /help · Esc aborts · Ctrl+C twice quits
       backend connection lost; reconnecting (/retry-backend-connection to retry now,
       Ctrl+C quits)
-    ── backend gone · retry 1 in 0s ────────────────────────────────────────────────
+    ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    reconnecting  deepseek-flash  think:off  mode:auto    ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  backend gone · retry 1 in 0s
     |}]
 ;;
 
@@ -667,24 +545,7 @@ let%expect_test "screen: 100x30 and 160x40" =
       print_endline "");
   [%expect
     {|
-    prigh  new session                                                                             /work
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -694,11 +555,9 @@ let%expect_test "screen: 100x30 and 160x40" =
         a.ml
         b.ml
       Two files: a.ml and b.ml.
-    ── ⠋ writing · Esc aborts · Enter steers ───────────────────────────────────────────────────────────
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
-
-    prigh  new session                                                                             /work
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ writing · Esc aborts · Enter steers
 
 
 
@@ -716,99 +575,101 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
-    ╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────╮
-    │ ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning… │
-    │   /model [name|id|provider/id]     pick or switch the model                                      │
-    │   /scoped-models                   pick the models Ctrl+P cycles through                         │
-    │   /import [path]                   import a session from a JSONL file                            │
-    │   /permissions                     show the mode and the allow/ask/deny rules (config and this … │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab/Enter accept · Alt+S as typed ───────────────────────────────────────────────────────────────
-    > /mo▏
-    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+      earlier answer
 
-    prigh  new session                                                                                                                                         /work
-     Agents                     │
-    ▌● main              running│
-       writing                  │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │ ▌ earlier question
-                                │   earlier answer
-                                │
-                                │ ▌ list the files
-                                │ ✓ bash $ ls
-                                │     a.ml
-                                │     b.ml
-     Alt+L hides · ⇧Tab focuses │   Two files: a.ml and b.ml.
-    ── ⠋ writing · Esc aborts · Enter steers ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Al…
+      /model [name|id|provider/id]     pick or switch the model
+      /scoped-models                   pick the models Ctrl+P cycles through
+      /import [path]                   import a session from a JSONL file
+      /permissions                     show the mode and the allow/ask/deny rules (config and this sess…
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /mo▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ list the files
+    ✓ bash $ ls
+        a.ml
+        b.ml
+      Two files: a.ml and b.ml.
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  mode:auto  view:normal                                                                                     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ writing · Esc aborts · Enter steers
 
-    prigh  new session                                                                                                                                         /work
-     Agents                     │
-    ▌● main              running│
-       writing                  │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │ ▌ earlier question
-                                │ ╭─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                                │ │ ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Alt+M cycles)                 │
-                                │ │   /model [name|id|provider/id]     pick or switch the model                                                                    │
-                                │ │   /scoped-models                   pick the models Ctrl+P cycles through                                                       │
-                                │ │   /import [path]                   import a session from a JSONL file                                                          │
-                                │ │   /permissions                     show the mode and the allow/ask/deny rules (config and this session)                        │
-     Alt+L hides · ⇧Tab focuses │ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ── Tab/Enter accept · Alt+S as typed ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
+      /model [name|id|provider/id]     pick or switch the model
+      /scoped-models                   pick the models Ctrl+P cycles through
+      /import [path]                   import a session from a JSONL file
+      /permissions                     show the mode and the allow/ask/deny rules (config and this session)
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /mo▏
-    deepseek-flash  think:off  mode:auto  view:normal                                                                                     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;

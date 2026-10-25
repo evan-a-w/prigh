@@ -1370,8 +1370,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
     `Btw_box` (the `/btw` panel above the composer: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
-    never aborts the run), `Boxed` (the rounded frames of every overlay, with
-    an optional footer in the bottom border), `Output_box` (long command
+    never aborts the run), `Boxed` (the framed dialogs, with an optional
+    footer in the bottom border), `Output_box` (long command
     output: `Mode.Output`, a scrollable box that is not a dialog, so a
     confirmation or a picker replaces it; typing closes it into the editor),
     `Notice` (the acknowledgement slot: `App.notice` sets it, the next key
@@ -1503,30 +1503,35 @@ terminal frontend and `web/` prigh-web, the browser one.
     to the confirmation). `Tool_render` draws `update_plan`, `ask_user` and
     `exit_plan_mode` calls.
   - `Layout` computes the frame's fixed zones from the size, the sidebar
-    preference and the editor's rows: header, main area (sidebar of
-    `Layout.sidebar_width` columns at `Layout.sidebar_threshold` and more,
-    the transcript beside it), the composer's rule, the editor (capped by
-    `Layout.editor_cap`, then it scrolls) and the status bar. Only the
+    preference (off by default, Alt+L) and the editor's rows: main area
+    (sidebar of `Layout.sidebar_width` columns at `Layout.sidebar_threshold`
+    and more, the transcript beside it), the composer's rule, the editor
+    (capped by `Layout.editor_cap`, then it scrolls) and the status line. Only the
     editor's height moves the others; `App` uses the same layout for
     scrolling and picker pages.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell.
-    Overlays (the mode's box: picker, completion, confirmation, question,
+    Overlays (the mode's rows: picker, completion, confirmation, question,
     sign-in, login, text prompt, search, output; in `Editing` also `/btw`,
     the queue and a notice too long for the rule) are stacked bottom-up
     over the transcript's last rows, the optional ones giving way first when
-    the area is short; on wide screens `/btw`, the queue and the notice box
-    take the right half so the transcript shows beside them. The cursor
-    stays in the editor unless typing goes into a box (picker filter,
-    search, question, sign-in, the deny reason). The composer's rule carries
-    the mode's keys (cut by whole keys) and the inline notice. The status
-    bar lays its segments out in a fixed order, a left and a right group,
-    and drops whole segments by priority (`view:` first, the model never).
-    It is gray; yellow marks modes, running work, warm context and what
-    waits for the user, red a full context or a lost backend.
+    the area is short. The cursor stays in the editor unless typing goes
+    into an overlay (picker filter, search, question, sign-in, the deny
+    reason). The rule is plain; a short notice sits on its right. The
+    status line keeps the cwd and model, then fills remaining width by
+    priority (mode hint, scroll position, context, queued/agents/jobs and an
+    approval mode that asks, then thinking, `mode:auto` and cost, verbosity
+    last; a mode hint too wide to fit whole drops its last keys, the least
+    important, after the context has its place; dialogs list the rest of
+    their keys in the box: the sessions picker on its title row, a question
+    under its answer, the reason prompt is typed in its box under the call)
+    in a fixed order, dropping whole parts: the verbosity gives way to the
+    cwd, the cwd to everything else, and the model is never cut. It is
+    gray; yellow marks modes, running work and warm context, red a full
+    context or a lost backend.
   - `Queued_message` is a queued steer or follow-up (kind, index in its
     queue, text) as `queue_update` lists them (whichever frontend queued
-    them), shown in a box above the composer; the TUI adds what it sends at once, the
+    them), shown above the rule; the TUI adds what it sends at once, the
     next `queue_update` replaces the list. `/queue` is a picker over them:
     Enter (`remove_queued`, then into the editor), Ctrl+D (`remove_queued`).
     prigh-web shares the module.
