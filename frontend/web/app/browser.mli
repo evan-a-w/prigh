@@ -12,8 +12,12 @@ val same_origin_ws_url : unit -> string
 
 val copy_to_clipboard : string -> unit
 
-(** Runs [f] once the DOM has been patched for the state changes made so far. *)
+(** Runs [f] once the DOM has been patched for the state changes made so far,
+    in the same frame, before the browser paints it. *)
 val after_render : (unit -> unit) -> unit
+
+(** Runs what [after_render] holds: the page calls it after each render. *)
+val rendered : unit -> unit
 
 (** Runs [f] whenever the window or visible viewport resizes or moves. *)
 val on_viewport_change : (unit -> unit) -> unit

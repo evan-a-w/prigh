@@ -82,16 +82,20 @@ module Viewport = struct
   ;;
 end
 
-let after_render f =
-  let request_frame g =
-    ignore
-      (Dom_html.window##requestAnimationFrame
-         (Js.wrap_callback (fun (_ : Js.number_t) -> g ()))
-       : Dom_html.animation_frame_request_id)
+let waiting_for_render = Queue.create ()
+let after_render f = Queue.enqueue waiting_for_render f
+
+(* In a microtask: after the mutation observers' (queued as Bonsai patched
+   the DOM), which keep the chat's scroll position, and still before the
+   browser paints. *)
+let rendered () =
+  let run () =
+    let callbacks = Queue.to_list waiting_for_render in
+    Queue.clear waiting_for_render;
+    List.iter callbacks ~f:(fun f -> f ())
   in
-  (* Bonsai patches the DOM in its own animation frame callback, which may run
-     after one requested now; the next frame is surely after it. *)
-  request_frame (fun () -> request_frame f)
+  if not (Queue.is_empty waiting_for_render)
+  then Js.Unsafe.global##queueMicrotask (Js.wrap_callback run)
 ;;
 
 let on_viewport_change = Viewport.on_change

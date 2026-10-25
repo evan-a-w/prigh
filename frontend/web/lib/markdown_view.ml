@@ -127,44 +127,35 @@ let blocks ~streaming text =
   List.map (Markdown.parse ~partial:streaming text) ~f:block
 ;;
 
-let cached table text ~f =
-  if Hashtbl.length table > 2000 then Hashtbl.clear table;
-  Hashtbl.find_or_add table text ~default:(fun () -> f text)
-;;
-
-(* The whole transcript is rendered on every event: finished texts are parsed
-   once. *)
-let cache = String.Table.create ()
-
-(* A streaming reply's complete blocks, parsed once each (as lazy nodes that
-   virtual_dom skips when they are reused): only its last part is parsed
-   again at each delta. *)
+(* Text as parts, one per top-level block that a streaming reply has
+   finished ([Markdown.block_starts]): each parsed once, as a lazy node that
+   virtual_dom skips when it is reused. A streaming reply's last part, still
+   arriving, is parsed again at each delta; once the reply ends it becomes a
+   part like the others, so the DOM drawn while it streamed is patched rather
+   than drawn again (which lost the selection and the code blocks' state). *)
 let parts = String.Table.create ()
 
 let part text =
-  Node.lazy_
-    (lazy (Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text)))
+  if Hashtbl.length parts > 10_000 then Hashtbl.clear parts;
+  Hashtbl.find_or_add parts text ~default:(fun () ->
+    Node.lazy_
+      (lazy (Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text))))
 ;;
 
-let render_streaming text =
+let render ?(streaming = false) text =
   let rec split pos = function
     | [] -> [ String.drop_prefix text pos ]
     | start :: rest ->
       String.sub text ~pos ~len:(start - pos) :: split start rest
   in
   let pieces = split 0 (Markdown.block_starts text) in
-  let settled = List.drop_last_exn pieces in
-  let last = List.last_exn pieces in
   Node.div
     ~attrs:(cls "markdown")
-    (List.map settled ~f:(cached parts ~f:part)
-     @ [ Node.div ~attrs:(cls "md-part") (blocks ~streaming:true last) ])
-;;
-
-let render ?(streaming = false) text =
-  if streaming
-  then render_streaming text
-  else
-    cached cache text ~f:(fun text ->
-      Node.div ~attrs:(cls "markdown") (blocks ~streaming:false text))
+    (if streaming
+     then (
+       let settled = List.drop_last_exn pieces in
+       let last = List.last_exn pieces in
+       List.map settled ~f:part
+       @ [ Node.div ~attrs:(cls "md-part") (blocks ~streaming:true last) ])
+     else List.map pieces ~f:part)
 ;;
