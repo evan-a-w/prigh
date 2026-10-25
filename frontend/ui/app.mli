@@ -53,6 +53,8 @@ module Reply_tag : sig
     | Models_for_scoped
     | Compact_done
     | Git_diff
+    | Review_comments (** [/review]: then the diff *)
+    | Review_status of P.Review.t
     | Review_started
     | Abort_done
     | Notice_on_success of string

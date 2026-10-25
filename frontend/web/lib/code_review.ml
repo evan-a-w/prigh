@@ -1,0 +1,771 @@
+open! Core
+open! Import
+module Diff_files = Prigh_ui.Diff_files
+module File_approval = Prigh_ui.File_approval
+
+module Mode = struct
+  type t =
+    | Comment
+    | Edit
+  [@@deriving sexp_of, equal]
+end
+
+module Layout = struct
+  type t =
+    | Unified
+    | Full
+  [@@deriving sexp_of, equal]
+end
+
+module Selection = struct
+  type t =
+    { path : string
+    ; first : int
+    ; last : int
+    ; from : int
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module Draft = struct
+  type t =
+    { path : string
+    ; first : int
+    ; last : int
+    ; text : string
+    ; busy : bool
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module Content = struct
+  type t =
+    | Loading
+    | Loaded of
+        { text : string
+        ; md5 : string option
+        }
+    | Failed of string
+  [@@deriving sexp_of, equal]
+end
+
+module Editor = struct
+  type t =
+    { path : string
+    ; text : string
+    ; md5 : string option
+    ; dirty : bool
+    ; saving : bool
+    ; conflict : bool
+    ; error : string option
+    }
+  [@@deriving sexp_of, equal]
+end
+
+type t =
+  { session : string option
+  ; review : Review.t
+  ; diff : Git_diff.t option
+  ; files : Diff_files.File.t list
+  ; diff_error : string option
+  ; loading : bool
+  ; again : bool
+  ; open_ : bool
+  ; current : string option
+  ; mode : Mode.t
+  ; layout : Layout.t
+  ; selection : Selection.t option
+  ; draft : Draft.t option
+  ; replies : string String.Map.t
+  ; busy : String.Set.t
+  ; contents : Content.t String.Map.t
+  ; editor : Editor.t option
+  ; submitting : bool
+  }
+[@@deriving sexp_of]
+
+let empty =
+  { session = None
+  ; review = Review.empty
+  ; diff = None
+  ; files = []
+  ; diff_error = None
+  ; loading = false
+  ; again = false
+  ; open_ = false
+  ; current = None
+  ; mode = Comment
+  ; layout = Unified
+  ; selection = None
+  ; draft = None
+  ; replies = String.Map.empty
+  ; busy = String.Set.empty
+  ; contents = String.Map.empty
+  ; editor = None
+  ; submitting = false
+  }
+;;
+
+module Reply = struct
+  type t =
+    | Diff
+    | Review
+    | Comment_added
+    | Changed of string option
+    | Decided of string
+    | Content of string
+    | Saved of string
+    | Submitted
+  [@@deriving sexp_of, equal]
+end
+
+module Out = struct
+  type t =
+    | Rpc of
+        { method_ : Request.Method.t
+        ; reply : Reply.t
+        }
+    | Get_diff
+    | Toast of
+        { text : string
+        ; error : bool
+        }
+    | Focus of string
+  [@@deriving sexp_of, equal]
+end
+
+module Action = struct
+  type t =
+    | Open of string option
+    | Close
+    | Toggle
+    | Go of string
+    | Step of int
+    | Set_mode of Mode.t
+    | Set_layout of Layout.t
+    | Select_line of
+        { path : string
+        ; line : int
+        ; extend : bool
+        }
+    | Clear_selection
+    | Start_comment
+    | Draft_input of string
+    | Draft_cancel
+    | Draft_send
+    | Reply_input of
+        { id : string
+        ; text : string
+        }
+    | Reply_send of string
+    | Set_status of
+        { id : string
+        ; status : Review_comment.Status.t
+        }
+    | Delete of string
+    | Decide of
+        { id : string
+        ; post : int
+        ; accept : bool
+        }
+    | Toggle_approval of string
+    | Submit
+    | Edit_input of string
+    | Save
+    | Reload
+    | Refresh
+  [@@deriving sexp_of]
+end
+
+let rpc method_ reply = Out.Rpc { method_; reply }
+let toast ?(error = false) text = Out.Toast { text; error }
+let root t = Option.map t.diff ~f:(fun d -> d.root)
+
+let relative t ~abs =
+  Option.bind (root t) ~f:(fun root ->
+    String.chop_prefix
+      abs
+      ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
+;;
+
+let absolute t path =
+  match root t with
+  | Some root -> Filename.concat root path
+  | None -> path
+;;
+
+let file t path =
+  List.find t.files ~f:(fun (f : Diff_files.File.t) -> String.equal f.path path)
+;;
+
+let approval t f = File_approval.status t.review f
+let approved t = File_approval.approved t.review t.files
+let unsent t = Review.unsent t.review
+
+let mark t ~abs =
+  match relative t ~abs with
+  | None -> `None
+  | Some rel ->
+    (match file t rel with
+     | Some f -> `File (approval t f)
+     | None ->
+       let prefix = rel ^ "/" in
+       (match
+          List.count t.files ~f:(fun f -> String.is_prefix f.path ~prefix)
+        with
+        | 0 -> `None
+        | n -> `Dir n))
+;;
+
+let get_diff t =
+  if t.loading
+  then { t with again = true }, []
+  else { t with loading = true }, [ Out.Get_diff ]
+;;
+
+let refresh = get_diff
+let changed t ~watching = if watching || t.open_ then get_diff t else t, []
+
+(* What the page's file should read: its text, unless known or on its
+   way. *)
+let fetch_content t path =
+  match Map.find t.contents path with
+  | Some (Loading | Loaded _) -> t, []
+  | Some (Failed _) | None ->
+    ( { t with contents = Map.set t.contents ~key:path ~data:Content.Loading }
+    , [ rpc (Fs_preview { path = absolute t path }) (Content path) ] )
+;;
+
+let refetch_content t path =
+  fetch_content { t with contents = Map.remove t.contents path } path
+;;
+
+let paths t = List.map t.files ~f:(fun (f : Diff_files.File.t) -> f.path)
+
+(* The page shows [path]: its text is read, the selection and draft of
+   another file go. *)
+let show t path =
+  let t =
+    { t with
+      current = Some path
+    ; selection =
+        Option.filter t.selection ~f:(fun s -> String.equal s.path path)
+    ; draft =
+        Option.filter t.draft ~f:(fun (d : Draft.t) ->
+          String.equal d.path path
+          || not (String.is_empty (String.strip d.text)))
+    }
+  in
+  let t, outs = fetch_content t path in
+  let t =
+    match t.mode, t.editor with
+    | Edit, Some e when (not (String.equal e.path path)) && not e.dirty ->
+      { t with editor = None }
+    | _ -> t
+  in
+  t, outs
+;;
+
+(* The current file, or the first, as the diff changes under it. *)
+let settle_current t =
+  match t.current, t.files with
+  | Some path, _ when List.mem (paths t) path ~equal:String.equal -> t, []
+  | Some path, _
+    when Option.exists t.editor ~f:(fun e ->
+           e.dirty && String.equal e.path path) -> t, []
+  | _, f :: _ when t.open_ -> show t f.path
+  | _, [] -> { t with current = None }, []
+  | _ -> t, []
+;;
+
+let open_editor t path =
+  match Map.find t.contents path with
+  | Some (Loaded { text; md5 = Some md5 }) ->
+    { t with
+      editor =
+        Some
+          { path
+          ; text
+          ; md5 = Some md5
+          ; dirty = false
+          ; saving = false
+          ; conflict = false
+          ; error = None
+          }
+    }
+  | Some (Loaded { md5 = None; _ }) ->
+    { t with
+      editor =
+        Some
+          { path
+          ; text = ""
+          ; md5 = None
+          ; dirty = false
+          ; saving = false
+          ; conflict = false
+          ; error =
+              Some "This file is too large to edit here: open it in an editor."
+          }
+    }
+  | Some (Loading | Failed _) | None -> t
+;;
+
+let step t by =
+  match paths t with
+  | [] -> t, []
+  | paths ->
+    let n = List.length paths in
+    let i =
+      match t.current with
+      | None -> if by > 0 then 0 else n - 1
+      | Some p ->
+        (match List.findi paths ~f:(fun _ q -> String.equal p q) with
+         | Some (i, _) -> (((i + by) mod n) + n) mod n
+         | None -> 0)
+    in
+    show t (List.nth_exn paths i)
+;;
+
+let comment_busy t id = { t with busy = Set.add t.busy id }
+
+let selected_anchor t (s : Selection.t) =
+  match Map.find t.contents s.path with
+  | Some (Loaded { text; _ }) ->
+    let lines = Array.of_list (String.split_lines text) in
+    List.range s.first (s.last + 1)
+    |> List.filter_map ~f:(fun i ->
+      if i - 1 < Array.length lines then Some lines.(i - 1) else None)
+    |> String.concat ~sep:"\n"
+  | Some (Loading | Failed _) | None ->
+    (* Without the text, the diff's lines. *)
+    (match file t s.path with
+     | None -> ""
+     | Some f ->
+       Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
+       |> List.filter_map ~f:(fun (row : Diff_view.Row.t) ->
+         match row with
+         | Line { new_line = Some n; text; _ } when n >= s.first && n <= s.last
+           -> Some text
+         | Line _ | Hunk _ -> None)
+       |> String.concat ~sep:"\n")
+;;
+
+let update t (action : Action.t) =
+  match action with
+  | Open path ->
+    let t = { t with open_ = true } in
+    let t, diff = get_diff t in
+    let t, more =
+      match path with
+      | Some path -> show t path
+      | None ->
+        (match t.current with
+         | Some path -> show t path
+         | None -> settle_current t)
+    in
+    t, diff @ more @ [ Out.Focus "review-page" ]
+  | Close -> { t with open_ = false; selection = None }, [ Out.Focus "editor" ]
+  | Toggle ->
+    if t.open_
+    then { t with open_ = false; selection = None }, []
+    else (
+      let t = { t with open_ = true } in
+      let t, diff = get_diff t in
+      let t, more =
+        match t.current with
+        | Some path -> show t path
+        | None -> settle_current t
+      in
+      t, diff @ more @ [ Out.Focus "review-page" ])
+  | Go path ->
+    let t, outs = show t path in
+    let t, diff = get_diff t in
+    t, outs @ diff
+  | Step by -> step t by
+  | Set_mode Comment -> { t with mode = Comment }, []
+  | Set_mode Edit ->
+    (match t.current with
+     | None -> t, [ toast "No file to edit: the working tree has no changes." ]
+     | Some path ->
+       let t = { t with mode = Edit; selection = None } in
+       let t, outs = fetch_content t path in
+       let t =
+         match t.editor with
+         | Some e when String.equal e.path path -> t
+         | Some _ | None -> open_editor t path
+       in
+       t, outs @ [ Out.Focus "review-editor" ])
+  | Set_layout layout ->
+    let t = { t with layout } in
+    (match layout, t.current with
+     | Full, Some path -> fetch_content t path
+     | _ -> t, [])
+  | Select_line { path; line; extend } ->
+    let selection =
+      match t.selection with
+      | Some s when extend && String.equal s.path path ->
+        { s with first = Int.min s.from line; last = Int.max s.from line }
+      | Some _ | None ->
+        { Selection.path; first = line; last = line; from = line }
+    in
+    let t, outs = fetch_content t path in
+    { t with selection = Some selection }, outs
+  | Clear_selection -> { t with selection = None }, []
+  | Start_comment ->
+    (match t.selection with
+     | None ->
+       ( t
+       , [ toast
+             "Select lines first: click a line's number (Shift+click for a \
+              range)."
+         ] )
+     | Some s ->
+       ( { t with
+           draft =
+             Some
+               { path = s.path
+               ; first = s.first
+               ; last = s.last
+               ; text = ""
+               ; busy = false
+               }
+         }
+       , [ Out.Focus "review-draft" ] ))
+  | Draft_input text ->
+    { t with draft = Option.map t.draft ~f:(fun d -> { d with text }) }, []
+  | Draft_cancel -> { t with draft = None }, []
+  | Draft_send ->
+    (match t.draft, root t with
+     | Some d, _ when String.is_empty (String.strip d.text) ->
+       t, [ toast "Write the comment first." ]
+     | Some ({ busy = false; _ } as d), Some root ->
+       let anchor =
+         selected_anchor
+           t
+           { path = d.path; first = d.first; last = d.last; from = d.first }
+       in
+       ( { t with draft = Some { d with busy = true } }
+       , [ rpc
+             (Review_comment
+                { root
+                ; path = d.path
+                ; first = d.first
+                ; last = d.last
+                ; anchor
+                ; text = d.text
+                })
+             Comment_added
+         ] )
+     | Some _, None ->
+       t, [ toast ~error:true "The changes are still being read: try again." ]
+     | Some { busy = true; _ }, _ | None, _ -> t, [])
+  | Reply_input { id; text } ->
+    { t with replies = Map.set t.replies ~key:id ~data:text }, []
+  | Reply_send id ->
+    (match Map.find t.replies id with
+     | Some text when not (String.is_empty (String.strip text)) ->
+       ( comment_busy t id
+       , [ rpc (Review_reply { id; text }) (Changed (Some id)) ] )
+     | Some _ | None -> t, [ toast "Write the reply first." ])
+  | Set_status { id; status } ->
+    ( comment_busy t id
+    , [ rpc (Review_set_status { id; status }) (Changed (Some id)) ] )
+  | Delete id ->
+    comment_busy t id, [ rpc (Review_delete { id }) (Changed (Some id)) ]
+  | Decide { id; post; accept } ->
+    comment_busy t id, [ rpc (Review_decide { id; post; accept }) (Decided id) ]
+  | Toggle_approval path ->
+    (match file t path with
+     | None -> t, [ toast (sprintf "%s has no changes to approve." path) ]
+     | Some f ->
+       (match approval t f with
+        | Approved -> t, [ rpc (Review_unapprove { path }) (Changed None) ]
+        | Changed | Unapproved ->
+          t, [ rpc (Review_approve { path; hash = f.hash }) (Changed None) ]))
+  | Submit ->
+    if unsent t = 0
+    then
+      t, [ toast "No new comments to send: select lines to comment on them." ]
+    else if t.submitting
+    then t, []
+    else { t with submitting = true }, [ rpc Review_submit Submitted ]
+  | Edit_input text ->
+    ( { t with
+        editor =
+          Option.map t.editor ~f:(fun e ->
+            { e with text; dirty = true; error = None })
+      }
+    , [] )
+  | Save ->
+    (match t.editor with
+     | None | Some { saving = true; _ } -> t, []
+     | Some { md5 = None; _ } ->
+       t, [ toast ~error:true "This file cannot be saved from here." ]
+     | Some e ->
+       ( { t with editor = Some { e with saving = true; error = None } }
+       , [ rpc
+             (Fs_write
+                { path = absolute t e.path
+                ; text = e.text
+                ; expected = (if e.conflict then None else e.md5)
+                })
+             (Saved e.path)
+         ] ))
+  | Reload ->
+    (match t.editor with
+     | None -> t, []
+     | Some e ->
+       let t, outs = refetch_content { t with editor = None } e.path in
+       t, outs)
+  | Refresh -> get_diff t
+;;
+
+let set_review t review = { t with review }
+
+let set_session t session ~watching =
+  if Option.equal String.equal t.session session
+  then t, []
+  else (
+    let t = { empty with session; layout = t.layout } in
+    match session with
+    | None -> t, []
+    | Some _ ->
+      let t, diff = if watching then get_diff t else t, [] in
+      t, rpc Get_review Review :: diff)
+;;
+
+let preview_text t ~abs ~text ~md5 =
+  match relative t ~abs with
+  | None -> t
+  | Some path ->
+    { t with
+      contents = Map.set t.contents ~key:path ~data:(Loaded { text; md5 })
+    }
+;;
+
+(* The files whose change is different now: their texts are read again. *)
+let refresh_contents t ~before =
+  let stale =
+    List.filter_map t.files ~f:(fun (f : Diff_files.File.t) ->
+      match
+        List.find before ~f:(fun (b : Diff_files.File.t) ->
+          String.equal b.path f.path)
+      with
+      | Some b when String.equal b.hash f.hash -> None
+      | Some _ | None -> Some f.path)
+  in
+  List.fold stale ~init:(t, []) ~f:(fun (t, outs) path ->
+    if not (Map.mem t.contents path)
+    then t, outs
+    else (
+      let t, more = refetch_content t path in
+      t, outs @ more))
+;;
+
+let error_text e = String.capitalize e
+
+let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
+  match why, result with
+  | Diff, Error e ->
+    let t = { t with loading = false; diff_error = Some (error_text e) } in
+    if t.again then get_diff { t with again = false } else t, []
+  | Diff, Ok json ->
+    (match Git_diff.of_json json with
+     | Error e ->
+       { t with loading = false; diff_error = Some (Error.to_string_hum e) }, []
+     | Ok diff ->
+       let before = t.files in
+       let t =
+         { t with
+           loading = false
+         ; diff = Some diff
+         ; files = Diff_files.parse diff.diff
+         ; diff_error = None
+         }
+       in
+       let t, contents = refresh_contents t ~before in
+       let t, current = settle_current t in
+       let t, again =
+         if t.again then get_diff { t with again = false } else t, []
+       in
+       t, contents @ current @ again)
+  | Review, Error e -> t, [ toast ~error:true (error_text e) ]
+  | Review, Ok json ->
+    (match Review.of_json json with
+     | Ok review -> { t with review }, []
+     | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
+  | Comment_added, Error e ->
+    ( { t with draft = Option.map t.draft ~f:(fun d -> { d with busy = false }) }
+    , [ toast ~error:true (error_text e) ] )
+  | Comment_added, Ok json ->
+    let t = { t with draft = None; selection = None } in
+    (match Review_comment.of_json json with
+     | Ok c ->
+       let review =
+         if List.exists t.review.comments ~f:(fun o -> String.equal o.id c.id)
+         then t.review
+         else { t.review with comments = t.review.comments @ [ c ] }
+       in
+       { t with review }, []
+     | Error _ -> t, [])
+  | Decided id, result ->
+    (* An accepted change edited the file. *)
+    let t, outs = reply t (Changed (Some id)) result in
+    let t, diff = get_diff t in
+    t, outs @ diff
+  | Changed id, result ->
+    let t =
+      match id with
+      | Some id -> { t with busy = Set.remove t.busy id }
+      | None -> t
+    in
+    (match result with
+     | Error e -> t, [ toast ~error:true (error_text e) ]
+     | Ok json ->
+       let t =
+         match id with
+         | Some id -> { t with replies = Map.remove t.replies id }
+         | None -> t
+       in
+       (* An approval answers with the review; a comment with itself (the
+          [review] event brings the rest). *)
+       (match Review.of_json json with
+        | Ok review when Option.is_none id -> { t with review }, []
+        | _ ->
+          (match Review_comment.of_json json with
+           | Ok c ->
+             ( { t with
+                 review =
+                   { t.review with
+                     comments =
+                       List.map t.review.comments ~f:(fun o ->
+                         if String.equal o.id c.id then c else o)
+                   }
+               }
+             , [] )
+           | Error _ ->
+             (* Deleted. *)
+             ( { t with
+                 review =
+                   { t.review with
+                     comments =
+                       List.filter t.review.comments ~f:(fun o ->
+                         not (Option.exists id ~f:(String.equal o.id)))
+                   }
+               }
+             , [] ))))
+  | Content path, Error e ->
+    ( { t with
+        contents = Map.set t.contents ~key:path ~data:(Failed (error_text e))
+      }
+    , [] )
+  | Content path, Ok json ->
+    let content : Content.t =
+      match File_preview.of_json json with
+      | Ok { content = Text { text; truncated = false; md5 }; _ } ->
+        Loaded { text; md5 }
+      | Ok { content = Text { text; truncated = true; _ }; _ } ->
+        Loaded { text; md5 = None }
+      | Ok { content = Image _ | Binary; _ } -> Failed "not a text file"
+      | Error e -> Failed (Error.to_string_hum e)
+    in
+    let t = { t with contents = Map.set t.contents ~key:path ~data:content } in
+    let t =
+      match t.mode, t.editor, t.current with
+      | Edit, None, Some current when String.equal current path ->
+        open_editor t path
+      | _ -> t
+    in
+    t, []
+  | Saved path, Error e ->
+    ( { t with
+        editor =
+          Option.map t.editor ~f:(fun e' ->
+            if String.equal e'.path path
+            then
+              { e' with
+                saving = false
+              ; error = Some e
+              ; conflict =
+                  String.is_substring e ~substring:"changed since you opened it"
+              }
+            else e')
+      }
+    , [] )
+  | Saved path, Ok json ->
+    let md5 =
+      match Json.string_field json "md5" with
+      | Ok md5 -> Some md5
+      | Error _ -> None
+    in
+    let t =
+      { t with
+        editor =
+          Option.map t.editor ~f:(fun e ->
+            if String.equal e.path path
+            then
+              { e with
+                saving = false
+              ; dirty = false
+              ; conflict = false
+              ; md5 = Option.first_some md5 e.md5
+              }
+            else e)
+      ; contents =
+          (match t.editor with
+           | Some e when String.equal e.path path ->
+             Map.set t.contents ~key:path ~data:(Loaded { text = e.text; md5 })
+           | Some _ | None -> t.contents)
+      }
+    in
+    let t, diff = get_diff t in
+    t, toast (sprintf "Saved %s" path) :: diff
+  | Submitted, Error e ->
+    { t with submitting = false }, [ toast ~error:true (error_text e) ]
+  | Submitted, Ok json ->
+    let count =
+      Result.ok (Json.int_field json "count") |> Option.value ~default:0
+    in
+    ( { t with submitting = false }
+    , [ toast
+          (if count = 1
+           then "Sent 1 comment to prigh"
+           else sprintf "Sent %d comments to prigh" count)
+      ] )
+;;
+
+let key t ~key ~shift ~ctrl ~alt : Action.t option =
+  if ctrl || alt
+  then None
+  else (
+    match key with
+    | "]" | "n" | "j" -> Some (Step 1)
+    | "[" | "p" | "k" -> Some (Step (-1))
+    | "a" -> Option.map t.current ~f:(fun p -> Action.Toggle_approval p)
+    | "c" when Mode.equal t.mode Comment -> Some Start_comment
+    | "e" -> Some (Set_mode (if Mode.equal t.mode Edit then Comment else Edit))
+    | "v" ->
+      Some (Set_layout (if Layout.equal t.layout Full then Unified else Full))
+    | "s" when not shift -> Some Submit
+    | "Escape" ->
+      if Option.is_some t.draft
+      then Some Draft_cancel
+      else if Option.is_some t.selection
+      then Some Clear_selection
+      else Some Close
+    | _ -> None)
+;;
+
+let toggle_key ~code ~shift ~ctrl ~alt ~meta =
+  alt && (not (ctrl || shift || meta)) && String.equal code "KeyR"
+;;
+
+let field_key t ~field ~key ~ctrl ~meta : Action.t option =
+  let command = ctrl || meta in
+  match field, key with
+  | `Draft, "Enter" when command -> Some Draft_send
+  | `Draft, "Escape" -> Some Draft_cancel
+  | `Reply id, "Enter" when command -> Some (Reply_send id)
+  | `Editor, ("s" | "S") when command && Option.is_some t.editor -> Some Save
+  | _ -> None
+;;

@@ -22,6 +22,7 @@ module Kind : sig
     | Summary (** the compaction summary *)
     | Review (** [/review] *)
     | Init (** [/init] *)
+    | Review_comments (** the user's review comments, sent together *)
     | Other of string
   [@@deriving sexp_of, equal]
 
