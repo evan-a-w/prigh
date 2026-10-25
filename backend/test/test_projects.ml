@@ -410,7 +410,8 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     Agent.wait_idle agent
   done;
   print_sessions t (call main "list_sessions");
-  [%expect {|
+  [%expect
+    {|
     "main" cwd="$DIR/repo"
       repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
       agent_worktrees=[{"agent":"a1","task":"Tidy up","path":"$DIR/trees/repo/agent-tidy-up","branch":"agent/tidy-up","root":"$DIR/repo"}]
@@ -436,7 +437,8 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     ~params:(sprintf {|{"path": %S, "cwd": %S}|} agent_wt repo)
     "remove_worktree";
   print_sessions t (call main "list_sessions");
-  [%expect {|
+  [%expect
+    {|
     "main" cwd="$DIR/repo"
       repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
       agent_worktrees=[]
@@ -473,7 +475,8 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
              "remove_worktree")));
   print_s
     [%sexp (List.length (Session.agent_worktrees (Agent.session agent)) : int)];
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/gone","branch":"gone","head":null,"main":false,"managed":false,"locked":false,"prunable":true,"changes":null,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]}}}
     0
     |}]

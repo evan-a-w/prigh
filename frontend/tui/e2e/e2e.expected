@@ -89,7 +89,8 @@
  (duration_seconds <t>))
 <- get_entries: ((head <id>)
  (entries
-  (((id <id>) (parent null) (at <at>) (kind system_prompt))
+  (((id <id>) (parent null) (at <at>) (kind repo))
+   ((id <id>) (parent <id>) (at <at>) (kind system_prompt))
    ((id <id>) (parent <id>) (at <at>) (kind told_environment))
    ((id <id>) (parent <id>) (at <at>) (kind message)
     (message ((role user) (text "hello there"))))

@@ -72,6 +72,8 @@ type t =
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
+      ; repo : string option
+        (** its repository when not the session's: removed from the tree *)
       ; force : bool
       ; busy : bool
       ; error : string option

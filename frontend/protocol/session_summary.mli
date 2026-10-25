@@ -17,6 +17,11 @@ type t =
   ; clients : int (** frontends attached to it *)
   ; archived : bool
   ; bytes : int (** on disk *)
+  ; host : string option (** the tool host its cwd is on, when recorded *)
+  ; repo : Repo.t option
+    (** where its cwd is in git; [None] outside a repository, or unknown *)
+  ; agent_worktrees : Agent_worktree.t list
+    (** worktrees made for its subagents, not removed yet *)
   }
 [@@deriving sexp_of, equal]
 

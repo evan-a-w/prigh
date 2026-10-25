@@ -25,7 +25,9 @@ let%expect_test "the names of the controls" =
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
     button "Select" -- Select sessions to delete (/delete)
-    button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
+    button "work" -- /work
+    button "New session in work" -- New session in /work
+    button "Fix the build 2m ago" -- /sessions/s1.jsonl
     button "Archive Fix the build" -- Archive (A)
     button "Delete Fix the build" -- Delete session (Delete)
     button "Archived 1" -- Show the archived sessions
@@ -54,13 +56,15 @@ let%expect_test "the names of the controls" =
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
-    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
+    button "work" -- /work
+    button "New session in work" -- New session in /work
+    [checkbox] button "Fix the build 2m ago 0 B" -- /sessions/s1.jsonl
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
     button "Commands & keys" -- Commands and keys (/help)
     input "Search sessions"
-    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
+    [checkbox] button "Fix the build 2m ago 0 B" -- /sessions/s1.jsonl
     |}]
 ;;
 

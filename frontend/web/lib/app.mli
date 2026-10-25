@@ -134,8 +134,11 @@ module Reply_tag : sig
         { place : string (** [Worktrees.place] *)
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of string
-    (** [create_worktree], as typed: the session moves into it *)
+    | Worktree_created of
+        { command : string (** as typed *)
+        ; new_session : bool
+          (** a new session starts in it; otherwise this one moves there *)
+        } (** [create_worktree] *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
     | Worktree_session of
@@ -366,9 +369,14 @@ module Action : sig
     | Edit_queued of Queued.Message.t (** back into the editor *)
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string (** by name, from the [/remind] picker *)
-    | Toggle_worktrees (** fold or unfold the sidebar's worktrees *)
-    | Refresh_worktrees
-    | New_worktree (** its dialog *)
+    | Toggle_folded of string
+    (** fold or unfold a project or a worktree of the sidebar's tree (by its
+        directory) *)
+    | New_session_in of string
+    (** a new session working in this directory (a project, a worktree) *)
+    | New_worktree of { repo : string option }
+    (** its dialog; with a repository (a project's row), a new session
+        starts in the worktree *)
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -502,7 +510,9 @@ module Model : sig
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
     ; worktrees : Worktrees.t (** the sidebar's, [/worktree]'s completion *)
-    ; worktrees_open : bool (** the sidebar's section is unfolded *)
+    ; folded : String.Set.t
+      (** the sidebar's folded projects and worktrees, by directory (a
+          preference) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t

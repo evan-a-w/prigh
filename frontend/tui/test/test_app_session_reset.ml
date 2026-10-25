@@ -285,13 +285,13 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
+      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────────────────────────
     >

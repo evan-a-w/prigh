@@ -42,16 +42,23 @@ module Method : sig
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
-    | List_worktrees (** see {!Worktree.Listing} *)
+    | List_worktrees of
+        { cwd : string option
+          (** in its repository (default: the session cwd's) *)
+        } (** see {!Worktree.Listing} *)
     | Create_worktree of
         { branch : string
         ; base : string option
           (** a new branch from it; [None]: an existing branch, the one
               remote branch of that name, or a new one from [HEAD] *)
+        ; cwd : string option
+          (** in its repository (default: the session cwd's) *)
         } (** see {!Worktree.Created} *)
     | Remove_worktree of
         { path : string
         ; force : bool (** also with uncommitted changes, or locked *)
+        ; cwd : string option
+          (** in its repository (default: the session cwd's) *)
         } (** see {!Worktree.removed_of_json} *)
   [@@deriving sexp_of, equal]
 
