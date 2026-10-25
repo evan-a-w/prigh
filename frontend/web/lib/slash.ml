@@ -10,6 +10,8 @@ module Argument = struct
     | Directory
     | Backend_directory
     | Verbosity
+    | Theme
+    | Accent
     | Confirm
     | Mode
     | Plan
@@ -50,8 +52,8 @@ let all =
   ; c "hotkeys" "show the keyboard shortcuts"
   ; c
       "settings"
-      "notifications, transcript detail, tool confirmation, your account and \
-       providers (Ctrl+,)"
+      "theme and accent, notifications, transcript detail, tool confirmation, \
+       your account and providers (Ctrl+,)"
   ; c "new" "start a new session"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"
@@ -74,6 +76,17 @@ let all =
       ~args:"[quiet|normal|verbose]"
       "verbosity"
       "how much of tool calls and thinking the transcript shows"
+  ; c
+      ~argument:Theme
+      ~args:"[original|dark|light]"
+      "theme"
+      "pick or set the theme, for you in every browser"
+  ; c
+      ~argument:Accent
+      ~args:"[name|#rrggbb]"
+      "accent"
+      "pick or set the accent colour: orange, blue, green, purple, pink, teal, \
+       yellow or any #rrggbb"
   ; c
       ~argument:Confirm
       ~args:"[on|off]"

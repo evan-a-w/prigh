@@ -372,8 +372,8 @@ last line. Selecting one shows a subagent's live transcript at the panel's
 width or a job's output, with what it is pinned under it however far you
 scroll: its task (and who started it), how it stands or ended, its model,
 turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
-which scrolls to its card. It opens from the status ("2 agents running"), the session's
-robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
+which scrolls to its card. It opens from the status ("2 agents running"), the
+robot button at the chat's top right, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
 left to the browser (it moves the focus back), and on macOS Option+digit
@@ -398,7 +398,7 @@ backend elsewhere, `?session=ID` joins a session and `?name=` names the
 frontend in `/host`. Tools run on a tool host (a browser cannot host
 them). In Docker it is `PRIGH_MODE=web` (port 7790, see `DOCKER.md`).
 
-The terminal button beside the session's title (or `/terminal`, or Ctrl+`) opens a
+The terminal button at the chat's top right (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its
 directory) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
@@ -412,7 +412,7 @@ the user you act as; when the shell exits, "New shell" starts another,
 and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
-The folder button beside the session's title (or `/files [path]`, or Ctrl+Shift+F)
+The folder button at the chat's top right (or `/files [path]`, or Ctrl+Shift+F)
 opens the file browser, a drawer right of the chat (a full-screen sheet on
 a phone) on the machine where the session's tools run (the backend, the
 Docker container, or a laptop connected as a tool host), in the session's
@@ -461,9 +461,9 @@ the arrow keys move it (Shift: four times as far), Home and End make the
 panel as small or as large as it goes. The chat always keeps 400px: when
 the window narrows, the side panels beside it shrink in proportion (down
 to their minimums) and grow back to the sizes you chose when it widens
-again. The sizes are kept in the browser (`prigh-web.sidebar-width`,
-`files-width`, `files-split`, `agents-width`, `terminal-height` in
-localStorage). On a phone the panels are sheets, without handles.
+again. The sizes are kept with your preferences on the backend (below), so
+every browser you sign in on has them. On a phone the panels are sheets,
+without handles.
 
 Code is highlighted: fenced code blocks in replies (by the fence's
 language, also while the reply streams), the file browser's text preview
@@ -534,32 +534,63 @@ asks first; it filters as you type, Enter takes the choice, Esc closes it
 unchanged), then attach, stop and send on the right. Ctrl+L, Alt+T and
 Alt+M switch or cycle them; in a narrow composer the labels get short
 (`high`, `ask`, `plan`, after an icon). There is no bar over the chat
-while the sidebar is open: the session's card at the foot of the sidebar,
-above the account, has its title (click to rename) with the panel
-toggles, its cwd and branch (the cwd losing its middle rather than the
-directory it ends in), where tools run (click for the `/host` picker),
-then whatever applies — the goal, reminders, a scheduled resume, queued
-messages to take back, background agents and jobs, transfers, the
-verbosity, the plan chip `plan 2/5: step` that runs `/todos` — and last
-the status: what the agent is doing, the context (click for `/session`'s
-details), tokens and cost (or the budget). Nothing below the status
-changes, so it never moves as a turn starts and ends. With the sidebar
-closed, and always on a phone (where the sidebar is a drawer), a slim bar
-over the chat keeps the essentials on one line: the sidebar's button and
-the title, what applies (with the tool host when it is not the
-backend), the status, the panel toggles and the settings gear. What
-applies comes before the status, and the activity has a slot of its own
-width, so that nothing moves the status; a narrower chat column drops the
-tokens and cost, then says what applies with icons alone, then shows the
-activity as a dot; the bar never changes height.
+while the sidebar is open: the files, terminal and agents buttons sit
+quietly in the chat's top right corner (lit while their panel is open),
+and the session's status is in a card at the foot of the sidebar, above
+the account. The session list marks which session it is (its row has the
+cwd as it is now, and a rename button). The card has whatever applies at
+the top — the goal, reminders, a scheduled resume, queued messages to take
+back, background agents and jobs, transfers, the verbosity, the plan chip
+`plan 2/5: step` that runs `/todos` — then the status on a grid: what the
+agent is doing, with where tools run (click for the `/host` picker) and the
+branch across from it; the context across the card (click for
+`/session`'s details); the tokens and the cost (or the budget). Each part
+keeps its place, so nothing moves as a turn starts and ends. Your account
+is under it, with the settings gear; the account menu also has Settings
+and Commands and keys (`/help`). With the sidebar closed, and always on a
+phone (where the sidebar is a drawer), a slim bar over the chat keeps the
+essentials on one line: the sidebar's button and the title, what applies
+(with the tool host when it is not the backend), the status, the panel
+toggles and the settings gear. What applies comes before the status, and
+the activity has a slot of its own width, so that nothing moves the
+status; a narrower chat column drops the tokens and cost, then says what
+applies with icons alone, then shows the activity as a dot; the bar never
+changes height.
 
-The settings page (the gear beside the account, `/settings` or Ctrl+,) holds what is not
-about the session: notifications (on or off, and what to do when the
-browser has not been asked, blocks them or cannot show them), transcript
-detail (`/verbosity`), tool confirmation (`/confirm`), the providers
-(`/auth`), who you are signed in (and acting) as with Switch account and
-Sign out, and the keyboard shortcuts. Esc closes it; its controls keep it
-open. Steers and follow-ups sent while the agent works wait above
+The settings page (the gear beside your account at the foot of the
+sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
+about the session: the theme and accent, notifications (on or off, and
+what to do when the browser has not been asked, blocks them or cannot show
+them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),
+the providers (`/auth`), who you are signed in (and acting) as with Switch
+account and Sign out, and the keyboard shortcuts. Esc closes it; its
+controls keep it open.
+
+Themes: `original` (graphite with the warm sodium accent, the default),
+`dark` (neutral greys: the accent is the only colour but diffs' and
+outcomes' green and red) and `light`. Every theme takes an accent: orange
+(the original's), blue, green, purple, pink, teal, yellow or any colour.
+The settings page shows each theme as a small picture of the page with
+your accent on it, the accents as swatches and a colour picker for any
+other, which previews as you drag it; `/theme [original|dark|light]` and
+`/accent [name|#rrggbb]` set them, and without an argument are pickers
+that show what is highlighted (Esc puts yours back). Washes, lines, focus
+rings, the work lamp, code highlighting and the terminal follow the
+accent and the theme.
+
+Your preferences live on the backend, per user (`~/.prigh/prefs.json` in
+your home, or your namespace's with `-tokens`): the theme and accent,
+notifications, transcript detail, the panels' sizes, whether the terminal
+is open, and the prompt history, which the TUI shares. Every browser you
+sign in on gets them, and a change in one shows at once in the others
+(the history too). The browser keeps a copy so that a reload paints your
+theme before the backend answers, and for a backend that keeps none. A
+browser that kept them before the backend did uploads its own when it
+first signs in (unless the backend already has the user's). What stays in
+the browser: the saved sign-ins (needed before there is a user to ask), and
+per tab the draft and where the chat was scrolled. Acting as another user
+(`-superusers`) you keep your own preferences, which are not saved on the
+backend meanwhile. Steers and follow-ups sent while the agent works wait above
 the composer, each tagged "Steers this turn" or "After this turn", with
 Edit (back into the editor) and remove buttons; one leaving the queue says
 so ("Steer delivered: …") when it reaches the transcript. A tool confirmation is a dialog with a
@@ -1028,7 +1059,11 @@ the images; DeepSeek's cannot see them and are told one was left out. Images
 are stored in the session file.
 
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
-last 500) and loaded on start; secrets from login prompts are never recorded.
+last 500) and loaded on start, and on the backend with your preferences
+(above), shared with prigh-web: the backend's history replaces this
+machine's once it answers (a backend that has none gets this machine's),
+and prompts sent from another frontend arrive as you type. Secrets from
+login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
 through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
 or `auto`: the mode new sessions start in, see below; `/confirm on|off`
@@ -1175,6 +1210,7 @@ it.
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
+| `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
 | `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you approve the plan) |
@@ -1269,7 +1305,7 @@ whether the terminal reports focus. prigh-web uses the browser's
 notifications while the tab is hidden: `/notify on` (or the settings page's
 switch, or the account menu's "Turn notifications on") asks the browser for
 permission, `/notify off`
-turns them off (kept in localStorage, `prigh-web.notify`); the tab's title
+turns them off (kept with your preferences on the backend); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
 named with what to do in the settings page, whose switch shows whether

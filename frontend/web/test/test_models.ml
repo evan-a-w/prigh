@@ -87,7 +87,8 @@ let%expect_test "/model with a name switches, or says what matches" =
   H.act h Send;
   [%expect
     {|
-    (Save_history ("/model sonnet"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/model sonnet") (max 500))) (tag Ignore))
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
     |}];
@@ -96,7 +97,8 @@ let%expect_test "/model with a name switches, or says what matches" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history ("/model claude" "/model sonnet"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/model claude") (max 500))) (tag Ignore))
     (Focus picker-input)
     Claude Opus 5.5 anthropic, 200k ctx ✓
     Claude Sonnet 5 anthropic, 200k ctx
@@ -108,7 +110,8 @@ let%expect_test "/model with a name switches, or says what matches" =
   [%expect
     {|
     (Focus editor)
-    (Save_history ("/model gemini" "/model claude" "/model sonnet"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/model gemini") (max 500))) (tag Ignore))
     No model matches “gemini”. Ctrl+L lists them all. (Dismiss)
     |}]
 ;;
@@ -136,7 +139,8 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   H.act h Send;
   [%expect
     {|
-    (Save_history ("/thinking max"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/thinking max") (max 500))) (tag Ignore))
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     |}];
   H.type_ h "/thinking lots";
@@ -144,7 +148,8 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    (Save_history ("/thinking lots" "/thinking max"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/thinking lots") (max 500))) (tag Ignore))
     Unknown thinking level “lots”: use off, low, on, high, max. (Dismiss)
     |}];
   let deepseek =
@@ -165,7 +170,8 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    (Save_history ("/thinking high" "/thinking lots" "/thinking max"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/thinking high") (max 500))) (tag Ignore))
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model (Dismiss)
     |}]
 ;;

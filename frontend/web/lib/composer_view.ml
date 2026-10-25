@@ -31,6 +31,8 @@ let popup (m : App.Model.t) ~inject =
       | Argument Remind -> "Reminders"
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
+      | Argument Theme -> "Themes"
+      | Argument Accent -> "Accent colours"
     in
     div
       ~cls:"popup"

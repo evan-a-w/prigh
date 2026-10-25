@@ -167,3 +167,72 @@ let%expect_test "login: user name and password in localStorage, signing out" =
      (hello ()))
     |}]
 ;;
+
+let%expect_test
+    "preferences: a page from before's keys move into one cache, which only \
+     its owner gets back"
+  =
+  let items = String.Table.create () in
+  let storage : Login.Storage.t =
+    { get = Hashtbl.find items
+    ; set = (fun key data -> Hashtbl.set items ~key ~data)
+    ; remove = Hashtbl.remove items
+    }
+  in
+  let stored () =
+    print_s
+      [%sexp
+        (Hashtbl.to_alist items
+         |> List.sort ~compare:[%compare: string * string]
+         : (string * string) list)]
+  in
+  let load owner =
+    print_s
+      [%sexp
+        (Pref_cache.load storage ~owner
+         : Prigh_protocol.Prefs.Change.t list * bool)]
+  in
+  List.iter
+    [ "prigh-web.notify", "off"
+    ; "prigh-web.history", {|["newest","older"]|}
+    ; "prigh-web.sidebar-width", "320"
+    ; "prigh-web.terminal-open", "1"
+    ; "prigh-web.files-width", "wide"
+    ; "prigh.token", "sekrit"
+    ]
+    ~f:(fun (key, data) -> Hashtbl.set items ~key ~data);
+  load "ws://h/ws alice";
+  stored ();
+  [%expect
+    {|
+    ((((key web.notify) (value (false)))
+      ((key history) (value ((newest older))))
+      ((key web.terminal-open) (value (true)))
+      ((key web.sidebar-width) (value (320))))
+     true)
+    ((prigh-web.prefs
+      "{\"owner\":\"ws://h/ws alice\",\"legacy\":true,\"prefs\":{\"web.notify\":false,\"history\":[\"newest\",\"older\"],\"web.terminal-open\":true,\"web.sidebar-width\":320}}")
+     (prigh.token sekrit))
+    |}];
+  (* Saved: no longer legacy; another account's are not restored. *)
+  Pref_cache.save
+    storage
+    ~owner:"ws://h/ws alice"
+    [ { key = "web.notify"; value = None }
+    ; { key = "web.theme"; value = Some (`String "dark") }
+    ];
+  load "ws://h/ws alice";
+  load "ws://h/ws bob";
+  Pref_cache.save_theme storage { name = Light; accent = Custom "#123456" };
+  print_endline (Hashtbl.find_exn items Pref_cache.theme_key);
+  [%expect
+    {|
+    ((((key history) (value ((newest older))))
+      ((key web.terminal-open) (value (true)))
+      ((key web.sidebar-width) (value (320)))
+      ((key web.theme)         (value (dark))))
+     false)
+    (() false)
+    {"attrs":{"data-theme":"light","data-accent":"custom"},"vars":{"--sodium":"#123456","--sodium-ink":"#ffffff"}}
+    |}]
+;;

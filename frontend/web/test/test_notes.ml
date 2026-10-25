@@ -172,7 +172,8 @@ let%expect_test "/fork and /tree label the harness's messages by their notes" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
@@ -195,7 +196,8 @@ let%expect_test
   H.show h ~selector:".diff-dialog";
   [%expect
     {|
-    (Save_history (/diff))
+    (Rpc (method_ push_pref) (params ((key history) (value /diff) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     (Focus dialog)
@@ -309,11 +311,13 @@ let%expect_test
     {|
     (Focus editor)
     (Rpc (method_ list_paths) (params ((prefix src))) (tag (Paths src)))
-    (Save_history ("/diff src" /diff))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/diff src") (max 500))) (tag Ignore))
     (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ git_diff) (params ((path src))) (tag Git_diff))
     (Expire_toast (id 2) (after_ms 2780))
-    (Save_history (/diff "/diff src" /diff))
+    (Rpc (method_ push_pref) (params ((key history) (value /diff) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 3) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     No changes in /work against HEAD
@@ -332,7 +336,9 @@ let%expect_test
   H.text h ~selector:".composer";
   [%expect
     {|
-    (Save_history ("/review main look at errors"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/review main look at errors") (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 2780))
     (Rpc (method_ review) (params ((args "main look at errors")))
      (tag (Command_prompt "/review main look at errors")))
@@ -352,7 +358,8 @@ let%expect_test
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/init "/review main look at errors"))
+    (Rpc (method_ push_pref) (params ((key history) (value /init) (max 500)))
+     (tag Ignore))
     (Rpc (method_ init) (params ()) (tag (Command_prompt /init)))
     (Expire_toast (id 2) (after_ms 3220))
     Queued: it starts when the current run ends
@@ -393,7 +400,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
-    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
@@ -411,12 +418,13 @@ let%expect_test
      hidden, counted in the title until it is seen"
   =
   let h = H.create () in
-  H.act h (Set_notifications { enabled = true; permission = "default" });
+  H.act h (Set_notification_permission "default");
   run h "/notify";
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/notify))
+    (Rpc (method_ push_pref) (params ((key history) (value /notify) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 4700))
     Notifications are on, but the browser has not been asked yet: /notify on asks it
     |}];
@@ -425,8 +433,11 @@ let%expect_test
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history ("/notify on" /notify))
-    (Save_notifications true)
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/notify on") (max 500))) (tag Ignore))
+    (Cache_prefs (((key web.notify) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify true)))))
+     (tag Show_error))
     Request_notification_permission
     (Expire_toast (id 1) (after_ms 6000))
     Notifications are on, but the browser has not been asked yet: /notify on asks it
@@ -474,8 +485,11 @@ let%expect_test
   H.act h (Page_hidden false);
   [%expect
     {|
-    (Save_history ("/notify off" "/notify on" /notify))
-    (Save_notifications false)
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/notify off") (max 500))) (tag Ignore))
+    (Cache_prefs (((key web.notify) (value (false)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify false)))))
+     (tag Show_error))
     (Expire_toast (id 2) (after_ms 3220))
     (Set_title "(1) prigh")
     (Set_title prigh)
@@ -488,27 +502,38 @@ let%expect_test
      turns them on and off"
   =
   let h = H.create () in
-  H.act h (Set_notifications { enabled = false; permission = "denied" });
+  H.act
+    h
+    (Restore_prefs
+       { prefs = [ { key = Pref_sync.Key.notify; value = Some `False } ]
+       ; legacy = false
+       });
+  H.act h (Set_notification_permission "denied");
   H.act h Open_accounts;
   H.act h (Picker_choose "notify on");
   H.text h ~selector:".toast";
   [%expect
     {|
+    (Apply_theme ((name Original) (accent (Preset Orange))))
     (Focus dialog)
     (Focus editor)
     (Focus editor)
-    (Save_notifications true)
+    (Cache_prefs (((key web.notify) (value (true)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.notify true)))))
+     (tag Show_error))
     The browser blocks notifications for this page: allow them in its site settings (the icon left of the address), then /notify on (Dismiss)
     |}];
-  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
+  H.act h (Set_notification_permission "unsupported");
   run h "/notify";
   run h "/notify loud";
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Save_history (/notify))
+    (Rpc (method_ push_pref) (params ((key history) (value /notify) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 1) (after_ms 6000))
-    (Save_history ("/notify loud" /notify))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/notify loud") (max 500))) (tag Ignore))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
     Unknown /notify argument “loud”: /notify on or /notify off (/notify alone says what is on) (Dismiss)
     |}]

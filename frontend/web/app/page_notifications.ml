@@ -40,16 +40,6 @@ let request_permission () =
     Ivar.read result)
 ;;
 
-let key = "prigh-web.notify"
-
-let saved () =
-  match Browser.get_item key with
-  | Some "off" -> false
-  | Some _ | None -> true
-;;
-
-let save enabled = Browser.set_item key (if enabled then "on" else "off")
-
 let show (n : Prigh_ui.Notify.t) =
   if supported () && String.equal (permission ()) "granted"
   then (
