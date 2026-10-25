@@ -177,8 +177,8 @@ let%expect_test "images in user messages and tool results (absent means none)" =
     |}]
 ;;
 
-let%expect_test
-    "message and entry times (\"at\", ms since the epoch; absent means unknown)"
+let%expect_test "message and entry times (\"at\", ms since the epoch; absent \
+                 means unknown)"
   =
   decode
     {|{"type":"event","event":"message_start","message":{"role":"user","text":"hi","at":1791210730250}}|};
@@ -1172,8 +1172,7 @@ let%expect_test "archived sessions and deleting them" =
          (List.map
             [ 0; 1023; 1024; 1_500_000; 3_000_000_000 ]
             ~f:Session_summary.size_string));
-  [%expect
-    {|
+  [%expect {|
     {"id":1,"method":"set_archived","params":{"path":"/s/a.jsonl","archived":true}}
     {"id":1,"method":"delete_sessions","params":{"paths":["/s/a.jsonl","/s/b.jsonl"]}}
     {"id":1,"method":"delete_archived","params":{}}
@@ -1211,20 +1210,21 @@ let%expect_test "archived sessions and deleting them" =
 let%expect_test "Moved_job: a foreground bash call that became a job" =
   List.iter
     [ "still running after 30s, so it was moved to the background as job j3 \
-       (not restarted: it keeps running). Output so far (last 2 of 9 lines):\n\
+       (not restarted: it keeps running). Output so far (last 2 of 9 \
+       lines):\n\
        eight\n\
        nine\n\
-       Its report ([job j3 exited ...] and its last lines) is delivered to you \
-       when it exits."
+       Its report ([job j3 exited ...] and its last lines) is delivered to \
+       you when it exits."
     ; "still running after 0.5s, so it was moved to the background as job j12 \
        (not restarted: it keeps running). No output so far.\n\
        Its report ([job j12 exited ...]) is delivered to you when it exits."
     ; "started job j1: make"
     ; "still running after 30s"
     ]
-    ~f:(fun text -> print_s [%sexp (Moved_job.parse text : Moved_job.t option)]);
-  [%expect
-    {|
+    ~f:(fun text ->
+      print_s [%sexp (Moved_job.parse text : Moved_job.t option)]);
+  [%expect {|
     ((
       (id     j3)
       (after  30s)
