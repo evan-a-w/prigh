@@ -45,6 +45,9 @@ type t =
   | Login of Login_flow.t
   | Auth of Auth_status.t list
   | Hotkeys
+  | Settings
+  (** [/settings]: notifications, the transcript, tool confirmation, the
+      account, providers and keys *)
   | Scoped_models of
       { picker : Picker.t
       ; checked : String.Set.t (** model keys *)

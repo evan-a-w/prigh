@@ -40,8 +40,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     <button type="button"
             title="Tools run without asking (Alt+M cycles, /mode picks)"
             data-short="auto"
-            popovertarget="topbar-controls"
-            popovertargetaction="hide"
             class="btn chip-button mode-chip"
             @on_click>
       <icon class="shield"> </icon>
@@ -64,8 +62,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
             disabled=""
             aria-busy="true"
             data-short="plan"
-            popovertarget="topbar-controls"
-            popovertargetaction="hide"
             class="awaiting btn chip-button mode-chip"
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
@@ -81,8 +77,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     <button type="button"
             title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             data-short="plan"
-            popovertarget="topbar-controls"
-            popovertargetaction="hide"
             class="btn chip-button mode-chip plan-mode"
             @on_click>
       <icon class="shield"> </icon>
@@ -152,10 +146,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   (* The status line leaves the mode to the chip. *)
   status h;
   [%expect
-    {|
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
-    |}]
+    {| Ready (0%) ↑0 ↓0 $0.0000 |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
@@ -258,10 +249,7 @@ let%expect_test "the plan: its chip, /todos" =
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
   status h;
   [%expect
-    {|
-    Ready 0% ↑0 ↓0 $0.0000 (plan 1/3: change it)
-    (Notifications not allowed yet: click to ask the browser)
-    |}];
+    {| Ready (0%) ↑0 ↓0 $0.0000 (plan 1/3: change it) |}];
   H.click h ~selector:".status .plan";
   modal h;
   [%expect
@@ -292,8 +280,7 @@ let%expect_test "the plan: its chip, /todos" =
   [%expect
     {|
     (Focus editor)
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
+    Ready (0%) ↑0 ↓0 $0.0000
     (Save_history (/todos))
     (Focus dialog)
     Plan 2/2
@@ -967,8 +954,7 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    Ready 0% ↑0 ↓0 $0.0000 (1 queued)
-    (Notifications not allowed yet: click to ask the browser)
+    Ready (0%) ↑0 ↓0 $0.0000 (1 queued)
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");

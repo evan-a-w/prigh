@@ -134,8 +134,6 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
             title="Switching to Claude Sonnet 5…"
             disabled=""
             aria-busy="true"
-            popovertarget="topbar-controls"
-            popovertargetaction="hide"
             class="awaiting btn chip-button model-chip"
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
@@ -155,7 +153,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (sprintf
        {|{"event":"state","state":%s}|}
        (H.state_json ~fields:[ "model", sonnet ] ()));
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   [%expect {| (Claude Sonnet 5) (Thinking on) (Auto: never asks) |}];
   H.elements h ~selector:".chip-button.awaiting";
   [%expect {| |}];
@@ -163,7 +161,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   H.act h (Set_thinking "max");
   H.text h ~selector:".thinking-chip";
   H.fail h "set_thinking" "no such level";
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   H.text h ~selector:".toast";
   [%expect
     {|

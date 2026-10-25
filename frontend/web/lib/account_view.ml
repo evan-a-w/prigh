@@ -5,21 +5,33 @@ module Action = App.Action
 
 let initial name = String.prefix (String.uppercase name) 1
 
-let who (m : App.Model.t) =
+module Who = struct
+  type t =
+    { name : string
+    ; acting_as : string option
+    ; host : string option
+    }
+end
+
+let who (m : App.Model.t) : Who.t option =
   match m.hello, m.account with
   | Some ({ user = Some user; _ } as hello), account ->
     Some
-      ( user
-      , Hello_reply.acting_as hello
-      , Option.map account ~f:Accounts.Account.host )
+      { name = user
+      ; acting_as = Hello_reply.acting_as hello
+      ; host = Option.map account ~f:Accounts.Account.host
+      }
   | _, Some account ->
     Some
-      (Accounts.Account.name account, None, Some (Accounts.Account.host account))
+      { name = Accounts.Account.name account
+      ; acting_as = None
+      ; host = Some (Accounts.Account.host account)
+      }
   | _, None -> None
 ;;
 
 let trigger (m : App.Model.t) ~inject =
-  Option.map (who m) ~f:(fun (name, acting, _) ->
+  Option.map (who m) ~f:(fun { name; acting_as = acting; _ } ->
     Node.button
       ~attrs:
         [ Attr.class_ "account-button"
@@ -101,7 +113,7 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
           ]
         [ (match who m with
            | None -> Node.none
-           | Some (name, acting, host) ->
+           | Some { name; acting_as = acting; host } ->
              div
                ~cls:"account-current"
                [ span ~cls:"avatar large" (initial name)
