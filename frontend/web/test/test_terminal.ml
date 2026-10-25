@@ -184,6 +184,7 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
      (tag (Resync (session s2) (from ()))))

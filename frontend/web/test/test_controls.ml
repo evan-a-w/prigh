@@ -168,10 +168,14 @@ let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
               <span class="where-head"> ~/projects/prigh </span>
               <span class="where-tail"> /tui </span>
             </span>
-            <span title="feature/narrow-top-bar" class="branch">
+            <button type="button"
+                    title="feature/narrow-top-bar: pull requests (/pr)"
+                    aria-haspopup="dialog"
+                    class="branch"
+                    @on_click>
               <icon class="branch"> </icon>
               <span class="branch-name"> feature/narrow-top-bar </span>
-            </span>
+            </button>
           </div>
         </div>
       </div>

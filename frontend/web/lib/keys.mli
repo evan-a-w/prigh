@@ -9,6 +9,7 @@ module Target : sig
   type t =
     | Editor of { cursor : int } (** the prompt editor, with its caret *)
     | Field (** another text field *)
+    | Multiline (** a dialog's text box: Enter is a new line there *)
     | Control (** a button, link or fold: Enter and Space are its own *)
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)

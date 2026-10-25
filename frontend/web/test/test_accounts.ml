@@ -266,6 +266,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ list_users) (params ()) (tag (Users Probe)))
     |}];
   H.reply h "list_users" {|["alice","bob"]|};
@@ -300,6 +301,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
@@ -338,6 +340,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ list_users) (params ()) (tag (Users Probe)))
     (Focus dialog)
     Add account… sign in as another user, or to another backend
@@ -388,6 +391,7 @@ let%expect_test "switching user resets everything that was the old user's" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     ((state false) (entries 0) (sessions 0) (query "") (dialog false)
      (btw false))
     |}]
