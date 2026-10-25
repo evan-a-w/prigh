@@ -116,9 +116,12 @@ let%expect_test
   let clicked = (H.model h).dialog in
   H.quiet h (fun () -> H.act h Close_dialog);
   H.quiet h (fun () -> H.act h (Run "/name"));
-  print_s [%sexp (Option.equal Prigh_web.Dialog.equal clicked (H.model h).dialog : bool)];
+  print_s
+    [%sexp
+      (Option.equal Prigh_web.Dialog.equal clicked (H.model h).dialog : bool)];
   H.quiet h (fun () -> H.act h Close_dialog);
-  [%expect {|
+  [%expect
+    {|
     <button class="btn ghost icon rename">
     Open_rename
     (Focus dialog-input)

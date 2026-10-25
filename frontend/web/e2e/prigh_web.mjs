@@ -278,13 +278,23 @@ const layoutProblems = selector => page.evaluate(selector => {
   const name = e => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
   const problems = [];
   const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open"));
+  // A box without one of its own (display: contents) lays its children out
+  // in its parent's.
+  const contents = e => getComputedStyle(e).display === "contents";
+  const boxParent = e => {
+    let p = e.parentElement;
+    while (p !== root && contents(p)) p = p.parentElement;
+    return p;
+  };
+  const boxKids = e => [...e.children].flatMap(k => (contents(k) ? boxKids(k) : [k]));
   for (const e of all) {
     const r = e.getBoundingClientRect();
     if (e !== root) {
-      const p = e.parentElement.getBoundingClientRect();
-      if (r.left < p.left - 0.5 || r.right > p.right + 0.5) problems.push(`${name(e)} sticks out of ${name(e.parentElement)}`);
+      const parent = boxParent(e);
+      const p = parent.getBoundingClientRect();
+      if (r.left < p.left - 0.5 || r.right > p.right + 0.5) problems.push(`${name(e)} sticks out of ${name(parent)}`);
     }
-    const kids = [...e.children].filter(k => all.includes(k));
+    const kids = boxKids(e).filter(k => all.includes(k));
     for (let i = 0; i < kids.length; i++)
       for (let j = i + 1; j < kids.length; j++) {
         const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
@@ -1316,18 +1326,30 @@ try {
     const where = await page.evaluate(() => {
       const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-where) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);
       const titleFits = !title ? "none" : title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
       return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; title whole or at least 100px: ${where.titleFits}; ${where.height}px high`);
+    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
     for (const s of [".session-card, .session-bar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
+    // With the card, the panels' toggles float in the chat's top right
+    // corner, clear of the jump list's button.
+    const tools = await page.evaluate(() => {
+      const t = document.querySelector(".chat-tools");
+      if (!t) return null;
+      const r = t.getBoundingClientRect(), main = document.querySelector(".main").getBoundingClientRect();
+      const list = document.querySelector(".jump-list")?.getBoundingClientRect();
+      const clear = !list || list.top >= r.bottom || list.right <= r.left;
+      const open = [...t.querySelectorAll(".btn.open")].map(b => b.getAttribute("aria-label"));
+      return `${t.querySelectorAll(".btn").length} buttons ${Math.round(r.top - main.top)}px from the top, ${Math.round(main.right - r.right)}px from the right, clear of the jump list: ${clear}, open: ${open.join(", ") || "none"}`;
+    });
+    if (tools) console.log(`the panels' toggles: ${tools}`);
     await screenshot(label);
   };
   await page.keyboard.press("Control+Shift+F");

@@ -69,7 +69,8 @@ let branch (state : State.t) =
 
 let card (m : App.Model.t) ~inject =
   Node.section
-    ~attrs:[ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
+    ~attrs:
+      [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
     [ Status_view.extras m ~host:false ~inject
     ; div
         ~cls:"card-status"

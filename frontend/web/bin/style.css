@@ -429,7 +429,7 @@ kbd {
   gap: 7px 12px;
 }
 .card-status > .status { display: contents; }
-.card-status .activity { grid-area: activity; width: auto; font-size: 12.5px; }
+.card-status .status-item.activity { grid-area: activity; width: auto; min-width: 0; font-size: 12.5px; }
 .card-status .activity, .card-where { margin-bottom: 3px; }
 .card-status .context { grid-area: context; gap: 10px; }
 .card-status .context .meter { flex: 1; width: auto; }
