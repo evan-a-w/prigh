@@ -155,6 +155,7 @@ module Reply_tag : sig
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
         ; images : Image.t list
@@ -447,6 +448,8 @@ module Action : sig
         ; status : Terminal.Status.t
         } (** from the page's widget *)
     | Files of Files.Action.t (** the file browser and the attachments *)
+    | Review of Code_review.Action.t
+    (** the review page, comments and approvals *)
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
@@ -517,6 +520,7 @@ module Model : sig
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; review : Code_review.t
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t

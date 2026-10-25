@@ -48,6 +48,8 @@ module Reply_tag = struct
     | Models_for_scoped
     | Compact_done
     | Git_diff
+    | Review_comments (** [/review]: then the diff *)
+    | Review_status of P.Review.t
     | Review_started
     | Abort_done
     | Notice_on_success of string
@@ -2722,6 +2724,8 @@ let run_command m (cmd : Commands.Parsed.t) =
             (if String.is_empty cmd.rest then [] else [ "path", str cmd.rest ])
           ~tag:Git_diff
       ] )
+  | "review", [] ->
+    notice m "reading the review…", [ rpc "get_review" ~tag:Review_comments ]
   | "review", _ ->
     ( notice m "reading the changes to review…"
     , [ rpc
@@ -4424,6 +4428,7 @@ let event m (e : P.Event.t) =
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
   | Config_changed config -> { m with config = Some config }, []
+  | Review _ -> m, []
   | Auth a -> auth_event m a
   | Tool_confirm c -> add_pending_confirms m [ c ], []
   | Tool_confirm_done { call_id; agent_id } ->
@@ -4747,6 +4752,21 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.against diff))
            , [] )
          else output m ~title:"Changes" (Diff_files.render diff), [])
+     | Review_comments ->
+       decode json ~f:P.Review.of_json (fun review ->
+         m, [ rpc "git_diff" ~tag:(Review_status review) ])
+     | Review_status review ->
+       decode json ~f:P.Git_diff.of_json (fun diff ->
+         if String.is_empty diff.diff && List.is_empty review.comments
+         then
+           ( notice
+               m
+               (sprintf
+                  "nothing to review: no changes in %s against %s"
+                  diff.root
+                  (Diff_files.against diff))
+           , [] )
+         else output m ~title:"Review" (File_approval.render diff review), [])
      | Review_started ->
        (* The run's first message shows what started; a busy agent queues it. *)
        (match m.state with

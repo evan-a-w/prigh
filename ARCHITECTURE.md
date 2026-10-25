@@ -527,6 +527,13 @@ two can share one.
   size)` and a `Title:` line; long text is cut like `bash` output with the
   full text saved (`Tool_bash.save_output`). HTTP errors keep the start of
   the body. Not destructive.
+- `Tool_review_reply` — `reply_to_comment {id, text, edits?, resolve?}`,
+  the main agent's answer to one of the user's review comments (see
+  `Review_state` in the harness): threaded under it, `edits`
+  (`{old_text, new_text}`, like `edit`'s, on the comment's file) proposing
+  a change for the user to accept, `resolve` closing the thread. Not on
+  the host; offered only while the session has comments, never to
+  subagents (`Tools.main_agent_only`).
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -973,14 +980,15 @@ two can share one.
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
   cancelled; `resume_at`, also in `Summary`) — these three are ignored by
-  `messages` and not copied by `fork` — and `Told_environment` (what the
-  model was last told about its environment, see the harness), `Repo
-  {cwd, repo}` (where `cwd` is in git, a `Git_location.t` or `None`
-  outside a repository: `repo`, and `Summary.repo` for the summary's cwd,
-  `None` when nothing was recorded for it), `Agent_worktree` and
-  `Worktree_removed {path}` (the worktrees made for its subagents and not
-  removed since: `agent_worktrees`, also in `Summary`; neither is copied
-  by `fork`);
+  `messages` and not copied by `fork` — `Review` (a `Review_state.Change`,
+  read from every branch; a comment is worth creating the file for),
+  `Told_environment` (what the model was last told about its environment,
+  see the harness), `Repo {cwd, repo}` (where `cwd` is in git, a
+  `Git_location.t` or `None` outside a repository: `repo`, and
+  `Summary.repo` for the summary's cwd, `None` when nothing was recorded
+  for it), `Agent_worktree` and `Worktree_removed {path}` (the worktrees
+  made for its subagents and not removed since: `agent_worktrees`, also in
+  `Summary`; neither is copied by `fork`);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -1069,6 +1077,30 @@ two can share one.
   worktree and, without force, one with changes or locked (`--force`
   twice for a locked one), prunes one whose directory is gone, and keeps
   the branch. Errors say what to do, like `Git_diff`'s.
+- `Review_comment`, `Review_state` — the session's review of the working
+  tree: comments (`c1`, `c2`, ... never reused) on a line range of a file
+  (relative to the repository's `root`, as `git_diff` names it) with the
+  lines' text as `anchor` (frontends find the lines again with it when the
+  file moved), `Open | Resolved`, and a thread of posts (the user's, the
+  agent's; each `delivered` once the agent has seen it), an agent's post
+  possibly carrying a `Proposal` (`edits`, `Pending | Accepted | Rejected
+  | Failed`); and the approvals, a hash per path (the frontends' hash of
+  the file's section of the diff, so a file changed after it was approved
+  is not approved any more). It is recorded as `Review` session entries,
+  each a `Change` (a comment whole, a deletion, an approval or its
+  withdrawal), and `Session.review` folds those of every branch in file
+  order: rewinding keeps the review, `fork` copies the active path's.
+  `Agent` caches it, applies changes through `update_review` (recording
+  them, then a `Review_changed` event with the whole review) and offers
+  `reply_to_comment` while there are comments. `submit_review` turns the
+  user's undelivered posts into one message (instructions on replying,
+  then each comment with them as `<comment id file lines status>` with its
+  numbered `<code>` and `<post from new>`s; `Injected.Source.Review_comments
+  {count}`), queued as a steer (it starts a run when idle) and marks them
+  delivered; `decide_proposal` runs the proposal's `edit` on the active
+  host (`Failed` with its error when it no longer applies) and adds the
+  user's undelivered post saying what became of it, so the agent hears it
+  with the next comments.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -1225,7 +1257,18 @@ two can share one.
   they are now, saved ones by `Session.Summary`'s last cwd and host,
   archived ones only while loaded), and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
-  `fs_upload` (`Files_rpc`, above).
+  `fs_upload` (`Files_rpc`, above), `fs_write {path, text, expected?}`
+  (the review page's editor: the `write` tool on the active host, refused
+  when the file's MD5, which `fs_preview` gives a whole text file as
+  `md5`, is no longer `expected`), and the review's (`Review_rpc`, on the
+  calling client's session): `get_review` (`{comments, approvals}`),
+  `review_comment {root, path, first, last, anchor, text}`, `review_reply
+  {id, text}`, `review_set_status {id, status}` (each answering the
+  comment), `review_delete {id}`, `review_submit` (`{count}`),
+  `review_decide {id, post, accept}`, `review_approve {path, hash}` and
+  `review_unapprove {path}` (answering the review); every change is also
+  sent to the session's clients as a `review` event with the whole
+  review.
   `get_messages_page {limit, before?, from?, session?}` (`Message_page`,
   for frontends that open a session at its end) answers `{messages,
   older, before}`: the newest `limit` messages (a page never starts with
@@ -1391,9 +1434,11 @@ terminal frontend and `web/` prigh-web, the browser one.
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
   `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
   `Mcp_server`, `Mcp_list`, `Delete_result`, the file browser's
-  `File_listing` and `File_preview`) and the `Request` encoder
-  (`Request.Method` has typed constructors for `list_skills`, `list_mcp`,
-  `mcp_approve`, `set_archived`, `delete_sessions` and `delete_archived`).
+  `File_listing` and `File_preview`, the review's `Review` and
+  `Review_comment`) and the `Request` encoder (`Request.Method` has typed
+  constructors for `list_skills`, `list_mcp`, `mcp_approve`,
+  `set_archived`, `delete_sessions`, `delete_archived`, the review's
+  methods, `fs_preview` and `fs_write`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
   tests) and `Client` (created with a `connect` thunk and
@@ -1559,8 +1604,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     mention; `sessions ~collapsed` flattens it in display order.
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
-    shows coloured; `/review` and `/init` send `review`/`init` tagged so
-    a refusal goes back to the editor.
+    shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
+    so a refusal goes back to the editor. `/review` alone reads
+    `get_review`, then `git_diff`, and shows `File_approval.render`: each
+    changed file with its approval and its comments' threads, then the
+    comments on files no longer changed. `File_approval` (an approval
+    counts while its hash is the file's `Diff_files.File.hash`, the MD5
+    of its section of the diff) and `Comment_anchor` (a comment's lines
+    now: where its anchor text is, nearest to where it was, else
+    outdated) are shared with prigh-web.
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
@@ -2093,7 +2145,43 @@ terminal frontend and `web/` prigh-web, the browser one.
       text the model saw) and the user's bubble with only their `body`;
       `Session_tree` labels them like the TUI. `/diff` opens
       `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
-      its counts).
+      its counts, and a button to the review page).
+    - The review: `Code_review` (pure, like `Files`: the session's
+      `Review`, kept by the `review` event and read with `get_review` when
+      the session changes; the diff, read again with `git_diff` while the
+      review page or the file browser shows (on opening, on choosing a
+      file, after any `edit`/`write`/`apply_patch`/`bash` of the agent or
+      a subagent and at every run's end), one request at a time with
+      another wanted once it is in; the page's file, mode (`Comment |
+      Edit`) and layout (`Unified | Full`); a selection of lines, the
+      comment being written on them and the replies being typed; the
+      files' texts (`fs_preview`, read again when their change does, and
+      taken from the browser's preview); the editor's text with the MD5 it
+      was read with). Its `update`/`reply` return `Out.t`s that `App`
+      turns into requests (`Reply_tag.Review`), toasts and focus.
+      `Review_code_view` draws a file: the hunks, or the whole file with
+      them inline (`full_rows` fills the lines between hunks from its
+      text), highlighted, the rows and their tokens made once per file
+      version and layout and each row a `View_cache` node; new line
+      numbers select (Shift: a range), a bar under the selection offers
+      Comment, and each comment's thread (posts, an agent's proposal as a
+      diff with Accept and Reject, the reply field, Resolve and Delete)
+      sits under the line its anchor is on now, those whose lines are gone
+      or not shown above the file. `Review_page_view` is the page: in
+      `.app.reviewing` it comes before `.main`, which narrows to a column
+      (`review.css`); its head (the approvals strip, refresh, the mode and
+      layout, Send N comments, close), the files with their approval
+      marks and open comment counts, and the current file (previous and
+      next, Approve / Approved / Approve again, the code or the editor: a
+      transparent `textarea` over its own highlighted text, Ctrl+S saving
+      with `fs_write`; after a conflict the next save overwrites). Keys
+      (`Keys.Target.Review`, the page focused but not its fields): `]`
+      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere. `Files_view`
+      marks changed entries (a dot, a sage tick once approved, sodium once
+      changed after; a directory's count) and previews a text file of the
+      repository with `Review_code_view`, under a bar with its approval,
+      counts, the layout and Review. `Tool_view` draws `reply_to_comment`
+      as its reply and proposed diff.
     - Worktrees: `Worktrees` keeps the listing of the session's place
       (session, tool host, directory; reset on a session or user switch,
       stale after a turn, a create or remove, or other sessions moving)
@@ -2218,7 +2306,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     `[data-theme=light]` overriding them, the accent presets
     `[data-accent=...]` and what derives from the accent by `color-mix`),
     `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
-    `highlight.css` (which tokens take which colours) and `resize.css`
+    `review.css`, `highlight.css` (which tokens take which colours) and `resize.css`
     (the handles) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
@@ -2485,6 +2573,14 @@ opened 900 in 30s), then "Retry now" once the connection holds. Then
 `stability.mjs`: nothing redrawn or shifted that did not change while the
 page idles and a reply streams, the editor's height in every frame, and the
 top bar's status in the same place in every frame as turns start, run a
-tool, queue a steer and end, on a desktop and on a phone.
+tool, queue a steer and end, on a desktop and on a phone. Then
+`review.mjs`, in a git repository with an edited and a new file: the file
+browser's marks and a changed file's diff (hunks, whole file), a comment
+on a range of lines from it, the review page beside the chat (the files,
+`]`/`[`, `c` on a selected line, `a`), sending the comments (the faux
+agent replies to both, proposing a change to one, and edits the README,
+which shows up), accepting the proposal (the file on disk), a file
+changed after its approval, edit mode saving with Ctrl+S, Esc and
+`/review`, and the phone sheet.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

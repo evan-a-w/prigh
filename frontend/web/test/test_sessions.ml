@@ -193,6 +193,7 @@ let%expect_test "switching resets what belonged to the old session" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\
@@ -241,6 +242,7 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\
@@ -537,6 +539,7 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\
@@ -594,6 +597,7 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s3\
                             \nbackend\
@@ -740,6 +744,7 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s3\
                             \nbackend\

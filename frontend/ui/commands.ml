@@ -155,8 +155,10 @@ let all =
   ; c
       "review"
       "[base] [instructions]"
-      "review the uncommitted changes, or those against a base branch, for \
-       prioritised findings"
+      "alone: the changed files' approvals and review comments (prigh-web: the \
+       review page); with a base (HEAD: the uncommitted changes) or \
+       instructions, have the model review the changes for prioritised \
+       findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"

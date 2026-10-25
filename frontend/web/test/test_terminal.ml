@@ -155,6 +155,7 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\

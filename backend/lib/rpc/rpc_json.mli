@@ -18,6 +18,16 @@ val state : Agent.State.t -> Json.t
 val reminder : stops:int -> Reminder.t -> Json.t
 
 val config : Config.t -> Json.t
+
+(** [{id, root, path, first, last, anchor, status: open|resolved, thread:
+    [{author: user|agent, text, at_ms, delivered, proposal?: {edits:
+    [{old_text, new_text}], state: pending|accepted|rejected|failed,
+    error?}}]}]. *)
+val review_comment : Review_comment.t -> Json.t
+
+(** [{comments, approvals: [{path, hash}]}]. *)
+val review : Review_state.t -> Json.t
+
 val model : Model.t -> Json.t
 
 (** A job for [list_jobs]: id, command, running, exit, delivered, elapsed

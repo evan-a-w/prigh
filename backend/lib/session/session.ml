@@ -45,6 +45,7 @@ module Entry = struct
           }
       | Resume_at of { at : float option }
       | Told_environment of Told_environment.t
+      | Review of Review_state.Change.t
       | Repo of
           { cwd : string
           ; repo : Git_location.t option
@@ -148,7 +149,7 @@ let header t =
 
 let worth_saving (line : Line.t) =
   match line with
-  | Entry { payload = Message _ | Name _; _ } -> true
+  | Entry { payload = Message _ | Name _ | Review _; _ } -> true
   | Entry
       { payload =
           ( Model _
@@ -297,7 +298,8 @@ let add_entry t (entry : Entry.t) =
   | Archived _
   | Spend _
   | Resume_at _
-  | Told_environment _ -> ()
+  | Told_environment _
+  | Review _ -> ()
   | Repo { cwd; repo } -> Hashtbl.set t.repos ~key:cwd ~data:repo
   | Agent_worktree w ->
     t.agent_worktrees
@@ -461,6 +463,14 @@ let set_repo t ~cwd repo = append t (Repo { cwd; repo })
 let agent_worktrees t = List.rev t.agent_worktrees
 let add_agent_worktree t worktree = append t (Agent_worktree worktree)
 let worktree_removed t ~path = append t (Worktree_removed { path })
+let record_review t change = append t (Review change)
+
+let review t =
+  List.fold (entries t) ~init:Review_state.empty ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Review change -> Review_state.apply acc change
+    | _ -> acc)
+;;
 
 let spend t =
   List.fold
@@ -506,7 +516,8 @@ let name t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> None)
+    | Worktree_removed _
+    | Review _ -> None)
 ;;
 
 let description t =
@@ -530,7 +541,8 @@ let description t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> None)
+    | Worktree_removed _
+    | Review _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -613,7 +625,8 @@ let context t =
       | Told_environment _
       | Repo _
       | Agent_worktree _
-      | Worktree_removed _ -> acc)
+      | Worktree_removed _
+      | Review _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -636,7 +649,8 @@ let context t =
       | Told_environment _
       | Repo _
       | Agent_worktree _
-      | Worktree_removed _ -> None)
+      | Worktree_removed _
+      | Review _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -681,7 +695,8 @@ let system_prompt t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> acc)
+    | Worktree_removed _
+    | Review _ -> acc)
 ;;
 
 let goal t =
@@ -705,7 +720,8 @@ let goal t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> acc)
+    | Worktree_removed _
+    | Review _ -> acc)
 ;;
 
 let reminders t =
@@ -744,7 +760,8 @@ let budget t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> acc)
+    | Worktree_removed _
+    | Review _ -> acc)
 ;;
 
 let model t =
@@ -768,7 +785,8 @@ let model t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> acc)
+    | Worktree_removed _
+    | Review _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -924,7 +942,8 @@ let archived_and_activity t ~mtime =
         | Told_environment _
         | Repo _
         | Agent_worktree _
-        | Worktree_removed _ -> last_message, marker)
+        | Worktree_removed _
+        | Review _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
   let activity =
@@ -1205,7 +1224,8 @@ let to_markdown t =
     | Told_environment _
     | Repo _
     | Agent_worktree _
-    | Worktree_removed _ -> None
+    | Worktree_removed _
+    | Review _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

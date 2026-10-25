@@ -5,6 +5,7 @@ module Content = struct
     | Text of
         { text : string
         ; truncated : bool
+        ; md5 : string option
         }
     | Image of
         { mime : string
@@ -33,10 +34,11 @@ let of_json j =
     match%bind Json.string_field j "kind" with
     | "text" ->
       let%bind text = Json.string_field j "text" in
-      let%map truncated =
+      let%bind truncated =
         Json.bool_default_field j "truncated" ~default:false
       in
-      Content.Text { text; truncated }
+      let%map md5 = Json.string_opt_field j "md5" in
+      Content.Text { text; truncated; md5 }
     | "image" ->
       let%bind mime = Json.string_field j "mime" in
       let%map url = Json.string_opt_field j "url" in
