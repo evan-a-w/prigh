@@ -198,8 +198,7 @@ let%expect_test "the settings page: the account, switching it, signing out" =
 let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
-  [%expect
-    {| (A alice) (Settings (Ctrl+, or /settings)) |}];
+  [%expect {| (A alice) (Settings (Ctrl+, or /settings)) |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
   [%expect
@@ -262,7 +261,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
           (id : string)
         , (Option.equal Dialog.equal chosen (H.model h).dialog : bool)];
       H.quiet h (fun () -> H.act h Close_dialog));
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (settings true)
     (Focus dialog)
@@ -451,6 +451,5 @@ let%expect_test "token-only backends show the account too" =
            Some { backend; user = None; token = Some "t"; session = None }
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect
-    {| (T token) (Settings (Ctrl+, or /settings)) |}]
+  [%expect {| (T token) (Settings (Ctrl+, or /settings)) |}]
 ;;

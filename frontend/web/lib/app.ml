@@ -2518,14 +2518,8 @@ let account_menu (m : Model.t) =
                     ~id:"notify on"
                     ~detail:"when a turn ends or something waits for you"
                     "Turn notifications on")
-             ; Picker.Item.create
-                 ~id:"settings"
-                 ~detail:"Ctrl+,"
-                 "Settings"
-             ; Picker.Item.create
-                 ~id:"help"
-                 ~detail:"/help"
-                 "Commands and keys"
+             ; Picker.Item.create ~id:"settings" ~detail:"Ctrl+," "Settings"
+             ; Picker.Item.create ~id:"help" ~detail:"/help" "Commands and keys"
              ; Picker.Item.create
                  ~id:"signout"
                  ~detail:"forget this account in this browser"

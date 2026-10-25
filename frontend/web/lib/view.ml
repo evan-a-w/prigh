@@ -286,7 +286,9 @@ let view (m : Model.t) ~inject ~terminal =
            ; banner m ~inject
            ; div
                ~cls:"chat-frame"
-               [ (if Model.docked m then Session_view.tools m ~inject else Node.none)
+               [ (if Model.docked m
+                  then Session_view.tools m ~inject
+                  else Node.none)
                ; Node.div
                    ~attrs:
                      [ Attr.classes
