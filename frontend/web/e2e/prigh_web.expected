@@ -163,7 +163,7 @@ same session after reload: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
 cwd
 count some lines
@@ -187,7 +187,7 @@ new session in the url: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
 cwd
 hello again
@@ -1411,7 +1411,7 @@ same session after reload: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
 cwd
 count some lines
@@ -1435,7 +1435,7 @@ new session in the url: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
 cwd
 hello again

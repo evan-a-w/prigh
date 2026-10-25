@@ -39,7 +39,7 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   sidebar h;
   [%expect
     {|
-    Sessions (Select)
+    Projects (Select)
     (work) (New session in /work)
     (fix the parser bug 2m ago) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago) (Archive (A)) (Delete session (Delete))
@@ -81,7 +81,7 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
       <span class="divider-rule"> </span>
       <span class="chev"> </span>
     </button>
-    Sessions (Select)
+    Projects (Select)
     (work) (New session in /work)
     (fix the parser bug 2m ago) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago) (Archive (A)) (Delete session (Delete))
@@ -179,7 +179,7 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   sidebar h;
   [%expect
     {|
-    Sessions (Select)
+    Projects (Select)
     (work) (New session in /work)
     (Release notes 2m ago) (Archive (A)) (Delete session (Delete))
     (Open elsewhere 2m ago) (Archive (A)) (Delete session (Delete))
@@ -379,7 +379,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     (Select_sessions false)
-    Sessions (Select)
+    Projects (Select)
     (work) (New session in /work)
     (fix the parser bug 2m ago) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago) (Archive (A)) (Delete session (Delete))
