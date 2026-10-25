@@ -10,15 +10,19 @@ module H = Harness
 
 let controls h = H.text h ~selector:".composer-controls"
 
-let%expect_test "the thinking chip names the level and opens its picker" =
+let%expect_test "the thinking chip names the level and opens its menu over it" =
   let h = H.create () in
   controls h;
   H.show h ~selector:".thinking-chip";
   [%expect
     {|
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-haspopup="dialog"
+            aria-expanded="false"
             class="btn chip-button thinking-chip"
             @on_click>
       <icon class="brain"> </icon>
@@ -27,21 +31,63 @@ let%expect_test "the thinking chip names the level and opens its picker" =
       <icon class="chevron"> </icon>
     </button>
     |}];
+  (* Its menu: the levels, the current one checked, the keyboard's on the
+     list. Not the command's dialog. *)
   H.click h ~selector:".thinking-chip";
-  H.text h ~selector:".modal";
+  H.elements h ~selector:"#chip-popover";
+  H.elements h ~selector:"#chip-popover > *";
+  H.text h ~selector:"#chip-popover";
+  H.show h ~selector:".popover-item.selected";
+  H.elements h ~selector:".modal";
+  H.show h ~selector:".thinking-chip";
   [%expect
     {|
-    Open_thinking_picker
-    (Focus picker-input)
-    Thinking level
-    (Close (Esc))
-    []
+    (Open_chip Thinking)
+    (Focus popover-list)
+    Place_popover
+    <div class="chip-popover menu-surface">
+    <div class="popover-head">
+    <div class="popover-items">
+    <div class="menu-keys">
+    Thinking Alt+T cycles
     off answer straight away
     low a little
-    on the provider's default budget ✓
+    ✓ on the provider's default budget
     high more
     max as much as the model allows
-    ↑↓ to move, Enter to choose, Esc to close
+    Enter chooses, ← → the next setting, Esc closes
+    <div role="option"
+         id="popover-option-2"
+         aria-selected="true"
+         aria-checked="true"
+         class="marked menu-item popover-item selected"
+         @on_click>
+      <span aria-hidden="true" class="mark picked popover-check">
+        <icon class="check"> </icon>
+      </span>
+      <span class="menu-text">
+        <span class="menu-label"> on </span>
+        <span class="menu-detail"> the provider's default budget </span>
+      </span>
+      <span aria-hidden="true" class="thinking-meter">
+        <span class="bar on"> </span>
+        <span class="bar on"> </span>
+        <span class="bar"> </span>
+        <span class="bar"> </span>
+      </span>
+    </div>
+    <button type="button"
+            title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-haspopup="dialog"
+            aria-expanded="true"
+            aria-controls="chip-popover"
+            class="btn chip-button thinking-chip"
+            @on_click>
+      <icon class="brain"> </icon>
+      <span class="chip-key"> Thinking </span>
+      <span class="chip-label"> on </span>
+      <icon class="chevron"> </icon>
+    </button>
     |}];
   (* Esc closes it without a change. *)
   H.key h "Escape" ~target:Field;
@@ -50,7 +96,9 @@ let%expect_test "the thinking chip names the level and opens its picker" =
     {|
     Close_dialog
     (Focus editor)
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     |}];
   (* Alt+T: the next level shows at once, waiting on the backend. *)
   H.key h "t" ~alt:true;
@@ -61,7 +109,9 @@ let%expect_test "the thinking chip names the level and opens its picker" =
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
-    (Claude Opus 5.5) (Thinking high) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking high)
+    (Auto: never asks)
     <button class="awaiting btn chip-button thinking-chip">
     |}];
   H.text h ~selector:".thinking-chip .chip-label";
@@ -73,7 +123,12 @@ let%expect_test "the thinking chip names the level and opens its picker" =
        {|{"event":"state","state":%s}|}
        (H.state_json ~fields:[ "thinking", `String "high" ] ()));
   controls h;
-  [%expect {| (Claude Opus 5.5) (Thinking high) (Auto: never asks) |}]
+  [%expect
+    {|
+    (Claude Opus 5.5)
+    (Thinking high)
+    (Auto: never asks)
+    |}]
 ;;
 
 let%expect_test "a model without thinking says so, and the chip tells why" =
@@ -95,13 +150,18 @@ let%expect_test "a model without thinking says so, and the chip tells why" =
       ()
   in
   controls h;
-  [%expect {| (DeepSeek Chat) (No thinking) (Auto: never asks) |}];
+  [%expect
+    {|
+    (DeepSeek Chat)
+    (No thinking)
+    (Auto: never asks)
+    |}];
   H.click h ~selector:".thinking-chip";
   H.elements h ~selector:".modal";
   H.text h ~selector:".toast";
   [%expect
     {|
-    Open_thinking_picker
+    (Open_chip Thinking)
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model (Dismiss)
     |}]
 ;;
@@ -487,22 +547,24 @@ let%expect_test
     <button class="attach btn ghost icon">
     <button class="btn primary send">
     |}];
-  (* The model's chip opens its picker; so does the mode's. *)
+  (* The model's chip opens its menu; so does the mode's. *)
   H.click h ~selector:".model-chip";
-  H.text h ~selector:".modal h2";
+  H.text h ~selector:"#chip-popover .popover-search";
   H.key h "Escape" ~target:Field;
   H.click h ~selector:".mode-chip";
-  H.text h ~selector:".modal h2";
+  H.text h ~selector:"#chip-popover .popover-head";
   [%expect
     {|
-    Open_model_picker
-    (Focus picker-input)
-    Switch model
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    [] Ctrl+L
     Close_dialog
     (Focus editor)
-    (Run /mode)
-    (Focus picker-input)
-    When tools ask first (Alt+M cycles)
+    (Open_chip Mode)
+    (Focus popover-list)
+    Place_popover
+    When tools ask first Alt+M cycles
     |}];
   (* Running: stop beside steer. *)
   H.event
@@ -526,7 +588,9 @@ let%expect_test
   [%expect {| |}]
 ;;
 
-let%expect_test "each chip opens its command's picker, which owns the keyboard" =
+let%expect_test
+    "each chip's menu has its command's choices, and owns the keyboard"
+  =
   let h = H.create () in
   List.iter
     [ ".model-chip", "/model"
@@ -538,63 +602,330 @@ let%expect_test "each chip opens its command's picker, which owns the keyboard" 
       let clicked = (H.model h).dialog in
       H.quiet h (fun () -> H.key h "Escape" ~target:Field);
       H.quiet h (fun () -> H.act h (Run command));
+      let items = function
+        | Some (Dialog.Picker { picker; _ } | Popover { picker; _ }) ->
+          Some (List.map (Picker.visible picker) ~f:(fun i -> i.id))
+        | _ -> None
+      in
       printf
-        "%s: %s, same as %s: %b\n"
+        "%s: %s, the same choices as %s: %b\n"
         chip
         (match clicked with
-         | Some (Picker { picker; _ }) -> Picker.title picker
-         | _ -> "no picker")
+         | Some (Popover { chip; _ }) ->
+           Sexp.to_string [%sexp (chip : Chip.t)] ^ "'s menu"
+         | _ -> "no menu")
         command
-        (Option.equal Dialog.equal clicked (H.model h).dialog);
+        ([%equal: string list option]
+           (items clicked)
+           (items (H.model h).dialog));
       H.quiet h (fun () -> H.key h "Escape" ~target:Field));
   [%expect
     {|
-    Open_model_picker
+    (Open_chip Model)
     Close_dialog
-    .model-chip: Switch model, same as /model: true
+    .model-chip: Model's menu, the same choices as /model: true
     Close_dialog
-    Open_thinking_picker
+    (Open_chip Thinking)
     Close_dialog
-    .thinking-chip: Thinking level, same as /thinking: true
+    .thinking-chip: Thinking's menu, the same choices as /thinking: true
     Close_dialog
-    (Run /mode)
+    (Open_chip Mode)
     Close_dialog
-    .mode-chip: When tools ask first (Alt+M cycles), same as /mode: true
+    .mode-chip: Mode's menu, the same choices as /mode: true
     Close_dialog
     |}];
-  (* Typing filters it (fuzzily), Enter takes the choice, Esc leaves it as
-     it was. *)
+  (* Typing filters the models (fuzzily), Enter takes the choice, Esc leaves
+     it as it was. *)
   H.click h ~selector:".model-chip";
-  H.input h ~selector:"#picker-input" "sonet";
-  H.text h ~selector:".picker-items";
+  H.input h ~selector:"#popover-filter" "sonet";
+  H.text h ~selector:".popover-items";
   H.key h "Enter" ~target:Field;
-  H.elements h ~selector:".modal";
+  H.elements h ~selector:"#chip-popover";
   controls h;
   [%expect
     {|
-    Open_model_picker
-    (Focus picker-input)
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
     (Picker_query sonet)
-    Claude Sonnet 5 anthropic, 200k ctx
+    Claude Sonnet 5 Anthropic 200k
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
-    (Claude Sonnet 5) (Thinking on) (Auto: never asks)
+    (Claude Sonnet 5)
+    (Thinking on)
+    (Auto: never asks)
     |}];
   H.click h ~selector:".mode-chip";
-  H.key h "ArrowDown" ~target:Field;
-  H.key h "Escape" ~target:Field;
-  H.elements h ~selector:".modal";
+  H.key h "ArrowDown" ~target:Page;
+  H.text h ~selector:".popover-item.selected";
+  H.key h "Escape" ~target:Page;
+  H.elements h ~selector:"#chip-popover";
   controls h;
   [%expect
     {|
-    (Run /mode)
-    (Focus picker-input)
+    (Open_chip Mode)
+    (Focus popover-list)
+    Place_popover
     (Dialog_move 1)
+    Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
     Close_dialog
     (Focus editor)
-    (Claude Sonnet 5) (Thinking on) (Auto: never asks)
+    (Claude Sonnet 5)
+    (Thinking on)
+    (Auto: never asks)
+    |}];
+  (* Clicking a choice takes it. *)
+  H.click h ~selector:".thinking-chip";
+  H.click h ~selector:".popover-item" ~nth:3;
+  controls h;
+  [%expect
+    {|
+    (Open_chip Thinking)
+    (Focus popover-list)
+    Place_popover
+    (Picker_choose high)
+    (Focus editor)
+    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
+    (Claude Sonnet 5)
+    (Thinking high)
+    (Auto: never asks)
+    |}]
+;;
+
+let%expect_test
+    "the model's menu: under each provider, the context window; filtered, best \
+     first"
+  =
+  let h = H.create () in
+  H.key h "l" ~ctrl:true;
+  H.text h ~selector:"#chip-popover";
+  H.show h ~selector:".popover-item.selected";
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    [] Ctrl+L
+    Anthropic
+    ✓ Claude Opus 5.5 200k
+    Claude Sonnet 5 200k
+    OpenAI not logged in: /login
+    GPT-6 200k
+    DeepSeek not logged in: /login
+    DeepSeek Chat 200k
+    Enter chooses, ← → the next setting, Esc closes
+    <div role="option"
+         id="popover-option-0"
+         aria-selected="true"
+         aria-checked="true"
+         class="marked menu-item popover-item selected"
+         @on_click>
+      <span aria-hidden="true" class="mark picked popover-check">
+        <icon class="check"> </icon>
+      </span>
+      <span class="menu-text">
+        <span class="menu-label"> Claude Opus 5.5 </span>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </span>
+      <span title="Context window, in tokens" class="popover-aside"> 200k </span>
+    </div>
+    |}];
+  H.input h ~selector:"#popover-filter" "chat";
+  H.text h ~selector:".popover-items";
+  [%expect
+    {|
+    (Picker_query chat)
+    DeepSeek Chat DeepSeek, not logged in 200k
+    ✓ Claude Opus 5.5 Anthropic 200k
+    Claude Sonnet 5 Anthropic 200k
+    |}];
+  H.input h ~selector:"#popover-filter" "zz";
+  H.text h ~selector:".popover-empty";
+  [%expect
+    {|
+    (Picker_query zz)
+    Nothing matches “zz”: Backspace widens the search.
+    |}];
+  (* Emptied, the highlight is back on the current model. *)
+  H.input h ~selector:"#popover-filter" "";
+  H.text h ~selector:".popover-item.selected";
+  [%expect
+    {|
+    (Picker_query "")
+    ✓ Claude Opus 5.5 200k
+    |}];
+  (* Ctrl+L again closes it. *)
+  H.key h "l" ~ctrl:true ~target:Field;
+  H.elements h ~selector:"#chip-popover";
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus editor)
+    |}]
+;;
+
+let%expect_test
+    "one chip's menu at a time: ← → and Tab go along the chips, a click on \
+     another opens its, on the same one or beside the menu closes it"
+  =
+  let h = H.create () in
+  let shown () =
+    match (H.model h).dialog with
+    | Some (Popover { chip; _ }) -> print_s [%sexp (chip : Chip.t)]
+    | Some _ -> print_endline "another dialog"
+    | None -> print_endline "closed"
+  in
+  H.click h ~selector:".model-chip";
+  H.key h "ArrowRight" ~target:Field;
+  shown ();
+  H.key h "ArrowRight" ~target:Page;
+  shown ();
+  H.key h "ArrowRight" ~target:Page;
+  shown ();
+  H.key h "ArrowLeft" ~target:Field;
+  shown ();
+  H.key h "Tab" ~target:Page;
+  shown ();
+  H.key h "Tab" ~shift:true ~target:Page;
+  shown ();
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    (Chip_step 1)
+    (Focus popover-list)
+    Place_popover
+    Thinking
+    (Chip_step 1)
+    (Focus popover-list)
+    Place_popover
+    Mode
+    (Chip_step 1)
+    (Focus popover-filter)
+    Place_popover
+    Model
+    (Chip_step -1)
+    (Focus popover-list)
+    Place_popover
+    Mode
+    (Chip_step 1)
+    (Focus popover-filter)
+    Place_popover
+    Model
+    (Chip_step -1)
+    (Focus popover-list)
+    Place_popover
+    Mode
+    |}];
+  (* In the model's filter, once something is typed, ← → move the caret. *)
+  H.click h ~selector:".model-chip";
+  H.input h ~selector:"#popover-filter" "gp";
+  H.key h "ArrowLeft" ~target:Field;
+  shown ();
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    (Picker_query gp)
+    (browser default)
+    Model
+    |}];
+  (* Only the open chip says so; the other chips stay live, the rest of the
+     composer is inert, under the menu. *)
+  H.names h ~selector:".chip-button[aria-expanded=true]";
+  H.elements h ~selector:".composer [inert]";
+  H.elements h ~selector:".chip-anchor";
+  [%expect
+    {|
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    <textarea class="editor">
+    <div class="composer-buttons">
+    <div class="chip-anchor model open">
+    <div class="chip-anchor thinking">
+    <div class="chip-anchor mode">
+    |}];
+  H.click h ~selector:".mode-chip";
+  shown ();
+  H.click h ~selector:".mode-chip";
+  shown ();
+  H.click h ~selector:".thinking-chip";
+  H.click h ~selector:".popover-backdrop";
+  shown ();
+  [%expect
+    {|
+    (Open_chip Mode)
+    (Focus popover-list)
+    Place_popover
+    Mode
+    (Open_chip Mode)
+    (Focus editor)
+    closed
+    (Open_chip Thinking)
+    (Focus popover-list)
+    Place_popover
+    Close_dialog
+    (Focus editor)
+    closed
+    |}];
+  (* A model without thinking levels: ← → pass over its chip. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ ( "model"
+              , Jsonaf.of_string
+                  (H.model_json
+                     ~thinking:false
+                     ~provider:"deepseek"
+                     ~id:"deepseek-chat"
+                     ~name:"DeepSeek Chat"
+                     ()) )
+            ; "thinking", `String "off"
+            ]
+          ()));
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
+  shown ();
+  [%expect
+    {|
+    (Open_chip Model)
+    (Chip_step 1)
+    Mode
+    |}]
+;;
+
+(* A phone: the menu is as wide as the composer (style.css); what it shows
+   is the same. *)
+let%expect_test "narrow: the same menu" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.click h ~selector:".mode-chip";
+  H.text h ~selector:"#chip-popover";
+  H.names h ~selector:"#chip-popover";
+  H.names h ~selector:"#chip-popover [role]";
+  [%expect
+    {|
+    (Open_chip Mode)
+    (Focus popover-list)
+    Place_popover
+    When tools ask first Alt+M cycles
+    Asks: edits & commands bash, job_input, edits and MCP tools ask first
+    Asks: commands file edits run; bash, job_input and MCP tools ask first
+    ✓ Auto: never asks tools run without asking
+    Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
+    Enter chooses, ← → the next setting, Esc closes
+    [dialog] div "When tools ask first"
+    [listbox] div "When tools ask first"
+    [option] div "Asks: edits & commands bash, job_input, edits and MCP tools ask first"
+    [option] div "Asks: commands file edits run; bash, job_input and MCP tools ask first"
+    [option] div "Auto: never asks tools run without asking"
+    [option] div "Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first"
     |}]
 ;;
 
@@ -694,6 +1025,8 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
     <button type="button"
             title="Tools run without asking (Alt+M cycles, /mode picks)"
             data-short="auto"
+            aria-haspopup="dialog"
+            aria-expanded="false"
             class="btn chip-button mode-chip"
             @on_click>
       <icon class="shield"> </icon>

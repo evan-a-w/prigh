@@ -241,3 +241,14 @@ let caret (ev : Dom_html.event Js.t) =
               ~utf16:i##.selectionStart)
        | _ -> None)
 ;;
+
+let rec inert (node : Node.t) : Node.t =
+  match node with
+  | Element e ->
+    Element
+      (Node.Element.map_attrs e ~f:(fun a ->
+         Attr.many [ a; Attr.create "inert" "" ]))
+  | Lazy { key; t } -> Lazy { key; t = lazy (inert (Lazy.force t)) }
+  | Fragment nodes -> Fragment (List.map nodes ~f:inert)
+  | (None | Text _ | Widget _) as node -> node
+;;

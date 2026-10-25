@@ -2002,9 +2002,23 @@ terminal frontend and `web/` prigh-web, the browser one.
       toggles and the gear — its
       steps are container queries on the bar in `style.css`),
       `Composer_view` (one box: the editor, then the model, thinking and
-      approval mode chips, plain text until pointed at, each opening the
-      picker its command opens, and attach, stop and send along its
-      bottom; the composer's container queries shorten the chips) with `Queue_view` (the queued steers and follow-ups from `Queued`:
+      approval mode chips, plain text until pointed at, and attach, stop
+      and send along its bottom; the composer's container queries shorten
+      the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
+      opens `Dialog.Popover`: its command's `Picker` (the same items as
+      `/model`, `/thinking`, `/mode`), drawn by `Chip_popover_view` inside
+      the chip's anchor rather than as a `Modal` — the models under their
+      providers, filtered in its own field; the thinking levels with a
+      meter. It is a dialog like the others (it owns the keys, Esc closes
+      it, choosing goes through `picker_accept`), except that the composer
+      keeps its chips live (the rest of it inert), so that a click on
+      another chip, or ← → and Tab (`Chip_step`), opens that one's; a
+      transparent backdrop under the chips closes it. `Place_popover` has
+      the page measure it once rendered: raised clear of the composer's
+      box, below the chip only when there is no room above, within the box
+      sideways, its height capped by the room (`--popover-lift`,
+      `--popover-room`, `--popover-shift`); on a phone it is as wide as the
+      box. With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
@@ -2487,7 +2501,11 @@ the composer with the chat column 700, 520 and 400px wide, then the bar
 over the chat without the sidebar at 900, 600 and 400px (by bounding boxes:
 nothing overlaps, sticks out of its parent or is cut off without an
 ellipsis; the controls' menu under its button, closed by a choice and by
-Esc), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
+Esc), the composer's chips' menus (above the composer's box at their
+chip's left edge and inside the window, the focus in them: a choice
+closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
+→ → along the chips, a click beside one; as wide as the box on a phone),
+with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
 back, and signs bob out, leaving alice on the sign-in page. Then

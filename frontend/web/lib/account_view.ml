@@ -107,7 +107,7 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
       ]
     [ Node.div
         ~attrs:
-          [ Attr.class_ "account-menu"
+          [ Attr.class_ "account-menu menu-surface"
           ; Attr.id "dialog"
           ; Attr.role "dialog"
           ; Attr.create "aria-label" "Account"

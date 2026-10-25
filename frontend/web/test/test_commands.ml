@@ -163,7 +163,9 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model
+    Ctrl+L switch model: the model chip's menu
+    ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models
+    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
