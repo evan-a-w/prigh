@@ -29,6 +29,8 @@ type t =
   ; session_name : string option
   ; session_description : string option
   ; cwd : string
+  ; home : Session_home.t option
+    (** where a worktree switch took it from, for [/worktree back] *)
   ; git_branch : string option
   ; model : Model.t
   ; thinking : string

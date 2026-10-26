@@ -1363,8 +1363,8 @@ let%expect_test "/pr checkout: offers to change the directory there" =
     (Rpc
       (method_ set_cwd)
       (params (
-        (path       /src/prigh-wt/pr-24)
-        (if_missing ask)))
+        (path     /src/prigh-wt/pr-24)
+        (worktree true)))
       (tag (Dir_changed Cwd)))
     |}];
   H.reply h (Pr_checked_out 24) checkout;

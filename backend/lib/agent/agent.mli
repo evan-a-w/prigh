@@ -71,6 +71,8 @@ module State : sig
     ; plan : Plan.t option (** the model's [update_plan] *)
     ; session_rules : string list
       (** rules the user allowed for this session ("don't ask again") *)
+    ; home : Session.Home.t option
+      (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
     }
   [@@deriving sexp_of]
 end
@@ -102,6 +104,9 @@ module Event : sig
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
         }
+    | Subagent_queues of Subagent_inbox.Listing.t list
+    (** the background subagents' queues, those with messages; after every
+        change of one *)
     | Tool_exec of
         { host : string (** only delivered to this host *)
         ; exec_id : string
@@ -286,7 +291,7 @@ val dequeue : t -> Queued.t option
     Emits [Queue_update]. *)
 val remove_queued
   :  t
-  -> queue:[ `Steer | `Follow_up ]
+  -> queue:Steer_queue.Kind.t
   -> index:int
   -> text:string option
   -> Queued.t Or_error.t
@@ -345,6 +350,35 @@ val subagent
 
 (** Cancels one; its partial report is still delivered. *)
 val cancel_subagent : t -> agent_id:string -> unit Or_error.t
+
+(** Sends the user's message to a running background subagent: a steer
+    reaches it at its next step boundary, a follow-up when it ends its turn
+    (it carries on with it rather than report). A subagent that finished, or
+    a subagent's own, refuses it, saying what to do instead; one that stops
+    before taking a message drops it with a [Notice]. Emits [Queue_update]
+    whenever a subagent's queue changes. *)
+val steer_subagent
+  :  t
+  -> agent_id:string
+  -> kind:Steer_queue.Kind.t
+  -> string
+  -> unit Or_error.t
+
+(** Takes back the subagent's most recently queued message (follow-ups
+    first), if any. *)
+val dequeue_subagent : t -> agent_id:string -> string option Or_error.t
+
+(** Like {!remove_queued}, for a subagent's queue. *)
+val remove_subagent_queued
+  :  t
+  -> agent_id:string
+  -> queue:Steer_queue.Kind.t
+  -> index:int
+  -> text:string option
+  -> string Or_error.t
+
+(** What [Queue_update]'s [agents] says. *)
+val subagent_queues : t -> Subagent_inbox.Listing.t list
 
 (** Cancels every running subagent and job; with [discard] their reports are
     dropped. *)
@@ -438,14 +472,30 @@ val compact : ?instructions:string -> t -> string Or_error.t
 (** {2 Changes: /diff, /review, /init} *)
 
 (** A worktree's changes on the active tool host ({!Git_diff}): the
-    session directory's, or [dir]'s. *)
+    session directory's, or [dir]'s; or a branch's ([rev]), not checked
+    out. *)
 val git_diff
   :  ?path:string
   -> ?base:string
   -> ?dir:string
+  -> ?rev:string
+  -> ?direct:bool
   -> ?default_base:bool
   -> t
   -> Git_diff.Result.t Or_error.t
+
+(** The branches and tags of the repository of [dir] (default: the
+    session's), for completion. *)
+val git_refs : ?dir:string -> t -> Git_diff.Refs.t Or_error.t
+
+(** A file ([path], relative to the repository's top) as it is in [rev],
+    for the review of a branch that is not checked out. *)
+val git_show
+  :  ?dir:string
+  -> t
+  -> rev:string
+  -> path:string
+  -> Git_diff.Shown.t Or_error.t
 
 (** {2 Worktrees}
 
@@ -501,11 +551,47 @@ val update_review
     (with [root], those on that worktree). *)
 val submit_review : ?root:string -> t -> int Or_error.t
 
+(** Like [update_review], then records a {!Review_snapshot} of the file
+    [path] of the worktree [root] for [action] (by the user [by]): [text],
+    or the file as it is now on the active tool host. A file that cannot be
+    read gets no snapshot, nor does one of a branch that is not checked out
+    ([branch:NAME]). *)
+val update_review_file
+  :  ?by:string
+  -> ?text:string
+  -> t
+  -> root:string
+  -> path:string
+  -> action:Review_snapshot.Action.t
+  -> f:(Review_state.t -> ('a * Review_state.Change.t list) Or_error.t)
+  -> 'a Or_error.t
+
+(** A file of the worktree [root] as it is now on the active tool host, as
+    {!Review_snapshot.content_of} makes it (at most
+    {!Review_snapshot.max_bytes} read). *)
+val read_review_file
+  :  t
+  -> root:string
+  -> path:string
+  -> (Review_snapshot.Content.t * string option) Or_error.t
+
+(** What changed since the last action ({!Review_state.since}; with [path]
+    and [index], since that one) in [path], or in each file of the worktree
+    [root] with snapshots. *)
+val review_since
+  :  t
+  -> root:string
+  -> ?path:string
+  -> ?index:int
+  -> unit
+  -> Review_state.Since.t list Or_error.t
+
 (** Accepts (applies the edits to the comment's file on the active tool host,
     with [edit], in the comment's worktree) or rejects a pending proposal; one that no longer applies is
-    [Failed]. *)
+    [Failed]. Records the file's snapshot, by [by]. *)
 val decide_proposal
-  :  t
+  :  ?by:string
+  -> t
   -> id:string
   -> post:int
   -> accept:bool
@@ -613,12 +699,22 @@ val set_session_name : t -> string -> unit
     records it in the session. Fails while a run is in progress. A missing
     directory fails, is created on the active tool host, or (when it could
     be) is answered [Missing] without changing anything, as [if_missing]
-    (default [Fail]) says. *)
+    (default [Fail]) says. With [worktree] it is a worktree switch, which
+    records the session's home unless it has one; any change of directory
+    may forget it ({!Worktree_home}). *)
 val set_cwd
   :  ?if_missing:Dir_change.If_missing.t
+  -> ?worktree:bool
   -> t
   -> path:string
   -> Dir_change.Outcome.t Or_error.t
+
+(** Moves the session back to its home ({!Session.home}) on the home's
+    host, or with [main] to the main checkout of the home's repository
+    (when the home's directory is gone), and forgets the home. Fails
+    without a home, while that host is disconnected and when the directory
+    is gone (saying what to do). *)
+val switch_back : ?main:bool -> t -> Dir_change.Outcome.t Or_error.t
 
 (** Paths under the session cwd matching [prefix], listed on the active tool
     host (for [@] completion). *)

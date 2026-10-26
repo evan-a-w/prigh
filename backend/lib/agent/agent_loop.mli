@@ -23,7 +23,8 @@ end
 val is_retryable_error : string -> bool
 
 (** What a call does, for confirmations: [bash]'s command, a file tool's
-    path, the files an [apply_patch] touches, what [job_input] writes. *)
+    path, the files an [apply_patch] touches, what [job_input] writes,
+    [worktree]'s action and its branch or path. *)
 val tool_summary : name:string -> Json.t -> string
 
 (** Returns the messages added to the context (prompts, assistant messages

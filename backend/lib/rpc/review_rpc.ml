@@ -11,6 +11,7 @@ let methods =
   ; "review_decide"
   ; "review_approve"
   ; "review_unapprove"
+  ; "review_since"
   ]
 ;;
 
@@ -75,17 +76,39 @@ let bool params name =
 
 let now agent = Eio.Time.now (Eio.Stdenv.clock (Agent.env agent))
 
-let comment agent ~f =
-  Or_error.map (Agent.update_review agent ~f) ~f:Rpc_json.review_comment
+let comment ?by agent ~action ~f =
+  let open Or_error.Let_syntax in
+  let%bind root, path =
+    match action with
+    | `New (root, path) -> Ok (root, path)
+    | `On id ->
+      let%map c = Review_state.find (Agent.review_state agent) id in
+      c.root, c.path
+  in
+  Or_error.map
+    (Agent.update_review_file
+       ?by
+       agent
+       ~root
+       ~path
+       ~action:
+         (match action with
+          | `New _ -> Commented
+          | `On _ -> Replied)
+       ~f)
+    ~f:Rpc_json.review_comment
 ;;
 
-let review agent ~f =
+let review ?by agent ~root ~path ~action ~f =
+  let f r = Ok ((), f r) in
   Or_error.map
-    (Agent.update_review agent ~f:(fun r -> Ok ((), f r)))
+    (match root with
+     | Some root -> Agent.update_review_file ?by agent ~root ~path ~action ~f
+     | None -> Agent.update_review agent ~f)
     ~f:(fun () -> Rpc_json.review (Agent.review_state agent))
 ;;
 
-let dispatch agent ~meth ~params =
+let dispatch ?by agent ~meth ~params =
   let open Or_error.Let_syntax in
   match meth with
   | "get_review" -> Some (Ok (Rpc_json.review (Agent.review_state agent)))
@@ -98,13 +121,17 @@ let dispatch agent ~meth ~params =
        let%bind range = range params ~first ~last in
        let%bind anchor = string params "anchor" in
        let%bind text = string params "text" in
-       comment agent ~f:(fun r ->
-         Review_state.add r ~root ~path ~range ~anchor ~text ~at:(now agent)))
+       comment
+         ?by
+         agent
+         ~action:(`New (root, path))
+         ~f:(fun r ->
+           Review_state.add r ~root ~path ~range ~anchor ~text ~at:(now agent)))
   | "review_reply" ->
     Some
       (let%bind id = string params "id" in
        let%bind text = string params "text" in
-       comment agent ~f:(fun r ->
+       comment ?by agent ~action:(`On id) ~f:(fun r ->
          Review_state.reply r ~id ~author:User ~text ~at:(now agent) ()))
   | "review_set_status" ->
     Some
@@ -114,7 +141,10 @@ let dispatch agent ~meth ~params =
            (string params "status")
            ~f:Review_comment.Status.of_string
        in
-       comment agent ~f:(fun r -> Review_state.set_status r ~id status))
+       Or_error.map
+         (Agent.update_review agent ~f:(fun r ->
+            Review_state.set_status r ~id status))
+         ~f:Rpc_json.review_comment)
   | "review_delete" ->
     Some
       (let%bind id = string params "id" in
@@ -134,18 +164,27 @@ let dispatch agent ~meth ~params =
        let%bind post = int params "post" in
        let%bind accept = bool params "accept" in
        Or_error.map
-         (Agent.decide_proposal agent ~id ~post ~accept)
+         (Agent.decide_proposal ?by agent ~id ~post ~accept)
          ~f:Rpc_json.review_comment)
   | "review_approve" ->
     Some
       (let%bind root = optional string params "root" in
        let%bind path = string params "path" in
        let%bind hash = string params "hash" in
-       review agent ~f:(fun _ -> Review_state.approve ?root ~path ~hash ()))
+       review ?by agent ~root ~path ~action:Approved ~f:(fun _ ->
+         Review_state.approve ?root ~path ~hash ()))
   | "review_unapprove" ->
     Some
       (let%bind root = optional string params "root" in
        let%bind path = string params "path" in
-       review agent ~f:(fun r -> Review_state.unapprove ?root r ~path))
+       review ?by agent ~root ~path ~action:Unapproved ~f:(fun r ->
+         Review_state.unapprove ?root r ~path))
+  | "review_since" ->
+    Some
+      (let%bind root = string params "root" in
+       let%bind path = optional string params "path" in
+       let%bind index = optional int params "index" in
+       let%map since = Agent.review_since agent ~root ?path ?index () in
+       `Object [ "files", `Array (List.map since ~f:Rpc_json.review_since) ])
   | _ -> None
 ;;

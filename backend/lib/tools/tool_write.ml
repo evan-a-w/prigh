@@ -6,7 +6,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
-  ; destructive = true
+  ; destructive = Always
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \
        entirely. An existing file must have been read first, and not changed \

@@ -363,7 +363,10 @@ let%expect_test "fuzzy ranking: a typo's subsequence prefers runs of letters" =
 ;;
 
 let%expect_test "fuzzy ranking: command names" =
-  let names = List.map Commands.all ~f:(fun (c : Commands.Spec.t) -> c.name) in
+  let names =
+    List.map (Commands.all ~superuser:true) ~f:(fun (c : Commands.Spec.t) ->
+      c.name)
+  in
   List.iter [ "mo"; "lo"; "s"; "sw"; "xyz" ] ~f:(fun query ->
     printf
       "%-4S -> %s\n"
@@ -459,16 +462,30 @@ let%expect_test "commands" =
     ()
     (((name x) (args ()) (rest "")))
     |}];
-  List.iter [ "modle"; "hlep"; "sess"; "zzzz" ] ~f:(fun s ->
+  List.iter [ "modle"; "hlep"; "sess"; "zzzz"; "nix-g" ] ~f:(fun s ->
+    let closest superuser =
+      Option.map (Commands.closest ~superuser s) ~f:(fun c -> c.name)
+    in
     print_s
       [%message
-        s (Option.map (Commands.closest s) ~f:(fun c -> c.name) : string option)]);
+        s
+          ~others:(closest false : string option)
+          ~superusers:(closest true : string option)]);
   [%expect
     {|
-    (modle ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (mode)))
-    (hlep ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (help)))
-    (sess ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (session)))
-    (zzzz ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" ()))
+    (modle
+      (others     (mode))
+      (superusers (mode)))
+    (hlep
+      (others     (help))
+      (superusers (help)))
+    (sess
+      (others     (session))
+      (superusers (session)))
+    (zzzz
+      (others     ())
+      (superusers ()))
+    (nix-g (others ()) (superusers (nix-gc)))
     |}]
 ;;
 
@@ -614,20 +631,20 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     ()
     |}];
   print_endline (Content.to_plain Keymap.help);
-  print_endline (Content.to_plain Commands.help);
+  print_endline (Content.to_plain (Commands.help ~superuser:true));
   print_endline (Content.to_plain Commands.input_help);
   print_endline (Content.to_plain Keymap.list_help);
   [%expect
     {|
-    Enter                   send the prompt / accept the highlighted item
-    Alt+Enter               queue a follow-up to run after the current turn
+    Enter                   send the prompt (steer a focused subagent) / accept the highlighted item
+    Alt+Enter               queue a follow-up to run after the current turn (a focused subagent's: before it reports)
     Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
-    Esc                     close the dialog, or abort the running turn
+    Esc                     close the dialog, back to the main agent from a subagent, or abort the running turn
     Tab                     complete a slash command, @path or #snippet / open the command picker / the next field of the sign-in and pull request dialogs
     Up                      move up (editor line, history, or list row)
     Down                    move down (editor line, history, or list row)
-    Alt+Up                  pop the last queued steer/follow-up back into the editor
+    Alt+Up                  pop the last queued steer/follow-up (the focused agent's) back into the editor
     Left                    move the cursor left
     Right                   move the cursor right
     Alt+B / Ctrl+Left       move the cursor back one word
@@ -694,7 +711,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
     /commit [-a] [-m MSG|--generate]   commit the staged changes of the session's worktree (-a: every change to tracked files first; MSG: the rest of the line, or quoted); --generate has the model draft the message into the editor to edit and send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping its message without -m
     /push                              push the session's worktree's branch to its upstream (set to the remote's branch of the same name when there is none)
-    /review [worktree] [--base REV]    the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
+    /review [target] [--base REV ...]  the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
@@ -704,14 +721,14 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /unarchive [session]               unarchive a session (the current one without an argument)
     /delete [session...]               delete sessions, after a confirmation (none: pick them in /sessions)
     /delete-archived                   delete every archived session, after a confirmation
-    /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
+    /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory (asks to create a missing one)
     /mkdir [path]                      create a directory (and its parents) and change to it
-    /worktree [list|new|open|rm ...]   pick a git worktree of the repository to work in (Ctrl+N: in a new session, Ctrl+D removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
+    /worktree [list|new|open|back|rm]  pick a git worktree of the repository to work in (Ctrl+N: in a new session, Ctrl+D removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
     /fork                              fork at a previous user message
     /rewind                            rewind the head to a previous user message
     /tree                              show the session tree and switch head
@@ -727,10 +744,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
-    /connect [HOST:PORT|local]         switch to the backend at HOST:PORT (saved for next time) or to a local one; none: asks, with the current address
+    /connect [HOST:PORT|URL|local]     switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, through an HTTPS proxy; saved for next time) or to a local one; none: asks, with the current address
     /signin [user]                     sign in to the server, as another user or again
     /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them
+    /nix-gc [run [DAYS|all]]           show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones)
     /quit                              exit
     !command   run a shell command; its output joins the context
     !!command  run a shell command without adding it to the context
@@ -2173,6 +2191,7 @@ let%expect_test
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~superuser:false
       ~current_session:None
       ~line
       ~col:(String.length line)
@@ -2184,7 +2203,9 @@ let%expect_test
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~agents:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2253,6 +2274,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~superuser:false
       ~current_session:None
       ~line
       ~col:(String.length line)
@@ -2264,7 +2286,9 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~agents:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2405,6 +2429,7 @@ let%expect_test
   let show ?col ?default_dir_host line =
     match
       Autocomplete.compute
+        ~superuser:false
         ~current_session:None
         ~line
         ~col:(Option.value col ~default:(String.length line))
@@ -2416,7 +2441,9 @@ let%expect_test
         ~skills:None
         ~snippets:[]
         ~reminders:[]
+        ~agents:[]
         ~worktrees:None
+        ~refs:Prigh_protocol.Git_diff.Refs.empty
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None

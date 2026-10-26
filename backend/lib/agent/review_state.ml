@@ -28,6 +28,10 @@ module Change = struct
         { root : string option [@sexp.option] [@jsonaf.option]
         ; path : string
         }
+    | Snapshot of
+        { snapshot : Review_snapshot.t
+        ; text : string option [@sexp.option] [@jsonaf.option]
+        }
   [@@deriving sexp, jsonaf, equal]
 end
 
@@ -35,10 +39,23 @@ type t =
   { comments : Review_comment.t list
   ; approvals : string File_key.Map.t
   ; next_id : int
+  ; snapshots : Review_snapshot.t list File_key.Map.t
+  ; blobs : string String.Map.t
+  ; kept : int
   }
 [@@deriving sexp_of, equal]
 
-let empty = { comments = []; approvals = File_key.Map.empty; next_id = 1 }
+let max_kept_bytes = 32 * 1024 * 1024
+
+let empty =
+  { comments = []
+  ; approvals = File_key.Map.empty
+  ; next_id = 1
+  ; snapshots = File_key.Map.empty
+  ; blobs = String.Map.empty
+  ; kept = 0
+  }
+;;
 
 let number id =
   Option.bind (String.chop_prefix id ~prefix:"c") ~f:Int.of_string_opt
@@ -73,6 +90,22 @@ let apply t (change : Change.t) =
     { t with approvals = Map.set t.approvals ~key:{ root; path } ~data:hash }
   | Unapprove { root; path } ->
     { t with approvals = Map.remove t.approvals { root; path } }
+  | Snapshot { snapshot; text } ->
+    let blobs, kept =
+      match snapshot.content, text with
+      | Text { md5 }, Some text when not (Map.mem t.blobs md5) ->
+        Map.set t.blobs ~key:md5 ~data:text, t.kept + String.length text
+      | (Text _ | Absent | Binary _ | Too_large _), _ -> t.blobs, t.kept
+    in
+    { t with
+      snapshots =
+        Map.add_multi
+          t.snapshots
+          ~key:{ root = Some snapshot.root; path = snapshot.path }
+          ~data:snapshot
+    ; blobs
+    ; kept
+    }
 ;;
 
 let of_changes = List.fold ~init:empty ~f:apply
@@ -221,6 +254,13 @@ let instructions =
    is on lines the change removed, numbered as in the file before it."
 ;;
 
+let branch_instructions =
+  "A comment with a branch is on a branch that is not checked out: its file is \
+   BRANCH:PATH, as git show reads it. To change it, check the branch out first \
+   (in a worktree of its own if it is not yours), or say what you would \
+   change."
+;;
+
 let submit ?root t =
   match
     List.filter t.comments ~f:(fun c ->
@@ -230,6 +270,11 @@ let submit ?root t =
     Or_error.error_string
       "no new comments to send: select text in a changed file to comment on it"
   | comments ->
+    let instructions =
+      if List.exists comments ~f:(fun c -> Option.is_some (C.branch c))
+      then instructions ^ " " ^ branch_instructions
+      else instructions
+    in
     let text =
       String.concat
         ~sep:"\n\n"
@@ -252,4 +297,95 @@ let unapprove ?root t ~path =
   if Map.mem t.approvals { root; path }
   then [ Change.Unapprove { root; path } ]
   else []
+;;
+
+let snapshot t (snapshot : Review_snapshot.t) ~text =
+  let text =
+    match snapshot.content with
+    | Text { md5 } when not (Map.mem t.blobs md5) ->
+      Option.filter text ~f:(fun text ->
+        t.kept + String.length text <= max_kept_bytes)
+    | Text _ | Absent | Binary _ | Too_large _ -> None
+  in
+  [ Change.Snapshot { snapshot; text } ]
+;;
+
+let snapshots t ~root ~path =
+  List.rev
+    (Option.value (Map.find t.snapshots { root = Some root; path }) ~default:[])
+;;
+
+let blob t ~md5 = Map.find t.blobs md5
+
+module Since = struct
+  type t =
+    { path : string
+    ; index : int
+    ; snapshot : Review_snapshot.t
+    ; current : Review_snapshot.Content.t
+    ; changed : bool
+    ; diff : Text_diff.t
+    ; note : string option
+    }
+  [@@deriving sexp_of, equal]
+end
+
+let since t ~root ~path ?index ~current () =
+  let history = snapshots t ~root ~path in
+  let count = List.length history in
+  let chosen =
+    match index with
+    | None -> Option.map (List.last history) ~f:(fun s -> count - 1, s)
+    | Some i -> Option.map (List.nth history i) ~f:(fun s -> i, s)
+  in
+  match chosen, index with
+  | None, Some i when count > 0 ->
+    Or_error.errorf
+      "%s has no review action %d to compare with: it has %d (0 to %d)"
+      path
+      i
+      count
+      (count - 1)
+  | None, _ ->
+    Or_error.errorf
+      "%s has no review action to compare with: approve it or comment on it \
+       first"
+      path
+  | Some (index, (snapshot : Review_snapshot.t)), _ ->
+    let current_content, current_text = current in
+    let text (content : Review_snapshot.Content.t) ~known
+      : [ `Text of string | `Binary | `Too_large ] option
+      =
+      match content with
+      | Text { md5 } -> Option.map (known md5) ~f:(fun t -> `Text t)
+      | Absent -> Some (`Text "")
+      | Binary _ -> Some `Binary
+      | Too_large _ -> Some `Too_large
+    in
+    let old = text snapshot.content ~known:(fun md5 -> blob t ~md5) in
+    let new_ = text current_content ~known:(fun _ -> current_text) in
+    let changed =
+      not (Review_snapshot.Content.equal snapshot.content current_content)
+    in
+    let nothing = { Text_diff.diff = ""; added = 0; removed = 0 } in
+    let note, diff =
+      match old, new_ with
+      | _ when not changed -> None, nothing
+      | Some (`Text old), Some (`Text new_) ->
+        None, Text_diff.unified ~path ~old ~new_
+      | None, _ -> Some "its text then was not kept", nothing
+      | _, None -> Some "it cannot be read now", nothing
+      | Some `Too_large, _ | _, Some `Too_large ->
+        Some "it is larger than 1 MiB", nothing
+      | Some `Binary, _ | _, Some `Binary -> Some "it is a binary file", nothing
+    in
+    Ok
+      { Since.path
+      ; index
+      ; snapshot
+      ; current = current_content
+      ; changed
+      ; diff
+      ; note
+      }
 ;;

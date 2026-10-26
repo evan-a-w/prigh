@@ -78,6 +78,9 @@ type t =
       { steer : string list
       ; follow_up : string list
       }
+  | Agent_queues of Agent_queue.t list
+  (** the background subagents' queues ({!Agent_queue}), those not empty;
+      after every change of one *)
   | Subagent_start of
       { call_id : string
       ; agent_id : string
@@ -139,6 +142,7 @@ type t =
       } (** streamed text of our own [generate_text] request *)
   | Sessions_changed
   | Prefs_changed of Prefs.Change.t list
+  | Nix_gc_progress of Nix_gc_progress.t
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -202,6 +206,8 @@ let rec of_json j =
   | "review" ->
     Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
   | "sessions_changed" -> Ok Sessions_changed
+  | "nix_gc_progress" ->
+    Nix_gc_progress.of_json j >>| fun p -> Nix_gc_progress p
   | "prefs_changed" ->
     Json.object_field j "prefs"
     >>= Prefs.changes_of_json
@@ -211,6 +217,9 @@ let rec of_json j =
     let%bind steer = texts "steer_texts" in
     let%map follow_up = texts "follow_up_texts" in
     Queue_update { steer; follow_up }
+  | "agent_queues" ->
+    Json.optional_list_field j "agents" ~f:Agent_queue.of_json
+    >>| fun agents -> Agent_queues agents
   | "subagent_start" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in

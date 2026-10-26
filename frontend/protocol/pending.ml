@@ -44,6 +44,7 @@ end
 type t =
   { steer_texts : string list
   ; follow_up_texts : string list
+  ; agents : Agent_queue.t list (** the subagents' queues, those not empty *)
   ; confirms : Confirm.t list
   ; questions : Ask.t list
   }
@@ -56,9 +57,10 @@ let of_json j =
   in
   let%bind steer_texts = strings "steer_texts" in
   let%bind follow_up_texts = strings "follow_up_texts" in
+  let%bind agents = Json.optional_list_field j "agents" ~f:Agent_queue.of_json in
   let%bind confirms =
     Json.optional_list_field j "confirms" ~f:Confirm.of_json
   in
   let%map questions = Json.optional_list_field j "questions" ~f:Ask.of_json in
-  { steer_texts; follow_up_texts; confirms; questions }
+  { steer_texts; follow_up_texts; agents; confirms; questions }
 ;;

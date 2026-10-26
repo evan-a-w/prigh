@@ -160,7 +160,10 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     (Comment) (Edit)
     (Changes) (Whole file)
     (Send comments) (Close the review (Esc, Alt+R))
-    Reviewing /home/me/proj against HEAD (the uncommitted changes)
+    Reviewing
+    (proj /home/me/proj)
+    against
+    (HEAD the uncommitted changes)
     (○ src/ main.ml +2 −1)
     (○ src/ util.ml +2 −0)
     2 files changed, +4 −1
@@ -583,7 +586,7 @@ let%expect_test
         \nlet f = 6\
         \nlet g = 7\
         \n")
-       (expected m1)))
+       (expected m1) (review_root /home/me/proj)))
      (tag (Review (Saved src/main.ml))))
     |}];
   H.fail
@@ -614,7 +617,8 @@ let%expect_test
         \nlet e = 5\
         \nlet f = 6\
         \nlet g = 7\
-        \n")))
+        \n")
+       (review_root /home/me/proj)))
      (tag (Review (Saved src/main.ml))))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
@@ -885,6 +889,7 @@ let%expect_test "help lists the review's keys" =
     Alt+R: open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k): the next / previous changed file
     a / c / e / v / s (reviewing): approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    r / b / d (reviewing): choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     Esc (reviewing): drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+Enter (the review's commit message): commit the ticked files (approved files come ticked; untick to leave one out)

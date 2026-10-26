@@ -128,7 +128,7 @@ let%expect_test "/diff: tracked changes, untracked files, a path, no repository"
     |}];
   print_diff t (Agent.git_diff agent ~base:"nope");
   [%expect
-    {| error: unknown revision "nope": name a branch, tag or commit (e.g. main) |}]
+    {| error: unknown revision "nope": name a branch, tag or commit (closest: main) |}]
 ;;
 
 let user_messages t agent =

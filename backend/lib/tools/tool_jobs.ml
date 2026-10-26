@@ -17,7 +17,7 @@ let spec ~name ~description parameters =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description
   ; parameters
   }
@@ -193,7 +193,7 @@ let input_tool =
             ]))
       with
       parallel_safe = false
-    ; destructive = true (* the job may run what it reads *)
+    ; destructive = Always (* the job may run what it reads *)
     }
   in
   let run (context : Tool.Context.t) args =

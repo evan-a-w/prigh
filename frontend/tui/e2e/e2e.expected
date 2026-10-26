@@ -262,7 +262,7 @@ fallback backend exited
   event tool_start bash
   event tool_confirm bash echo e2e-ran
 <- get_pending: (Ok
- (((steer_texts ()) (follow_up_texts ())
+ (((steer_texts ()) (follow_up_texts ()) (agents ())
    (confirms
     (((call_id c1) (agent_id ()) (name bash) (summary "echo e2e-ran")
       (rules ("bash(echo:*)")))))
@@ -280,7 +280,7 @@ fallback backend exited
   event tool_start ask_user
   event ask_user q1 (1 questions)
 <- get_pending: (Ok
- (((steer_texts ()) (follow_up_texts ()) (confirms ())
+ (((steer_texts ()) (follow_up_texts ()) (agents ()) (confirms ())
    (questions
     (((call_id q1)
       (questions

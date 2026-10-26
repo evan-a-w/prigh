@@ -49,6 +49,9 @@ type t =
       { chip : Chip.t
       ; picker : Picker.t
       } (** a composer chip's menu, over the chip *)
+  | Review_pick of Review_picker.t
+  (** the review page's menu of what to review or compare with, over its
+      button *)
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -102,6 +105,8 @@ type t =
       ; busy : bool (** removing: waiting for the backend *)
       ; error : string option
       } (** asked before removing it *)
+  | Nix_gc_confirm of Nix_generations.t
+  (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)
