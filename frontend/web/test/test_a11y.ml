@@ -25,12 +25,8 @@ let%expect_test "the names of the controls" =
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
     button "Select" -- Select sessions to delete (/delete)
-    button "work" -- /work
-    button "New session in work" -- New session in /work
-    button "Fix the build 2m ago" -- /sessions/s1.jsonl
-    button "Rename Fix the build" -- Rename (/name)
-    button "Archive Fix the build" -- Archive (A)
-    button "Delete Fix the build" -- Delete session (Delete)
+    button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
+    button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archived 1" -- Show the archived sessions
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
@@ -57,9 +53,7 @@ let%expect_test "the names of the controls" =
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
-    button "work" -- /work
-    button "New session in work" -- New session in /work
-    [checkbox] button "Fix the build 2m ago 0 B" -- /sessions/s1.jsonl
+    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
@@ -69,7 +63,7 @@ let%expect_test "the names of the controls" =
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"
-    [checkbox] button "Fix the build 2m ago 0 B" -- /sessions/s1.jsonl
+    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
     [status] span "Ready"
     |}]
 ;;
