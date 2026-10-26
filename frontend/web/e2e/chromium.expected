@@ -1898,3 +1898,11 @@ in the editor: /agents steer a1 one more thing
 The survey is in.
 === chromium: steer: errors ===
 none
+=== chromium: subagent_paged: reloaded ===
+the call is loaded: false
+older messages to load: true
+=== chromium: subagent_paged: its transcript ===
+There are 3 files.
+<TIME>
+=== chromium: subagent_paged: errors ===
+none
