@@ -166,7 +166,7 @@ let picker ~kind (p : Picker.t) ~inject =
     ]
 ;;
 
-let help ~inject =
+let help (m : App.Model.t) ~inject =
   let table rows =
     Node.table
       ~attrs:[ Attr.class_ "help-table" ]
@@ -192,8 +192,9 @@ let help ~inject =
     ; table Keys.help
     ; Node.h3 [ Node.text "Commands" ]
     ; table
-        (List.map Slash.all ~f:(fun (s : Slash.Spec.t) ->
-           Slash.Spec.usage s, s.help))
+        (List.map
+           (Slash.all ~superuser:(App.superuser m))
+           ~f:(fun (s : Slash.Spec.t) -> Slash.Spec.usage s, s.help))
     ; Node.h3 [ Node.text "Left to the browser" ]
     ; table Keys.browser
     ]
@@ -584,7 +585,7 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some (Review_pick _) -> Chip_popover_view.backdrop ~inject
-  | Some Help -> help ~inject
+  | Some Help -> help m ~inject
   | Some Settings -> Settings_view.view m ~inject
   | Some (Rename name) -> rename name ~inject
   | Some (Delete target) -> delete m target ~inject

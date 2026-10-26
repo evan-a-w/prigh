@@ -81,6 +81,8 @@ module Confirm_action : sig
         ; force : bool
         ; back : Open_picker.t option (** where Esc returns *)
         }
+    | Nix_gc of Nix_generations.t
+    (** [/nix-gc run DAYS|all]: deleting profile generations *)
   [@@deriving sexp_of, equal]
 end
 

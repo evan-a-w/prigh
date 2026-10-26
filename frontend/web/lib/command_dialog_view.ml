@@ -407,6 +407,36 @@ let rewind_confirm ~text ~inject =
     ]
 ;;
 
+let nix_gc_confirm generations ~inject =
+  let what =
+    Option.value
+      (Prigh_ui.Nix_gc_command.describe_generations (Some generations))
+      ~default:""
+  in
+  Modal.view
+    ~cls:"nix-gc-confirm"
+    ~title:"Delete old profile generations?"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"danger"
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text "Delete and collect" ]
+      ]
+    [ Node.p
+        [ Node.text
+            (sprintf
+               "Collecting Nix garbage, first %s of every user. They can no \
+                longer roll back to them; current ones are kept."
+               what)
+        ]
+    ; Node.p
+        ~attrs:[ Attr.class_ "dialog-note" ]
+        [ Node.text "Collect in Settings keeps the generations." ]
+    ]
+;;
+
 let tokens n =
   if n >= 1_000_000
   then sprintf "%.1fM" (Float.of_int n /. 1e6)
@@ -549,6 +579,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (scoped_models picker checked ~inject)
   | Prompt p -> Some (prompt m p ~inject)
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
+  | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)

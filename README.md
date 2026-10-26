@@ -67,7 +67,7 @@ backend with prigh-web, the browser frontend (`prigh serve -web
 `prigh-tui [DIR]` starts in `DIR` (default: the current directory; `-cwd
 DIR` is the same). Flags: `-faux`, `-session PATH`, `-model ID`, `-thinking
 LEVEL`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
-`-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
+`-connect HOST:PORT|URL`, `-header 'NAME: VALUE'`, `-token SECRET`, `-user NAME` (with `-tokens`),
 `-local`, `-forget`, `-tools local|remote`, `-name NAME`,
 `-detached`, `-tmux-session NAME` and `-- <extra backend args>`. The Nix
 wrapper sets `PRIGH_BACKEND` to the Nix-built backend by default; set
@@ -122,7 +122,29 @@ prigh-tui -session <id>                  # join a session
 prigh-tui -local                         # spawn a local backend this once
 prigh-tui -forget                        # forget the saved connection (and spawn)
 prigh -web -remote                       # prigh-web here for the same backend (see "prigh-web for a backend elsewhere")
+
+# a backend behind an HTTPS reverse proxy (its prigh-web URL; see DOCKER.md, "Behind a reverse proxy")
+prigh-tui -connect https://prigh.example.com/ -token sekrit ~/proj   # = wss://prigh.example.com/ws
+prigh-tui -connect wss://example.com/prigh/ws                        # a site under a path
 ```
+
+`-connect` takes the backend's `HOST:PORT` (its `-listen` or `-web` port:
+JSON lines over TCP) or its prigh-web URL: `wss://host/ws`,
+`https://host/` (the same: `https://host/prigh/` is
+`wss://host/prigh/ws`), `ws://` or `http://`. With a URL the TUI speaks
+the same JSON lines as WebSocket text messages on the site's `/ws`, as the
+browser does, over TLS for `wss`/`https`, so it can go through a
+TLS-terminating reverse proxy. The server's certificate is checked against
+the system's CAs (`$SSL_CERT_FILE` names another bundle). The connection
+answers the server's pings and pings it when quiet, and like a TCP one it
+reconnects when it drops. A proxy that wants a browser sign-in (a redirect
+to a login page, a 401, an HTML page instead of the WebSocket upgrade) is
+reported as such: exempt `/ws` and `/terminal` from it (prigh checks its
+own token there; DOCKER.md shows how for authentik, Caddy, nginx and
+Traefik), send its credentials with `-header 'NAME: VALUE'` (repeatable;
+`$PRIGH_CONNECT_HEADERS`, one per line; never saved), or use an SSH tunnel
+to `HOST:PORT`. The tools the TUI runs on this machine go over the same
+connection.
 
 `-connect`, `-token` and `-user` are saved in `~/.prigh/tui-connection.sexp`
 (mode 0600) and used when they are not given: `-connect` to another address
@@ -134,7 +156,8 @@ take precedence over the saved values but are not saved. `-local` (and
 All of that can also be done from inside the TUI, so `prigh-tui .` is
 enough once a connection is saved:
 
-- `/connect HOST:PORT` switches to another backend: the old connection, its
+- `/connect HOST:PORT` (or `/connect wss://host/ws`, any address
+  `-connect` takes) switches to another backend: the old connection, its
   session, user and dialogs go (as when switching users), and the new
   address becomes the saved connection once its `hello` is answered,
   keeping the saved token and user only if it is the saved address. When
@@ -159,7 +182,7 @@ startup, or after a reconnect, no longer stops the TUI: it shows the
 sign-in dialog. Escaped, the TUI stays disconnected and the status line
 says `not signed in to HOST:PORT · /signin signs in · /connect switches
 server`; while connected to a remote backend it shows `server:HOST:PORT`
-next to `user:`. `/login` and `/logout` are unrelated: they manage model
+(`server:wss://host` for a URL) next to `user:`. `/login` and `/logout` are unrelated: they manage model
 provider and git host credentials.
 
 By default a connected frontend runs the session's tools (bash, file
@@ -187,8 +210,11 @@ with `/host` stays where you put it. A machine's identity is the id in
 its TUIs and `prigh tool-host`: with two TUIs open, the newer one runs the
 machine's tools and the older one takes over again if the newer one quits. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
-session keeps running when its frontends disconnect. Plain TCP with a shared
-token: bind to localhost and use an SSH tunnel on untrusted networks.
+session keeps running when its frontends disconnect. `prigh serve` itself
+speaks plain TCP and HTTP with a shared token (it warns when `-listen` or
+`-web` is reachable beyond loopback): bind to localhost and use an SSH
+tunnel or an HTTPS reverse proxy in front of `-web` (then `-connect
+wss://host/ws`) on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
 sekrit -cwd ~/proj [-name NAME] [-host-id ID]` (`-connect` also takes a
@@ -240,7 +266,14 @@ other: `/setusr NAME` (in the TUI and prigh-web, where the account menu's
 "Act as…" does it too) switches the
 connection to NAME's sessions, logins and tool hosts (the TUI's status line
 shows `user:<me> as <them>`, prigh-web's sidebar and settings "acting as"), `/setusr` alone lists the users and `/setusr <me>`
-switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
+switches back. Everyone else gets an error. Superusers also clean the Nix
+store: `/nix-gc` shows its size and the free space and `/nix-gc run [DAYS|all]`
+collects garbage, first deleting every user's profile generations older
+than DAYS days (prigh-web: Settings, Nix store); in Docker through the
+container's root helper (DOCKER.md, "Garbage collection"), elsewhere as
+the backend's user. To everyone else (and on a backend without users)
+none of this exists: no `/nix-gc`, no Settings section, and the backend
+answers its methods as unknown and sends them nothing about the store. `-host-tokens NAME=TOKEN,...`
 (`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
 superuser, for tool hosts that should not hold the user's own token (the
 Docker image starts one per user with one).
@@ -369,6 +402,19 @@ repository's. The fold at the right of a session's second line (`⑂ 3`)
 hides its worktrees; the folds are kept with your preferences, so they
 follow you to other browsers.
 
+A session that switched into a worktree (`/worktree open`, `/worktree
+new`, `/pr checkout`, Switch session here) remembers where it came from,
+its home, and its row says so quietly (`from main`, the home's branch, or
+`from ~/projects/prigh`). Its menu then starts with Switch back to main
+(`/worktree back`, also in the TUI, whose `/sessions` shows the home too),
+which moves it back and forgets the home. Switching on from one worktree
+to another keeps the first home; a `/cd` within the repository's worktrees
+keeps it, and a `/cd` to the home itself or anywhere outside the
+repository forgets it. The home is kept in the session, so it survives
+reloads and restarts, and a fork has it too. When the home's tool host is
+not connected, switching back says so; when its directory is gone,
+`/worktree back main` goes to the repository's main checkout instead.
+
 Right-click a session or a worktree (or press Shift+F10 or the context
 menu key on it, long-press it on a phone, or use the ⋯ that shows while
 pointing at a session) for its menu; each item names the command that
@@ -428,6 +474,21 @@ left to the browser (it moves the focus back), and on macOS Option+digit
 types its character instead. What finished before your latest prompt
 folds under "Earlier"; switching sessions empties the panel. `/agents cancel
 <n|id>` and `/jobs kill <id>` open the item there and stop it.
+
+A running background subagent can be steered like the main agent. The one
+shown in the panel (or chosen with its Steer button) is who the composer
+writes to: a "Steering a1 · task" chip over the editor says so, Enter sends
+a steer (it reaches the subagent after its current tool calls) and
+Alt+Enter a follow-up (when it ends its turn, before it reports); Esc, the
+chip's × or going back to the panel's list write to the main agent again.
+What waits for a subagent is listed above the composer with the main
+agent's ("To a1, next step"), with Edit and remove, and Alt+↑ takes back the
+last message for whoever the composer writes to. Delivered messages show in
+its transcript as "You (steer)" / "You (follow-up)". A subagent that has
+finished, or one nested in another, takes no messages: refusals say what to
+do and keep your text in the editor, and when the subagent being steered
+finishes the composer goes back to the main agent. `/agents steer <n|id>
+TEXT` and `/agents follow-up <n|id> TEXT` send one without switching.
 
 `-web-root DIR` (`$PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
@@ -838,8 +899,8 @@ prigh serve -web 0.0.0.0:7790 -token sekrit
 - reuses the TUI's saved connection (`~/.prigh/tui-connection.sexp`, and
   `$PRIGH_CONNECT`, `$PRIGH_TOKEN`, `$PRIGH_USER`) by the TUI's rules, so
   `prigh-tui` and `./prigh -web -remote` go to the same backend; it is
-  saved once the check passed, and only for `HOST:PORT` (prigh-tui does
-  not connect to URLs: give those with `-connect` or `$PRIGH_CONNECT`).
+  saved once the check passed (a URL too: prigh-tui connects to those as
+  well).
 
 Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
 the backend's ports carries the RPC, but the terminal and file transfers
@@ -1008,14 +1069,14 @@ that no longer exists.
 
 | Key | Action |
 |---|---|
-| Enter | send the prompt; accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
-| Alt+Enter | queue a follow-up to run after the current turn |
+| Enter | send the prompt (to a focused subagent: steer it); accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
+| Alt+Enter | queue a follow-up to run after the current turn (a focused subagent's: before it reports) |
 | Alt+S | send exactly what is typed, ignoring the completion popup (`/cd newdir` while it highlights an existing directory); Esc then Enter does the same |
 | Ctrl+J / Alt+J | insert a newline |
-| Esc | close the dialog, abort the running turn, or scroll back to the bottom |
+| Esc | close the dialog, go back to the main agent from a subagent, abort the running turn, or scroll back to the bottom |
 | Tab | accept the highlighted completion (a command, argument, `@path` or `#snippet`); on an empty prompt, list the commands |
 | Up / Down | move up/down (editor line, history, or list row) |
-| Alt+Up | pop the last queued steer/follow-up back into the editor |
+| Alt+Up | pop the last queued steer/follow-up (the focused agent's) back into the editor |
 | Left / Right | move the cursor |
 | Alt+B / Ctrl+Left | move back one word |
 | Alt+F / Ctrl+Right | move forward one word |
@@ -1131,7 +1192,9 @@ you can keep talking to it. When a subagent finishes (or fails, or is
 cancelled) its report is handed to the main agent as a message starting
 `[subagent a1 finished]`: an idle agent starts a turn for it, a running one
 gets it after its current tool calls (several finishing together arrive as one
-message). The model also has `subagent_status` and `subagent_cancel`; there
+message). The model also has `subagent_status`, `subagent_cancel` and
+`subagent_message` (tell a running subagent something, which it reads at its
+next step); there
 is no tool to block on a subagent, since its report wakes the main agent
 anyway. Subagents started by a subagent stay synchronous (and cannot
 delegate further).
@@ -1148,6 +1211,21 @@ until it is removed: prigh-web shows it under the session, tagged
 `subagent`, and `/worktree` lists it like any other (open it, or start a
 session there, to look at the work).
 
+The model makes worktrees itself with the `worktree` tool (main agent and
+subagents alike): `create` checks a branch out at the standard place, like
+`/worktree new` (an existing branch as it is, else a new one from `base`),
+and the session records it (a subagent's as that subagent's, tagged
+`subagent`); the model works there by its path (`cd` in bash, a
+subagent's `cwd`). `list` shows the worktrees with their branch and
+changes, and `remove` takes one away with `/worktree rm`'s rules: never
+the main checkout or the worktree the agent or the session works in, and
+one with uncommitted changes only with `force`. The system prompt tells
+the model to use it rather than `git worktree add`. Should it run `git
+worktree add` (or `remove`, `move`, `prune`) in bash anyway, prigh
+compares the repository's worktrees before and after the command: new
+ones are recorded on the session (one outside `worktrees_dir` gets a note
+telling the model to use the tool next time) and removed ones forgotten.
+
 Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
 …, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
 the highlighted one); `/agents cancel <n|id>` cancels by number or id; Esc
@@ -1156,6 +1234,19 @@ has been delivered, then until the next prompt. The status line shows an
 `agents:` strip, with `bg` while agents run and the main agent is idle; a
 delivered report shows as `↩ subagent a1 finished "task"` and the report's
 first lines.
+
+You can steer a running subagent like the main agent. With it focused, the
+editor talks to it (its placeholder and the status line say so: `→ a1`):
+Enter sends a steer, which it reads at its next step (after its current tool
+calls), Alt+Enter a follow-up, which it reads when it would otherwise report,
+and Alt+Up takes the last queued one back; its queue is listed above the
+rule as the main agent's is, and `/queue` edits or removes from it. Slash
+and `!` commands still go to the app. `/agents steer N TEXT` and `/agents
+follow-up N TEXT` send without focusing. Delivered messages show in its
+transcript as `→ You (steer)` and in the main one as a quiet `→ a1: text`.
+A subagent that has finished takes no more messages: the error says to tell
+the main agent instead, and the text stays in the editor. The main agent can
+message its subagents too (`subagent_message`).
 
 Long commands run as background jobs: the model calls `bash` with
 `background: true` (the system prompt tells it to for anything that may take
@@ -1478,10 +1569,10 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
-| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|back [main]\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `back` moves the session back where it switched into worktrees from (`main`: the repository's main checkout, when that place is gone); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
-| `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
+| `/agents [steer\|cancel ...]` | focus a subagent (Ctrl+D in the picker cancels one); `steer N TEXT` / `follow-up N TEXT` tell subagent N (its number or id) something; `cancel N` cancels it |
 | `/jobs [<id>\|kill <id>]` | list background jobs (Enter shows recent output, Ctrl+D kills one), or show/kill one |
 | `/queue` | the queued steers and follow-ups (Enter takes one back into the editor, Ctrl+D removes it) |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
@@ -1491,7 +1582,7 @@ it.
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
 | `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
 | `/retry-backend-connection` | reconnect to the backend now |
-| `/connect [HOST:PORT\|local]` | (TUI) switch to another backend, saved for next time, or to a spawned one; alone: pick or type the address |
+| `/connect [HOST:PORT\|URL\|local]` | (TUI) switch to another backend (`HOST:PORT` or a prigh-web URL such as `wss://host/ws`), saved for next time, or to a spawned one; alone: pick or type the address |
 | `/signin [user]` | (TUI) sign in to the server: a dialog for the user and the token or password |
 | `/signout` | forget the saved login and sign in again (TUI: the token; prigh-web: its sign-in form) |
 | `/state` | show session state |
@@ -1617,7 +1708,9 @@ there), keeps the branch, and is refused for the main checkout, for the
 worktree the session itself is in (open another first) and, without
 `-f`, for one with uncommitted changes or locked; a worktree whose
 directory was deleted is pruned. prigh-web's sidebar shows, under each
-session, the worktrees it made, moved into or gave its subagents (above).
+session, the worktrees it made, moved into or gave its subagents (above),
+including those its agents made with the `worktree` tool or `git worktree
+add`.
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:
@@ -1708,9 +1801,10 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  and MCP tools that are not read-only) wait for your answer.
-- `auto-edit`: file edits run without asking; `bash`, `job_input` and MCP
-  tools still ask.
+  `worktree`'s `create` and `remove` (not `list`), and MCP tools that are
+  not read-only) wait for your answer.
+- `auto-edit`: file edits run without asking; `bash`, `job_input`,
+  `worktree create`/`remove` and MCP tools still ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its

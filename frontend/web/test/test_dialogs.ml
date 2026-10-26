@@ -169,6 +169,9 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Alt+↑ (steering a subagent) take its last queued message back
+    Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k) the next / previous changed file
@@ -220,7 +223,7 @@ let%expect_test "help lists every key and command" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
-    /worktree [list|new|open|rm ...] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
+    /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
     /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
@@ -238,7 +241,7 @@ let%expect_test "help lists every key and command" =
     /abort stop the current run
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
+    /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>] follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /logout [provider|HOST] remove a provider's login, or sign out of a git host (github: github.com)
@@ -609,7 +612,12 @@ let%expect_test "signing out" =
   [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "ann"
+       ; superuser = false
+       });
   H.text h ~selector:".sidebar-footer";
   [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];
   H.act h Sign_out;

@@ -818,7 +818,38 @@ let%expect_test "remove_queued removes a queued message by queue and index" =
     {"type":"response","id":"r1","ok":true,"result":{"text":"later","attachments":[]}}
     {"type":"response","id":"r1","ok":false,"error":"param \"queue\" is \"later\": use \"steer\" or \"follow_up\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"index\" must be a natural number"}
-    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":["steer one"],"follow_up_texts":[],"confirms":[],"questions":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":["steer one"],"follow_up_texts":[],"agents":[],"confirms":[],"questions":[]}}
+    |}]
+;;
+
+let%expect_test
+    "steer_agent, dequeue_agent and remove_agent_queued say what is wrong"
+  =
+  with_agent [ Reply.text "done" ]
+  @@ fun t agent h ->
+  call t h ~params:{|{"agent_id": "a1", "text": "hi"}|} "steer_agent";
+  call t h ~params:{|{"text": "hi"}|} "steer_agent";
+  call
+    t
+    h
+    ~params:{|{"agent_id": "a1", "text": "hi", "mode": "later"}|}
+    "steer_agent";
+  call t h ~params:{|{"agent_id": "a1"}|} "dequeue_agent";
+  call
+    t
+    h
+    ~params:{|{"agent_id": "a1", "queue": "steer", "index": 0}|}
+    "remove_agent_queued";
+  call t h "get_pending";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":false,"error":"missing param \"agent_id\""}
+    {"type":"response","id":"r1","ok":false,"error":"param \"mode\" is \"later\": use \"steer\" or \"follow_up\""}
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":[],"follow_up_texts":[],"agents":[],"confirms":[],"questions":[]}}
     |}]
 ;;
 

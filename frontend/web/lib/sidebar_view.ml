@@ -3,14 +3,7 @@ open! Import
 open Html
 module Action = App.Action
 
-let home_relative cwd =
-  match String.chop_prefix cwd ~prefix:"/home/" with
-  | Some rest ->
-    (match String.lsplit2 rest ~on:'/' with
-     | Some (_, path) -> "~/" ^ path
-     | None -> "~")
-  | None -> cwd
-;;
+let home_relative = Tilde.of_path
 
 let age (m : App.Model.t) (s : Session_summary.t) =
   match
@@ -203,6 +196,7 @@ module Row = struct
     ; loading : bool
     ; age : string
     ; cwd : string
+    ; home : Session_home.t option
     ; worktrees : Session_worktrees.Node.t list
     ; folded : bool (** its worktrees *)
     ; entering : string option
@@ -221,6 +215,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; loading
       ; age
       ; cwd
+      ; home
       ; worktrees
       ; folded
       ; entering
@@ -341,6 +336,20 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
                     ; place s ~cwd
+                    ; Option.value_map home ~default:Node.none ~f:(fun h ->
+                        span
+                          ~cls:"session-home"
+                          ~attrs:
+                            [ Attr.title
+                                (sprintf
+                                   "Switched into worktrees from %s: Switch \
+                                    back (/worktree back) returns"
+                                   (home_relative h.cwd))
+                            ]
+                          (Option.value_exn
+                             (Session_worktrees.home
+                                ~tilde:home_relative
+                                (Some h))))
                     ; (if selecting
                        then
                          span
@@ -380,6 +389,11 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     | Some state when selected -> state.cwd
     | _ -> s.cwd
   in
+  let home =
+    match m.state with
+    | Some state when selected -> state.home
+    | _ -> s.home
+  in
   let deps =
     { Row.selected
     ; running = s.running || (selected && App.Model.active m)
@@ -392,6 +406,7 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
          | Some Starting | None -> false)
     ; age = age m s
     ; cwd
+    ; home
     ; worktrees =
         Session_worktrees.of_session
           ~listings:

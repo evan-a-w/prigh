@@ -105,6 +105,8 @@ type t =
       ; busy : bool (** removing: waiting for the backend *)
       ; error : string option
       } (** asked before removing it *)
+  | Nix_gc_confirm of Nix_generations.t
+  (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

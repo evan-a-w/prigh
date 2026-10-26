@@ -93,6 +93,19 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
      ; "- Ask before destructive or irreversible actions."
      ]
+     @ (if has "worktree"
+        then
+          [ ("- To work on a separate branch, use the worktree tool"
+             ^ (if has "subagent"
+                then
+                  " (or the subagent tool's worktree option for delegated work)"
+                else "")
+             ^ "; never run git worktree add yourself. Work in the worktree by \
+                its path: cd there in bash, use paths under it in file tools"
+             ^ if has "subagent" then ", pass it as a subagent's cwd." else "."
+            )
+          ]
+        else [])
      @ (if Role.equal role Main && has "subagent"
         then
           [ "- You are the orchestrator: for substantial work (implementing a \

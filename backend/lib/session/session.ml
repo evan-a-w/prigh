@@ -10,6 +10,15 @@ module Host = struct
   [@@deriving sexp, jsonaf, equal]
 end
 
+module Home = struct
+  type t =
+    { cwd : string
+    ; host : Host.t option [@jsonaf.option] [@sexp.option]
+    ; repo : Git_location.t option [@jsonaf.option] [@sexp.option]
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry = struct
   module Payload = struct
     type t =
@@ -53,6 +62,7 @@ module Entry = struct
       | Agent_worktree of Agent_worktree.t
       | Worktree of Session_worktree.t
       | Worktree_removed of { path : string }
+      | Home of { home : Home.t option }
     [@@deriving sexp, jsonaf]
   end
 
@@ -86,6 +96,7 @@ type t =
   ; host_cwds : string String.Table.t
   ; repos : Git_location.t option String.Table.t (** by cwd *)
   ; mutable worktrees : Session_worktree.t list (** newest first *)
+  ; mutable home : Home.t option
   ; created_at : Time_float.t
   ; parent : string option
   ; mutable entries : Entry.t list (* reversed *)
@@ -170,7 +181,8 @@ let worth_saving (line : Line.t) =
           | Repo _
           | Agent_worktree _
           | Worktree _
-          | Worktree_removed _ )
+          | Worktree_removed _
+          | Home _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -262,6 +274,7 @@ let create ~dir ~cwd ?parent () =
     ; host_cwds = String.Table.create ()
     ; repos = String.Table.create ()
     ; worktrees = []
+    ; home = None
     ; created_at
     ; parent
     ; entries = []
@@ -324,6 +337,7 @@ let add_entry t (entry : Entry.t) =
       ~f:(track_worktree t)
   | Agent_worktree w -> track_worktree t (Session_worktree.of_agent w)
   | Worktree w -> track_worktree t w
+  | Home { home } -> t.home <- home
   | Worktree_removed { path } ->
     t.worktrees
     <- List.filter t.worktrees ~f:(fun (o : Session_worktree.t) ->
@@ -397,6 +411,7 @@ let load ?(yield = fun () -> ()) path =
            ; host_cwds = String.Table.create ()
            ; repos = String.Table.create ()
            ; worktrees = []
+           ; home = None
            ; created_at
            ; parent
            ; entries = []
@@ -485,6 +500,8 @@ let worktrees t = List.rev t.worktrees
 let add_agent_worktree t worktree = append t (Agent_worktree worktree)
 let add_worktree t worktree = append t (Worktree worktree)
 let worktree_removed t ~path = append t (Worktree_removed { path })
+let home t = t.home
+let set_home t home = append t (Home { home })
 let record_review t change = append t (Review change)
 
 let review t =
@@ -540,6 +557,7 @@ let name t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> None)
 ;;
 
@@ -566,6 +584,7 @@ let description t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> None)
 ;;
 
@@ -651,6 +670,7 @@ let context t =
       | Agent_worktree _
       | Worktree _
       | Worktree_removed _
+      | Home _
       | Review _ -> acc)
   in
   let messages entries =
@@ -676,6 +696,7 @@ let context t =
       | Agent_worktree _
       | Worktree _
       | Worktree_removed _
+      | Home _
       | Review _ -> None)
   in
   match compaction with
@@ -723,6 +744,7 @@ let system_prompt t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> acc)
 ;;
 
@@ -749,6 +771,7 @@ let goal t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> acc)
 ;;
 
@@ -790,6 +813,7 @@ let budget t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> acc)
 ;;
 
@@ -816,6 +840,7 @@ let model t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> acc)
 ;;
 
@@ -867,6 +892,10 @@ let fork ?at t ~dir =
           if not (String.equal e.id at) then copy rest
       in
       copy path;
+      (* The home follows the file, not the path: it may have been set on
+         another branch. *)
+      if not (Option.equal Home.equal forked.home t.home)
+      then ignore (append forked (Home { home = t.home }) : Entry.t);
       Ok forked)
 ;;
 
@@ -889,6 +918,7 @@ module Summary = struct
     ; bytes : int
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
+    ; home : Home.t option
     }
   [@@deriving sexp_of]
 
@@ -970,6 +1000,7 @@ let archived_and_activity t ~mtime =
         | Agent_worktree _
         | Worktree _
         | Worktree_removed _
+        | Home _
         | Review _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
@@ -1013,6 +1044,7 @@ let summarise t ~path ~mtime =
   ; bytes = 0
   ; repo = repo t
   ; worktrees = worktrees t
+  ; home = t.home
   }
 ;;
 
@@ -1253,6 +1285,7 @@ let to_markdown t =
     | Agent_worktree _
     | Worktree _
     | Worktree_removed _
+    | Home _
     | Review _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in

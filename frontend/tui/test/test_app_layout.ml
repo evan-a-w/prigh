@@ -391,15 +391,15 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     --- after ---
     ┌─ Keys ─────────────────────────────────────────────────────────────┐
     │ Keys                                                               │
-    │ Enter                   send the prompt / accept the highlighted   │
-    │ item                                                               │
+    │ Enter                   send the prompt (steer a focused subagent) │
+    │ / accept the highlighted item                                      │
     │ Alt+Enter               queue a follow-up to run after the current │
-    │ turn                                                               │
+    │ turn (a focused subagent's: before it reports)                     │
     │ Alt+S                   send exactly what is typed, ignoring the   │
     │ completion popup                                                   │
     │ Ctrl+J / Alt+J          insert a newline                           │
-    │ Esc                     close the dialog, or abort the running     │
-    │ turn                                                               │
+    │ Esc                     close the dialog, back to the main agent   │
+    │ from a subagent, or abort the running turn                         │
     │ Tab                     complete a slash command, @path or         │
     └──────────────────── 1–11 of 83 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────
@@ -418,8 +418,8 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ row)                                                               │
     │ Down                    move down (editor line, history, or list   │
     │ row)                                                               │
-    │ Alt+Up                  pop the last queued steer/follow-up back   │
-    │ into the editor                                                    │
+    │ Alt+Up                  pop the last queued steer/follow-up (the   │
+    │ focused agent's) back into the editor                              │
     │ Left                    move the cursor left                       │
     │ Right                   move the cursor right                      │
     │ Alt+B / Ctrl+Left       move the cursor back one word              │

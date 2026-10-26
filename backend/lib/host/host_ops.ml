@@ -150,7 +150,7 @@ let instructions_tool =
       ; description = "project instruction files"
       ; parameters = `Object []
       ; parallel_safe = true
-      ; destructive = false
+      ; destructive = Never
       ; on_host = true
       ; freeform = None
       }

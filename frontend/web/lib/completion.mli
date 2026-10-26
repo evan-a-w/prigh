@@ -35,6 +35,7 @@ val compute
        (** the repository's, for [/worktree] and [/review] *)
   -> ?refs:Git_diff.Refs.t
        (** the reviewed repository's branches and tags, for [/review] *)
+  -> superuser:bool (** offers the commands only superusers have *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list

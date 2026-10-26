@@ -35,7 +35,7 @@ let spec_with ?(description = description) parameters =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
-  ; destructive = true
+  ; destructive = Always
   ; description
   ; parameters = Tool_args.schema ~required:[ "command" ] parameters
   }

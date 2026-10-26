@@ -13,7 +13,7 @@ let spec =
         ~required:[ "summary" ]
         [ "summary", `String, "One or two sentences on what was achieved" ]
   ; parallel_safe = true
-  ; destructive = false
+  ; destructive = Never
   ; on_host = false
   ; freeform = None
   }
