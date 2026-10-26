@@ -130,6 +130,7 @@ module Method : sig
     | Git_stage of
         { dir : string option
         ; paths : string list (** relative to the worktree's top directory *)
+        ; tracked : bool (** and every change to tracked files ([git add -u]) *)
         } (** {!Git_status} after *)
     | Git_unstage of
         { dir : string option

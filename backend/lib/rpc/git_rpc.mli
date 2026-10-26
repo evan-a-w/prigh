@@ -6,8 +6,9 @@ open! Import
     session's directory; default: the session's):
 
     - [git_status {dir?}]: {!Git_actions.Status}.
-    - [git_stage {dir?, paths}], [git_unstage {dir?, paths}]: the status
-      after; [paths] are relative to the worktree's top directory.
+    - [git_stage {dir?, paths, tracked?}], [git_unstage {dir?, paths}]: the
+      status after; [paths] are relative to the worktree's top directory;
+      [tracked] also stages every change to tracked files ([git add -u]).
     - [git_commit {dir?, message, amend?, paths?}]: {!Git_actions.Commit};
       [paths] are staged first.
     - [git_push {dir?}]: {!Git_actions.Push}, to the branch's upstream (set
