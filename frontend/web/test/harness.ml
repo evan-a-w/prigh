@@ -17,6 +17,7 @@ let act t action =
     (match command with
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
      | Reconnect _
+     | Place_popover
      | Set_url_session _
      | Expire_toast _
      | Focus _

@@ -11,7 +11,9 @@ let%expect_test
   [%expect
     {|
     []
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
@@ -95,7 +97,8 @@ let%expect_test
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ()));
   H.key h "Escape";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nbackend\

@@ -40,7 +40,7 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
@@ -81,7 +81,7 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
       <span class="chev"> </span>
     </button>
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
@@ -99,7 +99,7 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     (Focus session-s4)
     (Session_nav (from (s3)) (by 1))
     (Focus session-s3)
-    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
@@ -374,7 +374,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Select_sessions false)
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     |}]

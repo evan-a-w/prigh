@@ -531,27 +531,72 @@ kbd {
 
 .scrim { display: none; }
 
-/* Top bar */
-
-/* Three regions: the session on the left, what the agent is doing in the
-   middle of the bar, the panels and the settings on the right. It steps
-   down with the chat column's width, not the window's (see the container
-   queries at the end). Its height is fixed: what the status says never
-   moves the page. */
-.topbar {
-  container: topbar / inline-size;
+/* The session: in the docked sidebar a card of its status, with the
+   panels' toggles floating over the chat's corner; else a slim bar over the
+   chat (one of them at a time). The bar steps down with the chat column's
+   width, not the window's (see the container queries at the end). Its
+   height is fixed: what the status says never moves the page. */
+.session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 -10px;
+  padding: 12px 14px 12px 18px;
+  border-top: 1px solid var(--rule);
+}
+/* The status on a grid: what the agent is doing beside where tools run,
+   the context across, then the counters, each pair on the same edges. */
+.card-status {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+  grid-template-columns: minmax(0, 1fr) fit-content(62%);
+  grid-template-areas: "activity where" "context context" "tokens cost";
   align-items: center;
-  gap: 16px;
-  padding: 0 12px 0 16px;
-  height: 54px;
+  gap: 7px 12px;
+}
+.card-status > .status { display: contents; }
+.card-status .status-item.activity { grid-area: activity; width: auto; min-width: 0; font-size: 12.5px; }
+.card-status .activity, .card-where { margin-bottom: 3px; }
+.card-status .context { grid-area: context; gap: 10px; }
+.card-status .context .meter { flex: 1; width: auto; }
+.card-status .tokens { grid-area: tokens; }
+.card-status .cost { grid-area: cost; justify-self: end; }
+.card-where { grid-area: where; display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; font: 11.5px var(--mono); }
+.card-where > .status-item.host { min-width: 0; color: var(--muted); font: inherit; }
+.card-where > .host .status-text { overflow: hidden; text-overflow: ellipsis; }
+.card-where > .host .icon { color: var(--faint); }
+.card-where > .branch { max-width: 50%; }
+.session-card .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
+
+.chat-tools {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 4;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--bg);
+}
+.chat-tools > .panel-toggles { gap: 2px; }
+.chat-tools .btn.icon { width: 30px; height: 30px; }
+.chat-frame:has(> .chat-tools) > .jump-nav { top: 50px; }
+
+.session-bar {
+  container: bar / inline-size;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 8px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--rule);
 }
-.topbar-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.app.sidebar-open:not(.narrow) .topbar .toggle-sidebar { display: none; }
-.topbar .title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
+.session-bar > .toggle-sidebar { margin-right: -6px; color: var(--muted); }
+.session-bar > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--muted); font-size: 13.5px; }
+.session-bar > .session-name:hover { color: var(--chalk); }
+.session-bar > .status-extras { flex: 1 1 0; justify-content: flex-end; }
+.session-bar > .status { flex-shrink: 0; margin-left: auto; }
+.session-bar > .settings-toggle { color: var(--faint); }
+.session-bar > .settings-toggle:hover { color: var(--chalk); }
 .session-name {
   display: inline-flex;
   align-items: center;
@@ -571,18 +616,11 @@ kbd {
 .session-name.muted { color: var(--muted); font-weight: 400; }
 .session-name .edit-hint { width: 13px; height: 13px; color: var(--faint); opacity: 0; transition: opacity 0.15s; }
 .session-name:hover .edit-hint, .session-name:focus-visible .edit-hint { opacity: 1; }
-.session-where { display: flex; gap: 12px; color: var(--faint); font: 11.5px/1.4 var(--mono); min-width: 0; max-width: 100%; }
-/* A long cwd loses its middle: the directory it ends in stays. */
-.where { display: flex; min-width: 6ch; white-space: nowrap; overflow: hidden; }
-.where-head { min-width: 1ch; overflow: hidden; text-overflow: ellipsis; }
-.where-tail { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.where-head + .where-tail { max-width: calc(100% - 1ch); }
 /* Long paths lose their start, not the directory they end in (the mark
    keeps the leading "/" in place). */
 .session-cwd { direction: rtl; text-align: left; }
 .session-cwd::before { content: "\200E"; }
-/* A branch keeps its name up to almost half the line; the cwd gives way. */
-.branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--muted); flex-shrink: 0; max-width: 45%; }
+.branch { display: inline-flex; align-items: center; gap: 3px; min-width: 0; white-space: nowrap; color: var(--muted); }
 .branch .icon { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; }
 .branch-name { overflow: hidden; text-overflow: ellipsis; }
 
@@ -702,31 +740,42 @@ kbd {
   overflow-y: auto;
 }
 .composer-bar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
-.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; }
-/* Quiet until pointed at: the box's border is theirs. */
+.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
+/* Settings of the message, written in the box's own voice: plain words
+   that line up with the text above them, until pointed at. Their chevrons
+   (and a hover's wash) say they open something; the pickers are the
+   commands' own. */
 .chip-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
+  gap: 4px;
+  height: 28px;
   min-width: 0;
   flex-shrink: 0;
   border-radius: var(--r-control);
   padding: 0 8px;
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 400;
   background: transparent;
   border-color: transparent;
-  color: var(--muted);
+  color: var(--faint);
+  transition: color 0.12s, background-color 0.12s;
 }
-.chip-button:hover { background: var(--slate-2); color: var(--chalk); }
+.composer-controls .chip-button:not(.awaiting):focus-visible { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+@media (hover: hover) {
+  .composer-controls .chip-button:not(.awaiting):hover { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+}
 .chip-button:focus-visible { outline-offset: 0; }
-.chip-button .icon { width: 14px; height: 14px; color: var(--faint); flex-shrink: 0; }
-.chip-button:hover .icon { color: var(--muted); }
-.chip-button .chevron { width: 12px; height: 12px; }
+.chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
+.composer-controls .chip-button > .icon:first-child { display: none; }
+.chip-button .chevron { width: 11px; height: 11px; opacity: 0; transition: opacity 0.12s; }
+.chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
+.composer-box:focus-within .chip-button:not(:hover, :focus-visible) { color: var(--muted); }
+.model-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer-controls > .model-chip { flex-shrink: 1; }
-.composer-controls > .model-chip .chip-label { min-width: 4ch; }
+.chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
+.chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
+.chip-anchor.model .chip-label { min-width: 4ch; }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -797,12 +846,10 @@ kbd {
 .popup-item.dimmed, .picker-item.dimmed { opacity: 0.5; }
 .popup-item > .mark.picked { --mark-size: 13px; align-self: center; margin-left: -6px; }
 
-/* The status, in the middle of the top bar, and what applies after it at
-   the start of the bar's end: one line that gives way rather than wraps
+/* The status and what applies: one line that gives way rather than wraps
    (the padding keeps its links' focus rings inside). Nothing in the status
-   moves as the agent starts and stops: the activity comes last, in a slot
-   of its own width, and what applies is outside the status (before it on a
-   phone, where the status is at the end). */
+   moves as the agent starts and stops: the activity has a slot of its own
+   width, and what applies is outside the status, before it in the bar. */
 
 .status, .status-extras {
   display: flex;
@@ -815,12 +862,10 @@ kbd {
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
-.topbar-end { display: flex; align-items: center; gap: 10px; min-width: 0; }
-/* Its width does not count in the bar's end column, so it never pushes the
-   status off the centre: it takes what is left beside the panels. */
-.status-extras { flex: 1 1 0; contain: inline-size; }
+/* Its width does not count in the bar, so it never pushes the status: it
+   takes what is left beside the title. */
+.status-extras { contain: inline-size; }
 .status-extras:empty { display: none; }
-.topbar-end > .panel-toggles { margin-left: auto; }
 .status .context, .status .tokens, .status .cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
@@ -1063,8 +1108,7 @@ kbd {
 .app.narrow .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: 25; }
 
 @media (max-width: 760px) {
-  .topbar { padding: 0 8px; gap: 8px; height: 50px; }
-  .session-name { font-size: 14px; }
+  .session-bar { gap: 8px; }
   .composer { padding: 6px 8px 8px; }
   .popup { left: 8px; right: 8px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
@@ -1098,6 +1142,14 @@ kbd {
 .avatar.large { width: 38px; height: 38px; font-size: 16px; }
 
 .menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+/* What a menu floats on: the account's, a composer chip's. */
+.menu-surface {
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+  outline: none;
+}
 .account-menu {
   position: fixed;
   left: 10px;
@@ -1105,12 +1157,7 @@ kbd {
   width: 300px;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
   padding: 6px;
-  outline: none;
   animation: appear 0.12s ease-out;
 }
 .account-current { display: flex; align-items: center; gap: 10px; padding: 8px 8px 10px; border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
@@ -1354,14 +1401,15 @@ kbd {
   .app.offline :is(.banner, .status) .lamp { animation: none !important; }
 }
 
-.panel-toggles { display: flex; align-items: center; justify-self: end; gap: 6px; }
+.panel-toggles { display: flex; align-items: center; gap: 2px; }
+.panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
+.panel-toggles > .btn.icon:hover { color: var(--chalk); }
 
 /* The thinking level and what asks first, beside the model: always shown,
    each opening its picker. Plan mode holds the agent back, so it is lit. */
-.chip-key { color: var(--faint); font-weight: 400; }
+.chip-key { opacity: 0.75; }
 .thinking-chip.unsupported { color: var(--faint); }
-.mode-chip.plan-mode { color: var(--sodium); background: var(--sodium-wash); }
-.mode-chip.plan-mode .icon { color: var(--sodium); }
+.mode-chip.plan-mode, .composer-box:focus-within .mode-chip.plan-mode:not(:hover) { color: var(--sodium); background: var(--sodium-wash); }
 
 /* Queued steers and follow-ups, above the composer while they wait. */
 .queue {
@@ -1420,34 +1468,25 @@ kbd {
    mode's name. */
 @container composer (width < 600px) {
   .composer-controls .chip-key, .composer-controls .chevron { display: none; }
+  .composer-controls .chip-button > .icon:first-child { display: inline-block; }
   .composer-controls .mode-chip:not(.awaiting) .chip-label { display: none; }
   .composer-controls .mode-chip:not(.awaiting)::after { content: attr(data-short); }
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
 }
-/* Then the model's name gives way before the level and the mode do. */
-@container composer (width < 400px) {
-  .composer-controls > .model-chip > .icon:first-child { display: none; }
-}
 
-/* The top bar's steps. A narrower bar drops the counters (the context's
-   link has them, in the session's details), then says what applies with
-   icons alone (their tooltips and names say the rest). */
-@container topbar (width < 760px) {
+/* The bar's steps. A narrower bar drops the counters (the context's link
+   has them, in the session's details), then says what applies with icons
+   alone (their tooltips and names say the rest), then the activity is a
+   dot. */
+@container bar (width < 760px) {
   .status { gap: 0 12px; }
   .status .tokens, .status .cost:not(.budget) { display: none; }
 }
-@container topbar (width < 600px) {
+@container bar (width < 600px) {
   .status-extras .status-text, .status-extras .status-item.mode { display: none; }
   .status-item.activity { width: 14ch; }
 }
-/* A phone: the session gets the room, the status follows it, and what
-   applies comes before the status. */
-.app.narrow .topbar { grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
-.app.narrow .topbar-end { display: contents; }
-.app.narrow .status-extras { order: 1; contain: none; max-width: 40cqi; }
-.app.narrow .status { order: 2; }
-.app.narrow .panel-toggles { order: 3; }
-@container topbar (width < 480px) {
+@container bar (width < 480px) {
   .status, .status-extras { gap: 0 10px; padding: 4px 0; }
   .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
   .status-item.activity:is(.running, .idle) > .label { display: none; }
@@ -1593,4 +1632,115 @@ kbd {
   .tool-head .open-agent { min-height: 32px; padding: 0 10px; }
   .queued-remove.btn.icon, .queued-edit.btn { min-width: 40px; min-height: 40px; }
   .btn.icon { min-width: 36px; min-height: 36px; }
+}
+
+/* A composer chip's menu: a small surface standing on its chip, opening
+   upward over the chat (below the chip only when there is no room above:
+   web_main's place_popover, which also gives the height it may take). Its
+   chip stays lit while it is open, and only the chips stay above the
+   backdrop, so a click on another chip opens that one's menu. */
+.composer-controls { position: relative; z-index: 41; }
+.chip-anchor.open > .chip-button,
+.composer-box:focus-within .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
+.chip-anchor.open > .chip-button .chevron { opacity: 1; transform: rotate(180deg); }
+.chip-popover {
+  position: absolute;
+  left: calc(var(--popover-shift, 0px) - 2px);
+  bottom: calc(100% + var(--popover-lift, 0px) + 8px);
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: min(26rem, var(--popover-room, 70vh));
+  display: flex;
+  flex-direction: column;
+  border-bottom-left-radius: 4px;
+  animation: popover-rise 0.12s ease-out;
+  overflow: hidden;
+}
+.chip-popover[data-placement="below"] {
+  bottom: auto;
+  top: calc(100% + 8px);
+  border-bottom-left-radius: var(--r-surface);
+  border-top-left-radius: 4px;
+}
+.chip-popover[data-chip="model"] { width: 340px; }
+.chip-popover[data-chip="mode"] { width: 360px; }
+@keyframes popover-rise { from { opacity: 0; transform: translateY(4px); } }
+.popover-head, .popover-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.popover-title { flex: 1; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.popover-shortcut { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.popover-search > .icon { width: 14px; height: 14px; color: var(--faint); flex-shrink: 0; }
+.popover-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--chalk);
+  font-size: 13.5px;
+}
+.popover-search input::placeholder { color: var(--faint); }
+.popover-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  outline: none;
+  scrollbar-width: thin;
+}
+.popover-group + .popover-group { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px; }
+.popover-group > .menu-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 4px 10px 3px 32px; }
+.popover-note { color: var(--faint); font-size: 11.5px; font-weight: 400; }
+.popover-item { gap: 8px; padding: 6px 10px 6px 8px; border-radius: 0 var(--r-control) var(--r-control) 0; }
+.popover-item.selected { box-shadow: inset 2px 0 0 var(--sodium); }
+.popover-item.dimmed .menu-text { opacity: 0.55; }
+.popover-item .menu-text { flex: 1; }
+.popover-item .menu-label { font-size: 13.5px; }
+.chip-popover[data-chip="thinking"] .menu-label { text-transform: capitalize; }
+.chip-popover[data-chip="mode"] .menu-detail { white-space: normal; }
+.popover-check { --mark-size: 14px; width: 16px; }
+.popover-aside { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.popover-empty { padding: 14px 12px; color: var(--muted); font-size: 12.5px; }
+.chip-popover > .menu-keys { flex-shrink: 0; padding: 6px 12px 7px; }
+/* Thinking's effort, as rising bars: lit up to the level. */
+.thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
+.thinking-meter > .bar { width: 3px; border-radius: 1px; background: var(--rule-2); }
+.thinking-meter > .bar:nth-child(1) { height: 4px; }
+.thinking-meter > .bar:nth-child(2) { height: 6.5px; }
+.thinking-meter > .bar:nth-child(3) { height: 9px; }
+.thinking-meter > .bar:nth-child(4) { height: 12px; }
+.thinking-meter > .bar.on { background: var(--muted); }
+.popover-item.marked .thinking-meter > .bar.on { background: var(--sodium); }
+@media (prefers-reduced-motion: reduce) {
+  .chip-popover { animation: none; }
+  .chip-anchor.open > .chip-button .chevron { transition: none; }
+}
+/* A phone: the menu is as wide as the composer's box, over it, the page
+   behind dimmed. */
+@media (max-width: 760px) {
+  .composer-box { position: relative; }
+  .composer-controls, .chip-anchor { position: static; }
+  .chip-popover { z-index: 42; bottom: calc(100% + 8px); }
+  .chip-popover,
+  .chip-popover[data-chip] {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+    border-radius: var(--r-surface);
+  }
+  .chip-popover { max-height: min(70dvh, var(--popover-room, 70dvh)); }
+  .popover-item { padding-top: 10px; padding-bottom: 10px; }
+}
+/* No keyboard to speak of: no keys to tell of. */
+@media (pointer: coarse) {
+  .chip-popover > .menu-keys, .popover-shortcut { display: none; }
 }

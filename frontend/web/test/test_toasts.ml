@@ -159,12 +159,13 @@ let%expect_test "toasts are not under a dialog's inert page" =
   H.elements h ~selector:".toast";
   [%expect
     {|
-    Open_model_picker
-    (Focus picker-input)
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
-    <footer class="composer">
+    <textarea class="editor">
+    <div class="composer-buttons">
     <div class="toast">
     |}]
 ;;
