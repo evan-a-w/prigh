@@ -12,6 +12,12 @@ module Reply_tag = struct
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Forge_refresh
+    | Prs_picker of string option (** the state asked for *)
+    | Pr_shown
+    | Pr_form_defaults of string option (** the title typed *)
+    | Pr_created
+    | Pr_checked_out of int
     | Models_for_picker of string
     | Models_for_switch of string
     | Models_after_login of string
@@ -48,6 +54,8 @@ module Reply_tag = struct
     | Models_for_scoped
     | Compact_done
     | Git_diff
+    | Review_comments (** [/review]: then the diff *)
+    | Review_status of P.Review.t
     | Review_started
     | Abort_done
     | Notice_on_success of string
@@ -74,6 +82,8 @@ module Reply_tag = struct
     | Pending
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Subagent_loaded
+    (** [get_subagent], for a subagent whose events we missed *)
     | Dir_changed of P.Dir_change.Target.t
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker
@@ -203,6 +213,7 @@ module Model = struct
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; forge : P.Forge_account.t list
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
     ; focus : [ `Main | `Agent of string ]
@@ -514,6 +525,7 @@ let init =
   { state = None
   ; models = []
   ; auth = []
+  ; forge = []
   ; transcript = Transcript.empty
   ; agents = []
   ; focus = `Main
@@ -559,6 +571,7 @@ let refill_commands =
   [ rpc "get_state" ~tag:Initial_state
   ; rpc "get_messages" ~tag:Initial_messages
   ; rpc "auth_status" ~tag:Auth_refresh
+  ; call Forge_status ~tag:Forge_refresh
   ; rpc "get_config" ~tag:Config
   ; rpc "list_models" ~tag:Models_catalog
   ; rpc "get_pending" ~tag:Pending
@@ -755,36 +768,38 @@ let verbosity_picker m =
   open_picker m Verbosity (Picker.create ~title:"Transcript verbosity" items)
 ;;
 
-let login_picker m (statuses : P.Auth_status.t list) =
-  let items =
-    List.concat_map statuses ~f:(fun s ->
-      List.map s.methods ~f:(fun meth ->
-        let configured =
-          match s.configured with
-          | Some c when String.equal c.method_ meth.method_ ->
-            sprintf "logged in via %s" c.source
-          | _ -> ""
-        in
-        match s.custom with
-        | Some c ->
-          Picker.Item.create
-            ~id:(s.provider ^ " " ^ meth.method_)
-            ~detail:(sprintf "custom: %s (%s)" c.base_url c.api)
-            ~search:(s.provider ^ " custom " ^ c.base_url)
-            (s.name ^ " (edit)")
-        | None ->
-          Picker.Item.create
-            ~id:(s.provider ^ " " ^ meth.method_)
-            ~detail:(String.strip (meth.label ^ "  " ^ configured))
-            ~marked:(not (String.is_empty configured))
-            (s.name ^ " (" ^ meth.method_ ^ ")")))
-    @ [ Picker.Item.create
-          ~id:"custom api_key"
-          ~detail:"aiproxy, LiteLLM, OpenRouter, vLLM, Ollama, ..."
-          "custom (add an OpenAI-compatible endpoint)"
-      ]
-  in
-  open_picker m Login (Picker.create ~title:"Log in to" items)
+let login_items m =
+  List.concat_map m.auth ~f:(fun (s : P.Auth_status.t) ->
+    List.map s.methods ~f:(fun meth ->
+      let configured =
+        match s.configured with
+        | Some c when String.equal c.method_ meth.method_ ->
+          sprintf "logged in via %s" c.source
+        | _ -> ""
+      in
+      match s.custom with
+      | Some c ->
+        Picker.Item.create
+          ~id:(s.provider ^ " " ^ meth.method_)
+          ~detail:(sprintf "custom: %s (%s)" c.base_url c.api)
+          ~search:(s.provider ^ " custom " ^ c.base_url)
+          (s.name ^ " (edit)")
+      | None ->
+        Picker.Item.create
+          ~id:(s.provider ^ " " ^ meth.method_)
+          ~detail:(String.strip (meth.label ^ "  " ^ configured))
+          ~marked:(not (String.is_empty configured))
+          (s.name ^ " (" ^ meth.method_ ^ ")")))
+  @ [ Picker.Item.create
+        ~id:"custom api_key"
+        ~detail:"aiproxy, LiteLLM, OpenRouter, vLLM, Ollama, ..."
+        "custom (add an OpenAI-compatible endpoint)"
+    ]
+  @ Forge_accounts.login_items m.forge
+;;
+
+let login_picker m =
+  open_picker m Login (Picker.create ~title:"Log in to" (login_items m))
 ;;
 
 (* A custom provider's logout asks itself what to remove (a backend login
@@ -808,21 +823,24 @@ let logout m provider =
     , [] )
 ;;
 
-let logout_picker m (statuses : P.Auth_status.t list) =
-  let items =
-    List.filter_map statuses ~f:(fun s ->
-      Option.map s.configured ~f:(fun c ->
-        Picker.Item.create
-          ~id:s.provider
-          ~detail:
-            (match s.custom with
-             | Some custom ->
-               sprintf "custom: %s, key: %s" custom.base_url c.source
-             | None -> sprintf "%s via %s" c.method_ c.source)
-          s.name))
-  in
+let logout_items m =
+  List.filter_map m.auth ~f:(fun (s : P.Auth_status.t) ->
+    Option.map s.configured ~f:(fun c ->
+      Picker.Item.create
+        ~id:s.provider
+        ~detail:
+          (match s.custom with
+           | Some custom ->
+             sprintf "custom: %s, key: %s" custom.base_url c.source
+           | None -> sprintf "%s via %s" c.method_ c.source)
+        s.name))
+  @ Forge_accounts.logout_items m.forge
+;;
+
+let logout_picker m =
+  let items = logout_items m in
   if List.is_empty items
-  then notice m "no provider is logged in"
+  then notice m "no provider or git host is signed in; /login signs in"
   else open_picker m Logout (Picker.create ~title:"Log out of" items)
 ;;
 
@@ -844,6 +862,122 @@ let restore_command m command =
   if Editor.is_empty m.editor
   then { m with editor = Editor.set_text m.editor command }
   else m
+;;
+
+(* ---- git hosting ------------------------------------------------------ *)
+
+let forge_login m (login : Forge_accounts.Login.t) =
+  match login with
+  | Host { host; kind; method_ } ->
+    ( notice m (sprintf "signing in to %s…" host)
+    , [ call (Forge_login { host; kind; method_ }) ] )
+  | Ask_host { kind; method_ } ->
+    ( { m with
+        mode =
+          Text_prompt
+            { question = Forge_accounts.Login.host_question ~kind
+            ; action = Forge_host { kind; method_ }
+            }
+      ; editor = Editor.clear m.editor
+      ; autocomplete = None
+      }
+    , [] )
+;;
+
+let forge_logout m host =
+  match Forge_accounts.find m.forge host with
+  | Some account when not (P.Forge_account.signed_in account) ->
+    ( notice
+        m
+        (sprintf
+           "not signed in to %s; /login %s signs in"
+           host
+           (P.Forge_account.login_arg account))
+    , [] )
+  | account ->
+    let user =
+      match Option.bind account ~f:(fun a -> a.user) with
+      | Some user -> sprintf " (%s)" user
+      | None -> ""
+    in
+    ( { m with
+        mode =
+          Confirm
+            { question =
+                sprintf
+                  "Sign out of %s%s and delete its token? (y/n)"
+                  host
+                  user
+            ; action = Forge_logout host
+            }
+      }
+    , [] )
+;;
+
+let pr_command m rest =
+  match Pr_command.parse rest with
+  | Error e -> error (restore_command m (String.strip ("/pr " ^ rest))) e, []
+  | Ok (List { state }) ->
+    ( notice m "reading pull requests…"
+    , [ call (Pr_list { state }) ~tag:(Prs_picker state) ] )
+  | Ok (View number) ->
+    ( notice m (sprintf "reading pull request #%d…" number)
+    , [ call (Pr_view number) ~tag:Pr_shown ] )
+  | Ok (New { title }) ->
+    ( notice m "reading the branch…"
+    , [ call Pr_defaults ~tag:(Pr_form_defaults title) ] )
+  | Ok (Checkout number) ->
+    ( notice m (sprintf "checking out pull request #%d…" number)
+    , [ call (Pr_checkout number) ~tag:(Pr_checked_out number) ] )
+;;
+
+let prs_picker m ~state (list : P.Pr_list.t) =
+  match list.prs with
+  | [] ->
+    notice
+      m
+      (sprintf
+         "no %spull requests in %s; /pr new creates one%s"
+         (match state with
+          | None -> "open "
+          | Some "all" -> ""
+          | Some state -> state ^ " ")
+         (P.Forge_repo.slug list.repo)
+         (match state with
+          | Some "all" -> ""
+          | _ -> ", /pr list all lists every one"))
+  | prs ->
+    open_picker
+      m
+      Pull_requests
+      (Picker.create
+         ~title:(Pr_view.picker_title list ~state)
+         (List.map prs ~f:Pr_view.item))
+;;
+
+let pr_checked_out m number (checkout : P.Pr_checkout.t) =
+  let what =
+    sprintf
+      "%s pull request #%d (%s) at %s"
+      (if checkout.created then "checked out" else "updated")
+      number
+      checkout.branch
+      checkout.path
+  in
+  if Mode.is_dialog m.mode
+  then notice m (sprintf "%s: /cd %s goes there" what checkout.path)
+  else
+    { (notice m what) with
+      mode =
+        Confirm
+          { question =
+              sprintf
+                "Change the session's directory to %s? (y/n)"
+                checkout.path
+          ; action = Cd_to_checkout checkout.path
+          }
+    ; autocomplete = None
+    }
 ;;
 
 let archive_verb ~archived = if archived then "archived" else "unarchived"
@@ -1460,6 +1594,48 @@ let prune_agents m =
   { m with agents; focus }
 ;;
 
+(* The session's subagents whose events this client missed (it switched
+   session or reconnected) join the list at once and their transcripts
+   follow. *)
+let set_state m (state : P.State.t) =
+  let missed =
+    List.filter state.subagents ~f:(fun a ->
+      Option.is_none (Agent_view.find m.agents a.id))
+  in
+  let adopted =
+    List.map missed ~f:(fun a ->
+      let agent =
+        Agent_view.create ~call_id:"" ~agent_id:a.id ~task:a.task ~model:""
+      in
+      if a.running
+      then agent
+      else { agent with status = Done { turns = 0; cost_usd = 0. } })
+  in
+  ( { m with state = Some state; agents = m.agents @ adopted }
+  , List.map missed ~f:(fun a ->
+      rpc "get_subagent" ~params:[ "id", str a.id ] ~tag:Subagent_loaded) )
+;;
+
+let subagent_loaded m (d : P.Subagent_detail.t) =
+  update_agents m ~f:(fun agents ->
+    Agent_view.replace agents d.id (fun a ->
+      { a with
+        call_id = d.call_id
+      ; model = d.model
+      ; turns = d.turns
+      ; status =
+          (match d.result with
+           | None -> a.status
+           | Some result ->
+             Agent_view.status_of_result ~turns:d.turns ~cost_usd:0. result)
+      ; transcript =
+          List.fold
+            d.messages
+            ~init:(Transcript.clear a.transcript)
+            ~f:Transcript.add_message
+      }))
+;;
+
 (* [arg] is the agent's number in the strip or its id. *)
 let cancel_agent m arg =
   let agent =
@@ -1507,7 +1683,8 @@ let focus_agent m n =
 
 (* ---- auth ------------------------------------------------------------- *)
 
-let format_auth (statuses : P.Auth_status.t list) : Content.t =
+let format_auth m : Content.t =
+  let statuses = m.auth in
   let width =
     List.fold statuses ~init:0 ~f:(fun acc s ->
       Int.max acc (String.length s.provider))
@@ -1552,6 +1729,30 @@ let format_auth (statuses : P.Auth_status.t list) : Content.t =
         }
       ]
     ]
+  @ if List.is_empty m.forge then [] else [] :: Forge_accounts.describe m.forge
+;;
+
+let logins_title = "Logins"
+
+(* What lists the git hosts is redrawn when they change. *)
+let forge_refreshed m forge =
+  let m = { m with forge } in
+  match m.mode with
+  | Picker { kind = Login; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Login; picker = Picker.set_items picker (login_items m) }
+    }
+  | Picker { kind = Logout; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Logout; picker = Picker.set_items picker (logout_items m) }
+    }
+  | Output box when String.equal box.title logins_title ->
+    { m with mode = Output { box with lines = format_auth m } }
+  | _ -> m
 ;;
 
 (* ---- reconnection ----------------------------------------------------- *)
@@ -1589,7 +1790,10 @@ let reset_session m =
       { m with
         mode =
           (match m.mode with
-           | Output _ -> Editing
+           | Output _
+           | Pr_form _
+           | Picker { kind = Pull_requests; _ }
+           | Confirm { action = Cd_to_checkout _; _ } -> Editing
            | mode -> mode)
       ; notice = None
       ; skills = Location_cache.empty
@@ -1657,6 +1861,7 @@ let reset_connection m =
     state = None
   ; models = []
   ; auth = []
+  ; forge = []
   ; sessions = None
   ; config = None
   ; client_id = None
@@ -1930,6 +2135,7 @@ let reconnect_reply m ~generation result =
        ( follow m
        , session_commands
          @ [ rpc "auth_status" ~tag:Auth_refresh
+           ; call Forge_status ~tag:Forge_refresh
            ; rpc "get_config" ~tag:Config
            ; rpc "list_models" ~tag:Models_catalog
            ] ))
@@ -2433,16 +2639,20 @@ let worktree_command m rest =
   let command = String.strip ("/worktree " ^ rest) in
   match Worktree_command.parse rest with
   | Error text -> error (restore_command m command) text, []
-  | List -> m, [ call List_worktrees ~tag:Worktrees_picker ]
+  | List -> m, [ call (List_worktrees { cwd = None }) ~tag:Worktrees_picker ]
   | New { branch; base } ->
     ( notice m (sprintf "creating a worktree for %s…" branch)
     , [ call
-          (Create_worktree { branch; base })
+          (Create_worktree { branch; base; cwd = None })
           ~tag:
             (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
       ] )
   | (Open _ | Remove _) as action ->
-    m, [ call List_worktrees ~tag:(Worktree_target { command; action }) ]
+    ( m
+    , [ call
+          (List_worktrees { cwd = None })
+          ~tag:(Worktree_target { command; action })
+      ] )
 ;;
 
 let worktree_target m ~command (action : Worktree_command.Action.t) listing =
@@ -2644,7 +2854,10 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "default-dir", [] ->
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
-  | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
+  | "auth", _ ->
+    ( m
+    , [ rpc "auth_status" ~tag:Auth_show; call Forge_status ~tag:Forge_refresh ]
+    )
   | "budget", [] -> with_state m ~f:Loop_status.describe_budget
   | "budget", _ ->
     (match Loop_status.parse_budget cmd.rest with
@@ -2690,16 +2903,31 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "automatic resume cancelled")
       ] )
   | "resume", _ -> error m "usage: /resume [now|cancel]", []
-  | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
+  | "login", [] ->
+    ( m
+    , [ rpc "auth_status" ~tag:Auth_login_picker
+      ; call Forge_status ~tag:Forge_refresh
+      ] )
   | "login", provider :: rest ->
-    let params =
-      ("provider", str provider)
-      :: Option.to_list
-           (Option.map (List.hd rest) ~f:(fun meth -> "method", str meth))
-    in
-    m, [ rpc "login" ~params ]
-  | "logout", [] -> m, [ rpc "auth_status" ~tag:Auth_logout_picker ]
-  | "logout", provider :: _ -> logout m provider
+    (match Forge_accounts.Login.parse m.forge cmd.args with
+     | Some (Ok login) -> forge_login m login
+     | Some (Error e) -> error (restore_command m ("/login " ^ cmd.rest)) e, []
+     | None ->
+       let params =
+         ("provider", str provider)
+         :: Option.to_list
+              (Option.map (List.hd rest) ~f:(fun meth -> "method", str meth))
+       in
+       m, [ rpc "login" ~params ])
+  | "logout", [] ->
+    ( m
+    , [ rpc "auth_status" ~tag:Auth_logout_picker
+      ; call Forge_status ~tag:Forge_refresh
+      ] )
+  | "logout", provider :: _ ->
+    (match Forge_accounts.logout_host m.forge provider with
+     | Some host -> forge_logout m host
+     | None -> logout m provider)
   | "compact", _ ->
     ( notice m "compacting…"
     , [ rpc
@@ -2710,6 +2938,7 @@ let run_command m (cmd : Commands.Parsed.t) =
              else [ "instructions", str cmd.rest ])
           ~tag:Compact_done
       ] )
+  | "pr", _ -> pr_command m cmd.rest
   | "diff", _ ->
     ( notice m "reading the changes…"
     , [ rpc
@@ -2718,6 +2947,8 @@ let run_command m (cmd : Commands.Parsed.t) =
             (if String.is_empty cmd.rest then [] else [ "path", str cmd.rest ])
           ~tag:Git_diff
       ] )
+  | "review", [] ->
+    notice m "reading the review…", [ rpc "get_review" ~tag:Review_comments ]
   | "review", _ ->
     ( notice m "reading the changes to review…"
     , [ rpc
@@ -3095,7 +3326,10 @@ let fetch_autocomplete m ac =
      | None -> { m with autocomplete = Some ac }, []
      | Some worktrees ->
        ( { m with autocomplete = Some ac; worktrees }
-       , [ call List_worktrees ~tag:(Worktrees_for_autocomplete key) ] ))
+       , [ call
+             (List_worktrees { cwd = None })
+             ~tag:(Worktrees_for_autocomplete key)
+         ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some (Commands.Argument.Sessions | Session_list) ->
@@ -3126,6 +3360,7 @@ let refresh_command_autocomplete m =
       ~line_index
       ~models:m.models
       ~auth:m.auth
+      ~forge:m.forge
       ~sessions:m.sessions
       ~skills:(Location_cache.find m.skills ~key:(Location_cache.key m.state))
       ~snippets:(Option.value (snippets m) ~default:[])
@@ -3571,13 +3806,21 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
     in
     set_verbosity m verbosity, []
   | Login ->
-    (match String.split item.id ~on:' ' with
-     | [ provider; meth ] ->
+    (match
+       ( Forge_accounts.login_of_item_id m.forge item.id
+       , String.split item.id ~on:' ' )
+     with
+     | Some login, _ -> forge_login m login
+     | None, [ provider; meth ] ->
        ( m
        , [ rpc "login" ~params:[ "provider", str provider; "method", str meth ]
          ] )
-     | _ -> error m "bad login selection", [])
-  | Logout -> logout m item.id
+     | None, _ -> error m "bad login selection", [])
+  | Logout ->
+    (match Forge_accounts.logout_of_item_id item.id with
+     | Some host -> forge_logout m host
+     | None -> logout m item.id)
+  | Pull_requests -> pr_command m item.id
   | Sessions _ ->
     ( m
     , [ rpc
@@ -4013,6 +4256,10 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       then m, []
       else m, [ set_host_command m ~host ~cwd:text ]
     | Connect -> if String.is_empty text then m, [] else connect m text
+    | Forge_host { kind; method_ } ->
+      if String.is_empty text
+      then m, []
+      else forge_login m (Host { host = text; kind = Some kind; method_ })
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -4031,7 +4278,8 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
-    | Name | Export_path | Import_path | Deny_reason _ | Connect -> None
+    | Name | Export_path | Import_path | Deny_reason _ | Connect | Forge_host _
+      -> None
   in
   let edit m =
     let m', cmds = editing_intent m intent in
@@ -4078,7 +4326,14 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
-     | Name | Cd | Mkdir | Export_path | Import_path | Host_cwd _ | Connect ->
+     | Name
+     | Cd
+     | Mkdir
+     | Export_path
+     | Import_path
+     | Host_cwd _
+     | Connect
+     | Forge_host _ ->
        ( { m with
            editor = Editor.clear m.editor
          ; mode = Editing
@@ -4146,6 +4401,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+    | Forge_logout host -> m, [ call (Forge_logout host) ]
+    | Cd_to_checkout path -> m, [ change_dir ~target:Cwd path ]
     | Rewind id ->
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Delete_sessions { paths; back } ->
@@ -4156,7 +4413,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
-            (Remove_worktree { path = worktree.path; force })
+            (Remove_worktree { path = worktree.path; force; cwd = None })
             ~tag:
               (Worktree_removed
                  { target = Worktree_command.target worktree; force })
@@ -4168,7 +4425,10 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
-    | Logout _ | Rewind _ | Delete_sessions _ | Remove_worktree _ ->
+    | Cd_to_checkout path ->
+      notice m (sprintf "staying here; /cd %s goes there" path), []
+    | Logout _ | Forge_logout _ | Rewind _ | Delete_sessions _ | Remove_worktree _
+      ->
       notice m "cancelled", []
   in
   match intent, action with
@@ -4211,6 +4471,34 @@ let sign_in_mode m form (intent : Intent.t) =
   | Insert text | Paste text -> set (Sign_in_form.insert form text)
   | Backspace -> set (Sign_in_form.backspace form)
   | Kill_to_start | Kill_word -> set (Sign_in_form.clear form)
+  | _ -> m, []
+;;
+
+(* ---- the pull request form -------------------------------------------- *)
+
+let pr_form_mode m form (intent : Intent.t) =
+  let set form = { m with mode = Pr_form form }, [] in
+  match intent with
+  | Submit | Submit_as_typed ->
+    (match Pr_form.submit form with
+     | `Wait form -> set form
+     | `Create (form, request) ->
+       { m with mode = Pr_form form }, [ call request ~tag:Pr_created ])
+  | Cancel | Interrupt ->
+    ( notice
+        { m with mode = Editing }
+        (if Pr_form.submitting form
+         then "closed; the pull request is still being created"
+         else "no pull request created")
+    , [] )
+  | Force_quit -> { m with quitting = true }, [ Quit ]
+  | Complete | Down -> set (Pr_form.next form)
+  | Next_agent | Up -> set (Pr_form.prev form)
+  | Newline -> set (Pr_form.newline form)
+  | Insert text | Paste text -> set (Pr_form.insert form text)
+  | Backspace -> set (Pr_form.backspace form)
+  | Kill_to_start -> set (Pr_form.clear form)
+  | Kill_word -> set (Pr_form.kill_word form)
   | _ -> m, []
 ;;
 
@@ -4300,6 +4588,7 @@ let intent m (intent : Intent.t) =
      | Confirm { action; _ } -> confirm m ~action intent
      | Question { call_id; form } -> question m ~call_id ~form intent
      | Sign_in form -> sign_in_mode m form intent
+     | Pr_form form -> pr_form_mode m form intent
      | Search _ -> search m intent)
 ;;
 
@@ -4406,6 +4695,24 @@ let auth_event m (e : P.Auth_event.t) =
   | Logged_out provider ->
     ( notice m (sprintf "logged out of %s" provider)
     , [ rpc "auth_status" ~tag:Auth_refresh ] )
+  | Forge_done { host; user; method_ } ->
+    let m =
+      match m.mode with
+      | Login_prompt _ -> { m with mode = Editing }
+      | _ -> m
+    in
+    let m = { m with login_lines = [] } in
+    ( notice
+        m
+        (sprintf
+           "signed in to %s%s (%s)"
+           host
+           (Option.value_map user ~default:"" ~f:(fun u -> " as " ^ u))
+           method_)
+    , [ call Forge_status ~tag:Forge_refresh ] )
+  | Forge_logged_out host ->
+    ( notice m (sprintf "signed out of %s" host)
+    , [ call Forge_status ~tag:Forge_refresh ] )
 ;;
 
 let event m (e : P.Event.t) =
@@ -4413,10 +4720,11 @@ let event m (e : P.Event.t) =
   let m = { m with activity = Activity.apply m.activity e } in
   let m = update_agents m ~f:(fun agents -> Agent_view.apply_all agents e) in
   match e with
-  | State state -> { m with state = Some state }, []
+  | State state -> set_state m state
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
   | Config_changed config -> { m with config = Some config }, []
+  | Review _ -> m, []
   | Auth a -> auth_event m a
   | Tool_confirm c -> add_pending_confirms m [ c ], []
   | Tool_confirm_done { call_id; agent_id } ->
@@ -4598,6 +4906,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            (if String.is_empty hint then e else sprintf "%s; %s" e hint)
        , [] )
      | Ignore | Prefs_history -> m, []
+     | Forge_refresh ->
+       (* A backend without git hosting: the hosts stay unlisted. *)
+       m, []
      | Btw id -> update_btw m id ~f:(fun box -> Btw_box.fail box e), []
      | Set_model_done _ ->
        (* The backend formats "did you mean"; the picker helps recover. *)
@@ -4633,6 +4944,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Archive_done _ ->
        (* Undo the picker's optimistic change. *)
        error m e, [ rpc "list_sessions" ~tag:Sessions_refresh ]
+     | Pr_created ->
+       (match m.mode with
+        | Pr_form form ->
+          { m with mode = Pr_form (Pr_form.failed form ~error:e) }, []
+        | _ -> error m e, [])
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
@@ -4671,10 +4987,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Mode_set text ->
        decode json ~f:P.State.of_json (fun state ->
-         notice { m with state = Some state } text, [])
-     | Refresh_state ->
-       decode json ~f:P.State.of_json (fun state ->
-         { m with state = Some state }, [])
+         let m, commands = set_state m state in
+         notice m text, commands)
+     | Refresh_state -> decode json ~f:P.State.of_json (set_state m)
+     | Subagent_loaded ->
+       decode json ~f:P.Subagent_detail.of_json (fun d ->
+         subagent_loaded m d, [])
      | Btw id ->
        decode
          json
@@ -4740,6 +5058,21 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.against diff))
            , [] )
          else output m ~title:"Changes" (Diff_files.render diff), [])
+     | Review_comments ->
+       decode json ~f:P.Review.of_json (fun review ->
+         m, [ rpc "git_diff" ~tag:(Review_status review) ])
+     | Review_status review ->
+       decode json ~f:P.Git_diff.of_json (fun diff ->
+         if String.is_empty diff.diff && List.is_empty review.comments
+         then
+           ( notice
+               m
+               (sprintf
+                  "nothing to review: no changes in %s against %s"
+                  diff.root
+                  (Diff_files.against diff))
+           , [] )
+         else output m ~title:"Review" (File_approval.render diff review), [])
      | Review_started ->
        (* The run's first message shows what started; a busy agent queues it. *)
        (match m.state with
@@ -4769,8 +5102,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
-         let m = { m with state = Some state } in
-         log_block m [ banner m state ], [])
+         let m, commands = set_state m state in
+         log_block m [ banner m state ], commands)
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
          let transcript =
@@ -4828,6 +5161,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
             ( follow m
             , session_commands
               @ [ rpc "auth_status" ~tag:Auth_refresh
+                ; call Forge_status ~tag:Forge_refresh
                 ; rpc "get_config" ~tag:Config
                 ] ))
      | Session_stats ->
@@ -4926,13 +5260,48 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with auth }, [])
      | Auth_show ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         output { m with auth } ~title:"Logins" (format_auth auth), [])
+         let m = { m with auth } in
+         output m ~title:logins_title (format_auth m), [])
      | Auth_login_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         login_picker { m with auth } auth, [])
+         login_picker { m with auth }, [])
      | Auth_logout_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         logout_picker { m with auth } auth, [])
+         logout_picker { m with auth }, [])
+     | Forge_refresh ->
+       decode json ~f:P.Forge_account.list_of_json (fun forge ->
+         forge_refreshed m forge, [])
+     | Prs_picker state ->
+       decode json ~f:P.Pr_list.of_json (fun list ->
+         prs_picker m ~state list, [])
+     | Pr_shown ->
+       decode json ~f:P.Pr_detail.of_json (fun detail ->
+         ( output
+             m
+             ~title:(sprintf "Pull request #%d" detail.pr.number)
+             (Pr_view.render detail)
+         , [] ))
+     | Pr_form_defaults title ->
+       decode json ~f:P.Pr_defaults.of_json (fun defaults ->
+         if Mode.is_dialog m.mode
+         then warn m "close the current dialog first (Esc), then /pr new", []
+         else
+           ( { m with
+               mode = Pr_form (Pr_form.create ?title defaults)
+             ; autocomplete = None
+             }
+           , [] ))
+     | Pr_created ->
+       decode json ~f:P.Pr_detail.of_json (fun { pr; _ } ->
+         let m =
+           match m.mode with
+           | Pr_form _ -> { m with mode = Editing }
+           | _ -> m
+         in
+         notice m (sprintf "#%d created: %s" pr.number pr.url), [])
+     | Pr_checked_out number ->
+       decode json ~f:P.Pr_checkout.of_json (fun checkout ->
+         pr_checked_out m number checkout, [])
      | Config ->
        decode json ~f:P.Config.of_json (fun config ->
          { m with config = Some config }, [])

@@ -582,7 +582,8 @@ let follow t login =
           "done" (provider : Provider_id.t) (method_ : Provider_auth.Method.t)]
     | Failed { provider; error } ->
       print_s [%message "failed" provider (mask t error)]
-    | Logged_out p -> print_s [%message "logged out" (p : Provider_id.t)])
+    | Logged_out p -> print_s [%message "logged out" (p : Provider_id.t)]
+    | Forge_done _ | Forge_logged_out _ -> print_endline "forge?!")
 ;;
 
 let drive answers = script := answers

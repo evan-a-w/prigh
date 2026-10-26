@@ -47,6 +47,12 @@
   (copy ../files.css files.css)))
 
 (rule
+ (target review.css)
+ (deps ../review.css)
+ (action
+  (copy ../review.css review.css)))
+
+(rule
  (target highlight.css)
  (deps ../highlight.css)
  (action
@@ -69,6 +75,12 @@
  (deps ../jump.css)
  (action
   (copy ../jump.css jump.css)))
+
+(rule
+ (target forge.css)
+ (deps ../forge.css)
+ (action
+  (copy ../forge.css forge.css)))
 
 ; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
 ; fontTools to Latin and two instances: sans (casual axis kept, for
@@ -130,10 +142,12 @@
   (agents.css as web/agents.css)
   (terminal.css as web/terminal.css)
   (files.css as web/files.css)
+  (review.css as web/review.css)
   (highlight.css as web/highlight.css)
   (resize.css as web/resize.css)
   (paging.css as web/paging.css)
   (jump.css as web/jump.css)
+  (forge.css as web/forge.css)
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)
   (recursive-OFL.txt as web/recursive-OFL.txt)

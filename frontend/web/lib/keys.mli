@@ -9,11 +9,13 @@ module Target : sig
   type t =
     | Editor of { cursor : int } (** the prompt editor, with its caret *)
     | Field (** another text field *)
+    | Multiline (** a dialog's text box: Enter is a new line there *)
     | Control (** a button, link or fold: Enter and Space are its own *)
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)
     | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
     | Files (** the file browser's list (not its fields) *)
+    | Review (** the review page (not its fields or buttons) *)
     | Resize of Resize.Handle.t (** a panel's resize handle *)
     | Page
   [@@deriving sexp_of]

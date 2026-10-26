@@ -37,14 +37,69 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
-    | List_worktrees
+    | Forge_status
+    | Forge_login of
+        { host : string
+        ; kind : string option
+        ; method_ : string option
+        }
+    | Forge_logout of string
+    | Pr_list of { state : string option }
+    | Pr_view of int
+    | Pr_defaults
+    | Pr_create of
+        { title : string
+        ; body : string
+        ; base : string option
+        ; head : string option
+        ; draft : bool
+        ; push : bool
+        }
+    | Pr_checkout of int
+    | List_worktrees of { cwd : string option }
     | Create_worktree of
         { branch : string
         ; base : string option
+        ; cwd : string option
         }
     | Remove_worktree of
         { path : string
         ; force : bool
+        ; cwd : string option
+        }
+    | Get_review
+    | Review_comment of
+        { root : string
+        ; path : string
+        ; range : Review_comment.Range.t
+        ; anchor : string
+        ; text : string
+        }
+    | Review_reply of
+        { id : string
+        ; text : string
+        }
+    | Review_set_status of
+        { id : string
+        ; status : Review_comment.Status.t
+        }
+    | Review_delete of { id : string }
+    | Review_submit
+    | Review_decide of
+        { id : string
+        ; post : int
+        ; accept : bool
+        }
+    | Review_approve of
+        { path : string
+        ; hash : string
+        }
+    | Review_unapprove of { path : string }
+    | Fs_preview of { path : string }
+    | Fs_write of
+        { path : string
+        ; text : string
+        ; expected : string option
         }
   [@@deriving sexp_of, equal]
 
@@ -60,15 +115,69 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
-    | List_worktrees -> "list_worktrees"
+    | Forge_status -> "forge_status"
+    | Forge_login _ -> "forge_login"
+    | Forge_logout _ -> "forge_logout"
+    | Pr_list _ -> "pr_list"
+    | Pr_view _ -> "pr_view"
+    | Pr_defaults -> "pr_defaults"
+    | Pr_create _ -> "pr_create"
+    | Pr_checkout _ -> "pr_checkout"
+    | List_worktrees _ -> "list_worktrees"
     | Create_worktree _ -> "create_worktree"
     | Remove_worktree _ -> "remove_worktree"
+    | Get_review -> "get_review"
+    | Review_comment _ -> "review_comment"
+    | Review_reply _ -> "review_reply"
+    | Review_set_status _ -> "review_set_status"
+    | Review_delete _ -> "review_delete"
+    | Review_submit -> "review_submit"
+    | Review_decide _ -> "review_decide"
+    | Review_approve _ -> "review_approve"
+    | Review_unapprove _ -> "review_unapprove"
+    | Fs_preview _ -> "fs_preview"
+    | Fs_write _ -> "fs_write"
+  ;;
+
+  let cwd_param = function
+    | None -> []
+    | Some cwd -> [ "cwd", Json.str cwd ]
   ;;
 
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | List_worktrees -> []
+    | Delete_archived
+    | Forge_status
+    | Pr_defaults
+    | Get_review
+    | Review_submit -> []
+    | Review_comment { root; path; range; anchor; text } ->
+      [ "root", Json.str root
+      ; "path", Json.str path
+      ; "first", Json.int range.first
+      ; "last", Json.int range.last
+      ]
+      @ Review_comment.Range.params range
+      @ [ "anchor", Json.str anchor; "text", Json.str text ]
+    | Review_reply { id; text } -> [ "id", Json.str id; "text", Json.str text ]
+    | Review_set_status { id; status } ->
+      [ "id", Json.str id
+      ; "status", Json.str (Review_comment.Status.to_string status)
+      ]
+    | Review_delete { id } -> [ "id", Json.str id ]
+    | Review_decide { id; post; accept } ->
+      [ "id", Json.str id; "post", Json.int post; "accept", Json.bool accept ]
+    | Review_approve { path; hash } ->
+      [ "path", Json.str path; "hash", Json.str hash ]
+    | Review_unapprove { path } | Fs_preview { path } ->
+      [ "path", Json.str path ]
+    | Fs_write { path; text; expected } ->
+      [ "path", Json.str path; "text", Json.str text ]
+      @ Option.value_map expected ~default:[] ~f:(fun e ->
+        [ "expected", Json.str e ])
+    | List_worktrees { cwd = None } -> []
+    | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -97,12 +206,28 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
-    | Create_worktree { branch; base } ->
+    | Forge_login { host; kind; method_ } ->
+      [ "host", Json.str host ]
+      @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])
+      @ Option.value_map method_ ~default:[] ~f:(fun m ->
+        [ "method", Json.str m ])
+    | Forge_logout host -> [ "host", Json.str host ]
+    | Pr_list { state } ->
+      Option.value_map state ~default:[] ~f:(fun s -> [ "state", Json.str s ])
+    | Pr_view number | Pr_checkout number -> [ "number", Json.int number ]
+    | Pr_create { title; body; base; head; draft; push } ->
+      [ "title", Json.str title; "body", Json.str body ]
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+      @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
+      @ [ "draft", Json.bool draft; "push", Json.bool push ]
+    | Create_worktree { branch; base; cwd } ->
       [ "branch", Json.str branch ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
-    | Remove_worktree { path; force } ->
+      @ cwd_param cwd
+    | Remove_worktree { path; force; cwd } ->
       [ "path", Json.str path ]
-      @ if force then [ "force", Json.bool true ] else []
+      @ (if force then [ "force", Json.bool true ] else [])
+      @ cwd_param cwd
   ;;
 end
 

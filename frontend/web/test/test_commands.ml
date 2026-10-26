@@ -34,10 +34,12 @@ let%expect_test "every command does something (none is unknown)" =
          | Scoped_models _ -> "scoped models dialog"
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
-         | Loading title ->
+         | (Loading _ | Pulls _) as d ->
            sprintf
-             "loading %s: %s"
-             title
+             "%s: %s"
+             (match d with
+              | Loading title -> "loading " ^ title
+              | _ -> "pull requests")
              (List.filter_map commands ~f:(function
                 | Rpc { method_; _ } -> Some ("rpc " ^ method_)
                 | _ -> None)
@@ -78,7 +80,7 @@ let%expect_test "every command does something (none is unknown)" =
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /compact                   toast: Compacting the conversation…
     /diff                      toast: Reading the changes…
-    /review                    toast: Reading the changes to review…
+    /review                    rpc git_diff
     /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
@@ -111,12 +113,13 @@ let%expect_test "every command does something (none is unknown)" =
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
     /terminal                  rpc set_prefs, Focus_terminal
-    /files                     rpc fs_list, (Files(Focus files-list))
+    /files                     rpc fs_list, (Files(Focus files-list)), rpc git_diff
     /agents                    agents panel
     /jobs                      agents panel
-    /login                     loading Log in to a provider: rpc push_pref, rpc auth_status
-    /logout                    loading Log out of a provider: rpc push_pref, rpc auth_status
-    /auth                      loading Providers: rpc push_pref, rpc auth_status
+    /login                     loading Log in: rpc push_pref, rpc auth_status
+    /logout                    loading Log out: rpc push_pref, rpc auth_status
+    /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
+    /pr                        pull requests: rpc push_pref, rpc pr_list
     /setusr                    loading Act as: rpc push_pref, rpc list_users
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
@@ -163,7 +166,9 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model
+    Ctrl+L switch model: the model chip's menu
+    ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models
+    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
@@ -184,7 +189,14 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
+    Alt+R open or close the review page (/review): the changes file by file, beside the chat
+    ] / [ (reviewing; also n p, j k) the next / previous changed file
+    a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    Esc (reviewing) drop the comment or selection, then close the review
+    Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
@@ -1616,6 +1628,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     |}];
   H.reply h "get_state" (H.state_json ~fields:[ "session_id", `String "b1" ] ());
   H.text h ~selector:".sidebar-footer";
@@ -1630,11 +1643,12 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "b1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    (A alice acting as bob) (Commands and keys (/help))
+    (A alice acting as bob) (Settings (Ctrl+, or /settings))
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};
@@ -1649,12 +1663,13 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1701,12 +1716,13 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

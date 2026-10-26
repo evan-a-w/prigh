@@ -11,7 +11,9 @@ let%expect_test
   [%expect
     {|
     []
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
@@ -95,7 +97,8 @@ let%expect_test
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ()));
   H.key h "Escape";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nbackend\
@@ -391,7 +394,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics

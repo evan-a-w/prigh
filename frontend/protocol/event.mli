@@ -59,6 +59,7 @@ type t =
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
+  | Review of Review.t (** the session's review changed *)
   | Notice of string
   | Queue_update of
       { steer : string list (** the queued texts, oldest first *)
@@ -70,6 +71,8 @@ type t =
       ; task : string
       ; model : string
       ; tools : string list
+      ; worktree : Agent_worktree.t option
+        (** a worktree made for it, which it works in *)
       }
   | Subagent of
       { call_id : string

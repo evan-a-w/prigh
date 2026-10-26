@@ -623,7 +623,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
     Esc                     close the dialog, or abort the running turn
-    Tab                     complete a slash command, @path or #snippet / open the command picker / the next field of the sign-in dialog
+    Tab                     complete a slash command, @path or #snippet / open the command picker / the next field of the sign-in and pull request dialogs
     Up                      move up (editor line, history, or list row)
     Down                    move down (editor line, history, or list row)
     Alt+Up                  pop the last queued steer/follow-up back into the editor
@@ -672,8 +672,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /change_default                    save the current model and thinking level as the default for new sessions
     /fallback [off|model...]           show or set the models that take over, in order, when a model's usage runs out
     /default-dir [off|path]            show or set the directory new sessions start in
-    /login [provider] [api_key|oauth]  log in to a provider
-    /logout [provider]                 remove a provider's stored credential
+    /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
+    /logout [provider|HOST]            remove a provider's or a git host's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /confirm [on|off]                  ask before destructive tools (approval mode ask or auto, also for new sessions)
@@ -682,14 +682,15 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /todos                             show the model's plan (its update_plan steps)
     /permissions                       show the mode and the allow/ask/deny rules (config and this session)
     /notify [off|bell|desktop]         how to tell you that a turn ended or something waits for you while the terminal is not focused
-    /auth                              show which providers are configured
+    /auth                              show which providers and git hosts are configured
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
-    /review [base] [instructions]      review the uncommitted changes, or those against a base branch, for prioritised findings
+    /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [title] creates one from the current branch, checkout N checks one out in a git worktree
+    /review [base] [instructions]      alone: the changed files' approvals and review comments (prigh-web: the review page); with a base (HEAD: the uncommitted changes) or instructions, have the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
@@ -2173,6 +2174,7 @@ let%expect_test
       ~line_index:0
       ~models
       ~auth:[]
+      ~forge:[]
       ~sessions:None
       ~skills
       ~snippets:[]
@@ -2252,6 +2254,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~line_index:0
       ~models:[]
       ~auth:[]
+      ~forge:[]
       ~sessions:None
       ~skills
       ~snippets:[]
@@ -2403,6 +2406,7 @@ let%expect_test
         ~line_index:0
         ~models
         ~auth:[]
+        ~forge:[]
         ~sessions:None
         ~skills:None
         ~snippets:[]

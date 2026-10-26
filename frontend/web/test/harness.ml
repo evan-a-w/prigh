@@ -17,7 +17,9 @@ let act t action =
     (match command with
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
      | Reconnect _
+     | Place_popover
      | Set_url_session _
+     | Clear_text_selection
      | Expire_toast _
      | Focus _
      | Set_caret _
@@ -148,6 +150,26 @@ let models_json =
        ])
 ;;
 
+let forge_json ?user ?(oauth = true) ?note ~kind ~label host =
+  let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
+  sprintf
+    {|{"host":"%s","kind":"%s","label":"%s","user":%s,"method":%s,"expires_ms":null,"oauth":%b,"oauth_note":%s}|}
+    host
+    kind
+    label
+    (opt user)
+    (opt (Option.map user ~f:(fun _ -> "oauth")))
+    oauth
+    (opt note)
+;;
+
+let forges_json =
+  sprintf
+    {|{"accounts":[%s,%s]}|}
+    (forge_json ~kind:"github" ~label:"GitHub" "github.com")
+    (forge_json ~kind:"forgejo" ~label:"Forgejo" "codeberg.org")
+;;
+
 let auth_json =
   {|[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Claude subscription"},{"method":"api_key","label":"API key"}],"configured":{"method":"oauth","source":"auth.json"}},
      {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"API key"}],"configured":null},
@@ -167,11 +189,36 @@ let session_json
       ?(clients = 0)
       ?(archived = false)
       ?(bytes = 0)
+      ?repo
+      ?(agent_worktrees = [])
       id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
+  let repo =
+    match repo with
+    | None -> ""
+    | Some (root, worktree, branch) ->
+      sprintf
+        {|"repo":{"root":%S,"worktree":%S,"branch":%s,"main":%b},|}
+        root
+        worktree
+        (opt branch)
+        (String.equal root worktree)
+  in
+  let agent_worktrees =
+    String.concat
+      ~sep:","
+      (List.map agent_worktrees ~f:(fun (agent, task, path, branch, root) ->
+         sprintf
+           {|{"agent":%S,"task":%S,"path":%S,"branch":%S,"root":%S}|}
+           agent
+           task
+           path
+           branch
+           root))
+  in
   sprintf
-    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
+    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s"agent_worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
     id
     id
     (opt name)
@@ -180,6 +227,8 @@ let session_json
     updated_at
     (opt first_prompt)
     messages
+    repo
+    agent_worktrees
     live
     running
     background
@@ -259,6 +308,7 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   reply t "list_models" models_json;
   reply t "auth_status" auth_json;
   reply t "get_config" config_json;
+  reply t "forge_status" forges_json;
   reply t "get_messages_page" (page "[]");
   reply
     t
@@ -326,6 +376,25 @@ let block_tags =
   ]
 ;;
 
+(* Checkboxes and radio buttons, drawn by CSS. *)
+let check_glyph (node : Node_helpers.t) =
+  match node with
+  | Element e ->
+    let classes =
+      List.Assoc.find e.attributes ~equal:String.equal "class"
+      |> Option.value_map ~default:[] ~f:(String.split ~on:' ')
+    in
+    let has c = List.mem classes c ~equal:String.equal in
+    Option.some_if
+      (has "check")
+      (match has "radio", has "on" with
+       | true, true -> "◉"
+       | true, false -> "○"
+       | false, true -> "☑"
+       | false, false -> "☐")
+  | Text _ | Widget -> None
+;;
+
 let render node =
   let lines = Queue.create () in
   let line = Buffer.create 80 in
@@ -347,9 +416,9 @@ let render node =
     | Widget -> []
     | Element { tag_name = "icon"; _ } -> []
     | Element e ->
-      (match Render.mark_glyph node with
-       | Some glyph -> [ glyph ]
-       | None -> List.concat_map e.children ~f:inline)
+      (match Render.mark_glyph node, check_glyph node with
+       | Some glyph, _ | None, Some glyph -> [ glyph ]
+       | None, None -> List.concat_map e.children ~f:inline)
   in
   let rec walk (node : Node_helpers.t) =
     match node with
@@ -358,24 +427,8 @@ let render node =
     | Element { tag_name = "icon"; _ } -> ()
     | Element _ when Node_helpers.has_class ~cls:"mark" node ->
       Option.iter (Render.mark_glyph node) ~f:add
-    (* Checkboxes and radio buttons, drawn by CSS. *)
-    | Element e
-      when List.exists e.attributes ~f:(fun (k, v) ->
-             String.equal k "class"
-             && List.mem (String.split v ~on:' ') "check" ~equal:String.equal)
-      ->
-      let class_ =
-        List.Assoc.find_exn e.attributes ~equal:String.equal "class"
-      in
-      let has c =
-        List.mem (String.split class_ ~on:' ') c ~equal:String.equal
-      in
-      add
-        (match has "radio", has "on" with
-         | true, true -> "◉"
-         | true, false -> "○"
-         | false, true -> "☑"
-         | false, false -> "☐")
+    | Element _ when Option.is_some (check_glyph node) ->
+      Option.iter (check_glyph node) ~f:add
     (* Hidden file pickers: the page opens them from buttons. *)
     | Element ({ tag_name = "input"; _ } as e)
       when List.exists e.attributes ~f:(fun (k, v) ->

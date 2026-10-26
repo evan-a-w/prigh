@@ -229,12 +229,13 @@ let%expect_test
             <table class="diff">
               <tbody>
                 <tr class="hunk">
-                  <td colspan="4"> @@ -1,2 +1,2 @@ </td>
+                  <td colspan="3">
+                    <span class="hunk-range"> @@ -1,2 +1,2 @@ </span>
+                  </td>
                 </tr>
                 <tr class="same">
                   <td class="ln"> 1 </td>
-                  <td class="ln"> 1 </td>
-                  <td class="sign">   </td>
+                  <td aria-hidden="true" class="sign">   </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      x =
@@ -242,9 +243,8 @@ let%expect_test
                   </td>
                 </tr>
                 <tr class="del">
-                  <td class="ln"> 2 </td>
-                  <td class="ln">  </td>
-                  <td class="sign"> - </td>
+                  <td class="ln old"> 2 </td>
+                  <td aria-hidden="true" class="sign"> - </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
@@ -252,9 +252,8 @@ let%expect_test
                   </td>
                 </tr>
                 <tr class="add">
-                  <td class="ln">  </td>
                   <td class="ln"> 2 </td>
-                  <td class="sign"> + </td>
+                  <td aria-hidden="true" class="sign"> + </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
@@ -276,12 +275,13 @@ let%expect_test
             <table class="diff">
               <tbody>
                 <tr class="hunk">
-                  <td colspan="4"> @@ -0,0 +1 @@ </td>
+                  <td colspan="3">
+                    <span class="hunk-range"> @@ -0,0 +1 @@ </span>
+                  </td>
                 </tr>
                 <tr class="add">
-                  <td class="ln">  </td>
                   <td class="ln"> 1 </td>
-                  <td class="sign"> + </td>
+                  <td aria-hidden="true" class="sign"> + </td>
                   <td class="text"> hello </td>
                 </tr>
               </tbody>
@@ -291,6 +291,10 @@ let%expect_test
       </div>
       <footer class="modal-buttons">
         <span class="keys-hint"> /diff PATH shows one file or directory </span>
+        <button type="button"
+                title="Approve and comment file by file (Alt+R, /review)"
+                class="btn small"
+                @on_click> Review </button>
         <button type="button" class="btn primary" @on_click> Done </button>
       </footer>
     </div>
@@ -344,7 +348,9 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
@@ -387,9 +393,9 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /quit how to leave (close the tab; /signout signs out)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /login [provider] log in to a model provider (or /login custom)
+    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /switch [path] switch to a saved session
     /rewind go back to an earlier message in this session
     /skills pick a skill to invoke (/skill:name)

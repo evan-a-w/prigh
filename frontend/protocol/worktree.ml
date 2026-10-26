@@ -111,16 +111,20 @@ module Created = struct
   type nonrec t =
     { worktree : t
     ; new_branch : bool
+    ; root : string option
+    ; cwd : string option
     }
   [@@deriving sexp_of, equal]
 
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind worktree = Json.object_field j "worktree" >>= of_json in
-    let%map new_branch =
+    let%bind new_branch =
       Json.bool_default_field j "new_branch" ~default:false
     in
-    { worktree; new_branch }
+    let%bind root = Json.string_opt_field j "root" in
+    let%map cwd = Json.string_opt_field j "cwd" in
+    { worktree; new_branch; root; cwd }
   ;;
 end
 

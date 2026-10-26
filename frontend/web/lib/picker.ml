@@ -48,25 +48,33 @@ let filter items ~query =
   Prigh_ui.Fuzzy.rank ~query items ~key:(fun (i : Item.t) -> i.search)
 ;;
 
+(* Unfiltered, the highlight is on [highlight], else the marked item. *)
+let first_selected ?highlight visible ~query =
+  if String.is_empty query
+  then
+    Option.value_map
+      (List.findi visible ~f:(fun _ (i : Item.t) ->
+         match highlight with
+         | Some id -> String.equal i.id id
+         | None -> i.marked))
+      ~default:0
+      ~f:fst
+  else 0
+;;
+
 let set_query t query =
-  { t with query; visible = filter t.items ~query; selected = 0 }
+  let visible = filter t.items ~query in
+  { t with query; visible; selected = first_selected visible ~query }
 ;;
 
 let create ?(query = "") ?highlight ~title items =
   let visible = filter items ~query in
-  let selected =
-    if String.is_empty query
-    then
-      Option.value_map
-        (List.findi visible ~f:(fun _ (i : Item.t) ->
-           match highlight with
-           | Some id -> String.equal i.id id
-           | None -> i.marked))
-        ~default:0
-        ~f:fst
-    else 0
-  in
-  { title; query; items; visible; selected }
+  { title
+  ; query
+  ; items
+  ; visible
+  ; selected = first_selected ?highlight visible ~query
+  }
 ;;
 
 let move t delta =

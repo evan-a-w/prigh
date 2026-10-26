@@ -6,7 +6,8 @@ open Prigh_web
 type t
 
 (** Started and connected: [state] (a fresh session, default [state_json ()]),
-    the models ([models_json]), the providers ([auth_json]), the config
+    the models ([models_json]), the providers ([auth_json]), the git hosts
+    ([forges_json]), the config
     ([config_json]), [sessions] and the user's preferences (none) answered, and the clock at [now]. The startup commands are printed only
     when [verbose]. *)
 val create : ?verbose:bool -> ?sessions:string -> ?state:string -> unit -> t
@@ -98,6 +99,11 @@ val session_json
   -> ?clients:int
   -> ?archived:bool
   -> ?bytes:int
+  -> ?repo:string * string * string option
+       (** where its cwd is in git: the repository's root, the worktree and
+           its branch *)
+  -> ?agent_worktrees:(string * string * string * string * string) list
+       (** its subagents' worktrees: agent, task, path, branch, root *)
   -> string
   -> string
 
@@ -119,6 +125,19 @@ val config_json : string
 
 (** Anthropic logged in (oauth); OpenAI and DeepSeek not. *)
 val auth_json : string
+
+(** A [forge_status] account; [user] signs it in (with OAuth). *)
+val forge_json
+  :  ?user:string
+  -> ?oauth:bool
+  -> ?note:string
+  -> kind:string
+  -> label:string
+  -> string
+  -> string
+
+(** GitHub (github.com) and Forgejo (codeberg.org), signed out. *)
+val forges_json : string
 
 (** 2026-10-05 10:00 UTC. *)
 val now : Time_ns.t

@@ -123,27 +123,51 @@ let mem t name =
     List.Assoc.mem fields ~equal:String.equal name)
 ;;
 
-let modify t provider ~f =
+let modify_entry t key ~f =
   with_lock t ~f:(fun () ->
     let open Or_error.Let_syntax in
     let%bind fields = load t in
-    let key = Provider_id.to_string provider in
-    let%bind current =
-      match List.Assoc.find fields ~equal:String.equal key with
-      | None -> Ok None
-      | Some json -> Or_error.map (Credential.of_json json) ~f:Option.some
-    in
+    let current = List.Assoc.find fields ~equal:String.equal key in
     let%map next = f current in
-    if not ([%equal: Credential.t option] current next)
+    if not (Option.equal Json.exactly_equal current next)
     then (
       let fields = List.Assoc.remove fields ~equal:String.equal key in
       let fields =
         match next with
         | None -> fields
-        | Some c -> fields @ [ key, Credential.to_json c ]
+        | Some json -> fields @ [ key, json ]
       in
       save t fields);
     next)
+;;
+
+let read_entry t key =
+  Or_error.map (load t) ~f:(fun fields ->
+    List.Assoc.find fields ~equal:String.equal key)
+;;
+
+let entries t ~prefix =
+  Or_error.map (load t) ~f:(fun fields ->
+    List.filter fields ~f:(fun (key, _) -> String.is_prefix key ~prefix))
+;;
+
+let modify t provider ~f =
+  let current = ref None in
+  let%map.Or_error _ =
+    modify_entry t (Provider_id.to_string provider) ~f:(fun json ->
+      let open Or_error.Let_syntax in
+      let%bind credential =
+        match json with
+        | None -> Ok None
+        | Some json -> Or_error.map (Credential.of_json json) ~f:Option.some
+      in
+      let%map next = f credential in
+      current := next;
+      if [%equal: Credential.t option] credential next
+      then json
+      else Option.map next ~f:Credential.to_json)
+  in
+  !current
 ;;
 
 let set t provider credential =

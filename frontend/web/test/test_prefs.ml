@@ -69,7 +69,7 @@ let%expect_test "the cache first, then the backend's, which win" =
     (Cache_prefs
      (((key web.theme) (value (light))) ((key web.accent) (value (#3366ff)))
       ((key web.notify) (value ())) ((key web.verbosity) (value (quiet)))
-      ((key web.terminal-open) (value ()))
+      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ())) ((key web.files-split) (value ()))
@@ -100,7 +100,7 @@ let%expect_test "a page from before uploads the browser's once" =
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value (false))) ((key web.verbosity) (value ()))
-      ((key web.terminal-open) (value ()))
+      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ())) ((key web.files-split) (value ()))
@@ -126,10 +126,11 @@ let%expect_test "a page from before uploads the browser's once" =
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value ())) ((key web.verbosity) (value ()))
-      ((key web.terminal-open) (value ())) ((key history) (value ()))
-      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
-      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
+      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
+      ((key history) (value ())) ((key web.migrated) (value (true)))
+      ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
+      ((key web.files-split) (value ())) ((key web.agents-width) (value ()))
+      ((key web.terminal-height) (value ()))))
     true
     |}]
 ;;
@@ -220,6 +221,7 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Cache_prefs (((key history) (value (("/accent green" "/accent teal"))))))
     (Cache_prefs
      (((key web.theme) (value (original))) ((key web.accent) (value (green)))))
@@ -244,12 +246,13 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];

@@ -293,9 +293,13 @@ let new_worktree (d : New_worktree.t) ~inject =
       ]
   in
   let head = Option.value d.head ~default:"HEAD" in
+  let fresh = Option.is_some d.repo in
   Modal.view
     ~cls:"prompt-dialog worktree-dialog"
-    ~title:"New worktree"
+    ~title:
+      (match d.repo with
+       | Some repo -> "New worktree of " ^ Filename.basename repo
+       | None -> "New worktree")
     ~on_close:(inject Action.Close_dialog)
     ~footer:
       [ keys_hint "Enter creates, Esc cancels"
@@ -304,7 +308,12 @@ let new_worktree (d : New_worktree.t) ~inject =
           ~cls:"primary"
           ~disabled:d.busy
           ~on_click:(inject Action.Dialog_accept)
-          [ Node.text (if d.busy then "Creating…" else "Create and switch") ]
+          [ Node.text
+              (match d.busy, fresh with
+               | true, _ -> "Creating…"
+               | false, true -> "Create and start a session"
+               | false, false -> "Create and switch")
+          ]
       ]
     [ field
         Branch
@@ -318,18 +327,26 @@ let new_worktree (d : New_worktree.t) ~inject =
         ~value:d.base
         ~placeholder:head
         ~note:
-          (sprintf
-             "Where a new branch starts (empty: %s, where this session is)"
-             head)
+          (if fresh
+           then sprintf "Where a new branch starts (empty: %s)" head
+           else
+             sprintf
+               "Where a new branch starts (empty: %s, where this session is)"
+               head)
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.text
-            (match d.project_dir with
-             | Some dir ->
+            (match d.project_dir, fresh with
+             | Some dir, false ->
                sprintf
                  "Created in %s, then this session works there."
                  (Sidebar_view.home_relative dir)
-             | None -> "This session works there once it is created.")
+             | None, false -> "This session works there once it is created."
+             | Some dir, true ->
+               sprintf
+                 "Created in %s, then a new session starts there."
+                 (Sidebar_view.home_relative dir)
+             | None, true -> "A new session starts there once it is created.")
         ]
     ; dialog_error d.error
     ]
@@ -556,8 +573,20 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
+  | Picker _
+  | Popover _
+  | Help
+  | Settings
+  | Rename _
+  | Delete _
+  | Login _
+  | Auth _
+  | Forge_host _
+  | Pulls _
+  | Pull _
+  | Pr_create _
+  | Pr_checked_out _ -> None
   | New_worktree d -> Some (new_worktree d ~inject)
-  | Remove_worktree { worktree; force; busy; error } ->
+  | Remove_worktree { worktree; force; busy; error; repo = _ } ->
     Some (remove_worktree worktree ~force ~busy ~error ~inject)
-  | Picker _ | Help | Settings | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

@@ -659,13 +659,16 @@ let%expect_test
     browser: event sessions_changed
     browser: event notice
     browser: event state active_host=backend hosts=<host>,laptop
+    browser: event sessions_changed
     browser: response b3 ok=true
     terminal: event state active_host=client-2 hosts=<host>,laptop
     terminal: event sessions_changed
     terminal: event notice
     terminal: event state active_host=backend hosts=<host>,laptop
+    terminal: event sessions_changed
     terminal: event notice
     terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: event sessions_changed
     terminal: response t2 ok=true
     browser: event notice
     browser: event state active_host=client-2 hosts=<host>,laptop

@@ -55,6 +55,13 @@ let spec =
           , `String
           , "Thinking level: off|on|low|high|max (default: this agent's)" )
         ; "cwd", `String, "Working directory (default: this agent's)"
+        ; ( "worktree"
+          , `String
+          , "Run it in a fresh git worktree of the working directory's \
+             repository, on a new branch: a branch name, or \"auto\" for one \
+             named after the task. Use it for changes to review and merge \
+             separately, or to keep parallel work apart; its report says where \
+             the branch is (default: none, it works in the working directory)" )
         ; ( "max_turns"
           , `Integer
           , sprintf "Maximum number of turns (default %d)" max_turns )
@@ -76,8 +83,35 @@ module Prepared = struct
     ; extra_context : string option
     ; tools : Tool.t list
     ; depth : int
+    ; worktree : [ `Auto | `Branch of string ] option (** asked for *)
+    ; created : Worktree.Created.t option (** made, [cwd] is in it *)
     }
 end
+
+let worktree_arg args =
+  match Json.member "worktree" args with
+  | None | Some `Null | Some `False -> None
+  | Some `True -> Some `Auto
+  | Some (`String s) ->
+    (match String.strip s with
+     | "" | "false" | "no" | "none" -> None
+     | "auto" | "true" | "yes" -> Some `Auto
+     | branch -> Some (`Branch branch))
+  | Some _ ->
+    raise
+      (Tool_args.Invalid "worktree must be a branch name or \"auto\" (or true)")
+;;
+
+(* [agent/<the task's first words>]. *)
+let auto_branch task =
+  let words =
+    String.split_on_chars (String.lowercase task) ~on:[ ' '; '\n'; '\t' ]
+    |> List.filter ~f:(Fn.non String.is_empty)
+    |> fun words -> List.take words 5
+  in
+  let slug = Worktree.slug (String.concat ~sep:"-" words) in
+  "agent/" ^ String.prefix slug 40 |> String.rstrip ~drop:(Char.equal '-')
+;;
 
 let prepare
       ~models
@@ -137,7 +171,33 @@ let prepare
   ; extra_context = Tool_args.string_opt args "context"
   ; tools
   ; depth
+  ; worktree = worktree_arg args
+  ; created = None
   }
+;;
+
+(* The worktree [p] asks for, made on the tool host; [p] then works in it. *)
+let make_worktree ~worktrees_dir (context : Tool.Context.t) (p : Prepared.t) =
+  match p.worktree with
+  | None -> Ok p
+  | Some wanted ->
+    let branch, fresh =
+      match wanted with
+      | `Auto -> auto_branch p.task, true
+      | `Branch branch -> branch, false
+    in
+    Tool.execute_via
+      { context with cwd = p.cwd; on_output = ignore }
+      Worktree.create_tool
+      (Worktree.create_args
+         ~fresh
+         ~dir:(worktrees_dir ())
+         ~branch
+         ~base:None
+         ())
+    |> Worktree.created_of_result
+    |> Or_error.map ~f:(fun (created : Worktree.Created.t) ->
+      { p with cwd = created.cwd; created = Some created })
 ;;
 
 (* A subagent's jobs are its own: their reports arrive between its turns,
@@ -180,6 +240,15 @@ let execute
       ~agent_id
   =
   let call_id = context.call_id in
+  let worktree =
+    Option.map p.created ~f:(fun (c : Worktree.Created.t) ->
+      { Agent_worktree.agent = agent_id
+      ; task = p.task
+      ; path = c.worktree.path
+      ; branch = Option.value c.worktree.branch ~default:"HEAD"
+      ; root = c.root
+      })
+  in
   let system =
     let base =
       match p.extra_context with
@@ -228,6 +297,7 @@ let execute
        ; task = p.task
        ; model = p.model.id
        ; tools = List.map p.tools ~f:Tool.name
+       ; worktree
        });
   let turns = ref 0 in
   let nested_usage = ref Usage.zero in
@@ -320,6 +390,8 @@ let execute
         usage.input
         usage.output
         cost_usd
+    ^ Option.value_map worktree ~default:"" ~f:(fun w ->
+      "\n" ^ Agent_worktree.report_line w)
   in
   let result =
     match last_assistant with
@@ -365,6 +437,7 @@ let execute
 
 let create
       ?(models = Model_registry.builtin ())
+      ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
       ~provider
       ~current_model
       ~current_thinking
@@ -375,41 +448,48 @@ let create
     let prepared =
       prepare ~models ~current_model ~current_thinking context args
     in
-    match context.background with
-    | Some background when context.depth = 0 ->
-      let id =
-        Background_tasks.spawn
-          background
-          ~kind:Subagent
-          ~label:prepared.task
-          ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
-            let result =
-              execute
-                ~provider
-                ~home
-                { context with cancel; emit; on_output = ignore }
-                prepared
-                ~agent_id:id
-            in
-            { Background_tasks.Outcome.status =
-                (if result.is_error then "failed" else "finished")
-            ; body = result.text
-            ; is_error = result.is_error
-            })
-      in
-      Tool.Result.ok
+    match make_worktree ~worktrees_dir context prepared with
+    | Error e ->
+      Tool.Result.error
         (sprintf
-           "started agent %s (%s); its result will be delivered to you when it \
-            finishes: keep working or end your turn meanwhile"
-           id
-           (Background_tasks.short_task prepared.task))
-    | _ ->
-      let agent_id =
-        match context.agent_id with
-        | None -> context.call_id
-        | Some parent -> parent ^ "/" ^ context.call_id
-      in
-      execute ~provider ~home context prepared ~agent_id
+           "could not make the subagent's worktree: %s"
+           (Error.to_string_hum e))
+    | Ok prepared ->
+      (match context.background with
+       | Some background when context.depth = 0 ->
+         let id =
+           Background_tasks.spawn
+             background
+             ~kind:Subagent
+             ~label:prepared.task
+             ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
+               let result =
+                 execute
+                   ~provider
+                   ~home
+                   { context with cancel; emit; on_output = ignore }
+                   prepared
+                   ~agent_id:id
+               in
+               { Background_tasks.Outcome.status =
+                   (if result.is_error then "failed" else "finished")
+               ; body = result.text
+               ; is_error = result.is_error
+               })
+         in
+         Tool.Result.ok
+           (sprintf
+              "started agent %s (%s); its result will be delivered to you when \
+               it finishes: keep working or end your turn meanwhile"
+              id
+              (Background_tasks.short_task prepared.task))
+       | _ ->
+         let agent_id =
+           match context.agent_id with
+           | None -> context.call_id
+           | Some parent -> parent ^ "/" ^ context.call_id
+         in
+         execute ~provider ~home context prepared ~agent_id)
   in
   { Tool.spec; run }
 ;;
