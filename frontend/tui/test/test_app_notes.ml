@@ -629,7 +629,11 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
          "approvals":[{"path":"src/a.ml","hash":%S},{"path":"new file.txt","hash":"older"}]}|}
       (hash "src/a.ml")
   in
-  H.reply ~quiet:true h (Review_comments { dir = None; base = None }) review_json;
+  H.reply
+    ~quiet:true
+    h
+    (Review_comments { dir = None; base = None })
+    review_json;
   H.reply
     h
     (Review_status

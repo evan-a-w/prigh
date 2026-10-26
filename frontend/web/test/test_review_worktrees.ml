@@ -56,8 +56,10 @@ let diff_json ?(base = "HEAD") ?(against = "HEAD") ~root ~branch diff =
         ; "truncated", `False
         ; "branch", `String branch
         ; "base", `String base
-        ; "main", if String.equal root "/work" then `True else `False
-        ; "branches", `Array [ `String "feat/login"; `String "main"; `String "origin/main" ]
+        ; ("main", if String.equal root "/work" then `True else `False)
+        ; ( "branches"
+          , `Array
+              [ `String "feat/login"; `String "main"; `String "origin/main" ] )
         ])
 ;;
 
@@ -110,8 +112,9 @@ let started () =
   h
 ;;
 
-let%expect_test "/review WORKTREE: its changes against its base, its own \
-                 comments and approvals"
+let%expect_test
+    "/review WORKTREE: its changes against its base, its own comments and \
+     approvals"
   =
   let h = started () in
   H.type_ h "/review feat/login";
@@ -128,7 +131,8 @@ let%expect_test "/review WORKTREE: its changes against its base, its own \
     |}];
   H.reply h "git_diff" (feat_diff ());
   page h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ fs_preview)
      (params ((path /home/u/.prigh/worktrees/work/feat-login/a.ml)))
      (tag (Review (Content a.ml))))
@@ -155,7 +159,8 @@ let%expect_test "/review WORKTREE: its changes against its base, its own \
     []
     |}];
   H.show h ~selector:".review-target";
-  [%expect {|
+  [%expect
+    {|
     <div title="Reviewing feat/login (/home/u/.prigh/worktrees/work/feat-login) against main (merge base abcdef01)"
          class="review-target">
       <span class="review-target-text"> Reviewing </span>
@@ -183,7 +188,8 @@ let%expect_test "/review WORKTREE: its changes against its base, its own \
   (* Approving and sending name the worktree. *)
   H.key h "a" ~target:Review;
   H.key h "s" ~target:Review;
-  [%expect {|
+  [%expect
+    {|
     (Review (Toggle_approval a.ml))
     (Rpc (method_ review_approve)
      (params
@@ -197,15 +203,17 @@ let%expect_test "/review WORKTREE: its changes against its base, its own \
     |}]
 ;;
 
-let%expect_test "the session's own worktree keeps the approvals from before \
-                 worktrees were told apart"
+let%expect_test
+    "the session's own worktree keeps the approvals from before worktrees were \
+     told apart"
   =
   let h = started () in
   H.type_ h "/review";
   H.act h Send;
   H.reply h "git_diff" (diff_json ~root:"/work" ~branch:"main" a_diff);
   page h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /review) (max 500)))
      (tag Ignore))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
@@ -235,19 +243,22 @@ let%expect_test "the session's own worktree keeps the approvals from before \
     |}];
   (* Taking that approval back names no worktree, as it was made. *)
   H.key h "a" ~target:Review;
-  [%expect {|
+  [%expect
+    {|
     (Review (Toggle_approval a.ml))
     (Rpc (method_ review_unapprove) (params ((path a.ml)))
      (tag (Review (Changed ()))))
     |}]
 ;;
 
-let%expect_test "another base, another worktree: from the pickers; replies \
-                 for the one before are dropped"
+let%expect_test
+    "another base, another worktree: from the pickers; replies for the one \
+     before are dropped"
   =
   let h = started () in
   H.act h (Review_worktree { path = feat; base = None });
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff)
      (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
@@ -258,14 +269,16 @@ let%expect_test "another base, another worktree: from the pickers; replies \
   [%expect {| (Focus review-page) |}];
   (* The first reply is for the default base: read again for HEAD. *)
   H.reply h "git_diff" (feat_diff ());
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff)
      (params ((base HEAD) (dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
     |}];
   H.reply h "git_diff" (feat_diff ~base:"HEAD" ());
   target h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ fs_preview)
      (params ((path /home/u/.prigh/worktrees/work/feat-login/a.ml)))
      (tag (Review (Content a.ml))))
@@ -275,7 +288,8 @@ let%expect_test "another base, another worktree: from the pickers; replies \
   H.event
     h
     {|{"event":"subagent","call_id":"c1","agent_id":"a1","inner":{"event":"tool_end","call":{"id":"e1","name":"write","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"e1","tool_name":"write","text":"ok","is_error":false}}}|};
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff)
      (params ((base HEAD) (dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
@@ -292,9 +306,9 @@ let%expect_test "another base, another worktree: from the pickers; replies \
             ; "cwd", `String "/work"
             ]
           ()));
-  print_s
-    [%sexp ((H.model h).review.target : Prigh_web.Code_review.Target.t)];
-  [%expect {|
+  print_s [%sexp ((H.model h).review.target : Prigh_web.Code_review.Target.t)];
+  [%expect
+    {|
     (Set_url_session s2)
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 60)))
@@ -319,7 +333,8 @@ let%expect_test "/worktree's picker: Alt+R reviews the highlighted worktree" =
   H.reply h "list_worktrees" listing;
   H.act h (Picker_query "feat");
   H.key h "r" ~alt:true ~code:"KeyR";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /worktree) (max 500)))
      (tag Ignore))
     (Focus dialog)
@@ -355,7 +370,8 @@ let%expect_test "/review completes worktrees, --base and branches" =
   completions ();
   H.type_ h "/review --base ";
   completions ();
-  [%expect {|
+  [%expect
+    {|
     (browser default)
     (--base main feat/login)
     (HEAD feat/login main origin/main)

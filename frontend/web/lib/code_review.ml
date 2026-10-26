@@ -281,7 +281,8 @@ let mark t ~abs =
 let get_diff t =
   if t.loading
   then { t with again = true }, []
-  else { t with loading = true; requested = t.target }, [ Out.Get_diff t.target ]
+  else
+    { t with loading = true; requested = t.target }, [ Out.Get_diff t.target ]
 ;;
 
 let refresh = get_diff
@@ -793,7 +794,9 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
            ; files = Diff_files.parse diff.diff
            ; diff_error = None
            ; own_root =
-               (if Option.is_none t.target.dir then Some diff.root else t.own_root)
+               (if Option.is_none t.target.dir
+                then Some diff.root
+                else t.own_root)
            }
        in
        let t, contents = refresh_contents t ~before in

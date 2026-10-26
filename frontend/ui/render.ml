@@ -217,8 +217,8 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some
             [ span
                 ~style:attention
-                "Enter opens · Ctrl+D removes · Ctrl+N in a new session · Alt+R \
-                 reviews · Esc closes"
+                "Enter opens · Ctrl+D removes · Ctrl+N in a new session · \
+                 Alt+R reviews · Esc closes"
             ]
         | Picker { kind = Snippets; _ } ->
           Some

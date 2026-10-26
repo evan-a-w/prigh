@@ -88,8 +88,9 @@ let worktree t ~branch ~base =
   |> fun (c : Worktree.Created.t) -> c.worktree.path
 ;;
 
-let%expect_test "git_diff of a worktree: committed, uncommitted and untracked \
-                 changes against its base"
+let%expect_test
+    "git_diff of a worktree: committed, uncommitted and untracked changes \
+     against its base"
   =
   with_agent []
   @@ fun t agent ->
@@ -155,8 +156,10 @@ let%expect_test "git_diff of a worktree: committed, uncommitted and untracked \
   [%expect
     {| root=$DIR/wts/repo/feat-y branch=feat/y main=false base=feat/x against=<sha> files=1 +1 -0 |}];
   (* Made by hand, nothing recorded: the remote's default branch, else main. *)
-  sh t "git worktree add -q -b manual ../manual && cd ../manual && echo m > \
-        m.txt && git add m.txt && git commit -q -m m";
+  sh
+    t
+    "git worktree add -q -b manual ../manual && cd ../manual && echo m > m.txt \
+     && git add m.txt && git commit -q -m m";
   let manual = Filename.concat t.dir "manual" in
   print_diff t (Agent.git_diff agent ~dir:manual ~default_base:true);
   sh
@@ -214,8 +217,9 @@ let dispatch t agent meth params =
   | Some (Error e) -> printf "error: %s\n" (mask t (Error.to_string_hum e))
 ;;
 
-let%expect_test "the review per worktree: approvals, sending, proposals \
-                 applied in the comment's worktree"
+let%expect_test
+    "the review per worktree: approvals, sending, proposals applied in the \
+     comment's worktree"
   =
   let sent = Queue.create () in
   with_agent
@@ -236,11 +240,16 @@ let%expect_test "the review per worktree: approvals, sending, proposals \
   let main = Filename.concat t.dir "repo" in
   let feat = worktree t ~branch:"feat/x" ~base:None in
   write t "repo/a.txt" "one\ntwo\nmain\n";
-  write t (String.chop_prefix_exn feat ~prefix:(t.dir ^ "/") ^ "/a.txt") "one\ntwo\nfeat\n";
-  print_endline (comment t agent ~root:main ~path:"a.txt" ~anchor:"one" "In main");
+  write
+    t
+    (String.chop_prefix_exn feat ~prefix:(t.dir ^ "/") ^ "/a.txt")
+    "one\ntwo\nfeat\n";
+  print_endline
+    (comment t agent ~root:main ~path:"a.txt" ~anchor:"one" "In main");
   print_endline
     (comment t agent ~root:feat ~path:"a.txt" ~anchor:"one" "In the worktree");
-  [%expect {|
+  [%expect
+    {|
     c1
     c2
     |}];

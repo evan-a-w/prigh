@@ -2794,8 +2794,9 @@ let submit_review ?root t =
   | None ->
     Or_error.map
       (update_review t ~f:(fun review ->
-         Or_error.map (Review_state.submit ?root review) ~f:(fun (text, n, changes) ->
-           (text, n), changes)))
+         Or_error.map
+           (Review_state.submit ?root review)
+           ~f:(fun (text, n, changes) -> (text, n), changes)))
       ~f:(fun (text, count) ->
         enqueue_queued
           t

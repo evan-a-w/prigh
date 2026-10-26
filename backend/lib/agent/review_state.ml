@@ -208,18 +208,17 @@ let decide t ~id ~post:index (state : C.Proposal.State.t) ~at =
 ;;
 
 let instructions =
-  "The user left review comments on the changes in a worktree (each \
-   comment's file is its absolute path, in the worktree it names: edit that \
-   file, even when it is not under your directory; line numbers are as \
-   when they commented: the file may have changed since). \
-   Answer every comment with reply_to_comment: say what you did, or why not. \
-   Make the changes they ask for; where the user should decide, propose the \
-   change with the reply's edits instead of making it (it is applied when they \
-   accept it). Resolve a comment (resolve: true) when it needs nothing more. \
-   Posts marked new are what you have not seen yet. A comment on text the user \
-   selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one \
-   with side=\"old\" is on lines the change removed, numbered as in the file \
-   before it."
+  "The user left review comments on the changes in a worktree (each comment's \
+   file is its absolute path, in the worktree it names: edit that file, even \
+   when it is not under your directory; line numbers are as when they \
+   commented: the file may have changed since). Answer every comment with \
+   reply_to_comment: say what you did, or why not. Make the changes they ask \
+   for; where the user should decide, propose the change with the reply's \
+   edits instead of making it (it is applied when they accept it). Resolve a \
+   comment (resolve: true) when it needs nothing more. Posts marked new are \
+   what you have not seen yet. A comment on text the user selected marks it \
+   ⟦like this⟧ in its code and quotes it in <selected>; one with side=\"old\" \
+   is on lines the change removed, numbered as in the file before it."
 ;;
 
 let submit ?root t =
