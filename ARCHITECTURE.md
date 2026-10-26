@@ -1149,15 +1149,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Session.messages` is the message list for the next request, folding the
   active path in order: a compaction's summary replaces everything before
   its `kept_from` in the context so far, preceded by the compaction's
-  `pinned` message (the user's latest, kept verbatim when the cut falls in
-  the middle of the work on it; `context_ids` gives each message's entry
-  id); a `Trim {before}` entry (`append_trim`, only before a user message
-  in the context other than the first, and never parting a tool call from
-  its result) drops everything before that message, the summary and pinned
-  message too when it cuts into a compaction's kept part, and `Untrim`
+  `pinned` messages (`Pinned_messages`: entry ids, each `shortened` or not;
+  the user's own earlier messages, cut to a head by
+  `Pinned_messages.shorten`, and their latest verbatim; files from before
+  there could be several have one id, which loads as one unshortened pin;
+  `context_ids` gives each message's entry id); a `Trim {before}` entry
+  (`append_trim`, only before a user message in the context other than the
+  first, and never parting a tool call from its result) drops everything
+  before that message, the summary and pinned messages too when it cuts
+  into a compaction's kept part (a pinned message can itself be the trim
+  point: the pins before it go), and `Untrim`
   (`append_untrim`) puts back in front what the latest trim in effect
-  dropped (trims stack; a compaction after a trim summarised only what was
-  after it, so an undo puts the older messages ahead of its summary).
+  dropped (trims stack; a compaction after a trim summarised, and pinned,
+  only what was after it, so an undo puts the older messages ahead of its
+  pins and summary).
   `trim` totals the trims in effect (the latest's `before`, messages and
   estimated tokens, `Message.estimate_tokens` message by message),
   `trimmed_messages` is what they dropped, and `context_tokens` is the
@@ -1203,11 +1208,39 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `customInstructions`, are appended to the summariser's) or automatic.
   `plan` picks the cut: the earliest user or assistant message (never a
   tool result, so calls keep their results) such that the rest fits in
-  `keep_recent_tokens`, else the last turn, and pins the user's latest
-  message when it falls before the cut; the transcript sent to the
-  summariser loses its middle if it would not fit the model.
+  `keep_recent_tokens`, else the last turn, and pins what falls before
+  the cut of the user's instructions: their latest message verbatim, and
+  their own earlier ones (not summaries or what the harness writes in
+  their place: reminders, goals, deliveries; `Injected`) shortened to
+  2000 characters plus `[... N characters omitted]`, the newest first
+  while they fit in about 6k tokens. Compaction silently dropping the
+  user's constraints is the failure this guards against ("Governance
+  Decay", arXiv 2606.22528).
+  The summary is asked for with fixed sections (goal and constraints,
+  decisions, failed approaches and exact errors, files, current state,
+  next steps), at most 8192 output tokens (plus the thinking budget). By
+  default the summarised messages go as they are, as the agent's next
+  request: the caller's `Compaction.Prompt` (system prompt, tools,
+  thinking and cache key: `Agent_loop.Config.compaction_prompt`) and a
+  final user message asking for the summary and no tool calls, so the
+  provider's prompt cache serves the conversation. When that would not
+  fit the window (estimated), the compaction follows an overflow
+  (`overflowed`), or the provider rejects it as too long (or answers
+  without text), a transcript (`render_transcript`, tool output cut,
+  thinking dropped, its middle cut if it would not fit) goes in a request
+  of its own instead. An earlier summary among the summarised messages is
+  updated, not summarised again (in the transcript request it is passed
+  apart, as `<previous-summary>`). `Compaction_files` appends a section
+  listing the files the summarised `read`, `write`, `edit` and
+  `apply_patch` calls touched (`Files read:`, `Files modified:`), starting
+  from the previous summary's, so the list does not depend on the model:
+  only calls whose results are not errors count, relative paths are
+  resolved against the cwd the call was made in (`Session.context_cwds`;
+  a subagent's own), each path is listed once where last touched, and each
+  line keeps the 100 most recent (`(and N more)`).
   `compact_messages` works on a list (subagents), `compact` on a session
-  (appending a `Compaction` entry); both return the summary and its usage.
+  (appending a `Compaction` entry); both return the summary and its usage
+  (of both requests when the first fell back).
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
   `git diff` against `HEAD` (or a base's merge base) plus untracked files
   as new ones, optionally one path, cut at 1 MB, in the session cwd's

@@ -30,7 +30,11 @@ module Entry = struct
       | Compaction of
           { summary : string
           ; kept_from : string
-          ; pinned : string option [@jsonaf.option] [@sexp.option]
+          ; pinned : Pinned_messages.t
+                [@jsonaf.default []]
+                [@jsonaf_drop_default.equal]
+                [@sexp.default []]
+                [@sexp_drop_default.equal]
           }
       | Name of { name : string }
       | Description of { text : string }
@@ -93,6 +97,7 @@ end
 type t =
   { id : string
   ; path : string
+  ; initial_cwd : string (** the header's: before any [Cwd] entry *)
   ; mutable cwd : string
   ; mutable host : Host.t option
   ; host_cwds : string String.Table.t
@@ -273,6 +278,7 @@ let create ~dir ~cwd ?parent () =
   let t =
     { id
     ; path
+    ; initial_cwd = cwd
     ; cwd
     ; host = None
     ; host_cwds = String.Table.create ()
@@ -412,6 +418,7 @@ let load ?(yield = fun () -> ()) path =
          let t =
            { id
            ; path
+           ; initial_cwd = cwd
            ; cwd
            ; host = None
            ; host_cwds = String.Table.create ()
@@ -598,7 +605,7 @@ let description t =
     | Review _ -> None)
 ;;
 
-let append_compaction ?pinned t ~summary ~kept_from =
+let append_compaction ?(pinned = []) t ~summary ~kept_from =
   append t (Compaction { summary; kept_from; pinned })
 ;;
 
@@ -646,10 +653,12 @@ let summary_message summary =
     (summary_prefix ^ summary)
 ;;
 
-let is_summary_message : Message.t -> bool = function
-  | User { text; _ } -> String.is_prefix text ~prefix:summary_prefix
-  | Assistant _ | Tool_result _ -> false
+let summary_of_message : Message.t -> string option = function
+  | User { text; _ } -> String.chop_prefix text ~prefix:summary_prefix
+  | Assistant _ | Tool_result _ -> None
 ;;
+
+let is_summary_message m = Option.is_some (summary_of_message m)
 
 module Trim = struct
   type t =
@@ -673,7 +682,7 @@ end
 
 (* The messages of the next request, each with the id of its entry (none for
    a compaction's summary), folding the path: a compaction replaces what
-   comes before [kept_from] with its pinned message and the summary, a trim
+   comes before [kept_from] with its pinned messages and the summary, a trim
    drops what comes before its message, and an untrim puts back what the
    latest trim in effect dropped. *)
 let fold t path =
@@ -698,9 +707,12 @@ let fold t path =
             | _ -> false)
         in
         let pinned =
-          Option.bind pinned ~f:(Hashtbl.find t.by_id)
-          |> Option.bind ~f:message
-          |> Option.to_list
+          List.filter_map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
+            Option.bind (Hashtbl.find t.by_id pin.id) ~f:message
+            |> Option.map ~f:(fun (id, (m : Timed_message.t)) ->
+              if pin.shortened
+              then id, { m with message = Pinned_messages.shorten m.message }
+              else id, m))
         in
         let summary =
           None, { Timed_message.message = summary_message summary; at = None }
@@ -885,6 +897,43 @@ let context_tokens t =
 
 let timed_messages t = List.map (context t) ~f:snd
 let context_ids t = List.map (context t) ~f:fst
+
+let context_cwds t =
+  let cwds = String.Table.create () in
+  let (_ : string) =
+    List.fold (entries t) ~init:t.initial_cwd ~f:(fun cwd (e : Entry.t) ->
+      match e.payload with
+      | Cwd { cwd; host = _ } -> cwd
+      | Message _ ->
+        Hashtbl.set cwds ~key:e.id ~data:cwd;
+        cwd
+      | Model _
+      | Compaction _
+      | Name _
+      | Description _
+      | System_prompt _
+      | Goal _
+      | Reminders _
+      | Budget _
+      | Approval _
+      | Allow_rule _
+      | Archived _
+      | Spend _
+      | Resume_at _
+      | Told_environment _
+      | Repo _
+      | Agent_worktree _
+      | Worktree _
+      | Worktree_removed _
+      | Home _
+      | Trim _
+      | Untrim
+      | Review _ -> cwd)
+  in
+  List.map (context_ids t) ~f:(fun id ->
+    Option.value (Option.bind id ~f:(Hashtbl.find cwds)) ~default:t.cwd)
+;;
+
 let identified_messages = context
 
 let messages t =
@@ -1091,7 +1140,9 @@ let fork ?at t ~dir =
                 (Compaction
                    { summary
                    ; kept_from = renamed kept_from
-                   ; pinned = Option.map pinned ~f:renamed
+                   ; pinned =
+                       List.map pinned ~f:(fun pin ->
+                         { pin with id = renamed pin.id })
                    })
             | Trim { before } -> Some (Trim { before = renamed before })
             | Review

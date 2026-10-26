@@ -18,6 +18,9 @@ module Config : sig
     }
 
   val default_retries : int
+
+  (** What the summarising request shares with the loop's requests. *)
+  val compaction_prompt : t -> Compaction.Prompt.t
 end
 
 val is_retryable_error : string -> bool
@@ -38,7 +41,7 @@ val tool_summary : name:string -> Json.t -> string
     since) cross {!Compaction.should_compact}'s threshold, the context is
     compacted with [compact] (default: {!Compaction.compact_messages}, in
     memory) and the run continues on the result; a request the provider
-    rejects as too long ({!Context_overflow}) is compacted and sent again,
+    rejects as too long ({!Context_overflow}) is compacted ([overflowed]) and sent again,
     keeping less the second time, before the run fails with what to do.
     Each compaction emits [Compacted]. [halt] is polled before each turn
     (also passed to tools, for subagents): [Some _] ends the run there.
@@ -71,6 +74,7 @@ val run
   -> ?sleep:(float -> unit)
   -> ?compact:
        (keep_recent_tokens:int
+        -> overflowed:bool
         -> cancel:Cancellation.t
         -> Message.t list
         -> (Message.t list * Compaction.Outcome.t) Or_error.t)

@@ -258,7 +258,7 @@ let%expect_test "a trim after a compaction cuts into its kept part" =
       session
       ~summary:"S1"
       ~kept_from:(names.id "u2")
-      ~pinned:(names.id "u1")
+      ~pinned:[ { id = names.id "u1"; shortened = false } ]
   in
   print_context session;
   (* The pinned message and the summary go too. *)
@@ -359,15 +359,20 @@ let with_agent replies f =
   Eio.Switch.run
   @@ fun sw ->
   let on_request (r : Provider.Request.t) =
-    match r.system with
-    | Some system when String.is_prefix system ~prefix:"Summarise" ->
+    let is_ask (m : Message.t) =
+      match m with
+      | User u -> String.is_prefix u.text ~prefix:"[prigh: compaction]"
+      | Assistant _ | Tool_result _ -> false
+    in
+    match r.system, List.last r.messages with
+    | Some system, _ when String.is_prefix system ~prefix:"You summarise" ->
       let transcript =
         match r.messages with
         | [ User u ] -> u.text
         | _ -> "?"
       in
       printf
-        "summarise: %s\n"
+        "summarise (transcript): %s\n"
         (String.concat
            ~sep:" | "
            (List.filter_map (String.split_lines transcript) ~f:(fun l ->
@@ -375,6 +380,8 @@ let with_agent replies f =
                 (String.is_prefix l ~prefix:"q"
                  || String.is_prefix l ~prefix:"r")
                 (String.prefix l 12))))
+    | _, Some last when is_ask last ->
+      printf "summarise: %s\n" (shapes (List.drop_last_exn r.messages))
     | _ -> printf "request: %s\n" (shapes r.messages)
   in
   let provider = Faux_provider.create ~on_request replies in
@@ -507,6 +514,8 @@ let%expect_test "/compact after a trim summarises only what is after it" =
   ignore
     (Or_error.ok_exn (Agent.trim agent ~before:(user_entry agent "q2"))
      : Session.Trim.t);
+  (* The user's earlier messages are carried over, but only those after the
+     trim: q1 stays out. *)
   print_s [%sexp (Agent.compact agent : string Or_error.t)];
   run agent "q4";
   print_state agent;
@@ -515,9 +524,88 @@ let%expect_test "/compact after a trim summarises only what is after it" =
     request: U(q1)
     request: U(q1) A(r1) U(q2)
     request: U(q1) A(r1) U(q2) A(r2xxxxxxxxxx) U(q3)
-    summarise: q2 | r2xxxxxxxxxx
+    summarise: U(q2) A(r2xxxxxxxxxx)
     (Ok SUMMARY)
-    request: S(SUMMARY) U(q3) A(r3) U(q4)
-    state: messages=5 context_tokens=10 trim=2 messages, ~0 tokens
+    request: U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
+    state: messages=6 context_tokens=10 trim=2 messages, ~0 tokens
+    |}];
+  (* Undoing the trim puts q1 back ahead of the carried-over q2 and the
+     summary. *)
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  run agent "q5";
+  [%expect
+    {| request: U(q1) A(r1) U(q2) S(SUMMARY) U(q3) A(r3) U(q4) A(r4) U(q5) |}]
+;;
+
+let print_points agent =
+  List.iter
+    (Trim_point.create (Session.identified_messages (Agent.session agent)))
+    ~f:(fun (p : Trim_point.t) ->
+      printf
+        "point %d (%s): %d messages, ~%d tokens\n"
+        p.index
+        (String.prefix p.text 12)
+        p.messages
+        p.tokens)
+;;
+
+let%expect_test "a trim after a compaction: its carried-over messages" =
+  let long = String.make 40_000 'x' in
+  with_agent
+    [ Reply.text "r1"
+    ; Reply.text ("r2" ^ long)
+    ; Reply.text "r3"
+    ; Reply.text "SUMMARY"
+    ; Reply.text "r4"
+    ; Reply.text "r5"
+    ; Reply.text "r6"
+    ]
+  @@ fun agent ->
+  run agent ("q1" ^ String.make 12_000 'p');
+  run agent "q2";
+  run agent "q3";
+  print_s [%sexp (Agent.compact agent : string Or_error.t)];
+  run agent "q4";
+  [%expect
+    {|
+    request: U(q1pppppppppp)
+    request: U(q1pppppppppp) A(r1) U(q2)
+    request: U(q1pppppppppp) A(r1) U(q2) A(r2xxxxxxxxxx) U(q3)
+    summarise: U(q1pppppppppp) A(r1) U(q2) A(r2xxxxxxxxxx)
+    (Ok SUMMARY)
+    request: U(q1pppppppppp) U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
+    |}];
+  (* q1 is carried over shortened (~500 tokens, not its ~3000): a trim
+     point's tokens, and a trim's, count what the model is sent. *)
+  print_points agent;
+  [%expect
+    {|
+    point 1 (q2): 1 messages, ~507 tokens
+    point 3 (q3): 3 messages, ~517 tokens
+    point 5 (q4): 5 messages, ~517 tokens
+    |}];
+  (* A trim at a carried-over message drops the ones before it. *)
+  print_s
+    [%sexp
+      (Agent.trim agent ~before:(user_entry agent "q2")
+       |> Result.map ~f:(fun t -> t.messages, t.tokens)
+       : (int * int) Or_error.t)];
+  run agent "q5";
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  (* One in the compaction's kept part drops them all, and the summary. *)
+  print_s
+    [%sexp
+      (Agent.trim agent ~before:(user_entry agent "q3")
+       |> Result.map ~f:(fun t -> t.messages, t.tokens)
+       : (int * int) Or_error.t)];
+  run agent "q6";
+  print_state agent;
+  [%expect
+    {|
+    (Ok (1 507))
+    request: U(q2) S(SUMMARY) U(q3) A(r3) U(q4) A(r4) U(q5)
+    (Ok (3 517))
+    request: U(q3) A(r3) U(q4) A(r4) U(q5) A(r5) U(q6)
+    state: messages=8 context_tokens=10 trim=3 messages, ~517 tokens
     |}]
 ;;

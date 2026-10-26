@@ -36,8 +36,12 @@ let last_user (r : Provider.Request.t) =
 
 let print_request (r : Provider.Request.t) =
   match r.system with
-  | Some system when String.is_prefix system ~prefix:"Summarise" ->
-    print_endline "summarise"
+  | _ when String.is_prefix (last_user r) ~prefix:"[prigh: compaction]" ->
+    printf
+      "summarise: the agent's request, %d messages\n"
+      (List.length r.messages - 1)
+  | Some system when String.is_prefix system ~prefix:"You summarise" ->
+    print_endline "summarise: transcript"
   | _ ->
     printf
       "request: %d messages, last user %S%s\n"
@@ -154,7 +158,7 @@ let%expect_test
       (List.filter_map (Session.active_path reloaded) ~f:(fun e ->
          match e.payload with
          | Compaction { summary; pinned; _ } ->
-           Some (summary, Option.is_some pinned)
+           Some (summary, not (List.is_empty pinned))
          | _ -> None)
        : (string * bool) list)];
   [%expect
@@ -165,7 +169,7 @@ let%expect_test
     request: 3 messages, last user "the task"
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    summarise
+    summarise: the agent's request, 3 messages
     compacted: SUMMARY
     request: 4 messages, last user "Summary of the conversation so far:"
     assistant: done
@@ -204,7 +208,7 @@ let%expect_test "an overflowing request in a session is compacted and retried" =
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     request: 5 messages, last user "the task"
-    summarise
+    summarise: transcript
     compacted: SUMMARY
     request: 4 messages, last user "Summary of the conversation so far:"
     assistant: fits now

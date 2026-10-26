@@ -39,10 +39,10 @@ module Entry : sig
           { summary : string
           ; kept_from : string
             (** id of the first entry retained after the summary *)
-          ; pinned : string option
-            (** a message before [kept_from] kept verbatim ahead of the
-                summary: the user's latest, when the compaction falls in the
-                middle of the work on it *)
+          ; pinned : Pinned_messages.t
+            (** messages before [kept_from] carried ahead of the summary:
+                the user's own, and their latest as it is, when the
+                compaction falls in the middle of the work on it *)
           }
       | Name of { name : string }
       | Description of { text : string }
@@ -175,8 +175,8 @@ val active_path : t -> Entry.t list
 (** Messages for the next model request: those on the active path, folded
     in order: a compaction's summary replaces everything before its
     [kept_from] in the context so far, preceded by the compaction's pinned
-    message; a trim drops everything before its message (the summary and
-    the pinned message too, when it cuts into a compaction's kept part); an
+    messages; a trim drops everything before its message (the summary and
+    the pinned messages too, when it cuts into a compaction's kept part); an
     untrim puts back what the latest trim in effect dropped, in front of the
     context as it is now (a compaction after a trim summarised only what
     came after it). *)
@@ -217,10 +217,17 @@ val context_tokens : t -> int
 (** The entry id of each of [messages] ([None] for a compaction summary). *)
 val context_ids : t -> string option list
 
+(** The cwd each of [messages] was appended in: the last [cwd] entry written
+    before it, on any branch (the current cwd for the summary). *)
+val context_cwds : t -> string list
+
 (** A compaction summary as it appears in [messages]. *)
 val summary_message : string -> Message.t
 
 val is_summary_message : Message.t -> bool
+
+(** The summary a {!summary_message} carries. *)
+val summary_of_message : Message.t -> string option
 
 (** [messages] with the times they were appended (none for the summary). *)
 val timed_messages : t -> Timed_message.t list
@@ -322,7 +329,7 @@ val set_resume_at : t -> float option -> unit
 val set_cwd : t -> ?host:Host.t -> cwd:string -> unit -> Entry.t
 
 val append_compaction
-  :  ?pinned:string
+  :  ?pinned:Pinned_messages.t
   -> t
   -> summary:string
   -> kept_from:string
