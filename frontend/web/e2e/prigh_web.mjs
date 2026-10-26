@@ -867,7 +867,7 @@ try {
   };
   const git = (...args) => execFileSync("git", ["-c", "user.name=e2e", "-c", "user.email=e2e@example.com", ...args], { cwd, stdio: "ignore" });
   writeFileSync(join(cwd, "notes.txt"), "one\ntwo\nthree\n");
-  git("init", "-q");
+  git("init", "-q", "-b", "main");
   git("add", "notes.txt", "flag.png");
   git("commit", "-q", "-m", "start");
   writeFileSync(join(cwd, "notes.txt"), "one\n2\nthree\nfour\n");
