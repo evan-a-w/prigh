@@ -42,6 +42,28 @@ module Method : sig
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
+    | Forge_status (** see {!Forge_account.list_of_json} *)
+    | Forge_login of
+        { host : string
+        ; kind : string option (** [github] or [forgejo]; [None]: guess *)
+        ; method_ : string option
+          (** [oauth] or [token]; [None]: OAuth when available *)
+        } (** a login flow: [auth] events, ending in [Forge_done] or [Failed] *)
+    | Forge_logout of string (** the host; [Forge_logged_out] follows *)
+    | Pr_list of
+        { state : string option (** [open] (default), [closed], [all] *) }
+    (** see {!Pr_list} *)
+    | Pr_view of int (** see {!Pr_detail} *)
+    | Pr_defaults (** see {!Pr_defaults} *)
+    | Pr_create of
+        { title : string
+        ; body : string
+        ; base : string option (** default: the repository's default branch *)
+        ; head : string option (** default: the current branch *)
+        ; draft : bool
+        ; push : bool (** push the branch to the remote first *)
+        } (** answers {!Pr_detail} without checks or diff *)
+    | Pr_checkout of int (** see {!Pr_checkout} *)
     | List_worktrees of
         { cwd : string option
           (** in its repository (default: the session cwd's) *)

@@ -46,6 +46,7 @@ val compute
   -> line_index:int
   -> models:P.Model.t list
   -> auth:P.Auth_status.t list
+  -> forge:P.Forge_account.t list
   -> sessions:P.Session_summary.t list option
   -> skills:P.Skill.t list option (** [None]: not fetched yet *)
   -> snippets:P.Snippet.t list

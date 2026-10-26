@@ -34,10 +34,12 @@ let%expect_test "every command does something (none is unknown)" =
          | Scoped_models _ -> "scoped models dialog"
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
-         | Loading title ->
+         | (Loading _ | Pulls _) as d ->
            sprintf
-             "loading %s: %s"
-             title
+             "%s: %s"
+             (match d with
+              | Loading title -> "loading " ^ title
+              | _ -> "pull requests")
              (List.filter_map commands ~f:(function
                 | Rpc { method_; _ } -> Some ("rpc " ^ method_)
                 | _ -> None)
@@ -114,9 +116,10 @@ let%expect_test "every command does something (none is unknown)" =
     /files                     rpc fs_list, (Files(Focus files-list)), rpc git_diff
     /agents                    agents panel
     /jobs                      agents panel
-    /login                     loading Log in to a provider: rpc push_pref, rpc auth_status
-    /logout                    loading Log out of a provider: rpc push_pref, rpc auth_status
-    /auth                      loading Providers: rpc push_pref, rpc auth_status
+    /login                     loading Log in: rpc push_pref, rpc auth_status
+    /logout                    loading Log out: rpc push_pref, rpc auth_status
+    /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
+    /pr                        pull requests: rpc push_pref, rpc pr_list
     /setusr                    loading Act as: rpc push_pref, rpc list_users
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
@@ -192,6 +195,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Esc (reviewing) drop the comment or selection, then close the review
     Ctrl+Enter / Ctrl+S (reviewing) add the comment or reply; save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
@@ -1623,6 +1628,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     |}];
   H.reply h "get_state" (H.state_json ~fields:[ "session_id", `String "b1" ] ());
   H.text h ~selector:".sidebar-footer";
@@ -1657,6 +1663,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys
@@ -1709,6 +1716,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys

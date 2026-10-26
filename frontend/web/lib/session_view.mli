@@ -6,8 +6,9 @@ open! Import
 
 (** In the docked sidebar, above the account: what applies, then the status
     ([Status_view]) on a grid: the activity beside where tools run (opening
-    the host picker) and the branch, the context across, the tokens and the
-    cost. The session list marks which session it is. *)
+    the host picker) and the branch (opening the pull requests), the context
+    across, the tokens and the cost. The session list marks which session it
+    is. *)
 val card : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** With the card: the panels' toggles (files, terminal, agents), floating

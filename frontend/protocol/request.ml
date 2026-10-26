@@ -37,6 +37,25 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
+    | Forge_status
+    | Forge_login of
+        { host : string
+        ; kind : string option
+        ; method_ : string option
+        }
+    | Forge_logout of string
+    | Pr_list of { state : string option }
+    | Pr_view of int
+    | Pr_defaults
+    | Pr_create of
+        { title : string
+        ; body : string
+        ; base : string option
+        ; head : string option
+        ; draft : bool
+        ; push : bool
+        }
+    | Pr_checkout of int
     | List_worktrees of { cwd : string option }
     | Create_worktree of
         { branch : string
@@ -97,6 +116,14 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
+    | Forge_status -> "forge_status"
+    | Forge_login _ -> "forge_login"
+    | Forge_logout _ -> "forge_logout"
+    | Pr_list _ -> "pr_list"
+    | Pr_view _ -> "pr_view"
+    | Pr_defaults -> "pr_defaults"
+    | Pr_create _ -> "pr_create"
+    | Pr_checkout _ -> "pr_checkout"
     | List_worktrees _ -> "list_worktrees"
     | Create_worktree _ -> "create_worktree"
     | Remove_worktree _ -> "remove_worktree"
@@ -121,7 +148,11 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | Get_review | Review_submit -> []
+    | Delete_archived
+    | Forge_status
+    | Pr_defaults
+    | Get_review
+    | Review_submit -> []
     | Review_comment { root; path; first; last; anchor; text } ->
       [ "root", Json.str root
       ; "path", Json.str path
@@ -176,6 +207,20 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
+    | Forge_login { host; kind; method_ } ->
+      [ "host", Json.str host ]
+      @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])
+      @ Option.value_map method_ ~default:[] ~f:(fun m ->
+        [ "method", Json.str m ])
+    | Forge_logout host -> [ "host", Json.str host ]
+    | Pr_list { state } ->
+      Option.value_map state ~default:[] ~f:(fun s -> [ "state", Json.str s ])
+    | Pr_view number | Pr_checkout number -> [ "number", Json.int number ]
+    | Pr_create { title; body; base; head; draft; push } ->
+      [ "title", Json.str title; "body", Json.str body ]
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+      @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
+      @ [ "draft", Json.bool draft; "push", Json.bool push ]
     | Create_worktree { branch; base; cwd } ->
       [ "branch", Json.str branch ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])

@@ -32,6 +32,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Worktree -> "Worktrees"
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
+      | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
       | Argument Accent -> "Accent colours"
     in

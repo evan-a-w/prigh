@@ -17,7 +17,8 @@ tools of MCP servers.
                                                                        │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
                                                                        │                └─ Tools (bash, read, write, edit, ls, grep, find, subagent) ── on the backend or a tool host
                                                                        ├─ Session (JSONL tree under ~/.prigh/sessions/)
-                                                                       └─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
+                                                                       ├─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
+                                                                       └─ Forges ── Forge_login / Forge_api ── GitHub, Forgejo REST (HTTPS); git on the tool host (Git_forge)
 ```
 
 ## Process model and concurrency
@@ -397,6 +398,60 @@ two can share one.
   definition (`config.json`) and the key (`auth.json`) and tell the
   registry. `logout` asks whether to remove the key only or the provider
   too.
+
+### Git hosting (`forge/`)
+
+GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
+`tea`), with the sign-ins in the user's `Auth_store`.
+
+- `Forge_kind` (`Github | Forgejo`), `Forge_instance` — a host's kind, web
+  and API URLs (`api.github.com`, `HOST/api/v3`, `HOST/api/v1`) and OAuth
+  client from `config.json`'s `forges` (`kind`, `client_id`, `url` by host)
+  and `$PRIGH_GITHUB_CLIENT_ID`; Forgejo hosts default to the
+  pre-registered git-credential-oauth public client
+  (`a4792ccc-144e-407e-86c9-5e7d8d9c3269`), GitHub has none unless
+  configured. The kind: asked for, configured, stored with the sign-in, else
+  GitHub for github.com and Forgejo for any other host.
+- `Forge_credential` — `{kind, method: oauth|token, token, refresh?,
+  expires?, client_id?, user?}` in `auth.json` under `forge:HOST`, through
+  `Auth_store.modify_entry` (the providers' lock and 0600 atomic writes;
+  other entries untouched). `Authorization` is `Bearer`, except Forgejo's
+  personal access tokens (`token`).
+- `Forge_http` — the HTTP the forge code uses as a value (`real` is
+  `Http_client`), so tests answer with a fake host; errors never carry
+  headers.
+- `Forge_login` — the sign-ins as `Auth_interaction` flows: GitHub's device
+  flow (`/login/device/code`, then polling `/login/oauth/access_token` at
+  `interval`, slower on `slow_down`, until the code's `expires_in`; the
+  `auth_url` notice carries the user code), Forgejo's authorization code
+  with PKCE (S256) redirected to a one-shot `Oauth_callback_server` on
+  `127.0.0.1` at a free port, raced with a pasted redirect URL
+  (`Oauth_common.wait_for_code`), and a pasted token. Each checks the token
+  with `GET /user` and keeps the login. `refresh` renews an expiring OAuth
+  token (Forgejo's last an hour).
+- `Forge_api` — `/user`, the repository's pulls (list, one, its diff via
+  `Accept: application/vnd.github.diff` or `pulls/N.diff`, cut at 1 MB),
+  checks (GitHub's check runs plus commit statuses; Forgejo's statuses),
+  the default branch and creating a pull request (a Forgejo draft is a
+  `WIP:` title). HTTP failures become messages that say what to do: 401
+  signs in again, 404 on the repository checks the remote, a 422 about the
+  head pushes the branch first; a 404 on `/user` suggests the other kind.
+- `Forge_remote` (a remote URL's host, owner and name: HTTPS keeps its
+  port, SSH drops it), `Forge_repo`, `Pull_request`, `Pr_checks`.
+- `Git_forge` (`host/`) — the pseudo-tool `$git_forge` on the session's
+  tool host: `info` (top directory, branch, its remote, HEAD, remotes with
+  their configured and rewritten URLs), `log` (commits on HEAD not on the
+  remote's base, and whether the remote-tracking branch has them all; no
+  fetch), `push` (`git push --set-upstream REMOTE HEAD:refs/heads/BRANCH`,
+  never prompting) and `checkout` (fetches `refs/pull/N/head` and checks
+  the branch `pr-N` out with `Worktree.create` at the config's
+  `worktrees_dir`, or fast-forwards the worktree that has it already).
+- `Forges` — the per-user service the RPC server holds: `accounts`
+  (github.com, codeberg.org, configured and signed-in hosts), `login`,
+  `logout`, `api` (refreshing an expiring token under the store lock,
+  re-checked there like `Provider_auth.resolve`), and the `pr_*` replies:
+  the repository is the current branch's remote, else `origin`, else the
+  first remote on a known host.
 
 ### Tools
 
@@ -1235,7 +1290,21 @@ two can share one.
   error?, tools: [{name, description}]}], problems}`, tools under their
   prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
-  `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
+  `logout`, `forge_status`, `forge_login {host?, kind?, method?}`,
+  `forge_logout {host}`, `pr_list {state?}`, `pr_view {number}`,
+  `pr_defaults`, `pr_create {title, body?, base?, head?, draft?, push?}`,
+  `pr_checkout {number}` (git hosting, above: `forge_status` answers
+  `{accounts: [{host, kind, label, user, method, expires_ms, oauth,
+  oauth_note}]}`; `forge_login` is a login flow like `login`'s, owned by its
+  caller and ending in `{kind: "forge_done", host, user, method}` or
+  `failed` naming the host; `forge_logout` tells everyone
+  `forge_logged_out`; the `pr_*` replies carry `repo {host, kind, owner,
+  name, remote, url}` and pull requests `{number, title, state:
+  open|closed|merged, draft, author, head, base, url, body, created_at,
+  updated_at}`; `pr_view` adds `checks {state, items: [{name, state,
+  url}]}` (null when unreadable), `diff` and `truncated`, `pr_defaults`
+  answers `{repo, head, base, title, body, commits, pushed}` and
+  `pr_checkout` `{path, branch, created}`), `set_budget {usd}` (a number, or null for none), `set_goal
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
@@ -1604,6 +1673,24 @@ terminal frontend and `web/` prigh-web, the browser one.
     mention; `sessions ~collapsed` flattens it in display order.
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
+    shows coloured; `/review` and `/init` send `review`/`init` tagged so
+    a refusal goes back to the editor.
+  - Git hosting: `Model.forge` holds `forge_status`'s accounts, fetched
+    with the other startup requests, after switching users and after every
+    `Forge_done`/`Forge_logged_out` (`Forge_refresh` also redraws an open
+    `/login`/`/logout` picker or `/auth` box; an error, from a backend
+    without git hosting, is ignored). `Forge_accounts` reads `/login` and
+    `/logout`'s git-host arguments (`Login.parse`: `github [HOST]`,
+    `forgejo HOST`, a listed or dotted host, `[token]`) and makes their
+    picker rows, completions and `/auth` rows; a login is `forge_login`
+    and then the provider logins' `auth` events and dialogs. `Pr_command`
+    parses `/pr`'s arguments; `Pr_view` renders the PR picker's rows and
+    `/pr view`'s output box (header, markdown body, checks, then
+    `Diff_files.render` of `Pr_detail.git_diff`); `Pr_form` is `/pr new`'s
+    dialog (`Mode.Pr_form`, drawn by `Render`; a refused `pr_create` shows
+    its error in it). `/pr checkout` confirms a `Change_dir` to the new
+    worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
+    form and checkout question (`reset_session`).
     shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
     so a refusal goes back to the editor. `/review` alone reads
     `get_review`, then `git_diff`, and shows `File_approval.render`: each
@@ -2169,6 +2256,31 @@ terminal frontend and `web/` prigh-web, the browser one.
       text the model saw) and the user's bubble with only their `body`;
       `Session_tree` labels them like the TUI. `/diff` opens
       `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
+      its counts).
+    - Git hosting: `Forges` (the user's `forge_status` accounts, asked for
+      at startup, after `Forge_done`/`Forge_logged_out` and after switching
+      user; the hosts being signed out of; parsing `/login github [HOST]
+      [token]`, `/login forgejo HOST`, `/login HOST` and `/logout HOST`
+      apart from providers; the pickers' items). `forge_login` opens the
+      login dialog (`Login_flow` with `forge`, the arguments that try
+      again; `device_code` picks GitHub's code out of the instructions,
+      shown big and `.copyable`) and the `auth` events drive it like a
+      provider's. `Model.return_to_settings`: a sign-in started from the
+      settings page (`Settings_view.git_hosts`, also in `/auth`) goes back
+      to it when it ends or is cancelled. Pull requests are dialogs
+      (per session): `Pull_requests` (the `/pr` list: the state `Filter`,
+      a `Picker` of the PRs, loading or the backend's error, and `/pr`'s
+      argument parser), `Pr_page` (one PR: `pr_view`'s detail, the
+      checkout's progress, the list it came from, which Esc goes back to)
+      and `Pr_create` (the form, prefilled by `pr_defaults`; `request` is
+      the `pr_create` to send; a refusal stays in it), drawn by
+      `Pull_requests_view` (the diff through `Git_diff_view.files`). Their
+      replies are tagged `Reply_tag.Forge` (`Forge_reply`, with the
+      session's id: another session's, or one for a dialog closed or
+      changed meanwhile, is dropped). A checkout from the editor offers
+      `Change_dir` in `Dialog.Pr_checked_out`. The branch in the session's
+      card (`Session_view`) runs `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
+      new line, Ctrl/⌘+Enter accepts.
       its counts, and a button to the review page).
     - The review: `Code_review` (pure, like `Files`: the session's
       `Review`, kept by the `review` event and read with `get_review` when
@@ -2330,8 +2442,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     `[data-theme=light]` overriding them, the accent presets
     `[data-accent=...]` and what derives from the accent by `color-mix`),
     `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
-    `review.css`, `highlight.css` (which tokens take which colours) and `resize.css`
-    (the handles) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    `review.css`, `highlight.css` (which tokens take which colours), `resize.css`
+    (the handles) and `forge.css` (git hosting and the pull request
+    dialogs) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
@@ -2389,7 +2502,8 @@ re-records); the flake check `nvim-plugin` runs them.
 
 ## Data on disk
 
-- `~/.config/prigh/auth.json` — credentials (pi-compatible).
+- `~/.config/prigh/auth.json` — credentials (pi-compatible), and git hosts'
+  sign-ins under `forge:HOST` (`Forge_credential`).
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/<stamp>_<id>/` — per-session data (`Session.data_dir`),
   deleted with the session and counted in its `bytes`: `subagents.jsonl`
@@ -2402,7 +2516,8 @@ re-records); the flake check `nvim-plugin` runs them.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
-  (custom endpoints; their keys are in `auth.json` under their names).
+  (custom endpoints; their keys are in `auth.json` under their names),
+  `forges` (git hosts' kind, OAuth client id and URL, by host).
 - `~/.prigh/AGENTS.md` — global instructions.
 
 ## Testing

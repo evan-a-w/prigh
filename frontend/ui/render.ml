@@ -130,6 +130,8 @@ let picker_keys (kind : Mode.Picker_kind.t) =
 
 let sign_in_keys = "Tab next field · Enter signs in · Esc closes"
 
+let pr_form_keys = "Enter creates · Esc cancels"
+
 let disconnected_hint (m : App.Model.t) =
   match m.mode with
   | Sign_in _ -> sign_in_keys
@@ -224,6 +226,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter inserts the text at the cursor · Esc closes"
             ]
+        | Picker { kind = Pull_requests; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter shows it, its checks and its diff · Esc closes"
+            ]
         | Picker { kind = Mcp _; _ } ->
           Some
             [ span
@@ -262,6 +270,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Question _ ->
           Some [ span ~style:attention "Enter accepts · Esc declines" ]
         | Sign_in _ -> Some [ span ~style:attention sign_in_keys ]
+        | Pr_form _ -> Some [ span ~style:attention pr_form_keys ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
           then
@@ -540,6 +549,147 @@ let sign_in_dialog ~width form =
       ~title:("Sign in to " ^ Sign_in_form.address form)
       ~width
       (rows @ note @ Content.wrap hint ~width:inner)
+  , cursor )
+;;
+
+let pr_form_body_rows = 6
+
+(* [/pr new]'s dialog: the cursor ends the focused text field, or sits in
+   the focused checkbox. *)
+let pr_form_dialog ~width form =
+  let inner = Boxed.inner_width ~width in
+  let focus = Pr_form.focus form in
+  let defaults = Pr_form.defaults form in
+  let label (which : Pr_form.Field.t) text =
+    span
+      ~style:
+        (if Pr_form.Field.equal focus which then Style.bold attention else gray)
+      text
+  in
+  let indent = "       " in
+  let text_rows which name value ~max_rows =
+    let room = Int.max 1 (inner - String.length indent) in
+    let rows =
+      List.concat_map (String.split value ~on:'\n') ~f:(fun line ->
+        let rec go text acc =
+          let head, rest = Text_width.take text ~width:room in
+          if String.is_empty rest
+          then List.rev (head :: acc)
+          else go rest (head :: acc)
+        in
+        go line [])
+    in
+    let focused = Pr_form.Field.equal focus which in
+    let shown, hidden =
+      if List.length rows <= max_rows
+      then rows, 0
+      else if focused
+      then (
+        let hidden = List.length rows - max_rows in
+        List.drop rows hidden, hidden)
+      else List.take rows max_rows, List.length rows - max_rows
+    in
+    let lines =
+      List.mapi shown ~f:(fun i row ->
+        [ (if i = 0 then label which (sprintf "%-7s" name) else span indent)
+        ; span row
+        ])
+    in
+    let note =
+      if hidden = 0
+      then []
+      else
+        [ [ span indent
+          ; span
+              ~style:dim
+              (sprintf
+                 "(%d more line%s %s)"
+                 hidden
+                 (if hidden = 1 then "" else "s")
+                 (if focused then "above" else "below"))
+          ]
+        ]
+    in
+    if focused then note @ lines else lines @ note
+  in
+  let checkbox which on text detail =
+    [ label which (if on then "[x] " else "[ ] ")
+    ; label which text
+    ; span ~style:gray detail
+    ]
+  in
+  let title = text_rows Title "title" (Pr_form.title form) ~max_rows:2 in
+  let body =
+    text_rows Body "body" (Pr_form.body form) ~max_rows:pr_form_body_rows
+  in
+  let base = text_rows Base "base" (Pr_form.base form) ~max_rows:1 in
+  let draft = [ checkbox Draft (Pr_form.draft form) "draft" "" ] in
+  let push =
+    [ checkbox
+        Push
+        (Pr_form.push form)
+        (sprintf "push %s first" defaults.head)
+        (if defaults.pushed
+         then "  (it is on the remote)"
+         else "  (not on the remote yet)")
+    ]
+  in
+  let commits = List.length defaults.commits in
+  let summary =
+    [ [ span
+          ~style:gray
+          (sprintf
+             "%s → %s · %d commit%s"
+             defaults.head
+             (Pr_form.base form)
+             commits
+             (if commits = 1 then "" else "s"))
+      ]
+    ]
+  in
+  let note =
+    match Pr_form.submitting form, Pr_form.error form with
+    | true, _ -> [ [ span ~style:gray "creating…" ] ]
+    | false, Some error ->
+      Content.wrap [ [ span ~style:(Style.fg Red) error ] ] ~width:inner
+    | false, None -> []
+  in
+  let keys =
+    Content.wrap
+      [ [ span
+            ~style:gray
+            "Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · \
+             Enter creates · Esc cancels"
+        ]
+      ]
+      ~width:inner
+  in
+  let sections = [ title; body; base; draft; push ] in
+  let rows = List.concat sections in
+  let cursor =
+    let index =
+      match focus with
+      | Title -> 0
+      | Body -> 1
+      | Base -> 2
+      | Draft -> 3
+      | Push -> 4
+    in
+    let above =
+      List.sum (module Int) (List.take sections index) ~f:List.length
+    in
+    let own = List.nth_exn sections index in
+    match focus with
+    | Draft | Push -> 1 + above, 2 + 3
+    | Title | Body | Base ->
+      let last = List.length own - 1 in
+      let line = List.nth_exn own last in
+      1 + above + last, 2 + Int.min (Content.Line.width line) (inner - 1)
+  in
+  ( Boxed.render
+      ~title:("New pull request in " ^ P.Forge_repo.slug defaults.repo)
+      ~width
+      (rows @ summary @ note @ keys)
   , cursor )
 ;;
 
@@ -1194,13 +1344,18 @@ let mode_overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
         (Boxed.render
            ~title:"Confirm"
            ~width
-           [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ])
+           (Content.wrap
+              [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
+              ~width:(Boxed.inner_width ~width)))
     ]
   | Question { form; _ } ->
     let lines, cursor = question_dialog ~width ~utc_offset:m.utc_offset form in
     [ Overlay.create ~cursor lines ]
   | Sign_in form ->
     let lines, cursor = sign_in_dialog ~width form in
+    [ Overlay.create ~cursor lines ]
+  | Pr_form form ->
+    let lines, cursor = pr_form_dialog ~width form in
     [ Overlay.create ~cursor lines ]
   | Login_prompt _ ->
     [ Overlay.create
@@ -1432,7 +1587,7 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
   | Text_prompt _ | Confirm _ ->
     editor_rows m ~marker:"? " ~marker_style ~mask:false
   | Editing | Output _ -> editor_rows m ~marker:"> " ~marker_style ~mask:false
-  | Picker _ | Question _ | Sign_in _ | Search _ ->
+  | Picker _ | Question _ | Sign_in _ | Pr_form _ | Search _ ->
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false
 ;;
 

@@ -18,6 +18,8 @@ code. Put a new module in the group it belongs to:
 - `tools/` — `Tool`, `Tools`, the built-in tools (`Tool_*`) and their
   helpers (processes, patches, truncation, HTML to text)
 - `host/` — `Tool_host`, `Host_ops`, the tool host's files and git
+- `forge/` — git hosting: GitHub and Forgejo sign-ins, their REST APIs,
+  pull requests (`Forges`)
 - `mcp/` — MCP client, config, hub and tools
 - `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces and access,
   `Web_server`, `Websocket`, static and file HTTP

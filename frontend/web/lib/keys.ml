@@ -4,6 +4,7 @@ module Target = struct
   type t =
     | Editor of { cursor : int }
     | Field
+    | Multiline
     | Control
     | Session_search
     | Session of string
@@ -91,6 +92,10 @@ let help =
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
+  ; ( "Esc (in a pull request)"
+    , "back to the list it was opened from (/pr); Enter closes it" )
+  ; ( "Ctrl+Enter (in a dialog's text box)"
+    , "accept the dialog, e.g. create the pull request (Enter is a new line)" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
@@ -128,6 +133,7 @@ let on_control t =
   | Control -> true
   | Editor _
   | Field
+  | Multiline
   | Session_search
   | Session _
   | Terminal
@@ -143,13 +149,16 @@ let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
-  | "ArrowUp", (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _) ->
-    Some (Dialog_move (-1))
-  | "ArrowDown", (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _)
+  | ( "ArrowUp"
+    , (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
+    -> Some (Dialog_move (-1))
+  | ( "ArrowDown"
+    , (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
     -> Some (Dialog_move 1)
-  | "PageUp", (Picker _ | Popover _ | Scoped_models _) ->
+  | "PageUp", (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
     Some (Dialog_move (-8))
-  | "PageDown", (Picker _ | Popover _ | Scoped_models _) -> Some (Dialog_move 8)
+  | "PageDown", (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
+    Some (Dialog_move 8)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
     when plain t && String.is_empty (Picker.query picker) ->
@@ -169,7 +178,11 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete
-  | "Enter", _ when (not t.shift) && not (on_control t) -> Some Dialog_accept
+  | "Enter", _
+    when (match t.target with
+          | Multiline -> t.ctrl || t.meta
+          | _ -> not t.shift)
+         && not (on_control t) -> Some Dialog_accept
   | _ -> None
 ;;
 
@@ -224,8 +237,13 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              ||
              match t.target with
              | Editor _ | Terminal | Files | Review -> false
-             | Field | Control | Session_search | Session _ | Resize _ | Page ->
-               true) -> Some Agents_back
+             | Field
+             | Multiline
+             | Control
+             | Session_search
+             | Session _
+             | Resize _
+             | Page -> true) -> Some Agents_back
   | _ -> None
 ;;
 
@@ -317,7 +335,7 @@ let typed key = String.length key = 1 || Char.to_int key.[0] >= 0x80
 let question_key t : Question_dialog.Action.t option =
   let field =
     match t.target with
-    | Field -> true
+    | Field | Multiline -> true
     | Editor _
     | Control
     | Session_search
@@ -431,5 +449,5 @@ let handle (m : App.Model.t) t : App.Action.t option =
           |> Option.map ~f:(fun a -> App.Action.Review a)
         | None, Resize h ->
           resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
-        | None, (Field | Control | Terminal | Page) -> None))
+        | None, (Field | Multiline | Control | Terminal | Page) -> None))
 ;;

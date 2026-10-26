@@ -303,11 +303,14 @@ let%expect_test
             <icon class="server"> </icon>
             <span class="status-text"> desktop </span>
           </button>
-          <span title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui"
-                class="branch">
+          <button type="button"
+                  title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
+                  aria-haspopup="dialog"
+                  class="branch"
+                  @on_click>
             <icon class="branch"> </icon>
             <span class="branch-name"> feature/narrow-top-bar </span>
-          </span>
+          </button>
         </div>
       </div>
     </section>
@@ -316,7 +319,7 @@ let%expect_test
   [%expect
     {|
     (0%) ↑0 ↓0 $0.0000 Ready
-    (desktop) feature/narrow-top-bar
+    (desktop) (feature/narrow-top-bar)
     |}]
 ;;
 
@@ -381,13 +384,13 @@ let%expect_test "the host opens the host picker, as /host does" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (laptop) main
+    (laptop) (main)
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
-    (No host) main
+    (No host) (main)
     <button class="host link status-item warm">
     |}]
 ;;

@@ -40,6 +40,27 @@ module Mcp_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Forge_reply = struct
+  type t =
+    | Status
+    | Logout of string
+    | List of
+        { session : string
+        ; filter : Pull_requests.Filter.t
+        }
+    | View of
+        { session : string
+        ; number : int
+        }
+    | Defaults of string
+    | Created
+    | Checkout of
+        { session : string
+        ; number : int
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Worktrees_purpose = struct
   type t =
     | Sidebar of int
@@ -160,6 +181,7 @@ module Reply_tag = struct
         { generation : int
         ; session : string
         } (** reconnected, but the backend no longer has [session] *)
+    | Forge of Forge_reply.t
     | Prefs
   [@@deriving sexp_of, equal]
 end
@@ -398,6 +420,11 @@ module Action = struct
     | Prefetch_session of string (** a path *)
     | Load_output of string (** a [Fold] key *)
     | Network of bool (** the browser's [online] and [offline] events *)
+    | Pr_filter of Pull_requests.Filter.t
+    | Pr_open of int
+    | Pr_checkout of int
+    | New_pr
+    | Pr_form of Pr_create.Action.t
     | Preview_accent of string
   [@@deriving sexp_of]
 end
@@ -460,6 +487,8 @@ module Model = struct
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
           transcript stays on show, read-only *)
+    ; forges : Forges.t
+    ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
     ; prefs : Pref_sync.t
@@ -611,6 +640,8 @@ let init =
   ; jump = Jump.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
+  ; forges = Forges.empty
+  ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
   ; prefs = Pref_sync.init
@@ -670,6 +701,7 @@ let startup =
   ; rpc "list_models" [] ~tag:Models
   ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
   ; rpc "get_config" [] ~tag:Config
+  ; call Forge_status ~tag:(Forge Status)
   ]
 ;;
 
@@ -700,7 +732,11 @@ let field json name =
 ;;
 
 let close_dialog (m : Model.t) =
-  { m with dialog = None; theme_preview = None }, [ focus_editor ]
+  match m.return_to_settings, m.dialog with
+  | true, Some (Login _ | Forge_host _) ->
+    ( { m with dialog = Some Settings; return_to_settings = false; theme_preview = None }
+    , [ Command.Focus "dialog" ] )
+  | _ -> { m with dialog = None; return_to_settings = false; theme_preview = None }, [ focus_editor ]
 ;;
 
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
@@ -1051,7 +1087,7 @@ let add_custom_item =
     "Custom provider"
 ;;
 
-let login_picker (statuses : Auth_status.t list) =
+let login_picker (statuses : Auth_status.t list) ~forges =
   let items =
     List.concat_map statuses ~f:(fun s ->
       List.map s.methods ~f:(fun meth ->
@@ -1079,12 +1115,12 @@ let login_picker (statuses : Auth_status.t list) =
             ~marked:(not (String.is_empty configured))
             s.name))
     @ [ add_custom_item ]
+    @ Forges.login_items forges
   in
-  Dialog.Picker
-    { kind = Login; picker = Picker.create ~title:"Log in to a provider" items }
+  Dialog.Picker { kind = Login; picker = Picker.create ~title:"Log in" items }
 ;;
 
-let logout_picker (statuses : Auth_status.t list) =
+let logout_picker (statuses : Auth_status.t list) ~forges =
   List.filter_map statuses ~f:(fun s ->
     Option.map s.configured ~f:(fun c ->
       Picker.Item.create
@@ -1095,18 +1131,22 @@ let logout_picker (statuses : Auth_status.t list) =
            | None -> sprintf "%s via %s" c.method_ c.source)
         ~search:(s.name ^ " " ^ s.provider)
         s.name))
+  @ Forges.logout_items forges
   |> function
   | [] -> None
   | items ->
     Some
       (Dialog.Picker
-         { kind = Logout
-         ; picker = Picker.create ~title:"Log out of a provider" items
-         })
+         { kind = Logout; picker = Picker.create ~title:"Log out" items })
 ;;
 
 let open_dialog (m : Model.t) ?(focus = "dialog") dialog =
-  { m with dialog = Some dialog; completion = None }, [ Command.Focus focus ]
+  ( { m with
+      dialog = Some dialog
+    ; completion = None
+    ; return_to_settings = false
+    }
+  , [ Command.Focus focus ] )
 ;;
 
 let open_picker m dialog = open_dialog m ~focus:"picker-input" dialog
@@ -1140,6 +1180,92 @@ let logout (m : Model.t) provider =
     in
     m, cmds @ [ rpc "logout" [ "provider", str provider ] ~tag:Login_started ])
   else m, [ rpc "logout" [ "provider", str provider ] ]
+;;
+
+(* ---- git hosts ---------------------------------------------------------- *)
+
+let forge_login (m : Model.t) ~host ~kind ~method_ ~again =
+  let m, cmds = open_dialog m (Login (Login_flow.start ~forge:again host)) in
+  m, cmds @ [ call (Forge_login { host; kind; method_ }) ~tag:Login_started ]
+;;
+
+let forge_account_login (m : Model.t) host =
+  match Forges.find m.forges host with
+  | Some a ->
+    forge_login
+      m
+      ~host:a.host
+      ~kind:(Some a.kind)
+      ~method_:None
+      ~again:(Forge_account.login_arg a)
+  | None -> forge_login m ~host ~kind:None ~method_:None ~again:host
+;;
+
+let forge_host_dialog (m : Model.t) =
+  open_dialog m ~focus:"dialog-input" (Forge_host { input = ""; error = None })
+;;
+
+let signing_out host = sprintf "Signing out of %s…" host
+
+let forge_logout (m : Model.t) host =
+  let m =
+    { m with
+      forges = { m.forges with signing_out = Set.add m.forges.signing_out host }
+    }
+  in
+  let m, cmds = toast m (signing_out host) in
+  m, cmds @ [ call (Forge_logout host) ~tag:(Forge (Logout host)) ]
+;;
+
+(* ---- pull requests ------------------------------------------------------ *)
+
+let list_prs (m : Model.t) (l : Pull_requests.t) =
+  let m, cmds = open_picker m (Pulls l) in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_list { state = Some (Pull_requests.Filter.to_string l.filter) })
+          ~tag:(Forge (List { session = session_id m; filter = l.filter }))
+      ] )
+;;
+
+let open_pr ?back (m : Model.t) number =
+  let m, cmds = open_dialog m (Pull (Pr_page.create ?back number)) in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_view number)
+          ~tag:(Forge (View { session = session_id m; number }))
+      ] )
+;;
+
+let new_pr ?back (m : Model.t) ~title =
+  let m, cmds = open_dialog m (Pr_create (Pr_create.create ?back ~title ())) in
+  m, cmds @ [ call Pr_defaults ~tag:(Forge (Defaults (session_id m))) ]
+;;
+
+let checkout_pr (m : Model.t) number =
+  let m, cmds =
+    match m.dialog with
+    | Some (Pull p) when p.number = number ->
+      { m with dialog = Some (Pull { p with checkout = Busy }) }, []
+    | _ -> toast m (sprintf "Checking out pull request #%d…" number)
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_checkout number)
+          ~tag:(Forge (Checkout { session = session_id m; number }))
+      ] )
+;;
+
+let pr_command (m : Model.t) rest =
+  match Pull_requests.Command.parse rest with
+  | Error usage -> error m usage
+  | Ok (List filter) -> list_prs m (Pull_requests.create filter)
+  | Ok (View number) -> open_pr m number
+  | Ok (New title) -> new_pr m ~title
+  | Ok (Checkout number) -> checkout_pr m number
 ;;
 
 let no_thinking (m : Model.t) (state : State.t) =
@@ -1212,6 +1338,7 @@ let complete_draft (m : Model.t) ~skills =
            ~default:[]
            ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
       ~sessions:m.sessions
+      ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
       ~text:m.draft
@@ -2762,6 +2889,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
     ; agents = { Agents.empty with open_ = m.agents.open_ }
+    ; forges = Forges.empty
     }
   in
   let m, cmds =
@@ -3713,25 +3841,31 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | [ arg ] when not (String.equal arg "kill") -> with_job m arg ~f:select
      | _ -> error m "Usage: /jobs [id | kill <id>] (/jobs lists them)")
   | "login", "" ->
-    loading
-      m
-      "Log in to a provider"
-      [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
-  | "login", args ->
-    (match
-       String.split args ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
-     with
-     | provider :: method_ :: _ ->
-       start_login m ~provider ~method_:(Some method_)
-     | _ -> start_login m ~provider:args ~method_:None)
+    loading m "Log in" [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
+  | "login", _ ->
+    (match Forges.parse_login m.forges words with
+     | Provider { provider; method_ } -> start_login m ~provider ~method_
+     | Forge { host; kind; method_; again } ->
+       forge_login m ~host ~kind ~method_ ~again
+     | Ask_host -> forge_host_dialog m
+     | Bad usage -> error m usage)
   | "logout", "" ->
     loading
       m
-      "Log out of a provider"
+      "Log out"
       [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
-  | "logout", provider -> logout m provider
+  | "logout", arg ->
+    (match Forges.logout_host m.forges arg with
+     | Some host -> forge_logout m host
+     | None -> logout m arg)
   | "auth", _ ->
-    loading m "Providers" [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
+    loading
+      m
+      "Providers"
+      [ rpc "auth_status" [] ~tag:(Auth_status Show)
+      ; call Forge_status ~tag:(Forge Status)
+      ]
+  | "pr", rest -> pr_command m rest
   | "setusr", "" ->
     loading m "Act as" [ rpc "list_users" [] ~tag:(Users Picker) ]
   | "setusr", user ->
@@ -4250,9 +4384,120 @@ end
 (* The backend's word for a page cursor no longer in the session. *)
 let gone_from_session = "is not in the session any more"
 
+(* Git hosting's errors as the backend says them: they start with what
+   failed (often a host name) and say what to do. *)
+let said = function
+  | "backend closed" ->
+    "The connection went before the backend answered: try again once it is \
+     back."
+  | e -> e
+;;
+
+let with_forges (m : Model.t) ~f = { m with forges = f m.forges }
+
+let forge_reply (m : Model.t) (tag : Forge_reply.t) result =
+  let here session = String.equal session (session_id m) in
+  match tag, result, m.dialog with
+  | Status, Ok json, _ ->
+    decode m json Forge_account.list_of_json ~f:(fun accounts ->
+      with_forges m ~f:(fun f -> { f with accounts = Loaded accounts }), [])
+  | Status, Error "backend closed", _ -> m, []
+  | Status, Error e, _ ->
+    ( with_forges m ~f:(fun f ->
+        match f.accounts with
+        | Loaded _ -> f
+        | Loading | Failed _ -> { f with accounts = Failed e })
+    , [] )
+  | Logout _, Ok _, _ -> m, []
+  | Logout host, Error e, _ ->
+    error
+      (with_forges
+         (drop_toast m (signing_out host))
+         ~f:(fun f -> { f with signing_out = Set.remove f.signing_out host }))
+      (said e)
+  | List { session; filter }, result, Some (Pulls l)
+    when here session && Pull_requests.Filter.equal l.filter filter ->
+    let l =
+      match result with
+      | Ok json ->
+        (match Pr_list.of_json json with
+         | Ok list -> Pull_requests.loaded l list
+         | Error e -> Pull_requests.failed l (Error.to_string_hum e))
+      | Error e -> Pull_requests.failed l (said e)
+    in
+    { m with dialog = Some (Pulls l) }, []
+  | View { session; number }, result, Some (Pull p)
+    when here session && p.number = number ->
+    let status : Pr_page.Status.t =
+      match result with
+      | Ok json ->
+        (match Pr_detail.of_json json with
+         | Ok d -> Loaded d
+         | Error e -> Failed (Error.to_string_hum e))
+      | Error e -> Failed (said e)
+    in
+    { m with dialog = Some (Pull { p with status }) }, []
+  | Defaults session, result, Some (Pr_create f) when here session ->
+    let f, focus =
+      match result with
+      | Ok json ->
+        (match Pr_defaults.of_json json with
+         | Ok d -> Pr_create.set_defaults f d, [ Command.Focus "pr-title" ]
+         | Error e -> { f with failed = Some (Error.to_string_hum e) }, [])
+      | Error e -> { f with failed = Some (said e) }, []
+    in
+    { m with dialog = Some (Pr_create f) }, focus
+  | Created, Ok json, dialog ->
+    decode m json Pr_detail.of_json ~f:(fun d ->
+      let m, cmds =
+        match dialog with
+        | Some (Pr_create { busy = true; back = Some l; _ }) ->
+          list_prs
+            m
+            (Pull_requests.create ~query:(Picker.query l.picker) l.filter)
+        | Some (Pr_create { busy = true; back = None; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, toast_cmds =
+        toast m (sprintf "#%d created: %s" d.pr.number d.pr.url)
+      in
+      m, cmds @ toast_cmds)
+  | Created, Error e, Some (Pr_create ({ busy = true; _ } as f)) ->
+    ( { m with
+        dialog = Some (Pr_create { f with busy = false; error = Some (said e) })
+      }
+    , [] )
+  | Checkout { number; _ }, result, Some (Pull p) when p.number = number ->
+    let checkout : Pr_page.Checkout.t =
+      match result with
+      | Ok json ->
+        (match Pr_checkout.of_json json with
+         | Ok c -> Done c
+         | Error e -> Failed (Error.to_string_hum e))
+      | Error e -> Failed (said e)
+    in
+    { m with dialog = Some (Pull { p with checkout }) }, []
+  | Checkout { number; session }, Ok json, dialog ->
+    decode m json Pr_checkout.of_json ~f:(fun checkout ->
+      match dialog with
+      | None when here session ->
+        open_dialog m (Pr_checked_out { number; checkout })
+      | _ ->
+        toast
+          m
+          (sprintf
+             "Checked out pull request #%d at %s: /cd %s works there"
+             number
+             checkout.path
+             checkout.path))
+  | (List _ | View _ | Defaults _), _, _ -> m, []
+  | (Created | Checkout _), Error e, _ -> error m (said e)
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
+  | Forge tag, result -> forge_reply m tag result
   | Files (Previewed path as reply), (Ok json as result) ->
     let m =
       match File_preview.of_json json with
@@ -4737,11 +4982,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
          | _ -> m, [])
       | Show -> open_dialog m (Auth auth)
-      | Login_picker -> open_picker m (login_picker auth)
+      | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
       | Logout_picker ->
-        (match logout_picker auth with
+        (match logout_picker auth ~forges:m.forges with
          | Some dialog -> open_picker m dialog
-         | None -> toast m "No provider is logged in: /login logs in to one."))
+         | None ->
+           toast
+             m
+             "No provider or git host is logged in: /login logs in to one."))
   | Paths prefix, Ok json ->
     (match m.completion, strings json with
      | Some c, Ok paths ->
@@ -5039,6 +5287,31 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
+  | Forge_done { host; user; method_ }, dialog ->
+    let m, close =
+      match dialog with
+      | Some (Login _) -> close_dialog m
+      | _ -> m, []
+    in
+    let m, cmds =
+      toast
+        m
+        (sprintf
+           "Signed in to %s%s (%s)"
+           host
+           (Option.value_map user ~default:"" ~f:(fun u -> " as " ^ u))
+           method_)
+    in
+    m, close @ cmds @ [ call Forge_status ~tag:(Forge Status) ]
+  | Forge_logged_out host, _ ->
+    let m =
+      with_forges m ~f:(fun f ->
+        { f with signing_out = Set.remove f.signing_out host })
+    in
+    let m, cmds =
+      toast m ~replaces:"Signing out of " (sprintf "Signed out of %s" host)
+    in
+    m, cmds @ [ call Forge_status ~tag:(Forge Status) ]
   | Prompt { prompt = Secret _ | Text _ | Manual_code _; _ }, Some (Login flow)
     ->
     ( { m with dialog = Some (Login (Login_flow.apply flow e)) }
@@ -5351,6 +5624,8 @@ let accept_completion (m : Model.t) ~run =
            String.is_empty args || String.is_prefix args ~prefix:"["
          | Some { argument = Some _; _ } | None -> false)
       | Argument (Directory | Backend_directory | Path | Skill), _ -> false
+      (* Their number comes next. *)
+      | Argument Pr, Some { id = "view" | "checkout"; _ } -> false
       | Argument Worktree, _ when Completion.takes_more c -> false
       | Argument _, _ -> true
       | (Command | Path | Snippet), _ -> false
@@ -5367,11 +5642,18 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Models -> set_model m item.id
     | Thinking -> set_thinking m item.id
     | Login ->
-      (match String.lsplit2 item.id ~on:' ' with
-       | Some (provider, method_) ->
-         start_login m ~provider ~method_:(Some method_)
-       | None -> start_login m ~provider:item.id ~method_:None)
-    | Logout -> logout m item.id
+      (match String.chop_prefix item.id ~prefix:"forge ", item.id with
+       | Some host, _ -> forge_account_login m host
+       | None, "forge-host" -> forge_host_dialog m
+       | None, _ ->
+         (match String.lsplit2 item.id ~on:' ' with
+          | Some (provider, method_) ->
+            start_login m ~provider ~method_:(Some method_)
+          | None -> start_login m ~provider:item.id ~method_:None))
+    | Logout ->
+      (match String.chop_prefix item.id ~prefix:"forge " with
+       | Some host -> forge_logout m host
+       | None -> logout m item.id)
     | Verbosity ->
       (match
          List.find Prigh_ui.Verbosity.all ~f:(fun v ->
@@ -5460,6 +5742,8 @@ let with_picker (m : Model.t) ~f =
     { m with dialog = Some (Popover { chip; picker = f picker }) }, []
   | Some (Scoped_models { picker; checked }) ->
     { m with dialog = Some (Scoped_models { picker = f picker; checked }) }, []
+  | Some (Pulls l) ->
+    { m with dialog = Some (Pulls { l with picker = f l.picker }) }, []
   | _ -> m, []
 ;;
 
@@ -5564,6 +5848,48 @@ let dialog_accept (m : Model.t) =
     ( m
     , cmds @ toast_cmds @ [ rpc "rewind" [ "to", str id ] ~tag:Reload_messages ]
     )
+  | Some (Pulls l) ->
+    (match Pull_requests.selected l with
+     | Some pr -> open_pr ~back:l m pr.number
+     | None -> m, [])
+  | Some (Pull _) -> close_dialog m
+  | Some (Pr_create { busy = true; _ }) -> m, []
+  | Some (Pr_create f) ->
+    (match Pr_create.request f with
+     | Error e ->
+       { m with dialog = Some (Pr_create { f with error = Some e }) }, []
+     | Ok request ->
+       ( { m with
+           dialog = Some (Pr_create { f with busy = true; error = None })
+         }
+       , [ call request ~tag:(Forge Created) ] ))
+  | Some (Pr_checked_out { checkout; _ }) ->
+    let m, cmds = close_dialog m in
+    m, cmds @ [ change_dir ~target:Cwd checkout.path ]
+  | Some (Forge_host { input; _ }) ->
+    (match Forges.normalize_host input with
+     | "" ->
+       ( { m with
+           dialog =
+             Some
+               (Forge_host
+                  { input
+                  ; error =
+                      Some "Type the host, e.g. codeberg.org (Esc cancels)."
+                  })
+         }
+       , [] )
+     | host ->
+       let back = m.return_to_settings in
+       let m, cmds =
+         forge_login
+           m
+           ~host
+           ~kind:(Some "forgejo")
+           ~method_:None
+           ~again:("forgejo " ^ host)
+       in
+       { m with return_to_settings = back }, cmds)
 ;;
 
 (* Following new output again: the jump button, or sending something. *)
@@ -5777,6 +6103,10 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Picker_accept -> dialog_accept m
   | Picker_choose id ->
     (match m.dialog with
+     | Some (Pulls l) ->
+       (match Int.of_string_opt id with
+        | Some number -> open_pr ~back:l m number
+        | None -> m, [])
      | Some (Picker { kind; picker }) ->
        (match
           List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id)
@@ -5798,12 +6128,15 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
+     | Some (Forge_host _) ->
+       { m with dialog = Some (Forge_host { input = text; error = None }) }, []
+     | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | _ -> m, [])
   | Dialog_move delta ->
     (match m.dialog with
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
-     | Some (Picker _ | Popover _ | Scoped_models _) ->
+     | Some (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
        with_picker m ~f:(fun p -> Picker.move p delta)
      | Some (Prompt prompt) ->
        { m with dialog = Some (Prompt (Prompt.move prompt delta)) }, []
@@ -5814,6 +6147,8 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Login { failed = None; provider; _ }) ->
        let m, cmds = close_dialog { m with cancelled_login = Some provider } in
        m, cmds @ [ rpc "auth_cancel" [] ]
+     | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
+       open_picker m (Pulls l)
      | Some _ -> close_dialog m
      | None -> m, [])
   | Login_choose i ->
@@ -5966,7 +6301,9 @@ let update_connected (m : Model.t) (action : Action.t) =
        let m', cmds = run_command { m with dialog = None } parsed in
        (* A setting changed from the settings page leaves it open. *)
        (match m.dialog, m'.dialog with
-        | Some Settings, None -> { m' with dialog = m.dialog }, cmds
+        | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
+        | Some Settings, Some (Login _ | Forge_host _) ->
+          { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
   | Toggle_terminal ->
@@ -5984,6 +6321,27 @@ let update_connected (m : Model.t) (action : Action.t) =
         m
         (List.map saves ~f:(fun ({ key; value } : Resize.Save.t) ->
            { Prefs.Change.key; value = Option.map value ~f:Json.int })) )
+  | Pr_filter filter ->
+    let query =
+      match m.dialog with
+      | Some (Pulls l) -> Picker.query l.picker
+      | _ -> ""
+    in
+    list_prs m (Pull_requests.create ~query filter)
+  | Pr_open number ->
+    (match m.dialog with
+     | Some (Pulls l) -> open_pr ~back:l m number
+     | _ -> open_pr m number)
+  | Pr_checkout number -> checkout_pr m number
+  | New_pr ->
+    (match m.dialog with
+     | Some (Pulls l) -> new_pr ~back:l m ~title:""
+     | _ -> new_pr m ~title:"")
+  | Pr_form action ->
+    (match m.dialog with
+     | Some (Pr_create f) when not f.busy ->
+       { m with dialog = Some (Pr_create (Pr_create.update f action)) }, []
+     | _ -> m, [])
   | Preview_accent colour ->
     (match Theme.Accent.of_string colour with
      | Some accent ->

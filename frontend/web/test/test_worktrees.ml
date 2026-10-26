@@ -235,6 +235,7 @@ let%expect_test "acting as another user forgets the worktrees" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     |}];
   (* Bob's session is listed afresh. *)
   H.reply h "get_state" (state ~session:"b1" ());

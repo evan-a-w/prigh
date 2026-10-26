@@ -238,7 +238,7 @@ let%expect_test
                             \n/work") (purpose (Sidebar 2)))))
     (75%) ↑123k ↓7.9k $1.2345 Working
     (3 queued)
-    (laptop) main
+    (laptop) (main)
     |}];
   H.show h ~selector:".context";
   [%expect

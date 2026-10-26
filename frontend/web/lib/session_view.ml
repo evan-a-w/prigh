@@ -55,13 +55,21 @@ let tools (m : App.Model.t) ~inject =
   | Some _ -> div ~cls:"chat-tools" [ panel_toggles m ~inject ]
 ;;
 
-let branch (state : State.t) =
+(* It opens the pull requests ([/pr]). *)
+let branch (state : State.t) ~inject =
   match state.git_branch with
   | Some branch ->
-    Node.span
+    Node.button
       ~attrs:
         [ Attr.class_ "branch"
-        ; Attr.title (sprintf "On branch %s, in %s" branch state.cwd)
+        ; Attr.type_ "button"
+        ; Attr.title
+            (sprintf
+               "On branch %s, in %s: pull requests (/pr)"
+               branch
+               state.cwd)
+        ; Attr.create "aria-haspopup" "dialog"
+        ; Attr.on_click (fun _ -> inject (Action.Run "/pr"))
         ]
       [ icon Branch; span ~cls:"branch-name" branch ]
   | None -> Node.none
@@ -80,7 +88,9 @@ let card (m : App.Model.t) ~inject =
            | Some state ->
              div
                ~cls:"card-where"
-               [ Status_view.host m ~always:true ~inject; branch state ])
+               [ Status_view.host m ~always:true ~inject
+               ; branch state ~inject
+               ])
         ]
     ]
 ;;
