@@ -38,9 +38,11 @@ val selected_item : t -> Picker.Item.t option
 
 (** [compute ~line ~col ...] where [line] is the editor line under the cursor,
     [col] is the cursor's byte offset within it and [line_index] its index.
-    [current_session] (its path) is not offered to [/delete]. *)
+    [current_session] (its path) is not offered to [/delete]; [superuser]'s
+    commands include those only superusers have. *)
 val compute
-  :  current_session:string option
+  :  superuser:bool
+  -> current_session:string option
   -> line:string
   -> col:int
   -> line_index:int
@@ -51,6 +53,7 @@ val compute
   -> skills:P.Skill.t list option (** [None]: not fetched yet *)
   -> snippets:P.Snippet.t list
   -> reminders:P.Reminder.t list (** the session's, for [/remind rm] *)
+  -> agents:Agent_view.t list (** for [/agents steer] and the like *)
   -> worktrees:P.Worktree.t list option
        (** for [/worktree open] and [rm]; [None]: not fetched yet *)
   -> logged_in:(string -> bool)

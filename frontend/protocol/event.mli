@@ -65,6 +65,9 @@ type t =
       { steer : string list (** the queued texts, oldest first *)
       ; follow_up : string list
       }
+  | Agent_queues of Agent_queue.t list
+  (** the background subagents' queues ({!Agent_queue}), those not empty;
+      after every change of one *)
   | Subagent_start of
       { call_id : string
       ; agent_id : string
@@ -127,6 +130,8 @@ type t =
   (** something [list_sessions] shows changed, in any session *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
+  | Nix_gc_progress of Nix_gc_progress.t
+  (** how far the [nix_store_gc] we asked for got *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

@@ -52,6 +52,11 @@ val handle
 
 val browser_url : host:string -> port:int -> string
 
+(** [prigh serve]'s warning for [flag] listening on [addr] when that is not
+    a loopback address: prigh serves no TLS, so tokens and everything else
+    go in the clear unless a proxy or tunnel protects them. *)
+val plaintext_warning : flag:string -> Eio.Net.Ipaddr.v4v6 -> string option
+
 (** Turns on TCP keepalive probes (after 30s idle, every 10s, 3 tries), so
     that a peer gone without closing its connection is noticed. *)
 val keepalive : _ Eio.Net.stream_socket -> unit
