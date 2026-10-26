@@ -1464,6 +1464,51 @@ util.ml
 1
 +3 −0
 3 files changed, +8 −2
+=== chromium: review: compare: the base picker, filtered ===
+b
+origin/main
+remote-tracking branch
+origin/ma
+compare with this branch, tag or commit
+↑ ↓ and Enter choose, Esc closes
+=== chromium: review: compare: against origin/main ===
+Reviewing main (<REPO>) against origin/main (merge base <SHA>)
+=== chromium: review: compare: directly ===
+Reviewing main (<REPO>) against origin/main directly
+=== chromium: review: compare: what to review ===
+r
+Worktrees
+main
+<REPO> · this session's
+feat/login
+<WT>
+Branches
+feat/old
+not checked out: read-only
+Remote branches
+origin/main
+not checked out: read-only
+↑ ↓ and Enter choose, Esc closes
+=== chromium: review: compare: a branch not checked out ===
+Reviewing
+feat/old
+not checked out
+against
+main
+(merge base <SHA>)
+Since merge base
+Directly
+Read-only
+Check out into a worktree
+=== chromium: review: compare: read-only, what is reviewed ===
+Reviewing feat/old (not checked out) against main (merge base <SHA>)
+files: src/
+old.ml
++1 −0
+1 file changed, +1 −0
+edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
+=== chromium: review: compare: checked out ===
+Reviewing feat/old (<HOME>/.prigh/worktrees/repo/feat-old) against main (merge base <SHA>)
 === chromium: review: phone ===
 sheet: fixed
 Alt+R closed it
