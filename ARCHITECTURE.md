@@ -1812,7 +1812,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     and each tool call through `Tool_render`, which reads arguments with
     `Tool_args` and `apply_patch`'s per-file changes with `Patch` (both
     shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
-    anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
+    anchored view; `Anchored` counts the lines and the finished items
+    (`Transcript.finished`) that arrived beneath it, for the jump
+    indicator), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while
     `State.subagents` lists it as undelivered, then until the next prompt;
@@ -2033,11 +2035,13 @@ terminal frontend and `web/` prigh-web, the browser one.
     the queue and a notice too long for the rule) are stacked bottom-up
     in the transcript's area, the optional ones giving way first when the
     area is short; the transcript's tail ends above them (scrolled back,
-    they cover its bottom rows). The cursor stays in the editor unless typing goes
+    they cover its bottom rows, and the jump indicator, `↓ 3 new · End`, sits at
+    the right of the last transcript row above them; `Render.click` maps a
+    click on it to `Jump_to_bottom`). The cursor stays in the editor unless typing goes
     into an overlay (picker filter, search, question, sign-in, the deny
     reason). The rule is plain; a short notice sits on its right. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (mode hint, scroll position, context, queued/agents/jobs and an
+    priority (mode hint, context, queued/agents/jobs and an
     approval mode that asks, then thinking, `mode:auto` and cost, verbosity
     last; a mode hint too wide to fit whole drops its last keys, the least
     important, after the context has its place; dialogs list the rest of
@@ -2094,7 +2098,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     can mark this frontend as "(here)"
     and the status line can show `tools:<host>` when tools run elsewhere or
     `tools:offline` when the active host is gone. Mouse reporting is on so the
-    wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
+    wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines)
+    and a left click asks `Render.click` what is there (the jump indicator);
     without it the terminal turns the wheel into arrow keys, which walk the
     prompt history. Text selection therefore needs Shift.
   - `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same

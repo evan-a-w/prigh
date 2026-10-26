@@ -296,7 +296,7 @@ let app
     View_of_content.screen screen
   in
   let handler =
-    let%arr inject in
+    let%arr inject and model in
     fun (event : Event.t) ->
       match event, !paste with
       | Paste `Start, _ ->
@@ -320,6 +320,10 @@ let app
          | None -> Effect.Ignore)
       | Mouse { kind = Scroll `Up; _ }, _ -> inject (Intent Scroll_up)
       | Mouse { kind = Scroll `Down; _ }, _ -> inject (Intent Scroll_down)
+      | Mouse { kind = Left; position = { x; y }; _ }, _ ->
+        (match Prigh_ui.Render.click model ~row:y ~col:x with
+         | Some intent -> inject (Intent intent)
+         | None -> Effect.Ignore)
       | Mouse _, _ -> Effect.Ignore
   in
   let%arr model and view and handler and inject in

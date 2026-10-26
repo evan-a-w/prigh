@@ -53,8 +53,14 @@ let bindings =
       Word_right
       "move the cursor forward one word"
   ; b [ Key.alt (Char "d") ] Delete_word_forward "delete the next word"
-  ; b [ Key.plain Home; Key.ctrl 'a' ] Home "start of line"
-  ; b [ Key.plain End; Key.ctrl 'e' ] End "end of line"
+  ; b
+      [ Key.plain Home; Key.ctrl 'a' ]
+      Home
+      "start of line (on an empty prompt: the transcript's top)"
+  ; b
+      [ Key.plain End; Key.ctrl 'e' ]
+      End
+      "end of line (on an empty prompt: back to the bottom)"
   ; b [ Key.plain Page_up ] Page_up "scroll the transcript / list up a page"
   ; b
       [ Key.plain Page_down ]
@@ -68,6 +74,10 @@ let bindings =
       [ { (Key.plain Down) with ctrl = true } ]
       Next_user_message
       "jump to the next user message"
+  ; b
+      [ { (Key.plain End) with ctrl = true } ]
+      Jump_to_bottom
+      "back to the bottom of the transcript, following new output"
   ; b
       [ Key.plain Backspace; Key.ctrl 'h' ]
       Backspace

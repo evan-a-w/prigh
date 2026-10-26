@@ -384,17 +384,18 @@ let layout m =
 
 let transcript_width m = (layout m).main_width
 
+let focused_transcript m =
+  match m.focus with
+  | `Main -> m.transcript
+  | `Agent id ->
+    (match Agent_view.find m.agents id with
+     | Some agent -> agent.transcript
+     | None -> m.transcript)
+;;
+
 let transcript_line_count m =
-  let transcript =
-    match m.focus with
-    | `Main -> m.transcript
-    | `Agent id ->
-      (match Agent_view.find m.agents id with
-       | Some agent -> agent.transcript
-       | None -> m.transcript)
-  in
   Transcript.line_count
-    transcript
+    (focused_transcript m)
     ~width:(transcript_width m)
     ~verbosity:m.verbosity
 ;;
@@ -407,32 +408,36 @@ let transcript_rows m =
   | `Main -> rows
 ;;
 
-(* The single place transcript edits go through so the anchored viewport can
-   count lines appended beneath it. *)
-let with_transcript m ~f =
-  let before = transcript_line_count m in
-  let m = { m with transcript = f m.transcript } in
+(* Counts what [change] appended beneath an anchored viewport. *)
+let counting_arrivals m ~change =
+  let lines = transcript_line_count m in
+  let items = Transcript.finished (focused_transcript m) in
+  let m = change m in
   match m.viewport with
   | Viewport.Follow -> m
-  | Viewport.Anchored { top; new_lines } ->
-    let added = Int.max 0 (transcript_line_count m - before) in
+  | Viewport.Anchored { top; new_lines; new_items } ->
     { m with
-      viewport = Viewport.Anchored { top; new_lines = new_lines + added }
+      viewport =
+        Viewport.Anchored
+          { top
+          ; new_lines = new_lines + Int.max 0 (transcript_line_count m - lines)
+          ; new_items =
+              new_items
+              + Int.max 0 (Transcript.finished (focused_transcript m) - items)
+          }
     }
+;;
+
+(* The single place transcript edits go through so the anchored viewport can
+   count what is appended beneath it. *)
+let with_transcript m ~f =
+  counting_arrivals m ~change:(fun m -> { m with transcript = f m.transcript })
 ;;
 
 (* Same as [with_transcript] but for the agent list, so streaming inside a
    focused subagent still bumps the anchored viewport. *)
 let update_agents m ~f =
-  let before = transcript_line_count m in
-  let m = { m with agents = f m.agents } in
-  match m.viewport with
-  | Viewport.Follow -> m
-  | Viewport.Anchored { top; new_lines } ->
-    let added = Int.max 0 (transcript_line_count m - before) in
-    { m with
-      viewport = Viewport.Anchored { top; new_lines = new_lines + added }
-    }
+  counting_arrivals m ~change:(fun m -> { m with agents = f m.agents })
 ;;
 
 (* Acknowledgements go to the notice slot and expire; [log] is for what
@@ -3927,34 +3932,23 @@ let scroll_up m ~lines =
   | Viewport.Follow ->
     { m with
       viewport =
-        Viewport.Anchored
-          { top = Int.max 0 (transcript_line_count m - transcript_rows m - lines)
-          ; new_lines = 0
-          }
+        Viewport.anchored
+          (Int.max 0 (transcript_line_count m - transcript_rows m - lines))
     }
-  | Viewport.Anchored { top; new_lines } ->
+  | Viewport.Anchored a ->
     { m with
-      viewport = Viewport.Anchored { top = Int.max 0 (top - lines); new_lines }
+      viewport = Viewport.Anchored { a with top = Int.max 0 (a.top - lines) }
     }
 ;;
 
 let scroll_down m ~lines =
   match m.viewport with
   | Viewport.Follow -> m
-  | Viewport.Anchored { top; new_lines } ->
-    let top = top + lines in
+  | Viewport.Anchored a ->
+    let top = a.top + lines in
     if top + transcript_rows m >= transcript_line_count m
     then follow m
-    else { m with viewport = Viewport.Anchored { top; new_lines } }
-;;
-
-let focused_transcript m =
-  match m.focus with
-  | `Main -> m.transcript
-  | `Agent id ->
-    (match Agent_view.find m.agents id with
-     | Some agent -> agent.transcript
-     | None -> m.transcript)
+    else { m with viewport = Viewport.Anchored { a with top } }
 ;;
 
 let focused_lines m =
@@ -3982,11 +3976,7 @@ let search_top_for m line = Int.max 0 (line - (transcript_rows m / 2))
 let search_view m matches current =
   match List.nth matches current with
   | None -> m
-  | Some line ->
-    { m with
-      viewport =
-        Viewport.Anchored { top = search_top_for m line; new_lines = 0 }
-    }
+  | Some line -> { m with viewport = Viewport.anchored (search_top_for m line) }
 ;;
 
 let open_search m =
@@ -4041,13 +4031,11 @@ let jump_user_message m ~direction =
   match direction with
   | `Prev ->
     (match List.last (List.filter lines ~f:(fun line -> line < top)) with
-     | Some line ->
-       { m with viewport = Viewport.Anchored { top = line; new_lines = 0 } }, []
+     | Some line -> { m with viewport = Viewport.anchored line }, []
      | None -> warn m "no earlier message", [])
   | `Next ->
     (match List.find lines ~f:(fun line -> line > top) with
-     | Some line ->
-       { m with viewport = Viewport.Anchored { top = line; new_lines = 0 } }, []
+     | Some line -> { m with viewport = Viewport.anchored line }, []
      | None -> follow m, [])
 ;;
 
@@ -4071,8 +4059,7 @@ let editing_intent m (intent : Intent.t) =
   | Undo -> ed Editor.undo
   | Home ->
     (match m.mode, Editor.is_empty m.editor with
-     | Editing, true ->
-       { m with viewport = Viewport.Anchored { top = 0; new_lines = 0 } }, []
+     | Editing, true -> { m with viewport = Viewport.anchored 0 }, []
      | _ -> ed Editor.home)
   | End ->
     (match m.mode, Editor.is_empty m.editor with
@@ -4139,7 +4126,8 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
-  | Toggle_archived | Toggle_sidebar | Review_highlighted -> m, []
+  | Toggle_archived | Toggle_sidebar | Review_highlighted | Jump_to_bottom ->
+    m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -4223,6 +4211,7 @@ let editing m (intent : Intent.t) =
         | Toggle_archived
         | Review_highlighted
         | Toggle_sidebar
+        | Jump_to_bottom
         | Search ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
@@ -4652,6 +4641,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Toggle_archived
   | Review_highlighted
   | Toggle_sidebar
+  | Jump_to_bottom
   | Newline -> m, []
   | Insert _
   | Paste _
@@ -4846,7 +4836,8 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Next_user_message
   | Toggle_archived
   | Review_highlighted
-  | Toggle_sidebar -> m, []
+  | Toggle_sidebar
+  | Jump_to_bottom -> m, []
 ;;
 
 (* ---- confirm mode ----------------------------------------------------- *)
@@ -5056,6 +5047,7 @@ let intent m (intent : Intent.t) =
   in
   match m.mode, intent with
   | _, Toggle_sidebar -> toggle_sidebar m, []
+  | _, Jump_to_bottom -> follow m, []
   | Output box, _ -> output_mode m box intent
   | mode, _ ->
     (match mode with

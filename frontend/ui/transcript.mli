@@ -123,6 +123,10 @@ val render_tail
   -> verbosity:Verbosity.t
   -> Content.t
 
+(** How many items are complete: messages, notices, tools with their result
+    (a running tool and the text still streaming do not count). *)
+val finished : t -> int
+
 (** Total wrapped line count, for scroll clamping. *)
 val line_count : t -> width:int -> verbosity:Verbosity.t -> int
 

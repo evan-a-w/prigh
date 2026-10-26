@@ -227,5 +227,6 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Toggle_archived
   | Review_highlighted
   | Toggle_sidebar
+  | Jump_to_bottom
   | Submit_as_typed -> Continue t
 ;;

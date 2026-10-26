@@ -778,6 +778,12 @@ let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
   List.take window (Int.max 0 (List.length window - skip))
 ;;
 
+let finished t =
+  List.count t.items_rev ~f:(function
+    | Item.Tool { result = None; _ } | Server_tool { ended = false; _ } -> false
+    | _ -> true)
+;;
+
 let line_count t ~width ~verbosity =
   List.sum
     (module Int)

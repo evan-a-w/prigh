@@ -1125,6 +1125,17 @@ status line, and only the editor's own growth resizes the transcript. Long
 output is a box that scrolls with Up/Down/PageUp/PageDown; Esc or Enter
 closes it, and typing closes it into the editor.
 
+Scrolled back (PageUp, the wheel, Ctrl+Up), the transcript stays where you
+put it while new output arrives, and a **jump indicator** sits at its
+bottom right, just above the rule and any open dialog, like prigh-web's ↓
+button: `↓ bottom · End` until something arrives below, then `↓ new output`
+while text streams in and `↓ 3 new` once messages, notices or tool results
+are complete (in yellow; the key in gray). It names the key that goes
+back: End on an empty prompt, Ctrl+End otherwise (End then moves the
+editor's cursor). That key, a click on the indicator, Esc when nothing
+runs, or scrolling down past the end go back to the bottom and follow new
+output again.
+
 Acknowledgements (`view: verbose`, `copied 120 chars`, `model: x`, usage
 errors, `cancelled`, a failed command) are not transcript content: they show
 on the right of the rule (in a box above it when too long) until the next
@@ -1150,8 +1161,9 @@ that no longer exists.
 | Alt+B / Ctrl+Left | move back one word |
 | Alt+F / Ctrl+Right | move forward one word |
 | Alt+D | delete the next word |
-| Home / Ctrl+A | start of line |
-| End / Ctrl+E | end of line |
+| Home / Ctrl+A | start of line; on an empty prompt, the transcript's top |
+| End / Ctrl+E | end of line; on an empty prompt, back to the bottom of the transcript |
+| Ctrl+End / click on `↓ … · End` | back to the bottom of the transcript, following new output again |
 | PageUp / PageDown | scroll the transcript / list a page |
 | mouse wheel | scroll the transcript (selecting text needs Shift) |
 | Ctrl+Up / Ctrl+Down | jump to the previous/next user message |
