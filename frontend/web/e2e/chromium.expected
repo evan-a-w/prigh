@@ -700,17 +700,24 @@ notes.txt
 17 B
 todo.md
 18 B
+=== chromium: files: a preview on a phone ===
+the list: hidden; todo.md
+18 B
+<TIME>
+back: the list shown, the preview closed
 === chromium: resize: a highlighted preview ===
 hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+left to right: chat to 619, the preview from 619, the list from 974
 === chromium: resize: the file browser's edge ===
-handles: sidebar 280, files 400, files-split 45
+handles: sidebar 280, files 400
 while dragging: resizing-x; no text selected: true
 dragged 160px left: 400 -> 560 (aria 560), kept 560
 as wide as it goes: 600, the chat keeps 400
 double-clicked: 400, kept null
 arrow keys: 480
-=== chromium: resize: the list over the preview ===
-dragged down: the list taller, over 45%: true
+=== chromium: resize: the preview's edge ===
+dragged 100px left: the preview 480 -> 580 (aria 580), the list 480, the chat 460
+at 1150px: the list hidden, the preview 472 with files
 === chromium: resize: the sidebar's edge ===
 dragged 80px right: 280 -> 360
 === chromium: resize: kept after a reload ===
@@ -1301,6 +1308,10 @@ Generate
 Amend
 Commit
 chat still shown: true
+=== chromium: review: page: resized ===
+the chat 400 -> 520 (aria 520), the files 260 -> 320 (aria 320), the page keeps 640
+the chat as wide as it goes: the page keeps 480
+double-clicked: the chat 400, the files 260
 file browser hidden: true
 === chromium: review: page: a second comment, not sent yet ===
 src/util.mlnew

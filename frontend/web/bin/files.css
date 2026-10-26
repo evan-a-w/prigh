@@ -11,7 +11,6 @@
   display: flex;
   min-height: 0;
   background: var(--slate);
-  border-left: 1px solid var(--rule);
   animation: files-in 0.16s ease-out;
 }
 @keyframes files-in { from { opacity: 0; transform: translateX(12px); } }
@@ -26,6 +25,7 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  border-left: 1px solid var(--rule);
 }
 .files-panel.alone .files-side { display: none; }
 
@@ -165,11 +165,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
   background: var(--well);
   animation: files-open 0.14s ease-out;
 }
-.files-panel.alone .files-preview { width: var(--files-width, 400px); border-right: 0; }
+.files-panel.alone .files-preview { width: var(--files-width, 400px); }
 @keyframes files-open { from { opacity: 0; } }
 .files-preview-head {
   display: flex;
@@ -301,7 +301,7 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
   border-left: 0;
   animation: files-up 0.2s ease-out;
 }
-.app.narrow :is(.files-side, .files-preview) { width: auto; flex: 1 1 auto; }
+.app.narrow :is(.files-side, .files-preview) { width: auto; flex: 1 1 auto; border-left: 0; }
 .app.narrow :is(.files-head, .files-preview-head) { min-height: 50px; }
 .app.narrow .files-head { padding-left: 12px; }
 .app.narrow .files-columns, .app.narrow .files-row { grid-template-columns: 18px minmax(0, 1fr) auto 64px; }
