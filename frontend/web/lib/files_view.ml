@@ -751,51 +751,55 @@ let view (m : App.Model.t) ~inject =
              then Node.none
              else Resize_view.handle m ~inject Files)
           ; div
-          ~cls:"files-head"
-          [ glyph ~cls:"files-head-icon" Folder
-          ; span
-              ~cls:"files-machine"
-              ~attrs:[ Attr.title "The tools' host" ]
-              host
-          ; div
-              ~cls:"files-tools"
-              [ tool
-                  ~inject
-                  ~title:"Up (Backspace)"
-                  ~label:"Up"
-                  ~disabled:
-                    (Option.value_map t.listing ~default:true ~f:(fun l ->
-                       Option.is_none l.parent))
-                  Up
-                  (glyph Up)
-              ; tool ~inject ~title:"Refresh" Refresh (glyph Refresh)
-              ; tool
-                  ~inject
-                  ~cls:(if t.hidden then "on" else "")
-                  ~title:
-                    (if t.hidden then "Hide dot files" else "Show dot files")
-                  Toggle_hidden
-                  (glyph Eye)
-              ; tool ~inject ~title:"New folder" New_folder (glyph Folder_plus)
-              ; tool
-                  ~inject
-                  ~title:"Upload files here"
-                  (Pick Here)
-                  (glyph Upload)
-              ; (if List.is_empty m.review.files
-                 then Node.none
-                 else Review_page_view.open_button m ~inject)
-              ; button
-                  ~cls:"icon ghost files-close"
-                  ~title:"Close (Ctrl+Shift+F)"
-                  ~label:"Close files"
-                  ~on_click:(inject (files Close))
-                  [ icon Close ]
+              ~cls:"files-head"
+              [ glyph ~cls:"files-head-icon" Folder
+              ; span
+                  ~cls:"files-machine"
+                  ~attrs:[ Attr.title "The tools' host" ]
+                  host
+              ; div
+                  ~cls:"files-tools"
+                  [ tool
+                      ~inject
+                      ~title:"Up (Backspace)"
+                      ~label:"Up"
+                      ~disabled:
+                        (Option.value_map t.listing ~default:true ~f:(fun l ->
+                           Option.is_none l.parent))
+                      Up
+                      (glyph Up)
+                  ; tool ~inject ~title:"Refresh" Refresh (glyph Refresh)
+                  ; tool
+                      ~inject
+                      ~cls:(if t.hidden then "on" else "")
+                      ~title:
+                        (if t.hidden then "Hide dot files" else "Show dot files")
+                      Toggle_hidden
+                      (glyph Eye)
+                  ; tool
+                      ~inject
+                      ~title:"New folder"
+                      New_folder
+                      (glyph Folder_plus)
+                  ; tool
+                      ~inject
+                      ~title:"Upload files here"
+                      (Pick Here)
+                      (glyph Upload)
+                  ; (if List.is_empty m.review.files
+                     then Node.none
+                     else Review_page_view.open_button m ~inject)
+                  ; button
+                      ~cls:"icon ghost files-close"
+                      ~title:"Close (Ctrl+Shift+F)"
+                      ~label:"Close files"
+                      ~on_click:(inject (files Close))
+                      [ icon Close ]
+                  ]
               ]
-          ]
-      ; path_bar t ~inject
-      ; body m t ~inject
-      ; uploads t
+          ; path_bar t ~inject
+          ; body m t ~inject
+          ; uploads t
           ]
       ])
 ;;

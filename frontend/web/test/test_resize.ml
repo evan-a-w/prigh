@@ -322,7 +322,9 @@ let columns h =
   H.elements h ~selector:".files-panel .resizer"
 ;;
 
-let%expect_test "an open file's preview sits left of the list, each with its edge" =
+let%expect_test
+    "an open file's preview sits left of the list, each with its edge"
+  =
   let h = files_listed () in
   columns h;
   [%expect
@@ -367,7 +369,8 @@ let%expect_test "an open file's preview sits left of the list, each with its edg
   (* The list and the preview share what the chat leaves: 1440 - 400 for the
      chat - 280 for the sidebar. *)
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     sidebar-width=280px files-width=400px files-preview-width=360px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=260px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files-preview">
@@ -385,7 +388,8 @@ let%expect_test "an open file's preview sits left of the list, each with its edg
      width. *)
   H.key h "Escape" ~target:Files;
   columns h;
-  [%expect {|
+  [%expect
+    {|
     (Files Close_preview)
     (Files (Focus files-list))
     <aside class="files-panel">
@@ -396,7 +400,8 @@ let%expect_test "an open file's preview sits left of the list, each with its edg
   open_main h;
   H.act h (Resize (Set (Files, 500)));
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     (Files (Select main.ml))
     (Cache_prefs (((key web.files-width) (value (400)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 400)))))
@@ -424,7 +429,8 @@ let%expect_test "without room for both, the preview takes the list's place" =
      leave the chat less than 400px. *)
   columns h;
   H.text h ~selector:".files-preview-head";
-  [%expect {|
+  [%expect
+    {|
     (Files (Select main.ml))
     <aside class="alone files-panel previewing">
     <section class="files-preview">
@@ -434,7 +440,8 @@ let%expect_test "without room for both, the preview takes the list's place" =
     |}];
   H.key h ~target:(Resize Files) "ArrowLeft";
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     (Resize (Nudge Files 1))
     (Cache_prefs (((key web.files-width) (value (378)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 378)))))
@@ -454,7 +461,8 @@ let%expect_test "without room for both, the preview takes the list's place" =
     |}];
   H.click h ~selector:".files-back";
   columns h;
-  [%expect {|
+  [%expect
+    {|
     (Files Close_preview)
     (Files (Focus files-list))
     <aside class="files-panel">
@@ -467,7 +475,8 @@ let%expect_test "without room for both, the preview takes the list's place" =
   viewport h 1050 800;
   open_main h;
   columns h;
-  [%expect {|
+  [%expect
+    {|
     (Files (Select main.ml))
     <aside class="alone files-panel previewing">
     <section class="files-preview">
@@ -476,7 +485,8 @@ let%expect_test "without room for both, the preview takes the list's place" =
     |}];
   viewport h 1440 900;
   columns h;
-  [%expect {|
+  [%expect
+    {|
     <aside class="files-panel previewing">
     <section class="files-preview">
     <div class="files-side">
@@ -491,7 +501,8 @@ let%expect_test "the terminal's top edge" =
   H.quiet h (fun () -> H.act h Toggle_terminal);
   H.key h ~target:(Resize Terminal) "ArrowUp";
   H.key h ~target:(Resize Terminal) "End";
-  [%expect {|
+  [%expect
+    {|
     (Resize (Nudge Terminal 1))
     (Cache_prefs (((key web.terminal-height) (value (358)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 358)))))
@@ -502,7 +513,8 @@ let%expect_test "the terminal's top edge" =
      (tag Show_error))
     |}];
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=640px review-chat-width=400px review-files-width=260px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-terminal">
@@ -567,7 +579,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   let h = reviewing () in
   H.elements h ~selector:".resizer";
   H.show h ~selector:".resizer-review-chat";
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-review-files">
@@ -592,7 +605,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   H.key h ~target:(Resize Review_chat) "ArrowLeft";
   H.key h ~target:(Resize Review_chat) "End";
   H.key h ~target:(Resize Review_files) "ArrowRight" ~shift:true;
-  [%expect {|
+  [%expect
+    {|
     (Resize (Nudge Review_chat 1))
     (Cache_prefs (((key web.review-chat-width) (value (416)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.review-chat-width 416)))))
@@ -607,7 +621,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
      (tag Show_error))
     |}];
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=680px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-review-files">
@@ -625,7 +640,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
      the code. *)
   viewport h 1100 900;
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     sidebar-width=220px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=399px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-review-files">
@@ -642,7 +658,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   viewport h 1440 900;
   H.key h ~target:(Resize Review_chat) "Enter";
   H.key h ~target:(Resize Review_files) "Home";
-  [%expect {|
+  [%expect
+    {|
     (Resize (Reset Review_chat))
     (Cache_prefs (((key web.review-chat-width) (value ()))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.review-chat-width null)))))
@@ -654,7 +671,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   H.act h (Resize (Restore [ Review_chat, Some 340; Review_files, Some 200 ]));
   H.act h (Resize (Nudge (Review_margin, -2)));
   H.act h (Resize (Set (Review_margin, 5000)));
-  [%expect {|
+  [%expect
+    {|
     (Cache_prefs (((key web.review-margin-width) (value (268)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.review-margin-width 268)))))
      (tag Show_error))
@@ -663,7 +681,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
      (tag Show_error))
     |}];
   sizes h;
-  [%expect {|
+  [%expect
+    {|
     sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=340px review-files-width=200px review-margin-width=300px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-review-files">
@@ -682,14 +701,17 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   [%expect {| |}]
 ;;
 
-let%expect_test "phones keep sheets: no handles; the preview in the list's place" =
+let%expect_test
+    "phones keep sheets: no handles; the preview in the list's place"
+  =
   let h = files_listed () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   open_main h;
   H.elements h ~selector:".resizer";
   [%expect {| (Files (Select main.ml)) |}];
   columns h;
-  [%expect {|
+  [%expect
+    {|
     <aside class="alone files-panel previewing">
     <section class="files-preview">
     <div class="files-side">

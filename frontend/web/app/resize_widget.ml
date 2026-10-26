@@ -160,9 +160,7 @@ let install_drag ~schedule =
          let value =
            Int.max
              d.min
-             (Int.min
-                d.max
-                (d.start + Float.iround_nearest_exn moved))
+             (Int.min d.max (d.start + Float.iround_nearest_exn moved))
          in
          if value <> d.value
          then (

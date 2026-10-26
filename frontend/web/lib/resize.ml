@@ -66,8 +66,8 @@ module Handle = struct
 
   let grows = function
     | Sidebar | Review_files -> 1
-    | Files | Files_preview | Agents | Terminal | Review_chat | Review_margin
-      -> -1
+    | Files | Files_preview | Agents | Terminal | Review_chat | Review_margin ->
+      -1
   ;;
 end
 
@@ -165,17 +165,15 @@ let docked_sides t (shown : Shown.t) =
   if shown.narrow
   then []
   else
-    List.filter
-      [ Handle.Sidebar; Review_chat; Files; Agents ]
-      ~f:(function
-        | Sidebar -> shown.sidebar
-        | Review_chat -> shown.reviewing
-        | Files ->
-          shown.files
-          && (not shown.reviewing)
-          && t.viewport.width >= files_floats_below
-        | Agents -> shown.agents && t.viewport.width >= agents_floats_below
-        | _ -> false)
+    List.filter [ Handle.Sidebar; Review_chat; Files; Agents ] ~f:(function
+      | Sidebar -> shown.sidebar
+      | Review_chat -> shown.reviewing
+      | Files ->
+        shown.files
+        && (not shown.reviewing)
+        && t.viewport.width >= files_floats_below
+      | Agents -> shown.agents && t.viewport.width >= agents_floats_below
+      | _ -> false)
 ;;
 
 let preview_alone t (shown : Shown.t) =
@@ -190,9 +188,10 @@ let preview_alone t (shown : Shown.t) =
 
 let docked t shown =
   let sides = docked_sides t shown in
-  if shown.preview
-     && List.mem sides Files ~equal:Handle.equal
-     && not (preview_alone t shown)
+  if
+    shown.preview
+    && List.mem sides Files ~equal:Handle.equal
+    && not (preview_alone t shown)
   then Handle.Files_preview :: sides
   else sides
 ;;
