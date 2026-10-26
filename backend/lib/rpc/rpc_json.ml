@@ -424,9 +424,26 @@ let session_home (h : Session.Home.t) =
 (* Only while set: most sessions never have one. *)
 let home = Option.value_map ~default:[] ~f:(fun h -> [ "home", session_home h ])
 
+let trim_result (trim : Session.Trim.t) =
+  `Object [ "messages", int trim.messages; "tokens", int trim.tokens ]
+;;
+
+let trim (trim : Session.Trim.t) =
+  `Object
+    ([ "before", str trim.before
+     ; "messages", int trim.messages
+     ; "tokens", int trim.tokens
+     ]
+     @ Option.value_map trim.at ~default:[] ~f:(fun at -> [ "at", ms at ]))
+;;
+
 let state (s : Agent.State.t) =
   match state s with
-  | `Object fields -> `Object (fields @ home s.home)
+  | `Object fields ->
+    `Object
+      (fields
+       @ home s.home
+       @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ]))
   | json -> json
 ;;
 
@@ -509,6 +526,8 @@ let entry (e : Session.Entry.t) =
     | Worktree_removed { path } ->
       [ "kind", str "worktree_removed"; "path", str path ]
     | Home _ -> [ "kind", str "home" ]
+    | Trim { before } -> [ "kind", str "trim"; "before", str before ]
+    | Untrim -> [ "kind", str "untrim" ]
   in
   `Object
     ([ "id", str e.id

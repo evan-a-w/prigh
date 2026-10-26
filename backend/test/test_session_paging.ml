@@ -553,3 +553,88 @@ let%expect_test "sessions read again are cached until their file changes" =
     user: from elsewhere
     |}]
 ;;
+
+let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let session = saved t in
+  let path = Session.path session in
+  let c = server t ~sw in
+  ignore (Client.call c "switch_session" [ "path", `String path ] : Json.t);
+  let points =
+    Client.call c "get_trim_points" []
+    |> Json.member_exn "points"
+    |> Json.list_exn
+  in
+  List.iter (List.take points 3) ~f:(fun p ->
+    let field name = Json.to_string (Json.member_exn name p) in
+    printf
+      "%s %s messages=%s tokens=%s\n"
+      (field "index")
+      (field "text")
+      (field "messages")
+      (field "tokens"));
+  [%expect
+    {|
+    4 "turn 2" messages=4 tokens=17
+    8 "turn 3" messages=8 tokens=34
+    12 "turn 4" messages=12 tokens=51
+    |}];
+  let before point = Json.member_exn "before" point in
+  let summary () =
+    let state = Client.call c "get_state" [] in
+    let page = Client.call c "get_messages_page" [ "limit", `Number "100" ] in
+    let trimmed =
+      Client.call c "get_trimmed" []
+      |> Json.member_exn "messages"
+      |> Json.list_exn
+    in
+    printf
+      "trim=%s page=%d trimmed=%d first point=%s\n"
+      (Option.value_map
+         (Json.member "trim" state)
+         ~default:"none"
+         ~f:(fun trim ->
+           Json.to_string
+             (`Object
+                 [ "messages", Json.member_exn "messages" trim
+                 ; "tokens", Json.member_exn "tokens" trim
+                 ])))
+      (List.length (Json.list_exn (Json.member_exn "messages" page)))
+      (List.length trimmed)
+      (Json.to_string
+         (Json.member_exn
+            "text"
+            (List.hd_exn
+               (Json.list_exn
+                  (Json.member_exn "points" (Client.call c "get_outline" []))))))
+  in
+  summary ();
+  print_endline
+    (Json.to_string
+       (Client.call c "trim" [ "before", before (List.nth_exn points 2) ]));
+  summary ();
+  print_endline (Json.to_string (Client.call c "untrim" []));
+  summary ();
+  print_s
+    [%sexp
+      (Client.result (Client.request c "untrim" []) : (Json.t, string) Result.t)];
+  print_s
+    [%sexp
+      (Client.result (Client.request c "trim" [ "before", `String "nope" ])
+       : (Json.t, string) Result.t)];
+  [%expect
+    {|
+    trim=none page=41 trimmed=0 first point="turn 1"
+    {"messages":12,"tokens":51}
+    trim={"messages":12,"tokens":51} page=29 trimmed=12 first point="turn 4"
+    {"messages":12,"tokens":51}
+    trim=none page=41 trimmed=0 first point="turn 1"
+    (Error "nothing is trimmed: /trim picks a point")
+    (Error
+     "message nope is not in the model's context: trim before one of your messages that /trim lists")
+    |}]
+;;

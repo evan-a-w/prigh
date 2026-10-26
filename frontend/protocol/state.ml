@@ -64,6 +64,7 @@ type t =
   ; plan_mode : bool
   ; plan : Plan.t option
   ; session_rules : string list
+    ; trim : Trim.t option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
@@ -135,9 +136,10 @@ let of_json j =
     | None -> Ok None
     | Some plan -> Or_error.map (Plan.of_json plan) ~f:Option.some
   in
-  let%map session_rules =
+  let%bind session_rules =
     Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
   in
+  let%map trim = Trim.field j in
   { session_id
   ; session_path
   ; session_name
@@ -164,5 +166,6 @@ let of_json j =
   ; plan_mode
   ; plan
   ; session_rules
+  ; trim
   }
 ;;
