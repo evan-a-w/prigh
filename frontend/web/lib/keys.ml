@@ -8,6 +8,10 @@ module Target = struct
     | Control
     | Session_search
     | Session of string
+    | Worktree of
+        { session : string
+        ; path : string
+        }
     | Terminal
     | Files
     | Review
@@ -59,10 +63,15 @@ let help =
        transcript's right edge)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
-  ; ( "Alt+Enter / Delete (/worktree)"
-    , "start a new session in the highlighted worktree / remove it" )
+  ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
+    , "start a new session in the highlighted worktree / review its changes / \
+       remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
+  ; ( "Shift+F10 / ContextMenu (on a session or worktree)"
+    , "its menu: open, rename, fork, new worktree, review, files, terminal, \
+       pull request, copy, delete or remove (also right-click, a long press or \
+       its ⋯)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -137,6 +146,7 @@ let on_control t =
   | Multiline
   | Session_search
   | Session _
+  | Worktree _
   | Terminal
   | Files
   | Review
@@ -173,6 +183,9 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Ask_remove_worktree item.id)
+  | _, Picker { kind = Worktrees _; picker } when alt_letter t "r" ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Review_worktree { path = item.id; base = None })
   | "Enter", Picker { kind = Worktrees _; picker } when alt_only t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Open_worktree { path = item.id; new_session = true })
@@ -243,6 +256,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              | Control
              | Session_search
              | Session _
+             | Worktree _
              | Resize _
              | Page -> true) -> Some Agents_back
   | _ -> None
@@ -277,11 +291,20 @@ let session_search_key t : App.Action.t option =
   | _ -> None
 ;;
 
+let menu_key t =
+  String.equal t.key "ContextMenu"
+  || (String.equal t.key "F10" && t.shift && not (t.ctrl || t.alt || t.meta))
+;;
+
 let session_key (m : App.Model.t) t id : App.Action.t option =
   let session f =
     List.find m.sessions ~f:(fun s -> String.equal s.id id) |> Option.map ~f
   in
   match t.key with
+  | _ when menu_key t ->
+    session (fun s ->
+      App.Action.Open_menu
+        { target = Session s.path; anchor = Element (Session_list.dom_id s.id) })
   | "ArrowDown" when plain t -> Some (Session_nav { from = Some id; by = 1 })
   | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
   (* Space clicks the row's button, as Enter would. *)
@@ -297,6 +320,27 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   | "Escape" when m.marks.selecting -> Some (Select_sessions false)
   | "Escape" -> Some Leave_sidebar
   | _ -> None
+;;
+
+(* A worktree's row: its menu; ↑↓ go on through the sessions. *)
+let worktree_key (m : App.Model.t) t ~session ~path : App.Action.t option =
+  match List.find m.sessions ~f:(fun s -> String.equal s.id session) with
+  | None -> None
+  | Some s ->
+    (match t.key with
+     | _ when menu_key t ->
+       Some
+         (Open_menu
+            { target = Worktree { session = s.path; path }
+            ; anchor = Element (Context_menu.worktree_dom_id ~session path)
+            })
+     | "ArrowDown" when plain t ->
+       Some (Session_nav { from = Some session; by = 1 })
+     | "ArrowUp" when plain t ->
+       Some (Session_nav { from = Some session; by = 0 })
+     | ("Delete" | "Backspace") when plain t -> Some (Ask_remove_worktree path)
+     | "Escape" -> Some Leave_sidebar
+     | _ -> None)
 ;;
 
 (* y/Enter allow, a always (when offered), n/Esc deny, r a reason; while
@@ -341,6 +385,7 @@ let question_key t : Question_dialog.Action.t option =
     | Control
     | Session_search
     | Session _
+    | Worktree _
     | Terminal
     | Files
     | Review
@@ -374,6 +419,7 @@ let commenting (m : App.Model.t) t =
   | Control
   | Session_search
   | Session _
+  | Worktree _
   | Terminal
   | Resize _ -> false
 ;;
@@ -448,6 +494,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Editor { cursor } -> editor_key m t ~cursor
         | None, Session_search -> session_search_key t
         | None, Session id -> session_key m t id
+        | None, Worktree { session; path } -> worktree_key m t ~session ~path
         | None, Files ->
           Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
           |> Option.map ~f:(fun a -> App.Action.Files a)

@@ -437,8 +437,15 @@ val compact : ?instructions:string -> t -> string Or_error.t
 
 (** {2 Changes: /diff, /review, /init} *)
 
-(** The working tree's changes on the active tool host ({!Git_diff}). *)
-val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
+(** A worktree's changes on the active tool host ({!Git_diff}): the
+    session directory's, or [dir]'s. *)
+val git_diff
+  :  ?path:string
+  -> ?base:string
+  -> ?dir:string
+  -> ?default_base:bool
+  -> t
+  -> Git_diff.Result.t Or_error.t
 
 (** {2 Worktrees}
 
@@ -490,11 +497,12 @@ val update_review
 
 (** Sends the posts of the user's the agent has not seen
     ({!Review_state.submit}) as a message with the [Review_comments] source,
-    steering a running agent or starting a run; the comments it covers. *)
-val submit_review : t -> int Or_error.t
+    steering a running agent or starting a run; the comments it covers
+    (with [root], those on that worktree). *)
+val submit_review : ?root:string -> t -> int Or_error.t
 
 (** Accepts (applies the edits to the comment's file on the active tool host,
-    with [edit]) or rejects a pending proposal; one that no longer applies is
+    with [edit], in the comment's worktree) or rejects a pending proposal; one that no longer applies is
     [Failed]. *)
 val decide_proposal
   :  t

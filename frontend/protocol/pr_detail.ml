@@ -28,5 +28,9 @@ let git_diff t : Git_diff.t =
   ; against = t.pr.base
   ; diff = t.diff
   ; truncated = t.truncated
+  ; branch = Some t.pr.head
+  ; base = t.pr.base
+  ; main = true
+  ; branches = []
   }
 ;;

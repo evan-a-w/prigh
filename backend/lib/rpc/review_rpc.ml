@@ -125,7 +125,8 @@ let dispatch agent ~meth ~params =
        `Object [])
   | "review_submit" ->
     Some
-      (let%map count = Agent.submit_review agent in
+      (let%bind root = optional string params "root" in
+       let%map count = Agent.submit_review ?root agent in
        `Object [ "count", `Number (Int.to_string count) ])
   | "review_decide" ->
     Some
@@ -137,12 +138,14 @@ let dispatch agent ~meth ~params =
          ~f:Rpc_json.review_comment)
   | "review_approve" ->
     Some
-      (let%bind path = string params "path" in
+      (let%bind root = optional string params "root" in
+       let%bind path = string params "path" in
        let%bind hash = string params "hash" in
-       review agent ~f:(fun _ -> Review_state.approve ~path ~hash))
+       review agent ~f:(fun _ -> Review_state.approve ?root ~path ~hash ()))
   | "review_unapprove" ->
     Some
-      (let%bind path = string params "path" in
-       review agent ~f:(fun r -> Review_state.unapprove r ~path))
+      (let%bind root = optional string params "root" in
+       let%bind path = string params "path" in
+       review agent ~f:(fun r -> Review_state.unapprove ?root r ~path))
   | _ -> None
 ;;
