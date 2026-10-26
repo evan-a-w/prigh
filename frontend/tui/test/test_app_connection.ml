@@ -18,7 +18,14 @@ let rejection = "unauthorised: bad user name or password"
 let on ?(width = 100) ?(height = 14) (link : Server_link.t) =
   let h = Test_app.connected ~width ~height () in
   H.step h (Server_link link);
-  H.step h (Hello { client_id = "c1"; namespace = link.user; user = link.user });
+  H.step
+    h
+    (Hello
+       { client_id = "c1"
+       ; namespace = link.user
+       ; user = link.user
+       ; superuser = false
+       });
   h
 ;;
 

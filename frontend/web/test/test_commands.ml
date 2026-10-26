@@ -969,7 +969,10 @@ let hosts_state =
 
 let%expect_test "/host: pick a host, then the directory there" =
   let h = H.create ~state:hosts_state () in
-  H.act h (Hello { client_id = "c7"; namespace = None; user = None });
+  H.act
+    h
+    (Hello
+       { client_id = "c7"; namespace = None; user = None; superuser = false });
   run h "/host";
   H.text h ~selector:".picker-items";
   [%expect
@@ -1043,7 +1046,10 @@ let%expect_test "/host: pick a host, then the directory there" =
 
 let%expect_test "/cd and /host to a missing directory ask to create it" =
   let h = H.create ~state:hosts_state () in
-  H.act h (Hello { client_id = "c7"; namespace = None; user = None });
+  H.act
+    h
+    (Hello
+       { client_id = "c7"; namespace = None; user = None; superuser = false });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
   H.text h ~selector:".modal";
@@ -1599,7 +1605,12 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   let h = H.create () in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "alice"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};
   H.text h ~selector:".picker-items";

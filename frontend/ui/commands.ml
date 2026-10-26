@@ -293,6 +293,12 @@ let all =
       "setusr"
       "[user]"
       "act as another user (superusers only); without a user, list them"
+  ; c
+      "nix-gc"
+      "[run [DAYS|all]]"
+      "show the Nix store's size and free space; run collects garbage, first \
+       deleting every user's profile generations older than DAYS days (all: \
+       all but the current ones) (superusers only)"
   ; c "quit" "" "exit"
   ]
 ;;

@@ -22,8 +22,7 @@ let of_json = function
     (match Int.of_string_opt n with
      | Some days -> Or_error.map (of_days days) ~f:Option.some
      | None -> Or_error.errorf "bad generations %s" n)
-  | Some json ->
-    Or_error.errorf "bad generations %s" (Jsonaf.to_string json)
+  | Some json -> Or_error.errorf "bad generations %s" (Jsonaf.to_string json)
 ;;
 
 let to_json = function

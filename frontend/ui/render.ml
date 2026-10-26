@@ -921,6 +921,8 @@ let status (m : App.Model.t) : Content.Line.t =
             ] )
         ])
       @ server_part m
+      @ Option.value_map m.nix_gc ~default:[] ~f:(fun progress ->
+        [ 2, [ span ~style:attention (Nix_gc_command.progress progress) ] ])
       @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
         let text =
           match App.Model.acting_as m, m.user with

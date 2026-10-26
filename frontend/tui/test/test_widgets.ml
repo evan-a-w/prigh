@@ -729,6 +729,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /signin [user]                     sign in to the server, as another user or again
     /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them
+    /nix-gc [run [DAYS|all]]           show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones) (superusers only)
     /quit                              exit
     !command   run a shell command; its output joins the context
     !!command  run a shell command without adding it to the context
