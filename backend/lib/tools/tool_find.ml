@@ -8,7 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "Find files by glob pattern (e.g. *.ml, src/**/*.ts). Respects \
        .gitignore. Returns paths relative to the searched directory."

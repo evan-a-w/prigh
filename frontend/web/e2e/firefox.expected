@@ -841,6 +841,17 @@ Sign in
 Back to alice
 === firefox: accounts: sessions ===
 I am bob
+=== firefox: accounts: bob's settings ===
+Appearance
+Preferences
+On the backend
+Git hosting
+Account
+=== firefox: accounts: bob's commands ===
+/setus offers: /setusr [user]
+/nix-g offers: nothing
+=== firefox: accounts: bob's /nix-gc ===
+Unknown command /nix-gc: /help lists the commands.
 === firefox: accounts: bob's menu ===
 B
 bob
@@ -863,6 +874,27 @@ forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
 === firefox: accounts: sessions ===
 I am alice
+=== firefox: accounts: alice's nix store ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: none recorded
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Also delete generations over 14 days…
+Collect
+=== firefox: accounts: collected ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Freed 3.0 GiB: 1 path deleted in <N> s
+Also delete generations over 14 days…
+Collect
 === firefox: accounts: act as ===
 alice
 you
@@ -1507,4 +1539,58 @@ prefer_host: host-laptop
 === firefox: remote: the spent link elsewhere ===
 Sign in
 === firefox: remote: errors ===
+none
+=== firefox: steer: the subagent shown is written to ===
+Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+Survey the project
+Steering
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== firefox: steer: Esc ===
+(no chip); Steer the agent…
+still running: true
+Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+=== firefox: steer: queued for it ===
+To a1, next step
+use the tests
+Edit
+To a1, after its turn
+then summarise
+Edit
+=== firefox: steer: its row says so ===
+2 queued  deepseek-flash  1 turn  1 tool call
+=== firefox: steer: edited ===
+in the editor: then summarise
+=== firefox: steer: delivered, it finished ===
+a1 has finished: you are writing to the main agent again
+=== firefox: steer: the composer is the main agent's again ===
+(no chip); Steer the agent…
+=== firefox: steer: its transcript ===
+Looking around.
+bash
+until [ -f sub-go ]; do sleep 0.1; done; echo sub-go
+sub-go
+→
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+use the tests
+<TIME>
+Using the tests, as asked.
+<TIME>
+→
+You (follow-up)
+[The user sends you this as you finish: deal with it before you report.]
+then summarise
+<TIME>
+Summary: 3 files, all tested.
+<TIME>
+=== firefox: steer: too late ===
+Couldn't send it to a1: a1 has finished and its report is on its way to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor.
+in the editor: /agents steer a1 one more thing
+=== firefox: steer: the main agent got the report ===
+The survey is in.
+=== firefox: steer: errors ===
 none

@@ -6,7 +6,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "List a directory. Directories are shown with a trailing slash."
   ; parameters =

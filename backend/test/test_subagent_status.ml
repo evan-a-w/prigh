@@ -142,7 +142,7 @@ let emitting_tool name ~run =
       ; description = name
       ; parameters = Tool_args.schema []
       ; parallel_safe = false
-      ; destructive = false
+      ; destructive = Never
       ; on_host = false
       ; freeform = None
       }

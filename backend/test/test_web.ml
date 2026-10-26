@@ -142,6 +142,32 @@ let%expect_test "web server: browser URLs" =
     |}]
 ;;
 
+let%expect_test "web server: listening beyond loopback warns about plaintext" =
+  List.iter
+    [ "-web", Eio.Net.Ipaddr.V4.loopback
+    ; "-web", Eio.Net.Ipaddr.of_raw "\127\000\000\002"
+    ; "-listen", Eio.Net.Ipaddr.V6.loopback
+    ; "-web", Eio.Net.Ipaddr.V4.any
+    ; "-listen", Eio.Net.Ipaddr.V6.any
+    ; "-web", Eio.Net.Ipaddr.of_raw "\192\168\001\010"
+    ]
+    ~f:(fun (flag, addr) ->
+      print_endline
+        (Option.value
+           (Web_server.plaintext_warning ~flag addr)
+           ~default:
+             (Format.asprintf "%s %a: no warning" flag Eio.Net.Ipaddr.pp addr)));
+  [%expect
+    {|
+    -web 127.0.0.1: no warning
+    -web 127.0.0.2: no warning
+    -listen ::1: no warning
+    prigh: warning: -web 0.0.0.0 is reachable from other machines without TLS: tokens and everything else travel in the clear. Put an HTTPS reverse proxy in front of -web (see DOCKER.md, "Behind a reverse proxy"; then prigh-tui -connect wss://HOST/ws), use an SSH tunnel, or listen on 127.0.0.1 only.
+    prigh: warning: -listen :: is reachable from other machines without TLS: tokens and everything else travel in the clear. Put an HTTPS reverse proxy in front of -web (see DOCKER.md, "Behind a reverse proxy"; then prigh-tui -connect wss://HOST/ws), use an SSH tunnel, or listen on 127.0.0.1 only.
+    prigh: warning: -web 192.168.1.10 is reachable from other machines without TLS: tokens and everything else travel in the clear. Put an HTTPS reverse proxy in front of -web (see DOCKER.md, "Behind a reverse proxy"; then prigh-tui -connect wss://HOST/ws), use an SSH tunnel, or listen on 127.0.0.1 only.
+    |}]
+;;
+
 let%expect_test "web server: path safety and content types" =
   List.iter
     [ "/"

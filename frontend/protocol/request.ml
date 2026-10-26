@@ -107,6 +107,8 @@ module Method = struct
         ; text : string
         ; expected : string option
         }
+    | Nix_store_status
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -145,6 +147,8 @@ module Method = struct
     | Review_unapprove _ -> "review_unapprove"
     | Fs_preview _ -> "fs_preview"
     | Fs_write _ -> "fs_write"
+    | Nix_store_status -> "nix_store_status"
+    | Nix_store_gc _ -> "nix_store_gc"
   ;;
 
   let cwd_param = function
@@ -164,6 +168,10 @@ module Method = struct
     | Forge_status
     | Pr_defaults
     | Get_review
+    | Nix_store_status -> []
+    | Nix_store_gc { delete_generations = None } -> []
+    | Nix_store_gc { delete_generations = Some _ as generations } ->
+      [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []
     | Review_submit { root = Some root } -> [ "root", Json.str root ]
     | Review_comment { root; path; range; anchor; text } ->

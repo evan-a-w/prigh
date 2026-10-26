@@ -128,6 +128,10 @@ module Method : sig
         ; text : string
         ; expected : string option (** the [md5] it was read with *)
         } (** [{path, md5}] *)
+    | Nix_store_status (** superusers: {!Nix_store_status} *)
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
+    (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can
+        take minutes *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

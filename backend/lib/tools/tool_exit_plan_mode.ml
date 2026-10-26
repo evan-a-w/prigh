@@ -8,7 +8,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "In plan mode, presents your plan to the user and asks to leave plan \
        mode so that you can implement it. Call it once the plan is ready: the \

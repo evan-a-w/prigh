@@ -3,20 +3,13 @@ open! Async
 open Prigh_client
 
 let connect ~host ~port =
-  match%map
-    Monitor.try_with_or_error (fun () ->
-      Tcp.connect (Tcp.Where_to_connect.of_host_and_port { host; port }))
-  with
-  | Error _ as e -> e
-  | Ok (_socket, reader, writer) ->
-    let _stderr_r, _stderr_w = Pipe.create () in
-    Ok
-      { Transport.send_line =
-          (fun line ->
-            if not (Writer.is_closed writer) then Writer.write_line writer line)
-      ; lines = Reader.lines reader
-      ; stderr_lines = _stderr_r
-      ; close = (fun () -> don't_wait_for (Writer.close writer))
-      ; closed = Reader.close_finished reader
-      }
+  let%map.Deferred.Or_error (channel : Channel.t) = Channel.tcp ~host ~port in
+  let stderr_r, stderr_w = Pipe.create () in
+  Pipe.close stderr_w;
+  { Transport.send_line = (fun line -> channel.write (line ^ "\n"))
+  ; lines = Reader.lines channel.reader
+  ; stderr_lines = stderr_r
+  ; close = channel.close
+  ; closed = Reader.close_finished channel.reader
+  }
 ;;

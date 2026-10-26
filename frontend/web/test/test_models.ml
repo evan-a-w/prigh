@@ -220,7 +220,12 @@ let%expect_test
   [%expect {| (0%) ↑0 ↓0 $0.0000 Ready |}];
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "ann"
+       ; superuser = false
+       });
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.event
     h
