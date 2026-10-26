@@ -131,8 +131,12 @@ let accept_key key =
     (Digestif.SHA1.to_raw_string (Digestif.SHA1.digest_string (key ^ guid)))
 ;;
 
+(* Masks and keys must not be predictable (RFC 6455, 5.3). *)
+let rng = lazy (Mirage_crypto_rng_unix.use_default ())
+
 let random_bytes n =
-  String.init n ~f:(fun _ -> Char.of_int_exn (Random.int 256))
+  force rng;
+  Mirage_crypto_rng.generate n
 ;;
 
 module Opcode = struct
