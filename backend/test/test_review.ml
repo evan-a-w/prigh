@@ -364,24 +364,29 @@ let%expect_test "the RPC methods" =
   call "fs_list" "{}";
   [%expect
     {|
-    {"comments":[],"approvals":[]}
+    {"comments":[],"approvals":[],"snapshots":[]}
     {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false}]}
     error: param "first" must be a whole number
     {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
     error: unknown status "done": open or resolved
     {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
     error: c1 has no proposed change at post 0
-    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.ml","hash":"abc"}]}
-    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[]}
+    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.ml","hash":"abc"}],"snapshots":[{"root":"$DIR","path":"a.ml","action":"commented","at_ms":<ms>,"content":{"kind":"absent"}},{"root":"$DIR","path":"a.ml","action":"replied","at_ms":<ms>,"content":{"kind":"absent"}}]}
+    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[],"snapshots":[{"root":"$DIR","path":"a.ml","action":"commented","at_ms":<ms>,"content":{"kind":"absent"}},{"root":"$DIR","path":"a.ml","action":"replied","at_ms":<ms>,"content":{"kind":"absent"}}]}
     {}
     not a review method
     |}];
   (* The event every change broadcasts. *)
   print_endline
-    (Jsonaf.to_string
-       (Rpc_json.event (Review_changed (Agent.review_state agent))));
+    (mask
+       t
+       (Jsonaf.to_string
+          (Rpc_json.event (Review_changed (Agent.review_state agent))))
+     |> Re.replace_string
+          (Re.compile (Re.Perl.re {|"at_ms":[0-9]+|}))
+          ~by:{|"at_ms":<ms>|});
   [%expect
-    {| {"type":"event","event":"review","review":{"comments":[],"approvals":[]}} |}]
+    {| {"type":"event","event":"review","review":{"comments":[],"approvals":[],"snapshots":[{"root":"$DIR","path":"a.ml","action":"commented","at_ms":<ms>,"content":{"kind":"absent"}},{"root":"$DIR","path":"a.ml","action":"replied","at_ms":<ms>,"content":{"kind":"absent"}}]}} |}]
 ;;
 
 let%expect_test "fs_write: the editor saves a file unless it changed" =
