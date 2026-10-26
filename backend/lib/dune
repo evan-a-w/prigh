@@ -25,6 +25,7 @@
   mirage-crypto-rng
   mirage-crypto-rng.unix
   digestif
+  patience_diff
   base64
   ohex
   uri

@@ -501,11 +501,46 @@ val update_review
     (with [root], those on that worktree). *)
 val submit_review : ?root:string -> t -> int Or_error.t
 
+(** Like [update_review], then records a {!Review_snapshot} of the file
+    [path] of the worktree [root] for [action] (by the user [by]): [text],
+    or the file as it is now on the active tool host. A file that cannot be
+    read gets no snapshot. *)
+val update_review_file
+  :  ?by:string
+  -> ?text:string
+  -> t
+  -> root:string
+  -> path:string
+  -> action:Review_snapshot.Action.t
+  -> f:(Review_state.t -> ('a * Review_state.Change.t list) Or_error.t)
+  -> 'a Or_error.t
+
+(** A file of the worktree [root] as it is now on the active tool host, as
+    {!Review_snapshot.content_of} makes it (at most
+    {!Review_snapshot.max_bytes} read). *)
+val read_review_file
+  :  t
+  -> root:string
+  -> path:string
+  -> (Review_snapshot.Content.t * string option) Or_error.t
+
+(** What changed since the last action ({!Review_state.since}; with [path]
+    and [index], since that one) in [path], or in each file of the worktree
+    [root] with snapshots. *)
+val review_since
+  :  t
+  -> root:string
+  -> ?path:string
+  -> ?index:int
+  -> unit
+  -> Review_state.Since.t list Or_error.t
+
 (** Accepts (applies the edits to the comment's file on the active tool host,
     with [edit], in the comment's worktree) or rejects a pending proposal; one that no longer applies is
-    [Failed]. *)
+    [Failed]. Records the file's snapshot, by [by]. *)
 val decide_proposal
-  :  t
+  :  ?by:string
+  -> t
   -> id:string
   -> post:int
   -> accept:bool
