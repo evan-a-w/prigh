@@ -505,6 +505,17 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     |}]
 ;;
 
+let%expect_test "masking old tool outputs is a toast" =
+  let h = H.create () in
+  H.event h {|{"event":"masked","masked":1,"tokens_saved":979}|};
+  H.text h ~selector:".toasts";
+  [%expect
+    {|
+    (Expire_toast (id 0) (after_ms 4340))
+    masked 1 old tool output to make room in the context (about 979 tokens)
+    |}]
+;;
+
 let%expect_test
     "toasts: notices expire, errors stay until dismissed, at most two"
   =

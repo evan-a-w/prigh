@@ -11,6 +11,7 @@ module Config = struct
     ; max_tokens : int option
     ; retries : int
     ; cache_key : string option
+    ; mask_observations : bool
     }
 
   let default_retries = 5
@@ -171,6 +172,7 @@ let run
       ?background
       ?sleep
       ?compact
+      ?mask
       ?(halt = fun () -> None)
       ~context
       ~prompts
@@ -224,14 +226,52 @@ let run
              ; cost_usd = Model.cost_usd config.model outcome.usage
              }))
   in
+  let mask =
+    match mask with
+    | Some f -> f
+    | None ->
+      fun ~through messages -> Ok (Observation_mask.apply ~through messages)
+  in
+  (* Masks old tool outputs when [Observation_mask.worth_masking] says so,
+     returning the tokens it saved. *)
+  let mask_context ~input_tokens ~overflowed =
+    if not config.mask_observations
+    then None
+    else (
+      match Observation_mask.plan !messages with
+      | Some plan
+        when Observation_mask.worth_masking
+               config.model
+               ~input_tokens
+               ~overflowed
+               plan ->
+        (match mask ~through:plan.through !messages with
+         | Error _ -> None
+         | Ok context ->
+           messages := context;
+           last_tokens
+           := Option.map !last_tokens ~f:(fun (tokens, since) ->
+                tokens - plan.tokens_saved, since);
+           emit
+             (Masked { masked = plan.masked; tokens_saved = plan.tokens_saved });
+           Some plan.tokens_saved)
+      | Some _ | None -> None)
+  in
   let compaction_failed = ref false in
   let compact_if_large () =
     match !last_tokens with
-    | Some (tokens, since) when not !compaction_failed ->
+    | Some (tokens, since) ->
       let tokens =
         tokens + Message.estimate_tokens (List.drop !messages since)
       in
-      if Compaction.should_compact config.model ~input_tokens:tokens
+      let tokens =
+        match mask_context ~input_tokens:tokens ~overflowed:false with
+        | Some saved -> tokens - saved
+        | None -> tokens
+      in
+      if
+        (not !compaction_failed)
+        && Compaction.should_compact config.model ~input_tokens:tokens
       then (
         match
           compact_context
@@ -240,7 +280,7 @@ let run
         with
         | Ok () -> ()
         | Error _ -> compaction_failed := true)
-    | Some _ | None -> ()
+    | None -> ()
   in
   let turns = ref 0 in
   let continue_ = ref true in
@@ -270,7 +310,8 @@ let run
             (Message_update
                { partial = Assistant_builder.snapshot builder; delta }))
       in
-      (* An overflowing request is compacted and sent again, up to
+      (* An overflowing request is masked, if there is anything to mask, or
+         else compacted, and sent again, compacting up to
          [overflow_attempts] times; the failed reply is dropped. *)
       let rec attempt n ~overflows =
         let assistant = stream () in
@@ -278,7 +319,9 @@ let run
         | Error message
           when Context_overflow.matches message
                && not (Cancellation.is_cancelled cancel) ->
-          if overflows >= overflow_attempts
+          if Option.is_some (mask_context ~input_tokens:0 ~overflowed:true)
+          then attempt n ~overflows
+          else if overflows >= overflow_attempts
           then
             { assistant with
               stop_reason =

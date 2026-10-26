@@ -92,6 +92,7 @@ module Session_stats : sig
     ; context_percent : float
     ; model_changes : int
     ; compactions : int
+    ; masks : int (** observation maskings ({!Observation_mask}) *)
     ; duration_seconds : float
     }
   [@@deriving sexp_of]

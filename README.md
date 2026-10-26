@@ -1505,9 +1505,11 @@ it is replaced by `approval_mode` when prigh saves the file),
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
-command moves to the background and how long a wait lasts, above) and
+command moves to the background and how long a wait lasts, above),
 `generate_model` (the model ✦ Generate drafts commit messages, pull
-requests, branch names and session names with; default: the session's).
+requests, branch names and session names with; default: the session's) and
+`mask_observations` (default `true`: replace old tool outputs with
+placeholders before summarising, see "Long runs" below).
 Without a `default_thinking`, sessions start with thinking `on`; models that
 cannot think ignore it. A fallback model keeps the session's thinking level.
 
@@ -1545,16 +1547,31 @@ known one), and a `default_model` that names no known model.
 
 ### Long runs: compaction, budget, goals, usage limits
 
-Context never runs out mid-task. Between the turns of a run, when the last
-response's tokens (plus the tool results since) cross 80% of the model's
-window, the older part of the conversation is summarised and the run carries
-on with the summary (the transcript shows `Context compacted`); the same
-happens after a run, and on `/compact`. When a provider rejects a request as
-too long anyway (Anthropic's "prompt is too long", OpenAI's
-`context_length_exceeded`, and the wordings of DeepSeek and other
-OpenAI-compatible servers), the conversation is compacted and the request
-sent again, keeping less the second time; only then does the run fail,
-saying what to do. A compaction keeps the end of the conversation from a
+Context never runs out mid-task. The first, cheap tier is observation
+masking: once the context passes half of the model's window, the outputs of
+tool calls older than the last 10 turns are replaced with a one-line
+placeholder (`[bash output omitted to save context: 412 lines, 18 KB; run the
+tool again if you need it]`), and so are large arguments of old tool calls
+(a `write`'s content, an `apply_patch` body); the model's reasoning, its
+calls and your messages stay, and so do errors and outputs under 2 KB. It
+masks in batches, only when that frees at least a tenth of the window (also
+past the point where it would summarise), so the provider's prompt cache is
+not invalidated every turn, and the session
+records it, so a resumed session sends the same context. The transcript
+keeps showing the full outputs, with a note saying what was masked;
+`mask_observations: false` in `config.json` turns it off.
+
+When the context still crosses 80% of the model's window between the turns
+of a run (the last response's tokens plus the tool results since, less what
+masking freed), the older part of the conversation is summarised and the run
+carries on with the summary (the transcript shows `Context compacted`); the
+same happens after a run, and on `/compact` (which always summarises). When
+a provider rejects a request as too long anyway (Anthropic's "prompt is too
+long", OpenAI's `context_length_exceeded`, and the wordings of DeepSeek and
+other OpenAI-compatible servers), old tool outputs are masked, if there are
+any, and the request sent again; then the conversation is compacted and the
+request sent again, keeping less the second time; only then does the run
+fail, saying what to do. A compaction keeps the end of the conversation from a
 turn boundary, so tool calls keep their results, and carries your
 instructions over: when it falls in the middle of the work on your latest
 message, that message is kept verbatim ahead of the summary, and your
@@ -1565,9 +1582,10 @@ errors, files, current state, next steps), updates the previous one rather
 than summarising it again, and ends with the files read and modified,
 recorded from the tool calls that succeeded (absolute paths, the 100 most
 recent of each). It is written by the model from the
-conversation as it is, in a request that shares the session's prompt
-cache; a conversation too long for that is sent as a shortened transcript
-instead. Subagents compact their own context the same way.
+conversation as the agent sends it (masked), in a request that shares the
+session's prompt cache; a conversation too long for that is sent as a
+shortened transcript instead. Subagents mask and compact their own context
+the same way.
 
 #### Trimming the context
 

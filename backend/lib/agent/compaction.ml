@@ -320,6 +320,7 @@ let summarise
       ~overflowed
       ~cancel
       ?cwd
+      ?(files_of = Fn.id)
       ?instructions
       older
   =
@@ -330,7 +331,7 @@ let summarise
       let text, files = Compaction_files.of_summary summary in
       Some text, files
   in
-  let files = Compaction_files.add_calls ?cwd files older in
+  let files = Compaction_files.add_calls ?cwd files (files_of older) in
   let stream request = provider.stream request ~cancel ~on_event:ignore in
   let transcript () =
     stream (transcript_request model ~previous ?instructions older)
@@ -423,6 +424,12 @@ let compact
   let messages = Session.messages session in
   let ids = Array.of_list (Session.context_ids session) in
   let cwds = Array.of_list (Session.context_cwds session) in
+  (* The summary is asked for with the messages as the agent sends them
+     (masked), so that the prompt cache serves it; the files come from them
+     as they were (a masked [apply_patch] has lost its paths). *)
+  let unmasked =
+    List.map (Session.timed_messages session) ~f:(fun m -> m.message)
+  in
   match plan ~keep_recent_tokens messages with
   | None -> Or_error.error_string nothing_to_compact
   | Some { kept_from; pinned } ->
@@ -438,6 +445,7 @@ let compact
             ~overflowed
             ~cancel
             ~cwd:(fun i -> Some cwds.(i))
+            ~files_of:(fun older -> List.take unmasked (List.length older))
             ?instructions
             older)
          ~f:(fun (outcome : Outcome.t) ->

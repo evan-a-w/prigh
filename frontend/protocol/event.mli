@@ -58,6 +58,12 @@ type t =
       } (** answered (by any frontend), timed out or withdrawn *)
   | State of State.t
   | Compacted of string
+  | Masked of
+      { masked : int (** how many messages *)
+      ; tokens_saved : int (** estimated *)
+      }
+  (** old tool outputs were replaced with placeholders to make room in the
+      context (observation masking) *)
   | Config_changed of Config.t
   | Review of Review.t (** the session's review changed *)
   | Notice of string
@@ -139,3 +145,6 @@ type t =
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t
+
+(** What a frontend says about [Masked]. *)
+val masked_notice : masked:int -> tokens_saved:int -> string

@@ -565,7 +565,7 @@ let%expect_test "/session" =
   H.reply
     h
     "session_stats"
-    {|{"message_count":12,"turns":4,"tool_calls":{"bash":3,"read":5},"usage":{"input":45000,"output":3200,"cache_read":30000},"cost_usd":0.4321,"context_percent":22.5,"model_changes":1,"compactions":0,"duration_seconds":754.2}|};
+    {|{"message_count":12,"turns":4,"tool_calls":{"bash":3,"read":5},"usage":{"input":45000,"output":3200,"cache_read":30000},"cost_usd":0.4321,"context_percent":22.5,"model_changes":1,"compactions":0,"masks":2,"duration_seconds":754.2}|};
   H.text h ~selector:".modal";
   [%expect
     {|
@@ -585,7 +585,7 @@ let%expect_test "/session" =
     3.2k Output
     30.0k Cache read
     12m 34s Duration
-    Tools bash 3, read 5 Model changes 1 Compactions 0
+    Tools bash 3, read 5 Model changes 1 Compactions 0 Maskings 2
     (Rename) (Export) (Tree) (Done)
     |}];
   H.act h (Run "/name");

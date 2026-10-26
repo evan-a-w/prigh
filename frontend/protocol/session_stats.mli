@@ -9,6 +9,7 @@ type t =
   ; context_percent : float
   ; model_changes : int
   ; compactions : int
+  ; masks : int
   ; duration_seconds : float
   }
 [@@deriving sexp_of, equal]

@@ -84,6 +84,7 @@ let config =
   ; max_tokens = None
   ; retries = 0
   ; cache_key = None
+  ; mask_observations = false
   }
 ;;
 

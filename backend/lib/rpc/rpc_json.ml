@@ -482,6 +482,7 @@ let session_stats (s : Agent.Session_stats.t) =
     ; "context_percent", float s.context_percent
     ; "model_changes", int s.model_changes
     ; "compactions", int s.compactions
+    ; "masks", int s.masks
     ; "duration_seconds", float s.duration_seconds
     ]
 ;;
@@ -506,6 +507,7 @@ let entry (e : Session.Entry.t) =
               (List.map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
                  str pin.id)) )
         ]
+    | Masked { through } -> [ "kind", str "masked"; "through", str through ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
     | Description { text } -> [ "kind", str "description"; "text", str text ]
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
@@ -750,6 +752,11 @@ let rec event ?now (e : Agent.Event.t) =
       ; "summary", str summary
       ; "usage", usage u
       ; "cost_usd", float cost_usd
+      ]
+    | Loop (Masked { masked; tokens_saved }) ->
+      [ "event", str "masked"
+      ; "masked", int masked
+      ; "tokens_saved", int tokens_saved
       ]
     | State_changed s -> [ "event", str "state"; "state", state s ]
     | Compacted { summary } ->

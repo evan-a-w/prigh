@@ -503,6 +503,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Tool_end { call; result } -> end_tool t ~call ~result
   | P.Event.Compacted summary -> add t (Compaction summary)
   | P.Event.Notice text -> notice t text
+  | P.Event.Masked { masked; tokens_saved } ->
+    notice t (P.Event.masked_notice ~masked ~tokens_saved)
   | P.Event.Subagent_start { call_id; agent_id; task; model; _ } ->
     mark_subagent t ~call_id ~agent_id ~task ~model
   | P.Event.Subagent { call_id; event = inner; _ } ->
