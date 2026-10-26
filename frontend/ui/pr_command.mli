@@ -6,7 +6,10 @@ open! Core
 type t =
   | List of { state : string option } (** [None]: open ones *)
   | View of int
-  | New of { title : string option }
+  | New of
+      { title : string option
+      ; generate : bool (** [--generate] *)
+      }
   | Checkout of int
 [@@deriving sexp_of, equal]
 

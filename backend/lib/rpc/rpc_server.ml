@@ -17,6 +17,9 @@ let methods =
   ; "abort"
   ; "dequeue"
   ; "remove_queued"
+  ; "steer_agent"
+  ; "dequeue_agent"
+  ; "remove_agent_queued"
   ; "cancel_subagent"
   ; "list_subagents"
   ; "get_subagent"
@@ -39,6 +42,8 @@ let methods =
   ; "list_models"
   ; "compact"
   ; "git_diff"
+  ; "git_show"
+  ; "git_refs"
   ; "list_worktrees"
   ; "create_worktree"
   ; "remove_worktree"
@@ -68,6 +73,7 @@ let methods =
   ; "rewind"
   ; "session_stats"
   ; "set_cwd"
+  ; "worktree_back"
   ; "list_paths"
   ; "list_dirs"
   ; "get_config"
@@ -78,6 +84,8 @@ let methods =
   ; "ask_user_respond"
   ; "btw"
   ; "btw_cancel"
+  ; "generate_text"
+  ; "generate_cancel"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -97,6 +105,8 @@ let methods =
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
+  @ Git_rpc.methods
+  @ Nix_store_rpc.methods
 ;;
 
 let param params name =
@@ -164,6 +174,25 @@ let if_missing_param params =
     ~f:Dir_change.If_missing.of_param
 ;;
 
+let queue_param ?default params name =
+  match param params name, default with
+  | (None | Some `Null), Some kind -> Ok kind
+  | _ ->
+    Or_error.bind (string_param params name) ~f:(fun s ->
+      Result.map_error (Steer_queue.Kind.of_string s) ~f:(fun _ ->
+        Error.createf "param %S is %S: use \"steer\" or \"follow_up\"" name s))
+;;
+
+let index_param params =
+  match param params "index" with
+  | Some (`Number n) ->
+    (match Int.of_string_opt n with
+     | Some i when i >= 0 -> Ok i
+     | _ -> Or_error.error_string "param \"index\" must be a natural number")
+  | Some _ | None ->
+    Or_error.error_string "param \"index\" must be a natural number"
+;;
+
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
 let queued_json (queued : Agent.Queued.t) =
@@ -206,6 +235,7 @@ module Listed = struct
     ; description : string option
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
+    ; home : Session.Home.t option
     }
   [@@deriving equal]
 
@@ -218,6 +248,7 @@ module Listed = struct
     ; description = Session.description session
     ; repo = Session.repo session
     ; worktrees = Session.worktrees session
+    ; home = Session.home session
     }
   ;;
 end
@@ -254,6 +285,8 @@ module Client = struct
     ; mutable tab : string option
       (** [hello]'s [tab]: the page instance it comes from *)
     ; btws : Cancellation.t String.Table.t (** in-flight [btw] calls by id *)
+    ; generations : Cancellation.t String.Table.t
+      (** in-flight [generate_text] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
     }
 
@@ -291,6 +324,7 @@ type t =
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
   ; mutable btw_seq : int
+  ; mutable generate_seq : int
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
     (** how long the executions of a host that dropped its connection wait
@@ -314,6 +348,7 @@ type t =
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
+  ; nix_store : Nix_store.t option
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -453,8 +488,15 @@ let route t agent (event : Agent.Event.t) =
    | Tool_exec_input { host; _ } ->
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+  (* A subagent's messages too: its tools may have made worktrees. *)
+  let rec message_end : Agent_event.t -> bool = function
+    | Message_end _ -> true
+    | Subagent { event; _ } -> message_end event
+    | _ -> false
+  in
   (match event with
-   | State_changed _ | Loop (Message_end _) -> note_listed t agent
+   | State_changed _ -> note_listed t agent
+   | Loop e when message_end e -> note_listed t agent
    | _ -> ());
   match event with
   | State_changed { running; _ } ->
@@ -484,6 +526,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?nix_store
       ~login
       ~sessions_dir
       ~cwd
@@ -517,6 +560,7 @@ let create
     ; clients = String.Table.create ()
     ; client_seq = 0
     ; btw_seq = 0
+    ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
     ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
@@ -533,6 +577,7 @@ let create
     ; on_session_deleted = []
     ; loading = String.Table.create ()
     ; repos = String.Table.create ()
+    ; nix_store
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -739,6 +784,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; close
     ; tab = None
     ; btws = String.Table.create ()
+    ; generations = String.Table.create ()
     ; told = String.Set.empty
     }
   in
@@ -807,6 +853,7 @@ let hand_over_host_id t (gone : Client.t) =
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
+  Hashtbl.iter client.generations ~f:Cancellation.cancel;
   if client.tools && not (String.equal client.host_id client.id)
   then await_host t client
   else release_host_id t client ~text:"[tool host disconnected]";
@@ -1504,6 +1551,58 @@ let btw t (client : Client.t) params =
             ]))))
 ;;
 
+(* Like [btw]: the draft streams to the asking client only. *)
+let generate_text t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind kind =
+    Or_error.bind (string_param params "kind") ~f:Generate_text.Kind.of_string
+  in
+  let%bind gen_id = string_param_opt params "gen_id" in
+  let%bind dir = string_param_opt params "dir" in
+  let%bind base = string_param_opt params "base" in
+  let%bind task = string_param_opt params "task" in
+  let blank =
+    Option.filter ~f:(fun s -> not (String.is_empty (String.strip s)))
+  in
+  let gen_id =
+    match gen_id with
+    | Some id -> id
+    | None ->
+      t.generate_seq <- t.generate_seq + 1;
+      sprintf "gen-%d" t.generate_seq
+  in
+  if Hashtbl.mem client.generations gen_id
+  then Or_error.errorf "generation %S is already running" gen_id
+  else (
+    let cancel = Cancellation.create () in
+    Hashtbl.set client.generations ~key:gen_id ~data:cancel;
+    let%map result =
+      Exn.protect
+        ~finally:(fun () -> Hashtbl.remove client.generations gen_id)
+        ~f:(fun () ->
+          Generate_text.run
+            client.agent
+            kind
+            { dir = blank dir; base = blank base; task = blank task }
+            ~cancel
+            ~on_delta:(fun delta ->
+              client.send
+                (`Object
+                    [ "type", `String "event"
+                    ; "event", `String "generate_delta"
+                    ; "gen_id", `String gen_id
+                    ; "delta", `String delta
+                    ])))
+    in
+    match Generate_text.Result.to_json result with
+    | `Object fields ->
+      `Object
+        (("gen_id", `String gen_id)
+         :: ("kind", `String (Generate_text.Kind.to_string kind))
+         :: fields)
+    | json -> json)
+;;
+
 let switch_user (client : Client.t) params =
   match client.signed_in with
   | None -> Or_error.error_string User_access.no_users
@@ -1524,13 +1623,15 @@ let number_param params name =
 
 (* The repository is the client's session's, on its active tool host. *)
 let pull_requests t (client : Client.t) ~meth ~params =
+  let open Or_error.Let_syntax in
+  let%bind dir = string_param_opt params "dir" in
+  let dir = Option.filter dir ~f:(fun d -> not (String.is_empty d)) in
   let git request =
     Agent.host_call
       client.agent
       ~name:Git_forge.op
-      (Git_forge.Request.to_json request)
+      (Git_forge.in_dir dir (Git_forge.Request.to_json request))
   in
-  let open Or_error.Let_syntax in
   match meth with
   | "pr_list" ->
     let%bind state = string_param_opt params "state" in
@@ -1703,7 +1804,7 @@ let remove_worktree t (client : Client.t) params =
   let cwd = (Agent.state client.agent).cwd in
   let home =
     if String.is_prefix path ~prefix:"~"
-    then Agent.active_home client.agent
+    then Agent.active_host_home client.agent
     else None
   in
   let target = Tool.resolve ?home ~cwd path in
@@ -1863,7 +1964,22 @@ let dispatch_server t (client : Client.t) ~meth ~params
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->
     Some (prefs t client ~meth ~params)
+  | "nix_store_status" | "nix_store_gc" ->
+    Nix_store_rpc.dispatch
+      t.nix_store
+      ~signed_in:client.signed_in
+      ~send:client.send
+      ~meth
+      ~params
   | "btw" -> Some (btw t client params)
+  | "generate_text" -> Some (generate_text t client params)
+  | "generate_cancel" ->
+    Some
+      (Or_error.map (string_param params "gen_id") ~f:(fun gen_id ->
+         let found = Hashtbl.find client.generations gen_id in
+         Option.iter found ~f:Cancellation.cancel;
+         `Object
+           [ ("cancelled", if Option.is_some found then `True else `False) ]))
   | "btw_cancel" ->
     Some
       (Or_error.map (string_param params "btw_id") ~f:(fun btw_id ->
@@ -2124,26 +2240,30 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
        | Some queued -> queued_json queued)
   | "remove_queued" ->
     let open Or_error.Let_syntax in
-    let%bind queue =
-      match%bind string_param params "queue" with
-      | "steer" -> Ok `Steer
-      | "follow_up" -> Ok `Follow_up
-      | other ->
-        Or_error.errorf
-          "param \"queue\" is %S: use \"steer\" or \"follow_up\""
-          other
-    in
-    let%bind index =
-      match param params "index" with
-      | Some (`Number n) ->
-        (match Int.of_string_opt n with
-         | Some i when i >= 0 -> Ok i
-         | _ -> Or_error.error_string "param \"index\" must be a natural number")
-      | Some _ | None ->
-        Or_error.error_string "param \"index\" must be a natural number"
-    in
+    let%bind queue = queue_param params "queue" in
+    let%bind index = index_param params in
     let%bind text = string_param_opt params "text" in
     Or_error.map (Agent.remove_queued agent ~queue ~index ~text) ~f:queued_json
+  | "steer_agent" ->
+    let open Or_error.Let_syntax in
+    let%bind agent_id = string_param params "agent_id" in
+    let%bind text = string_param params "text" in
+    let%bind kind = queue_param params "mode" ~default:Steer in
+    unit_result (Agent.steer_subagent agent ~agent_id ~kind text)
+  | "dequeue_agent" ->
+    Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
+      Or_error.map (Agent.dequeue_subagent agent ~agent_id) ~f:(function
+        | None -> `Null
+        | Some text -> `Object [ "text", `String text ]))
+  | "remove_agent_queued" ->
+    let open Or_error.Let_syntax in
+    let%bind agent_id = string_param params "agent_id" in
+    let%bind queue = queue_param params "queue" in
+    let%bind index = index_param params in
+    let%bind text = string_param_opt params "text" in
+    Or_error.map
+      (Agent.remove_subagent_queued agent ~agent_id ~queue ~index ~text)
+      ~f:(fun text -> `Object [ "text", `String text ])
   | "shell" ->
     Or_error.bind (string_param params "command") ~f:(fun command ->
       Or_error.bind
@@ -2173,6 +2293,7 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       (Rpc_json.pending
          ~steer
          ~follow_up
+         ~agents:(Agent.subagent_queues agent)
          ~confirms:(Agent.pending_confirms agent)
          ~questions:(Agent.pending_questions agent))
   | "list_subagents" ->
@@ -2239,9 +2360,22 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     let%bind path = string_param_opt params "path" in
     let%bind base = string_param_opt params "base" in
     let%bind dir = string_param_opt params "dir" in
+    let%bind rev = string_param_opt params "rev" in
+    let%bind direct = bool_param params "direct" ~default:false in
     Or_error.map
-      (Agent.git_diff ?path ?base ?dir ~default_base:true agent)
+      (Agent.git_diff ?path ?base ?dir ?rev ~direct ~default_base:true agent)
       ~f:[%jsonaf_of: Git_diff.Result.t]
+  | "git_refs" ->
+    Or_error.bind (string_param_opt params "dir") ~f:(fun dir ->
+      Or_error.map (Agent.git_refs ?dir agent) ~f:[%jsonaf_of: Git_diff.Refs.t])
+  | "git_show" ->
+    let open Or_error.Let_syntax in
+    let%bind dir = string_param_opt params "dir" in
+    let%bind rev = string_param params "rev" in
+    let%bind path = string_param params "path" in
+    Or_error.map
+      (Agent.git_show ?dir agent ~rev ~path)
+      ~f:[%jsonaf_of: Git_diff.Shown.t]
   | "review" ->
     Or_error.bind (string_param_opt params "args") ~f:(fun args ->
       unit_result (Agent.review agent ~args:(Option.value args ~default:"")))
@@ -2307,9 +2441,15 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
       Or_error.bind (if_missing_param params) ~f:(fun if_missing ->
-        Or_error.map
-          (Agent.set_cwd agent ~path ~if_missing)
-          ~f:Dir_change.Outcome.to_json))
+        Or_error.bind
+          (bool_param params "worktree" ~default:false)
+          ~f:(fun worktree ->
+            Or_error.map
+              (Agent.set_cwd agent ~path ~if_missing ~worktree)
+              ~f:Dir_change.Outcome.to_json)))
+  | "worktree_back" ->
+    Or_error.bind (bool_param params "main" ~default:false) ~f:(fun main ->
+      Or_error.map (Agent.switch_back agent ~main) ~f:Dir_change.Outcome.to_json)
   | "list_paths" ->
     let prefix =
       match param params "prefix" with
@@ -2453,10 +2593,16 @@ let handle t client (request : Json.t) : Json.t =
            | Some result -> result
            | None ->
              let agent = agent_of_client t client in
+             let by =
+               Option.map client.signed_in ~f:(fun s ->
+                 s.User_access.Signed_in.user)
+             in
              (match
                 Option.first_some
-                  (Files_rpc.dispatch agent ~meth ~params)
-                  (Review_rpc.dispatch agent ~meth ~params)
+                  (Files_rpc.dispatch ?by agent ~meth ~params)
+                  (Option.first_some
+                     (Review_rpc.dispatch ?by agent ~meth ~params)
+                     (Git_rpc.dispatch agent ~meth ~params))
               with
               | Some result -> result
               | None -> dispatch agent t.login ~meth ~params))

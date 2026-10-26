@@ -327,8 +327,11 @@ let rec apply t (event : Event.t) =
   | Terminal_close _
   | Terminal_kill _
   | Btw_delta _
+  | Generate_delta _
   | Review _
   | Sessions_changed
+  | Agent_queues _
+  | Nix_gc_progress _
   | Prefs_changed _ -> t
 ;;
 

@@ -141,7 +141,7 @@ let empty (m : Model.t) =
            ~cls:"empty-where"
            [ Node.text
                (Sidebar_view.home_relative
-                  ?home:(Sidebar_view.state_home m)
+                  ?host_home:(Sidebar_view.state_host_home m)
                   state.cwd)
            ]
        | None -> Node.none)
@@ -279,7 +279,13 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
-    ; under_drawer (Review_page_view.view m ~inject)
+    ; (* Its pickers are on the page, which keeps them live (the page makes
+         the rest of itself inert). *)
+      (match m.dialog with
+       | Some (Review_pick _) when not (Model.waiting m || Files.asking m.files)
+         -> layered Fn.id
+       | _ -> under_drawer)
+        (Review_page_view.view m ~inject)
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         (List.map

@@ -53,7 +53,7 @@ let hold_tool promise ~started =
       ; description = "wait"
       ; parameters = Tool_args.schema []
       ; parallel_safe = false
-      ; destructive = false
+      ; destructive = Never
       ; on_host = false
       ; freeform = None
       }

@@ -16,16 +16,25 @@ module Action = struct
         { target : string
         ; force : bool
         }
+    | Back of { main : bool }
     | Error of string
   [@@deriving sexp_of, equal]
 end
 
-let usage = "/worktree [list|new BRANCH [BASE]|open [-n] TARGET|rm [-f] TARGET]"
+let usage =
+  "/worktree [list|new BRANCH [BASE]|open [-n] TARGET|back [main]|rm [-f] \
+   TARGET]"
+;;
+
+let no_home =
+  "this session hasn't switched into a worktree; /worktree open TARGET switches"
+;;
 
 let subcommands =
   [ "list", "pick a worktree of this repository to work in"
   ; "new", "new BRANCH [BASE]: create a worktree and work in it"
   ; "open", "open [-n] TARGET: work in a worktree (-n: in a new session)"
+  ; "back", "back [main]: back where the session switched into worktrees from"
   ; "rm", "rm [-f] TARGET: remove a worktree (-f: with uncommitted changes)"
   ]
 ;;
@@ -67,6 +76,12 @@ let parse s : Action.t =
       ~usage:"/worktree open [-n] TARGET"
       args
       ~f:(fun ~target ~flagged -> Open { target; new_session = flagged })
+  | [ "back" ] -> Back { main = false }
+  | [ "back"; "main" ] -> Back { main = true }
+  | "back" :: _ ->
+    Error
+      "usage: /worktree back [main] (main: the repository's main checkout, \
+       when the place it came from is gone)"
   | ("rm" | "remove") :: args ->
     with_flag
       ~flag:"-f"
@@ -241,10 +256,27 @@ let complete ~worktrees rest =
           ~flag:"-f"
           ~flag_help:"also with uncommitted changes"
           ~removable:true )
+  | [ "back" ] ->
+    Some (offset, [ "main", "the repository's main checkout instead" ])
   | [ "new"; _ ] ->
     Some
       ( offset
       , List.filter_map worktrees ~f:(fun (w : P.Worktree.t) ->
           Option.map w.branch ~f:(fun b -> b, "base: " ^ describe w)) )
   | _ -> None
+;;
+
+let back_notice home ~cwd ~tilde =
+  let cwd =
+    Option.first_some
+      cwd
+      (Option.map home ~f:(fun (h : P.Session_home.t) -> h.cwd))
+  in
+  match home, cwd with
+  | Some (home : P.Session_home.t), Some cwd
+    when Option.exists home.repo ~f:(fun r -> Option.is_some r.branch)
+         && String.equal home.cwd cwd ->
+    sprintf "back in %s (%s)" (P.Session_home.label home ~tilde) (tilde cwd)
+  | _, Some cwd -> "back in " ^ tilde cwd
+  | _, None -> "back"
 ;;

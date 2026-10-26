@@ -270,11 +270,18 @@ let dialog_error = function
   | None -> Node.none
 ;;
 
-let new_worktree ?home (d : New_worktree.t) ~inject =
-  let field (f : New_worktree.Field.t) ~label ~value ~placeholder ~note =
+let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
+  let field
+        ?(corner = Node.none)
+        (f : New_worktree.Field.t)
+        ~label
+        ~value
+        ~placeholder
+        ~note
+    =
     Node.label
       ~attrs:[ Attr.class_ "field" ]
-      [ span ~cls:"field-label" label
+      [ div ~cls:"field-head" [ span ~cls:"field-label" label; corner ]
       ; Node.input
           ~attrs:
             [ Attr.id (New_worktree.Field.id f)
@@ -308,10 +315,18 @@ let new_worktree ?home (d : New_worktree.t) ~inject =
       ]
     [ field
         Branch
+        ~corner:
+          (Generate_view.button
+             ~label:"Generate name"
+             m.generate
+             Worktree_branch
+             ~inject)
         ~label:"Branch"
         ~value:d.branch
-        ~placeholder:"feature/name"
-        ~note:"A new branch, or an existing one to check out"
+        ~placeholder:"feature/name, or the task to name it from"
+        ~note:
+          "A new branch, or an existing one to check out (✦ names one from the \
+           task typed here)"
     ; field
         Base
         ~label:"Base"
@@ -328,7 +343,9 @@ let new_worktree ?home (d : New_worktree.t) ~inject =
              | Some dir ->
                sprintf
                  "Created in %s, then this session works there."
-                 (Sidebar_view.home_relative ?home dir)
+                 (Sidebar_view.home_relative
+                    ?host_home:(Sidebar_view.state_host_home m)
+                    dir)
              | None -> "This session works there once it is created.")
         ]
     ; dialog_error d.error
@@ -404,6 +421,36 @@ let rewind_confirm ~text ~inject =
         [ Node.text
             "Later messages are kept as a branch: /tree returns to them."
         ]
+    ]
+;;
+
+let nix_gc_confirm generations ~inject =
+  let what =
+    Option.value
+      (Prigh_ui.Nix_gc_command.describe_generations (Some generations))
+      ~default:""
+  in
+  Modal.view
+    ~cls:"nix-gc-confirm"
+    ~title:"Delete old profile generations?"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"danger"
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text "Delete and collect" ]
+      ]
+    [ Node.p
+        [ Node.text
+            (sprintf
+               "Collecting Nix garbage, first %s of every user. They can no \
+                longer roll back to them; current ones are kept."
+               what)
+        ]
+    ; Node.p
+        ~attrs:[ Attr.class_ "dialog-note" ]
+        [ Node.text "Collect in Settings keeps the generations." ]
     ]
 ;;
 
@@ -549,6 +596,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (scoped_models picker checked ~inject)
   | Prompt p -> Some (prompt m p ~inject)
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
+  | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)
@@ -558,6 +606,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
   | Picker _
   | Popover _
+  | Review_pick _
   | Help
   | Settings
   | Rename _
@@ -569,8 +618,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Pull _
   | Pr_create _
   | Pr_checked_out _ -> None
-  | New_worktree d ->
-    Some (new_worktree ?home:(Sidebar_view.state_home m) d ~inject)
+  | New_worktree d -> Some (new_worktree m d ~inject)
   | Remove_worktree { worktree; force; busy; error; repo = _ } ->
     Some (remove_worktree worktree ~force ~busy ~error ~inject)
 ;;

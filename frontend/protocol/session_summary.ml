@@ -21,6 +21,7 @@ type t =
   ; repo : Repo.t option
     (** where its cwd is in git; [None] outside a repository, or unknown *)
   ; worktrees : Session_worktree.t list
+  ; home : Session_home.t option
     (** those that matter to it, not removed yet, by when they first did *)
   }
 [@@deriving sexp_of, equal]
@@ -43,9 +44,10 @@ let of_json j =
     | None | Some `Null -> Ok None
     | Some r -> Repo.of_json r >>| Option.some
   in
-  let%map worktrees =
+  let%bind worktrees =
     Json.optional_list_field j "worktrees" ~f:Session_worktree.of_json
   in
+  let%map home = Session_home.field j in
   let opt_bool name =
     Result.ok (Json.bool_field j name) |> Option.value ~default:false
   in
@@ -71,6 +73,7 @@ let of_json j =
   ; host
   ; repo
   ; worktrees
+  ; home
   }
 ;;
 

@@ -31,6 +31,10 @@ let place (s : P.Session_summary.t) =
     | None -> repo_name r)
 ;;
 
+let home ?(tilde = Fn.id) home =
+  Option.map home ~f:(fun h -> "from " ^ P.Session_home.label h ~tilde)
+;;
+
 let of_session ?(listings = []) ?cwd (s : P.Session_summary.t) =
   let cwd = Option.value cwd ~default:s.cwd in
   List.filter_map s.worktrees ~f:(fun w ->

@@ -19,8 +19,19 @@ module Reply_tag : sig
     | Forge_refresh (** [forge_status]: the git hosts, and what lists them *)
     | Prs_picker of string option (** [/pr list]'s state *)
     | Pr_shown
-    | Pr_form_defaults of string option (** the title after [/pr new] *)
+    | Pr_form_defaults of
+        { title : string option (** the title after [/pr new] *)
+        ; generate : bool (** [--generate]: then draft it *)
+        }
     | Pr_created (** errors go to the form *)
+    | Pr_drafted of string (** the form's [generate_text]: its [gen_id] *)
+    | Commit_staged of
+        { command : string (** back in the editor if it fails *)
+        ; commit : Commit_command.t
+        } (** [/commit -a]: then commit *)
+    | Committed of { amend : bool }
+    | Commit_drafted of string (** [/commit --generate]: its [gen_id] *)
+    | Pushed
     | Pr_checked_out of int (** offers to [/cd] to the worktree *)
     | Models_for_picker of string (** initial filter *)
     | Models_for_switch of string (** the argument to resolve *)
@@ -60,17 +71,24 @@ module Reply_tag : sig
     | Compact_done
     | Git_diff
     | Review_comments of
-        { dir : string option
+        { target : P.Git_diff.Target.t
         ; base : string option
-        } (** [/review [WORKTREE] [--base REV]]: then the diff *)
+        ; direct : bool
+        } (** [/review [WORKTREE|BRANCH] [--base REV]]: then the diff *)
     | Review_status of
         { review : P.Review.t
-        ; dir : string option (** [None]: the session's own worktree *)
+        ; target : P.Git_diff.Target.t
+          (** [Dir None]: the session's own worktree *)
         }
+    | Review_since of
+        { review : P.Review.t
+        ; diff : P.Git_diff.t
+        } (** then what changed since the files' last actions *)
     | Review_named of
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         } (** [/review NAME]: [list_worktrees], to find it *)
     | Review_started
@@ -81,11 +99,19 @@ module Reply_tag : sig
     (** [get_prefs] of the history the backend keeps for the user (shared
         with prigh-web) *)
     | Dequeued
+    | Agent_message of
+        { agent_id : string
+        ; kind : Queued_message.Kind.t
+        ; text : string
+        ; retry : string
+        } (** [steer_agent]: on an error, back in the editor as [retry] *)
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Nix_store_shown (** [/nix-gc] *)
+    | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
     | Jobs_picker
     | Job_output
@@ -108,12 +134,15 @@ module Reply_tag : sig
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker (** [list_worktrees] for [/worktree] *)
     | Worktrees_for_autocomplete of string (** the [Location_cache] key *)
+    | Refs_for_autocomplete of string (** [git_refs], for [/review] *)
     | Worktree_target of
         { command : string (** back in the editor when there is none *)
         ; action : Worktree_command.Action.t (** [Open] or [Remove] *)
         } (** [list_worktrees] to find the worktree [action] names *)
     | Worktree_created (** then [set_cwd] there *)
     | Worktree_entered of string (** [set_cwd] into one; the notice *)
+    | Worktree_went_back of P.Session_home.t option
+    (** [worktree_back], from that home *)
     | Worktree_session_started of
         { path : string
         ; notice : string
@@ -246,8 +275,12 @@ module Model : sig
     ; sessions : P.Session_summary.t list option
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
+    ; refs : P.Git_diff.Refs.t Location_cache.t
+      (** the repository's branches and tags, for [/review]'s completion *)
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
+    ; agent_queues : Agent_queues.t
+      (** the background subagents' queues, from [agent_queues] *)
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -261,6 +294,9 @@ module Model : sig
     ; client_id : string option
     ; namespace : string option (** the user whose sessions we see *)
     ; user : string option (** the user we signed in as *)
+    ; superuser : bool
+      (** [user] is a superuser (even when acting as another): has the
+          commands only superusers have ([/nix-gc]) *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -268,6 +304,9 @@ module Model : sig
     ; reconnect_generation : int
     ; btw : Btw_box.t option
     ; btw_seq : int
+    ; commit_draft : Commit_draft.t option
+      (** [/commit --generate]'s, until it is in the editor *)
+    ; gen_seq : int (** numbers [generate_text]'s [gen_id]s *)
     ; width : int
     ; height : int
     ; quitting : bool
@@ -276,6 +315,8 @@ module Model : sig
     ; server : Server_link.t option (** [None] until the platform reports it *)
     ; notice : Notice.t option
       (** the latest acknowledgement, until it expires (Esc dismisses it) *)
+    ; nix_gc : P.Nix_gc_progress.t option
+      (** while our [nix_store_gc] runs: how far it got *)
     ; sidebar : bool
       (** whether the agents sidebar shows on wide terminals (Alt+L) *)
     }
@@ -298,6 +339,12 @@ module Model : sig
   (** [namespace] when a superuser acts as another user ([/setusr]). *)
   val acting_as : t -> string option
 end
+
+(** The subagent the view and the editor are on, if any. *)
+val focused_agent : Model.t -> Agent_view.t option
+
+(** The focused agent's queued messages (the main agent's or a subagent's). *)
+val shown_queue : Model.t -> Queued_message.t list
 
 (** The screen's zones for the model's size and editor. *)
 val layout : Model.t -> Layout.t

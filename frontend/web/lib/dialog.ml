@@ -44,6 +44,7 @@ type t =
       { chip : Chip.t
       ; picker : Picker.t
       }
+  | Review_pick of Review_picker.t
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -94,10 +95,12 @@ type t =
       ; busy : bool
       ; error : string option
       }
+  | Nix_gc_confirm of Nix_generations.t
 [@@deriving sexp_of, equal]
 
 let per_session = function
   | Popover _
+  | Review_pick _
   | Rename _
   | Prompt _
   | Rewind_confirm _
@@ -139,5 +142,6 @@ let per_session = function
   | Delete _
   | Login _
   | Auth _
-  | Forge_host _ -> false
+  | Forge_host _
+  | Nix_gc_confirm _ -> false
 ;;

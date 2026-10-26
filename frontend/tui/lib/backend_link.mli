@@ -2,7 +2,8 @@ open! Core
 open! Async
 
 (** The terminal UI's connection to its backend: which backend (one it
-    spawns, or [prigh serve -listen] at [HOST:PORT]), the credentials sent
+    spawns, [prigh serve -listen] at [HOST:PORT], or a backend's prigh-web
+    URL, see {!Prigh_ui.Server_address}), the credentials sent
     in [hello], and where the session's tools run. [/connect], [/signin] and
     [/signout] change them while the TUI runs; what works is saved as the
     {!Prigh_client_unix.Saved_connection}, as [-connect], [-token] and
@@ -11,7 +12,7 @@ open! Async
 module Target : sig
   type t =
     | Spawn (** [backend serve], like [prigh-tui -local] *)
-    | Remote of string (** [HOST:PORT] *)
+    | Remote of string (** [HOST:PORT] or a prigh-web URL *)
   [@@deriving sexp_of, equal]
 end
 
@@ -26,9 +27,14 @@ module Endpoint : sig
         { host : string
         ; port : int
         }
+    | Websocket of
+        { url : string (** as given *)
+        ; address : Prigh_ui.Server_address.t
+        ; headers : (string * string) list (** sent with the upgrade *)
+        }
   [@@deriving sexp_of]
 
-  (** A spawned process or a TCP connection. *)
+  (** A spawned process, a TCP connection or a WebSocket. *)
   val open_ : t -> Prigh_client.Transport.t Deferred.Or_error.t
 end
 
@@ -55,6 +61,8 @@ val create
        (** default: {!Endpoint.open_} *)
   -> ?spawn_worker:(unit -> Prigh_client.Transport.t Deferred.Or_error.t)
        (** default: [backend tool-host] *)
+  -> ?headers:(string * string) list
+       (** sent with a WebSocket's upgrade, e.g. a proxy's credentials *)
   -> home:string
   -> backend:string
   -> spawn_args:string list (** [serve ...] *)

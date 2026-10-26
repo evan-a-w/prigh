@@ -22,10 +22,19 @@ let with_messages h =
 ;;
 
 let%expect_test "every command does something (none is unknown)" =
-  List.iter Slash.all ~f:(fun spec ->
+  List.iter (Slash.all ~superuser:true) ~f:(fun spec ->
     let h = H.create () in
     let m = H.model h in
-    let m', commands = App.update { m with draft = "/" ^ spec.name } Send in
+    let hello =
+      { Prigh_protocol.Hello_reply.client_id = "c1"
+      ; namespace = Some "alice"
+      ; user = Some "alice"
+      ; superuser = true
+      }
+    in
+    let m', commands =
+      App.update { m with draft = "/" ^ spec.name; hello = Some hello } Send
+    in
     let what =
       match m'.dialog, m'.toasts, commands with
       | Some dialog, _, _ ->
@@ -80,7 +89,7 @@ let%expect_test "every command does something (none is unknown)" =
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /compact                   toast: Compacting the conversation…
     /diff                      toast: Reading the changes…
-    /review                    rpc git_diff
+    /review                    rpc git_diff, rpc git_status
     /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
@@ -121,6 +130,7 @@ let%expect_test "every command does something (none is unknown)" =
     /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
     /pr                        pull requests: rpc push_pref, rpc pr_list
     /setusr                    loading Act as: rpc push_pref, rpc list_users
+    /nix-gc                    rpc nix_store_status
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
     /state                     text: Session state
@@ -189,14 +199,20 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Alt+↑ (steering a subagent) take its last queued message back
+    Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k) the next / previous changed file
     a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     Esc (reviewing) drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
+    Ctrl+Enter (the review's commit message) commit the ticked files (approved files come ticked; untick to leave one out)
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
@@ -969,7 +985,10 @@ let hosts_state =
 
 let%expect_test "/host: pick a host, then the directory there" =
   let h = H.create ~state:hosts_state () in
-  H.act h (Hello { client_id = "c7"; namespace = None; user = None });
+  H.act
+    h
+    (Hello
+       { client_id = "c7"; namespace = None; user = None; superuser = false });
   run h "/host";
   H.text h ~selector:".picker-items";
   [%expect
@@ -1043,7 +1062,10 @@ let%expect_test "/host: pick a host, then the directory there" =
 
 let%expect_test "/cd and /host to a missing directory ask to create it" =
   let h = H.create ~state:hosts_state () in
-  H.act h (Hello { client_id = "c7"; namespace = None; user = None });
+  H.act
+    h
+    (Hello
+       { client_id = "c7"; namespace = None; user = None; superuser = false });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
   H.text h ~selector:".modal";
@@ -1491,7 +1513,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Close (Alt+0))
     Loading the transcript…
     lint
-    (Stopping…) (Show in chat) Running 30s m  1 turn
+    (Steering) (Stopping…) (Show in chat) Running 30s m  1 turn
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel a1") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
@@ -1599,7 +1621,12 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   let h = H.create () in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "alice"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};
   H.text h ~selector:".picker-items";
@@ -1669,7 +1696,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     Acting as bob
@@ -1722,7 +1749,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
@@ -1744,7 +1771,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     Session state
     (Close (Esc))
     ((session_id s1) (session_path /sessions/s1.jsonl) (session_name ())
-     (session_description ()) (cwd /work) (git_branch (main))
+     (session_description ()) (cwd /work) (home ()) (git_branch (main))
      (model
       ((id claude-opus-5-5) (provider anthropic) (key anthropic/claude-opus-5-5)
        (name "Claude Opus 5.5") (context_window 200000) (max_output 64000)

@@ -563,6 +563,10 @@ let%expect_test
       (params ())
       (tag (Worktrees_for_autocomplete "abc123 backend:/work")))
     (Rpc
+      (method_ git_refs)
+      (params ())
+      (tag (Refs_for_autocomplete "abc123 backend:/work")))
+    (Rpc
       (method_ review)
       (params ((args "main look at errors")))
       (tag (
@@ -632,7 +636,7 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
   H.reply
     ~quiet:true
     h
-    (Review_comments { dir = None; base = None })
+    (Review_comments { target = Dir None; base = None; direct = false })
     review_json;
   H.reply
     h
@@ -640,7 +644,7 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
        { review =
            P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
            |> Or_error.ok_exn
-       ; dir = None
+       ; target = Dir None
        })
     diff_json;
   H.show h;

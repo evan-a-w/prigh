@@ -276,6 +276,10 @@ kbd {
 .session-repo { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
 .session-branch { min-width: 0; display: inline-flex; align-items: center; gap: 3px; overflow: hidden; text-overflow: ellipsis; }
 .place-icon { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.8; }
+/* Where a worktree switch took it from: quiet, and short of room the
+   place keeps its share. */
+.session-home { flex: 0 1000 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+.session-place:has(+ .session-home) { flex: 0 1 auto; }
 /* Its ⋯ menu, over the right end of the title line while the row is
    pointed at: the worktrees' fold is on the line below. */
 .session-actions {
@@ -1448,6 +1452,31 @@ kbd {
 .queued.steer { border-left-color: var(--sodium); }
 .queued-tag { font-size: 12px; line-height: 26px; color: var(--muted); white-space: nowrap; }
 .queued.steer .queued-tag { color: var(--sodium); }
+
+/* Steering a subagent: whom the composer writes to, over the editor. */
+.steer-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  align-self: flex-start;
+  padding: 2px 2px 2px 8px;
+  color: var(--sodium);
+  background: var(--sodium-wash);
+  border: 1px solid var(--sodium-line);
+  border-radius: var(--r-chip);
+  font-size: 12.5px;
+  animation: rise 0.12s ease-out;
+}
+.steer-chip-icon { width: 13px; height: 13px; flex-shrink: 0; }
+.steer-chip-label { white-space: nowrap; font-weight: 500; }
+.steer-chip-id { font: 500 12px var(--mono); }
+.steer-chip-task { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steer-chip-task::before { content: "· "; color: var(--faint); }
+.steer-chip-close.btn.icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--muted); }
+.steer-chip-close .icon { width: 11px; height: 11px; }
+.steer-chip-close:hover { color: var(--fg); }
 .queued-text {
   padding: 3px 0;
   font-size: 14px;
@@ -1756,3 +1785,14 @@ kbd {
 @media (pointer: coarse) {
   .chip-popover > .menu-keys, .popover-shortcut { display: none; }
 }
+
+/* ---- ✦ Generate: a field's draft by the model, in its corner */
+
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.generate { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.generate .btn { padding-inline: 8px; }
+.generate-spark { color: var(--sodium); margin-right: 4px; font-size: 11px; }
+.generate-stop { color: var(--sodium); }
+.generate-field { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.generate-field > .generate { align-self: flex-end; }
+.pr-generate { display: flex; justify-content: flex-end; margin-bottom: -6px; }

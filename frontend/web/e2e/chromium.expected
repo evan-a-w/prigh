@@ -840,6 +840,17 @@ Sign in
 Back to alice
 === chromium: accounts: sessions ===
 I am bob
+=== chromium: accounts: bob's settings ===
+Appearance
+Preferences
+On the backend
+Git hosting
+Account
+=== chromium: accounts: bob's commands ===
+/setus offers: /setusr [user]
+/nix-g offers: nothing
+=== chromium: accounts: bob's /nix-gc ===
+Unknown command /nix-gc: /help lists the commands.
 === chromium: accounts: bob's menu ===
 B
 bob
@@ -862,6 +873,27 @@ forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
 === chromium: accounts: sessions ===
 I am alice
+=== chromium: accounts: alice's nix store ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: none recorded
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Also delete generations over 14 days…
+Collect
+=== chromium: accounts: collected ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Freed 3.0 GiB: 1 path deleted in <N> s
+Also delete generations over 14 days…
+Collect
 === chromium: accounts: act as ===
 alice
 you
@@ -1076,7 +1108,9 @@ Delete…  Delete
 === chromium: worktrees: the new worktree dialog ===
 New worktree
 Branch
-A new branch, or an existing one to check out
+✦
+Generate name
+A new branch, or an existing one to check out (✦ names one from the task typed here)
 Base
 Where a new branch starts (empty: main, where this session is)
 Created in ~/.prigh/worktrees/prigh, then this session works there.
@@ -1098,7 +1132,7 @@ The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | 3 [selected]
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
 │ agent/tidy-the-docs | subagent [agent]
 │ feat/login
 │ docs | here | ● 2 [dirty here]
@@ -1125,9 +1159,32 @@ The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | 3 [folded selected]
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [folded selected]
 === chromium: worktrees: searching ===
 Tidy the docs in a worktree
+=== chromium: worktrees: a switched session's menu ===
+Tidy the docs in a worktree — prigh — docs
+▸ Switch back to main  /worktree back
+Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== chromium: worktrees: switched back ===
+Tidy the docs in a worktree | <age> | prigh | main | 3 [selected]
+│ agent/tidy-the-docs | subagent [agent]
+│ feat/login
+│ docs | ● 2 [dirty]
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === chromium: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
@@ -1227,6 +1284,7 @@ Comment
 Edit
 Changes
 Whole file
+Since you commented · <TIME>
 Send 1 comment
 === chromium: review: page: the files ===
 src/
@@ -1237,6 +1295,11 @@ src/
 util.ml
 +3 −0
 2 files changed, +5 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 chat still shown: true
 file browser hidden: true
 === chromium: review: page: a second comment, not sent yet ===
@@ -1316,6 +1379,7 @@ Comment
 Edit
 Changes
 Whole file
+Since you approved · <TIME>
 Send 4 comments
 === chromium: review: page: the files after the agent's edit ===
 README.md
@@ -1329,6 +1393,11 @@ util.ml
 1
 +3 −0
 3 files changed, +6 −2
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === chromium: review: page: the agent's reply ===
 src/main.ml
 Approved
@@ -1446,10 +1515,20 @@ src/
 login.ml
 +1 −0
 2 files changed, +2 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 === chromium: review: worktree: against HEAD ===
 README.md
 +1 −1
 1 file changed, +1 −1
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === chromium: review: worktree: against HEAD, what is reviewed ===
 Reviewing feat/login (<WT>) against HEAD
 === chromium: review: worktree: back to the session's own ===
@@ -1464,10 +1543,275 @@ util.ml
 1
 +3 −0
 3 files changed, +8 −2
+Commit message
+✦
+Generate
+Amend
+Commit
+=== chromium: review: since: the files ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++1 −0 since approved
++4 −0
+3 files changed, +9 −2
+Commit message
+✦
+Generate
+Amend
+Commit
+=== chromium: review: since: the view shown ===
+Comment
+Since you approved · <TIME>
+=== chromium: review: since: what changed since approved ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you approved · <TIME>: +1 −0
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+4		let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: the earlier actions ===
+you approved · <TIME>
+you accepted · <TIME>
+you commented · <TIME>
+=== chromium: review: since: since the comment ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+3	-	let twice f x = f (f x)
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: a comment in the since-view ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+c5
+line 2
+Resolve
+const
+You
+<TIME>
+not sent yet
+Is const used?
+3
+3	-	let twice f x = f (f x)
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: l, the changes again ===
+Comment
+Changes
+=== chromium: review: since: main.ml since its last action ===
+src/main.ml
+Changed since you approved it
+Approve again
+Nothing changed since you edited · <TIME>.
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+c4
+old line 12
+old text
+its code changed
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+=== chromium: review: since: the file browser ===
+Changes
+Whole file
+Since you commented · <TIME>
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+=== chromium: review: compare: the base picker, filtered ===
+b
+origin/main
+remote-tracking branch
+origin/ma
+compare with this branch, tag or commit
+↑ ↓ and Enter choose, Esc closes
+=== chromium: review: compare: against origin/main ===
+Reviewing main (<REPO>) against origin/main (merge base <SHA>)
+=== chromium: review: compare: directly ===
+Reviewing main (<REPO>) against origin/main directly
+=== chromium: review: compare: what to review ===
+r
+Worktrees
+main
+<REPO> · this session's
+feat/login
+<WT>
+Branches
+feat/old
+not checked out: read-only
+Remote branches
+origin/main
+not checked out: read-only
+↑ ↓ and Enter choose, Esc closes
+=== chromium: review: compare: a branch not checked out ===
+Reviewing
+feat/old
+not checked out
+against
+main
+(merge base <SHA>)
+Since merge base
+Directly
+Read-only
+Check out into a worktree
+=== chromium: review: compare: read-only, what is reviewed ===
+Reviewing feat/old (not checked out) against main (merge base <SHA>)
+files: src/
+old.ml
++1 −0
+1 file changed, +1 −0
+edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
+=== chromium: review: compare: checked out ===
+Reviewing feat/old (<HOME>/.prigh/worktrees/repo/feat-old) against main (merge base <SHA>)
 === chromium: review: phone ===
 sheet: fixed
 Alt+R closed it
 === chromium: review: errors ===
+none
+=== chromium: review git: the bar ===
+main
+↑0 ↓0 origin/main
+0 staged
+1 unstaged
+1 untracked
+Stage approved
+Push
+Create PR
+=== chromium: review git: the boxes ===
+src/main.ml: false
+src/util.ml: false
+=== chromium: review git: ticked ===
+src/main.ml: true (staged at the commit)
+src/util.ml: true
+=== chromium: review git: one staged ===
+1 staged
+1 unstaged
+0 untracked
+=== chromium: review git: drafted ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+=== chromium: review git: the commit box ===
+Commit message
+✦
+Generate
+Undo
+Amend
+Commit 2 files
+=== chromium: review git: both staged ===
+2 staged
+0 unstaged
+0 untracked
+=== chromium: review git: committed ===
+Committed <SHA> main: double v12, add util on main
+=== chromium: review git: ahead of origin ===
+main
+↑1 ↓0 origin/main
+0 staged
+0 unstaged
+0 untracked
+Stage approved
+Push ↑1
+Create PR
+Committed <SHA> main: double v12, add util on main
+=== chromium: review git: pushed ===
+Pushed main to origin
+=== chromium: review git: level with origin ===
+↑0 ↓0 origin/main
+=== chromium: review git: origin has it ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+src/main.ml | 2 +-
+src/util.ml | 3 +++
+2 files changed, 4 insertions(+), 1 deletion(-)
+=== chromium: review git: errors ===
 none
 === chromium: remote: prigh web ===
 http://127.0.0.1:<PORT>/#signin=<code>
@@ -1483,4 +1827,58 @@ prefer_host: host-laptop
 === chromium: remote: the spent link elsewhere ===
 Sign in
 === chromium: remote: errors ===
+none
+=== chromium: steer: the subagent shown is written to ===
+Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+Survey the project
+Steering
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== chromium: steer: Esc ===
+(no chip); Steer the agent…
+still running: true
+Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+=== chromium: steer: queued for it ===
+To a1, next step
+use the tests
+Edit
+To a1, after its turn
+then summarise
+Edit
+=== chromium: steer: its row says so ===
+2 queued  deepseek-flash  1 turn  1 tool call
+=== chromium: steer: edited ===
+in the editor: then summarise
+=== chromium: steer: delivered, it finished ===
+a1 has finished: you are writing to the main agent again
+=== chromium: steer: the composer is the main agent's again ===
+(no chip); Steer the agent…
+=== chromium: steer: its transcript ===
+Looking around.
+bash
+until [ -f sub-go ]; do sleep 0.1; done; echo sub-go
+sub-go
+→
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+use the tests
+<TIME>
+Using the tests, as asked.
+<TIME>
+→
+You (follow-up)
+[The user sends you this as you finish: deal with it before you report.]
+then summarise
+<TIME>
+Summary: 3 files, all tested.
+<TIME>
+=== chromium: steer: too late ===
+Couldn't send it to a1: a1 has finished and its report is on its way to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor.
+in the editor: /agents steer a1 one more thing
+=== chromium: steer: the main agent got the report ===
+The survey is in.
+=== chromium: steer: errors ===
 none

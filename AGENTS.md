@@ -137,8 +137,11 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 
 All changes go through pull requests on GitHub (`evan-a-w/prigh`): never
 commit or push to `main` directly. Work on a branch (`feat/...`,
-`fix/...`, `docs/...`), ideally in its own `git worktree` so parallel work
-does not collide, push it and open a PR with `gh pr create` (`nix run
+`fix/...`, `docs/...`), ideally in its own git worktree so parallel work
+does not collide: make it with the `subagent` tool's `worktree` option
+(delegated work) or the `worktree` tool, never `git worktree add` by hand,
+so that it lives under `worktrees_dir` (`~/.prigh/worktrees/<project>/...`)
+and the session shows it. Push it and open a PR with `gh pr create` (`nix run
 nixpkgs#gh -- pr create` if `gh` is not installed). One PR per coherent
 change; its description says what changed and why, how it was tested
 (which suites ran and passed), and anything left for later. Keep PRs

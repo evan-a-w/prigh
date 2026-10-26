@@ -18,6 +18,9 @@ val describe
   -> Session.t
   -> string Or_error.t
 
+(** What the model is asked to write. *)
+val instructions : string
+
 (** Normalises a model reply into one short line: first non-empty line,
     quotes and trailing period stripped, truncated. *)
 val clean : string -> string

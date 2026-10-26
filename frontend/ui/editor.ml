@@ -171,6 +171,12 @@ let set_text t text =
 
 let clear t = { (set_text t "") with history_index = None }
 
+let replace_text t text =
+  if is_empty t
+  then set_text t text
+  else set_text (push_undo t ~coalesce:false) text
+;;
+
 let set_history t lines =
   { t with history = List.rev lines; history_index = None }
 ;;

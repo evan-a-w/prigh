@@ -53,7 +53,11 @@ let with_agent
         (Tools.all
          @ (subagent :: Tool_subagent.control_tools)
          @ Tool_jobs.tools
-         @ Tools.interaction)
+         @ Tools.interaction
+         @ [ Tool_worktree.create
+               ~worktrees_dir:(fun () -> Filename.concat t.dir "trees")
+               ()
+           ])
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
       ~cwd:t.dir
@@ -209,6 +213,45 @@ let%expect_test
     (((auto-edit false)) ("bash(echo:*)" "bash(true:*)" "bash(printf:*)"))
     (reloaded (mode auto-edit)
      (rules ("bash(echo:*)" "bash(true:*)" "bash(printf:*)")))
+    |}]
+;;
+
+let%expect_test "ask: the worktree tool asks to create and remove, not to list" =
+  with_agent
+    ~answer:(fun _ -> Deny None)
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"worktree"
+        ~arguments:{|{"action":"list","cwd":"repo"}|}
+        ()
+    ; Reply.tool_call
+        ~id:"c2"
+        ~name:"worktree"
+        ~arguments:{|{"action":"create","branch":"feat/a","cwd":"repo"}|}
+        ()
+    ; Reply.tool_call
+        ~id:"c3"
+        ~name:"worktree"
+        ~arguments:{|{"action":"remove","path":"repo","cwd":"repo"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent _requests ->
+  Test_worktree.init_repo t;
+  Agent.set_mode agent ~approval:Ask;
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    mode=ask plan=none rules=[]
+    worktree {"action":"list","cwd":"repo"} -> worktrees of $DIR/repo (new ones go in $DIR/trees/repo):
+    - $DIR/repo  main  clean  [main checkout]
+    confirm c2 worktree: create feat/a [worktree]
+      -> (Deny())
+    worktree {"action":"create","branch":"feat/a","cwd":"repo"} -> ERROR [denied by user]
+    confirm c3 worktree: remove repo [worktree]
+      -> (Deny())
+    worktree {"action":"remove","path":"repo","cwd":"repo"} -> ERROR [denied by user]
     |}]
 ;;
 
@@ -903,7 +946,8 @@ let%expect_test
       "archive_after_days": 7,
       "notify": "bell",
       "snippets": [],
-      "auto_background_seconds": 30
+      "auto_background_seconds": 30,
+      "generate_model": null
     }
     |}]
 ;;

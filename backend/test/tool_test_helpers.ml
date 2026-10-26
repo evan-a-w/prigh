@@ -135,7 +135,7 @@ let filler =
       ; description = "returns SIZE characters"
       ; parameters = Tool_args.schema [ "size", `Integer, "how many" ]
       ; parallel_safe = false
-      ; destructive = false
+      ; destructive = Never
       ; on_host = false
       ; freeform = None
       }

@@ -47,6 +47,7 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
              "queue: steer=%d follow_up=%d"
              (List.length steer)
              (List.length follow_up))
+      | Subagent_queues _ -> None
       | Tool_exec { name; _ } -> Some ("tool_exec: " ^ name)
       | Tool_exec_cancel _ -> Some "tool_exec_cancel"
       | Tool_exec_input _ -> Some "tool_exec_input"
@@ -336,12 +337,12 @@ let%expect_test "remove_queued takes out one message, if it is still there" =
          |> Or_error.map ~f:(fun (q : Agent.Queued.t) -> q.text)
          : string Or_error.t)]
   in
-  remove `Steer ~index:0 ~text:(Some "first");
+  remove Steer ~index:0 ~text:(Some "first");
   (* Stale: "first" is gone, "second" is now at 0. *)
-  remove `Steer ~index:0 ~text:(Some "first");
-  remove `Steer ~index:3 ~text:None;
+  remove Steer ~index:0 ~text:(Some "first");
+  remove Steer ~index:3 ~text:None;
   print_s [%sexp (Agent.queued_texts agent : string list * string list)];
-  remove `Follow_up ~index:0 ~text:None;
+  remove Follow_up ~index:0 ~text:None;
   Agent.wait_idle agent;
   dump ();
   [%expect
@@ -475,7 +476,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (fallback_models ()) (default_cwd ()) (worktrees_dir ~/.prigh/worktrees)
      (max_budget_usd ()) (goal_max_continuations 20) (resume_on_limit_reset true)
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
-     (snippets ()) (auto_background_seconds 30))
+     (snippets ()) (auto_background_seconds 30) (generate_model ()))
     {
       "scoped_models": [
         "a"
@@ -493,7 +494,8 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "archive_after_days": 7,
       "notify": "bell",
       "snippets": [],
-      "auto_background_seconds": 30
+      "auto_background_seconds": 30,
+      "generate_model": null
     }
     (default deepseek/deepseek-flash (On (High)))
     (explicit deepseek/deepseek-v4-pro Off)
