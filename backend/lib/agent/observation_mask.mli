@@ -44,9 +44,18 @@ val plan : ?keep_turns:int -> Message.t list -> Plan.t option
 (** [mask]s the messages up to index [through]. *)
 val apply : through:int -> Message.t list -> Message.t list
 
-(** Whether to carry out [plan] on a context of [input_tokens]: when it is
-    [urgent] (the context would otherwise be summarised, or does not fit),
-    or when the context is over half the model's window and masking frees at
-    least a tenth of the window. The second condition keeps it from
-    re-masking (and so invalidating the provider's cache) every turn. *)
-val worth_masking : Model.t -> input_tokens:int -> urgent:bool -> Plan.t -> bool
+(** Whether to carry out [plan] on a context of [input_tokens]: when the
+    request [overflowed] the window (anything that helps), or when the
+    context is over half the model's window and masking frees at least a
+    tenth of the window. The floor holds over the summarisation threshold
+    too, and so keeps masking from re-masking (and so invalidating the
+    provider's cache) every turn: with less to free, the conversation is
+    summarised instead, and when it is not (nothing to summarise, or the
+    summary failed), masking waits until the batch is large. A smaller
+    floor would not do: one turn's output alone can exceed it. *)
+val worth_masking
+  :  Model.t
+  -> input_tokens:int
+  -> overflowed:bool
+  -> Plan.t
+  -> bool
