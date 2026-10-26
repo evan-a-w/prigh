@@ -449,6 +449,30 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   never prompting) and `checkout` (fetches `refs/pull/N/head` and checks
   the branch `pr-N` out with `Worktree.create` at the config's
   `worktrees_dir`, or fast-forwards the worktree that has it already).
+  A `dir` argument (the `pr_defaults`/`pr_create` RPCs' `dir`, set by
+  `in_dir`) works in another worktree than the session's. Its `Runner`
+  (git with prompts off) and `push_branch` are shared with `Git_actions`.
+- `Git_actions` (`host/`) — the pseudo-tool `$git_actions`: the review's
+  git on a worktree (the session's, or `dir`): `status` (`git status
+  --porcelain=v2 --branch -z` parsed: branch, HEAD, upstream, ahead and
+  behind, each file's staged and unstaged letter, a rename's old path),
+  `stage` (`git add --all -- PATHS`; `tracked`: `git add --update` too),
+  `unstage` (`git reset HEAD --`, a rename's both paths; `git rm --cached`
+  before the first commit), `commit` (the given paths staged first;
+  `--amend`, `--no-edit` without a message), `push` (`push_branch` to the
+  upstream's remote and branch, else `origin`/the only remote, setting the
+  upstream), and the context a draft needs: `commit_context` (the staged
+  diff, the last 15 subjects, commit guidance) and `pr_context` (the
+  commits and `BASE...HEAD` diff, pull-request guidance and template).
+  Paths must be relative and stay inside the worktree (`..` checked
+  lexically; git runs with `--literal-pathspecs`, so pathspec magic is
+  literal). Refusals say what to do: nothing staged, an empty message, a
+  detached HEAD, no commit to amend or push, no remote, a rejected push
+  ("pull first"), no credentials, no committer identity. Guidance is the
+  sections of AGENTS.md, CLAUDE.md and CONTRIBUTING.md whose headings
+  mention the topic (`sections`); diffs go through `Diff_digest` (whole up
+  to 40 kB, else each file's header and an even share of its hunks, then
+  the files left out with their counts).
 - `Forges` — the per-user service the RPC server holds: `accounts`
   (github.com, codeberg.org, configured and signed-in hosts), `login`,
   `logout`, `api` (refreshing an expiring token under the store lock,
@@ -1411,6 +1435,26 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
   (or the client disconnecting) cancels it. Its usage is added to the
   in-memory `State.usage`/`cost_usd` like subagents'.
+  `generate_text {kind, gen_id?, dir?, base?, task?}` drafts a
+  description field (`Generate_text`): `kind` is `commit_message`, `pr`,
+  `branch_name` or `session_title`, each a `Spec` (instructions, a token
+  cap, and `gather`, which builds the prompt: `Git_actions`'
+  `commit_context`/`pr_context` on the tool host plus the session's goal,
+  plan and name, the task, or the transcript), so a kind is a constructor
+  and its spec. One tool-less request without thinking
+  (`Agent.complete`, its spend recorded like `btw`'s) on
+  `Agent.generate_model` (the config's `generate_model`, resolved and
+  saved as a key by `set_config`, else the session's model); the text
+  streams to the calling client as `generate_delta {gen_id, delta}` and the
+  response is `{gen_id, kind, text, title?, body?, model, cost_usd}`, the
+  text cleaned (`Generate_text.clean`: fences and quotes dropped, a branch
+  name made valid, a PR split into title and body).
+  `generate_cancel {gen_id}` (or disconnecting) cancels it. The review's
+  git (`Git_rpc`, on the active tool host): `git_status {dir?}`,
+  `git_stage {dir?, paths, tracked?}`, `git_unstage {dir?, paths}` (each
+  answering the status), `git_commit {dir?, message, amend?, paths?}`
+  (`{sha, subject, status}`) and `git_push {dir?}` (`{remote, branch,
+  status}`).
 - `Guarded` — fibers on a long-lived switch that cannot fail it: every
   agent and listener of `prigh serve` shares one switch, so an exception
   escaping a run, a resume, a background task's bookkeeping or an accept
@@ -1755,8 +1799,13 @@ terminal frontend and `web/` prigh-web, the browser one.
     `/pr view`'s output box (header, markdown body, checks, then
     `Diff_files.render` of `Pr_detail.git_diff`); `Pr_form` is `/pr new`'s
     dialog (`Mode.Pr_form`, drawn by `Render`; a refused `pr_create` shows
-    its error in it). `/pr checkout` confirms a `Change_dir` to the new
-    worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
+    its error in it; Ctrl+G or `/pr new --generate` streams a
+    `generate_text` draft of the title and body into it, Esc stops it,
+    Ctrl+_ swaps back the text from before). `Commit_command` parses
+    `/commit` (flags, `-m` with the rest of the line or a quoted string)
+    and words the notices of `/commit` and `/push`; `Commit_draft` is the panel `/commit --generate` streams
+    into before the editor gets `/commit -m "…"`. `/pr checkout` confirms a
+    `Change_dir` to the new worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
     form and checkout question (`reset_session`).
     shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
     so a refusal goes back to the editor. `/review` alone reads
@@ -2357,7 +2406,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       argument parser), `Pr_page` (one PR: `pr_view`'s detail, the
       checkout's progress, the list it came from, which Esc goes back to)
       and `Pr_create` (the form, prefilled by `pr_defaults`; `request` is
-      the `pr_create` to send; a refusal stays in it), drawn by
+      the `pr_create` to send, with the worktree `dir` it was opened for;
+      a refusal stays in it), drawn by
       `Pull_requests_view` (the diff through `Git_diff_view.files`). Their
       replies are tagged `Reply_tag.Forge` (`Forge_reply`, with the
       session's id: another session's, or one for a dialog closed or
@@ -2413,7 +2463,29 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Keys.Target.Review`, the page focused but not its fields): `]`
       `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere; c also wherever
       code is selected but in a field. In the comment and reply fields
-      Enter sends and Shift+Enter is a new line. `Files_view`
+      Enter sends and Shift+Enter is a new line. The page's git bar is
+      `Git_bar` (pure: the reviewed worktree's `git_status`, read with
+      every `git_diff` the open page makes (`Git_bar.watch`, starting over
+      for another worktree), the approved files unticked (`excluded`), the
+      commit message, Amend, and the action on its way; `update`/`reply`
+      return `Out.t`s: requests tagged `Reply_tag.Git`, `Draft_message`
+      (after staging the ticked files), `Changed` (read the diff again) and
+      `Create_pr`, which opens `Pr_create` for its `dir`) drawn by
+      `Git_bar_view`: `strip` under the target bar (branch, upstream,
+      counts, Stage approved, Push, Create PR, the last notice or
+      refusal), `tick`, a file's box in the list (`Git_bar.tick`: staged,
+      or approved and not unticked, is ticked; partly staged is mixed),
+      and `commit_box` under the list (Alt+G, Esc and Ctrl+Enter handled
+      in its textarea). `Generate` keeps the one draft streaming into a
+      field (`Target`: the PR dialog, the commit box, the new worktree's
+      branch, the rename dialog; its id, the text so far and the field's
+      text before) and the undo; `App` reads and writes the targets'
+      fields (`field_texts`, `set_field_texts`), sends `generate_text`
+      (`Reply_tag.Generated`), applies `generate_delta`s and the reply,
+      puts the text back when it fails, and stops it on Stop or on Esc in
+      its dialog (before closing it); `Generate_view.button` is the corner
+      button (✦ Generate, Stop, Undo), Alt+G in the dialogs (`Keys`).
+      Switching sessions or users resets both. `Files_view`
       marks changed entries (a dot, a sage tick once approved, sodium once
       changed after; a directory's count) and previews a text file of the
       repository with `Review_code_view`, under a bar with its approval,
