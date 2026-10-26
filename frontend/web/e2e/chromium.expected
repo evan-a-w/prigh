@@ -149,6 +149,14 @@ a red flag with a blue stripe
 <TIME>
 === chromium: the read tool's image ===
 data:image/png;base64, 24x16
+=== chromium: an image open: the chips ===
+model: under .lightbox
+thinking: under .lightbox
+mode: under .lightbox
+=== chromium: a chip's menu open: the chips ===
+model: the chip, on top
+thinking: the chip, on top
+mode: the chip, on top
 === chromium: attached in the composer ===
 data:image/png;base64, 20x10
 data:image/png;base64, 12x30
@@ -530,6 +538,10 @@ also check the docs
 <TIME>
 Done waiting.
 <TIME>
+=== chromium: phone: the drawer open: the chips ===
+model: under .sidebar, .scrim
+thinking: under .sidebar, .scrim
+mode: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
 thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
@@ -793,6 +805,10 @@ Switch account
 Sign out
 Keyboard shortcuts
 Done
+=== chromium: a dialog open: the chips ===
+model: under .modal-backdrop
+thinking: under .modal-backdrop
+mode: under .modal-backdrop
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===

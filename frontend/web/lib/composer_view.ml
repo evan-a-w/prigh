@@ -214,7 +214,13 @@ let controls (m : App.Model.t) ~inject =
   | Some state ->
     Node.div
       ~attrs:
-        [ Attr.class_ "composer-controls"
+        [ classes
+            [ "composer-controls" ]
+            [ ( "menu-open"
+              , match m.dialog with
+                | Some (Popover _) -> true
+                | _ -> false )
+            ]
         ; Attr.role "group"
         ; Attr.create "aria-label" "Model, thinking and mode"
         ]

@@ -188,7 +188,7 @@ mark.review-mark[data-comment] { cursor: default; }
 /* Text selected: Comment, floating under its end. */
 .review-pop {
   position: absolute;
-  z-index: 5;
+  z-index: var(--z-float);
   animation: review-pop-in 110ms ease-out;
 }
 .review-pop .btn {
@@ -500,7 +500,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 
 /* Phones: a full-screen sheet; Esc or the close button goes back to the
    chat. */
-.app.narrow .review-page { position: fixed; inset: 0; z-index: 40; }
+.app.narrow .review-page { position: fixed; inset: 0; z-index: var(--z-sheet); }
 .app.narrow.reviewing .main { flex-basis: auto; }
 .app.narrow .review-body { flex-direction: column; }
 .app.narrow .review-files { width: auto; max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rule); }
@@ -548,8 +548,10 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .review-pick-button .chevron { width: 12px; height: 12px; align-self: center; color: var(--faint); flex-shrink: 0; }
 .review-pick-button.open .chevron { transform: rotate(180deg); color: var(--chalk); }
 /* Its menu hangs from the button, over the page (the backdrop under it
-   closes it), and keeps the composer chips' look. */
-.review-target { position: relative; z-index: 41; }
+   closes it), and keeps the composer chips' look. Over the backdrop only
+   while it is open, like the composer's chips. */
+.review-target { position: relative; }
+.review-target:has(.review-pick-button.open) { z-index: var(--z-menu-anchor); }
 .review-popover {
   position: absolute;
   left: -2px;

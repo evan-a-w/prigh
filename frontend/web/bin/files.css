@@ -232,7 +232,7 @@ body.dropping-chat .composer-box::after {
   background: color-mix(in srgb, var(--graphite) 88%, transparent);
   color: var(--chalk);
   font-size: 14px;
-  z-index: 5;
+  z-index: var(--z-float);
   pointer-events: none;
 }
 body.dropping-chat .composer-box { position: relative; }
@@ -286,7 +286,7 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
     top: 0;
     right: 0;
     bottom: 0;
-    z-index: 20;
+    z-index: var(--z-panel);
     max-width: 86vw;
     box-shadow: var(--float-shadow);
   }
@@ -297,7 +297,7 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
   position: fixed;
   inset: 0;
   width: auto;
-  z-index: 40;
+  z-index: var(--z-sheet);
   border-left: 0;
   animation: files-up 0.2s ease-out;
 }
