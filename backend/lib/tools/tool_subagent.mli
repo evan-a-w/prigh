@@ -13,8 +13,9 @@ val max_turns : int
 val create
   :  ?models:Model_registry.t (** what the [model] argument resolves against *)
   -> ?worktrees_dir:(unit -> string) (** the config's, when the tool runs *)
-  -> ?mask_observations:(unit -> bool)
-       (** the config's (default true), see {!Agent_loop.run} *)
+  -> ?compaction:(unit -> Compaction_settings.t)
+       (** the session's, when the tool runs (default:
+           {!Compaction_settings.window_only}) *)
   -> provider:Provider.t
   -> current_model:(unit -> Model.t)
   -> current_thinking:(unit -> Thinking.t)

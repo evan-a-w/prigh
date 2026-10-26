@@ -15,7 +15,7 @@ module Config : sig
     ; max_tokens : int option
     ; retries : int (** retries per turn for transient provider errors *)
     ; cache_key : string option (** see [Provider.Request.cache_key] *)
-    ; mask_observations : bool (** see {!run} *)
+    ; compaction : Compaction_settings.t (** see {!run} *)
     }
 
   val default_retries : int
@@ -38,19 +38,21 @@ val tool_summary : name:string -> Json.t -> string
     turn limit, not cancelled): it may block, and any messages it
     returns are appended and the run goes on; [[]] ends the run.
 
-    Between turns, with [config.mask_observations], old tool outputs are
-    masked when {!Observation_mask.worth_masking} says so for the latest
-    response's tokens (plus what was added since): [mask] (default:
-    {!Observation_mask.apply}, in memory) returns the masked context, and
-    [Masked] says what it saved. When the tokens left still cross
-    {!Compaction.should_compact}'s threshold, the context is compacted with
-    [compact] (default: {!Compaction.compact_messages}, in memory) and the
-    run continues on the result. A request the provider rejects as too long
-    ({!Context_overflow}) is masked, if there is anything to mask, else
-    compacted ([overflowed]), and sent again, compacting at most twice and keeping less the
-    second time, before the run fails with what to do. Each compaction emits
-    [Compacted]. [halt] is polled before each turn
-    (also passed to tools, for subagents): [Some _] ends the run there.
+    Between turns, with [config.compaction.mask_observations], old tool
+    outputs are masked when {!Compaction_settings.worth_masking} says so for
+    the latest response's tokens (plus what was added since): [mask]
+    (default: {!Observation_mask.apply}, in memory) returns the masked
+    context, and [Masked] says what it saved. When the tokens left still
+    cross [config.compaction]'s threshold ({!Compaction_settings.threshold}),
+    the context is compacted with [compact] (default:
+    {!Compaction.compact_messages}, in memory), summarised by
+    {!Compaction_settings.summary_model}, and the run continues on the
+    result. A request the provider rejects as too long ({!Context_overflow})
+    is masked, if there is anything to mask, else compacted ([overflowed]),
+    and sent again, compacting at most twice and keeping less the second
+    time, before the run fails with what to do. Each compaction emits
+    [Compacted] (at the summariser's prices). [halt] is polled before each
+    turn (also passed to tools, for subagents): [Some _] ends the run there.
     [approve] checks every tool call before it runs (default: all run);
     [ask_user] is how the [ask_user] tool reaches the user. Both are passed
     on to the tools' contexts, so [subagent] can hand [approve] down.
@@ -79,7 +81,8 @@ val run
   -> ?background:Background_tasks.t
   -> ?sleep:(float -> unit)
   -> ?compact:
-       (keep_recent_tokens:int
+       (model:Model.t
+        -> keep_recent_tokens:int
         -> overflowed:bool
         -> cancel:Cancellation.t
         -> Message.t list

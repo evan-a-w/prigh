@@ -33,6 +33,15 @@ type t =
     (** how the terminal frontend notifies: [off], [bell] (default) or
         [desktop] *)
   ; snippets : Snippet.t list (** [/snippet]'s, shared by every frontend *)
+  ; compact_at_tokens : int
+    (** compact once the context exceeds this many tokens (or 80% of the
+        model's window, if less); [0]: at 80% only *)
+  ; compaction_model : string option
+    (** the model that writes compaction summaries; [None]: the
+        conversation's *)
+  ; mask_observations : bool
+    (** replace old tool outputs with placeholders before summarising
+        (default true) *)
   }
 [@@deriving sexp_of, equal]
 

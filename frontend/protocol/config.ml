@@ -40,6 +40,9 @@ type t =
   ; archive_after_days : float
   ; notify : string
   ; snippets : Snippet.t list
+  ; compact_at_tokens : int
+  ; compaction_model : string option
+  ; mask_observations : bool
   }
 [@@deriving sexp_of, equal]
 
@@ -55,6 +58,9 @@ let default =
   ; archive_after_days = 7.
   ; notify = "bell"
   ; snippets = []
+  ; compact_at_tokens = 200_000
+  ; compaction_model = None
+  ; mask_observations = true
   }
 ;;
 
@@ -101,6 +107,22 @@ let of_json j =
     | Some _ -> Or_error.error_string "archive_after_days must be a number"
   in
   let%bind notify = optional_string "notify" in
+  let%bind compact_at_tokens =
+    match Json.field j "compact_at_tokens" with
+    | None | Some `Null -> Ok default.compact_at_tokens
+    | Some (`Number n) ->
+      Or_error.try_with (fun () -> Int.of_string n)
+      |> Or_error.tag ~tag:"compact_at_tokens must be a whole number"
+    | Some _ -> Or_error.error_string "compact_at_tokens must be a whole number"
+  in
+  let%bind compaction_model = optional_string "compaction_model" in
+  let%bind mask_observations =
+    match Json.field j "mask_observations" with
+    | None | Some `Null -> Ok default.mask_observations
+    | Some `True -> Ok true
+    | Some `False -> Ok false
+    | Some _ -> Or_error.error_string "mask_observations must be a boolean"
+  in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
@@ -113,6 +135,9 @@ let of_json j =
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
   ; snippets
+  ; compact_at_tokens
+  ; compaction_model
+  ; mask_observations
   }
 ;;
 
@@ -133,5 +158,8 @@ let to_json t =
      @ [ "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
        ; "notify", `String t.notify
        ; "snippets", Snippet.list_to_json t.snippets
+       ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
+       ; "compaction_model", optional t.compaction_model
+       ; ("mask_observations", if t.mask_observations then `True else `False)
        ])
 ;;

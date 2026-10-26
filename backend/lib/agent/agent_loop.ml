@@ -11,7 +11,7 @@ module Config = struct
     ; max_tokens : int option
     ; retries : int
     ; cache_key : string option
-    ; mask_observations : bool
+    ; compaction : Compaction_settings.t
     }
 
   let default_retries = 5
@@ -199,10 +199,10 @@ let run
     match compact with
     | Some f -> f
     | None ->
-      fun ~keep_recent_tokens ~overflowed ~cancel messages ->
+      fun ~model ~keep_recent_tokens ~overflowed ~cancel messages ->
         Compaction.compact_messages
           ~provider
-          ~model:config.model
+          ~model
           ~prompt:(Config.compaction_prompt config)
           ~overflowed
           ~keep_recent_tokens
@@ -214,8 +214,11 @@ let run
      describe the context (until it is compacted). *)
   let last_tokens = ref None in
   let compact_context ~keep_recent_tokens ~overflowed =
+    let model =
+      Compaction_settings.summary_model config.compaction config.model
+    in
     Or_error.map
-      (compact ~keep_recent_tokens ~overflowed ~cancel !messages)
+      (compact ~model ~keep_recent_tokens ~overflowed ~cancel !messages)
       ~f:(fun (context, (outcome : Compaction.Outcome.t)) ->
         messages := context;
         last_tokens := None;
@@ -223,7 +226,7 @@ let run
           (Compacted
              { summary = outcome.summary
              ; usage = outcome.usage
-             ; cost_usd = Model.cost_usd config.model outcome.usage
+             ; cost_usd = Model.cost_usd model outcome.usage
              }))
   in
   let mask =
@@ -232,15 +235,16 @@ let run
     | None ->
       fun ~through messages -> Ok (Observation_mask.apply ~through messages)
   in
-  (* Masks old tool outputs when [Observation_mask.worth_masking] says so,
+  (* Masks old tool outputs when [Compaction_settings.worth_masking] says so,
      returning the tokens it saved. *)
   let mask_context ~input_tokens ~overflowed =
-    if not config.mask_observations
+    if not config.compaction.mask_observations
     then None
     else (
       match Observation_mask.plan !messages with
       | Some plan
-        when Observation_mask.worth_masking
+        when Compaction_settings.worth_masking
+               config.compaction
                config.model
                ~input_tokens
                ~overflowed
@@ -264,14 +268,18 @@ let run
       let tokens =
         tokens + Message.estimate_tokens (List.drop !messages since)
       in
+      let should_compact tokens =
+        Compaction_settings.should_compact
+          config.compaction
+          config.model
+          ~input_tokens:tokens
+      in
       let tokens =
         match mask_context ~input_tokens:tokens ~overflowed:false with
         | Some saved -> tokens - saved
         | None -> tokens
       in
-      if
-        (not !compaction_failed)
-        && Compaction.should_compact config.model ~input_tokens:tokens
+      if (not !compaction_failed) && should_compact tokens
       then (
         match
           compact_context

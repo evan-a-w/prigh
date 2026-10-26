@@ -143,6 +143,7 @@ module Reply_tag = struct
     | Config_saved of string
     | Fallback_saved
     | Default_dir_saved
+    | Compaction_saved
     | Default_saved
     | Session_stats
     | Entries of Entries_purpose.t
@@ -2773,6 +2774,27 @@ let set_default_dir (m : Model.t) dir =
       ] ))
 ;;
 
+let compaction_summary config =
+  String.capitalize (Prigh_ui.Compaction_command.summary config)
+;;
+
+(* The backend resolves the model as /model does, and says which models
+   come closest to one it doesn't know. *)
+let compaction_command (m : Model.t) rest =
+  match Prigh_ui.Compaction_command.parse rest with
+  | Show -> with_config m ~f:(fun c -> toast m (compaction_summary c))
+  | Error e -> error m (String.capitalize e)
+  | (Set_at _ | Set_model _ | Set_mask _) as action ->
+    with_config m ~f:(fun config ->
+      ( m
+      , [ set_config
+            (Prigh_ui.Compaction_command.apply action config)
+            ~fields:
+              (List.map (Prigh_ui.Compaction_command.fields action) ~f:fst)
+            ~tag:Compaction_saved
+        ] ))
+;;
+
 let last_reply (m : Model.t) =
   List.rev (Chat.entries m.chat)
   |> List.find_map ~f:(fun (entry : Chat.Entry.t) ->
@@ -4501,6 +4523,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     (match default_dir m dir with
      | Ok dir -> set_default_dir m (Some dir)
      | Error message -> error m message)
+  | "compaction", rest -> compaction_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -5769,6 +5792,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
+  | Compaction_saved, Error e ->
+    error m (sprintf "Couldn't set compaction: %s" e)
   | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
@@ -6236,6 +6261,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | None ->
            "Default directory cleared: new sessions start in the backend's \
             working directory"))
+  | Compaction_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (compaction_summary config))
   | Default_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       let show = Option.value ~default:"?" in

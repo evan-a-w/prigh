@@ -12,7 +12,7 @@ let config ?(tools = Tools.all) ?max_turns () =
   ; max_tokens = None
   ; retries = 2
   ; cache_key = None
-  ; mask_observations = true
+  ; compaction = Compaction_settings.window_only
   }
 ;;
 

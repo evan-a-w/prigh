@@ -413,6 +413,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /unarchive [session] unarchive a session (this one without an argument)
+    /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /default-dir [path|off] show or set the directory new sessions start in
     /delete-archived delete every archived session, after a confirmation
