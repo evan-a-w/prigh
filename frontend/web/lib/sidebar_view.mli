@@ -1,13 +1,13 @@
 open! Core
 open! Import
 
-(** Sessions: search, new, the tree of projects (each folding; a new
-    session or worktree in it), their worktrees (changes, sync, a subagent's
-    with the session it came from; a new session there, remove) and their
-    sessions (current highlighted, live and running marked, age, the
-    subdirectory, size), the archived ones, delete; then [session], the
-    current session's card; the signed-in user, help, the settings and sign
-    out. *)
+(** Sessions: search, new, the sessions (current highlighted, live and
+    running marked, age, repository and branch, size), each with the
+    worktrees that matter to it under it (folding; changes, sync, a
+    subagent's or a pull request's), context menus on both (right-click,
+    Shift+F10, a long press, ⋯), the archived ones, delete; then [session],
+    the current session's card; the signed-in user, help, the settings and
+    sign out. *)
 val view
   :  App.Model.t
   -> inject:(App.Action.t -> unit Effect.t)

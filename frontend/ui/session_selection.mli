@@ -1,8 +1,8 @@
 open! Core
 open! Import
 
-(** The [/sessions] picker's data: active sessions first, grouped by
-    project and worktree ({!Project_tree}) under a divider naming each, then
+(** The [/sessions] picker's data: active sessions first, each with its
+    repository and branch and its worktrees ({!Session_worktrees}), then
     the archived ones after a divider, dimmed. Also what its keys, [/delete] and
     [/delete-archived] act on and the confirmations they ask. *)
 

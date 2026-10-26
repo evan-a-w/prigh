@@ -23,6 +23,144 @@ let age (m : App.Model.t) (s : Session_summary.t) =
 
 let shift_click ev = Js_of_ocaml.Js.to_bool ev##.shiftKey
 
+module Session_worktrees = Prigh_ui.Session_worktrees
+
+(* A context menu's event: at the pointer, or (from the keyboard, which
+   gives no position) under the row. *)
+let open_menu ~inject target ~row (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t)
+  =
+  let x = ev##.clientX
+  and y = ev##.clientY in
+  let anchor : Context_menu.Anchor.t =
+    if x = 0 && y = 0 then Element row else Point { x; y }
+  in
+  Effect.Many
+    [ Effect.Prevent_default
+    ; Effect.Stop_propagation
+    ; inject (Action.Open_menu { target; anchor })
+    ]
+;;
+
+(* The row's ⋯: its menu, under the button. *)
+let more_button ~inject ~id ~label target =
+  Node.button
+    ~attrs:
+      [ Attr.class_ "btn icon ghost more"
+      ; Attr.type_ "button"
+      ; Attr.id id
+      ; Attr.title "More: open, rename, fork, worktrees, delete… (right-click, Shift+F10)"
+      ; Attr.create "aria-label" ("More for " ^ label)
+      ; Attr.create "aria-haspopup" "menu"
+      ; Attr.on_click (fun _ ->
+          Effect.Many
+            [ Effect.Stop_propagation
+            ; inject (Action.Open_menu { target; anchor = Element id })
+            ])
+      ]
+    [ icon More ]
+;;
+
+let changes (w : Worktree.t) =
+  match w.changes with
+  | Some n when n > 0 ->
+    Node.span
+      ~attrs:
+        [ Attr.class_ "worktree-changes"
+        ; Attr.title
+            (sprintf
+               "%d file%s with uncommitted changes"
+               n
+               (if n = 1 then "" else "s"))
+        ]
+      [ Node.textf "● %d" n ]
+  | _ -> Node.none
+;;
+
+let sync (w : Worktree.t) =
+  match
+    List.filter_opt
+      [ Option.some_if (w.ahead > 0) (sprintf "↑%d" w.ahead)
+      ; Option.some_if (w.behind > 0) (sprintf "↓%d" w.behind)
+      ]
+  with
+  | [] -> Node.none
+  | parts ->
+    Node.span
+      ~attrs:
+        [ Attr.class_ "worktree-sync"
+        ; Attr.title
+            (sprintf
+               "%d ahead of and %d behind %s"
+               w.ahead
+               w.behind
+               (Option.value w.upstream ~default:"its upstream"))
+        ]
+      [ Node.text (String.concat ~sep:" " parts) ]
+;;
+
+let tag ?(cls = "") text ~title =
+  Node.span
+    ~attrs:[ Attr.class_ ("worktree-tag " ^ cls); Attr.title title ]
+    [ Node.text text ]
+;;
+
+(* A worktree under its session: its branch, what is in it, why it is
+   there. Clicking (or right-clicking) opens its menu. *)
+let worktree_row ~inject ~entering (s : Session_summary.t) (n : Session_worktrees.Node.t)
+  =
+  let w = n.worktree in
+  let label = Session_worktrees.Node.label n in
+  let id = Context_menu.worktree_dom_id ~session:s.id w.path in
+  let target = Context_menu.Target.Worktree { session = s.path; path = w.path } in
+  let gone = Option.exists n.listed ~f:(fun l -> l.prunable) in
+  let opening = Option.equal String.equal entering (Some w.path) in
+  Node.button
+    ~attrs:
+      [ classes
+          [ "worktree" ]
+          [ "here", n.here
+          ; "agent", Session_worktrees.Node.agent n
+          ; "dirty", Option.exists n.listed ~f:Worktree.dirty
+          ; "gone", gone
+          ; "opening", opening
+          ]
+      ; Attr.type_ "button"
+      ; Attr.id id
+      ; Attr.create "data-worktree" w.path
+      ; Attr.create "data-owner" s.id
+      ; Attr.create "aria-haspopup" "menu"
+      ; Attr.title (home_relative w.path)
+      ; Attr.on_click (fun _ ->
+          inject (Action.Open_menu { target; anchor = Element id }))
+      ; Attr.on_contextmenu (open_menu ~inject target ~row:id)
+      ]
+    [ (if opening
+       then lamp ~title:"Opening…" ()
+       else icon ~cls:"worktree-icon" Branch)
+    ; span ~cls:"worktree-branch" label
+    ; (match w.source with
+       | Agent { agent; task } ->
+         tag
+           ~cls:"agent"
+           "subagent"
+           ~title:(sprintf "Made for subagent %s: %s" agent task)
+       | Pull_request number ->
+         tag (sprintf "#%d" number) ~title:(sprintf "Pull request #%d, checked out" number)
+       | Created | Entered -> Node.none)
+    ; (if n.here
+       then tag ~cls:"here" "here" ~title:"The session works in it"
+       else Node.none)
+    ; Option.value_map n.listed ~default:Node.none ~f:changes
+    ; Option.value_map n.listed ~default:Node.none ~f:sync
+    ; (if Option.exists n.listed ~f:(fun l -> l.locked)
+       then tag "locked" ~title:"git worktree unlock to remove it"
+       else Node.none)
+    ; (if gone
+       then tag "gone" ~title:"Its directory was deleted"
+       else Node.none)
+    ]
+;;
+
 (* What a row shows besides its session: rebuilt only when one changes
    (the list is drawn again at every event otherwise). *)
 module Row = struct
@@ -34,8 +172,11 @@ module Row = struct
     ; marked : bool
     ; loading : bool
     ; age : string
-    ; where : string (** its directory, as the list puts it *)
+    ; where : string (** its repository and branch, else its directory *)
     ; cwd : string
+    ; worktrees : Session_worktrees.Node.t list
+    ; folded : bool (** its worktrees *)
+    ; entering : string option
     }
   [@@deriving equal]
 end
@@ -52,22 +193,12 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; age
       ; where
       ; cwd
+      ; worktrees
+      ; folded
+      ; entering
       }
     =
     row
-  in
-  let action ~cls ~title ~label ~icon:i effect =
-    Node.button
-      ~attrs:
-        [ Attr.class_ ("btn icon ghost " ^ cls)
-        ; Attr.type_ "button"
-        ; Attr.title title
-        ; Attr.create "aria-label" label
-        ; Attr.on_click (fun ev ->
-            Js_of_ocaml.Dom_html.stopPropagation ev;
-            effect)
-        ]
-      [ icon i ]
   in
   (* The lamp: work in progress here (its turn, or only its subagents and
      jobs), or the row being opened. Archived sessions never run. *)
@@ -92,109 +223,122 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
     else Node.none
   in
   let title = Session_list.title s in
+  let dom_id = Session_list.dom_id s.id in
+  let target = Context_menu.Target.Session s.path in
+  let fold =
+    match worktrees with
+    | [] -> Node.none
+    | nodes ->
+      Node.button
+        ~attrs:
+          [ classes [ "session-fold" ] [ "folded", folded ]
+          ; Attr.type_ "button"
+          ; Attr.create "aria-expanded" (Bool.to_string (not folded))
+          ; Attr.title
+              (sprintf
+                 "%s its worktree%s"
+                 (if folded then "Show" else "Hide")
+                 (if List.length nodes = 1 then "" else "s"))
+          ; Attr.on_click (fun _ -> inject (Action.Toggle_folded s.id))
+          ]
+        [ icon ~cls:"fold-icon" Branch
+        ; Node.text (Int.to_string (List.length nodes))
+        ; Node.span ~attrs:[ Attr.class_ "chev" ] []
+        ]
+  in
   Node.div
     ~attrs:
       [ classes
-          [ "session" ]
-          [ "selected", selected
-          ; "running", running
-          ; "opening", loading
-          ; "archived", s.archived
-          ; "marked", marked
-          ]
-        (* Its transcript is fetched ahead while the pointer rests on it (or
-           a finger or the keyboard is on it), so that the click shows it at
-           once. *)
-      ; Attr.on_pointerenter (fun _ -> inject (Action.Prefetch_session s.path))
+          [ "session-item" ]
+          [ "selected", selected; "has-worktrees", not (List.is_empty worktrees) ]
       ]
-    [ Node.button
+    [ Node.div
         ~attrs:
-          [ Attr.class_ "session-open"
-          ; Attr.type_ "button"
-          ; Attr.id (Session_list.dom_id s.id)
-          ; Attr.create "data-session" s.id
-          ; Attr.title s.path
+          [ classes
+              [ "session" ]
+              [ "selected", selected
+              ; "running", running
+              ; "opening", loading
+              ; "archived", s.archived
+              ; "marked", marked
+              ]
+            (* Its transcript is fetched ahead while the pointer rests on it
+               (or a finger or the keyboard is on it), so that the click shows
+               it at once. *)
+          ; Attr.on_pointerenter (fun _ -> inject (Action.Prefetch_session s.path))
           ; (if selecting
-             then Attr.many [ Attr.role "checkbox"; Attr.create "aria-checked" (Bool.to_string marked) ]
-             else if selected
-             then Attr.create "aria-current" "true"
-             else Attr.empty)
-          ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
-          ; Attr.on_click (fun ev ->
-              if selecting
-              then
-                inject (Action.Mark_session { path = s.path; range = shift_click ev })
-              else inject (Action.Switch_session s.path))
-          ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
-          ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
+             then Attr.empty
+             else Attr.on_contextmenu (open_menu ~inject target ~row:dom_id))
           ]
-        [ (if selecting
-           then
-             check marked
-           else Node.none)
-        ; div ~cls:"session-mark" [ mark ]
-        ; div
-            ~cls:"session-main"
-            [ span ~cls:"session-title" ~attrs:[ Attr.create "dir" "auto" ] title
+        [ Node.button
+            ~attrs:
+              [ Attr.class_ "session-open"
+              ; Attr.type_ "button"
+              ; Attr.id dom_id
+              ; Attr.create "data-session" s.id
+              ; Attr.title s.path
+              ; (if selecting
+                 then
+                   Attr.many
+                     [ Attr.role "checkbox"
+                     ; Attr.create "aria-checked" (Bool.to_string marked)
+                     ]
+                 else if selected
+                 then Attr.create "aria-current" "true"
+                 else Attr.empty)
+              ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
+              ; Attr.on_click (fun ev ->
+                  if selecting
+                  then
+                    inject
+                      (Action.Mark_session { path = s.path; range = shift_click ev })
+                  else inject (Action.Switch_session s.path))
+              ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
+              ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
+              ]
+            [ (if selecting then check marked else Node.none)
+            ; div ~cls:"session-mark" [ mark ]
             ; div
-                ~cls:"session-meta"
-                [ span ~cls:"session-age" age
-                ; (if String.is_empty where
-                   then Node.none
-                   else
-                     Node.span
-                       ~attrs:[ Attr.class_ "session-cwd"; Attr.title cwd ]
-                       [ Node.text where ])
-                ; (if selecting
-                   then
-                     span ~cls:"session-size" (Session_summary.size_string s.bytes)
-                   else Node.none)
+                ~cls:"session-main"
+                [ span ~cls:"session-title" ~attrs:[ Attr.create "dir" "auto" ] title
+                ; div
+                    ~cls:"session-meta"
+                    [ span ~cls:"session-age" age
+                    ; (if String.is_empty where
+                       then Node.none
+                       else
+                         Node.span
+                           ~attrs:[ Attr.class_ "session-cwd"; Attr.title cwd ]
+                           [ Node.text where ])
+                    ; (if selecting
+                       then
+                         span ~cls:"session-size" (Session_summary.size_string s.bytes)
+                       else Node.none)
+                    ]
                 ]
             ]
+        ; (if selecting then Node.none else fold)
+        ; (if selecting
+           then Node.none
+           else
+             Node.span
+               ~attrs:[ Attr.class_ "session-actions" ]
+               [ more_button ~inject ~id:("more-" ^ dom_id) ~label:title target ])
         ]
-    ; (if selecting
+    ; (if folded || selecting || List.is_empty worktrees
        then Node.none
        else
-         Node.span
-           ~attrs:[ Attr.class_ "session-actions" ]
-           [ (if selected
-              then
-                action
-                  ~cls:"rename"
-                  ~title:"Rename (/name)"
-                  ~label:("Rename " ^ title)
-                  ~icon:Pencil
-                  (inject Action.Open_rename)
-              else Node.none)
-           ; (if s.archived
-              then
-                action
-                  ~cls:"unarchive"
-                  ~title:"Unarchive (A)"
-                  ~label:("Unarchive " ^ title)
-                  ~icon:Unarchive
-                  (inject (Action.Set_archived { path = s.path; archived = false }))
-              else
-                action
-                  ~cls:"archive"
-                  ~title:"Archive (A)"
-                  ~label:("Archive " ^ title)
-                  ~icon:Archive
-                  (inject (Action.Set_archived { path = s.path; archived = true })))
-           ; action
-               ~cls:"delete"
-               ~title:"Delete session (Delete)"
-               ~label:("Delete " ^ title)
-               ~icon:Trash
-               (inject (Action.Ask_delete s.path))
-           ])
+         Node.div
+           ~attrs:
+             [ Attr.class_ "session-worktrees"
+             ; Attr.role "group"
+             ; Attr.create "aria-label" ("Worktrees of " ^ title)
+             ]
+           (List.map worktrees ~f:(worktree_row ~inject ~entering s)))
     ]
 ;;
 
-(* [within]: the directory of the project or worktree the row is under,
-   whose subdirectories it names relative to it; outside the tree, the whole
-   cwd. *)
-let session ?within (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
+let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
   let selected = Option.equal String.equal current (Some s.id) in
   let cwd =
     (* The current session's as it is now: [/cd] moves it. *)
@@ -203,13 +347,9 @@ let session ?within (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     | _ -> s.cwd
   in
   let where =
-    match within with
+    match Session_worktrees.place s with
+    | Some place -> place
     | None -> home_relative cwd
-    | Some dir when String.equal dir cwd -> ""
-    | Some dir ->
-      (match String.chop_prefix cwd ~prefix:(dir ^ "/") with
-       | Some sub -> sub ^ "/"
-       | None -> home_relative cwd)
   in
   let deps =
     { Row.selected
@@ -224,6 +364,15 @@ let session ?within (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     ; age = age m s
     ; where
     ; cwd
+    ; worktrees =
+        Session_worktrees.of_session
+          ~listings:
+            (Option.to_list (Worktrees.listing m.worktrees)
+             @ Repo_listings.listings m.repo_worktrees)
+          ~cwd
+          s
+    ; folded = Set.mem m.folded s.id
+    ; entering = Worktrees.entering m.worktrees
     }
   in
   View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
@@ -244,7 +393,7 @@ let toolbar (m : App.Model.t) ~inject =
   else
     div
       ~cls:"sessions-toolbar"
-      [ span ~cls:"sessions-label" "Projects"
+      [ span ~cls:"sessions-label" "Sessions"
       ; button
           ~cls:"small ghost"
           ~title:"Select sessions to delete (/delete)"
@@ -321,279 +470,6 @@ let settings ~inject =
     ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
     ~on_click:(inject Action.Open_settings)
     [ icon Gear ]
-;;
-
-(* ---- the tree: projects, their worktrees, their sessions *)
-
-module Project_tree = Prigh_ui.Project_tree
-
-let hover_action ~cls ~title ~label ~icon:i effect =
-  Node.button
-    ~attrs:
-      [ Attr.class_ ("btn icon ghost " ^ cls)
-      ; Attr.type_ "button"
-      ; Attr.title title
-      ; Attr.create "aria-label" label
-      ; Attr.on_click (fun ev ->
-          Js_of_ocaml.Dom_html.stopPropagation ev;
-          effect)
-      ]
-    [ icon i ]
-;;
-
-(* A folded row still says what is inside: the count, work in progress, the
-   session we are in. *)
-let summary ~folded ~current sessions =
-  let running =
-    List.count sessions ~f:(fun (s : Session_summary.t) -> s.running)
-  in
-  let here =
-    List.exists sessions ~f:(fun (s : Session_summary.t) ->
-      Option.equal String.equal current (Some s.id))
-  in
-  ( here
-  , if not folded
-    then Node.none
-    else
-      Node.span
-        ~attrs:[ Attr.class_ "tree-count" ]
-        [ (if running > 0
-           then lamp ~title:(sprintf "%d running" running) ()
-           else Node.none)
-        ; Node.text (Int.to_string (List.length sessions))
-        ] )
-;;
-
-let toggle_attrs ~folded ~dir ~inject =
-  [ Attr.type_ "button"
-  ; Attr.create "aria-expanded" (Bool.to_string (not folded))
-  ; Attr.create "data-dir" dir
-  ; Attr.title (home_relative dir)
-  ; Attr.on_click (fun _ -> inject (Action.Toggle_folded dir))
-  ]
-;;
-
-let changes (w : Worktree.t) =
-  match w.changes with
-  | Some n when n > 0 ->
-    Node.span
-      ~attrs:
-        [ Attr.class_ "worktree-changes"
-        ; Attr.title
-            (sprintf
-               "%d file%s with uncommitted changes"
-               n
-               (if n = 1 then "" else "s"))
-        ]
-      [ Node.textf "%d changed" n ]
-  | _ -> Node.none
-;;
-
-let sync (w : Worktree.t) =
-  match
-    List.filter_opt
-      [ Option.some_if (w.ahead > 0) (sprintf "↑%d" w.ahead)
-      ; Option.some_if (w.behind > 0) (sprintf "↓%d" w.behind)
-      ]
-  with
-  | [] -> Node.none
-  | parts ->
-    Node.span
-      ~attrs:
-        [ Attr.class_ "worktree-sync"
-        ; Attr.title
-            (sprintf
-               "%d ahead of and %d behind %s"
-               w.ahead
-               w.behind
-               (Option.value w.upstream ~default:"its upstream"))
-        ]
-      [ Node.text (String.concat ~sep:" " parts) ]
-;;
-
-let worktree_node
-      (m : App.Model.t)
-      ~inject
-      ~current
-      ~searching
-      (w : Project_tree.Worktree_node.t)
-  =
-  let label = Project_tree.Worktree_node.label w in
-  let folded = (not searching) && Set.mem m.folded w.path in
-  let here, count = summary ~folded ~current w.sessions in
-  let here = here || Option.exists w.listed ~f:(fun l -> l.current) in
-  let gone = Option.exists w.listed ~f:(fun l -> l.prunable) in
-  let entering =
-    Option.equal String.equal (Worktrees.entering m.worktrees) (Some w.path)
-  in
-  let removable =
-    match w.listed with
-    | Some l -> Option.is_none (Worktree_command.cannot_remove l)
-    | None -> not here
-  in
-  let tag text ~title =
-    Node.span
-      ~attrs:[ Attr.class_ "worktree-tag"; Attr.title title ]
-      [ Node.text text ]
-  in
-  Node.div
-    ~attrs:
-      [ classes
-          [ "worktree" ]
-          [ "here", here
-          ; "folded", folded
-          ; "agent", Option.is_some w.agent
-          ; "dirty", Option.exists w.listed ~f:Worktree.dirty
-          ; "gone", gone
-          ; "opening", entering
-          ]
-      ; Attr.create "data-worktree" w.path
-      ]
-    [ div
-        ~cls:"worktree-row"
-        [ Node.button
-            ~attrs:
-              (Attr.class_ "worktree-toggle"
-               :: toggle_attrs ~folded ~dir:w.path ~inject)
-            [ (if entering
-               then lamp ~title:"Opening…" ()
-               else icon ~cls:"worktree-icon" Branch)
-            ; span ~cls:"worktree-branch" label
-            ; (match w.agent with
-               | Some (a, _) ->
-                 tag
-                   "subagent"
-                   ~title:(sprintf "Made for subagent %s: %s" a.agent a.task)
-               | None -> Node.none)
-            ; Option.value_map w.listed ~default:Node.none ~f:changes
-            ; Option.value_map w.listed ~default:Node.none ~f:sync
-            ; (if Option.exists w.listed ~f:(fun l -> l.locked)
-               then tag "locked" ~title:"git worktree unlock to remove it"
-               else Node.none)
-            ; (if gone
-               then tag "gone" ~title:"Its directory was deleted"
-               else Node.none)
-            ; count
-            ]
-        ; Node.span
-            ~attrs:[ Attr.class_ "tree-actions" ]
-            [ (if gone
-               then Node.none
-               else
-                 hover_action
-                   ~cls:"new-here"
-                   ~title:"New session in this worktree"
-                   ~label:("New session in " ^ label)
-                   ~icon:Plus
-                   (inject (Action.New_session_in w.path)))
-            ; (if removable
-               then
-                 hover_action
-                   ~cls:"delete"
-                   ~title:"Remove this worktree (/worktree rm)"
-                   ~label:("Remove " ^ label)
-                   ~icon:Trash
-                   (inject (Action.Ask_remove_worktree w.path))
-               else Node.none)
-            ]
-        ]
-    ; (match w.agent with
-       | Some (_, owner) when not folded ->
-         div
-           ~cls:"worktree-origin"
-           [ Node.text "from "
-           ; Node.button
-               ~attrs:
-                 [ Attr.class_ "worktree-owner"
-                 ; Attr.type_ "button"
-                 ; Attr.title "The session whose subagent works here"
-                 ; Attr.on_click (fun _ ->
-                     inject (Action.Switch_session owner.path))
-                 ]
-               [ Node.span
-                   ~attrs:[ Attr.create "dir" "auto" ]
-                   [ Node.text (Session_list.title owner) ]
-               ]
-           ]
-       | Some _ | None -> Node.none)
-    ; (if folded || List.is_empty w.sessions
-       then Node.none
-       else
-         div
-           ~cls:"worktree-sessions"
-           (List.map w.sessions ~f:(session ~within:w.path m ~inject ~current)))
-    ]
-;;
-
-let project
-      (m : App.Model.t)
-      ~inject
-      ~current
-      ~searching
-      (p : Project_tree.Project.t)
-  =
-  let name = Project_tree.Project.name p in
-  let folded = (not searching) && Set.mem m.folded p.root in
-  let here, count =
-    summary ~folded ~current (Project_tree.Project.all_sessions p)
-  in
-  let here =
-    here
-    || Option.exists p.listed ~f:(fun l -> l.current)
-    || List.exists p.worktrees ~f:(fun w ->
-      Option.exists w.listed ~f:(fun l -> l.current))
-  in
-  Node.section
-    ~attrs:
-      [ classes [ "project" ] [ "here", here; "folded", folded; "git", p.git ]
-      ; Attr.create "aria-label" name
-      ; Attr.create "data-project" p.root
-      ]
-    [ div
-        ~cls:"project-row"
-        [ Node.button
-            ~attrs:
-              (Attr.class_ "project-toggle"
-               :: toggle_attrs ~folded ~dir:p.root ~inject)
-            [ Node.span ~attrs:[ Attr.class_ "chev" ] []
-            ; icon ~cls:"project-icon" (if p.git then Repo else Folder)
-            ; span ~cls:"project-name" name
-            ; (match p.branch with
-               | Some branch when p.git -> span ~cls:"project-branch" branch
-               | _ -> Node.none)
-            ; count
-            ]
-        ; Node.span
-            ~attrs:[ Attr.class_ "tree-actions" ]
-            [ hover_action
-                ~cls:"new-here"
-                ~title:(sprintf "New session in %s" (home_relative p.root))
-                ~label:("New session in " ^ name)
-                ~icon:Plus
-                (inject (Action.New_session_in p.root))
-            ; (if p.git
-               then
-                 hover_action
-                   ~cls:"new-worktree"
-                   ~title:
-                     "New worktree: work on a branch of its own, in a new \
-                      session"
-                   ~label:("New worktree of " ^ name)
-                   ~icon:Branch_plus
-                   (inject (Action.New_worktree { repo = Some p.root }))
-               else Node.none)
-            ]
-        ]
-    ; (if folded
-       then Node.none
-       else
-         div
-           ~cls:"project-body"
-           (List.map p.sessions ~f:(session ~within:p.root m ~inject ~current)
-            @ List.map
-                p.worktrees
-                ~f:(worktree_node m ~inject ~current ~searching)))
-    ]
 ;;
 
 let user_footer (m : App.Model.t) ~inject =
@@ -684,21 +560,15 @@ let view (m : App.Model.t) ~inject ~session:card =
                [ Node.textf "Nothing matches “%s”." m.session_query ]
            ]
          | _, _ ->
-           let _, archived =
+           let active, archived =
              Session_list.sections m.sessions ~query:m.session_query
            in
-           let searching = Session_list.searching ~query:m.session_query in
            let shown =
              Session_list.archived_shown
                ~query:m.session_query
                ~archived_open:m.archived_open
            in
-           List.map
-             (Session_list.tree
-                m.sessions
-                ~query:m.session_query
-                ~listing:(Worktrees.listing m.worktrees))
-             ~f:(project m ~inject ~current ~searching)
+           List.map active ~f:(session m ~inject ~current)
            @
            (match archived with
             | [] -> []
