@@ -438,14 +438,30 @@ val compact : ?instructions:string -> t -> string Or_error.t
 (** {2 Changes: /diff, /review, /init} *)
 
 (** A worktree's changes on the active tool host ({!Git_diff}): the
-    session directory's, or [dir]'s. *)
+    session directory's, or [dir]'s; or a branch's ([rev]), not checked
+    out. *)
 val git_diff
   :  ?path:string
   -> ?base:string
   -> ?dir:string
+  -> ?rev:string
+  -> ?direct:bool
   -> ?default_base:bool
   -> t
   -> Git_diff.Result.t Or_error.t
+
+(** The branches and tags of the repository of [dir] (default: the
+    session's), for completion. *)
+val git_refs : ?dir:string -> t -> Git_diff.Refs.t Or_error.t
+
+(** A file ([path], relative to the repository's top) as it is in [rev],
+    for the review of a branch that is not checked out. *)
+val git_show
+  :  ?dir:string
+  -> t
+  -> rev:string
+  -> path:string
+  -> Git_diff.Shown.t Or_error.t
 
 (** {2 Worktrees}
 

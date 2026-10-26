@@ -2671,7 +2671,7 @@ let compact ?instructions t =
 
 (* ---- /diff, /review, /init ------------------------------------------ *)
 
-let git_diff ?path ?base ?dir ?default_base t =
+let git_diff ?path ?base ?dir ?rev ?direct ?default_base t =
   host_exec
     t
     ~cancel:Cancellation.never
@@ -2679,8 +2679,32 @@ let git_diff ?path ?base ?dir ?default_base t =
     ~call_id:"git_diff"
     ~cwd:t.cwd
     ~name:Git_diff.op
-    ~arguments:(Git_diff.args ?path ?base ?dir ?default_base ())
+    ~arguments:(Git_diff.args ?path ?base ?dir ?rev ?direct ?default_base ())
   |> Git_diff.of_tool_result
+;;
+
+let git_refs ?dir t =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"git_refs"
+    ~cwd:t.cwd
+    ~name:Git_diff.refs_op
+    ~arguments:(Git_diff.refs_args ?dir ())
+  |> Git_diff.refs_of_tool_result
+;;
+
+let git_show ?dir t ~rev ~path =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"git_show"
+    ~cwd:t.cwd
+    ~name:Git_diff.show_op
+    ~arguments:(Git_diff.show_args ?dir ~rev ~path ())
+  |> Git_diff.shown_of_tool_result
 ;;
 
 let resolve_path t path =

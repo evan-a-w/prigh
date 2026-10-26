@@ -193,7 +193,12 @@ let%expect_test
   add
     (Session.add_agent_worktree
        session
-       { agent = "1"; task = "t"; path = "/t/c"; branch = "agent/c"; root = "/r" });
+       { agent = "1"
+       ; task = "t"
+       ; path = "/t/c"
+       ; branch = "agent/c"
+       ; root = "/r"
+       });
   (* Made, then moved into: still made. *)
   add (Session.set_repo session ~cwd:"/t/b" (location "/t/b" "feat/b"));
   print session;
@@ -344,10 +349,8 @@ let print_sessions t json =
     (match List.Assoc.find fields ~equal:String.equal "result" with
      | Some (`Array sessions) ->
        let field s name =
-         Option.value_map
-           (Jsonaf.member name s)
-           ~default:"absent"
-           ~f:(fun j -> show t (Jsonaf.to_string j))
+         Option.value_map (Jsonaf.member name s) ~default:"absent" ~f:(fun j ->
+           show t (Jsonaf.to_string j))
        in
        List.sort sessions ~compare:(fun a b ->
          String.compare (field a "name") (field b "name"))
@@ -446,7 +449,9 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     "create_worktree";
   let wt = Filename.concat trees "repo/feat-w" in
   let _in_wt = session ~name:"in worktree" ~cwd:wt in
-  let other_session = session ~name:"other" ~cwd:(Filename.concat t.dir "other") in
+  let other_session =
+    session ~name:"other" ~cwd:(Filename.concat t.dir "other")
+  in
   (* Made from a session in another repository, naming the repository: that
      session records it. *)
   call_

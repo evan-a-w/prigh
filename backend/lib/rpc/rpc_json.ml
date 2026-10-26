@@ -353,7 +353,8 @@ let session_worktree (w : Session_worktree.t) =
      match w.source with
      | Created -> [ "source", str "created" ]
      | Entered -> [ "source", str "entered" ]
-     | Pull_request { number } -> [ "source", str "pull_request"; "pr", int number ]
+     | Pull_request { number } ->
+       [ "source", str "pull_request"; "pr", int number ]
      | Agent { agent; task } ->
        [ "source", str "agent"; "agent", str agent; "task", str task ])
 ;;
