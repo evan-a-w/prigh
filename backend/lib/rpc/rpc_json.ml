@@ -217,8 +217,13 @@ let review (r : Review_state.t) =
     [ "comments", `Array (List.map r.comments ~f:review_comment)
     ; ( "approvals"
       , `Array
-          (List.map (Map.to_alist r.approvals) ~f:(fun (path, hash) ->
-             `Object [ "path", str path; "hash", str hash ])) )
+          (List.map
+             (Map.to_alist r.approvals)
+             ~f:(fun ({ Review_state.File_key.root; path }, hash) ->
+               `Object
+                 (Option.value_map root ~default:[] ~f:(fun r ->
+                    [ "root", str r ])
+                  @ [ "path", str path; "hash", str hash ]))) )
     ]
 ;;
 
@@ -338,6 +343,21 @@ let agent_worktree (w : Agent_worktree.t) =
     ]
 ;;
 
+let session_worktree (w : Session_worktree.t) =
+  `Object
+    ([ "path", str w.path
+     ; "branch", Option.value_map w.branch ~default:`Null ~f:str
+     ; "root", str w.root
+     ]
+     @
+     match w.source with
+     | Created -> [ "source", str "created" ]
+     | Entered -> [ "source", str "entered" ]
+     | Pull_request { number } -> [ "source", str "pull_request"; "pr", int number ]
+     | Agent { agent; task } ->
+       [ "source", str "agent"; "agent", str agent; "task", str task ])
+;;
+
 let repo (r : Git_location.t) =
   `Object
     [ "root", str r.root
@@ -363,7 +383,7 @@ let session_summary (s : Session.Summary.t) =
   @ (match s.repo with
      | None -> []
      | Some r -> [ "repo", Option.value_map r ~default:`Null ~f:repo ])
-  @ [ "agent_worktrees", `Array (List.map s.agent_worktrees ~f:agent_worktree)
+  @ [ "worktrees", `Array (List.map s.worktrees ~f:session_worktree)
     ; "bytes", int s.bytes
     ]
   |> fun fields -> `Object fields
@@ -421,6 +441,7 @@ let entry (e : Session.Entry.t) =
     | Review _ -> [ "kind", str "review" ]
     | Repo _ -> [ "kind", str "repo" ]
     | Agent_worktree w -> [ "kind", str "agent_worktree"; "path", str w.path ]
+    | Worktree w -> [ "kind", str "worktree"; "path", str w.path ]
     | Worktree_removed { path } ->
       [ "kind", str "worktree_removed"; "path", str path ]
   in

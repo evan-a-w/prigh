@@ -99,17 +99,23 @@ module Method : sig
         ; status : Review_comment.Status.t
         }
     | Review_delete of { id : string }
-    | Review_submit (** [{count}]: the comments sent to the agent *)
+    | Review_submit of { root : string option }
+    (** [{count}]: the comments sent to the agent (with [root]: those on
+        that worktree) *)
     | Review_decide of
         { id : string
         ; post : int (** in the thread, from 0 *)
         ; accept : bool
         } (** a proposal: accepted (applied) or rejected *)
     | Review_approve of
-        { path : string
+        { root : string option (** the worktree, as [git_diff] says *)
+        ; path : string
         ; hash : string
         } (** the {!Review} *)
-    | Review_unapprove of { path : string }
+    | Review_unapprove of
+        { root : string option
+        ; path : string
+        }
     | Fs_preview of { path : string } (** {!File_preview} *)
     | Fs_write of
         { path : string

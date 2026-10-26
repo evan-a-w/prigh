@@ -84,17 +84,21 @@ module Method = struct
         ; status : Review_comment.Status.t
         }
     | Review_delete of { id : string }
-    | Review_submit
+    | Review_submit of { root : string option }
     | Review_decide of
         { id : string
         ; post : int
         ; accept : bool
         }
     | Review_approve of
-        { path : string
+        { root : string option
+        ; path : string
         ; hash : string
         }
-    | Review_unapprove of { path : string }
+    | Review_unapprove of
+        { root : string option
+        ; path : string
+        }
     | Fs_preview of { path : string }
     | Fs_write of
         { path : string
@@ -133,7 +137,7 @@ module Method = struct
     | Review_reply _ -> "review_reply"
     | Review_set_status _ -> "review_set_status"
     | Review_delete _ -> "review_delete"
-    | Review_submit -> "review_submit"
+    | Review_submit _ -> "review_submit"
     | Review_decide _ -> "review_decide"
     | Review_approve _ -> "review_approve"
     | Review_unapprove _ -> "review_unapprove"
@@ -148,6 +152,11 @@ module Method = struct
     | Some cwd -> [ "cwd", Json.str cwd ]
   ;;
 
+  let root_param = function
+    | None -> []
+    | Some root -> [ "root", Json.str root ]
+  ;;
+
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
@@ -155,11 +164,12 @@ module Method = struct
     | Forge_status
     | Pr_defaults
     | Get_review
-    | Review_submit
-    | Nix_store_status
+    | Nix_store_status -> []
     | Nix_store_gc { delete_generations = None } -> []
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
+    | Review_submit { root = None } -> []
+    | Review_submit { root = Some root } -> [ "root", Json.str root ]
     | Review_comment { root; path; range; anchor; text } ->
       [ "root", Json.str root
       ; "path", Json.str path
@@ -176,10 +186,11 @@ module Method = struct
     | Review_delete { id } -> [ "id", Json.str id ]
     | Review_decide { id; post; accept } ->
       [ "id", Json.str id; "post", Json.int post; "accept", Json.bool accept ]
-    | Review_approve { path; hash } ->
-      [ "path", Json.str path; "hash", Json.str hash ]
-    | Review_unapprove { path } | Fs_preview { path } ->
-      [ "path", Json.str path ]
+    | Review_approve { root; path; hash } ->
+      root_param root @ [ "path", Json.str path; "hash", Json.str hash ]
+    | Review_unapprove { root; path } ->
+      root_param root @ [ "path", Json.str path ]
+    | Fs_preview { path } -> [ "path", Json.str path ]
     | Fs_write { path; text; expected } ->
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->

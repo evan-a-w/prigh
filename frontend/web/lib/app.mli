@@ -81,6 +81,12 @@ module Worktrees_purpose : sig
         { command : string (** as typed: back to the editor if it fails *)
         ; action : Prigh_ui.Worktree_command.Action.t
         } (** [/worktree open] or [rm]: the worktree it names *)
+    | Review_target of
+        { command : string
+        ; name : string
+        ; base : string option
+        ; model : string option
+        } (** [/review NAME]: the worktree it names, if any *)
   [@@deriving sexp_of, equal]
 end
 
@@ -157,11 +163,8 @@ module Reply_tag : sig
         { place : string (** [Worktrees.place] *)
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of
-        { command : string (** as typed *)
-        ; new_session : bool
-          (** a new session starts in it; otherwise this one moves there *)
-        } (** [create_worktree] *)
+    | Worktree_created of { command : string (** as typed *) }
+    (** [create_worktree]: the session moves there *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
     | Worktree_session of
@@ -172,6 +175,13 @@ module Reply_tag : sig
         { target : string
         ; force : bool
         }
+    | Repo_worktrees of string
+    (** [list_worktrees] of this repository (its root), for its worktrees
+        under sessions in the sidebar *)
+    | Plan_switched of Context_menu.Plan.t
+    (** [switch_session] for a context menu's item: the plan's next steps
+        follow *)
+    | Plan_entered of Context_menu.Plan.t (** [set_cwd], likewise *)
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
     | Model_set (** [set_model]: the choice is no longer pending *)
     | Thinking_set
@@ -235,6 +245,10 @@ module Command : sig
     | Place_popover
     (** a chip's menu, once rendered: above the composer, or below its chip
         when only there is room; inside the composer sideways *)
+    | Place_menu of Context_menu.Anchor.t
+    (** the context menu, once rendered: at the anchor, kept in the
+        window *)
+    | Open_tab of string (** a session (its id) in a new browser tab *)
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -401,13 +415,11 @@ module Action : sig
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string (** by name, from the [/remind] picker *)
     | Toggle_folded of string
-    (** fold or unfold a project or a worktree of the sidebar's tree (by its
-        directory) *)
+    (** fold or unfold the worktrees under a session of the sidebar (by its
+        id) *)
     | New_session_in of string
-    (** a new session working in this directory (a project, a worktree) *)
-    | New_worktree of { repo : string option }
-    (** its dialog; with a repository (a project's row), a new session
-        starts in the worktree *)
+    (** a new session working in this directory (a worktree) *)
+    | New_worktree (** its dialog: the session moves into the worktree *)
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -419,6 +431,9 @@ module Action : sig
     | Ask_remove_worktree of string (** its path: confirmed first *)
     | Remove_worktree of { force : bool }
     (** the confirmation's answer; [force]: with uncommitted changes *)
+    | Open_menu of Context_menu.t
+    (** a session's or worktree's context menu (right-click, Shift+F10, the
+        context menu key, a long press, the row's ⋯) *)
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -480,6 +495,14 @@ module Action : sig
     | Files of Files.Action.t (** the file browser and the attachments *)
     | Review of Code_review.Action.t
     (** the review page, comments and approvals *)
+    | Review_worktree of
+        { path : string
+        ; base : string option
+        }
+    (** the review page on the worktree at [path] (any worktree of any
+        repository on the tool host), against [base] (default: its own, see
+        [git_diff]); the slash form is [/review PATH [--base REV]]. For the
+        sidebar's and the pickers' "Review changes" *)
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
@@ -547,9 +570,11 @@ module Model : sig
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
-    ; worktrees : Worktrees.t (** the sidebar's, [/worktree]'s completion *)
+    ; worktrees : Worktrees.t (** the session's, [/worktree]'s completion *)
+    ; repo_worktrees : Repo_listings.t
+      (** the repositories of the worktrees under the sidebar's sessions *)
     ; folded : String.Set.t
-      (** the sidebar's folded projects and worktrees, by directory (a
+      (** the sidebar's sessions whose worktrees are folded away, by id (a
           preference) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
