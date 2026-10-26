@@ -2087,12 +2087,13 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        in
        refresh_mcp t ~cancel;
        let halted = ref None in
+       let config = loop_config t in
        let added =
          match
            Agent_loop.run
              ~env:t.env
              ~provider:t.provider
-             ~config:(loop_config t)
+             ~config
              ~cwd:t.cwd
              ~cancel
              ~approve:(approve t)
@@ -2115,12 +2116,14 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                  else []
                in
                deliveries t @ note @ queued @ due_reminders t)
-             ~compact:(fun ~keep_recent_tokens ~cancel _messages ->
+             ~compact:(fun ~keep_recent_tokens ~overflowed ~cancel _messages ->
                match
                  Compaction.compact
                    ~env:t.env
                    ~provider:t.provider
                    ~model:t.model
+                   ~prompt:(Agent_loop.Config.compaction_prompt config)
+                   ~overflowed
                    ~keep_recent_tokens
                    ~cancel
                    session
@@ -2436,6 +2439,7 @@ and auto_compact t =
         ~env:t.env
         ~provider:t.provider
         ~model:t.model
+        ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
         t.session
     with
     | Ok outcome -> compacted t outcome
@@ -2908,6 +2912,7 @@ let compact ?instructions t =
       ~env:t.env
       ~provider:t.provider
       ~model:t.model
+      ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
       ?instructions
       t.session
     |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->

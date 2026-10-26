@@ -480,7 +480,15 @@ let entry (e : Session.Entry.t) =
       ; "summary", str summary
       ; "kept_from", str kept_from
       ]
-      @ Option.value_map pinned ~default:[] ~f:(fun id -> [ "pinned", str id ])
+      @
+      if List.is_empty pinned
+      then []
+      else
+        [ ( "pinned"
+          , `Array
+              (List.map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
+                 str pin.id)) )
+        ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
     | Description { text } -> [ "kind", str "description"; "text", str text ]
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]

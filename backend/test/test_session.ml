@@ -182,7 +182,11 @@ let%expect_test
   let (_ : Session.Entry.t) = Session.append_message t (assistant "a1") in
   let kept = Session.append_message t (assistant "a2") in
   let (_ : Session.Entry.t) =
-    Session.append_compaction t ~pinned:task.id ~summary:"S" ~kept_from:kept.id
+    Session.append_compaction
+      t
+      ~pinned:[ { id = task.id; shortened = false } ]
+      ~summary:"S"
+      ~kept_from:kept.id
   in
   let (_ : Session.Entry.t) = Session.append_message t (Message.user "q2") in
   let forked = Or_error.ok_exn (Session.fork t ~dir) in

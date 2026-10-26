@@ -72,16 +72,22 @@ let render_transcript messages =
              ((if String.is_empty text then [] else [ text ]) @ calls)))
 ;;
 
-let summary_instructions =
-  "Summarise the conversation below so that another assistant can continue the \
-   work without the original transcript. Include: the user's goals and \
-   constraints, what has been done (files read, changed, commands run and \
-   their outcomes), current state, open problems and next steps. Preserve \
-   exact identifiers, paths, commands and error messages that may be needed. \
-   Write plain prose and lists; no preamble."
-;;
-
 let default_keep_recent_tokens = 8000
+
+(* The user's earlier messages carried over (shortened), at most. *)
+let pinned_budget_tokens = 6000
+let summary_max_tokens = 8192
+
+module Prompt = struct
+  type t =
+    { system : string option
+    ; tools : Tool_spec.t list
+    ; thinking : Thinking.t
+    ; cache_key : string option
+    }
+
+  let none = { system = None; tools = []; thinking = Off; cache_key = None }
+end
 
 module Outcome = struct
   type t =
@@ -92,9 +98,17 @@ module Outcome = struct
 end
 
 module Plan = struct
+  module Pin = struct
+    type t =
+      { index : int
+      ; shortened : bool
+      }
+    [@@deriving sexp_of]
+  end
+
   type t =
     { kept_from : int
-    ; pinned : int option
+    ; pinned : Pin.t list
     }
   [@@deriving sexp_of]
 end
@@ -105,12 +119,24 @@ let is_user_message (m : Message.t) =
   | Assistant _ | Tool_result _ -> false
 ;;
 
+(* What the user wrote, not what the harness wrote in their place (a
+   summary, reminder, goal, report of background work...). *)
+let is_users_own (m : Message.t) =
+  match m with
+  | User u ->
+    (match Injected.of_message ~origin:u.origin u.text with
+     | None | Some { source = None | Some (Review_comments _); _ } -> true
+     | Some { source = Some _; _ } -> false)
+  | Assistant _ | Tool_result _ -> false
+;;
+
 (* The kept part starts at a user message or at an assistant message (whose
    tool results follow it), never at a tool result, so every tool call keeps
    its result. It starts as early as fits in [keep_recent_tokens], but always
    leaves something to summarise and keeps at least the last turn. The user's
    latest message is pinned when it would otherwise be summarised, as in a
-   long run on a single prompt. *)
+   long run on a single prompt, and so are their earlier ones, shortened, the
+   newest first while they fit in [pinned_budget_tokens]. *)
 let plan ~keep_recent_tokens messages =
   let messages = Array.of_list messages in
   let n = Array.length messages in
@@ -140,11 +166,30 @@ let plan ~keep_recent_tokens messages =
         (List.range ~stride:(-1) (n - 1) (-1))
         ~f:(fun i -> is_user_message messages.(i))
     in
-    let pinned = Option.filter last_user ~f:(fun i -> i < kept_from) in
+    let latest = Option.filter last_user ~f:(fun i -> i < kept_from) in
+    let rec fit budget = function
+      | [] -> []
+      | i :: older ->
+        let tokens = estimate_tokens [ Pinned_messages.shorten messages.(i) ] in
+        if tokens > budget then [] else i :: fit (budget - tokens) older
+    in
+    let earlier =
+      List.range ~stride:(-1) (kept_from - 1) (-1)
+      |> List.filter ~f:(fun i ->
+        is_users_own messages.(i)
+        && not (Option.equal Int.equal (Some i) latest))
+      |> fit pinned_budget_tokens
+      |> List.rev
+    in
+    let pinned =
+      List.map earlier ~f:(fun index -> { Plan.Pin.index; shortened = true })
+      @ Option.value_map latest ~default:[] ~f:(fun index ->
+        [ { Plan.Pin.index; shortened = false } ])
+    in
     let summarised =
       List.exists (List.range 0 kept_from) ~f:(fun i ->
         (not (Session.is_summary_message messages.(i)))
-        && not (Option.equal Int.equal (Some i) pinned))
+        && not (List.exists pinned ~f:(fun (pin : Plan.Pin.t) -> pin.index = i)))
     in
     if summarised then Some { Plan.kept_from; pinned } else None
 ;;
@@ -168,35 +213,203 @@ let bounded_transcript (model : Model.t) messages =
       (String.suffix text tail))
 ;;
 
-let summarise ~(provider : Provider.t) ~model ~cancel ?instructions older =
-  let request =
-    { Provider.Request.model
-    ; system =
-        Some
-          (match instructions with
-           | None -> summary_instructions
-           | Some extra ->
-             summary_instructions
-             ^ "\n\nThe user's instructions for this summary: "
-             ^ extra)
-    ; messages = [ Message.user (bounded_transcript model older) ]
-    ; tools = []
-    ; thinking = Off
-    ; max_tokens = None
-    ; cache_key = None
-    }
+let sections =
+  {|Use exactly these sections, as Markdown headings, and write "None" under a section with nothing to say:
+
+## Goal and constraints
+What the user wants, and every requirement, constraint and preference they stated, in their words where the wording matters.
+## Decisions
+What was decided, and why.
+## Failed approaches and exact errors
+What was tried and did not work, with the exact error messages, failing commands and test names. Do not smooth over failures: this evidence is what keeps them from being repeated.
+## Files
+What was learned from the files read, and what was changed in each and why. A list of the paths read and modified is appended automatically: do not repeat it.
+## Current state
+What works, what does not, what is in progress.
+## Next steps
+What remains to be done, in order.
+
+Keep exact identifiers, paths, commands, values and error messages that may be needed. Reply with the summary only, no preamble.|}
+;;
+
+let with_user_instructions text = function
+  | None -> text
+  | Some extra ->
+    text ^ "\n\nThe user's instructions for this summary: " ^ extra
+;;
+
+(* The request the agent would send next, ending with the request for a
+   summary: the same system prompt, tools, thinking and cache key, so the
+   provider's prompt cache serves the conversation. *)
+let full_request
+      (model : Model.t)
+      (prompt : Prompt.t)
+      ~update
+      ?instructions
+      older
+  =
+  let ask =
+    String.concat
+      ~sep:"\n\n"
+      ([ "[prigh: compaction] The conversation up to here is about to be \
+          replaced by a summary, which is all of it that will remain (with the \
+          user's own messages, kept verbatim). Do not call any tools: reply \
+          with the summary as text."
+       ]
+       @ (if update
+          then
+            [ "The conversation begins with the summary of earlier work: \
+               update it rather than starting over. Merge what happened since \
+               into its sections, keep every item that still matters, and drop \
+               only what is obsolete or resolved."
+            ]
+          else [])
+       @ [ sections ])
   in
-  let reply = provider.stream request ~cancel ~on_event:ignore in
+  { Provider.Request.model
+  ; system = prompt.system
+  ; messages =
+      older @ [ Message.user (with_user_instructions ask instructions) ]
+  ; tools = prompt.tools
+  ; thinking = prompt.thinking
+  ; max_tokens =
+      Some
+        (Int.min
+           model.max_output
+           (summary_max_tokens
+            + Option.value (Thinking.budget_tokens prompt.thinking) ~default:0))
+  ; cache_key = prompt.cache_key
+  }
+;;
+
+let fits (request : Provider.Request.t) =
+  let prompt_tokens =
+    (String.length (Option.value request.system ~default:"")
+     + List.sum
+         (module Int)
+         request.tools
+         ~f:(fun (t : Tool_spec.t) ->
+           String.length t.name
+           + String.length t.description
+           + String.length (Json.to_string t.parameters)))
+    / 4
+  in
+  prompt_tokens
+  + estimate_tokens request.messages
+  + Option.value request.max_tokens ~default:0
+  <= request.model.context_window
+;;
+
+let transcript_system =
+  "You summarise a coding agent's conversation with its user, so that the \
+   agent can carry on from the summary alone."
+;;
+
+(* The conversation rendered as text in a request of its own, for when it
+   does not fit as it is: cheaper, without images, thinking or long tool
+   output. *)
+let transcript_request (model : Model.t) ~previous ?instructions older =
+  let older =
+    List.filter older ~f:(fun m -> not (Session.is_summary_message m))
+  in
+  let ask =
+    String.concat
+      ~sep:"\n\n"
+      ([ "Summarise the conversation in <conversation>." ]
+       @ (if Option.is_some previous
+          then
+            [ "<previous-summary> is the summary of the work before it: update \
+               it rather than starting over. Merge what happened since into \
+               its sections, keep every item that still matters, and drop only \
+               what is obsolete or resolved."
+            ]
+          else [])
+       @ [ sections ])
+  in
+  let text =
+    String.concat
+      ~sep:"\n\n"
+      (Option.value_map previous ~default:[] ~f:(fun summary ->
+         [ "<previous-summary>\n" ^ summary ^ "\n</previous-summary>" ])
+       @ [ "<conversation>\n"
+           ^ bounded_transcript model older
+           ^ "\n</conversation>"
+         ; with_user_instructions ask instructions
+         ])
+  in
+  { Provider.Request.model
+  ; system = Some transcript_system
+  ; messages = [ Message.user text ]
+  ; tools = []
+  ; thinking = Off
+  ; max_tokens = Some (Int.min model.max_output summary_max_tokens)
+  ; cache_key = None
+  }
+;;
+
+let summarise
+      ~(provider : Provider.t)
+      ~model
+      ~prompt
+      ~overflowed
+      ~cancel
+      ?instructions
+      older
+  =
+  let previous, files =
+    match List.find_map (List.rev older) ~f:Session.summary_of_message with
+    | None -> None, Compaction_files.empty
+    | Some summary ->
+      let text, files = Compaction_files.of_summary summary in
+      Some text, files
+  in
+  let files = Compaction_files.add_calls files older in
+  let stream request = provider.stream request ~cancel ~on_event:ignore in
+  let transcript () =
+    stream (transcript_request model ~previous ?instructions older)
+  in
+  let full =
+    full_request
+      model
+      prompt
+      ~update:(Option.is_some previous)
+      ?instructions
+      older
+  in
+  let reply, usage =
+    if overflowed || not (fits full)
+    then transcript (), Usage.zero
+    else (
+      let reply = stream full in
+      let fall_back =
+        match reply.stop_reason with
+        | Error e -> Context_overflow.matches e
+        | Aborted -> false
+        | End_turn | Tool_use | Length ->
+          String.is_empty (String.strip (Message.Assistant.text reply))
+      in
+      if fall_back && not (Cancellation.is_cancelled cancel)
+      then transcript (), reply.usage
+      else reply, Usage.zero)
+  in
   match reply.stop_reason with
   | Error e -> Or_error.error_string ("compaction failed: " ^ e)
   | Aborted -> Or_error.error_string "compaction aborted"
   | End_turn | Tool_use | Length ->
-    Ok { Outcome.summary = Message.Assistant.text reply; usage = reply.usage }
+    Ok
+      { Outcome.summary =
+          Compaction_files.append
+            (String.strip (Message.Assistant.text reply))
+            files
+      ; usage = Usage.add usage reply.usage
+      }
 ;;
 
 let compact_messages
       ~provider
       ~model
+      ~prompt
+      ?(overflowed = false)
       ?(keep_recent_tokens = default_keep_recent_tokens)
       ?(cancel = Cancellation.never)
       ?instructions
@@ -207,11 +420,19 @@ let compact_messages
   | Some { kept_from; pinned } ->
     let older = List.take messages kept_from in
     Or_error.map
-      (summarise ~provider ~model ~cancel ?instructions older)
+      (summarise
+         ~provider
+         ~model
+         ~prompt
+         ~overflowed
+         ~cancel
+         ?instructions
+         older)
       ~f:(fun (outcome : Outcome.t) ->
         let pinned =
-          Option.value_map pinned ~default:[] ~f:(fun i ->
-            [ List.nth_exn messages i ])
+          List.map pinned ~f:(fun { index; shortened } ->
+            let m = List.nth_exn messages index in
+            if shortened then Pinned_messages.shorten m else m)
         in
         ( pinned
           @ [ Session.summary_message outcome.summary ]
@@ -223,6 +444,8 @@ let compact
       ~env:_
       ~provider
       ~model
+      ~prompt
+      ?(overflowed = false)
       ?(keep_recent_tokens = default_keep_recent_tokens)
       ?(cancel = Cancellation.never)
       ?instructions
@@ -238,12 +461,23 @@ let compact
      | Some kept_from_id ->
        let older = List.take messages kept_from in
        Or_error.map
-         (summarise ~provider ~model ~cancel ?instructions older)
+         (summarise
+            ~provider
+            ~model
+            ~prompt
+            ~overflowed
+            ~cancel
+            ?instructions
+            older)
          ~f:(fun (outcome : Outcome.t) ->
-           let pinned = Option.bind pinned ~f:(fun i -> ids.(i)) in
+           let pinned =
+             List.filter_map pinned ~f:(fun { index; shortened } ->
+               Option.map ids.(index) ~f:(fun id ->
+                 { Pinned_messages.Pin.id; shortened }))
+           in
            let (_ : Session.Entry.t) =
              Session.append_compaction
-               ?pinned
+               ~pinned
                session
                ~summary:outcome.summary
                ~kept_from:kept_from_id
