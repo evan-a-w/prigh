@@ -22,9 +22,7 @@ let of_json j =
   let open Or_error.Let_syntax in
   let%bind at = time_field j "at_ms" in
   let%bind by = Json.string_field j "by" in
-  let%bind generations =
-    Nix_generations.of_json (Json.field j "generations")
-  in
+  let%bind generations = Nix_generations.of_json (Json.field j "generations") in
   let%bind generations_deleted = Json.int_field j "generations_deleted" in
   let%bind paths_deleted = Json.int_field j "paths_deleted" in
   let%bind freed_bytes = Json.int_field j "freed_bytes" in

@@ -122,7 +122,14 @@ let bob = account ~session:"b7" "bob"
 
 let signed_in_as ?(users = false) user =
   let h = H.create () in
-  H.act h (Hello { client_id = "c1"; namespace = Some user; user = Some user });
+  H.act
+    h
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some user
+       ; user = Some user
+       ; superuser = false
+       });
   H.act
     h
     (Set_accounts
@@ -183,7 +190,12 @@ let%expect_test "the settings page: the account, switching it, signing out" =
   let h = signed_in_as "alice" in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   H.quiet h (fun () -> H.act h Open_settings);
   account h;
   [%expect
@@ -283,7 +295,12 @@ let%expect_test "a superuser acts as another user from the account menu" =
   let h = H.create () in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "alice"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   H.act h Start;
   [%expect
     {|
@@ -365,7 +382,12 @@ let%expect_test "a superuser acts as another user from the account menu" =
   let h = H.create () in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "bob" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "bob"
+       ; superuser = false
+       });
   H.act h Start;
   H.fail h "list_users" "unauthorised: bob is not a superuser";
   H.act h Open_accounts;
@@ -401,7 +423,12 @@ let%expect_test "switching user resets everything that was the old user's" =
   in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "alice"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   H.act
     h
     (Reply
