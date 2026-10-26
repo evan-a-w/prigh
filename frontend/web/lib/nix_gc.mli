@@ -25,10 +25,6 @@ type t =
 
 val empty : t
 
-(** Whether Settings shows the store: for superusers, or once it was shown
-    (e.g. a backend without users lets anyone see it). *)
-val shown : t -> superuser:bool -> bool
-
 val loading : t -> t
 val status : t -> (Nix_store_status.t, string) Result.t -> t
 

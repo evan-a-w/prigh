@@ -441,7 +441,7 @@ let view (m : App.Model.t) ~inject =
     ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
-    ; (if Nix_gc.shown m.nix_gc ~superuser:(App.superuser m)
+    ; (if App.superuser m
        then section "Nix store" (nix_store m ~inject)
        else Node.none)
     ; section "Account" (account m ~inject)

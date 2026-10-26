@@ -251,6 +251,7 @@ module Model = struct
     ; client_id : string option (** our host id, from [hello] *)
     ; namespace : string option
     ; user : string option
+    ; superuser : bool
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -299,7 +300,7 @@ module Model = struct
       { client_id = ""
       ; namespace = t.namespace
       ; user = t.user
-      ; superuser = false
+      ; superuser = t.superuser
       }
   ;;
 end
@@ -568,6 +569,7 @@ let init =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -1888,6 +1890,7 @@ let reset_connection m =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
@@ -2075,8 +2078,8 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser = _ } ->
-           { m with client_id = Some client_id; namespace; user }
+         | Ok { client_id; namespace; user; superuser } ->
+           { m with client_id = Some client_id; namespace; user; superuser }
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
@@ -2139,15 +2142,21 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user =
+       let client_id, namespace, user, superuser =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser = _ } ->
-           Some client_id, namespace, user
-         | Error _ -> m.client_id, m.namespace, m.user
+         | Ok { client_id; namespace; user; superuser } ->
+           Some client_id, namespace, user, superuser
+         | Error _ -> m.client_id, m.namespace, m.user, m.superuser
        in
        let m, session_commands =
          reset_session
-           { m with connection = Connected; client_id; namespace; user }
+           { m with
+             connection = Connected
+           ; client_id
+           ; namespace
+           ; user
+           ; superuser
+           }
        in
        let m =
          match session, m.state with
@@ -2815,7 +2824,7 @@ let update_btw m id ~f =
    error names the closest command to fix it to. *)
 let unknown_command m name ~retry =
   let m = { m with editor = Editor.set_text m.editor (retry name) } in
-  match Commands.closest name with
+  match Commands.closest ~superuser:m.superuser name with
   | Some c ->
     error
       m
@@ -2843,7 +2852,7 @@ let run_command m (cmd : Commands.Parsed.t) =
         m
         ~title:"Help"
         (List.concat
-           [ help_heading "Commands" :: Commands.help
+           [ help_heading "Commands" :: Commands.help ~superuser:m.superuser
            ; [ []; help_heading "In the prompt" ]
            ; Commands.input_help
            ; [ []; help_heading "Keys" ]
@@ -2853,7 +2862,7 @@ let run_command m (cmd : Commands.Parsed.t) =
            ])
     , [] )
   | "help", name :: _ ->
-    (match Commands.find name with
+    (match Commands.find ~superuser:m.superuser name with
      | Some spec ->
        let usage = Commands.usage spec in
        ( output
@@ -3191,7 +3200,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "connect", _ -> connect m cmd.rest
   | "signin", args -> sign_in m args
   | "signout", _ -> sign_out m
-  | "nix-gc", _ -> nix_gc_command m cmd.rest
+  | "nix-gc", _ when m.superuser -> nix_gc_command m cmd.rest
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
     m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
@@ -3444,6 +3453,7 @@ let refresh_command_autocomplete m =
   let line_index = (Editor.position m.editor).line in
   match
     Autocomplete.compute
+      ~superuser:m.superuser
       ~current_session:(current_session m)
       ~line
       ~col
@@ -3524,7 +3534,7 @@ let accept_autocomplete m ~submit_now =
          match Autocomplete.source ac, submit_now with
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
-           (match Commands.find item.id with
+           (match Commands.find ~superuser:m.superuser item.id with
             (* [/review] alone is the common case: it runs at once. *)
             | Some { argument = Some Review; _ } -> submit m
             | Some spec when Option.is_some spec.argument ->
@@ -5709,8 +5719,8 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello { client_id; namespace; user; superuser = _ } ->
-        { m with client_id = Some client_id; namespace; user }, []
+      | Hello { client_id; namespace; user; superuser } ->
+        { m with client_id = Some client_id; namespace; user; superuser }, []
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []

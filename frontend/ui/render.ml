@@ -1256,10 +1256,11 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
   in
   let lines =
     match Autocomplete.source ac with
+    (* Only the user's commands are offered. *)
     | Autocomplete.Source.Command ->
       let usage (item : Picker.Item.t) =
         Option.value_map
-          (Commands.find item.id)
+          (Commands.find ~superuser:true item.id)
           ~default:("/" ^ item.label)
           ~f:Commands.usage
       in
@@ -1272,8 +1273,10 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
         let help =
-          Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-            s.help)
+          Option.value_map
+            (Commands.find ~superuser:true item.id)
+            ~default:""
+            ~f:(fun s -> s.help)
         in
         let name = "/" ^ item.label in
         let args =

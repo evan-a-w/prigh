@@ -847,8 +847,11 @@ Preferences
 On the backend
 Git hosting
 Account
+=== firefox: accounts: bob's commands ===
+/setus offers: /setusr [user]
+/nix-g offers: nothing
 === firefox: accounts: bob's /nix-gc ===
-Cleaning the Nix store is for superusers: ask alice to run /nix-gc
+Unknown command /nix-gc: /help lists the commands.
 === firefox: accounts: bob's menu ===
 B
 bob

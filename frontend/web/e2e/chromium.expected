@@ -846,8 +846,11 @@ Preferences
 On the backend
 Git hosting
 Account
+=== chromium: accounts: bob's commands ===
+/setus offers: /setusr [user]
+/nix-g offers: nothing
 === chromium: accounts: bob's /nix-gc ===
-Cleaning the Nix store is for superusers: ask alice to run /nix-gc
+Unknown command /nix-gc: /help lists the commands.
 === chromium: accounts: bob's menu ===
 B
 bob

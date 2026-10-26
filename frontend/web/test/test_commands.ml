@@ -22,10 +22,19 @@ let with_messages h =
 ;;
 
 let%expect_test "every command does something (none is unknown)" =
-  List.iter Slash.all ~f:(fun spec ->
+  List.iter (Slash.all ~superuser:true) ~f:(fun spec ->
     let h = H.create () in
     let m = H.model h in
-    let m', commands = App.update { m with draft = "/" ^ spec.name } Send in
+    let hello =
+      { Prigh_protocol.Hello_reply.client_id = "c1"
+      ; namespace = Some "alice"
+      ; user = Some "alice"
+      ; superuser = true
+      }
+    in
+    let m', commands =
+      App.update { m with draft = "/" ^ spec.name; hello = Some hello } Send
+    in
     let what =
       match m'.dialog, m'.toasts, commands with
       | Some dialog, _, _ ->

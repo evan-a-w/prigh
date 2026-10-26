@@ -174,8 +174,7 @@ let background (m : App.Model.t) ~inject =
 
 let nix_gc (m : App.Model.t) ~inject =
   match m.nix_gc.collecting with
-  | None -> Node.none
-  | Some p ->
+  | Some p when App.superuser m ->
     let text =
       "Collecting Nix garbage: " ^ Prigh_ui.Nix_gc_command.deleted_so_far p
     in
@@ -187,6 +186,7 @@ let nix_gc (m : App.Model.t) ~inject =
         ; Attr.on_click (fun _ -> inject Action.Open_settings)
         ]
       [ Html.lamp (); text_ "Nix GC" ]
+  | Some _ | None -> Node.none
 ;;
 
 let transfers (m : App.Model.t) =

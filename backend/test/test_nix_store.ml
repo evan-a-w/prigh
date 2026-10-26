@@ -434,6 +434,19 @@ let rpc server ?signed_in () =
     print_endline (Json.to_string response)
 ;;
 
+let signed_in ?(superusers = [ "s"; "r" ]) ?as_user user =
+  let access =
+    User_access.create
+      (Or_error.ok_exn (Namespace.parse_spec "a=tok-a,r=tok-r,s=tok-s"))
+      ~host_tokens:[]
+      ~superusers
+    |> Or_error.ok_exn
+  in
+  fst
+    (Or_error.ok_exn
+       (User_access.authenticate access ?as_user (Some ("tok-" ^ user))))
+;;
+
 let%expect_test "rpc: only superusers, who see the store and collect" =
   with_sandbox
   @@ fun t ->
@@ -444,31 +457,29 @@ let%expect_test "rpc: only superusers, who see the store and collect" =
   <- [ "deleting '/nix/store/p1'"; "1 store path deleted, 3.00 KiB freed" ];
   let nix_store = Nix_store.create ~sw ~now:(fun () -> 10.) (Fake.ops fake) in
   let server = make_server t ~sw ~nix_store () in
-  let signed_in ?(superusers = [ "s"; "r" ]) user =
-    let access =
-      User_access.create
-        (Or_error.ok_exn (Namespace.parse_spec "a=tok-a,r=tok-r,s=tok-s"))
-        ~host_tokens:[]
-        ~superusers
-      |> Or_error.ok_exn
-    in
-    fst
-      (Or_error.ok_exn (User_access.authenticate access (Some ("tok-" ^ user))))
-  in
+  (* To everyone else the methods do not exist. *)
   let as_a = rpc server ~signed_in:(signed_in "a") () in
   as_a "nix_store_status";
   as_a "nix_store_gc";
+  as_a "nix_store_frob";
   let lonely = rpc server ~signed_in:(signed_in ~superusers:[] "a") () in
   lonely "nix_store_status";
   let anonymous = rpc server () in
   anonymous "nix_store_gc";
   [%expect
     {|
-    {"type":"response","id":1,"ok":false,"error":"cleaning the Nix store is for superusers: ask r or s to run /nix-gc"}
-    {"type":"response","id":1,"ok":false,"error":"cleaning the Nix store is for superusers: ask r or s to run /nix-gc"}
-    {"type":"response","id":1,"ok":false,"error":"cleaning the Nix store is for superusers, and there are none: ask whoever runs prigh to make a one (PRIGH_SUPERUSERS, or -superusers)"}
-    {"type":"response","id":1,"ok":false,"error":"cleaning the Nix store from prigh is for superusers, and this backend has no users: run `nix store gc` in a shell, or serve with -tokens and -superusers"}
+    {"type":"response","id":1,"ok":false,"error":"unknown method \"nix_store_status\""}
+    {"type":"response","id":1,"ok":false,"error":"unknown method \"nix_store_gc\""}
+    {"type":"response","id":1,"ok":false,"error":"unknown method \"nix_store_frob\""}
+    {"type":"response","id":1,"ok":false,"error":"unknown method \"nix_store_status\""}
+    {"type":"response","id":1,"ok":false,"error":"unknown method \"nix_store_gc\""}
     |}];
+  print_s [%sexp (Queue.to_list fake.calls : string list)];
+  [%expect {| () |}];
+  (* A superuser acting as another user keeps them. *)
+  rpc server ~signed_in:(signed_in ~as_user:"a" "r") () "nix_store_status";
+  [%expect
+    {| {"type":"response","id":1,"ok":true,"result":{"store_bytes":5000000,"store_paths":42,"fs_total_bytes":100000000,"fs_free_bytes":25000000,"last_gc":null,"running":null,"schedule":{"interval_seconds":86400,"keep_days":14,"next_at_ms":200000}}} |}];
   let as_s = rpc server ~signed_in:(signed_in "s") () in
   as_s "nix_store_status";
   as_s "nix_store_gc" ~params:{|{"delete_generations": 30}|};
@@ -490,6 +501,60 @@ let%expect_test "rpc: only superusers, who see the store and collect" =
   rpc bare ~signed_in:(signed_in "s") () "nix_store_status";
   [%expect
     {| {"type":"response","id":1,"ok":false,"error":"this backend does not manage a Nix store"} |}]
+;;
+
+let%expect_test "rpc: nothing reaches others while a superuser collects" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let fake = Fake.create () in
+  let finish, resolve = Promise.create () in
+  fake.finish <- finish;
+  fake.lines
+  <- [ "deleting '/nix/store/p1'"; "1 store path deleted, 3.00 KiB freed" ];
+  let nix_store = Nix_store.create ~sw ~now:(fun () -> 10.) (Fake.ops fake) in
+  let server = make_server t ~sw ~nix_store () in
+  let connect ?signed_in name =
+    let sent = Queue.create () in
+    let client =
+      Rpc_server.connect server ?signed_in ~send:(Queue.enqueue sent)
+    in
+    let call meth =
+      Rpc_server.handle
+        server
+        client
+        (Json.of_string (sprintf {|{"id":1,"method":"%s","params":{}}|} meth))
+    in
+    ignore (call "hello" : Json.t);
+    Queue.clear sent;
+    let show () =
+      Queue.iter sent ~f:(fun json ->
+        printf "%s got %s\n" name (Json.to_string json));
+      Queue.clear sent
+    in
+    call, show
+  in
+  let s_call, s_show = connect ~signed_in:(signed_in "s") "s" in
+  let _, a_show = connect ~signed_in:(signed_in "a") "a" in
+  let _, anon_show = connect "anonymous" in
+  let collecting = Fiber.fork_promise ~sw (fun () -> s_call "nix_store_gc") in
+  Fiber.yield ();
+  s_show ();
+  a_show ();
+  anon_show ();
+  [%expect
+    {|
+    s got {"type":"event","event":"nix_gc_progress","paths_deleted":1,"generations_deleted":0,"message":null}
+    s got {"type":"event","event":"nix_gc_progress","paths_deleted":1,"generations_deleted":0,"message":"1 store path deleted, 3.00 KiB freed"}
+    |}];
+  Promise.resolve resolve (Ok (Fake.report ~by:"" None));
+  print_endline (Json.to_string (Promise.await_exn collecting));
+  s_show ();
+  a_show ();
+  anon_show ();
+  [%expect
+    {| {"type":"response","id":1,"ok":true,"result":{"at_ms":100000,"by":"s","generations":null,"generations_deleted":1,"paths_deleted":2,"freed_bytes":3000,"duration_ms":4000}} |}]
 ;;
 
 (* Executables in a directory of [t] that is all of PATH. *)
@@ -703,8 +768,7 @@ let%expect_test "helper: requests through the FIFO" =
           ())
     in
     while
-      (not (Sys_unix.file_exists_exn ready))
-      && not (Promise.is_resolved helper)
+      (not (Sys_unix.file_exists_exn ready)) && not (Promise.is_resolved helper)
     do
       Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.01
     done;

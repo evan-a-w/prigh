@@ -1230,8 +1230,7 @@ let start_nix_gc (m : Model.t) generations =
         ] ))
 ;;
 
-(* [/nix-gc]: Settings, with the store; the backend refuses those who may
-   not, saying whom to ask. *)
+(* [/nix-gc]: Settings, with the store. *)
 let nix_gc_command (m : Model.t) rest =
   match Prigh_ui.Nix_gc_command.parse rest with
   | Status -> fetch_nix_status m ~open_settings:true
@@ -1426,6 +1425,7 @@ let complete_draft (m : Model.t) ~skills =
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
+      ~superuser:(superuser m)
       ~text:m.draft
       ~cursor:m.cursor
       ~models:m.models
@@ -2797,12 +2797,12 @@ let prompt_succeeded (m : Model.t) =
 
 let help_command (m : Model.t) name =
   let name = String.chop_prefix_if_exists name ~prefix:"/" in
-  match Slash.find name with
+  match Slash.find ~superuser:(superuser m) name with
   | Some spec -> toast m (sprintf "%s: %s" (Slash.Spec.usage spec) spec.help)
   | None ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec -> sprintf "No command /%s. Did you mean /%s?" name spec.name
        | None -> sprintf "No command /%s: /help lists them." name)
 ;;
@@ -3708,7 +3708,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
   | "settings", _ -> open_settings m
-  | "nix-gc", rest -> nix_gc_command m rest
+  | "nix-gc", rest when superuser m -> nix_gc_command m rest
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
@@ -4052,7 +4052,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | name, _ ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec ->
          sprintf
            "Unknown command /%s. Did you mean /%s? (/help lists them)"
@@ -5877,7 +5877,7 @@ let accept_completion (m : Model.t) ~run =
       | Command, Some item ->
         (* Optional free text (e.g. /compact's instructions) can be left out;
            an argument with completions is offered next. *)
-        (match Slash.find item.id with
+        (match Slash.find ~superuser:(superuser m) item.id with
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
          (* [/review] alone is the common case: it runs at once. *)
