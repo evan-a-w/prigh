@@ -1055,6 +1055,10 @@ let%expect_test "on a wide window threads sit in a margin beside their lines" =
     (Review (Unfold c2))
     c2 line 4 resolved
     (Fold it to its mark on the line) (Reopen) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Is d needed?
+    prigh 10:00
+    Fixed.
     (Review (Unfold c2))
     <div class="review-margin-item thread">
     <div class="folded review-margin-item">
