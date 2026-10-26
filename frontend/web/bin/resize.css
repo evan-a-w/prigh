@@ -5,7 +5,7 @@
 
 .resizer {
   position: absolute;
-  z-index: 6;
+  z-index: var(--z-handle);
   touch-action: none;
   outline: none;
 }
