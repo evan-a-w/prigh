@@ -213,6 +213,38 @@ try {
   section("page: the files");
   console.log(clean(await page.locator(".review-files").innerText()));
   console.log(`chat still shown: ${await page.locator(".main .composer").isVisible()}`);
+  // The chat's edge and the file list's edge resize them, kept.
+  {
+    const width = s => page.evaluate(s => Math.round(document.querySelector(s).getBoundingClientRect().width), s);
+    const edge = name => page.locator(`.resizer[data-resize="${name}"]`);
+    const dragEdge = async (name, dx) => {
+      const before = await edge(name).getAttribute("aria-valuenow");
+      const box = await edge(name).boundingBox();
+      const x = box.x + box.width / 2, y = box.y + box.height / 2;
+      // Within the window: off it, not every browser reports the pointer.
+      const to = Math.max(2, x + dx);
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move((x + to) / 2, y, { steps: 4 });
+      await page.mouse.move(to, y, { steps: 4 });
+      await page.mouse.up();
+      await page.waitForFunction(([n, v]) =>
+        document.querySelector(`.resizer[data-resize="${n}"]`).getAttribute("aria-valuenow") !== v, [name, before]);
+    };
+    section("page: resized");
+    const [chat, files] = [await width(".main"), await width(".review-files")];
+    await dragEdge("review-chat", -120);
+    await dragEdge("review-files", 80);
+    console.log(`the chat ${chat} -> ${await width(".main")} (aria ${await edge("review-chat").getAttribute("aria-valuenow")}), the files ${files} -> ${await width(".review-files")} (aria ${await edge("review-files").getAttribute("aria-valuenow")}), the page keeps ${await width(".review-page")}`);
+    await dragEdge("review-chat", -1440);
+    console.log(`the chat as wide as it goes: the page keeps ${await width(".review-page")}`);
+    await page.waitForFunction(() => !document.body.className.includes("resizing"));
+    await screenshot("page: resized");
+    await edge("review-chat").dblclick();
+    await edge("review-files").dblclick();
+    await page.waitForFunction(() => document.querySelector(".resizer[data-resize=review-files]").getAttribute("aria-valuenow") === "260");
+    console.log(`double-clicked: the chat ${await width(".main")}, the files ${await width(".review-files")}`);
+  }
   console.log(`file browser hidden: ${!(await page.locator(".files-panel").isVisible())}`);
 
   // 4. Keys: ] and [ go through the files; c comments on a word selected in
