@@ -232,7 +232,40 @@ let deliveries = function
   | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
+(* The loop's [steer] and [wake]: finished jobs' reports and the inbox's
+   messages. When the model ends its turn, it carries on with whatever is
+   queued, or waits for a job (or a message) while jobs run; the inbox is
+   closed when it stops, with nothing in between that could take a
+   message. *)
+let feeds ~(context : Tool.Context.t) ~jobs inbox =
+  let steers () =
+    Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_steers
+  in
+  let all () = Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_all in
+  let steer () = deliveries (Background_tasks.take_undelivered jobs) @ steers () in
+  let rec wake () =
+    match all () with
+    | _ :: _ as messages -> messages
+    | [] ->
+      (match
+         Background_tasks.take_next
+           jobs
+           ~cancel:context.cancel
+           ?interrupt:(Option.map inbox ~f:(fun inbox () -> Subagent_inbox.await inbox))
+       with
+       | _ :: _ as tasks -> deliveries tasks @ all ()
+       | [] ->
+         (match inbox with
+          | Some inbox
+            when (not (Cancellation.is_cancelled context.cancel))
+                 && not (Subagent_inbox.close_if_empty inbox) -> wake ()
+          | Some _ | None -> []))
+  in
+  steer, wake
+;;
+
 let execute
+      ?inbox
       ~provider
       ~home
       (context : Tool.Context.t)
@@ -314,13 +347,13 @@ let execute
   let added, left =
     with_jobs context ~emit
     @@ fun jobs ->
+    let steer, wake = feeds ~context ~jobs inbox in
     match
       Agent_loop.run
         ~env:context.env
         ~background:jobs
-        ~steer:(fun () -> deliveries (Background_tasks.take_undelivered jobs))
-        ~wake:(fun () ->
-          deliveries (Background_tasks.take_next jobs ~cancel:context.cancel))
+        ~steer
+        ~wake
         ~provider
         ~config
         ~cwd:p.cwd
@@ -457,14 +490,17 @@ let create
     | Ok prepared ->
       (match context.background with
        | Some background when context.depth = 0 ->
+         let inbox = Subagent_inbox.create () in
          let id =
            Background_tasks.spawn
              background
+             ~inbox
              ~kind:Subagent
              ~label:prepared.task
              ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
                let result =
                  execute
+                   ~inbox
                    ~provider
                    ~home
                    { context with cancel; emit; on_output = ignore }
@@ -556,4 +592,32 @@ let cancel_tool =
   { Tool.spec; run }
 ;;
 
-let control_tools = [ status_tool; cancel_tool ]
+let message_tool =
+  let spec =
+    control_spec
+      ~name:"subagent_message"
+      ~description:
+        "Send a message to a running background subagent, e.g. to correct its \
+         course or give it what it needs: it gets it at its next step (after \
+         its current tool calls), as from its caller, and carries on. Its \
+         report still arrives as usual."
+      (Tool_args.schema
+         ~required:[ "id"; "text" ]
+         [ "id", `String, "Agent id"; "text", `String, "The message" ])
+  in
+  let run (context : Tool.Context.t) args =
+    let id = Tool_args.string args "id" in
+    ok_or_invalid
+      (Background_tasks.send
+         (background_of context)
+         ~id
+         Steer
+         ~from:Caller
+         (Tool_args.string args "text"));
+    Tool.Result.ok
+      (sprintf "sent to %s: it gets the message at its next step" id)
+  in
+  { Tool.spec; run }
+;;
+
+let control_tools = [ status_tool; cancel_tool; message_tool ]

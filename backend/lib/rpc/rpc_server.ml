@@ -164,6 +164,18 @@ let if_missing_param params =
     ~f:Dir_change.If_missing.of_param
 ;;
 
+let queue_param ?default params name =
+  match param params name, default with
+  | (None | Some `Null), Some kind -> Ok kind
+  | _ ->
+    Or_error.bind (string_param params name) ~f:(fun s ->
+      Result.map_error (Steer_queue.Kind.of_string s) ~f:(fun _ ->
+        Error.createf
+          "param %S is %S: use \"steer\" or \"follow_up\""
+          name
+          s))
+;;
+
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
 let queued_json (queued : Agent.Queued.t) =
@@ -2075,15 +2087,7 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
        | Some queued -> queued_json queued)
   | "remove_queued" ->
     let open Or_error.Let_syntax in
-    let%bind queue =
-      match%bind string_param params "queue" with
-      | "steer" -> Ok `Steer
-      | "follow_up" -> Ok `Follow_up
-      | other ->
-        Or_error.errorf
-          "param \"queue\" is %S: use \"steer\" or \"follow_up\""
-          other
-    in
+    let%bind queue = queue_param params "queue" in
     let%bind index =
       match param params "index" with
       | Some (`Number n) ->
