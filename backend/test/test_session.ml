@@ -963,6 +963,8 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; last_activity = 0.
     ; resume_at = None
     ; bytes = 0
+    ; repo = None
+    ; agent_worktrees = []
     }
   in
   let all = List.map [ "abc1"; "abc12"; "abd"; "f00" ] ~f:summary in

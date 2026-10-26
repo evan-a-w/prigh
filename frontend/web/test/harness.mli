@@ -98,6 +98,11 @@ val session_json
   -> ?clients:int
   -> ?archived:bool
   -> ?bytes:int
+  -> ?repo:string * string * string option
+       (** where its cwd is in git: the repository's root, the worktree and
+           its branch *)
+  -> ?agent_worktrees:(string * string * string * string * string) list
+       (** its subagents' worktrees: agent, task, path, branch, root *)
   -> string
   -> string
 

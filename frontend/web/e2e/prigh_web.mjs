@@ -1126,7 +1126,11 @@ try {
   await page.waitForTimeout(300); // its fade in
   await show("/cd: the directory popup", ".popup");
   await composer().press("Control+Enter");
-  await page.waitForFunction(c => document.querySelector(".session.selected .session-cwd")?.title === c, cwd);
+  // Its row names the directory unless it is its project's own (no subdirectory).
+  await page.waitForFunction(c => {
+    const where = document.querySelector(".session.selected .session-cwd");
+    return where ? where.title === c : document.querySelector(".session.selected") !== null;
+  }, cwd);
   await page.keyboard.press("Control+Shift+F");
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();

@@ -230,7 +230,6 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
-    <Vdom.Node.none-widget class="">
     <section class="session-card">
     <div class="sidebar-footer">
     <Vdom.Node.none-widget class="">

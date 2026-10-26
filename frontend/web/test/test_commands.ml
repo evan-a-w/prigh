@@ -1660,9 +1660,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1712,9 +1712,9 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

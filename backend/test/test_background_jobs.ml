@@ -798,7 +798,7 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{"job_id":"j3"}}
-    tool_exec_result failed: no tool execution "<id>/j2-2"
+    tool_exec_result failed: no tool execution "<id>/j2-3"
     disconnected from 127.0.0.1:PORT
     retrying in 50ms
     connected to 127.0.0.1:PORT as client-3

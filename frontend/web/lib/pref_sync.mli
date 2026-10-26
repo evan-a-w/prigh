@@ -5,8 +5,8 @@ open! Import
     ([get_prefs], [set_prefs], [push_pref], [prefs_changed]), so that they
     follow the user from browser to browser and change live in the others:
     the theme and accent, notifications, the transcript's verbosity, the prompt
-    history (shared with the
-    TUI) and the panels' sizes and whether the terminal is open. The browser
+    history (shared with the TUI), the panels' sizes, whether the terminal is
+    open and which of the sidebar's projects are folded. The browser
     caches them ([Command.Cache_prefs]) for the first paint and for backends
     that keep none.
 
@@ -21,6 +21,9 @@ module Key : sig
   val notify : string
   val verbosity : string
   val terminal_open : string
+
+  (** The sidebar's folded projects and worktrees: their directories. *)
+  val folded : string
 
   (** ["history"]: the prompts sent, newest first, shared with the TUI. *)
   val history : string

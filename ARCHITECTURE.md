@@ -118,8 +118,9 @@ answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 A background job's exec carries `stdin: true` (the host keeps the process's
 stdin open) and `job_input` reaches it as `tool_exec_input {exec_id, data,
 close}` events, to the host only. Hosts announce what they support beyond
-that in `hello`'s `features` (`exec_input`, sent by `prigh tool-host` and
-the TUI with local tools; `Agent.Host.exec_input`): a job on a host without
+that in `hello`'s `features` (`exec_input` and `git_location`, sent by
+`prigh tool-host` and the TUI with local tools; `Agent.Host.exec_input`,
+`Agent.Host.git_location`): a job on a host without
 it gets a `Stdin_feed` that refuses writes with "runs an older prigh ...
 update it". A tool an older host does not know (`unknown host tool`) gets
 the same advice appended.
@@ -564,6 +565,17 @@ two can share one.
   a<n> (...)`; deeper calls (no jobs) block and return the report.
   `subagent_status`/`subagent_cancel` act on the jobs and are dropped below
   depth 0. Nothing blocks on background work: its reports wake the agent.
+  With `worktree` (a branch name, or `auto`/`true` for `agent/<the task's
+  first words>`, made `fresh`: `-2`, ... when the branch exists) the call
+  first makes a worktree through `Worktree.create_tool` (an `on_host`
+  pseudo-tool run with `Tool.execute_via`, so on the session's tool host,
+  under the `worktrees_dir` the tool reads from the agent's config) and
+  the child works in `Created.cwd` (the same subdirectory there); a
+  failure is the call's error, before anything starts. `Subagent_start`
+  carries the `Agent_worktree.t` (`agent, task, path, branch, root`),
+  which `Agent.broadcast` records in the session (`add_agent_worktree`),
+  and the report ends with `Agent_worktree.report_line` (where the branch
+  is, how to review, merge or remove it).
 - `Background_tasks` — one agent's background work, of two kinds:
   subagents (ids `a<n>`, seeded past the subagent calls already in the
   session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
@@ -969,9 +981,14 @@ two can share one.
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
   cancelled; `resume_at`, also in `Summary`) — these three are ignored by
   `messages` and not copied by `fork` — `Review` (a `Review_state.Change`,
-  read from every branch; a comment is worth creating the file for) and
-  `Told_environment` (what the
-  model was last told about its environment, see the harness);
+  read from every branch; a comment is worth creating the file for),
+  `Told_environment` (what the model was last told about its environment,
+  see the harness), `Repo {cwd, repo}` (where `cwd` is in git, a
+  `Git_location.t` or `None` outside a repository: `repo`, and
+  `Summary.repo` for the summary's cwd, `None` when nothing was recorded
+  for it), `Agent_worktree` and `Worktree_removed {path}` (the worktrees
+  made for its subagents and not removed since: `agent_worktrees`, also in
+  `Summary`; neither is copied by `fork`);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -1025,6 +1042,18 @@ two can share one.
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
+- `Git_location` — where a directory is in git, read from files only
+  (walking up to `.git`: a directory is a main checkout; a file points at a
+  linked worktree's git directory, whose `commondir` leads to the
+  repository's): `root` (the main checkout, which names the project),
+  `worktree`, `branch`, `main`. Also the `$git_location` host operation.
+  `Agent.refresh_location` records it in the session (a `Repo` entry, only
+  when it changed) whenever the location changes, a run starts or the
+  session is replaced: at once on the backend's host, and on a client host
+  that announced `git_location` with a `$git_location` exec in a daemon
+  fiber (once per host and directory per session; its answer announces the
+  state), so `list_sessions` never runs anything per session. The agent's
+  `git_branch` comes from it too (worktrees included).
 - `Worktree` — a repository's git worktrees, as the pseudo-tools
   `$worktree_list`, `$worktree_create` and `$worktree_remove` on the
   active tool host (`Host_ops`), in the repository of the session cwd
@@ -1042,7 +1071,9 @@ two can share one.
   with `-2`, ... when taken. `create` checks an existing local branch out
   as it is, else creates the branch from the base (default `HEAD`) or,
   without one, tracks the single remote branch of that name; it refuses a
-  branch checked out in another worktree. `remove` refuses the main
+  branch checked out in another worktree (with `fresh`, a branch that
+  exists or is checked out gets `-2`, ... instead; `Created` has the
+  repository's `root` and the asker's `cwd` carried over). `remove` refuses the main
   worktree and, without force, one with changes or locked (`--force`
   twice for a locked one), prunes one whose directory is gone, and keeps
   the branch. Errors say what to do, like `Git_diff`'s.
@@ -1143,7 +1174,12 @@ two can share one.
   create or load an agent and move only the calling client (`new_session`,
   `switch_session`, `fork` and `clone` answer `{state}`, the new session's
   state, so a frontend needs no `get_state` round trip); `list_sessions`
-  items carry `bytes`, `live` (with `clients` when live), `running` (a
+  items carry `host` (the tool host of the cwd, when recorded), `repo`
+  (`{root, worktree, branch, main}`, `null` outside a repository, absent
+  when unknown: the session's `Repo` entry, else, for a session on the
+  backend's host that recorded none, `Git_location.find` on the backend's
+  files, cached per cwd in `t.repos`), `agent_worktrees`, `bytes`, `live`
+  (with `clients` when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
   current `config.json`, reread per call). `set_archived {path, archived}`
@@ -1162,7 +1198,8 @@ two can share one.
   by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
-  `background`, persisted, name or description (compared per live session
+  `background`, persisted, name, description, repository or subagents'
+  worktrees (`Listed`, compared per live session
   on its state changes and message ends, so never per delta), and after
   archiving, deleting, importing, forking and cloning; frontends refetch
   the list. A session with running background subagents or jobs
@@ -1204,10 +1241,15 @@ two can share one.
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
   `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
-  [instructions]`) and `init`, `list_worktrees` (`{root, project_dir,
-  worktrees}`), `create_worktree {branch, base?}` (`{worktree,
-  new_branch}`) and `remove_worktree {path, force?}` (`{worktree}`, as it
-  was; refused for the worktree the client's session is in), where a
+  [instructions]`) and `init`, `list_worktrees {cwd?}` (`{root,
+  project_dir, worktrees}`), `create_worktree {branch, base?, cwd?}`
+  (`{worktree, new_branch, root, cwd}`: `cwd` is the directory it was
+  asked from carried over, the same subdirectory of the new worktree when
+  it has it) and `remove_worktree {path, force?, cwd?}` (`{worktree}`, as
+  it was; refused for the worktree the client's session is in; the saved
+  sessions that recorded it as a subagent's get `Worktree_removed`, and
+  one already gone from git that a session recorded is only forgotten), in
+  the repository of `cwd` (default the session's), where a
   worktree is `Worktree.t` (`path, branch, head, main, managed, locked,
   prunable, changes, upstream, ahead, behind`) plus `current` (the
   session's cwd is in it) and `sessions` (`{id, path, name, live,
@@ -1493,9 +1535,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
   - Sessions: `/sessions` is a picker over `list_sessions` laid out by
-    `Session_selection` (active sessions first, then the archived ones,
-    dimmed: `Picker.Item.section` keeps sections apart, also when filtering,
-    and `Render` draws a divider naming each). Tab marks rows
+    `Session_selection` (active sessions first, grouped by project and
+    worktree in `Project_tree`'s order with a section each, named by
+    `Project_tree.place_label` (`prigh`, `prigh ⎇ feat/x`, which the filter
+    also matches), then the archived ones, dimmed: `Picker.Item.section`
+    keeps sections apart, also when filtering, and `Render` draws a divider
+    naming each). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
     highlighted) sessions and Alt+D every archived one but the current, with
     the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
@@ -1550,6 +1595,13 @@ terminal frontend and `web/` prigh-web, the browser one.
     `new`/`open`/`rm` replies tagged so a refusal goes back to the editor
     (a removal refused for uncommitted changes puts `/worktree rm -f`
     there).
+  - Projects: `Project_tree` (shared with prigh-web) groups session
+    summaries into projects (a repository's main checkout from `repo.root`,
+    or the cwd of a session outside any repository), each with its main
+    checkout's sessions and its worktrees (from the sessions' `repo`, the
+    `agent_worktrees` of the sessions (and of `owners`, the archived ones
+    not shown), and a `list_worktrees` listing), in the order of first
+    mention; `sessions ~collapsed` flattens it in display order.
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
     shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
@@ -1591,7 +1643,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
     `Backend_link.connection_hello` with local tools announces `"features":
-    ["exec_input", "terminal_kill"]` (`Terminal_kill` goes to the worker,
+    ["exec_input", "terminal_kill", "git_location"]` (`Terminal_kill` goes to the worker,
     which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
@@ -1975,10 +2027,24 @@ terminal frontend and `web/` prigh-web, the browser one.
       again per delta), `Files_view`'s text preview (cached per preview by
       `View_cache`) and `Diff_view` (`?lang`, from the edited path: the old
       and new sides each carry their own state, reset at each hunk).
-    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
-      `Rel_time`; active sessions, then a divider with the archived ones'
+    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, also by
+      project and branch, ages from `Rel_time`; the active sessions as
+      `Session_list.tree`, a `Prigh_ui.Project_tree` built from the
+      summaries' `repo` and `agent_worktrees` plus `Worktrees`' listing of
+      the open session's repository: a section per project with its main
+      checkout's sessions, then its worktrees, each a row (changes and sync
+      from the listing, a subagent's tagged and linked to its session) with
+      its sessions; `Model.folded` (directories, kept in the
+      `web.sidebar-folded` preference) folds projects and worktrees, which
+      a search ignores; "+" is `New_session_in` (`new_session` then
+      `set_cwd`), a repository's "New worktree" `New_worktree {repo}`
+      (`create_worktree` with `cwd`, then a new session in the created
+      `cwd`), a worktree's bin `Ask_remove_worktree` (the listing's entry,
+      else the tree's with its repository, which `remove_worktree` gets as
+      `cwd`); then a divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
-      which keyboard navigation follows; a search shows them), muted, and
+      the tree's order without what is folded, which keyboard navigation
+      and selection ranges follow; a search shows them), muted, and
       "Delete archived"; a session is running while its
       turn or background work runs (`list_sessions`' `running`, and
       `Model.active` for the current one); the list is refetched on
@@ -2143,7 +2209,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     - Worktrees: `Worktrees` keeps the listing of the session's place
       (session, tool host, directory; reset on a session or user switch,
       stale after a turn, a create or remove, or other sessions moving)
-      for the sidebar's section in `Sidebar_view`, `/worktree`'s picker
+      for the sidebar's tree in `Sidebar_view`, `/worktree`'s picker
       (`Dialog.Picker_kind.Worktrees`) and `Completion`
       (`Worktree_command.complete`); `New_worktree` is the create dialog's
       state, and the remove confirmation is a dialog offering the forced

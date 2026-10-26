@@ -37,14 +37,16 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
-    | List_worktrees
+    | List_worktrees of { cwd : string option }
     | Create_worktree of
         { branch : string
         ; base : string option
+        ; cwd : string option
         }
     | Remove_worktree of
         { path : string
         ; force : bool
+        ; cwd : string option
         }
     | Get_review
     | Review_comment of
@@ -95,7 +97,7 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
-    | List_worktrees -> "list_worktrees"
+    | List_worktrees _ -> "list_worktrees"
     | Create_worktree _ -> "create_worktree"
     | Remove_worktree _ -> "remove_worktree"
     | Get_review -> "get_review"
@@ -111,10 +113,15 @@ module Method = struct
     | Fs_write _ -> "fs_write"
   ;;
 
+  let cwd_param = function
+    | None -> []
+    | Some cwd -> [ "cwd", Json.str cwd ]
+  ;;
+
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | List_worktrees | Get_review | Review_submit -> []
+    | Delete_archived | Get_review | Review_submit -> []
     | Review_comment { root; path; first; last; anchor; text } ->
       [ "root", Json.str root
       ; "path", Json.str path
@@ -139,6 +146,8 @@ module Method = struct
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->
         [ "expected", Json.str e ])
+    | List_worktrees { cwd = None } -> []
+    | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -167,12 +176,14 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
-    | Create_worktree { branch; base } ->
+    | Create_worktree { branch; base; cwd } ->
       [ "branch", Json.str branch ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
-    | Remove_worktree { path; force } ->
+      @ cwd_param cwd
+    | Remove_worktree { path; force; cwd } ->
       [ "path", Json.str path ]
-      @ if force then [ "force", Json.bool true ] else []
+      @ (if force then [ "force", Json.bool true ] else [])
+      @ cwd_param cwd
   ;;
 end
 
