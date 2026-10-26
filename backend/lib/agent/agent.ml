@@ -1685,10 +1685,12 @@ let update_review_file ?by ?text t ~root ~path ~action ~f =
   Or_error.map (f t.review) ~f:(fun (result, changes) ->
     let after = List.fold changes ~init:t.review ~f:Review_state.apply in
     let current =
-      match text with
-      | Some text ->
+      match text, Review_comment.root_branch root with
+      | _, Some branch ->
+        Or_error.errorf "%s is not checked out: no file to snapshot" branch
+      | Some text, None ->
         Ok (Review_snapshot.content_of (Some text) ~size:(String.length text))
-      | None -> read_review_file t ~root ~path
+      | None, None -> read_review_file t ~root ~path
     in
     let snapshot =
       match current with

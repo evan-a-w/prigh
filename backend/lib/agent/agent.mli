@@ -554,7 +554,8 @@ val submit_review : ?root:string -> t -> int Or_error.t
 (** Like [update_review], then records a {!Review_snapshot} of the file
     [path] of the worktree [root] for [action] (by the user [by]): [text],
     or the file as it is now on the active tool host. A file that cannot be
-    read gets no snapshot. *)
+    read gets no snapshot, nor does one of a branch that is not checked out
+    ([branch:NAME]). *)
 val update_review_file
   :  ?by:string
   -> ?text:string

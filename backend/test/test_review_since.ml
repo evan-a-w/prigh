@@ -423,3 +423,35 @@ let%expect_test "a session keeps at most max_kept_bytes of texts" =
     ((index 39) (added 0) (removed 0) (note ("its text then was not kept")))
     |}]
 ;;
+
+let%expect_test "a branch reviewed without a checkout gets no snapshots" =
+  with_agent []
+  @@ fun t agent ->
+  sh t "git branch feat";
+  call
+    ~quiet:true
+    t
+    agent
+    "review_approve"
+    {|{"root":"branch:feat","path":"a.txt","hash":"h1"}|};
+  call
+    ~quiet:true
+    t
+    agent
+    "review_comment"
+    {|{"root":"branch:feat","path":"a.txt","first":1,"last":1,"anchor":"one","text":"Why?"}|};
+  let review = Agent.review_state agent in
+  print_s
+    [%sexp
+      (List.length
+         (Review_state.snapshots review ~root:"branch:feat" ~path:"a.txt")
+       : int)];
+  (match Agent.review_since agent ~root:"branch:feat" () with
+   | Error e -> printf "error: %s\n" (mask t (Error.to_string_hum e))
+   | Ok files -> print_s [%sexp (List.length files : int)]);
+  [%expect
+    {|
+    0
+    0
+    |}]
+;;

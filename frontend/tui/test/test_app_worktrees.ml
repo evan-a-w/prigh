@@ -1239,9 +1239,9 @@ let%expect_test "/review: what changed since the last action on each file" =
     H.reply
       h
       (Retry_in_editor
-         { command = Review_command.command ?dir ()
+         { command = Review_command.command ~target:(Dir dir) ()
          ; hint = ""
-         ; then_ = Review_status { review; dir }
+         ; then_ = Review_status { review; target = Dir dir }
          })
       feat_diff_json
   in
@@ -1281,7 +1281,12 @@ let%expect_test "/review: what changed since the last action on each file" =
           (branch (feat/a))
           (base main)
           (main false)
-          (branches (feat/a main)))))))
+          (branches (feat/a main))
+          (remote_branches ())
+          (tags            ())
+          (commits         ())
+          (rev             ())
+          (direct false))))))
     |}];
   H.reply
     h
@@ -1348,7 +1353,12 @@ let%expect_test "/review: what changed since the last action on each file" =
           (branch (feat/a))
           (base main)
           (main false)
-          (branches (feat/a main)))))))
+          (branches (feat/a main))
+          (remote_branches ())
+          (tags            ())
+          (commits         ())
+          (rev             ())
+          (direct false))))))
 
 
 
@@ -1570,7 +1580,8 @@ let%expect_test
                 (at ((1970-01-01 10:00:00.003000000+10:00)))
                 (proposal ())
                 (delivered false)))))))
-            (approvals ())))
+            (approvals ())
+            (snapshots ())))
           (target (Rev feat/b)))))))
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
