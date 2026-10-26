@@ -34,8 +34,4 @@ val describe : Status.t -> P.Review_since.File.t option -> string
 (** The terminal's [/review]: each changed file with its status (and what
     changed since the last action on it, from [since]) and its comments'
     threads, after a summary. *)
-val render
-  :  ?since:P.Review_since.t
-  -> P.Git_diff.t
-  -> P.Review.t
-  -> Content.t
+val render : ?since:P.Review_since.t -> P.Git_diff.t -> P.Review.t -> Content.t

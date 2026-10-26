@@ -58,8 +58,14 @@ type t =
   ; snapshots : Review_snapshot.t list File_key.Map.t
     (** by file (always with a [root]), newest first *)
   ; blobs : string String.Map.t (** the snapshots' texts, by MD5 *)
+  ; kept : int (** the bytes of [blobs] *)
   }
 [@@deriving sexp_of, equal]
+
+(** A session keeps at most this much (32 MiB) of snapshots' texts: later
+    snapshots of new contents record their digest only (so the review still
+    tells whether the file changed, without a diff). *)
+val max_kept_bytes : int
 
 val empty : t
 val apply : t -> Change.t -> t
@@ -134,7 +140,8 @@ val approve
 
 val unapprove : ?root:string -> t -> path:string -> Change.t list
 
-(** Records [snapshot]; [text] is kept unless the review has it already. *)
+(** Records [snapshot]; [text] is kept unless the review has it already or
+    it would take the review over {!max_kept_bytes}. *)
 val snapshot : t -> Review_snapshot.t -> text:string option -> Change.t list
 
 (** [path]'s snapshots, oldest first: the history [since]'s [index] counts

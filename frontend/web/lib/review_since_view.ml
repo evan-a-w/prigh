@@ -75,7 +75,9 @@ let note (m : App.Model.t) path =
   | Some (_, s), None ->
     div
       ~cls:"review-note review-since-note"
-      [ lamp (); Node.text (sprintf "Reading what changed since %s…" (action_label m s)) ]
+      [ lamp ()
+      ; Node.text (sprintf "Reading what changed since %s…" (action_label m s))
+      ]
   | Some (_, s), Some since ->
     let label = action_label m s in
     (match since with
@@ -86,7 +88,9 @@ let note (m : App.Model.t) path =
      | { note = Some note; _ } ->
        div
          ~cls:"review-empty review-since-same"
-         [ Node.text (sprintf "Changed since %s, but %s: no diff to show." label note) ]
+         [ Node.text
+             (sprintf "Changed since %s, but %s: no diff to show." label note)
+         ]
      | { added; removed; _ } ->
        div
          ~cls:"review-note review-since-note"

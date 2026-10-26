@@ -1180,6 +1180,22 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   host (`Failed` with its error when it no longer applies) and adds the
   user's undelivered post saying what became of it, so the agent hears it
   with the next comments.
+- `Review_snapshot`, `Text_diff` — "what changed since": each user action
+  on a file in the review (approve, unapprove, comment, reply, accept or
+  reject a proposal, `fs_write` with `review_root`) goes through
+  `Agent.update_review_file`, which reads the file on the active tool host
+  (the host's `read` op, so remote hosts work; at most 1 MiB) and records a
+  `Change.Snapshot` after the action's own changes: `{root, path, action,
+  by, at, content}`, the content a `Text {md5}`, `Absent`, `Binary {md5}`
+  or `Too_large {bytes}`. The text rides on the first snapshot of its MD5
+  only (`Review_state.blobs`, deduplicated by content; `kept` caps them at
+  32 MiB a session, after which new contents record the digest only), so
+  the session file is the store: restarts and rewinds fold it back, and
+  `fork` copies a text onto the first copied snapshot needing it.
+  `Review_state.since` diffs a file's snapshot (the last, or `index` in its
+  history) with the file now (`Text_diff.unified`, a patience diff written
+  as git writes one file's section), or says why it cannot (binary, too
+  large, text not kept).
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -1354,11 +1370,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   they are now, saved ones by `Session.Summary`'s last cwd and host,
   archived ones only while loaded), and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
-  `fs_upload` (`Files_rpc`, above), `fs_write {path, text, expected?}`
+  `fs_upload` (`Files_rpc`, above), `fs_write {path, text, expected?, review_root?}`
   (the review page's editor: the `write` tool on the active host, refused
   when the file's MD5, which `fs_preview` gives a whole text file as
   `md5`, is no longer `expected`), and the review's (`Review_rpc`, on the
-  calling client's session): `get_review` (`{comments, approvals}`),
+  calling client's session): `get_review` (`{comments, approvals, snapshots}`),
   `review_comment {root, path, first, last, side?, start_col?, end_col?,
   anchor, text}` (a selection's columns come together; `side` is `new`
   without one), `review_reply
@@ -1368,7 +1384,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `review_decide {id, post, accept}` (applied in the comment's worktree),
   `review_approve {root?, path, hash}` and
   `review_unapprove {root?, path}` (answering the review; `approvals` are
-  `{root?, path, hash}`); every change is also
+  `{root?, path, hash}`; `snapshots` the files' review actions, without
+  texts), `review_since {root, path?, index?}` (`{files: [{path, index,
+  snapshot, current, changed, added, removed, diff, note?}]}`: what changed
+  since each file's last action, or `path`'s `index`th); every change is also
   sent to the session's clients as a `review` event with the whole
   review.
   `get_messages_page {limit, before?, from?, session?}` (`Message_page`,
@@ -1767,7 +1786,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     of its section of the diff) and `Comment_anchor` (a comment's code
     now: where its anchor text is, nearest to where it was, else where
     its selected text alone still is, else outdated) are shared with
-    prigh-web.
+    prigh-web. When the review has snapshots, `/review` also reads
+    `review_since` (`Reply_tag.Review_since`; an older backend's error
+    shows the list without it) and `File_approval.describe` says what
+    changed since each file's last action.
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
@@ -2373,7 +2395,11 @@ terminal frontend and `web/` prigh-web, the browser one.
       file, after any `edit`/`write`/`apply_patch`/`bash` of the agent or
       a subagent and at every run's end), one request at a time with
       another wanted once it is in; the page's file, mode (`Comment |
-      Edit`) and layout (`Unified | Full`); the code selected (a
+      Edit`) and layout (`Unified | Full | Since`, also chosen per file:
+      `layout_of` defaults a file that changed since its last action to
+      `Since`); what changed since each file's last action (`review_since`
+      for the worktree, read again after each diff and each action) and
+      since an older one picked from its history; the code selected (a
       `Review_comment.Range` with its lines' text, and where its floating
       button goes), the comment being written on it, the comment pointed
       at (`hover`) and the replies being typed; the
@@ -2383,7 +2409,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       turns into requests (`Reply_tag.Review`), toasts and focus.
       `Code_review.rows` are a file's rows: the hunks, or the whole file
       with them inline (`full_rows` fills the lines between hunks from its
-      text), made once per file version and layout. Text selected in them
+      text), or the since-diff's (whose removed lines are the old
+      snapshot's, so selections on them are refused), made once per file
+      version and layout. `Review_since_view` draws the since segment, the
+      older-actions menu and the note over it. Text selected in them
       comes from the page (`Selection_listeners`, in `app/`: once the
       selection settles, a mouse let go or a touch's long press, its ends
       as the rows' `data-side`/`data-line` and UTF-16 offsets into their

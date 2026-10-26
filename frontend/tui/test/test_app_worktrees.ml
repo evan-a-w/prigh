@@ -1138,6 +1138,180 @@ let%expect_test "/review WORKTREE: its approvals and comments, not the others'" 
     |}]
 ;;
 
+(* With review actions recorded, /review also reads what changed in each
+   file since its last action. *)
+let%expect_test "/review: what changed since the last action on each file" =
+  let h = connected ~height:20 () in
+  let root = "/h/.prigh/worktrees/repo/feat-a" in
+  let snapshot path action =
+    sprintf
+      {|{"root":"%s","path":"%s","action":"%s","at_ms":1,"content":{"kind":"text","md5":"m"}}|}
+      root
+      path
+      action
+  in
+  let review_json =
+    sprintf
+      {|{"comments":[],"approvals":[{"root":"%s","path":"b.ml","hash":"stale"}],"snapshots":[%s,%s]}|}
+      root
+      (snapshot "a.ml" "commented")
+      (snapshot "b.ml" "approved")
+  in
+  let since_file path action ~added ~removed =
+    sprintf
+      {|{"path":"%s","index":0,"snapshot":%s,"current":{"kind":"text","md5":"n"},"changed":%b,"added":%d,"removed":%d,"diff":""}|}
+      path
+      (snapshot path action)
+      (added + removed > 0)
+      added
+      removed
+  in
+  let review =
+    P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
+    |> Or_error.ok_exn
+  in
+  let diff =
+    P.Git_diff.of_json (P.Json.parse feat_diff_json |> Or_error.ok_exn)
+    |> Or_error.ok_exn
+  in
+  let dir = Some root in
+  let show_diff () =
+    H.reply
+      h
+      (Retry_in_editor
+         { command = Review_command.command ?dir ()
+         ; hint = ""
+         ; then_ = Review_status { review; dir }
+         })
+      feat_diff_json
+  in
+  show_diff ();
+  [%expect
+    {|
+    (Rpc
+      (method_ review_since)
+      (params ((root /h/.prigh/worktrees/repo/feat-a)))
+      (tag (
+        Review_since
+        (review (
+          (comments ())
+          (approvals ((
+            (root (/h/.prigh/worktrees/repo/feat-a))
+            (path b.ml)
+            (hash stale))))
+          (snapshots (
+            ((root   /h/.prigh/worktrees/repo/feat-a)
+             (path   a.ml)
+             (action commented)
+             (by ())
+             (at ((1970-01-01 10:00:00.001000000+10:00)))
+             (content (Text (md5 m))))
+            ((root   /h/.prigh/worktrees/repo/feat-a)
+             (path   b.ml)
+             (action approved)
+             (by ())
+             (at ((1970-01-01 10:00:00.001000000+10:00)))
+             (content (Text (md5 m))))))))
+        (diff (
+          (root    /h/.prigh/worktrees/repo/feat-a)
+          (against 0123456789abcdef0123456789abcdef01234567)
+          (diff
+           "diff --git a/a.ml b/a.ml\n--- a/a.ml\n+++ b/a.ml\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/b.ml b/b.ml\n--- a/b.ml\n+++ b/b.ml\n@@ -1 +1 @@\n-p\n+q\n")
+          (truncated false)
+          (branch (feat/a))
+          (base main)
+          (main false)
+          (branches (feat/a main)))))))
+    |}];
+  H.reply
+    h
+    (Review_since { review; diff })
+    (sprintf
+       {|{"files":[%s,%s]}|}
+       (since_file "a.ml" "commented" ~added:1 ~removed:0)
+       (since_file "b.ml" "approved" ~added:2 ~removed:1));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Review ─────────────────────────────────────────────────────────────────────┐
+    │ review feat/a (/h/.prigh/worktrees/repo/feat-a) against main (merge base     │
+    │ 01234567)  0 of 2 files approved                                             │
+    │   ○ a.ml  +1 −1  not approved, +1 −0 since commented                         │
+    │   ● b.ml  +1 −1  changed since approved (+2 −1)                              │
+    │ approve files and comment on code you select in prigh-web's review page;     │
+    │ /review HEAD has prigh review the changes itself                             │
+    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}];
+  (* An older backend without review_since: the list as before. *)
+  show_diff ();
+  H.reply_error h (Review_since { review; diff }) "unknown method review_since";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ review_since)
+      (params ((root /h/.prigh/worktrees/repo/feat-a)))
+      (tag (
+        Review_since
+        (review (
+          (comments ())
+          (approvals ((
+            (root (/h/.prigh/worktrees/repo/feat-a))
+            (path b.ml)
+            (hash stale))))
+          (snapshots (
+            ((root   /h/.prigh/worktrees/repo/feat-a)
+             (path   a.ml)
+             (action commented)
+             (by ())
+             (at ((1970-01-01 10:00:00.001000000+10:00)))
+             (content (Text (md5 m))))
+            ((root   /h/.prigh/worktrees/repo/feat-a)
+             (path   b.ml)
+             (action approved)
+             (by ())
+             (at ((1970-01-01 10:00:00.001000000+10:00)))
+             (content (Text (md5 m))))))))
+        (diff (
+          (root    /h/.prigh/worktrees/repo/feat-a)
+          (against 0123456789abcdef0123456789abcdef01234567)
+          (diff
+           "diff --git a/a.ml b/a.ml\n--- a/a.ml\n+++ b/a.ml\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/b.ml b/b.ml\n--- a/b.ml\n+++ b/b.ml\n@@ -1 +1 @@\n-p\n+q\n")
+          (truncated false)
+          (branch (feat/a))
+          (base main)
+          (main false)
+          (branches (feat/a main)))))))
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Review ─────────────────────────────────────────────────────────────────────┐
+    │ review feat/a (/h/.prigh/worktrees/repo/feat-a) against main (merge base     │
+    │ 01234567)  0 of 2 files approved                                             │
+    │   ○ a.ml  +1 −1  not approved                                                │
+    │   ● b.ml  +1 −1  changed since approved                                      │
+    │ approve files and comment on code you select in prigh-web's review page;     │
+    │ /review HEAD has prigh review the changes itself                             │
+    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}]
+;;
+
 let%expect_test
     "/review: a path and --base go straight there; a word that names no \
      worktree has the model review"
