@@ -329,6 +329,7 @@ let rec apply t (event : Event.t) =
   | Btw_delta _
   | Review _
   | Sessions_changed
+  | Agent_queues _
   | Prefs_changed _ -> t
 ;;
 

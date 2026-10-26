@@ -4771,6 +4771,7 @@ let event m (e : P.Event.t) =
   | State state -> set_state m state
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
+  | Agent_queues _ -> m, []
   | Config_changed config -> { m with config = Some config }, []
   | Review _ -> m, []
   | Auth a -> auth_event m a
