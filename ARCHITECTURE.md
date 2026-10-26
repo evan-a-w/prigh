@@ -2319,10 +2319,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       pinned under the scrolling body; the status line's
       summary and the toggle in the chat's corner or the bar). Steering:
       `Model.recipient` (`Recipient`: `Main` or a subagent's id) is who the
-      composer sends to; `follow_recipient`, after every update, makes it the
-      running top-level subagent shown in the panel when the selection
-      changes on a desktop (`Main` once the panel closes) and `Main` when
-      that subagent finishes, with a toast. `send` then calls `steer_agent`
+      composer sends to, set only by `Set_recipient` (the Steer button, the
+      chip's ×, Esc), not by what the panel shows; `follow_recipient`, after
+      every update, makes it `Main` when that subagent finishes, with a
+      toast. `send` then calls `steer_agent`
       (`mode: follow_up` for Alt+Enter, `Steered` puts the text back if it
       fails), `Dequeue` `dequeue_agent`; `Composer_view` shows the chip,
       `Agents_view` the Steer button (disabled, saying why, for nested
