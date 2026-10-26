@@ -1076,7 +1076,9 @@ Delete…  Delete
 === chromium: worktrees: the new worktree dialog ===
 New worktree
 Branch
-A new branch, or an existing one to check out
+✦
+Generate name
+A new branch, or an existing one to check out (✦ names one from the task typed here)
 Base
 Where a new branch starts (empty: main, where this session is)
 Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
@@ -1237,6 +1239,11 @@ src/
 util.ml
 +3 −0
 2 files changed, +5 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 chat still shown: true
 file browser hidden: true
 === chromium: review: page: a second comment, not sent yet ===
@@ -1329,6 +1336,11 @@ util.ml
 1
 +3 −0
 3 files changed, +6 −2
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === chromium: review: page: the agent's reply ===
 src/main.ml
 Approved
@@ -1446,10 +1458,20 @@ src/
 login.ml
 +1 −0
 2 files changed, +2 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 === chromium: review: worktree: against HEAD ===
 README.md
 +1 −1
 1 file changed, +1 −1
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === chromium: review: worktree: against HEAD, what is reviewed ===
 Reviewing feat/login (<WT>) against HEAD
 === chromium: review: worktree: back to the session's own ===
@@ -1464,6 +1486,11 @@ util.ml
 1
 +3 −0
 3 files changed, +8 −2
+Commit message
+✦
+Generate
+Amend
+Commit
 === chromium: review: phone ===
 sheet: fixed
 Alt+R closed it
