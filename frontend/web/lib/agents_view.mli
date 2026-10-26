@@ -11,5 +11,6 @@ val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
     what has run when nothing is. [None] when nothing has. *)
 val summary : Agents.t -> (string * bool) option
 
-(** The top bar's button that opens and closes the panel. *)
+(** The session's button (in its card or bar) that opens and closes the
+    panel. *)
 val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

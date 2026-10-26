@@ -17,7 +17,8 @@ tools of MCP servers.
                                                                        │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
                                                                        │                └─ Tools (bash, read, write, edit, ls, grep, find, subagent) ── on the backend or a tool host
                                                                        ├─ Session (JSONL tree under ~/.prigh/sessions/)
-                                                                       └─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
+                                                                       ├─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
+                                                                       └─ Forges ── Forge_login / Forge_api ── GitHub, Forgejo REST (HTTPS); git on the tool host (Git_forge)
 ```
 
 ## Process model and concurrency
@@ -118,8 +119,9 @@ answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 A background job's exec carries `stdin: true` (the host keeps the process's
 stdin open) and `job_input` reaches it as `tool_exec_input {exec_id, data,
 close}` events, to the host only. Hosts announce what they support beyond
-that in `hello`'s `features` (`exec_input`, sent by `prigh tool-host` and
-the TUI with local tools; `Agent.Host.exec_input`): a job on a host without
+that in `hello`'s `features` (`exec_input` and `git_location`, sent by
+`prigh tool-host` and the TUI with local tools; `Agent.Host.exec_input`,
+`Agent.Host.git_location`): a job on a host without
 it gets a `Stdin_feed` that refuses writes with "runs an older prigh ...
 update it". A tool an older host does not know (`unknown host tool`) gets
 the same advice appended.
@@ -397,6 +399,60 @@ two can share one.
   registry. `logout` asks whether to remove the key only or the provider
   too.
 
+### Git hosting (`forge/`)
+
+GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
+`tea`), with the sign-ins in the user's `Auth_store`.
+
+- `Forge_kind` (`Github | Forgejo`), `Forge_instance` — a host's kind, web
+  and API URLs (`api.github.com`, `HOST/api/v3`, `HOST/api/v1`) and OAuth
+  client from `config.json`'s `forges` (`kind`, `client_id`, `url` by host)
+  and `$PRIGH_GITHUB_CLIENT_ID`; Forgejo hosts default to the
+  pre-registered git-credential-oauth public client
+  (`a4792ccc-144e-407e-86c9-5e7d8d9c3269`), GitHub has none unless
+  configured. The kind: asked for, configured, stored with the sign-in, else
+  GitHub for github.com and Forgejo for any other host.
+- `Forge_credential` — `{kind, method: oauth|token, token, refresh?,
+  expires?, client_id?, user?}` in `auth.json` under `forge:HOST`, through
+  `Auth_store.modify_entry` (the providers' lock and 0600 atomic writes;
+  other entries untouched). `Authorization` is `Bearer`, except Forgejo's
+  personal access tokens (`token`).
+- `Forge_http` — the HTTP the forge code uses as a value (`real` is
+  `Http_client`), so tests answer with a fake host; errors never carry
+  headers.
+- `Forge_login` — the sign-ins as `Auth_interaction` flows: GitHub's device
+  flow (`/login/device/code`, then polling `/login/oauth/access_token` at
+  `interval`, slower on `slow_down`, until the code's `expires_in`; the
+  `auth_url` notice carries the user code), Forgejo's authorization code
+  with PKCE (S256) redirected to a one-shot `Oauth_callback_server` on
+  `127.0.0.1` at a free port, raced with a pasted redirect URL
+  (`Oauth_common.wait_for_code`), and a pasted token. Each checks the token
+  with `GET /user` and keeps the login. `refresh` renews an expiring OAuth
+  token (Forgejo's last an hour).
+- `Forge_api` — `/user`, the repository's pulls (list, one, its diff via
+  `Accept: application/vnd.github.diff` or `pulls/N.diff`, cut at 1 MB),
+  checks (GitHub's check runs plus commit statuses; Forgejo's statuses),
+  the default branch and creating a pull request (a Forgejo draft is a
+  `WIP:` title). HTTP failures become messages that say what to do: 401
+  signs in again, 404 on the repository checks the remote, a 422 about the
+  head pushes the branch first; a 404 on `/user` suggests the other kind.
+- `Forge_remote` (a remote URL's host, owner and name: HTTPS keeps its
+  port, SSH drops it), `Forge_repo`, `Pull_request`, `Pr_checks`.
+- `Git_forge` (`host/`) — the pseudo-tool `$git_forge` on the session's
+  tool host: `info` (top directory, branch, its remote, HEAD, remotes with
+  their configured and rewritten URLs), `log` (commits on HEAD not on the
+  remote's base, and whether the remote-tracking branch has them all; no
+  fetch), `push` (`git push --set-upstream REMOTE HEAD:refs/heads/BRANCH`,
+  never prompting) and `checkout` (fetches `refs/pull/N/head` and checks
+  the branch `pr-N` out with `Worktree.create` at the config's
+  `worktrees_dir`, or fast-forwards the worktree that has it already).
+- `Forges` — the per-user service the RPC server holds: `accounts`
+  (github.com, codeberg.org, configured and signed-in hosts), `login`,
+  `logout`, `api` (refreshing an expiring token under the store lock,
+  re-checked there like `Provider_auth.resolve`), and the `pr_*` replies:
+  the repository is the current branch's remote, else `origin`, else the
+  first remote on a known host.
+
 ### Tools
 
 - `Tool` — `{spec; run : Context.t -> Json.t -> Result.t}`; `Tool.execute`
@@ -564,6 +620,17 @@ two can share one.
   a<n> (...)`; deeper calls (no jobs) block and return the report.
   `subagent_status`/`subagent_cancel` act on the jobs and are dropped below
   depth 0. Nothing blocks on background work: its reports wake the agent.
+  With `worktree` (a branch name, or `auto`/`true` for `agent/<the task's
+  first words>`, made `fresh`: `-2`, ... when the branch exists) the call
+  first makes a worktree through `Worktree.create_tool` (an `on_host`
+  pseudo-tool run with `Tool.execute_via`, so on the session's tool host,
+  under the `worktrees_dir` the tool reads from the agent's config) and
+  the child works in `Created.cwd` (the same subdirectory there); a
+  failure is the call's error, before anything starts. `Subagent_start`
+  carries the `Agent_worktree.t` (`agent, task, path, branch, root`),
+  which `Agent.broadcast` records in the session (`add_agent_worktree`),
+  and the report ends with `Agent_worktree.report_line` (where the branch
+  is, how to review, merge or remove it).
 - `Background_tasks` — one agent's background work, of two kinds:
   subagents (ids `a<n>`, seeded past the subagent calls already in the
   session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
@@ -969,9 +1036,14 @@ two can share one.
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
   cancelled; `resume_at`, also in `Summary`) — these three are ignored by
   `messages` and not copied by `fork` — `Review` (a `Review_state.Change`,
-  read from every branch; a comment is worth creating the file for) and
-  `Told_environment` (what the
-  model was last told about its environment, see the harness);
+  read from every branch; a comment is worth creating the file for),
+  `Told_environment` (what the model was last told about its environment,
+  see the harness), `Repo {cwd, repo}` (where `cwd` is in git, a
+  `Git_location.t` or `None` outside a repository: `repo`, and
+  `Summary.repo` for the summary's cwd, `None` when nothing was recorded
+  for it), `Agent_worktree` and `Worktree_removed {path}` (the worktrees
+  made for its subagents and not removed since: `agent_worktrees`, also in
+  `Summary`; neither is copied by `fork`);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -1025,6 +1097,18 @@ two can share one.
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
+- `Git_location` — where a directory is in git, read from files only
+  (walking up to `.git`: a directory is a main checkout; a file points at a
+  linked worktree's git directory, whose `commondir` leads to the
+  repository's): `root` (the main checkout, which names the project),
+  `worktree`, `branch`, `main`. Also the `$git_location` host operation.
+  `Agent.refresh_location` records it in the session (a `Repo` entry, only
+  when it changed) whenever the location changes, a run starts or the
+  session is replaced: at once on the backend's host, and on a client host
+  that announced `git_location` with a `$git_location` exec in a daemon
+  fiber (once per host and directory per session; its answer announces the
+  state), so `list_sessions` never runs anything per session. The agent's
+  `git_branch` comes from it too (worktrees included).
 - `Worktree` — a repository's git worktrees, as the pseudo-tools
   `$worktree_list`, `$worktree_create` and `$worktree_remove` on the
   active tool host (`Host_ops`), in the repository of the session cwd
@@ -1042,7 +1126,9 @@ two can share one.
   with `-2`, ... when taken. `create` checks an existing local branch out
   as it is, else creates the branch from the base (default `HEAD`) or,
   without one, tracks the single remote branch of that name; it refuses a
-  branch checked out in another worktree. `remove` refuses the main
+  branch checked out in another worktree (with `fresh`, a branch that
+  exists or is checked out gets `-2`, ... instead; `Created` has the
+  repository's `root` and the asker's `cwd` carried over). `remove` refuses the main
   worktree and, without force, one with changes or locked (`--force`
   twice for a locked one), prunes one whose directory is gone, and keeps
   the branch. Errors say what to do, like `Git_diff`'s.
@@ -1148,7 +1234,12 @@ two can share one.
   create or load an agent and move only the calling client (`new_session`,
   `switch_session`, `fork` and `clone` answer `{state}`, the new session's
   state, so a frontend needs no `get_state` round trip); `list_sessions`
-  items carry `bytes`, `live` (with `clients` when live), `running` (a
+  items carry `host` (the tool host of the cwd, when recorded), `repo`
+  (`{root, worktree, branch, main}`, `null` outside a repository, absent
+  when unknown: the session's `Repo` entry, else, for a session on the
+  backend's host that recorded none, `Git_location.find` on the backend's
+  files, cached per cwd in `t.repos`), `agent_worktrees`, `bytes`, `live`
+  (with `clients` when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
   current `config.json`, reread per call). `set_archived {path, archived}`
@@ -1167,7 +1258,8 @@ two can share one.
   by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
-  `background`, persisted, name or description (compared per live session
+  `background`, persisted, name, description, repository or subagents'
+  worktrees (`Listed`, compared per live session
   on its state changes and message ends, so never per delta), and after
   archiving, deleting, importing, forking and cloning; frontends refetch
   the list. A session with running background subagents or jobs
@@ -1203,16 +1295,35 @@ two can share one.
   error?, tools: [{name, description}]}], problems}`, tools under their
   prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
-  `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
+  `logout`, `forge_status`, `forge_login {host?, kind?, method?}`,
+  `forge_logout {host}`, `pr_list {state?}`, `pr_view {number}`,
+  `pr_defaults`, `pr_create {title, body?, base?, head?, draft?, push?}`,
+  `pr_checkout {number}` (git hosting, above: `forge_status` answers
+  `{accounts: [{host, kind, label, user, method, expires_ms, oauth,
+  oauth_note}]}`; `forge_login` is a login flow like `login`'s, owned by its
+  caller and ending in `{kind: "forge_done", host, user, method}` or
+  `failed` naming the host; `forge_logout` tells everyone
+  `forge_logged_out`; the `pr_*` replies carry `repo {host, kind, owner,
+  name, remote, url}` and pull requests `{number, title, state:
+  open|closed|merged, draft, author, head, base, url, body, created_at,
+  updated_at}`; `pr_view` adds `checks {state, items: [{name, state,
+  url}]}` (null when unreadable), `diff` and `truncated`, `pr_defaults`
+  answers `{repo, head, base, title, body, commits, pushed}` and
+  `pr_checkout` `{path, branch, created}`), `set_budget {usd}` (a number, or null for none), `set_goal
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
   `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
-  [instructions]`) and `init`, `list_worktrees` (`{root, project_dir,
-  worktrees}`), `create_worktree {branch, base?}` (`{worktree,
-  new_branch}`) and `remove_worktree {path, force?}` (`{worktree}`, as it
-  was; refused for the worktree the client's session is in), where a
+  [instructions]`) and `init`, `list_worktrees {cwd?}` (`{root,
+  project_dir, worktrees}`), `create_worktree {branch, base?, cwd?}`
+  (`{worktree, new_branch, root, cwd}`: `cwd` is the directory it was
+  asked from carried over, the same subdirectory of the new worktree when
+  it has it) and `remove_worktree {path, force?, cwd?}` (`{worktree}`, as
+  it was; refused for the worktree the client's session is in; the saved
+  sessions that recorded it as a subagent's get `Worktree_removed`, and
+  one already gone from git that a session recorded is only forgotten), in
+  the repository of `cwd` (default the session's), where a
   worktree is `Worktree.t` (`path, branch, head, main, managed, locked,
   prunable, changes, upstream, ahead, behind`) plus `current` (the
   session's cwd is in it) and `sessions` (`{id, path, name, live,
@@ -1500,9 +1611,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
   - Sessions: `/sessions` is a picker over `list_sessions` laid out by
-    `Session_selection` (active sessions first, then the archived ones,
-    dimmed: `Picker.Item.section` keeps sections apart, also when filtering,
-    and `Render` draws a divider naming each). Tab marks rows
+    `Session_selection` (active sessions first, grouped by project and
+    worktree in `Project_tree`'s order with a section each, named by
+    `Project_tree.place_label` (`prigh`, `prigh ⎇ feat/x`, which the filter
+    also matches), then the archived ones, dimmed: `Picker.Item.section`
+    keeps sections apart, also when filtering, and `Render` draws a divider
+    naming each). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
     highlighted) sessions and Alt+D every archived one but the current, with
     the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
@@ -1557,8 +1671,33 @@ terminal frontend and `web/` prigh-web, the browser one.
     `new`/`open`/`rm` replies tagged so a refusal goes back to the editor
     (a removal refused for uncommitted changes puts `/worktree rm -f`
     there).
+  - Projects: `Project_tree` (shared with prigh-web) groups session
+    summaries into projects (a repository's main checkout from `repo.root`,
+    or the cwd of a session outside any repository), each with its main
+    checkout's sessions and its worktrees (from the sessions' `repo`, the
+    `agent_worktrees` of the sessions (and of `owners`, the archived ones
+    not shown), and a `list_worktrees` listing), in the order of first
+    mention; `sessions ~collapsed` flattens it in display order.
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
+    shows coloured; `/review` and `/init` send `review`/`init` tagged so
+    a refusal goes back to the editor.
+  - Git hosting: `Model.forge` holds `forge_status`'s accounts, fetched
+    with the other startup requests, after switching users and after every
+    `Forge_done`/`Forge_logged_out` (`Forge_refresh` also redraws an open
+    `/login`/`/logout` picker or `/auth` box; an error, from a backend
+    without git hosting, is ignored). `Forge_accounts` reads `/login` and
+    `/logout`'s git-host arguments (`Login.parse`: `github [HOST]`,
+    `forgejo HOST`, a listed or dotted host, `[token]`) and makes their
+    picker rows, completions and `/auth` rows; a login is `forge_login`
+    and then the provider logins' `auth` events and dialogs. `Pr_command`
+    parses `/pr`'s arguments; `Pr_view` renders the PR picker's rows and
+    `/pr view`'s output box (header, markdown body, checks, then
+    `Diff_files.render` of `Pr_detail.git_diff`); `Pr_form` is `/pr new`'s
+    dialog (`Mode.Pr_form`, drawn by `Render`; a refused `pr_create` shows
+    its error in it). `/pr checkout` confirms a `Change_dir` to the new
+    worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
+    form and checkout question (`reset_session`).
     shows coloured; `/review ARGS` and `/init` send `review`/`init` tagged
     so a refusal goes back to the editor. `/review` alone reads
     `get_review`, then `git_diff`, and shows `File_approval.render`: each
@@ -1599,7 +1738,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
     `Backend_link.connection_hello` with local tools announces `"features":
-    ["exec_input", "terminal_kill"]` (`Terminal_kill` goes to the worker,
+    ["exec_input", "terminal_kill", "git_location"]` (`Terminal_kill` goes to the worker,
     which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
@@ -1912,7 +2051,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       are missing after a reload — or a job's output, with what it is
       (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
       pinned under the scrolling body; the status line's
-      summary and the top bar's toggle). Elapsed times tick with `Clock`,
+      summary and the toggle in the chat's corner or the bar). Elapsed times tick with `Clock`,
       which the page sends every second only while the panel is open with
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
@@ -1922,7 +2061,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Status` with the key of the target it is about) and
       `Terminal_view` (a header with the active host's name and directory
       and the connection's state, a notice when the shell exited or could
-      not start — `Terminal.advice` says what to do — and the top bar's
+      not start — `Terminal.advice` says what to do — and the session's
       toggle). The view does not know xterm.js: `View.view` takes the
       widget as a function of a `Terminal.Target.t` (session, active host
       and whether it is connected, the user acted as, generation), so
@@ -1947,8 +2086,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       uploads or after one failed; `Sent_with_files` puts them back if
       the prompt fails. `Files_view` draws the drawer (breadcrumbs or the
       path field, sortable columns, rows, the selected entry's actions,
-      the preview, the transfers with the work lamp), its dialogs, the top
-      bar's toggle, the composer's chips and paperclip, and the hidden
+      the preview, the transfers with the work lamp), its dialogs, the
+      toggle in the chat's corner or the bar, the composer's chips and paperclip, and the hidden
       file pickers. Keys: Ctrl+Shift+F everywhere; in the list
       (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
       its dialog open, Enter and Esc.
@@ -1983,10 +2122,24 @@ terminal frontend and `web/` prigh-web, the browser one.
       again per delta), `Files_view`'s text preview (cached per preview by
       `View_cache`) and `Diff_view` (`?lang`, from the edited path: the old
       and new sides each carry their own state, reset at each hunk).
-    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
-      `Rel_time`; active sessions, then a divider with the archived ones'
+    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, also by
+      project and branch, ages from `Rel_time`; the active sessions as
+      `Session_list.tree`, a `Prigh_ui.Project_tree` built from the
+      summaries' `repo` and `agent_worktrees` plus `Worktrees`' listing of
+      the open session's repository: a section per project with its main
+      checkout's sessions, then its worktrees, each a row (changes and sync
+      from the listing, a subagent's tagged and linked to its session) with
+      its sessions; `Model.folded` (directories, kept in the
+      `web.sidebar-folded` preference) folds projects and worktrees, which
+      a search ignores; "+" is `New_session_in` (`new_session` then
+      `set_cwd`), a repository's "New worktree" `New_worktree {repo}`
+      (`create_worktree` with `cwd`, then a new session in the created
+      `cwd`), a worktree's bin `Ask_remove_worktree` (the listing's entry,
+      else the tree's with its repository, which `remove_worktree` gets as
+      `cwd`); then a divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
-      which keyboard navigation follows; a search shows them), muted, and
+      the tree's order without what is folded, which keyboard navigation
+      and selection ranges follow; a search shows them), muted, and
       "Delete archived"; a session is running while its
       turn or background work runs (`list_sessions`' `running`, and
       `Model.active` for the current one); the list is refetched on
@@ -1996,14 +2149,37 @@ terminal frontend and `web/` prigh-web, the browser one.
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
-      `Delete_result` reply is a toast), `Topbar_view` (a grid of
-      three: the title, the cwd with its middle elided and the branch;
-      `Status_view` in the middle; `Status_view.extras` and the panel
-      toggles and the settings gear — its steps are container queries on the top bar in `style.css`),
+      `Delete_result` reply is a toast; the current session's row shows
+      its live cwd and a rename button; at its foot `Session_view.card`,
+      then the account and the settings gear), `Session_view` (the
+      current session in one place at a time, by `Model.docked`: with the
+      sidebar open beside the chat, its `card` in the sidebar —
+      `Status_view.extras`, then `Status_view` on a grid with the tool host
+      (opening `/host`) and the branch beside the activity, the context
+      across, tokens and cost, each in its own cell so that nothing moves
+      it — and its `tools`, the panel toggles floating in the chat's top
+      right corner; otherwise its `bar`, a slim line over the chat with
+      the sidebar's toggle, the title, the extras, the status, the panel
+      toggles and the gear — its
+      steps are container queries on the bar in `style.css`),
       `Composer_view` (one box: the editor, then the model, thinking and
-      approval mode chips, each opening its picker, and attach, stop and
-      send along its bottom; the composer's container queries shorten the
-      chips) with `Queue_view` (the queued steers and follow-ups from `Queued`:
+      approval mode chips, plain text until pointed at, and attach, stop
+      and send along its bottom; the composer's container queries shorten
+      the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
+      opens `Dialog.Popover`: its command's `Picker` (the same items as
+      `/model`, `/thinking`, `/mode`), drawn by `Chip_popover_view` inside
+      the chip's anchor rather than as a `Modal` — the models under their
+      providers, filtered in its own field; the thinking levels with a
+      meter. It is a dialog like the others (it owns the keys, Esc closes
+      it, choosing goes through `picker_accept`), except that the composer
+      keeps its chips live (the rest of it inert), so that a click on
+      another chip, or ← → and Tab (`Chip_step`), opens that one's; a
+      transparent backdrop under the chips closes it. `Place_popover` has
+      the page measure it once rendered: raised clear of the composer's
+      box, below the chip only when there is no room above, within the box
+      sideways, its height capped by the room (`--popover-lift`,
+      `--popover-room`, `--popover-shift`); on a phone it is as wide as the
+      box. With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
@@ -2020,15 +2196,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       confirmation, `/session`, text), `Session_tree` (`get_entries`
       as `/fork`/`/rewind`/`/tree` pickers), `Btw_view`, `Account_view` (the
       sidebar's account button and the account menu, a `Picker` of
-      accounts and actions) over `Accounts` (the saved sign-ins in
+      accounts and actions, the settings and the commands and keys) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (in the top bar: the context linking to `/session`,
-      tokens, cost, then the activity in a slot of fixed width; and its
-      `extras`, kept out of the centred status so that they never move it:
-      the plan chip, queued messages, the transfers in progress from
-      `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
-      gear, `/settings` or Ctrl+,: the theme and accent (`Theme_view`),
-      notifications, verbosity, `/confirm`,
+      `Status_view` (the context linking to `/session`, tokens, cost and
+      the activity, on a grid in the card and on one line in the bar, where
+      the activity has a slot of fixed width; its `extras`, kept out of
+      the status so that they never move it: the plan chip, queued
+      messages, the transfers in progress from `Files.transfers`…; and
+      `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
+      gear beside the account, the account menu, `/settings` or Ctrl+,:
+      the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
       providers, the account; its controls are `Action.Run` commands, which
       leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
@@ -2087,6 +2264,31 @@ terminal frontend and `web/` prigh-web, the browser one.
       text the model saw) and the user's bubble with only their `body`;
       `Session_tree` labels them like the TUI. `/diff` opens
       `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
+      its counts).
+    - Git hosting: `Forges` (the user's `forge_status` accounts, asked for
+      at startup, after `Forge_done`/`Forge_logged_out` and after switching
+      user; the hosts being signed out of; parsing `/login github [HOST]
+      [token]`, `/login forgejo HOST`, `/login HOST` and `/logout HOST`
+      apart from providers; the pickers' items). `forge_login` opens the
+      login dialog (`Login_flow` with `forge`, the arguments that try
+      again; `device_code` picks GitHub's code out of the instructions,
+      shown big and `.copyable`) and the `auth` events drive it like a
+      provider's. `Model.return_to_settings`: a sign-in started from the
+      settings page (`Settings_view.git_hosts`, also in `/auth`) goes back
+      to it when it ends or is cancelled. Pull requests are dialogs
+      (per session): `Pull_requests` (the `/pr` list: the state `Filter`,
+      a `Picker` of the PRs, loading or the backend's error, and `/pr`'s
+      argument parser), `Pr_page` (one PR: `pr_view`'s detail, the
+      checkout's progress, the list it came from, which Esc goes back to)
+      and `Pr_create` (the form, prefilled by `pr_defaults`; `request` is
+      the `pr_create` to send; a refusal stays in it), drawn by
+      `Pull_requests_view` (the diff through `Git_diff_view.files`). Their
+      replies are tagged `Reply_tag.Forge` (`Forge_reply`, with the
+      session's id: another session's, or one for a dialog closed or
+      changed meanwhile, is dropped). A checkout from the editor offers
+      `Change_dir` in `Dialog.Pr_checked_out`. The branch in the session's
+      card (`Session_view`) runs `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
+      new line, Ctrl/⌘+Enter accepts.
       its counts, and a button to the review page).
     - The review: `Code_review` (pure, like `Files`: the session's
       `Review`, kept by the `review` event and read with `get_review` when
@@ -2144,7 +2346,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     - Worktrees: `Worktrees` keeps the listing of the session's place
       (session, tool host, directory; reset on a session or user switch,
       stale after a turn, a create or remove, or other sessions moving)
-      for the sidebar's section in `Sidebar_view`, `/worktree`'s picker
+      for the sidebar's tree in `Sidebar_view`, `/worktree`'s picker
       (`Dialog.Picker_kind.Worktrees`) and `Completion`
       (`Worktree_command.complete`); `New_worktree` is the create dialog's
       state, and the remove confirmation is a dialog offering the forced
@@ -2266,8 +2468,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     `[data-theme=light]` overriding them, the accent presets
     `[data-accent=...]` and what derives from the accent by `color-mix`),
     `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
-    `review.css`, `highlight.css` (which tokens take which colours) and `resize.css`
-    (the handles) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    `review.css`, `highlight.css` (which tokens take which colours), `resize.css`
+    (the handles) and `forge.css` (git hosting and the pull request
+    dialogs) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
@@ -2325,7 +2528,8 @@ re-records); the flake check `nvim-plugin` runs them.
 
 ## Data on disk
 
-- `~/.config/prigh/auth.json` — credentials (pi-compatible).
+- `~/.config/prigh/auth.json` — credentials (pi-compatible), and git hosts'
+  sign-ins under `forge:HOST` (`Forge_credential`).
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/<stamp>_<id>/` — per-session data (`Session.data_dir`),
   deleted with the session and counted in its `bytes`: `subagents.jsonl`
@@ -2338,7 +2542,8 @@ re-records); the flake check `nvim-plugin` runs them.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
-  (custom endpoints; their keys are in `auth.json` under their names).
+  (custom endpoints; their keys are in `auth.json` under their names),
+  `forges` (git hosts' kind, OAuth client id and URL, by host).
 - `~/.prigh/AGENTS.md` — global instructions.
 
 ## Testing
@@ -2469,7 +2674,7 @@ prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
 (ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
-the sign-in form and signing in with the token, the top bar, a scripted
+the sign-in form and signing in with the token, the session's card, a scripted
 bash call and its output, a long output folded, unfolded and folded again,
 the model `read`ing a real PNG (`png.mjs` writes
 it; the tool result's `img` must be a loaded `data:image/png` of the right
@@ -2498,11 +2703,16 @@ Playwright's `download` event (the `.tar.gz` listed with `tar`), a typed
 path, new folder, rename with F2, delete after its dialog, then a file
 attached from the browser, one dropped on the composer and one picked with
 the paperclip, sent with a prompt and checked in what the model saw, and
-the phone sheet), the panels' resize handles, and the top bar and the
-composer with the chat column 700, 520 and 400px wide (by bounding boxes:
+the phone sheet), the panels' resize handles, and the session's card and
+the composer with the chat column 700, 520 and 400px wide, then the bar
+over the chat without the sidebar at 900, 600 and 400px (by bounding boxes:
 nothing overlaps, sticks out of its parent or is cut off without an
 ellipsis; the controls' menu under its button, closed by a choice and by
-Esc), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
+Esc), the composer's chips' menus (above the composer's box at their
+chip's left edge and inside the window, the focus in them: a choice
+closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
+→ → along the chips, a click beside one; as wide as the box on a phone),
+with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
 back, and signs bob out, leaving alice on the sign-in page. Then
@@ -2532,8 +2742,9 @@ banner, never saying "Reconnected", and opens no more sockets; the old page
 opened 900 in 30s), then "Retry now" once the connection holds. Then
 `stability.mjs`: nothing redrawn or shifted that did not change while the
 page idles and a reply streams, the editor's height in every frame, and the
-top bar's status in the same place in every frame as turns start, run a
-tool, queue a steer and end, on a desktop and on a phone. Then
+session's status in the same place in every frame as turns start, run a
+tool, queue a steer and end, in the sidebar's card on a desktop and in the
+bar on a phone. Then
 `review.mjs`, in a git repository with an edited and a new file: the file
 browser's marks and a changed file's diff (hunks, whole file), a comment
 on a range of lines from it, the review page beside the chat (the files,

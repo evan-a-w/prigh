@@ -83,6 +83,14 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "forge_status"
+  ; "forge_login"
+  ; "forge_logout"
+  ; "pr_list"
+  ; "pr_view"
+  ; "pr_defaults"
+  ; "pr_create"
+  ; "pr_checkout"
   ; "get_prefs"
   ; "set_prefs"
   ; "push_pref"
@@ -196,6 +204,8 @@ module Listed = struct
     ; persisted : bool
     ; name : string option
     ; description : string option
+    ; repo : Git_location.t option option
+    ; agent_worktrees : Agent_worktree.t list
     }
   [@@deriving equal]
 
@@ -206,6 +216,8 @@ module Listed = struct
     ; persisted = Session.persisted session
     ; name = Session.name session
     ; description = Session.description session
+    ; repo = Session.repo session
+    ; agent_worktrees = Session.agent_worktrees session
     }
   ;;
 end
@@ -223,7 +235,7 @@ module Client = struct
     ; mutable features : string list
       (** [hello]'s [features]: what the host supports beyond the basics
           ([exec_input]: [tool_exec_input]; [terminal_kill]: the
-          [terminal_kill] event) *)
+          [terminal_kill] event; [git_location]: [$git_location]) *)
     ; mutable cwd : string option
     ; mutable agent : Agent.t
     ; mutable placeholder : Agent.t option
@@ -263,6 +275,7 @@ end
 
 type t =
   { login : Login_manager.t
+  ; forges : Forges.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
   ; backend_host : bool
@@ -294,6 +307,9 @@ type t =
         for [get_messages_page] without opening them *)
   ; loading : Session.t Or_error.t Promise.t String.Table.t
     (** session files being parsed, by path *)
+  ; repos : Git_location.t option String.Table.t
+    (** where the cwds of saved sessions that recorded none are in git, read
+        from the backend's files once (see [with_repo]) *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -383,6 +399,7 @@ let host_of (client : Client.t) =
   ; session_id = Some (session_id client.agent)
   ; session_name = Session.name (Agent.session client.agent)
   ; exec_input = List.mem client.features "exec_input" ~equal:String.equal
+  ; git_location = List.mem client.features "git_location" ~equal:String.equal
   }
 ;;
 
@@ -461,6 +478,7 @@ let create
       ?namespace
       ?(backend_host = true)
       ?home
+      ?forges
       ~login
       ~sessions_dir
       ~cwd
@@ -468,8 +486,21 @@ let create
       ?default_agent
       ()
   =
+  let forges =
+    match forges with
+    | Some forges -> forges
+    | None ->
+      Forges.create
+        ~http:(Forge_http.real ~env)
+        ~sleep:(Eio.Time.sleep (Eio.Stdenv.clock env))
+        ~listen:(Forge_login.Listen.real ~env)
+        ?home
+        ~store:(Login_manager.store login)
+        ()
+  in
   let t =
     { login
+    ; forges
     ; token
     ; namespace
     ; backend_host
@@ -496,6 +527,7 @@ let create
     ; listed = String.Table.create ()
     ; on_session_deleted = []
     ; loading = String.Table.create ()
+    ; repos = String.Table.create ()
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -510,7 +542,7 @@ let create
       Option.iter
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
-    | Done _ | Failed _ | Logged_out _ ->
+    | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
       Hashtbl.iter t.clients ~f:(fun c -> c.send json));
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
     Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
@@ -1199,6 +1231,28 @@ let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
 ;;
 
+(* Sessions from before repositories were recorded (or whose host could not
+   tell) on the backend's own host: their cwd is looked up here, once. *)
+let with_repo t (s : Session.Summary.t) =
+  match s.repo with
+  | Some _ -> s
+  | None ->
+    let on_backend =
+      Option.value_map
+        s.host
+        ~default:true
+        ~f:(String.equal Agent.Host.backend_id)
+    in
+    if t.backend_host && on_backend
+    then (
+      let repo =
+        Hashtbl.find_or_add t.repos s.cwd ~default:(fun () ->
+          Git_location.find ~cwd:s.cwd)
+      in
+      { s with repo = Some repo })
+    else s
+;;
+
 let list_sessions t client =
   let bool b = if b then `True else `False in
   let int n = `Number (Int.to_string n) in
@@ -1210,7 +1264,7 @@ let list_sessions t client =
            [ "live", `True; "clients", int (List.length (clients_of t agent)) ]
          | None -> [ "live", `False ]
        in
-       match Rpc_json.session_summary l.summary with
+       match Rpc_json.session_summary (with_repo t l.summary) with
        | `Object fields ->
          `Object
            (fields
@@ -1414,6 +1468,61 @@ let switch_user (client : Client.t) params =
       User_access.Signed_in.switch signed_in user)
 ;;
 
+let number_param params name =
+  match param params name with
+  | Some (`Number n) ->
+    (match Int.of_string_opt n with
+     | Some n -> Ok n
+     | None -> Or_error.errorf "param %S must be a whole number" name)
+  | Some _ -> Or_error.errorf "param %S must be a number" name
+  | None -> Or_error.errorf "missing param %S" name
+;;
+
+(* The repository is the client's session's, on its active tool host. *)
+let pull_requests t (client : Client.t) ~meth ~params =
+  let git request =
+    Agent.host_call
+      client.agent
+      ~name:Git_forge.op
+      (Git_forge.Request.to_json request)
+  in
+  let open Or_error.Let_syntax in
+  match meth with
+  | "pr_list" ->
+    let%bind state = string_param_opt params "state" in
+    Forges.list_pulls t.forges ~git ~state:(Option.value state ~default:"open")
+  | "pr_view" ->
+    let%bind number = number_param params "number" in
+    Forges.view_pull t.forges ~git number
+  | "pr_defaults" -> Forges.pull_defaults t.forges ~git
+  | "pr_checkout" ->
+    let%bind number = number_param params "number" in
+    Forges.checkout_pull
+      t.forges
+      ~git
+      ~worktrees_dir:(Agent.config client.agent).worktrees_dir
+      number
+  | _ ->
+    let%bind title = string_param params "title" in
+    let%bind body = string_param_opt params "body" in
+    let%bind base = string_param_opt params "base" in
+    let%bind head = string_param_opt params "head" in
+    let%bind draft = bool_param params "draft" ~default:false in
+    let%bind push = bool_param params "push" ~default:false in
+    let blank =
+      Option.filter ~f:(fun s -> not (String.is_empty (String.strip s)))
+    in
+    Forges.create_pull
+      t.forges
+      ~git
+      ~title
+      ~body:(Option.value body ~default:"")
+      ~base:(blank base)
+      ~head:(blank head)
+      ~draft
+      ~push
+;;
+
 let request_params request =
   Option.value (param request "params") ~default:(`Object [])
 ;;
@@ -1463,9 +1572,11 @@ let worktree_json t (client : Client.t) (worktree : Worktree.t) =
   | other -> other
 ;;
 
-let list_worktrees t (client : Client.t) =
+let list_worktrees t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind cwd = string_param_opt params "cwd" in
   Or_error.map
-    (Agent.worktrees client.agent)
+    (Agent.worktrees ?cwd client.agent)
     ~f:(fun (listing : Worktree.Listing.t) ->
       `Object
         [ "root", `String listing.root
@@ -1479,17 +1590,36 @@ let create_worktree t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind branch = string_param params "branch" in
   let%bind base = string_param_opt params "base" in
-  let%map created = Agent.create_worktree client.agent ~branch ~base in
+  let%bind cwd = string_param_opt params "cwd" in
+  let%map created = Agent.create_worktree ?cwd client.agent ~branch ~base in
   `Object
     [ "worktree", worktree_json t client created.worktree
     ; ("new_branch", if created.new_branch then `True else `False)
+    ; "root", `String created.root
+    ; "cwd", `String created.cwd
     ]
+;;
+
+(* The saved sessions whose subagents' worktrees include [path] forget it. *)
+let forget_agent_worktree t client ~path =
+  List.filter (listings t client) ~f:(fun (l : Listing.t) ->
+    List.exists l.summary.agent_worktrees ~f:(fun w -> String.equal w.path path))
+  |> List.iter ~f:(fun (l : Listing.t) ->
+    let session =
+      match l.agent with
+      | Some agent -> Ok (Agent.session agent)
+      | None -> Session.load l.summary.path
+    in
+    Or_error.iter session ~f:(fun session ->
+      ignore (Session.worktree_removed session ~path : Session.Entry.t)));
+  sessions_changed t
 ;;
 
 let remove_worktree t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind path = string_param params "path" in
   let%bind force = bool_param params "force" ~default:false in
+  let%bind repo_cwd = string_param_opt params "cwd" in
   let cwd = (Agent.state client.agent).cwd in
   let target = Tool.resolve ~cwd path in
   let%bind () =
@@ -1501,8 +1631,45 @@ let remove_worktree t (client : Client.t) params =
         target
     else Ok ()
   in
-  let%map removed = Agent.remove_worktree client.agent ~path ~force in
-  `Object [ "worktree", worktree_json t client removed ]
+  let recorded =
+    List.find_map (listings t client) ~f:(fun (l : Listing.t) ->
+      List.find l.summary.agent_worktrees ~f:(fun w ->
+        String.equal w.path target))
+  in
+  match
+    Agent.remove_worktree ?cwd:repo_cwd client.agent ~path ~force, recorded
+  with
+  | Ok removed, _ ->
+    forget_agent_worktree t client ~path:removed.path;
+    Ok (`Object [ "worktree", worktree_json t client removed ])
+  | Error e, Some w
+    when String.is_substring
+           (Error.to_string_hum e)
+           ~substring:"not a worktree of" ->
+    (* Removed outside prigh: only the record of it is left. *)
+    forget_agent_worktree t client ~path:w.path;
+    Ok
+      (`Object
+          [ ( "worktree"
+            , worktree_json
+                t
+                client
+                { Worktree.path = w.path
+                ; branch = Some w.branch
+                ; head = None
+                ; main = false
+                ; managed = false
+                ; locked = false
+                ; prunable = true
+                ; changes = None
+                ; upstream = None
+                ; ahead = 0
+                ; behind = 0
+                } )
+          ])
+  | (Error _ as error), _ -> error
+;;
+
 (* The other clients of the server: the user's other browsers and terminals
    follow at once. *)
 let prefs_changed t (from : Client.t) changes =
@@ -1645,7 +1812,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
-  | "list_worktrees" -> Some (list_worktrees t client)
+  | "list_worktrees" -> Some (list_worktrees t client params)
   | "create_worktree" -> Some (create_worktree t client params)
   | "remove_worktree" -> Some (remove_worktree t client params)
   | "get_messages_page" -> Some (messages_page t client params)
@@ -1757,6 +1924,49 @@ let dispatch_server t (client : Client.t) ~meth ~params
       if Result.is_error result || not (Login_manager.in_progress t.login)
       then t.login_owner <- previous;
       unit_result result)
+  | "forge_status" ->
+    Some
+      (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->
+         `Object
+           [ "accounts", `Array (List.map accounts ~f:Forges.Account.to_json) ]))
+  | "forge_login" ->
+    Option.some
+    @@
+    let open Or_error.Let_syntax in
+    let%bind host =
+      string_param_opt params "host" >>| Option.value ~default:"github.com"
+    in
+    let%bind kind =
+      match%bind string_param_opt params "kind" with
+      | None -> Ok None
+      | Some k -> Forge_kind.of_string k >>| Option.some
+    in
+    let%bind method_ =
+      match%bind string_param_opt params "method" with
+      | None -> Ok None
+      | Some m -> Forge_credential.Method.of_string m >>| Option.some
+    in
+    let%bind instance = Forges.instance t.forges ?kind host in
+    let previous = t.login_owner in
+    t.login_owner <- Some client.id;
+    let started =
+      Login_manager.start_forge
+        t.login
+        ~host:instance.host
+        ~run:(fun interaction ->
+          Forges.login t.forges instance ~method_ interaction)
+    in
+    if Result.is_error started then t.login_owner <- previous;
+    unit_result started
+  | "forge_logout" ->
+    Option.some
+    @@ Or_error.bind (string_param params "host") ~f:(fun host ->
+      Or_error.bind (Forges.instance t.forges host) ~f:(fun instance ->
+        Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
+          Login_manager.forge_logged_out t.login instance.host;
+          `Object [])))
+  | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" | "pr_checkout" ->
+    Some (pull_requests t client ~meth ~params)
   | "list_models" ->
     let models = Login_manager.models t.login in
     Model_registry.reload models;

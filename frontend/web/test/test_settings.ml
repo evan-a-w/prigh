@@ -1,7 +1,7 @@
 open! Core
 module H = Harness
 
-(* The settings page: opened from the top bar's gear, /settings or Ctrl+,;
+(* The settings page: opened from the sidebar's gear, /settings or Ctrl+,;
    Esc or Done closes it. Its controls run the commands that change them and
    leave it open. *)
 
@@ -9,7 +9,7 @@ let settings h = H.text h ~selector:".settings-dialog"
 
 let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   let h = H.create () in
-  H.click h ~selector:".topbar .settings-toggle";
+  H.click h ~selector:".sidebar-footer .settings-toggle";
   settings h;
   [%expect
     {|
@@ -33,6 +33,15 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Ask before tools run (/confirm on))
     Model providers Logged in to Anthropic.
     (Manage providers)
+    Git hosting
+    GitHub github.com
+    Not signed in.
+    (Use a token) (Connect)
+    Forgejo codeberg.org
+    Not signed in.
+    (Use a token) (Connect)
+    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    (Add host…)
     Account
     No sign-in This backend lets anyone in: there is no account to switch or sign out of.
     (Keyboard shortcuts) (Done)
@@ -77,11 +86,11 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     |}];
   (* It owns the keyboard: the page under it is inert. *)
   H.quiet h (fun () -> H.act h Open_settings);
-  H.elements h ~selector:".topbar[inert]";
+  H.elements h ~selector:".sidebar[inert]";
   H.elements h ~selector:".composer[inert]";
   [%expect
     {|
-    <header class="topbar">
+    <aside class="sidebar">
     <footer class="composer">
     |}]
 ;;
@@ -221,6 +230,7 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     (Run /auth)
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     Providers
     |}];
   H.key h "Escape" ~target:Page;
@@ -263,6 +273,11 @@ let%expect_test "the names of the settings' controls" =
     button "Verbose" -- /verbosity verbose
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
     button "Manage providers" -- /auth (/login, /logout)
+    button "Connect GitHub (github.com) with a token" -- /login github token
+    button "Connect GitHub (github.com)" -- /login github
+    button "Connect Forgejo (codeberg.org) with a token" -- /login forgejo codeberg.org token
+    button "Connect Forgejo (codeberg.org)" -- /login forgejo codeberg.org
+    button "Add host\226\128\166" -- /login forgejo HOST
     button "Keyboard shortcuts" -- /hotkeys
     button "Done"
     [radiogroup] div "Theme"

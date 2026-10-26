@@ -40,6 +40,27 @@ module Mcp_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Forge_reply = struct
+  type t =
+    | Status
+    | Logout of string
+    | List of
+        { session : string
+        ; filter : Pull_requests.Filter.t
+        }
+    | View of
+        { session : string
+        ; number : int
+        }
+    | Defaults of string
+    | Created
+    | Checkout of
+        { session : string
+        ; number : int
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Worktrees_purpose = struct
   type t =
     | Sidebar of int
@@ -121,7 +142,10 @@ module Reply_tag = struct
         { place : string
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of string
+    | Worktree_created of
+        { command : string
+        ; new_session : bool
+        }
     | Worktree_entered of string
     | Worktree_session of
         { path : string
@@ -157,6 +181,7 @@ module Reply_tag = struct
         { generation : int
         ; session : string
         } (** reconnected, but the backend no longer has [session] *)
+    | Forge of Forge_reply.t
     | Prefs
   [@@deriving sexp_of, equal]
 end
@@ -180,6 +205,7 @@ module Command = struct
         }
     | Focus of string
     | Clear_text_selection
+    | Place_popover
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -292,9 +318,9 @@ module Action = struct
     | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
-    | Open_model_picker
+    | Open_chip of Chip.t
+    | Chip_step of int
     | Open_snippets of int option
-    | Open_thinking_picker
     | Open_help
     | Open_settings
     | Open_rename
@@ -324,9 +350,9 @@ module Action = struct
     | Edit_queued of Queued.Message.t
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string
-    | Toggle_worktrees
-    | Refresh_worktrees
-    | New_worktree
+    | Toggle_folded of string
+    | New_session_in of string
+    | New_worktree of { repo : string option }
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -395,6 +421,11 @@ module Action = struct
     | Prefetch_session of string (** a path *)
     | Load_output of string (** a [Fold] key *)
     | Network of bool (** the browser's [online] and [offline] events *)
+    | Pr_filter of Pull_requests.Filter.t
+    | Pr_open of int
+    | Pr_checkout of int
+    | New_pr
+    | Pr_form of Pr_create.Action.t
     | Preview_accent of string
   [@@deriving sexp_of]
 end
@@ -443,7 +474,7 @@ module Model = struct
     ; terminal : Terminal.t
     ; skills : Skills.t
     ; worktrees : Worktrees.t
-    ; worktrees_open : bool
+    ; folded : String.Set.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
@@ -457,6 +488,8 @@ module Model = struct
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
           transcript stays on show, read-only *)
+    ; forges : Forges.t
+    ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
     ; prefs : Pref_sync.t
@@ -502,6 +535,7 @@ module Model = struct
     | None -> false
   ;;
 
+  let docked t = t.sidebar_open && not t.narrow
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
   let active t =
@@ -595,7 +629,7 @@ let init =
   ; terminal = Terminal.closed
   ; skills = Skills.empty
   ; worktrees = Worktrees.empty
-  ; worktrees_open = true
+  ; folded = String.Set.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
@@ -607,6 +641,8 @@ let init =
   ; jump = Jump.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
+  ; forges = Forges.empty
+  ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
   ; prefs = Pref_sync.init
@@ -666,6 +702,7 @@ let startup =
   ; rpc "list_models" [] ~tag:Models
   ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
   ; rpc "get_config" [] ~tag:Config
+  ; call Forge_status ~tag:(Forge Status)
   ]
 ;;
 
@@ -696,7 +733,11 @@ let field json name =
 ;;
 
 let close_dialog (m : Model.t) =
-  { m with dialog = None; theme_preview = None }, [ focus_editor ]
+  match m.return_to_settings, m.dialog with
+  | true, Some (Login _ | Forge_host _) ->
+    ( { m with dialog = Some Settings; return_to_settings = false; theme_preview = None }
+    , [ Command.Focus "dialog" ] )
+  | _ -> { m with dialog = None; return_to_settings = false; theme_preview = None }, [ focus_editor ]
 ;;
 
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
@@ -964,13 +1005,21 @@ let compact_tokens n =
   else Int.to_string n
 ;;
 
-let model_picker ?(query = "") (m : Model.t) =
+(* Those that can be used first, each provider's together. *)
+let models_picker ?(query = "") (m : Model.t) =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
+  let first (model : Llm.t) =
+    List.findi m.models ~f:(fun _ (other : Llm.t) ->
+      String.equal other.provider model.provider)
+    |> Option.value_map ~default:0 ~f:fst
+  in
   let models =
     List.stable_sort m.models ~compare:(fun a b ->
-      Bool.compare (usable b) (usable a))
+      match Bool.compare (usable b) (usable a) with
+      | 0 -> Int.compare (first a) (first b)
+      | c -> c)
   in
   let items =
     List.map models ~f:(fun model ->
@@ -987,11 +1036,14 @@ let model_picker ?(query = "") (m : Model.t) =
         ~dimmed:(not (usable model))
         model.name)
   in
-  Dialog.Picker
-    { kind = Models; picker = Picker.create ~query ~title:"Switch model" items }
+  Picker.create ~query ~title:"Switch model" items
 ;;
 
-let thinking_picker (m : Model.t) =
+let model_picker ?query m =
+  Dialog.Picker { kind = Models; picker = models_picker ?query m }
+;;
+
+let thinking_levels_picker (m : Model.t) =
   let current = Option.value_map m.state ~default:"" ~f:(fun s -> s.thinking) in
   let detail = function
     | "off" -> "answer straight away"
@@ -1001,18 +1053,14 @@ let thinking_picker (m : Model.t) =
     | "max" -> "as much as the model allows"
     | _ -> ""
   in
-  Dialog.Picker
-    { kind = Thinking
-    ; picker =
-        Picker.create
-          ~title:"Thinking level"
-          (List.map thinking_levels ~f:(fun level ->
-             Picker.Item.create
-               ~id:level
-               ~detail:(detail level)
-               ~marked:(String.equal level current)
-               level))
-    }
+  Picker.create
+    ~title:"Thinking level"
+    (List.map thinking_levels ~f:(fun level ->
+       Picker.Item.create
+         ~id:level
+         ~detail:(detail level)
+         ~marked:(String.equal level current)
+         level))
 ;;
 
 let custom_detail (c : Auth_status.Custom.t) =
@@ -1041,7 +1089,7 @@ let add_custom_item =
     "Custom provider"
 ;;
 
-let login_picker (statuses : Auth_status.t list) =
+let login_picker (statuses : Auth_status.t list) ~forges =
   let items =
     List.concat_map statuses ~f:(fun s ->
       List.map s.methods ~f:(fun meth ->
@@ -1069,12 +1117,12 @@ let login_picker (statuses : Auth_status.t list) =
             ~marked:(not (String.is_empty configured))
             s.name))
     @ [ add_custom_item ]
+    @ Forges.login_items forges
   in
-  Dialog.Picker
-    { kind = Login; picker = Picker.create ~title:"Log in to a provider" items }
+  Dialog.Picker { kind = Login; picker = Picker.create ~title:"Log in" items }
 ;;
 
-let logout_picker (statuses : Auth_status.t list) =
+let logout_picker (statuses : Auth_status.t list) ~forges =
   List.filter_map statuses ~f:(fun s ->
     Option.map s.configured ~f:(fun c ->
       Picker.Item.create
@@ -1085,18 +1133,22 @@ let logout_picker (statuses : Auth_status.t list) =
            | None -> sprintf "%s via %s" c.method_ c.source)
         ~search:(s.name ^ " " ^ s.provider)
         s.name))
+  @ Forges.logout_items forges
   |> function
   | [] -> None
   | items ->
     Some
       (Dialog.Picker
-         { kind = Logout
-         ; picker = Picker.create ~title:"Log out of a provider" items
-         })
+         { kind = Logout; picker = Picker.create ~title:"Log out" items })
 ;;
 
 let open_dialog (m : Model.t) ?(focus = "dialog") dialog =
-  { m with dialog = Some dialog; completion = None }, [ Command.Focus focus ]
+  ( { m with
+      dialog = Some dialog
+    ; completion = None
+    ; return_to_settings = false
+    }
+  , [ Command.Focus focus ] )
 ;;
 
 let open_picker m dialog = open_dialog m ~focus:"picker-input" dialog
@@ -1132,6 +1184,92 @@ let logout (m : Model.t) provider =
   else m, [ rpc "logout" [ "provider", str provider ] ]
 ;;
 
+(* ---- git hosts ---------------------------------------------------------- *)
+
+let forge_login (m : Model.t) ~host ~kind ~method_ ~again =
+  let m, cmds = open_dialog m (Login (Login_flow.start ~forge:again host)) in
+  m, cmds @ [ call (Forge_login { host; kind; method_ }) ~tag:Login_started ]
+;;
+
+let forge_account_login (m : Model.t) host =
+  match Forges.find m.forges host with
+  | Some a ->
+    forge_login
+      m
+      ~host:a.host
+      ~kind:(Some a.kind)
+      ~method_:None
+      ~again:(Forge_account.login_arg a)
+  | None -> forge_login m ~host ~kind:None ~method_:None ~again:host
+;;
+
+let forge_host_dialog (m : Model.t) =
+  open_dialog m ~focus:"dialog-input" (Forge_host { input = ""; error = None })
+;;
+
+let signing_out host = sprintf "Signing out of %s…" host
+
+let forge_logout (m : Model.t) host =
+  let m =
+    { m with
+      forges = { m.forges with signing_out = Set.add m.forges.signing_out host }
+    }
+  in
+  let m, cmds = toast m (signing_out host) in
+  m, cmds @ [ call (Forge_logout host) ~tag:(Forge (Logout host)) ]
+;;
+
+(* ---- pull requests ------------------------------------------------------ *)
+
+let list_prs (m : Model.t) (l : Pull_requests.t) =
+  let m, cmds = open_picker m (Pulls l) in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_list { state = Some (Pull_requests.Filter.to_string l.filter) })
+          ~tag:(Forge (List { session = session_id m; filter = l.filter }))
+      ] )
+;;
+
+let open_pr ?back (m : Model.t) number =
+  let m, cmds = open_dialog m (Pull (Pr_page.create ?back number)) in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_view number)
+          ~tag:(Forge (View { session = session_id m; number }))
+      ] )
+;;
+
+let new_pr ?back (m : Model.t) ~title =
+  let m, cmds = open_dialog m (Pr_create (Pr_create.create ?back ~title ())) in
+  m, cmds @ [ call Pr_defaults ~tag:(Forge (Defaults (session_id m))) ]
+;;
+
+let checkout_pr (m : Model.t) number =
+  let m, cmds =
+    match m.dialog with
+    | Some (Pull p) when p.number = number ->
+      { m with dialog = Some (Pull { p with checkout = Busy }) }, []
+    | _ -> toast m (sprintf "Checking out pull request #%d…" number)
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Pr_checkout number)
+          ~tag:(Forge (Checkout { session = session_id m; number }))
+      ] )
+;;
+
+let pr_command (m : Model.t) rest =
+  match Pull_requests.Command.parse rest with
+  | Error usage -> error m usage
+  | Ok (List filter) -> list_prs m (Pull_requests.create filter)
+  | Ok (View number) -> open_pr m number
+  | Ok (New title) -> new_pr m ~title
+  | Ok (Checkout number) -> checkout_pr m number
+;;
+
 let no_thinking (m : Model.t) (state : State.t) =
   error
     m
@@ -1143,7 +1281,10 @@ let no_thinking (m : Model.t) (state : State.t) =
 let open_thinking_picker (m : Model.t) =
   match m.state with
   | Some state when not state.model.supports_thinking -> no_thinking m state
-  | _ -> open_picker m (thinking_picker m)
+  | _ ->
+    open_picker
+      m
+      (Dialog.Picker { kind = Thinking; picker = thinking_levels_picker m })
 ;;
 
 let set_thinking (m : Model.t) level =
@@ -1199,6 +1340,7 @@ let complete_draft (m : Model.t) ~skills =
            ~default:[]
            ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
       ~sessions:m.sessions
+      ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
       ~text:m.draft
@@ -1267,12 +1409,22 @@ let switch_session (m : Model.t) path =
       @ [ focus_editor ] ))
 ;;
 
-(* The sidebar's sessions in the order it shows them: active, then archived. *)
+(* The sidebar's sessions in the order it shows them: the tree's, then the
+   archived ones. *)
 let shown_sessions (m : Model.t) =
   Session_list.shown
     m.sessions
     ~query:m.session_query
     ~archived_open:m.archived_open
+    ~folded:m.folded
+    ~listing:(Worktrees.listing m.worktrees)
+;;
+
+let project_tree (m : Model.t) =
+  Session_list.tree
+    m.sessions
+    ~query:""
+    ~listing:(Worktrees.listing m.worktrees)
 ;;
 
 let session_order (m : Model.t) =
@@ -1481,6 +1633,18 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
         | _ -> []
       in
       { m with history = History.of_list entries })
+  else if String.equal key Key.folded
+  then (
+    let folded =
+      match value with
+      | Some (`Array items) ->
+        String.Set.of_list
+          (List.filter_map items ~f:(function
+             | `String s -> Some s
+             | _ -> None))
+      | _ -> String.Set.empty
+    in
+    { m with folded })
   else if String.equal key Key.terminal_open
   then
     if startup
@@ -1625,9 +1789,7 @@ let open_terminal (m : Model.t) =
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
     }
-  , (if m.terminal.open_
-     then []
-     else save_pref m Key.terminal_open (Some `True))
+  , (if m.terminal.open_ then [] else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
 ;;
 
@@ -1998,25 +2160,69 @@ let cycle_mode (m : Model.t) =
     set_mode m (Session_mode.cycle (Session_mode.of_state s)))
 ;;
 
+let modes_picker (state : State.t) =
+  let current = Session_mode.of_state state in
+  Picker.create
+    ~title:"When tools ask first (Alt+M cycles)"
+    (List.map (Session_mode.choices ~current) ~f:(fun mode ->
+       Picker.Item.create
+         ~id:(Session_mode.label mode)
+         ~detail:(Session_mode.describe mode)
+         ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
+         ~marked:(Session_mode.equal mode current)
+         (Session_mode.title mode)))
+;;
+
 let mode_picker (m : Model.t) =
   current_state m ~f:(fun s ->
-    let current = Session_mode.of_state s in
-    open_picker
-      m
-      (Dialog.Picker
-         { kind = Modes
-         ; picker =
-             Picker.create
-               ~title:"When tools ask first (Alt+M cycles)"
-               (List.map (Session_mode.choices ~current) ~f:(fun mode ->
-                  Picker.Item.create
-                    ~id:(Session_mode.label mode)
-                    ~detail:(Session_mode.describe mode)
-                    ~search:
-                      (Session_mode.label mode ^ " " ^ Session_mode.title mode)
-                    ~marked:(Session_mode.equal mode current)
-                    (Session_mode.title mode)))
-         }))
+    open_picker m (Dialog.Picker { kind = Modes; picker = modes_picker s }))
+;;
+
+let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
+  | Model -> Models
+  | Thinking -> Thinking
+  | Mode -> Modes
+;;
+
+let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
+  | Thinking -> not state.model.supports_thinking
+  | Model | Mode -> false
+;;
+
+(* A chip's menu, over it; the same chip again closes it. *)
+let open_chip (m : Model.t) (chip : Chip.t) =
+  match m.dialog with
+  | Some (Popover { chip = shown; _ }) when Chip.equal shown chip ->
+    close_dialog m
+  | _ ->
+    current_state m ~f:(fun state ->
+      if chip_opens_nothing state chip
+      then no_thinking m state
+      else (
+        let picker =
+          match chip with
+          | Model -> models_picker m
+          | Thinking -> thinking_levels_picker m
+          | Mode -> modes_picker state
+        in
+        let m, cmds =
+          open_dialog
+            m
+            ~focus:
+              (match chip with
+               | Model -> "popover-filter"
+               | Thinking | Mode -> "popover-list")
+            (Popover { chip; picker })
+        in
+        m, cmds @ [ Command.Place_popover ]))
+;;
+
+(* ← → and Tab: the neighbouring chip's menu, as in a menu bar. *)
+let step_chip (m : Model.t) delta =
+  match m.dialog, m.state with
+  | Some (Popover { chip; _ }), Some state ->
+    open_chip m (Chip.step chip delta ~skip:(chip_opens_nothing state))
+  | _ -> m, []
 ;;
 
 let mode_by_name (m : Model.t) name =
@@ -2620,6 +2826,8 @@ let account_menu (m : Model.t) =
                     ~id:"notify on"
                     ~detail:"when a turn ends or something waits for you"
                     "Turn notifications on")
+             ; Picker.Item.create ~id:"settings" ~detail:"Ctrl+," "Settings"
+             ; Picker.Item.create ~id:"help" ~detail:"/help" "Commands and keys"
              ; Picker.Item.create
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
@@ -2683,6 +2891,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
     ; agents = { Agents.empty with open_ = m.agents.open_ }
+    ; forges = Forges.empty
     }
   in
   let m, cmds =
@@ -2709,6 +2918,8 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, "settings" -> open_dialog m Settings
+  | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
     let m, close = close_dialog m in
     let m, cmds = set_notifications m (String.equal id "notify on") in
@@ -2918,7 +3129,8 @@ let list_worktrees (m : Model.t) purpose =
     loading
       m
       "Worktrees"
-      [ call List_worktrees ~tag:(Worktrees { place; purpose }) ]
+      [ call (List_worktrees { cwd = None }) ~tag:(Worktrees { place; purpose })
+      ]
   | None -> error m "No session yet: wait for it to load, then try again."
 ;;
 
@@ -2988,7 +3200,8 @@ let ask_remove_worktree (m : Model.t) (w : Worktree.t) ~force =
   | None ->
     open_dialog
       m
-      (Remove_worktree { worktree = w; force; busy = false; error = None })
+      (Remove_worktree
+         { worktree = w; repo = None; force; busy = false; error = None })
 ;;
 
 (* The worktree a sidebar row or the picker names, by its path. *)
@@ -2997,6 +3210,78 @@ let shown_worktree (m : Model.t) path =
   | Some (Picker { kind = Worktrees listing; _ }) ->
     List.find listing.worktrees ~f:(fun w -> String.equal w.path path)
   | _ -> Worktrees.find m.worktrees path
+;;
+
+(* A worktree of the tree that the session's listing does not have (another
+   repository's, a subagent's): what is known of it, and its repository. *)
+let tree_worktree (m : Model.t) path =
+  Option.map
+    (Prigh_ui.Project_tree.find_worktree (project_tree m) path)
+    ~f:(fun ((p : Prigh_ui.Project_tree.Project.t), w) ->
+      let worktree : Worktree.t =
+        match w.listed with
+        | Some listed -> listed
+        | None ->
+          { path = w.path
+          ; branch = w.branch
+          ; head = None
+          ; main = false
+          ; managed = true
+          ; locked = false
+          ; prunable = false
+          ; changes = None
+          ; upstream = None
+          ; ahead = 0
+          ; behind = 0
+          ; current = false
+          ; sessions = []
+          }
+      in
+      worktree, p.root)
+;;
+
+(* From the tree: a worktree of any project. *)
+let ask_remove_tree_worktree (m : Model.t) path =
+  match shown_worktree m path, tree_worktree m path with
+  | Some w, _ -> ask_remove_worktree m w ~force:false
+  | None, Some (w, repo) ->
+    let here =
+      Option.exists m.state ~f:(fun s ->
+        String.equal s.cwd w.path
+        || String.is_prefix s.cwd ~prefix:(w.path ^ "/"))
+    in
+    if here
+    then
+      error
+        m
+        (sprintf
+           "This session works in %s: /cd out of it first (e.g. to %s)."
+           w.path
+           repo)
+    else
+      open_dialog
+        m
+        (Remove_worktree
+           { worktree = w
+           ; repo = Some repo
+           ; force = false
+           ; busy = false
+           ; error = None
+           })
+  | None, None ->
+    error m (sprintf "No worktree at %s any more: /worktree lists them." path)
+;;
+
+(* A new session working in [path]: a project's directory or a worktree. *)
+let new_session_in (m : Model.t) path =
+  ( { (starting (with_entering m (Some path))) with
+      sidebar_open = m.sidebar_open && not m.narrow
+    }
+  , [ rpc
+        "new_session"
+        []
+        ~tag:(Worktree_session { path; notice = "New session in " ^ path })
+    ] )
 ;;
 
 let with_worktree (m : Model.t) path ~f =
@@ -3015,7 +3300,7 @@ let remove_worktree (m : Model.t) ~force =
           Some (Remove_worktree { d with force; busy = true; error = None })
       }
     , [ call
-          (Remove_worktree { path = worktree.path; force })
+          (Remove_worktree { path = worktree.path; force; cwd = d.repo })
           ~tag:
             (Worktree_removed
                { target = Worktree_command.target worktree; force })
@@ -3056,17 +3341,31 @@ let worktree_remove_failed (m : Model.t) ~target ~force e =
 
 let creating = "Creating the worktree "
 
-let new_worktree_dialog (m : Model.t) =
+let new_worktree_dialog (m : Model.t) ~repo =
   current_state m ~f:(fun state ->
+    let listing =
+      match repo, Worktrees.listing m.worktrees with
+      | None, listing -> listing
+      | Some repo, Some l when String.equal repo l.root -> Some l
+      | Some _, _ -> None
+    in
+    let head =
+      match repo with
+      | None -> state.git_branch
+      | Some repo ->
+        Option.bind
+          (Prigh_ui.Project_tree.find_project (project_tree m) repo)
+          ~f:(fun p -> p.branch)
+    in
     open_dialog
       m
       ~focus:(New_worktree.Field.id Branch)
       (New_worktree
          (New_worktree.create
-            ~head:state.git_branch
-            ~project_dir:
-              (Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
-                 l.project_dir)))))
+            ?repo
+            ~head
+            ~project_dir:(Option.map listing ~f:(fun l -> l.project_dir))
+            ())))
 ;;
 
 let create_worktree (m : Model.t) (d : New_worktree.t) =
@@ -3081,36 +3380,56 @@ let create_worktree (m : Model.t) (d : New_worktree.t) =
           dialog = Some (New_worktree { d with busy = true; error = None })
         }
       , [ call
-            (Create_worktree { branch; base })
-            ~tag:(Worktree_created (New_worktree.command ~branch ~base))
+            (Create_worktree { branch; base; cwd = d.repo })
+            ~tag:
+              (Worktree_created
+                 { command = New_worktree.command ~branch ~base
+                 ; new_session = Option.is_some d.repo
+                 })
         ] ))
 ;;
 
-let worktree_created (m : Model.t) (c : Worktree.Created.t) =
+let worktree_created (m : Model.t) (c : Worktree.Created.t) ~new_session =
   let m, close =
     match m.dialog with
     | Some (New_worktree { busy = true; _ }) -> close_dialog m
     | _ -> m, []
   in
-  let m =
-    with_entering
-      { m with worktrees = Worktrees.stale m.worktrees }
-      (Some c.worktree.path)
-  in
-  let m, cmds =
-    toast m ~replaces:creating (String.capitalize (Worktree_command.created c))
-  in
-  ( m
-  , close
-    @ cmds
-    @ [ enter_worktree
-          ~notice:
-            (sprintf
-               "Working in the worktree %s (%s)"
-               (Worktree.label c.worktree)
-               c.worktree.path)
-          c.worktree.path
-      ] )
+  if new_session
+  then (
+    let m, cmds =
+      toast
+        { m with worktrees = Worktrees.stale m.worktrees }
+        ~replaces:creating
+        (String.capitalize (Worktree_command.created c))
+    in
+    let m, start =
+      new_session_in m (Option.value c.cwd ~default:c.worktree.path)
+    in
+    m, close @ cmds @ start)
+  else (
+    let m =
+      with_entering
+        { m with worktrees = Worktrees.stale m.worktrees }
+        (Some c.worktree.path)
+    in
+    let m, cmds =
+      toast
+        m
+        ~replaces:creating
+        (String.capitalize (Worktree_command.created c))
+    in
+    ( m
+    , close
+      @ cmds
+      @ [ enter_worktree
+            ~notice:
+              (sprintf
+                 "Working in the worktree %s (%s)"
+                 (Worktree.label c.worktree)
+                 c.worktree.path)
+            c.worktree.path
+        ] ))
 ;;
 
 let worktree_create_failed (m : Model.t) ~command e =
@@ -3166,8 +3485,8 @@ let worktree_command (m : Model.t) rest =
     ( m
     , cmds
       @ [ call
-            (Create_worktree { branch; base })
-            ~tag:(Worktree_created command)
+            (Create_worktree { branch; base; cwd = None })
+            ~tag:(Worktree_created { command; new_session = false })
         ] )
   | (Open _ | Remove _) as action ->
     list_worktrees m (Target { command; action })
@@ -3207,7 +3526,9 @@ let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
     let worktrees, seq = Worktrees.requested m.worktrees state in
     ( { m with worktrees }
     , cmds
-      @ [ call List_worktrees ~tag:(Worktrees { place; purpose = Sidebar seq })
+      @ [ call
+            (List_worktrees { cwd = None })
+            ~tag:(Worktrees { place; purpose = Sidebar seq })
         ] )
   | _ -> m, cmds
 ;;
@@ -3522,25 +3843,31 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | [ arg ] when not (String.equal arg "kill") -> with_job m arg ~f:select
      | _ -> error m "Usage: /jobs [id | kill <id>] (/jobs lists them)")
   | "login", "" ->
-    loading
-      m
-      "Log in to a provider"
-      [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
-  | "login", args ->
-    (match
-       String.split args ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
-     with
-     | provider :: method_ :: _ ->
-       start_login m ~provider ~method_:(Some method_)
-     | _ -> start_login m ~provider:args ~method_:None)
+    loading m "Log in" [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
+  | "login", _ ->
+    (match Forges.parse_login m.forges words with
+     | Provider { provider; method_ } -> start_login m ~provider ~method_
+     | Forge { host; kind; method_; again } ->
+       forge_login m ~host ~kind ~method_ ~again
+     | Ask_host -> forge_host_dialog m
+     | Bad usage -> error m usage)
   | "logout", "" ->
     loading
       m
-      "Log out of a provider"
+      "Log out"
       [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
-  | "logout", provider -> logout m provider
+  | "logout", arg ->
+    (match Forges.logout_host m.forges arg with
+     | Some host -> forge_logout m host
+     | None -> logout m arg)
   | "auth", _ ->
-    loading m "Providers" [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
+    loading
+      m
+      "Providers"
+      [ rpc "auth_status" [] ~tag:(Auth_status Show)
+      ; call Forge_status ~tag:(Forge Status)
+      ]
+  | "pr", rest -> pr_command m rest
   | "setusr", "" ->
     loading m "Act as" [ rpc "list_users" [] ~tag:(Users Picker) ]
   | "setusr", user ->
@@ -3707,30 +4034,17 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
 
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
-  let open Or_error.Let_syntax in
-  let%bind summary = Json.object_field json "subagent" in
-  let%bind agent_id = Json.string_field summary "id" in
-  let%bind call_id = Json.string_field summary "call_id" in
-  let%bind parent = Json.string_opt_field summary "parent" in
-  let%bind task = Json.string_field summary "task" in
-  let%bind model = Json.string_field summary "model" in
-  let%bind turns = Json.int_field summary "turns" in
-  let%bind result =
-    match Json.field summary "result" with
-    | None -> Ok None
-    | Some r -> Or_error.map (Event.Subagent_result.of_json r) ~f:Option.some
-  in
-  let%map messages = Json.list_field json "messages" ~f:Message.of_json in
-  ( { Chat.Subagent.agent_id
-    ; task
-    ; model
-    ; chat = Chat.of_messages ~running:(Option.is_none result) messages
-    ; turns
-    ; cost_usd = None
-    ; result
-    }
-  , `Parent parent
-  , `Call call_id )
+  Or_error.map (Subagent_detail.of_json json) ~f:(fun (d : Subagent_detail.t) ->
+    ( { Chat.Subagent.agent_id = d.id
+      ; task = d.task
+      ; model = d.model
+      ; chat = Chat.of_messages ~running:(Option.is_none d.result) d.messages
+      ; turns = d.turns
+      ; cost_usd = None
+      ; result = d.result
+      }
+    , `Parent d.parent
+    , `Call d.call_id ))
 ;;
 
 (* ---- pages of the transcript, cached transcripts, whole outputs *)
@@ -4072,9 +4386,120 @@ end
 (* The backend's word for a page cursor no longer in the session. *)
 let gone_from_session = "is not in the session any more"
 
+(* Git hosting's errors as the backend says them: they start with what
+   failed (often a host name) and say what to do. *)
+let said = function
+  | "backend closed" ->
+    "The connection went before the backend answered: try again once it is \
+     back."
+  | e -> e
+;;
+
+let with_forges (m : Model.t) ~f = { m with forges = f m.forges }
+
+let forge_reply (m : Model.t) (tag : Forge_reply.t) result =
+  let here session = String.equal session (session_id m) in
+  match tag, result, m.dialog with
+  | Status, Ok json, _ ->
+    decode m json Forge_account.list_of_json ~f:(fun accounts ->
+      with_forges m ~f:(fun f -> { f with accounts = Loaded accounts }), [])
+  | Status, Error "backend closed", _ -> m, []
+  | Status, Error e, _ ->
+    ( with_forges m ~f:(fun f ->
+        match f.accounts with
+        | Loaded _ -> f
+        | Loading | Failed _ -> { f with accounts = Failed e })
+    , [] )
+  | Logout _, Ok _, _ -> m, []
+  | Logout host, Error e, _ ->
+    error
+      (with_forges
+         (drop_toast m (signing_out host))
+         ~f:(fun f -> { f with signing_out = Set.remove f.signing_out host }))
+      (said e)
+  | List { session; filter }, result, Some (Pulls l)
+    when here session && Pull_requests.Filter.equal l.filter filter ->
+    let l =
+      match result with
+      | Ok json ->
+        (match Pr_list.of_json json with
+         | Ok list -> Pull_requests.loaded l list
+         | Error e -> Pull_requests.failed l (Error.to_string_hum e))
+      | Error e -> Pull_requests.failed l (said e)
+    in
+    { m with dialog = Some (Pulls l) }, []
+  | View { session; number }, result, Some (Pull p)
+    when here session && p.number = number ->
+    let status : Pr_page.Status.t =
+      match result with
+      | Ok json ->
+        (match Pr_detail.of_json json with
+         | Ok d -> Loaded d
+         | Error e -> Failed (Error.to_string_hum e))
+      | Error e -> Failed (said e)
+    in
+    { m with dialog = Some (Pull { p with status }) }, []
+  | Defaults session, result, Some (Pr_create f) when here session ->
+    let f, focus =
+      match result with
+      | Ok json ->
+        (match Pr_defaults.of_json json with
+         | Ok d -> Pr_create.set_defaults f d, [ Command.Focus "pr-title" ]
+         | Error e -> { f with failed = Some (Error.to_string_hum e) }, [])
+      | Error e -> { f with failed = Some (said e) }, []
+    in
+    { m with dialog = Some (Pr_create f) }, focus
+  | Created, Ok json, dialog ->
+    decode m json Pr_detail.of_json ~f:(fun d ->
+      let m, cmds =
+        match dialog with
+        | Some (Pr_create { busy = true; back = Some l; _ }) ->
+          list_prs
+            m
+            (Pull_requests.create ~query:(Picker.query l.picker) l.filter)
+        | Some (Pr_create { busy = true; back = None; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, toast_cmds =
+        toast m (sprintf "#%d created: %s" d.pr.number d.pr.url)
+      in
+      m, cmds @ toast_cmds)
+  | Created, Error e, Some (Pr_create ({ busy = true; _ } as f)) ->
+    ( { m with
+        dialog = Some (Pr_create { f with busy = false; error = Some (said e) })
+      }
+    , [] )
+  | Checkout { number; _ }, result, Some (Pull p) when p.number = number ->
+    let checkout : Pr_page.Checkout.t =
+      match result with
+      | Ok json ->
+        (match Pr_checkout.of_json json with
+         | Ok c -> Done c
+         | Error e -> Failed (Error.to_string_hum e))
+      | Error e -> Failed (said e)
+    in
+    { m with dialog = Some (Pull { p with checkout }) }, []
+  | Checkout { number; session }, Ok json, dialog ->
+    decode m json Pr_checkout.of_json ~f:(fun checkout ->
+      match dialog with
+      | None when here session ->
+        open_dialog m (Pr_checked_out { number; checkout })
+      | _ ->
+        toast
+          m
+          (sprintf
+             "Checked out pull request #%d at %s: /cd %s works there"
+             number
+             checkout.path
+             checkout.path))
+  | (List _ | View _ | Defaults _), _, _ -> m, []
+  | (Created | Checkout _), Error e, _ -> error m (said e)
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
+  | Forge tag, result -> forge_reply m tag result
   | Files (Previewed path as reply), (Ok json as result) ->
     let m =
       match File_preview.of_json json with
@@ -4217,7 +4642,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error
       (back_in_editor m command)
       (sprintf "Couldn't list the worktrees: %s." e)
-  | Worktree_created command, Error e -> worktree_create_failed m ~command e
+  | Worktree_created { command; _ }, Error e ->
+    worktree_create_failed m ~command e
   | Worktree_entered _, Error e ->
     error (with_entering m None) (sprintf "Couldn't open the worktree: %s." e)
   | Worktree_session _, Error e ->
@@ -4558,11 +4984,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
          | _ -> m, [])
       | Show -> open_dialog m (Auth auth)
-      | Login_picker -> open_picker m (login_picker auth)
+      | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
       | Logout_picker ->
-        (match logout_picker auth with
+        (match logout_picker auth ~forges:m.forges with
          | Some dialog -> open_picker m dialog
-         | None -> toast m "No provider is logged in: /login logs in to one."))
+         | None ->
+           toast
+             m
+             "No provider or git host is logged in: /login logs in to one."))
   | Paths prefix, Ok json ->
     (match m.completion, strings json with
      | Some c, Ok paths ->
@@ -4745,8 +5174,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         else m, []
       | Picker -> worktrees_picker m listing
       | Target { command; action } -> worktree_target m ~command action listing)
-  | Worktree_created _, Ok json ->
-    decode m json Worktree.Created.of_json ~f:(worktree_created m)
+  | Worktree_created { new_session; _ }, Ok json ->
+    decode m json Worktree.Created.of_json ~f:(worktree_created m ~new_session)
   | Worktree_entered notice, Ok json ->
     let m = with_entering m None in
     decode m json Dir_change.Outcome.of_json ~f:(function
@@ -4860,6 +5289,31 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
+  | Forge_done { host; user; method_ }, dialog ->
+    let m, close =
+      match dialog with
+      | Some (Login _) -> close_dialog m
+      | _ -> m, []
+    in
+    let m, cmds =
+      toast
+        m
+        (sprintf
+           "Signed in to %s%s (%s)"
+           host
+           (Option.value_map user ~default:"" ~f:(fun u -> " as " ^ u))
+           method_)
+    in
+    m, close @ cmds @ [ call Forge_status ~tag:(Forge Status) ]
+  | Forge_logged_out host, _ ->
+    let m =
+      with_forges m ~f:(fun f ->
+        { f with signing_out = Set.remove f.signing_out host })
+    in
+    let m, cmds =
+      toast m ~replaces:"Signing out of " (sprintf "Signed out of %s" host)
+    in
+    m, cmds @ [ call Forge_status ~tag:(Forge Status) ]
   | Prompt { prompt = Secret _ | Text _ | Manual_code _; _ }, Some (Login flow)
     ->
     ( { m with dialog = Some (Login (Login_flow.apply flow e)) }
@@ -5172,6 +5626,8 @@ let accept_completion (m : Model.t) ~run =
            String.is_empty args || String.is_prefix args ~prefix:"["
          | Some { argument = Some _; _ } | None -> false)
       | Argument (Directory | Backend_directory | Path | Skill), _ -> false
+      (* Their number comes next. *)
+      | Argument Pr, Some { id = "view" | "checkout"; _ } -> false
       | Argument Worktree, _ when Completion.takes_more c -> false
       | Argument _, _ -> true
       | (Command | Path | Snippet), _ -> false
@@ -5188,11 +5644,18 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Models -> set_model m item.id
     | Thinking -> set_thinking m item.id
     | Login ->
-      (match String.lsplit2 item.id ~on:' ' with
-       | Some (provider, method_) ->
-         start_login m ~provider ~method_:(Some method_)
-       | None -> start_login m ~provider:item.id ~method_:None)
-    | Logout -> logout m item.id
+      (match String.chop_prefix item.id ~prefix:"forge ", item.id with
+       | Some host, _ -> forge_account_login m host
+       | None, "forge-host" -> forge_host_dialog m
+       | None, _ ->
+         (match String.lsplit2 item.id ~on:' ' with
+          | Some (provider, method_) ->
+            start_login m ~provider ~method_:(Some method_)
+          | None -> start_login m ~provider:item.id ~method_:None))
+    | Logout ->
+      (match String.chop_prefix item.id ~prefix:"forge " with
+       | Some host -> forge_logout m host
+       | None -> logout m item.id)
     | Verbosity ->
       (match
          List.find Prigh_ui.Verbosity.all ~f:(fun v ->
@@ -5277,8 +5740,12 @@ let with_picker (m : Model.t) ~f =
   match m.dialog with
   | Some (Picker { kind; picker }) ->
     { m with dialog = Some (Picker { kind; picker = f picker }) }, []
+  | Some (Popover { chip; picker }) ->
+    { m with dialog = Some (Popover { chip; picker = f picker }) }, []
   | Some (Scoped_models { picker; checked }) ->
     { m with dialog = Some (Scoped_models { picker = f picker; checked }) }, []
+  | Some (Pulls l) ->
+    { m with dialog = Some (Pulls { l with picker = f l.picker }) }, []
   | _ -> m, []
 ;;
 
@@ -5320,6 +5787,10 @@ let dialog_accept (m : Model.t) =
   | Some (Picker { kind; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind item
+     | None -> m, [])
+  | Some (Popover { chip; picker }) ->
+    (match Picker.selected_item picker with
+     | Some item -> picker_accept m ~kind:(chip_kind chip) item
      | None -> m, [])
   | Some (Rename name) ->
     let name = String.strip name in
@@ -5379,6 +5850,48 @@ let dialog_accept (m : Model.t) =
     ( m
     , cmds @ toast_cmds @ [ rpc "rewind" [ "to", str id ] ~tag:Reload_messages ]
     )
+  | Some (Pulls l) ->
+    (match Pull_requests.selected l with
+     | Some pr -> open_pr ~back:l m pr.number
+     | None -> m, [])
+  | Some (Pull _) -> close_dialog m
+  | Some (Pr_create { busy = true; _ }) -> m, []
+  | Some (Pr_create f) ->
+    (match Pr_create.request f with
+     | Error e ->
+       { m with dialog = Some (Pr_create { f with error = Some e }) }, []
+     | Ok request ->
+       ( { m with
+           dialog = Some (Pr_create { f with busy = true; error = None })
+         }
+       , [ call request ~tag:(Forge Created) ] ))
+  | Some (Pr_checked_out { checkout; _ }) ->
+    let m, cmds = close_dialog m in
+    m, cmds @ [ change_dir ~target:Cwd checkout.path ]
+  | Some (Forge_host { input; _ }) ->
+    (match Forges.normalize_host input with
+     | "" ->
+       ( { m with
+           dialog =
+             Some
+               (Forge_host
+                  { input
+                  ; error =
+                      Some "Type the host, e.g. codeberg.org (Esc cancels)."
+                  })
+         }
+       , [] )
+     | host ->
+       let back = m.return_to_settings in
+       let m, cmds =
+         forge_login
+           m
+           ~host
+           ~kind:(Some "forgejo")
+           ~method_:None
+           ~again:("forgejo " ^ host)
+       in
+       { m with return_to_settings = back }, cmds)
 ;;
 
 (* Following new output again: the jump button, or sending something. *)
@@ -5566,9 +6079,9 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with sidebar_open = m.sidebar_open && not m.narrow }, [ focus_editor ]
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
-  | Open_model_picker -> open_picker m (model_picker m)
+  | Open_chip chip -> open_chip m chip
+  | Chip_step delta -> step_chip m delta
   | Open_snippets cursor -> open_snippets m ~cursor
-  | Open_thinking_picker -> open_thinking_picker m
   | Open_help -> open_dialog m Help
   | Open_settings -> open_dialog m Settings
   | Open_rename -> open_rename m
@@ -5592,11 +6105,21 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Picker_accept -> dialog_accept m
   | Picker_choose id ->
     (match m.dialog with
+     | Some (Pulls l) ->
+       (match Int.of_string_opt id with
+        | Some number -> open_pr ~back:l m number
+        | None -> m, [])
      | Some (Picker { kind; picker }) ->
        (match
           List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id)
         with
         | Some item -> picker_accept m ~kind item
+        | None -> m, [])
+     | Some (Popover { chip; picker }) ->
+       (match
+          List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id)
+        with
+        | Some item -> picker_accept m ~kind:(chip_kind chip) item
         | None -> m, [])
      | _ -> m, [])
   | Dialog_input text ->
@@ -5604,15 +6127,18 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with input = text }) }, []
-     | Some (Picker _ | Scoped_models _) ->
+     | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
+     | Some (Forge_host _) ->
+       { m with dialog = Some (Forge_host { input = text; error = None }) }, []
+     | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | _ -> m, [])
   | Dialog_move delta ->
     (match m.dialog with
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
-     | Some (Picker _ | Scoped_models _) ->
+     | Some (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
        with_picker m ~f:(fun p -> Picker.move p delta)
      | Some (Prompt prompt) ->
        { m with dialog = Some (Prompt (Prompt.move prompt delta)) }, []
@@ -5623,6 +6149,8 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Login { failed = None; provider; _ }) ->
        let m, cmds = close_dialog { m with cancelled_login = Some provider } in
        m, cmds @ [ rpc "auth_cancel" [] ]
+     | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
+       open_picker m (Pulls l)
      | Some _ -> close_dialog m
      | None -> m, [])
   | Login_choose i ->
@@ -5644,9 +6172,23 @@ let update_connected (m : Model.t) (action : Action.t) =
       m
       ~command:("/remind rm " ^ name)
       (Prigh_ui.Remind_command.Action.Remove name)
-  | Toggle_worktrees -> { m with worktrees_open = not m.worktrees_open }, []
-  | Refresh_worktrees -> { m with worktrees = Worktrees.stale m.worktrees }, []
-  | New_worktree -> new_worktree_dialog m
+  | Toggle_folded dir ->
+    let folded =
+      if Set.mem m.folded dir
+      then Set.remove m.folded dir
+      else Set.add m.folded dir
+    in
+    ( { m with folded }
+    , save_pref
+        m
+        Key.folded
+        (if Set.is_empty folded
+         then None
+         else
+           Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
+    )
+  | New_session_in path -> new_session_in m path
+  | New_worktree { repo } -> new_worktree_dialog m ~repo
   | New_worktree_input { field; text } ->
     (match m.dialog with
      | Some (New_worktree d) ->
@@ -5658,8 +6200,7 @@ let update_connected (m : Model.t) (action : Action.t) =
       let m = { m with dialog = None } in
       let m, cmds = open_worktree m w ~new_session in
       m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds)
-  | Ask_remove_worktree path ->
-    with_worktree m path ~f:(fun w -> ask_remove_worktree m w ~force:false)
+  | Ask_remove_worktree path -> ask_remove_tree_worktree m path
   | Remove_worktree { force } -> remove_worktree m ~force
   | Remove_queued q ->
     ( { m with queue = Queued.remove m.queue q }
@@ -5762,7 +6303,9 @@ let update_connected (m : Model.t) (action : Action.t) =
        let m', cmds = run_command { m with dialog = None } parsed in
        (* A setting changed from the settings page leaves it open. *)
        (match m.dialog, m'.dialog with
-        | Some Settings, None -> { m' with dialog = m.dialog }, cmds
+        | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
+        | Some Settings, Some (Login _ | Forge_host _) ->
+          { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
   | Toggle_terminal ->
@@ -5780,6 +6323,27 @@ let update_connected (m : Model.t) (action : Action.t) =
         m
         (List.map saves ~f:(fun ({ key; value } : Resize.Save.t) ->
            { Prefs.Change.key; value = Option.map value ~f:Json.int })) )
+  | Pr_filter filter ->
+    let query =
+      match m.dialog with
+      | Some (Pulls l) -> Picker.query l.picker
+      | _ -> ""
+    in
+    list_prs m (Pull_requests.create ~query filter)
+  | Pr_open number ->
+    (match m.dialog with
+     | Some (Pulls l) -> open_pr ~back:l m number
+     | _ -> open_pr m number)
+  | Pr_checkout number -> checkout_pr m number
+  | New_pr ->
+    (match m.dialog with
+     | Some (Pulls l) -> new_pr ~back:l m ~title:""
+     | _ -> new_pr m ~title:"")
+  | Pr_form action ->
+    (match m.dialog with
+     | Some (Pr_create f) when not f.busy ->
+       { m with dialog = Some (Pr_create (Pr_create.update f action)) }, []
+     | _ -> m, [])
   | Preview_accent colour ->
     (match Theme.Accent.of_string colour with
      | Some accent ->

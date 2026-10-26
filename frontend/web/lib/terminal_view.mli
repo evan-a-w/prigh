@@ -10,5 +10,5 @@ val view
   -> widget:(Terminal.Target.t -> Node.t)
   -> Node.t
 
-(** The top bar's button. *)
+(** The session's button (in its card or bar). *)
 val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

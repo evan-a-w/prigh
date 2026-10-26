@@ -1,8 +1,9 @@
 open! Core
 open! Import
 
-(** The [/sessions] picker's data: active sessions first, then the archived
-    ones after a divider, dimmed. Also what its keys, [/delete] and
+(** The [/sessions] picker's data: active sessions first, grouped by
+    project and worktree ({!Project_tree}) under a divider naming each, then
+    the archived ones after a divider, dimmed. Also what its keys, [/delete] and
     [/delete-archived] act on and the confirmations they ask. *)
 
 type t =
