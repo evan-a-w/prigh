@@ -17,6 +17,9 @@ let methods =
   ; "abort"
   ; "dequeue"
   ; "remove_queued"
+  ; "steer_agent"
+  ; "dequeue_agent"
+  ; "remove_agent_queued"
   ; "cancel_subagent"
   ; "list_subagents"
   ; "get_subagent"
@@ -98,6 +101,7 @@ let methods =
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
+  @ Nix_store_rpc.methods
 ;;
 
 let param params name =
@@ -163,6 +167,25 @@ let if_missing_param params =
   Or_error.bind
     (string_param_opt params "if_missing")
     ~f:Dir_change.If_missing.of_param
+;;
+
+let queue_param ?default params name =
+  match param params name, default with
+  | (None | Some `Null), Some kind -> Ok kind
+  | _ ->
+    Or_error.bind (string_param params name) ~f:(fun s ->
+      Result.map_error (Steer_queue.Kind.of_string s) ~f:(fun _ ->
+        Error.createf "param %S is %S: use \"steer\" or \"follow_up\"" name s))
+;;
+
+let index_param params =
+  match param params "index" with
+  | Some (`Number n) ->
+    (match Int.of_string_opt n with
+     | Some i when i >= 0 -> Ok i
+     | _ -> Or_error.error_string "param \"index\" must be a natural number")
+  | Some _ | None ->
+    Or_error.error_string "param \"index\" must be a natural number"
 ;;
 
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
@@ -316,6 +339,7 @@ type t =
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
+  ; nix_store : Nix_store.t option
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -454,8 +478,15 @@ let route t agent (event : Agent.Event.t) =
    | Tool_exec_input { host; _ } ->
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+  (* A subagent's messages too: its tools may have made worktrees. *)
+  let rec message_end : Agent_event.t -> bool = function
+    | Message_end _ -> true
+    | Subagent { event; _ } -> message_end event
+    | _ -> false
+  in
   (match event with
-   | State_changed _ | Loop (Message_end _) -> note_listed t agent
+   | State_changed _ -> note_listed t agent
+   | Loop e when message_end e -> note_listed t agent
    | _ -> ());
   match event with
   | State_changed { running; _ } ->
@@ -485,6 +516,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?nix_store
       ~login
       ~sessions_dir
       ~cwd
@@ -534,6 +566,7 @@ let create
     ; on_session_deleted = []
     ; loading = String.Table.create ()
     ; repos = String.Table.create ()
+    ; nix_store
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -1857,6 +1890,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->
     Some (prefs t client ~meth ~params)
+  | "nix_store_status" | "nix_store_gc" ->
+    Nix_store_rpc.dispatch
+      t.nix_store
+      ~signed_in:client.signed_in
+      ~send:client.send
+      ~meth
+      ~params
   | "btw" -> Some (btw t client params)
   | "btw_cancel" ->
     Some
@@ -2118,26 +2158,30 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
        | Some queued -> queued_json queued)
   | "remove_queued" ->
     let open Or_error.Let_syntax in
-    let%bind queue =
-      match%bind string_param params "queue" with
-      | "steer" -> Ok `Steer
-      | "follow_up" -> Ok `Follow_up
-      | other ->
-        Or_error.errorf
-          "param \"queue\" is %S: use \"steer\" or \"follow_up\""
-          other
-    in
-    let%bind index =
-      match param params "index" with
-      | Some (`Number n) ->
-        (match Int.of_string_opt n with
-         | Some i when i >= 0 -> Ok i
-         | _ -> Or_error.error_string "param \"index\" must be a natural number")
-      | Some _ | None ->
-        Or_error.error_string "param \"index\" must be a natural number"
-    in
+    let%bind queue = queue_param params "queue" in
+    let%bind index = index_param params in
     let%bind text = string_param_opt params "text" in
     Or_error.map (Agent.remove_queued agent ~queue ~index ~text) ~f:queued_json
+  | "steer_agent" ->
+    let open Or_error.Let_syntax in
+    let%bind agent_id = string_param params "agent_id" in
+    let%bind text = string_param params "text" in
+    let%bind kind = queue_param params "mode" ~default:Steer in
+    unit_result (Agent.steer_subagent agent ~agent_id ~kind text)
+  | "dequeue_agent" ->
+    Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
+      Or_error.map (Agent.dequeue_subagent agent ~agent_id) ~f:(function
+        | None -> `Null
+        | Some text -> `Object [ "text", `String text ]))
+  | "remove_agent_queued" ->
+    let open Or_error.Let_syntax in
+    let%bind agent_id = string_param params "agent_id" in
+    let%bind queue = queue_param params "queue" in
+    let%bind index = index_param params in
+    let%bind text = string_param_opt params "text" in
+    Or_error.map
+      (Agent.remove_subagent_queued agent ~agent_id ~queue ~index ~text)
+      ~f:(fun text -> `Object [ "text", `String text ])
   | "shell" ->
     Or_error.bind (string_param params "command") ~f:(fun command ->
       Or_error.bind
@@ -2167,6 +2211,7 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       (Rpc_json.pending
          ~steer
          ~follow_up
+         ~agents:(Agent.subagent_queues agent)
          ~confirms:(Agent.pending_confirms agent)
          ~questions:(Agent.pending_questions agent))
   | "list_subagents" ->

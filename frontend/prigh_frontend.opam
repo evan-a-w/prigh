@@ -23,6 +23,15 @@ depends: [
   "expect_test_helpers_async"
   "re"
   "uucp"
+  "tls"
+  "x509"
+  "ca-certs"
+  "mirage-crypto-rng"
+  "digestif"
+  "base64"
+  "domain-name"
+  "ipaddr"
+  "ptime"
   "odoc" {with-doc}
 ]
 build: [

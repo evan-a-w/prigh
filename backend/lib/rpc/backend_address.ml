@@ -95,6 +95,12 @@ let to_string t =
       t.prefix
 ;;
 
+let normalize text =
+  match parse text with
+  | Ok t when not t.lines -> to_string t
+  | Ok _ | Error _ -> String.strip text
+;;
+
 let connect ~env ~sw t =
   let net = Eio.Stdenv.net env in
   match

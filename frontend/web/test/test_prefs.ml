@@ -194,7 +194,12 @@ let%expect_test
   let h = H.create () in
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   run h "/accent teal";
   [%expect
     {|

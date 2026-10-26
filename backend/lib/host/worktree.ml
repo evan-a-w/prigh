@@ -435,7 +435,7 @@ let create ?(fresh = false) ~env ~cancel ~cwd ~dir ~branch ~base () =
     | None -> fail "git worktree add did not create %s" path)
 ;;
 
-let remove ~env ~cancel ~cwd ~dir ~path ~force =
+let remove ?(keep = []) ~env ~cancel ~cwd ~dir ~path ~force () =
   protect (fun () ->
     let listing, _ = list_exn ~env ~cancel ~cwd ~dir in
     let wanted = Tool.resolve ~cwd path in
@@ -454,6 +454,15 @@ let remove ~env ~cancel ~cwd ~dir ~path ~force =
       fail
         "%s is the repository's main worktree: it cannot be removed"
         worktree.path;
+    List.iter keep ~f:(fun kept ->
+      let real = realpath (Tool.resolve ~cwd kept) in
+      if contains worktree ~dir:real
+      then
+        fail
+          "%s is in use: %s, inside it, is where the agent or the session \
+           works (work elsewhere first; the session moves with /cd)"
+          worktree.path
+          real);
     if worktree.prunable
     then
       ignore
@@ -517,12 +526,16 @@ let create_args ?(fresh = false) ~dir ~branch ~base () =
      @ if fresh then [ "fresh", `True ] else [])
 ;;
 
-let remove_args ~dir ~path ~force =
+let remove_args ?(keep = []) ~dir ~path ~force () =
   `Object
-    [ "dir", `String dir
-    ; "path", `String path
-    ; ("force", if force then `True else `False)
-    ]
+    ([ "dir", `String dir
+     ; "path", `String path
+     ; ("force", if force then `True else `False)
+     ]
+     @
+     if List.is_empty keep
+     then []
+     else [ "keep", `Array (List.map keep ~f:(fun d -> `String d)) ])
 ;;
 
 let run ~env ~cancel ~cwd ~name ~arguments =
@@ -561,7 +574,17 @@ let run ~env ~cancel ~cwd ~name ~arguments =
         | Some `True -> true
         | _ -> false
       in
-      reply [%jsonaf_of: t] (remove ~env ~cancel ~cwd ~dir ~path ~force))
+      let keep =
+        match Json.member "keep" arguments with
+        | Some (`Array dirs) ->
+          List.filter_map dirs ~f:(function
+            | `String d -> Some d
+            | _ -> None)
+        | _ -> []
+      in
+      reply
+        [%jsonaf_of: t]
+        (remove ~keep ~env ~cancel ~cwd ~dir ~path ~force ()))
   else Tool_result.error (sprintf "unknown worktree operation %S" name)
 ;;
 
@@ -577,13 +600,13 @@ let listing_of_result = of_result [%of_jsonaf: Listing.t]
 let created_of_result = of_result [%of_jsonaf: Created.t]
 let removed_of_result = of_result [%of_jsonaf: t]
 
-let create_tool =
+let op_tool name =
   { Tool.spec =
-      { Tool_spec.name = create_op
-      ; description = "a git worktree"
+      { Tool_spec.name
+      ; description = "git worktrees"
       ; parameters = `Object []
       ; parallel_safe = true
-      ; destructive = false
+      ; destructive = Never
       ; on_host = true
       ; freeform = None
       }
@@ -593,7 +616,11 @@ let create_tool =
           ~env:context.env
           ~cancel:context.cancel
           ~cwd:context.cwd
-          ~name:create_op
+          ~name
           ~arguments)
   }
 ;;
+
+let list_tool = op_tool list_op
+let create_tool = op_tool create_op
+let remove_tool = op_tool remove_op

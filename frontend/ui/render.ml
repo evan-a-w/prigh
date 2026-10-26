@@ -139,8 +139,20 @@ let disconnected_hint (m : App.Model.t) =
     sprintf
       "not signed in%s · /signin signs in · /connect switches server"
       (match Option.bind m.server ~f:(fun s -> s.address) with
-       | Some address -> " to " ^ address
+       | Some address -> " to " ^ Server_address.display_string address
        | None -> "")
+;;
+
+(* What the editor sends to: [→ a1], after what the main agent does. *)
+let focused_agent_hint ~main (a : Agent_view.t) =
+  [ span
+      ~style:attention
+      (main
+       ^
+       match a.status with
+       | Running -> sprintf "→ %s · Esc: main agent" a.id
+       | Done _ | Failed _ -> sprintf "→ %s (finished) · Esc: main agent" a.id)
+  ]
 ;;
 
 let mode_hint (m : App.Model.t) : Content.Line.t option =
@@ -310,6 +322,19 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                             (doing m)
                       else "Esc dismisses btw")
                  ]
+             else if Option.is_some (App.focused_agent m)
+             then
+               Option.map
+                 (App.focused_agent m)
+                 ~f:
+                   (focused_agent_hint
+                      ~main:
+                        (if s.running
+                         then
+                           spinner_frames.(m.spinner
+                                           % Array.length spinner_frames)
+                           ^ sprintf " %s · " (doing m)
+                         else ""))
              else if s.running
              then
                Some
@@ -546,7 +571,9 @@ let sign_in_dialog ~width form =
     1 + row, 2 + Int.min (Content.Line.width line) (inner - 1)
   in
   ( Boxed.render
-      ~title:("Sign in to " ^ Sign_in_form.address form)
+      ~title:
+        ("Sign in to "
+         ^ Server_address.display_string (Sign_in_form.address form))
       ~width
       (rows @ note @ Content.wrap hint ~width:inner)
   , cursor )
@@ -864,7 +891,11 @@ let context_text (s : P.State.t) =
 
 let server_part (m : App.Model.t) =
   match Option.bind m.server ~f:(fun s -> s.address) with
-  | Some address -> [ 6, [ span ~style:gray ("server:" ^ address) ] ]
+  | Some address ->
+    [ ( 6
+      , [ span ~style:gray ("server:" ^ Server_address.display_string address) ]
+      )
+    ]
   | None -> []
 ;;
 
@@ -921,6 +952,8 @@ let status (m : App.Model.t) : Content.Line.t =
             ] )
         ])
       @ server_part m
+      @ Option.value_map m.nix_gc ~default:[] ~f:(fun progress ->
+        [ 2, [ span ~style:attention (Nix_gc_command.progress progress) ] ])
       @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
         let text =
           match App.Model.acting_as m, m.user with
@@ -941,7 +974,7 @@ let status (m : App.Model.t) : Content.Line.t =
                ] )
            ]
          | None -> [])
-      @ (let queued = List.length m.queued_messages in
+      @ (let queued = List.length (App.shown_queue m) in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
@@ -1078,7 +1111,8 @@ let max_queued_shown = 3
 
 (** The queued steers and follow-ups, oldest first. *)
 let queued_block (m : App.Model.t) ~width : Overlay.t option =
-  let total = List.length m.queued_messages in
+  let queued = App.shown_queue m in
+  let total = List.length queued in
   if total = 0
   then None
   else (
@@ -1086,11 +1120,14 @@ let queued_block (m : App.Model.t) ~width : Overlay.t option =
       [ span
           ~style:dim
           (sprintf
-             "queued (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             "queued%s (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             (match m.focus with
+              | `Main -> ""
+              | `Agent id -> " for " ^ id)
              total)
       ]
     in
-    let shown = List.take m.queued_messages max_queued_shown in
+    let shown = List.take queued max_queued_shown in
     let rows =
       List.map shown ~f:(fun (q : Queued_message.t) ->
         [ span
@@ -1254,10 +1291,11 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
   in
   let lines =
     match Autocomplete.source ac with
+    (* Only the user's commands are offered. *)
     | Autocomplete.Source.Command ->
       let usage (item : Picker.Item.t) =
         Option.value_map
-          (Commands.find item.id)
+          (Commands.find ~superuser:true item.id)
           ~default:("/" ^ item.label)
           ~f:Commands.usage
       in
@@ -1270,8 +1308,10 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
         let help =
-          Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-            s.help)
+          Option.value_map
+            (Commands.find ~superuser:true item.id)
+            ~default:""
+            ~f:(fun s -> s.help)
         in
         let name = "/" ^ item.label in
         let args =
@@ -1567,6 +1607,20 @@ let exactly rows (lines : Content.t) =
 
 (* The editor's rows for the mode, and the cursor in them: the typed text
    (or the draft kept while a dialog asks something else). *)
+(* An empty editor says where what is typed goes. *)
+let placeholder (a : Agent_view.t) =
+  match a.status with
+  | Running ->
+    sprintf
+      "Steer %s · %s (Enter: steer, Alt+Enter: follow-up)"
+      a.id
+      (Text_width.truncate
+         (String.concat ~sep:" " (String.split_lines a.task))
+         ~width:30)
+  | Done _ | Failed _ ->
+    sprintf "%s has finished · Esc goes back to the main agent" a.id
+;;
+
 let composer (m : App.Model.t) : Content.t * (int * int) =
   let marker_style = Style.bold (Style.fg Yellow) in
   let elsewhere = Style.fg Gray in
@@ -1586,7 +1640,16 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
       ~mask:false
   | Text_prompt _ | Confirm _ ->
     editor_rows m ~marker:"? " ~marker_style ~mask:false
-  | Editing | Output _ -> editor_rows m ~marker:"> " ~marker_style ~mask:false
+  | Editing | Output _ ->
+    let rows, cursor = editor_rows m ~marker:"> " ~marker_style ~mask:false in
+    (match App.focused_agent m with
+     | Some a when Editor.is_empty m.editor ->
+       ( [ [ span ~style:marker_style "> "
+           ; span ~style:dim (" " ^ placeholder a)
+           ]
+         ]
+       , cursor )
+     | _ -> rows, cursor)
   | Picker _ | Question _ | Sign_in _ | Pr_form _ | Search _ ->
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false
 ;;

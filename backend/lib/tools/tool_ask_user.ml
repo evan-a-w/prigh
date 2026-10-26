@@ -68,7 +68,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       sprintf
         "Asks the user questions and waits for the answers. Use it when you \

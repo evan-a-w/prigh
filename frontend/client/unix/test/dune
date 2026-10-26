@@ -1,0 +1,15 @@
+(library
+ (name prigh_client_unix_test)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  core
+  async
+  expect_test_helpers_core
+  expect_test_helpers_async
+  prigh_client
+  prigh_client_unix
+  prigh_client_unix_testing))

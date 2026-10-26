@@ -12,7 +12,7 @@ let tools =
     ; parallel_safe = false
     ; on_host = true
     ; freeform = None
-    ; destructive = true
+    ; destructive = Always
     ; description = "Run a command"
     ; parameters =
         `Object
@@ -25,7 +25,7 @@ let tools =
     ; parallel_safe = true
     ; on_host = true
     ; freeform = None
-    ; destructive = false
+    ; destructive = Never
     ; description = "Delegate"
     ; parameters = `Object [ "type", `String "object" ]
     }

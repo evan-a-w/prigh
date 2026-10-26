@@ -26,7 +26,9 @@ end
     (default [Main]) is whose prompt it is: the main agent's tells a model
     with the [subagent] tool to delegate substantial work to subagents; a
     subagent's tells it to block on commands rather than sleep, and that it
-    finishes only once its jobs have exited. *)
+    finishes only once its jobs have exited. Either role, given the
+    [worktree] tool, is told to make worktrees with it rather than with
+    [git worktree add]. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list

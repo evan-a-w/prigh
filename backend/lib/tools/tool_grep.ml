@@ -8,7 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "Search file contents with a regular expression (ripgrep syntax). \
        Returns matching lines as path:line:text. Respects .gitignore."
