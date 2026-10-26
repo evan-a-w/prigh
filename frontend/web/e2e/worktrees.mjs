@@ -249,7 +249,9 @@ try {
   // and changes nothing.
   await session("A landing page").locator(".session-open").focus();
   await page.keyboard.press("Shift+F10");
+  await page.locator(".context-menu.placed").waitFor();
   await page.keyboard.press("ArrowDown");
+  await page.locator(".context-menu .menu-item").nth(1).and(page.locator(".selected")).waitFor();
   await menuText("from the keyboard");
   await closeMenu();
   section("Esc changed nothing");
