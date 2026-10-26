@@ -37,6 +37,8 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
+    | Enter_worktree of string
+    | Worktree_back of { main : bool }
     | Forge_status
     | Forge_login of
         { host : string
@@ -46,9 +48,10 @@ module Method = struct
     | Forge_logout of string
     | Pr_list of { state : string option }
     | Pr_view of int
-    | Pr_defaults
+    | Pr_defaults of { dir : string option }
     | Pr_create of
-        { title : string
+        { dir : string option
+        ; title : string
         ; body : string
         ; base : string option
         ; head : string option
@@ -99,12 +102,50 @@ module Method = struct
         { root : string option
         ; path : string
         }
+    | Review_since of
+        { root : string
+        ; path : string option
+        ; index : int option
+        }
     | Fs_preview of { path : string }
+    | Git_show of
+        { dir : string option
+        ; rev : string
+        ; path : string
+        }
     | Fs_write of
         { path : string
         ; text : string
         ; expected : string option
+        ; review_root : string option
         }
+    | Git_status of { dir : string option }
+    | Git_stage of
+        { dir : string option
+        ; paths : string list
+        ; tracked : bool
+        }
+    | Git_unstage of
+        { dir : string option
+        ; paths : string list
+        }
+    | Git_commit of
+        { dir : string option
+        ; message : string
+        ; amend : bool
+        ; paths : string list
+        }
+    | Git_push of { dir : string option }
+    | Generate_text of
+        { gen_id : string
+        ; kind : Generated.Kind.t
+        ; dir : string option
+        ; base : string option
+        ; task : string option
+        }
+    | Generate_cancel of { gen_id : string }
+    | Nix_store_status
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -119,12 +160,14 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
+    | Enter_worktree _ -> "set_cwd"
+    | Worktree_back _ -> "worktree_back"
     | Forge_status -> "forge_status"
     | Forge_login _ -> "forge_login"
     | Forge_logout _ -> "forge_logout"
     | Pr_list _ -> "pr_list"
     | Pr_view _ -> "pr_view"
-    | Pr_defaults -> "pr_defaults"
+    | Pr_defaults _ -> "pr_defaults"
     | Pr_create _ -> "pr_create"
     | Pr_checkout _ -> "pr_checkout"
     | List_worktrees _ -> "list_worktrees"
@@ -139,9 +182,27 @@ module Method = struct
     | Review_decide _ -> "review_decide"
     | Review_approve _ -> "review_approve"
     | Review_unapprove _ -> "review_unapprove"
+    | Review_since _ -> "review_since"
     | Fs_preview _ -> "fs_preview"
+    | Git_show _ -> "git_show"
     | Fs_write _ -> "fs_write"
+    | Git_status _ -> "git_status"
+    | Git_stage _ -> "git_stage"
+    | Git_unstage _ -> "git_unstage"
+    | Git_commit _ -> "git_commit"
+    | Git_push _ -> "git_push"
+    | Generate_text _ -> "generate_text"
+    | Generate_cancel _ -> "generate_cancel"
+    | Nix_store_status -> "nix_store_status"
+    | Nix_store_gc _ -> "nix_store_gc"
   ;;
+
+  let dir_param = function
+    | None -> []
+    | Some dir -> [ "dir", Json.str dir ]
+  ;;
+
+  let paths_param paths = [ "paths", `Array (List.map paths ~f:Json.str) ]
 
   let cwd_param = function
     | None -> []
@@ -156,10 +217,10 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
-    | Forge_status
-    | Pr_defaults
-    | Get_review
+    | Delete_archived | Forge_status | Get_review | Nix_store_status -> []
+    | Nix_store_gc { delete_generations = None } -> []
+    | Nix_store_gc { delete_generations = Some _ as generations } ->
+      [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []
     | Review_submit { root = Some root } -> [ "root", Json.str root ]
     | Review_comment { root; path; range; anchor; text } ->
@@ -183,10 +244,19 @@ module Method = struct
     | Review_unapprove { root; path } ->
       root_param root @ [ "path", Json.str path ]
     | Fs_preview { path } -> [ "path", Json.str path ]
-    | Fs_write { path; text; expected } ->
+    | Review_since { root; path; index } ->
+      [ "root", Json.str root ]
+      @ Option.value_map path ~default:[] ~f:(fun p -> [ "path", Json.str p ])
+      @ Option.value_map index ~default:[] ~f:(fun i -> [ "index", Json.int i ])
+    | Git_show { dir; rev; path } ->
+      Option.value_map dir ~default:[] ~f:(fun d -> [ "dir", Json.str d ])
+      @ Git_diff.show_params ~rev ~path
+    | Fs_write { path; text; expected; review_root } ->
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->
         [ "expected", Json.str e ])
+      @ Option.value_map review_root ~default:[] ~f:(fun r ->
+        [ "review_root", Json.str r ])
     | List_worktrees { cwd = None } -> []
     | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
@@ -217,6 +287,9 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
+    | Enter_worktree path ->
+      [ "path", Json.str path; "worktree", Json.bool true ]
+    | Worktree_back { main } -> if main then [ "main", Json.bool true ] else []
     | Forge_login { host; kind; method_ } ->
       [ "host", Json.str host ]
       @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])
@@ -226,8 +299,10 @@ module Method = struct
     | Pr_list { state } ->
       Option.value_map state ~default:[] ~f:(fun s -> [ "state", Json.str s ])
     | Pr_view number | Pr_checkout number -> [ "number", Json.int number ]
-    | Pr_create { title; body; base; head; draft; push } ->
-      [ "title", Json.str title; "body", Json.str body ]
+    | Pr_defaults { dir } -> dir_param dir
+    | Pr_create { dir; title; body; base; head; draft; push } ->
+      dir_param dir
+      @ [ "title", Json.str title; "body", Json.str body ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
       @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
       @ [ "draft", Json.bool draft; "push", Json.bool push ]
@@ -239,6 +314,25 @@ module Method = struct
       [ "path", Json.str path ]
       @ (if force then [ "force", Json.bool true ] else [])
       @ cwd_param cwd
+    | Git_status { dir } | Git_push { dir } -> dir_param dir
+    | Git_stage { dir; paths; tracked } ->
+      dir_param dir
+      @ paths_param paths
+      @ if tracked then [ "tracked", Json.bool true ] else []
+    | Git_unstage { dir; paths } -> dir_param dir @ paths_param paths
+    | Git_commit { dir; message; amend; paths } ->
+      dir_param dir
+      @ [ "message", Json.str message ]
+      @ (if amend then [ "amend", Json.bool true ] else [])
+      @ if List.is_empty paths then [] else paths_param paths
+    | Generate_text { gen_id; kind; dir; base; task } ->
+      [ "gen_id", Json.str gen_id
+      ; "kind", Json.str (Generated.Kind.to_string kind)
+      ]
+      @ dir_param dir
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+      @ Option.value_map task ~default:[] ~f:(fun t -> [ "task", Json.str t ])
+    | Generate_cancel { gen_id } -> [ "gen_id", Json.str gen_id ]
   ;;
 end
 

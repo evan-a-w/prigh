@@ -83,7 +83,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]           show or set the models that take…
       /default-dir [off|path]            show or set the directory new se…
       /login [provider] [api_key|oauth]  log in to a provider, or a git h…
-      ↕ 1–8 of 63
+      ↕ 1–8 of 65
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -391,17 +391,17 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     --- after ---
     ┌─ Keys ─────────────────────────────────────────────────────────────┐
     │ Keys                                                               │
-    │ Enter                   send the prompt / accept the highlighted   │
-    │ item                                                               │
+    │ Enter                   send the prompt (steer a focused subagent) │
+    │ / accept the highlighted item                                      │
     │ Alt+Enter               queue a follow-up to run after the current │
-    │ turn                                                               │
+    │ turn (a focused subagent's: before it reports)                     │
     │ Alt+S                   send exactly what is typed, ignoring the   │
     │ completion popup                                                   │
     │ Ctrl+J / Alt+J          insert a newline                           │
-    │ Esc                     close the dialog, or abort the running     │
-    │ turn                                                               │
+    │ Esc                     close the dialog, back to the main agent   │
+    │ from a subagent, or abort the running turn                         │
     │ Tab                     complete a slash command, @path or         │
-    └──────────────────── 1–11 of 83 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └──────────────────── 1–11 of 85 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor
@@ -418,12 +418,12 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ row)                                                               │
     │ Down                    move down (editor line, history, or list   │
     │ row)                                                               │
-    │ Alt+Up                  pop the last queued steer/follow-up back   │
-    │ into the editor                                                    │
+    │ Alt+Up                  pop the last queued steer/follow-up (the   │
+    │ focused agent's) back into the editor                              │
     │ Left                    move the cursor left                       │
     │ Right                   move the cursor right                      │
     │ Alt+B / Ctrl+Left       move the cursor back one word              │
-    └─────────────────── 12–22 of 83 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └─────────────────── 12–22 of 85 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor
@@ -461,7 +461,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /name [text]                     set the session name
       /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agent wh…
       /resume [now|cancel]             show, run now or cancel the automa…
-      ↕ 1–8 of 12
+      ↕ 1–8 of 13
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed

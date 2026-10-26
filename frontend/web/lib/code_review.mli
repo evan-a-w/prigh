@@ -12,23 +12,33 @@ open! Import
     turns into requests and toasts.
 
     The page reviews one worktree at a time ([Target]): the session's own,
-    or another (from [/review WORKTREE], the worktree picker, the sidebar),
-    against its base or one chosen. [review] is that worktree's part of the
+    or another (from [/review WORKTREE], the page's pickers, the worktree
+    picker, the sidebar), or a branch that is not checked out (read-only:
+    its files are read with [git_show], it cannot be edited and proposals
+    cannot be accepted), against its base or one chosen. A base that is no
+    revision goes back to what was reviewed before, with a toast naming the
+    closest. [review] is that worktree's part of the
     session's review ([all]): comments and approvals of other worktrees stay
     out of it, and what is sent or approved here is the worktree's.
 
     Paths are relative to the worktree's root, as [git diff] names them. *)
 
 module Target : sig
-  (** What the page reviews: the worktree at [dir] ([None]: the session's)
-      compared with [base] ([None]: its default, see [git_diff]). *)
+  (** What the page reviews: a worktree ([Dir None]: the session's) or a
+      branch that is not checked out ([Rev]: read-only), compared with
+      [base] ([None]: its default, see [git_diff]) since their merge base,
+      or [direct]ly. *)
   type t =
-    { dir : string option
+    { reviewed : Git_diff.Target.t
     ; base : string option
+    ; direct : bool
     }
   [@@deriving sexp_of, equal]
 
   val default : t
+
+  (** Of the session's own worktree. *)
+  val own : t -> bool
 end
 
 module Mode : sig
@@ -42,6 +52,9 @@ module Layout : sig
   type t =
     | Unified (** the changed hunks *)
     | Full (** the whole file with the changes inline *)
+    | Since
+    (** what changed since the user's last action on the file (or one
+        picked from its history): its snapshot then to the file now *)
   [@@deriving sexp_of, equal]
 end
 
@@ -110,6 +123,8 @@ end
 type t =
   { session : string option (** whose review this is *)
   ; target : Target.t
+  ; fallback : Target.t option
+    (** what was reviewed before [target], until its diff is in *)
   ; requested : Target.t (** of the [git_diff] on its way *)
   ; own_root : string option
     (** the session's worktree, once a diff of it came: approvals from
@@ -133,6 +148,14 @@ type t =
   ; contents : Content.t String.Map.t
   ; editor : Editor.t option
   ; submitting : bool
+  ; since : Review_since.File.t String.Map.t
+    (** of the reviewed worktree's files with actions, since the last *)
+  ; since_loading : bool (** a [review_since] is on its way *)
+  ; since_again : bool
+  ; picked : (int * Review_since.File.t option) String.Map.t
+    (** an older action chosen to compare with, by file: its index in
+        {!Review.history} and, once in, what changed since *)
+  ; views : Layout.t String.Map.t (** the layout chosen for a file *)
   }
 [@@deriving sexp_of]
 
@@ -147,8 +170,15 @@ module Reply : sig
     | Changed of string option (** a comment's id *)
     | Decided of string (** a proposal of the comment's: the file changed *)
     | Content of string (** a path *)
+    | Shown of string (** a path, as a branch not checked out has it *)
     | Saved of string
     | Submitted
+    | Since of string (** the worktree's root *)
+    | Since_picked of
+        { root : string
+        ; path : string
+        ; index : int
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -180,7 +210,15 @@ module Action : sig
     | Go of string (** the page's file *)
     | Step of int (** the next (1) or previous (-1) file *)
     | Set_mode of Mode.t
-    | Set_layout of Layout.t
+    | Set_layout of Layout.t (** for the page's file, and the default *)
+    | Set_view of
+        { path : string
+        ; layout : Layout.t
+        } (** for that file (the file browser's), and the default *)
+    | Pick_since of
+        { path : string
+        ; index : int (** in {!Review.history} *)
+        } (** the since-view, against that action *)
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -231,8 +269,9 @@ val reply : t -> Reply.t -> (Json.t, string) Result.t -> t * Out.t list
     ([watching]). *)
 val set_session : t -> string option -> watching:bool -> t * Out.t list
 
-(** The review changed (the [review] event). *)
-val set_review : t -> Review.t -> t
+(** The session's review, from its [review] event; new actions on the
+    reviewed worktree's files read what changed since them again. *)
+val set_review : t -> Review.t -> t * Out.t list
 
 (** The files may have changed (the agent edited, a run ended): the diff is
     read again while something shows it ([watching]). *)
@@ -248,13 +287,37 @@ val preview_text : t -> abs:string -> text:string -> md5:string option -> t
 (** The repository's root, once the diff is in. *)
 val root : t -> string option
 
-(** [abs] relative to the root, if inside it. *)
+(** The branch reviewed without a checkout. *)
+val read_only : t -> string option
+
+(** What the review keys the reviewed worktree's comments and approvals by
+    ({!Git_diff.review_root}), once the diff is in. *)
+val review_root : t -> string option
+
+(** [abs] relative to the root, if inside it (never for a branch not
+    checked out: its files are not on disk). *)
 val relative : t -> abs:string -> string option
 
 val file : t -> string -> Prigh_ui.Diff_files.File.t option
 
+(** How [path] shows: as chosen for it, else [Since] when it changed since
+    the last action on it, else the page's layout; never [Since] without
+    actions. *)
+val layout_of : t -> string -> Layout.t
+
+(** [path]'s review actions, oldest first. *)
+val history : t -> string -> Review.Snapshot.t list
+
+(** What changed in [path] since the action the since-view compares with
+    (the last, or the one picked), once read. *)
+val since : t -> string -> Review_since.File.t option
+
+(** Whether [path] changed after the last action on it. *)
+val changed_since : t -> string -> bool
+
 (** The rows [path] shows: its hunks, the whole file with them inline
-    ([Full]), or an unchanged file's lines. The same value until the file,
+    ([Full]), what changed since an action ([Since]), or an unchanged file's
+    lines. The same value until the file,
     its change or the layout changes. *)
 val rows : t -> path:string -> Diff_view.Row.t list
 
@@ -281,6 +344,7 @@ val unsent : t -> int
 (** The page's keys (focus on the page, not in a field): [\]] / [n] / [j]
     next file, [\[] / [p] / [k] previous, [a] approve, [c] comment on the
     selected code, [e] edit or comment mode, [v] the whole file or the hunks,
+    [l] what changed since the last action or not,
     [s] send the comments, Esc clears the selection then closes. *)
 val key
   :  t

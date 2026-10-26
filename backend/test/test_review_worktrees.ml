@@ -71,7 +71,9 @@ let print_diff ?(full = false) t (r : Git_diff.Result.t Or_error.t) =
       removed;
     if full
     then (
-      printf "branches: %s\n" (String.concat ~sep:" " r.branches);
+      printf
+        "branches: %s\n"
+        (String.concat ~sep:" " (r.branches @ r.remote_branches));
       print_string (show t r.diff))
 ;;
 
@@ -189,7 +191,7 @@ let%expect_test
   [%expect
     {|
     root=$DIR/wts/repo/feat-y branch=feat/y main=false base=origin/trunk against=<sha> files=2 +2 -1
-    error: unknown revision "nope": name a branch, tag or commit (e.g. main)
+    error: unknown revision "nope": name a branch, tag or commit (closest: main, manual, feat/x)
     error: not a git repository: $DIR (name a worktree of the repository: /worktree lists them)
     |}]
 ;;
@@ -213,7 +215,12 @@ let comment t agent ~root ~path ~anchor text =
 let dispatch t agent meth params =
   match Review_rpc.dispatch agent ~meth ~params:(Jsonaf.of_string params) with
   | None -> print_endline "not a review method"
-  | Some (Ok json) -> print_endline (mask t (Jsonaf.to_string json))
+  | Some (Ok json) ->
+    print_endline
+      (mask t (Jsonaf.to_string json)
+       |> Re.replace_string
+            (Re.compile (Re.Perl.re {|"at_ms":[0-9]+|}))
+            ~by:{|"at_ms":<ms>|})
   | Some (Error e) -> printf "error: %s\n" (mask t (Error.to_string_hum e))
 ;;
 
@@ -266,10 +273,10 @@ let%expect_test
   call "review_unapprove" (sprintf {|{"root":%S,"path":"a.txt"}|} main);
   [%expect
     {|
-    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":0,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":0,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"}]}
-    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":0,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":0,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/repo","path":"a.txt","hash":"h-main"}]}
-    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":0,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":0,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/repo","path":"a.txt","hash":"h-main"},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","hash":"h-feat"}]}
-    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":0,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":0,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","hash":"h-feat"}]}
+    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":<ms>,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"}],"snapshots":[]}
+    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":<ms>,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/repo","path":"a.txt","hash":"h-main"}],"snapshots":[{"root":"$DIR/repo","path":"a.txt","action":"approved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}}]}
+    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":<ms>,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/repo","path":"a.txt","hash":"h-main"},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","hash":"h-feat"}],"snapshots":[{"root":"$DIR/repo","path":"a.txt","action":"approved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","action":"approved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}}]}
+    {"comments":[{"id":"c1","root":"$DIR/repo","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In main","at_ms":<ms>,"delivered":false}]},{"id":"c2","root":"$DIR/wts/repo/feat-x","path":"a.txt","first":1,"last":1,"side":"new","anchor":"one","status":"open","thread":[{"author":"user","text":"In the worktree","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.txt","hash":"old"},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","hash":"h-feat"}],"snapshots":[{"root":"$DIR/repo","path":"a.txt","action":"approved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}},{"root":"$DIR/repo","path":"a.txt","action":"unapproved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}},{"root":"$DIR/wts/repo/feat-x","path":"a.txt","action":"approved","at_ms":<ms>,"content":{"kind":"text","md5":"<id><id>"}}]}
     |}];
   (* Sending the worktree's comments leaves main's unsent; the agent reads
      the worktree and the file's absolute path. *)

@@ -64,6 +64,7 @@ let%expect_test
             <span class="session-age"> just now </span>
             <span title="/work" class="session-cwd"> /work </span>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           </div>
         </div>
       </button>

@@ -94,7 +94,10 @@ let make_server t ~sw replies ~children =
         ~env:t.env
         ~sw
         ~provider
-        ~tools:(Tools.all @ (subagent :: Tool_subagent.control_tools))
+        ~tools:
+          (Tools.all
+           @ (subagent :: Tool_subagent.control_tools)
+           @ [ Tool_worktree.create () ])
         ~sessions_dir
         ~home:t.dir
         ?session
@@ -152,6 +155,12 @@ let scenario ~says_home =
       t
       ~sw
       [ Reply.tool_call
+          ~id:"w1"
+          ~name:"worktree"
+          ~arguments:{|{"action":"list","cwd":"~/sub"}|}
+          ()
+      ; Reply.text "listed"
+      ; Reply.tool_call
           ~id:"c1"
           ~name:"subagent"
           ~arguments:{|{"task":"look","cwd":"~/sub"}|}
@@ -204,6 +213,16 @@ let scenario ~says_home =
     ~params:{|{"host": "laptop", "cwd": "~/x"}|}
     "set_active_host";
   show_cwd t agent;
+  print_endline "--- a switch into the worktree ~/sub, then back";
+  call t server client ~params:{|{"path": "~/sub", "worktree": true}|} "set_cwd";
+  show_cwd t agent;
+  call t server client "worktree_back";
+  show_cwd t agent;
+  print_endline "--- the review of ~/sub";
+  call t server client ~params:{|{"dir": "~/sub"}|} "git_diff";
+  print_endline "--- the worktree tool with cwd ~/sub";
+  call t server client ~params:{|{"text": "list"}|} "prompt";
+  Agent.wait_idle agent;
   print_endline "--- a subagent with cwd ~/sub";
   call t server client ~params:{|{"text": "go"}|} "prompt";
   Agent.wait_idle agent;
@@ -231,9 +250,22 @@ let%expect_test "~ is the tool host's home" =
     host: $resolve_dir {"path":"~/x"} in $DIR/laptop-home/sub
     {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
     cwd: $DIR/laptop-home/x
-    --- a subagent with cwd ~/sub
+    --- a switch into the worktree ~/sub, then back
+    host: $resolve_dir {"path":"~/sub"} in $DIR/laptop-home/x
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/sub","created":false}}
+    cwd: $DIR/laptop-home/sub
+    host: $resolve_dir {"path":"$DIR/laptop-home/x"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
+    cwd: $DIR/laptop-home/x
+    --- the review of ~/sub
+    host: $git_diff {"dir":"~/sub","default_base":true} in $DIR/laptop-home/x
+    {"type":"response","id":"r","ok":false,"error":"not a git repository: $DIR/laptop-home/sub (name a worktree of the repository: /worktree lists them)"}
+    --- the worktree tool with cwd ~/sub
     {"type":"response","id":"r","ok":true,"result":{}}
     host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/x
+    host: $worktree_list {"dir":"~/.prigh/worktrees"} in $DIR/laptop-home/sub
+    --- a subagent with cwd ~/sub
+    {"type":"response","id":"r","ok":true,"result":{}}
     host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/sub
     host: ls {} in $DIR/laptop-home/sub
     |}]
@@ -258,10 +290,23 @@ let%expect_test "~ is the tool host's home: an older host that does not say" =
     host: $resolve_dir {"path":"~/x"} in $DIR/laptop-home/sub
     {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
     cwd: $DIR/laptop-home/x
-    --- a subagent with cwd ~/sub
+    --- a switch into the worktree ~/sub, then back
+    host: $resolve_dir {"path":"~/sub"} in $DIR/laptop-home/x
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/sub","created":false}}
+    cwd: $DIR/laptop-home/sub
+    host: $resolve_dir {"path":"$DIR/laptop-home/x"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
+    cwd: $DIR/laptop-home/x
+    --- the review of ~/sub
+    host: $git_diff {"dir":"~/sub","default_base":true} in $DIR/laptop-home/x
+    {"type":"response","id":"r","ok":false,"error":"not a git repository: $DIR/laptop-home/sub (name a worktree of the repository: /worktree lists them)"}
+    --- the worktree tool with cwd ~/sub
     {"type":"response","id":"r","ok":true,"result":{}}
     host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/x
     host: $resolve_dir {"path":"~"} in $DIR/laptop-home/x
+    host: $worktree_list {"dir":"~/.prigh/worktrees"} in $DIR/laptop-home/sub
+    --- a subagent with cwd ~/sub
+    {"type":"response","id":"r","ok":true,"result":{}}
     host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/sub
     host: ls {} in $DIR/laptop-home/sub
     |}]

@@ -102,6 +102,7 @@ module State = struct
     ; plan_mode : bool
     ; plan : Plan.t option
     ; session_rules : string list
+    ; home : Session.Home.t option
     }
   [@@deriving sexp_of]
 end
@@ -133,6 +134,7 @@ module Event = struct
         { steer : string list
         ; follow_up : string list
         }
+    | Subagent_queues of Subagent_inbox.Listing.t list
     | Tool_exec of
         { host : string
         ; exec_id : string
@@ -196,8 +198,7 @@ type t =
   ; mutable run : Run.t option
   ; mutable describing : unit Promise.t option
   ; auto_describe : bool
-  ; steer_queue : Queued.t Queue.t
-  ; follow_up_queue : Queued.t Queue.t
+  ; queue : Queued.t Steer_queue.t
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
@@ -322,17 +323,57 @@ let rec started_worktree (e : Agent_event.t) =
   | _ -> None
 ;;
 
+(* [Worktrees_changed] at any depth, with the id of the subagent whose it
+   is. *)
+let rec worktrees_changed ?agent (e : Agent_event.t) =
+  match e with
+  | Worktrees_changed { added; removed } -> Some (agent, added, removed)
+  | Subagent { agent_id; event; _ } -> worktrees_changed ~agent:agent_id event
+  | _ -> None
+;;
+
+let record_worktrees t ~agent ~added ~removed =
+  let recorded path =
+    List.exists (Session.worktrees t.session) ~f:(fun w ->
+      String.equal w.path path)
+  in
+  List.iter added ~f:(fun (w : Session_worktree.t) ->
+    if not (recorded w.path)
+    then (
+      let w =
+        match agent, w.source with
+        | Some agent, Created ->
+          let task =
+            Option.value_map
+              (Subagent_log.find t.subagent_log agent)
+              ~default:""
+              ~f:(fun ((s : Subagent_log.Summary.t), _) -> s.task)
+          in
+          { w with source = Agent { agent; task } }
+        | _ -> w
+      in
+      ignore (Session.add_worktree t.session w : Session.Entry.t)));
+  List.iter removed ~f:(fun path ->
+    if recorded path
+    then ignore (Session.worktree_removed t.session ~path : Session.Entry.t))
+;;
+
 let broadcast t (event : Event.t) =
-  (match event with
-   | Loop e ->
-     Subagent_log.record
-       t.subagent_log
-       ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
-       e;
-     Option.iter (started_worktree e) ~f:(fun w ->
-       ignore (Session.add_agent_worktree t.session w : Session.Entry.t))
-   | _ -> ());
-  List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+  match event with
+  | Loop e when Option.is_some (worktrees_changed e) ->
+    Option.iter (worktrees_changed e) ~f:(fun (agent, added, removed) ->
+      record_worktrees t ~agent ~added ~removed)
+  | _ ->
+    (match event with
+     | Loop e ->
+       Subagent_log.record
+         t.subagent_log
+         ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+         e;
+       Option.iter (started_worktree e) ~f:(fun w ->
+         ignore (Session.add_agent_worktree t.session w : Session.Entry.t))
+     | _ -> ());
+    List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 ;;
 
 let session t = t.session
@@ -428,16 +469,17 @@ let state t =
   ; plan_mode = t.plan_mode
   ; plan = t.plan
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
+  ; home = Session.home t.session
   }
 ;;
 
 let state_changed t = broadcast t (State_changed (state t))
 
 let queued_texts t =
-  let texts queue =
-    List.map (Queue.to_list queue) ~f:(fun (q : Queued.t) -> q.text)
+  let texts kind =
+    List.map (Steer_queue.items t.queue kind) ~f:(fun (q : Queued.t) -> q.text)
   in
-  texts t.steer_queue, texts t.follow_up_queue
+  texts Steer, texts Follow_up
 ;;
 
 let queue_update t =
@@ -752,10 +794,20 @@ let set_config t (config : Config.t) =
         Error.createf "fallback_models: %s" (Error.to_string_hum e)))
     |> Or_error.all
   in
+  let%bind generate_model =
+    match config.generate_model with
+    | None -> Ok None
+    | Some name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:(fun m -> Some (Model.key m))
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "generate_model: %s" (Error.to_string_hum e))
+  in
   let config =
     { config with
       fallback_models =
         List.stable_dedup fallback_models ~compare:String.compare
+    ; generate_model
     }
   in
   let%bind () =
@@ -1203,7 +1255,9 @@ let host_home t (host : Host.t) =
      | Error _ -> None)
 ;;
 
-let active_home t = Option.bind (find_host t t.active_host) ~f:(host_home t)
+let active_host_home t =
+  Option.bind (find_host t t.active_host) ~f:(host_home t)
+;;
 
 let approve t : Tool.approver =
   fun context tool args ->
@@ -1231,7 +1285,7 @@ let approve t : Tool.approver =
         ~session:t.session_rules
         ~cwd:t.cwd
         ~home
-        ~destructive:tool.spec.destructive
+        ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
         call
     in
     match decide () with
@@ -1284,6 +1338,72 @@ let apply_dir_change (outcome : Dir_change.Outcome.t) ~f =
   outcome
 ;;
 
+(* Where [cwd] on [host] is in git, asked at once ([None]: the host cannot
+   tell). *)
+let git_location_on t (host : Host.t) ~cwd =
+  if String.equal host.id Host.backend_id
+  then Option.some_if t.backend_host_enabled (Git_location.find ~cwd)
+  else if host.git_location
+  then
+    Result.ok
+      (Git_location.of_result
+         (host_exec_on
+            t
+            host
+            ~cancel:Cancellation.never
+            ~on_output:ignore
+            ~call_id:"git_location"
+            ~cwd
+            ~name:Git_location.op
+            ~arguments:(`Object [])))
+  else None
+;;
+
+let session_host (host : Host.t) ~pinned =
+  { Session.Host.id = host.id; name = host.name; pinned }
+;;
+
+(* Where the session is now, before it moves. *)
+let current_place t : Worktree_home.Place.t =
+  let repo =
+    match Session.repo t.session, find_host t t.active_host with
+    | Some repo, _ when String.equal (Session.cwd t.session) t.cwd -> Some repo
+    | _, Some host -> git_location_on t host ~cwd:t.cwd
+    | _, None -> None
+  in
+  { cwd = t.cwd; host = Option.map (location t) ~f:fst; repo }
+;;
+
+let place_on t (host : Host.t) ~pinned ~cwd : Worktree_home.Place.t =
+  { cwd
+  ; host = Some (session_host host ~pinned)
+  ; repo = git_location_on t host ~cwd
+  }
+;;
+
+(* [move] changes the directory; the home follows ({!Worktree_home}). Where
+   the session is in git is only asked when it matters: a worktree switch,
+   or a move with a home. *)
+let moving_home t ~worktree ~to_ ~move =
+  let home = Session.home t.session in
+  if (not worktree) && Option.is_none home
+  then move ()
+  else (
+    let from = current_place t in
+    move ();
+    let to_ : Worktree_home.Place.t = to_ () in
+    let change =
+      if worktree
+      then Worktree_home.switch home ~from ~to_
+      else Worktree_home.cd home ~from ~to_
+    in
+    match change with
+    | Keep -> ()
+    | Set home ->
+      ignore (Session.set_home t.session (Some home) : Session.Entry.t)
+    | Clear -> ignore (Session.set_home t.session None : Session.Entry.t))
+;;
+
 (* The session cwd is a property of the host, so switching hosts means
    choosing a directory there; without [cwd] the host's own is used. *)
 let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
@@ -1303,7 +1423,12 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
     Or_error.map
       outcome
       ~f:
-        (apply_dir_change ~f:(fun cwd -> activate_host t host ~cwd ~pinned:true))
+        (apply_dir_change ~f:(fun cwd ->
+           moving_home
+             t
+             ~worktree:false
+             ~to_:(fun () -> place_on t host ~pinned:true ~cwd)
+             ~move:(fun () -> activate_host t host ~cwd ~pinned:true)))
 ;;
 
 let executor t : Tool.executor =
@@ -1313,27 +1438,37 @@ let executor t : Tool.executor =
     then Seen_files.with_scope arguments ~scope:(Session.id t.session)
     else arguments
   in
-  if
-    (not tool.spec.on_host)
-    || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
-    || (String.equal (Tool.name tool) (Tool.name Tool_bash.tool)
-        && Tool_bash.runs_in_backend context arguments)
-  then
+  let bash = String.equal (Tool.name tool) (Tool.name Tool_bash.tool) in
+  let execute () =
     Tool.execute
       tool
-      { context with home = (fun () -> active_home t) }
+      { context with home = (fun () -> active_host_home t) }
       arguments
-  else
-    active_host_exec
-      t
-      ?stdin:context.stdin
-      ~cancel:context.cancel
-      ~on_output:context.on_output
-      ~call_id:context.call_id
-      ~cwd:context.cwd
-      ~name:(Tool.name tool)
-      ~arguments
-      ()
+  in
+  if bash && Tool_bash.runs_in_backend context arguments
+  then execute ()
+  else (
+    let run () =
+      if
+        (not tool.spec.on_host)
+        || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
+      then execute ()
+      else
+        active_host_exec
+          t
+          ?stdin:context.stdin
+          ~cancel:context.cancel
+          ~on_output:context.on_output
+          ~call_id:context.call_id
+          ~cwd:context.cwd
+          ~name:(Tool.name tool)
+          ~arguments
+          ()
+    in
+    if bash
+    then
+      Worktree_watch.around context ~dir:t.config.worktrees_dir ~arguments run
+    else run ())
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
@@ -1558,6 +1693,74 @@ let update_review t ~f =
 ;;
 
 let now t = Eio.Time.now (Eio.Stdenv.clock t.env)
+
+let read_review_file t ~root ~path =
+  let result =
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"review"
+      ~cwd:root
+      ~name:Host_files.read_op
+      ~arguments:
+        (`Object
+            [ "path", `String (Filename.concat root path)
+            ; "offset", `Number "0"
+            ; "length", `Number (Int.to_string Review_snapshot.max_bytes)
+            ])
+  in
+  if result.is_error
+  then
+    if String.is_suffix (String.strip result.text) ~suffix:"does not exist"
+    then Ok (Review_snapshot.content_of None ~size:0)
+    else Or_error.error_string (String.strip result.text)
+  else
+    let open Or_error.Let_syntax in
+    let%bind json = Json.parse result.text in
+    let%bind data =
+      match Json.member "data" json with
+      | Some (`String data) ->
+        Result.map_error (Base64.decode data) ~f:(fun (`Msg m) ->
+          Error.of_string ("bad data from the host: " ^ m))
+      | _ -> Or_error.error_string "bad reply from the host"
+    in
+    let size =
+      match Json.member "size" json with
+      | Some (`Number n) ->
+        Option.value (Int.of_string_opt n) ~default:(String.length data)
+      | _ -> String.length data
+    in
+    Ok (Review_snapshot.content_of (Some data) ~size)
+;;
+
+let update_review_file ?by ?text t ~root ~path ~action ~f =
+  Or_error.map (f t.review) ~f:(fun (result, changes) ->
+    let after = List.fold changes ~init:t.review ~f:Review_state.apply in
+    let current =
+      match text, Review_comment.root_branch root with
+      | _, Some branch ->
+        Or_error.errorf "%s is not checked out: no file to snapshot" branch
+      | Some text, None ->
+        Ok (Review_snapshot.content_of (Some text) ~size:(String.length text))
+      | None, None -> read_review_file t ~root ~path
+    in
+    let snapshot =
+      match current with
+      | Error _ -> []
+      | Ok (content, text) ->
+        Review_state.snapshot
+          after
+          { root; path; action; by; at = now t; content }
+          ~text
+    in
+    List.iter (changes @ snapshot) ~f:(fun change ->
+      ignore (Session.record_review t.session change : Session.Entry.t);
+      t.review <- Review_state.apply t.review change);
+    if not (List.is_empty changes && List.is_empty snapshot)
+    then broadcast t (Review_changed t.review);
+    result)
+;;
 
 let reply_tools t =
   if List.is_empty t.review.comments
@@ -1897,11 +2100,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
              ~execute:(executor t)
              ~background:t.background
              ~steer:(fun () ->
-               let l = Queue.to_list t.steer_queue in
-               if not (List.is_empty l)
-               then (
-                 Queue.clear t.steer_queue;
-                 queue_update t);
+               let l = Steer_queue.take_steers t.queue in
+               if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
                (* A plan mode switched during the run is told between turns. *)
                let note =
@@ -2006,11 +2206,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        in
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
-       if not (Queue.is_empty t.steer_queue)
-       then (
-         Queue.blit_transfer ~src:t.follow_up_queue ~dst:t.steer_queue ();
-         Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
-         queue_update t);
+       if Steer_queue.steers_first t.queue then queue_update t;
        auto_compact t;
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
@@ -2057,7 +2253,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
          match handover with
          | Some prompts -> Some (`Handover prompts)
          | None ->
-           (match Queue.dequeue t.follow_up_queue with
+           (match Steer_queue.take_follow_up t.queue with
             | Some queued ->
               queue_update t;
               Some (`Prompts [ user_message t queued ])
@@ -2247,6 +2443,26 @@ and auto_compact t =
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
 
+(* Messages a subagent stopped before taking are not lost silently. *)
+let subagent_queue_changed t =
+  broadcast t (Subagent_queues (Background_tasks.queues t.background));
+  List.iter (Background_tasks.tasks t.background ~kind:Subagent) ~f:(fun task ->
+    Option.iter (Background_tasks.Task.inbox task) ~f:(fun inbox ->
+      let dropped = Subagent_inbox.take_dropped inbox in
+      (* A discarded one belongs to a session no longer shown. *)
+      if not (Background_tasks.Task.delivered task)
+      then
+        List.iter dropped ~f:(fun text ->
+          broadcast
+            t
+            (Notice
+               (sprintf
+                  "%s stopped before it got your message %S, which was not \
+                   delivered: tell the main agent instead"
+                  (Background_tasks.Task.id task)
+                  (Background_tasks.short_task text))))))
+;;
+
 (* A background task finished (or was delivered): an idle agent starts a
    turn to receive it; a running one picks it up at its next turn boundary. *)
 let background_changed t =
@@ -2382,8 +2598,7 @@ let create
     ; run = None
     ; describing = None
     ; auto_describe
-    ; steer_queue = Queue.create ()
-    ; follow_up_queue = Queue.create ()
+    ; queue = Steer_queue.create ()
     ; subscribers = []
     ; config
     ; pending_confirms = String.Table.create ()
@@ -2435,7 +2650,8 @@ let create
     ~emit:(fun event ->
       account t event;
       broadcast t (Loop event))
-    ~on_change:(fun () -> background_changed t);
+    ~on_change:(fun () -> background_changed t)
+    ~on_queue_change:(fun () -> subagent_queue_changed t);
   t
 ;;
 
@@ -2460,41 +2676,39 @@ let prompt ?(attachments = []) ?(images = []) t text =
              ])))
 ;;
 
-let enqueue_queued t queue queued =
+let enqueue_queued t kind queued =
   if is_running t
   then (
-    Queue.enqueue queue queued;
+    Steer_queue.push t.queue kind queued;
     queue_update t)
   else start_run t [] ~then_:(fun () -> [ user_message t queued ])
 ;;
 
-let enqueue t queue ?(attachments = []) ?(images = []) text =
+let enqueue t kind ?(attachments = []) ?(images = []) text =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map (expand_skill t text) ~f:(fun skill ->
       enqueue_queued
         t
-        queue
+        kind
         { Queued.text; expanded = skill; source = None; attachments; images })
 ;;
 
 let steer ?attachments ?images t text =
-  enqueue t t.steer_queue ?attachments ?images text
+  enqueue t Steer ?attachments ?images text
 ;;
 
 let follow_up ?attachments ?images t text =
-  enqueue t t.follow_up_queue ?attachments ?images text
+  enqueue t Follow_up ?attachments ?images text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
    message is actually sent. *)
 let abort t =
-  let texts q = List.map (Queue.to_list q) ~f:(fun (q : Queued.t) -> q.text) in
-  let restored = texts t.steer_queue in
-  let follow_ups = texts t.follow_up_queue in
-  Queue.clear t.steer_queue;
-  Queue.clear t.follow_up_queue;
+  let restored =
+    List.map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) -> q.text)
+  in
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
   if Option.is_some t.resume
@@ -2502,7 +2716,7 @@ let abort t =
     cancel_resume_timer t;
     broadcast t (Notice "the automatic resume is cancelled");
     state_changed t);
-  restored @ follow_ups
+  restored
 ;;
 
 let rec wait_idle t =
@@ -2526,6 +2740,24 @@ let has_running_subagents t =
 
 let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
+
+let steer_subagent t ~agent_id ~kind text =
+  Background_tasks.send t.background ~id:agent_id kind ~from:User text
+;;
+
+let dequeue_subagent t ~agent_id =
+  Or_error.map
+    (Background_tasks.inbox_of t.background agent_id)
+    ~f:Subagent_inbox.pop_last
+;;
+
+let remove_subagent_queued t ~agent_id ~queue ~index ~text =
+  Or_error.bind
+    (Background_tasks.inbox_of t.background agent_id)
+    ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)
+;;
+
+let subagent_queues t = Background_tasks.queues t.background
 
 let cancel_subagent t ~agent_id =
   Background_tasks.cancel t.background ~kind:Subagent agent_id
@@ -2578,43 +2810,18 @@ let pending_confirms t =
     String.compare a.call_id b.call_id)
 ;;
 
-(* Pops the most recently queued message: follow-ups take priority over steer
-   messages, and within each queue the back (last enqueued) is removed. *)
 let dequeue t =
-  let pop_last queue =
-    match List.rev (Queue.to_list queue) with
-    | [] -> None
-    | last :: rest ->
-      Queue.clear queue;
-      List.iter (List.rev rest) ~f:(fun item -> Queue.enqueue queue item);
-      Some last
-  in
-  let popped =
-    match pop_last t.follow_up_queue with
-    | Some _ as queued -> queued
-    | None -> pop_last t.steer_queue
-  in
+  let popped = Steer_queue.pop_last t.queue in
   Option.iter popped ~f:(fun _ -> queue_update t);
   popped
 ;;
 
 let remove_queued t ~queue ~index ~text =
-  let q =
-    match queue with
-    | `Steer -> t.steer_queue
-    | `Follow_up -> t.follow_up_queue
-  in
-  let items = Queue.to_list q in
-  match List.nth items index with
-  | Some (item : Queued.t) when Option.for_all text ~f:(String.equal item.text)
-    ->
-    Queue.clear q;
-    List.iteri items ~f:(fun i item -> if i <> index then Queue.enqueue q item);
+  Steer_queue.remove t.queue queue ~index ~matches:(fun (item : Queued.t) ->
+    Option.for_all text ~f:(String.equal item.text))
+  |> Or_error.map ~f:(fun item ->
     queue_update t;
-    Ok item
-  | _ ->
-    Or_error.error_string
-      "that message is no longer queued: it was delivered or removed already"
+    item)
 ;;
 
 let shell t ~command ~add_to_context =
@@ -2711,7 +2918,7 @@ let compact ?instructions t =
 
 (* ---- /diff, /review, /init ------------------------------------------ *)
 
-let git_diff ?path ?base ?dir ?default_base t =
+let git_diff ?path ?base ?dir ?rev ?direct ?default_base t =
   host_exec
     t
     ~cancel:Cancellation.never
@@ -2719,8 +2926,32 @@ let git_diff ?path ?base ?dir ?default_base t =
     ~call_id:"git_diff"
     ~cwd:t.cwd
     ~name:Git_diff.op
-    ~arguments:(Git_diff.args ?path ?base ?dir ?default_base ())
+    ~arguments:(Git_diff.args ?path ?base ?dir ?rev ?direct ?default_base ())
   |> Git_diff.of_tool_result
+;;
+
+let git_refs ?dir t =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"git_refs"
+    ~cwd:t.cwd
+    ~name:Git_diff.refs_op
+    ~arguments:(Git_diff.refs_args ?dir ())
+  |> Git_diff.refs_of_tool_result
+;;
+
+let git_show ?dir t ~rev ~path =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"git_show"
+    ~cwd:t.cwd
+    ~name:Git_diff.show_op
+    ~arguments:(Git_diff.show_args ?dir ~rev ~path ())
+  |> Git_diff.shown_of_tool_result
 ;;
 
 (* A path for the active host, relative to the session cwd; [~] stays for
@@ -2781,7 +3012,8 @@ let remove_worktree ?cwd t ~path ~force =
     ?cwd
     t
     ~name:Worktree.remove_op
-    ~arguments:(Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force)
+    ~arguments:
+      (Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force ())
   |> Worktree.removed_of_result
 ;;
 
@@ -2793,7 +3025,7 @@ let command_prompt t ~text ~expanded ~source =
   | None ->
     enqueue_queued
       t
-      t.follow_up_queue
+      Follow_up
       { Queued.text
       ; expanded = Some expanded
       ; source = Some source
@@ -2856,7 +3088,7 @@ let submit_review ?root t =
       ~f:(fun (text, count) ->
         enqueue_queued
           t
-          t.steer_queue
+          Steer
           { Queued.text =
               (if count = 1
                then "Review comment"
@@ -2869,7 +3101,7 @@ let submit_review ?root t =
         count)
 ;;
 
-let decide_proposal t ~id ~post ~accept =
+let decide_proposal ?by t ~id ~post ~accept =
   let open Or_error.Let_syntax in
   let%bind comment, edits = Review_state.proposal t.review ~id ~post in
   let state : Review_comment.Proposal.State.t =
@@ -2898,8 +3130,29 @@ let decide_proposal t ~id ~post ~accept =
       in
       if result.is_error then Failed (String.strip result.text) else Accepted)
   in
-  update_review t ~f:(fun review ->
-    Review_state.decide review ~id ~post state ~at:(now t))
+  update_review_file
+    ?by
+    t
+    ~root:comment.root
+    ~path:comment.path
+    ~action:(if accept then Accepted else Rejected)
+    ~f:(fun review -> Review_state.decide review ~id ~post state ~at:(now t))
+;;
+
+let review_since t ~root ?path ?index () =
+  let open Or_error.Let_syntax in
+  let paths =
+    match path with
+    | Some path -> [ path ]
+    | None ->
+      Map.keys t.review.snapshots
+      |> List.filter_map ~f:(fun (k : Review_state.File_key.t) ->
+        Option.some_if (Option.exists k.root ~f:(String.equal root)) k.path)
+  in
+  List.map paths ~f:(fun path ->
+    let%bind current = read_review_file t ~root ~path in
+    Review_state.since t.review ~root ~path ?index ~current ())
+  |> Or_error.all
 ;;
 
 (* ---- budget, goal and resume ----------------------------------------- *)
@@ -3111,6 +3364,53 @@ let btw t ~question ~cancel ~on_delta =
   | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
 ;;
 
+let generate_model t =
+  match t.config.generate_model with
+  | None -> Ok t.model
+  | Some name ->
+    Model_registry.resolve t.models name
+    |> Result.map_error ~f:(fun e ->
+      Error.createf
+        "generate_model: %s (fix it with /settings or in config.json)"
+        (Error.to_string_hum e))
+;;
+
+let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
+  let session = t.session in
+  let request =
+    { Provider.Request.model
+    ; system = Some system
+    ; messages = [ Message.user user ]
+    ; tools = []
+    ; thinking = Off
+    ; max_tokens = Some max_tokens
+    ; cache_key = None
+    }
+  in
+  let reply =
+    t.provider.stream request ~cancel ~on_event:(function
+      | Text_delta text -> on_delta text
+      | Thinking_delta _
+      | Thinking_signature _
+      | Tool_call_start _
+      | Tool_call_delta _
+      | Server_tool_use _
+      | Server_tool_result _ -> ())
+  in
+  let cost_usd = Model.cost_usd model reply.usage in
+  ignore
+    (Session.add_spend session ~usage:reply.usage ~cost_usd : Session.Entry.t);
+  if phys_equal session t.session then state_changed t;
+  match reply.stop_reason with
+  | Error e -> Or_error.errorf "%s: %s" (Model.key model) e
+  | Aborted -> Or_error.error_string "cancelled"
+  | End_turn | Tool_use | Length ->
+    (match String.strip (Message.Assistant.text reply) with
+     | "" ->
+       Or_error.errorf "%s replied with nothing: try again" (Model.key model)
+     | text -> Ok (text, cost_usd))
+;;
+
 (* With [keep_host] (a new session or a fork) the session carries on where
    this one is; otherwise it goes where it last ran. *)
 let replace_session t session ~keep_host =
@@ -3169,7 +3469,12 @@ let set_session_name t name =
   state_changed t
 ;;
 
-let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
+let set_cwd
+      ?(if_missing = Dir_change.If_missing.Fail)
+      ?(worktree = false)
+      t
+      ~path
+  =
   if is_running t
   then
     Or_error.error_string "cannot change directory while a run is in progress"
@@ -3181,8 +3486,69 @@ let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
         (change_dir_on t host (host_relative t path) ~if_missing)
         ~f:
           (apply_dir_change ~f:(fun cwd ->
-             set_host_cwd t host ~cwd;
+             moving_home
+               t
+               ~worktree
+               ~to_:(fun () -> place_on t host ~pinned:t.host_pinned ~cwd)
+               ~move:(fun () -> set_host_cwd t host ~cwd);
              state_changed t)))
+;;
+
+let no_home_message =
+  "this session hasn't switched into a worktree; /worktree open TARGET switches"
+;;
+
+let switch_back ?(main = false) t =
+  match Session.home t.session with
+  | None -> Or_error.error_string no_home_message
+  | Some _ when is_running t ->
+    Or_error.error_string "cannot change directory while a run is in progress"
+  | Some (home : Session.Home.t) ->
+    let host_id =
+      Option.value_map home.host ~default:t.active_host ~f:(fun h -> h.id)
+    in
+    let host_name =
+      Option.value_map home.host ~default:t.active_host_name ~f:(fun h ->
+        h.name)
+    in
+    let root = Option.map home.repo ~f:(fun r -> r.root) in
+    (match find_host t host_id, main, root with
+     | None, _, _ ->
+       Or_error.errorf
+         "the tool host %s that %s is on is not connected: reconnect it (or \
+          /host picks another, and /cd a directory there)"
+         (if String.is_empty host_name then "(none)" else host_name)
+         home.cwd
+     | Some _, true, None ->
+       Or_error.errorf
+         "%s is not in a repository that prigh knows: /cd elsewhere"
+         home.cwd
+     | Some host, _, _ ->
+       let target = if main then Option.value_exn root else home.cwd in
+       (match resolve_dir_on t host target with
+        | Error _ when not main ->
+          Or_error.errorf
+            "%s is gone%s"
+            home.cwd
+            (match root with
+             | Some root ->
+               sprintf
+                 "; /worktree back main goes to the repository's main checkout \
+                  (%s) instead"
+                 root
+             | None -> "; /cd elsewhere (that forgets it)")
+        | Error _ as error -> error
+        | Ok cwd ->
+          let pinned =
+            Option.value_map home.host ~default:t.host_pinned ~f:(fun h ->
+              h.pinned)
+          in
+          if String.equal host.id t.active_host
+          then set_host_cwd t host ~cwd
+          else activate_host t host ~cwd ~pinned;
+          ignore (Session.set_home t.session None : Session.Entry.t);
+          state_changed t;
+          Ok (Dir_change.Outcome.Changed { cwd; created = false })))
 ;;
 
 let host_call

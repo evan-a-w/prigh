@@ -17,7 +17,7 @@ let%expect_test "a missing file yields the default" =
       (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
-      (snippets ()) (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30) (generate_model ())))
     |}]
 ;;
 
@@ -42,6 +42,7 @@ let%expect_test "save then load round trips" =
     ; snippets =
         [ { name = "review"; text = "Review the diff for bugs.\nBe brief." } ]
     ; auto_background_seconds = 30.
+    ; generate_model = None
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -73,7 +74,8 @@ let%expect_test "save then load round trips" =
           "text": "Review the diff for bugs.\nBe brief."
         }
       ],
-      "auto_background_seconds": 30
+      "auto_background_seconds": 30,
+      "generate_model": null
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
@@ -86,7 +88,7 @@ let%expect_test "save then load round trips" =
       (snippets
        (((name review) (text  "Review the diff for bugs.\
                              \nBe brief."))))
-      (auto_background_seconds 30)))
+      (auto_background_seconds 30) (generate_model ())))
     |}]
 ;;
 
@@ -107,7 +109,7 @@ let%expect_test "unknown fields are ignored" =
       (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
-      (snippets ()) (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30) (generate_model ())))
     |}]
 ;;
 
@@ -160,7 +162,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -197,7 +199,7 @@ let%expect_test "null defaults are unset" =
       (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
-      (snippets ()) (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30) (generate_model ())))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
@@ -206,7 +208,7 @@ let%expect_test "null defaults are unset" =
       (max_budget_usd ()) (goal_max_continuations 20)
       (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
       (archive_after_days 7) (notify Bell) (snippets ())
-      (auto_background_seconds 30)))
+      (auto_background_seconds 30) (generate_model ())))
     |}]
 ;;
 
@@ -257,7 +259,7 @@ let%expect_test "a leftover reminders setting says where reminders went" =
     (reminders notify scoped_models approval_mode default_model default_thinking
      fallback_models default_cwd worktrees_dir max_budget_usd
      goal_max_continuations resume_on_limit_reset ask_user_timeout_seconds
-     archive_after_days snippets auto_background_seconds)
+     archive_after_days snippets auto_background_seconds generate_model)
     |}]
 ;;
 

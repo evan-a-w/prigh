@@ -42,6 +42,12 @@ module Method : sig
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
+    | Enter_worktree of string
+    (** [set_cwd] to this path as a worktree switch: the session's home
+        ({!Session_home}) is recorded; see {!Dir_change.Outcome} *)
+    | Worktree_back of { main : bool }
+    (** back to the session's home, or with [main] to its repository's main
+        checkout; see {!Dir_change.Outcome} *)
     | Forge_status (** see {!Forge_account.list_of_json} *)
     | Forge_login of
         { host : string
@@ -54,9 +60,13 @@ module Method : sig
         { state : string option (** [open] (default), [closed], [all] *) }
     (** see {!Pr_list} *)
     | Pr_view of int (** see {!Pr_detail} *)
-    | Pr_defaults (** see {!Pr_defaults} *)
+    | Pr_defaults of
+        { dir : string option
+          (** a worktree's branch (default: the session's) *)
+        } (** see {!Pr_defaults} *)
     | Pr_create of
-        { title : string
+        { dir : string option (** in that worktree's repository *)
+        ; title : string
         ; body : string
         ; base : string option (** default: the repository's default branch *)
         ; head : string option (** default: the current branch *)
@@ -116,12 +126,59 @@ module Method : sig
         { root : string option
         ; path : string
         }
+    | Review_since of
+        { root : string
+        ; path : string option (** default: every file with actions *)
+        ; index : int option
+          (** of [path]'s action to compare with, in {!Review.history}
+              (default: the last) *)
+        } (** {!Review_since} *)
     | Fs_preview of { path : string } (** {!File_preview} *)
+    | Git_show of
+        { dir : string option
+        ; rev : string
+        ; path : string
+        } (** a file of a commit: {!Git_diff.shown_of_json} *)
     | Fs_write of
         { path : string
         ; text : string
         ; expected : string option (** the [md5] it was read with *)
+        ; review_root : string option
+          (** saved in the review's editor, of that worktree: an action on
+              the file *)
         } (** [{path, md5}] *)
+    | Git_status of
+        { dir : string option (** the worktree (default: the session's) *) }
+    (** {!Git_status} *)
+    | Git_stage of
+        { dir : string option
+        ; paths : string list (** relative to the worktree's top directory *)
+        ; tracked : bool (** and every change to tracked files ([git add -u]) *)
+        } (** {!Git_status} after *)
+    | Git_unstage of
+        { dir : string option
+        ; paths : string list
+        } (** {!Git_status} after *)
+    | Git_commit of
+        { dir : string option
+        ; message : string (** empty with [amend]: the commit's own *)
+        ; amend : bool
+        ; paths : string list (** staged first *)
+        } (** {!Git_status.Commit} *)
+    | Git_push of { dir : string option }
+    (** {!Git_status.Push}: to the upstream, set when there is none *)
+    | Generate_text of
+        { gen_id : string (** names its [Generate_delta] events *)
+        ; kind : Generated.Kind.t
+        ; dir : string option (** the worktree, for commits and PRs *)
+        ; base : string option (** [Pr]: what it merges into *)
+        ; task : string option (** [Branch_name]: what the branch is for *)
+        } (** {!Generated} *)
+    | Generate_cancel of { gen_id : string }
+    | Nix_store_status (** superusers: {!Nix_store_status} *)
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
+    (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can
+        take minutes *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

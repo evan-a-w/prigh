@@ -9,6 +9,7 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Rename -> Pencil
   | Fork -> Fork
   | New_worktree -> Branch_plus
+  | Switch_back -> Back
   | Switch_here -> Locate
   | New_session_here -> Plus
   | Review -> Review
@@ -36,7 +37,7 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
          [ span ~cls:"context-menu-title" (Session_list.title s)
          ; Sidebar_view.place
              ~cls:"context-menu-sub"
-             ?home:(Sidebar_view.session_home m s)
+             ?host_home:(Sidebar_view.session_host_home m s)
              s
              ~cwd:s.cwd
          ]
@@ -85,7 +86,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
   (* Separated: going there, changing it, looking at it, copying, and the
      destructive ones. *)
   let group : Context_menu.Item.t -> int = function
-    | Open | Open_tab | Switch_here | New_session_here -> 0
+    | Switch_back | Open | Open_tab | Switch_here | New_session_here -> 0
     | Rename | Fork | New_worktree | Create_pr -> 1
     | Review | Files | Terminal -> 2
     | Copy_path | Copy_id -> 3

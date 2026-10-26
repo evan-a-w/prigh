@@ -77,6 +77,7 @@ module Worktrees_purpose : sig
   type t =
     | Sidebar of int (** the [Worktrees] request's number *)
     | Picker (** [/worktree] *)
+    | Review_pick (** the review page's picker of what to review *)
     | Target of
         { command : string (** as typed: back to the editor if it fails *)
         ; action : Prigh_ui.Worktree_command.Action.t
@@ -85,6 +86,7 @@ module Worktrees_purpose : sig
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         } (** [/review NAME]: the worktree it names, if any *)
   [@@deriving sexp_of, equal]
@@ -109,6 +111,10 @@ module Reply_tag : sig
         { text : string
         ; images : Image.t list
         } (** a prompt, steer or follow-up: back to the editor if it fails *)
+    | Steered of
+        { agent : string
+        ; draft : string (** what was sent, as typed *)
+        } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
@@ -164,9 +170,16 @@ module Reply_tag : sig
         ; purpose : Worktrees_purpose.t
         }
     | Worktree_created of { command : string (** as typed *) }
+    | Review_checked_out of Code_review.Target.t
+    (** [create_worktree] of the branch the review page shows read-only:
+        then the page reviews the new worktree, compared the same way *)
     (** [create_worktree]: the session moves there *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
+    | Worktree_went_back of
+        { command : string (** as typed *)
+        ; home : Session_home.t option
+        } (** [worktree_back], from that home *)
     | Worktree_session of
         { path : string
         ; notice : string
@@ -215,6 +228,11 @@ module Reply_tag : sig
         (it restarted before saving it): we are on another one *)
     | Forge of Forge_reply.t
     | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
+    | Generated of string (** [generate_text]: the draft's id *)
+    | Git of Git_bar.Reply.t (** the review's git bar *)
+    | Nix_status of { open_settings : bool }
+    (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
+    | Nix_collected (** [nix_store_gc] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -410,9 +428,13 @@ module Action : sig
     | Logout of string (** provider *)
     | Cancel_subagent of string (** agent id *)
     | Kill_job of string (** job id *)
-    | Dequeue (** the last queued message back into the editor *)
-    | Edit_queued of Queued.Message.t (** back into the editor *)
-    | Remove_queued of Queued.Message.t
+    | Dequeue
+    (** the last message queued for the composer's recipient back into the
+        editor *)
+    | Edit_queued of Recipient.t * Queued.Message.t (** back into the editor *)
+    | Remove_queued of Recipient.t * Queued.Message.t
+    | Set_recipient of Recipient.t
+    (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
     | Toggle_folded of string
     (** fold or unfold the worktrees under a session of the sidebar (by its
@@ -495,6 +517,14 @@ module Action : sig
     | Files of Files.Action.t (** the file browser and the attachments *)
     | Review of Code_review.Action.t
     (** the review page, comments and approvals *)
+    | Review_pick of Review_picker.Which.t
+    (** the review page's menu of what to review or compare with (again
+        closes it) *)
+    | Review_direct of bool
+    (** compare with the base itself ([true]) or since the merge base *)
+    | Review_checkout
+    (** check the branch reviewed read-only out into a worktree, recorded
+        on the session (as [/worktree new] does), and review it there *)
     | Review_worktree of
         { path : string
         ; base : string option
@@ -520,6 +550,12 @@ module Action : sig
     | Preview_accent of string
     (** a colour, while the settings' colour input is being dragged: shown,
         not saved ([Run "/accent #hex"] saves it) *)
+    | Generate of Generate.Target.t
+    (** ✦ Generate (Alt+G): the model drafts the field's text *)
+    | Generate_stop (** Stop, or Esc while it drafts: what came stays *)
+    | Generate_undo of Generate.Target.t
+    (** the field's text from before its last draft *)
+    | Git of Git_bar.Action.t (** the review page's git bar *)
   [@@deriving sexp_of]
 end
 
@@ -544,6 +580,10 @@ module Model : sig
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
     ; queue : Queued.t
+    ; agent_queues : Agent_queue.t list
+      (** the background subagents' queues, those not empty *)
+    ; recipient : Recipient.t
+      (** who the composer sends to: a subagent while steering it *)
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)
@@ -581,6 +621,9 @@ module Model : sig
     ; notifications : Page_notify.t
     ; files : Files.t
     ; review : Code_review.t
+    ; review_memory : Review_memory.t
+      (** what the review page compared last, per worktree (a
+          preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t
@@ -591,6 +634,7 @@ module Model : sig
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
     ; forges : Forges.t (** the user's git hosts *)
+    ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; return_to_settings : bool
     (** the login dialog showing was opened from the settings page: closing
         it goes back there *)
@@ -598,6 +642,8 @@ module Model : sig
     ; theme_preview : Theme.t option
       (** an accent being picked in the settings, shown but not saved *)
     ; prefs : Pref_sync.t
+    ; generate : Generate.t (** the field being drafted by the model *)
+    ; git_bar : Git_bar.t (** the review page's *)
     }
   [@@deriving sexp_of]
 
@@ -642,6 +688,9 @@ val thinking_levels : string list
 
 (** A token count in a few characters: [200k], [1.2M]. *)
 val compact_tokens : int -> string
+
+(** Whether the user signed in as a superuser. *)
+val superuser : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list

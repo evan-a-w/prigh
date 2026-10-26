@@ -75,7 +75,7 @@ let view (m : App.Model.t) ~inject ~widget =
               ~cls:"terminal-cwd where"
               ~attrs:[ Attr.title cwd ]
               (Sidebar_view.home_relative
-                 ?home:(Sidebar_view.state_home m)
+                 ?host_home:(Sidebar_view.state_host_home m)
                  cwd)
           ; (match state_label status with
              | Some label ->

@@ -201,13 +201,15 @@ let common_params =
       let current f default () =
         Option.value_map !agent_ref ~default ~f:(fun a -> f (Agent.state a))
       in
+      let worktrees_dir () =
+        match !agent_ref with
+        | Some agent -> (Agent.config agent).worktrees_dir
+        | None -> Config.default.worktrees_dir
+      in
       let subagent =
         Tool_subagent.create
           ~models
-          ~worktrees_dir:(fun () ->
-            match !agent_ref with
-            | Some agent -> (Agent.config agent).worktrees_dir
-            | None -> Config.default.worktrees_dir)
+          ~worktrees_dir
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -225,6 +227,11 @@ let common_params =
              else
                Tools.all
                @ (subagent :: Tool_subagent.control_tools)
+               @ [ Tool_worktree.create
+                     ~worktrees_dir
+                     ~session:(fun () -> Option.map !agent_ref ~f:Agent.session)
+                     ()
+                 ]
                @ Tool_jobs.tools
                @ Tools.interaction)
           ~sessions_dir
@@ -559,6 +566,14 @@ let serve_command =
             build)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
+     and nix_gc_helper =
+       flag
+         "-nix-gc-helper"
+         (optional string)
+         ~doc:
+           "DIR superusers' Nix garbage collection goes through the root \
+            helper listening there (the container's; see DOCKER.md) instead of \
+            running nix as the backend's user (default: $PRIGH_NIX_GC_HELPER)"
      in
      fun () ->
        if Option.is_some tokens && Option.is_some token
@@ -636,10 +651,25 @@ let serve_command =
          eprintf "-open needs -web\n";
          exit 2);
        let stdio = stdio || (Option.is_none listen && Option.is_none web) in
+       List.iter
+         [ "-listen", listen; "-web", web ]
+         ~f:(fun (flag, addr) ->
+           Option.iter
+             (Option.bind addr ~f:(fun (addr, _) ->
+                Web_server.plaintext_warning ~flag addr))
+             ~f:(eprintf "%s\n%!"));
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
+       let nix_store =
+         Nix_store.create
+           ~sw
+           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+           (match from_env nix_gc_helper "PRIGH_NIX_GC_HELPER" with
+            | Some dir -> Nix_store_ops.helper ~env ~dir
+            | None -> Nix_store_ops.local ~env)
+       in
        let create_server ?token ?namespace ?world () =
          let { Setup.session; cwd; new_agent; world; models } =
            make_agent ~env ~sw ~backend_host ?world ()
@@ -669,6 +699,7 @@ let serve_command =
              ?namespace
              ~backend_host
              ~home:world.home
+             ~nix_store
              ~login
              ~sessions_dir:world.sessions_dir
              ~cwd
@@ -901,7 +932,7 @@ let web_command =
            "HOST:PORT|URL the backend: its -web (or -listen) port, or its \
             prigh-web URL (wss://host/ws, https://host/prigh/) behind a TLS \
             proxy (default: $PRIGH_CONNECT, else the connection saved by \
-            prigh-tui or an earlier prigh web; -connect HOST:PORT is saved)"
+            prigh-tui or an earlier prigh web; -connect is saved)"
      and (_ : bool) =
        flag
          "-remote"
@@ -992,8 +1023,16 @@ let web_command =
        let { Saved_connection.Resolved.settings; save } =
          Saved_connection.resolve
            ~saved
-           ~flags:{ connect; token; user }
-           ~env:env_settings
+           ~flags:
+             { connect = Option.map connect ~f:Backend_address.normalize
+             ; token
+             ; user
+             }
+           ~env:
+             { env_settings with
+               connect =
+                 Option.map env_settings.connect ~f:Backend_address.normalize
+             }
            ~local:false
        in
        let address =
@@ -1086,21 +1125,12 @@ let web_command =
             "%s"
             (Web_connect.Check.explain error remote ~source credentials));
        Option.iter save ~f:(fun connection ->
-         if remote.lines
-         then (
-           match Saved_connection.save ~home connection with
-           | Ok () -> ()
-           | Error e ->
-             eprintf
-               "prigh web: cannot save the connection: %s\n%!"
-               (Error.to_string_hum e))
-         else
+         match Saved_connection.save ~home connection with
+         | Ok () -> ()
+         | Error e ->
            eprintf
-             "prigh web: %s is not saved as the connection: prigh-tui, which \
-              shares it, only connects to HOST:PORT (set $PRIGH_CONNECT, or \
-              pass -connect again)\n\
-              %!"
-             address);
+             "prigh web: cannot save the connection: %s\n%!"
+             (Error.to_string_hum e));
        let log line = eprintf "prigh web: %s\n%!" line in
        let listen_addr =
          match listen with

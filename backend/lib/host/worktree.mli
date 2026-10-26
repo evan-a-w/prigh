@@ -94,16 +94,19 @@ val create
   -> Created.t Or_error.t
 
 (** Removes the worktree at [path] (relative to [cwd] or absolute) and
-    returns it as it was; its branch stays. Refuses the main worktree, and,
+    returns it as it was; its branch stays. Refuses the main worktree, one
+    that has any of the directories [keep] in it (someone works there), and,
     unless [force], one with uncommitted changes or locked. A worktree whose
     directory is gone is pruned. *)
 val remove
-  :  env:Env.t
+  :  ?keep:string list
+  -> env:Env.t
   -> cancel:Cancellation.t
   -> cwd:string
   -> dir:string
   -> path:string
   -> force:bool
+  -> unit
   -> t Or_error.t
 
 (** {2 On a tool host} *)
@@ -122,7 +125,13 @@ val create_args
   -> unit
   -> Jsonaf.t
 
-val remove_args : dir:string -> path:string -> force:bool -> Jsonaf.t
+val remove_args
+  :  ?keep:string list
+  -> dir:string
+  -> path:string
+  -> force:bool
+  -> unit
+  -> Jsonaf.t
 
 (** Runs one of the ops; [Ok] carries the result as JSON. *)
 val run
@@ -133,10 +142,12 @@ val run
   -> arguments:Jsonaf.t
   -> Tool_result.t
 
-(** [create_op] as an [on_host] tool, for [Tool.execute_via]: the
-    subagent tool makes worktrees with it on the session's tool host. *)
-val create_tool : Tool.t
+(** The ops as [on_host] tools, for [Tool.execute_via]: the [subagent] and
+    [worktree] tools run them on the session's tool host. *)
+val list_tool : Tool.t
 
+val create_tool : Tool.t
+val remove_tool : Tool.t
 val listing_of_result : Tool_result.t -> Listing.t Or_error.t
 val created_of_result : Tool_result.t -> Created.t Or_error.t
 val removed_of_result : Tool_result.t -> t Or_error.t

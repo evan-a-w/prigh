@@ -32,12 +32,14 @@ end
 val parse : string -> File.t list
 
 (** What the worktree is compared with: [HEAD], a base's merge base as
-    [main (merge base 1234abcd)], a commit shortened to 8 characters, the
-    empty tree as [nothing (no commits yet)]. *)
+    [main (merge base 1234abcd)], a base itself as [main directly], a commit
+    shortened to 8 characters, the empty tree as [nothing (no commits
+    yet)]. *)
 val against : P.Git_diff.t -> string
 
 (** The worktree reviewed: [feat/x (/path/to/it)], or its path when
-    detached. *)
+    detached; a branch that is not checked out as [feat/x (not checked
+    out)]. *)
 val where : P.Git_diff.t -> string
 
 (** [3 files changed, +12 −4], or [no changes]. *)

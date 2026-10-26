@@ -7,18 +7,15 @@ open! Import
 
 type t =
   { address : string option
-    (** [HOST:PORT]; [None]: a backend this frontend spawned *)
+    (** [HOST:PORT] or a prigh-web URL ({!Server_address}); [None]: a
+        backend this frontend spawned *)
   ; user : string option (** who we sign in as there *)
   ; saved : string option (** the saved remote address, if any *)
   }
 [@@deriving sexp_of, equal]
 
-(** [HOST:PORT], or "a local backend". *)
+(** The address, or "a local backend". *)
 val describe : t -> string
-
-(** [HOST:PORT] (an empty host is 127.0.0.1); the error says what is
-    expected. *)
-val parse_address : string -> (string * int, string) Result.t
 
 (** Whether a [hello] error means the backend rejected our user name or token
     (rather than, say, a missing session). *)
@@ -28,8 +25,9 @@ module Change : sig
   (** The token is never printed. *)
   type t =
     | Connect of string option
-    (** to [HOST:PORT], with the saved credentials when it is the saved
-        address; [None]: a freshly spawned local backend *)
+    (** to an address ({!Server_address.normalize}d), with the saved
+        credentials when it is the saved address; [None]: a freshly spawned
+        local backend *)
     | Sign_in of
         { user : string option
         ; token : string

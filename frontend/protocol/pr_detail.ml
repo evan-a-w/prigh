@@ -32,5 +32,10 @@ let git_diff t : Git_diff.t =
   ; base = t.pr.base
   ; main = true
   ; branches = []
+  ; remote_branches = []
+  ; tags = []
+  ; commits = []
+  ; rev = None
+  ; direct = false
   }
 ;;

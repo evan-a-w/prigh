@@ -28,6 +28,8 @@ module Argument = struct
     | Review
     | Server
     | Pr
+    | Commit
+    | Agents
   [@@deriving sexp_of, equal]
 end
 
@@ -46,7 +48,7 @@ let c ?argument name args help = { Spec.name; args; help; argument }
 (* In cycling order: "on" is the provider's default budget. *)
 let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
 
-let all =
+let every =
   [ c "help" "" "show commands and keys"
   ; c "hotkeys" "" "show keyboard shortcuts"
   ; c
@@ -161,17 +163,33 @@ let all =
       "[list|view N|new|checkout N]"
       "pull requests of the repository where the tools run: list \
        [open|closed|all] picks one (Enter shows it, its checks and diff), view \
-       N shows one, new [title] creates one from the current branch, checkout \
-       N checks one out in a git worktree"
+       N shows one, new [--generate] [title] creates one from the current \
+       branch (--generate, or Ctrl+G in the form: the model drafts the title \
+       and body), checkout N checks one out in a git worktree"
+  ; c
+      ~argument:Argument.Commit
+      "commit"
+      "[-a] [-m MSG|--generate]"
+      "commit the staged changes of the session's worktree (-a: every change \
+       to tracked files first; MSG: the rest of the line, or quoted); \
+       --generate has the model draft the message into the editor to edit and \
+       send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping \
+       its message without -m"
+  ; c
+      "push"
+      ""
+      "push the session's worktree's branch to its upstream (set to the \
+       remote's branch of the same name when there is none)"
   ; c
       ~argument:Argument.Review
       "review"
-      "[worktree] [--base REV]"
+      "[target] [--base REV ...]"
       "the changed files' approvals and review comments (prigh-web: the review \
        page) of the session's worktree or another (its branch, path or name), \
-       against its base or REV; /review BASE [instructions] (HEAD: the \
-       uncommitted changes) has the model review the changes for prioritised \
-       findings"
+       or of a branch not checked out (read-only), against its base or REV \
+       since their merge base (--direct: against REV itself); /review BASE \
+       [instructions] (HEAD: the uncommitted changes) has the model review the \
+       changes for prioritised findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
@@ -198,9 +216,12 @@ let all =
       "delete sessions, after a confirmation (none: pick them in /sessions)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
+      ~argument:Argument.Agents
       "agents"
-      "[cancel <n>]"
-      "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
+      "[steer|cancel ...]"
+      "focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N \
+       (its number or id) at its next step, follow-up N TEXT: before it \
+       reports; cancel N"
   ; c
       "jobs"
       "[id|kill <id>]"
@@ -229,11 +250,12 @@ let all =
   ; c
       ~argument:Argument.Worktree
       "worktree"
-      "[list|new|open|rm ...]"
+      "[list|new|open|back|rm]"
       "pick a git worktree of the repository to work in (Ctrl+N: in a new \
        session, Ctrl+D removes it); new BRANCH [BASE] creates one and works \
-       there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: \
-       with uncommitted changes)"
+       there; open [-n] TARGET (-n: in a new session); back [main]: back where \
+       the session switched into worktrees from; rm [-f] TARGET (-f: with \
+       uncommitted changes)"
   ; c "fork" "" "fork at a previous user message"
   ; c "rewind" "" "rewind the head to a previous user message"
   ; c "tree" "" "show the session tree and switch head"
@@ -281,9 +303,10 @@ let all =
   ; c
       ~argument:Argument.Server
       "connect"
-      "[HOST:PORT|local]"
-      "switch to the backend at HOST:PORT (saved for next time) or to a local \
-       one; none: asks, with the current address"
+      "[HOST:PORT|URL|local]"
+      "switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, \
+       through an HTTPS proxy; saved for next time) or to a local one; none: \
+       asks, with the current address"
   ; c "signin" "[user]" "sign in to the server, as another user or again"
   ; c
       "signout"
@@ -293,11 +316,29 @@ let all =
       "setusr"
       "[user]"
       "act as another user (superusers only); without a user, list them"
+  ; c
+      "nix-gc"
+      "[run [DAYS|all]]"
+      "show the Nix store's size and free space; run collects garbage, first \
+       deleting every user's profile generations older than DAYS days (all: \
+       all but the current ones)"
   ; c "quit" "" "exit"
   ]
 ;;
 
-let find name = List.find all ~f:(fun s -> String.equal s.name name)
+let superuser_only = [ "nix-gc" ]
+
+let all ~superuser =
+  if superuser
+  then every
+  else
+    List.filter every ~f:(fun s ->
+      not (List.mem superuser_only s.name ~equal:String.equal))
+;;
+
+let find ~superuser name =
+  List.find (all ~superuser) ~f:(fun s -> String.equal s.name name)
+;;
 
 let usage (s : Spec.t) =
   let sep = if String.is_suffix s.name ~suffix:":" then "" else " " in
@@ -327,15 +368,17 @@ let parse input =
        Some { name; args; rest })
 ;;
 
-let closest name =
-  List.filter_map all ~f:(fun s ->
+let closest ~superuser name =
+  List.filter_map (all ~superuser) ~f:(fun s ->
     let d = Edit_distance.distance s.name name in
     Option.some_if (d <= 2 || String.is_prefix s.name ~prefix:name) (d, s))
   |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
   |> Option.map ~f:snd
 ;;
 
-let help = Help_table.render (List.map all ~f:(fun s -> usage s, s.help))
+let help ~superuser =
+  Help_table.render (List.map (all ~superuser) ~f:(fun s -> usage s, s.help))
+;;
 
 let input_help =
   Help_table.render

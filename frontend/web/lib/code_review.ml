@@ -14,6 +14,7 @@ module Layout = struct
   type t =
     | Unified
     | Full
+    | Since
   [@@deriving sexp_of, equal]
 end
 
@@ -73,17 +74,20 @@ end
 
 module Target = struct
   type t =
-    { dir : string option
+    { reviewed : Git_diff.Target.t
     ; base : string option
+    ; direct : bool
     }
   [@@deriving sexp_of, equal]
 
-  let default = { dir = None; base = None }
+  let default = { reviewed = Dir None; base = None; direct = false }
+  let own t = Git_diff.Target.equal t.reviewed (Dir None)
 end
 
 type t =
   { session : string option
   ; target : Target.t
+  ; fallback : Target.t option
   ; requested : Target.t
   ; own_root : string option
   ; all : Review.t
@@ -105,12 +109,18 @@ type t =
   ; contents : Content.t String.Map.t
   ; editor : Editor.t option
   ; submitting : bool
+  ; since : Review_since.File.t String.Map.t
+  ; since_loading : bool
+  ; since_again : bool
+  ; picked : (int * Review_since.File.t option) String.Map.t
+  ; views : Layout.t String.Map.t
   }
 [@@deriving sexp_of]
 
 let empty =
   { session = None
   ; target = Target.default
+  ; fallback = None
   ; requested = Target.default
   ; own_root = None
   ; all = Review.empty
@@ -132,6 +142,11 @@ let empty =
   ; contents = String.Map.empty
   ; editor = None
   ; submitting = false
+  ; since = String.Map.empty
+  ; since_loading = false
+  ; since_again = false
+  ; picked = String.Map.empty
+  ; views = String.Map.empty
   }
 ;;
 
@@ -143,8 +158,15 @@ module Reply = struct
     | Changed of string option
     | Decided of string
     | Content of string
+    | Shown of string
     | Saved of string
     | Submitted
+    | Since of string
+    | Since_picked of
+        { root : string
+        ; path : string
+        ; index : int
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -174,6 +196,14 @@ module Action = struct
     | Step of int
     | Set_mode of Mode.t
     | Set_layout of Layout.t
+    | Set_view of
+        { path : string
+        ; layout : Layout.t
+        }
+    | Pick_since of
+        { path : string
+        ; index : int
+        }
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -220,19 +250,36 @@ let rpc method_ reply = Out.Rpc { method_; reply }
 let toast ?(error = false) text = Out.Toast { text; error }
 let root t = Option.map t.diff ~f:(fun d -> d.root)
 
+let read_only t =
+  match t.target.reviewed with
+  | Rev rev -> Some rev
+  | Dir _ -> None
+;;
+
+let not_checked_out rev =
+  sprintf
+    "%s is not checked out, so it is read-only here: Check out into a worktree \
+     to change it."
+    rev
+;;
+
+(* What the session's review keys this worktree's comments and approvals
+   by. *)
+let review_root t = Option.map t.diff ~f:Git_diff.review_root
+
 (* The reviewed worktree's part of [all]; before its diff is in, all of the
    session's own (as before worktrees were told apart), none of another. *)
 let scoped t =
   let review =
-    match root t with
+    match review_root t with
     | Some root ->
       Review.scope
         t.all
         ~root
         ~own:
-          (Option.is_none t.target.dir
+          (Target.own t.target
            || Option.equal String.equal t.own_root (Some root))
-    | None -> if Option.is_none t.target.dir then t.all else Review.empty
+    | None -> if Target.own t.target then t.all else Review.empty
   in
   { t with review }
 ;;
@@ -243,10 +290,13 @@ let with_all t all = scoped { t with all }
 let map_comments t ~f = with_all t { t.all with comments = f t.all.comments }
 
 let relative t ~abs =
-  Option.bind (root t) ~f:(fun root ->
-    String.chop_prefix
-      abs
-      ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
+  Option.bind
+    (Option.bind (root t) ~f:(fun root ->
+       Option.some_if (Option.is_none (read_only t)) root))
+    ~f:(fun root ->
+      String.chop_prefix
+        abs
+        ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
 ;;
 
 let absolute t path =
@@ -260,6 +310,60 @@ let file t path =
 ;;
 
 let approval t f = File_approval.status t.review f
+let history t path = Review.history t.review path
+
+let since t path =
+  match Map.find t.picked path with
+  | Some (_, picked) -> picked
+  | None -> Map.find t.since path
+;;
+
+let changed_since t path =
+  Option.exists (Map.find t.since path) ~f:(fun s -> s.changed)
+;;
+
+let layout_of t path : Layout.t =
+  let chosen =
+    match Map.find t.views path with
+    | Some layout -> layout
+    | None -> if changed_since t path then Since else t.layout
+  in
+  match chosen with
+  | Since when List.is_empty (history t path) -> Unified
+  | layout -> layout
+;;
+
+let get_since t =
+  match root t with
+  | None -> t, []
+  | Some _ when List.is_empty t.review.snapshots ->
+    { t with since = String.Map.empty }, []
+  | Some _ when t.since_loading -> { t with since_again = true }, []
+  | Some root ->
+    ( { t with since_loading = true }
+    , [ rpc (Review_since { root; path = None; index = None }) (Since root) ] )
+;;
+
+let get_picked t ~path ~index =
+  match root t with
+  | None -> t, []
+  | Some root ->
+    ( t
+    , [ rpc
+          (Review_since { root; path = Some path; index = Some index })
+          (Since_picked { root; path; index })
+      ] )
+;;
+
+(* New review actions on the reviewed worktree: what changed since them. *)
+let with_all_since t all =
+  let before = t.review.snapshots in
+  let t = with_all t all in
+  if List.equal Review.Snapshot.equal before t.review.snapshots
+  then t, []
+  else get_since t
+;;
+
 let approved t = File_approval.approved t.review t.files
 let unsent t = Review.unsent t.review
 
@@ -295,7 +399,10 @@ let fetch_content t path =
   | Some (Loading | Loaded _) -> t, []
   | Some (Failed _) | None ->
     ( { t with contents = Map.set t.contents ~key:path ~data:Content.Loading }
-    , [ rpc (Fs_preview { path = absolute t path }) (Content path) ] )
+    , [ (match read_only t with
+         | Some rev -> rpc (Git_show { dir = None; rev; path }) (Shown path)
+         | None -> rpc (Fs_preview { path = absolute t path }) (Content path))
+      ] )
 ;;
 
 let refetch_content t path =
@@ -455,6 +562,7 @@ module Rows = struct
     ; hash : string option
     ; text : string option
     ; full : bool
+    ; since : string option
     }
 
   let memo : (string, key * Diff_view.Row.t list) Hashtbl.t =
@@ -466,6 +574,7 @@ module Rows = struct
     && Option.equal String.equal a.hash b.hash
     && Option.equal phys_equal a.text b.text
     && Bool.equal a.full b.full
+    && Option.equal String.equal a.since b.since
   ;;
 
   let find key ~make =
@@ -481,20 +590,32 @@ end
 let rows t ~path =
   let file = file t path in
   let text = text_of t path in
-  let full = Layout.equal t.layout Full in
+  let layout = layout_of t path in
+  let full = Layout.equal layout Full in
+  let since =
+    match layout with
+    | Since ->
+      Some (Option.value_map (since t path) ~default:"" ~f:(fun s -> s.diff))
+    | Unified | Full -> None
+  in
   Rows.find
     { path
     ; hash = Option.map file ~f:(fun f -> f.hash)
     ; text = (if full || Option.is_none file then text else None)
     ; full
+    ; since
     }
     ~make:(fun () ->
       let lines () =
         Array.of_list (String.split_lines (Option.value text ~default:""))
       in
-      match file with
-      | None -> plain_rows (lines ())
-      | Some f ->
+      match since, file with
+      | Some diff, _ ->
+        (match Diff_files.parse diff with
+         | [] -> []
+         | f :: _ -> Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks))
+      | None, None -> plain_rows (lines ())
+      | None, Some f ->
         let hunk_rows =
           Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
         in
@@ -508,11 +629,27 @@ let lines t path =
     Array.of_list (String.split_lines text))
 ;;
 
+(* In the since-view the removed lines are the file as it was at the action,
+   not what the change removed: they take no comments. *)
+let on_snapshot t ~path (range : Review_comment.Range.t) =
+  Layout.equal (layout_of t path) Since
+  && Review_comment.Side.equal range.side Old
+;;
+
+let snapshot_lines =
+  "The removed lines here are the file as it was at that action: comment on \
+   the current lines, or on removed ones in Changes."
+;;
+
 let select t ~path ~start ~end_ ~pop =
-  Option.map
-    (Code_selection.resolve (rows t ~path) ~lines:(lines t path) ~start ~end_)
-    ~f:(fun (range, anchor) ->
-      { Selection.path; range; anchor; from = None; pop })
+  match
+    Code_selection.resolve (rows t ~path) ~lines:(lines t path) ~start ~end_
+  with
+  | Some (range, _) when on_snapshot t ~path range ->
+    None, [ toast snapshot_lines; Out.Clear_text_selection ]
+  | Some (range, anchor) ->
+    Some { Selection.path; range; anchor; from = None; pop }, []
+  | None -> None, []
 ;;
 
 let comment_busy t id = { t with busy = Set.add t.busy id }
@@ -537,6 +674,10 @@ let rec update t (action : Action.t) =
     let t =
       { t with
         target
+      ; fallback =
+          (match t.diff, t.diff_error with
+           | Some _, None -> Some t.target
+           | _ -> t.fallback)
       ; diff = None
       ; files = []
       ; diff_error = None
@@ -547,6 +688,9 @@ let rec update t (action : Action.t) =
       ; contents = String.Map.empty
       ; editor = None
       ; mode = Comment
+      ; since = String.Map.empty
+      ; picked = String.Map.empty
+      ; views = String.Map.empty
       }
     in
     update (scoped t) (Open None)
@@ -570,9 +714,11 @@ let rec update t (action : Action.t) =
   | Step by -> step t by
   | Set_mode Comment -> { t with mode = Comment }, []
   | Set_mode Edit ->
-    (match t.current with
-     | None -> t, [ toast "No file to edit: the working tree has no changes." ]
-     | Some path ->
+    (match t.current, read_only t with
+     | _, Some rev -> t, [ toast (not_checked_out rev) ]
+     | None, None ->
+       t, [ toast "No file to edit: the working tree has no changes." ]
+     | Some path, None ->
        let t = { t with mode = Edit; selection = None } in
        let t, outs = fetch_content t path in
        let t =
@@ -582,10 +728,39 @@ let rec update t (action : Action.t) =
        in
        t, outs @ [ Out.Focus "review-editor" ])
   | Set_layout layout ->
-    let t = { t with layout } in
-    (match layout, t.current with
-     | Full, Some path -> fetch_content t path
-     | _ -> t, [])
+    (match t.current with
+     | Some path -> update t (Set_view { path; layout })
+     | None -> { t with layout }, [])
+  | Set_view { path; layout } ->
+    let t =
+      { t with
+        layout
+      ; views = Map.set t.views ~key:path ~data:layout
+      ; selection = None
+      }
+    in
+    (match layout with
+     | Full -> fetch_content t path
+     | Since when List.is_empty (history t path) ->
+       ( t
+       , [ toast
+             (sprintf
+                "No review actions on %s yet: approve it or comment on it \
+                 first."
+                path)
+         ] )
+     | Unified | Since -> t, [])
+  | Pick_since { path; index } ->
+    let t =
+      { t with views = Map.set t.views ~key:path ~data:Since; selection = None }
+    in
+    if index >= List.length (history t path) - 1
+    then { t with picked = Map.remove t.picked path }, []
+    else
+      get_picked
+        { t with picked = Map.set t.picked ~key:path ~data:(index, None) }
+        ~path
+        ~index
   | Select_line { path; side; line; extend } ->
     let here = { Code_selection.Point.side; line; offset = 0 } in
     let from =
@@ -602,6 +777,8 @@ let rec update t (action : Action.t) =
          ~from
          ~to_:here
      with
+     | Some (range, _) when on_snapshot t ~path range ->
+       t, outs @ [ toast snapshot_lines ]
      | Some (range, anchor) ->
        ( { t with
            selection =
@@ -610,7 +787,8 @@ let rec update t (action : Action.t) =
        , outs @ [ Out.Clear_text_selection ] )
      | None -> t, outs @ [ toast "The file is still being read: try again." ])
   | Select_text { path; start; end_; pop } ->
-    { t with selection = select t ~path ~start ~end_ ~pop }, []
+    let selection, outs = select t ~path ~start ~end_ ~pop in
+    { t with selection }, outs
   | Clear_selection ->
     if Option.is_some t.selection
     then { t with selection = None }, [ Out.Clear_text_selection ]
@@ -641,7 +819,7 @@ let rec update t (action : Action.t) =
     { t with draft = Option.map t.draft ~f:(fun d -> { d with text }) }, []
   | Draft_cancel -> { t with draft = None }, []
   | Draft_send ->
-    (match t.draft, root t with
+    (match t.draft, review_root t with
      | Some d, _ when String.is_empty (String.strip d.text) ->
        t, [ toast "Write the comment first." ]
      | Some ({ busy = false; _ } as d), Some root ->
@@ -672,6 +850,8 @@ let rec update t (action : Action.t) =
     , [ rpc (Review_set_status { id; status }) (Changed (Some id)) ] )
   | Delete id ->
     comment_busy t id, [ rpc (Review_delete { id }) (Changed (Some id)) ]
+  | Decide { accept = true; _ } when Option.is_some (read_only t) ->
+    t, [ toast (not_checked_out (Option.value (read_only t) ~default:"")) ]
   | Decide { id; post; accept } ->
     comment_busy t id, [ rpc (Review_decide { id; post; accept }) (Decided id) ]
   | Toggle_approval path ->
@@ -684,7 +864,7 @@ let rec update t (action : Action.t) =
         | _ ->
           ( t
           , [ rpc
-                (Review_approve { root = root t; path; hash = f.hash })
+                (Review_approve { root = review_root t; path; hash = f.hash })
                 (Changed None)
             ] )))
   | Submit ->
@@ -695,7 +875,7 @@ let rec update t (action : Action.t) =
     then t, []
     else
       ( { t with submitting = true }
-      , [ rpc (Review_submit { root = root t }) Submitted ] )
+      , [ rpc (Review_submit { root = review_root t }) Submitted ] )
   | Edit_input text ->
     ( { t with
         editor =
@@ -715,6 +895,7 @@ let rec update t (action : Action.t) =
                 { path = absolute t e.path
                 ; text = e.text
                 ; expected = (if e.conflict then None else e.md5)
+                ; review_root = root t
                 })
              (Saved e.path)
          ] ))
@@ -727,7 +908,7 @@ let rec update t (action : Action.t) =
   | Refresh -> get_diff t
 ;;
 
-let set_review t review = with_all t review
+let set_review t review = with_all_since t review
 
 let set_session t session ~watching =
   if Option.equal String.equal t.session session
@@ -771,12 +952,25 @@ let refresh_contents t ~before =
 ;;
 
 let error_text e = String.capitalize e
+let root_of = root
 
 let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   match why, result with
   | Diff, _ when not (Target.equal t.requested t.target) ->
     (* For the worktree or base reviewed before. *)
     get_diff { t with loading = false; again = false }
+  | Diff, Error e
+    when String.is_prefix e ~prefix:"unknown revision"
+         && Option.is_some t.fallback ->
+    (* A base or branch typed wrong: back to what was reviewed, saying which
+       names are close. *)
+    let back = Option.value_exn t.fallback in
+    let t, outs =
+      update
+        { t with loading = false; again = false; fallback = None }
+        (Show back)
+    in
+    t, toast ~error:true (error_text e) :: outs
   | Diff, Error e ->
     let t = { t with loading = false; diff_error = Some (error_text e) } in
     if t.again then get_diff { t with again = false } else t, []
@@ -790,25 +984,25 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
          scoped
            { t with
              loading = false
+           ; fallback = None
            ; diff = Some diff
            ; files = Diff_files.parse diff.diff
            ; diff_error = None
            ; own_root =
-               (if Option.is_none t.target.dir
-                then Some diff.root
-                else t.own_root)
+               (if Target.own t.target then Some diff.root else t.own_root)
            }
        in
        let t, contents = refresh_contents t ~before in
        let t, current = settle_current t in
+       let t, since = get_since t in
        let t, again =
          if t.again then get_diff { t with again = false } else t, []
        in
-       t, contents @ current @ again)
+       t, contents @ current @ since @ again)
   | Review, Error e -> t, [ toast ~error:true (error_text e) ]
   | Review, Ok json ->
     (match Review.of_json json with
-     | Ok review -> with_all t review, []
+     | Ok review -> with_all_since t review
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Comment_added, Error e ->
     ( { t with draft = Option.map t.draft ~f:(fun d -> { d with busy = false }) }
@@ -843,9 +1037,9 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
          | None -> t
        in
        (* An approval answers with the review; a comment with itself (the
-          [review] event brings the rest). *)
+          [review] event brings the rest, its snapshot too). *)
        (match Review.of_json json with
-        | Ok review when Option.is_none id -> with_all t review, []
+        | Ok review when Option.is_none id -> with_all_since t review
         | _ ->
           (match Review_comment.of_json json with
            | Ok c ->
@@ -864,6 +1058,18 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
         contents = Map.set t.contents ~key:path ~data:(Failed (error_text e))
       }
     , [] )
+  | Shown path, Error e ->
+    ( { t with
+        contents = Map.set t.contents ~key:path ~data:(Failed (error_text e))
+      }
+    , [] )
+  | Shown path, Ok json ->
+    let content : Content.t =
+      match Git_diff.shown_of_json json with
+      | Ok (text, _) -> Loaded { text; md5 = None }
+      | Error e -> Failed (Error.to_string_hum e)
+    in
+    { t with contents = Map.set t.contents ~key:path ~data:content }, []
   | Content path, Ok json ->
     let content : Content.t =
       match File_preview.of_json json with
@@ -925,6 +1131,57 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     in
     let t, diff = get_diff t in
     t, toast (sprintf "Saved %s" path) :: diff
+  | Since root, _ when not (Option.equal String.equal (Some root) (root_of t))
+    ->
+    (* Of the worktree reviewed before. *)
+    get_since { t with since_loading = false; since_again = false }
+  | Since _, result ->
+    let t = { t with since_loading = false } in
+    let t =
+      match
+        Result.bind result ~f:(fun j ->
+          Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum)
+      with
+      | Ok files ->
+        { t with
+          since =
+            String.Map.of_alist_reduce
+              (List.map files ~f:(fun (f : Review_since.File.t) -> f.path, f))
+              ~f:(fun a _ -> a)
+        }
+      | Error _ ->
+        (* An older backend, or a file not readable: no since-view. *)
+        t
+    in
+    let t, picked =
+      List.fold
+        (Map.to_alist t.picked)
+        ~init:(t, [])
+        ~f:(fun (t, outs) (path, (index, _)) ->
+          let t, more = get_picked t ~path ~index in
+          t, outs @ more)
+    in
+    if t.since_again
+    then (
+      let t, again = get_since { t with since_again = false } in
+      t, picked @ again)
+    else t, picked
+  | Since_picked { root; path; index }, result ->
+    (match Map.find t.picked path with
+     | Some (i, _)
+       when i = index && Option.equal String.equal (Some root) (root_of t) ->
+       (match
+          Result.bind result ~f:(fun j ->
+            Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum)
+        with
+        | Ok [ f ] ->
+          ( { t with picked = Map.set t.picked ~key:path ~data:(index, Some f) }
+          , [] )
+        | Ok _ -> { t with picked = Map.remove t.picked path }, []
+        | Error e ->
+          ( { t with picked = Map.remove t.picked path }
+          , [ toast ~error:true (error_text e) ] ))
+     | Some _ | None -> t, [])
   | Submitted, Error e ->
     { t with submitting = false }, [ toast ~error:true (error_text e) ]
   | Submitted, Ok json ->
@@ -950,7 +1207,19 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
     | "c" when Mode.equal t.mode Comment -> Some Start_comment
     | "e" -> Some (Set_mode (if Mode.equal t.mode Edit then Comment else Edit))
     | "v" ->
-      Some (Set_layout (if Layout.equal t.layout Full then Unified else Full))
+      let layout =
+        Option.value_map t.current ~default:t.layout ~f:(layout_of t)
+      in
+      Some (Set_layout (if Layout.equal layout Full then Unified else Full))
+    | "l" ->
+      (match Option.map t.current ~f:(layout_of t) with
+       | Some Since ->
+         Some
+           (Set_layout
+              (match t.layout with
+               | Since -> Unified
+               | layout -> layout))
+       | Some (Unified | Full) | None -> Some (Set_layout Since))
     | "s" when not shift -> Some Submit
     | "Escape" ->
       if Option.is_some t.draft

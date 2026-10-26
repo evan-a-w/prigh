@@ -12,7 +12,11 @@ open! Import
 
     Comments name their worktree's [root]; approvals too, apart from those
     recorded before worktrees were told apart (no [root]: the session's own
-    repository's). A frontend reviewing a worktree shows its own only. *)
+    repository's). A frontend reviewing a worktree shows its own only.
+
+    Each action of the user's on a file records a {!Review_snapshot} of it
+    (its text kept once per content), so that [since] can say what changed
+    in it after. *)
 
 module File_key : sig
   (** An approved file: its worktree's top directory ([None]: unknown, the
@@ -39,6 +43,11 @@ module Change : sig
         { root : string option
         ; path : string
         }
+    | Snapshot of
+        { snapshot : Review_snapshot.t
+        ; text : string option
+          (** the file's text, the first time the review keeps it *)
+        }
   [@@deriving sexp, jsonaf, equal]
 end
 
@@ -46,8 +55,17 @@ type t =
   { comments : Review_comment.t list (** oldest first *)
   ; approvals : string File_key.Map.t (** hashes by file *)
   ; next_id : int (** of the next comment, [c<next_id>] *)
+  ; snapshots : Review_snapshot.t list File_key.Map.t
+    (** by file (always with a [root]), newest first *)
+  ; blobs : string String.Map.t (** the snapshots' texts, by MD5 *)
+  ; kept : int (** the bytes of [blobs] *)
   }
 [@@deriving sexp_of, equal]
+
+(** A session keeps at most this much (32 MiB) of snapshots' texts: later
+    snapshots of new contents record their digest only (so the review still
+    tells whether the file changed, without a diff). *)
+val max_kept_bytes : int
 
 val empty : t
 val apply : t -> Change.t -> t
@@ -121,3 +139,40 @@ val approve
   -> Change.t list
 
 val unapprove : ?root:string -> t -> path:string -> Change.t list
+
+(** Records [snapshot]; [text] is kept unless the review has it already or
+    it would take the review over {!max_kept_bytes}. *)
+val snapshot : t -> Review_snapshot.t -> text:string option -> Change.t list
+
+(** [path]'s snapshots, oldest first: the history [since]'s [index] counts
+    in. *)
+val snapshots : t -> root:string -> path:string -> Review_snapshot.t list
+
+val blob : t -> md5:string -> string option
+
+module Since : sig
+  (** What changed in a file since an action on it. *)
+  type t =
+    { path : string
+    ; index : int (** of the snapshot compared with, in [snapshots] *)
+    ; snapshot : Review_snapshot.t
+    ; current : Review_snapshot.Content.t
+    ; changed : bool
+    ; diff : Text_diff.t (** snapshot to now; empty when not [changed] *)
+    ; note : string option
+      (** why a changed file has no diff: binary, too large *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
+(** [path]'s snapshot [index] (default: the last) against [current], the
+    file as it is now (as {!Review_snapshot.content_of} makes it). Fails
+    when the file has no snapshot. *)
+val since
+  :  t
+  -> root:string
+  -> path:string
+  -> ?index:int
+  -> current:Review_snapshot.Content.t * string option
+  -> unit
+  -> Since.t Or_error.t

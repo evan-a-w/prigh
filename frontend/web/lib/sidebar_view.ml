@@ -3,41 +3,13 @@ open! Import
 open Html
 module Action = App.Action
 
-(* [cwd] with [home], the home of the tool host it is on, as [~]; with that
-   unknown (an older backend or host), any /home/USER is taken for it. *)
-let home_relative ?home cwd =
-  match home with
-  | Some home when String.equal cwd home -> "~"
-  | Some home ->
-    (match String.chop_prefix cwd ~prefix:(home ^ "/") with
-     | Some rest when not (String.equal home "/") -> "~/" ^ rest
-     | Some _ | None -> cwd)
-  | None ->
-    (match String.chop_prefix cwd ~prefix:"/home/" with
-     | Some rest ->
-       (match String.lsplit2 rest ~on:'/' with
-        | Some (_, path) -> "~/" ^ path
-        | None -> "~")
-     | None -> cwd)
+let home_relative = Tilde.of_path
+
+let state_host_home (m : App.Model.t) =
+  Option.bind m.state ~f:Tilde.active_host_home
 ;;
 
-let host_home (state : State.t) ~host =
-  List.find_map state.hosts ~f:(fun (h : Host.t) ->
-    if String.equal h.id host then h.home else None)
-;;
-
-(* The home of the session's active tool host. *)
-let active_home (state : State.t) = host_home state ~host:state.active_host
-
-let state_home (m : App.Model.t) = Option.bind m.state ~f:active_home
-
-(* The home of the host [s]'s cwd is on, when that host is connected. *)
-let session_home (m : App.Model.t) (s : Session_summary.t) =
-  Option.bind m.state ~f:(fun state ->
-    if String.equal s.id state.session_id
-    then active_home state
-    else Option.bind s.host ~f:(fun host -> host_home state ~host))
-;;
+let session_host_home (m : App.Model.t) s = Tilde.session_host_home m.state s
 
 let age (m : App.Model.t) (s : Session_summary.t) =
   match
@@ -135,7 +107,7 @@ let tag ?(cls = "") text ~title =
 (* A worktree under its session: its branch, what is in it, why it is
    there. Clicking (or right-clicking) opens its menu. *)
 let worktree_row
-      ?home
+      ?host_home
       ~inject
       ~entering
       (s : Session_summary.t)
@@ -164,7 +136,7 @@ let worktree_row
       ; Attr.create "data-worktree" w.path
       ; Attr.create "data-owner" s.id
       ; Attr.create "aria-haspopup" "menu"
-      ; Attr.title (home_relative ?home w.path)
+      ; Attr.title (home_relative ?host_home w.path)
       ; Attr.on_click (fun _ ->
           inject (Action.Open_menu { target; anchor = Element id }))
       ; Attr.on_contextmenu (open_menu ~inject target ~row:id)
@@ -196,15 +168,13 @@ let worktree_row
     ]
 ;;
 
-let place ?cls ?home (s : Session_summary.t) ~cwd =
+let place ?cls ?host_home (s : Session_summary.t) ~cwd =
   let class_ base = Attr.classes (base :: Option.to_list cls) in
   match s.repo with
   | Some r ->
     Node.span
       ~attrs:
-        [ class_ "session-place"
-        ; Attr.title (home_relative ?home cwd)
-        ]
+        [ class_ "session-place"; Attr.title (home_relative ?host_home cwd) ]
       [ span ~cls:"session-repo" (Session_worktrees.repo_name r)
       ; (match r.branch with
          | Some branch ->
@@ -216,7 +186,7 @@ let place ?cls ?home (s : Session_summary.t) ~cwd =
   | None ->
     Node.span
       ~attrs:[ class_ "session-cwd"; Attr.title cwd ]
-      [ Node.text (home_relative ?home cwd) ]
+      [ Node.text (home_relative ?host_home cwd) ]
 ;;
 
 (* What a row shows besides its session: rebuilt only when one changes
@@ -231,7 +201,8 @@ module Row = struct
     ; loading : bool
     ; age : string
     ; cwd : string
-    ; home : string option
+    ; host_home : string option (** of the tool host its cwd is on *)
+    ; home : Session_home.t option
     ; worktrees : Session_worktrees.Node.t list
     ; folded : bool (** its worktrees *)
     ; entering : string option
@@ -250,6 +221,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; loading
       ; age
       ; cwd
+      ; host_home
       ; home
       ; worktrees
       ; folded
@@ -370,7 +342,21 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                 ; div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
-                    ; place ?home s ~cwd
+                    ; place ?host_home s ~cwd
+                    ; Option.value_map home ~default:Node.none ~f:(fun h ->
+                        span
+                          ~cls:"session-home"
+                          ~attrs:
+                            [ Attr.title
+                                (sprintf
+                                   "Switched into worktrees from %s: Switch \
+                                    back (/worktree back) returns"
+                                   (home_relative ?host_home h.cwd))
+                            ]
+                          (Option.value_exn
+                             (Session_worktrees.home
+                                ~tilde:(home_relative ?host_home)
+                                (Some h))))
                     ; (if selecting
                        then
                          span
@@ -398,7 +384,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
              ; Attr.role "group"
              ; Attr.create "aria-label" ("Worktrees of " ^ title)
              ]
-           (List.map worktrees ~f:(worktree_row ?home ~inject ~entering s)))
+           (List.map worktrees ~f:(worktree_row ?host_home ~inject ~entering s)))
     ]
 ;;
 
@@ -409,6 +395,11 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     match m.state with
     | Some state when selected -> state.cwd
     | _ -> s.cwd
+  in
+  let home =
+    match m.state with
+    | Some state when selected -> state.home
+    | _ -> s.home
   in
   let deps =
     { Row.selected
@@ -422,7 +413,8 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
          | Some Starting | None -> false)
     ; age = age m s
     ; cwd
-    ; home = session_home m s
+    ; host_home = session_host_home m s
+    ; home
     ; worktrees =
         Session_worktrees.of_session
           ~listings:

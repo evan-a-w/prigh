@@ -23,6 +23,9 @@ code. Put a new module in the group it belongs to:
 - `mcp/` — MCP client, config, hub and tools
 - `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces and access,
   `Web_server`, `Websocket`, static and file HTTP
+- `nix/` — the Nix store for superusers: `Nix_store` (status, one garbage
+  collection at a time), `Nix_store_ops` (nix as the backend's user, or the
+  container's root helper), what Nix prints and the reports
 - `terminal/` — the browser terminals: `Terminal`, `Terminals`, tmux control,
   relays
 - `util/` — `Import`, `Config`, `Cancellation`, `Guarded`, UTF-8 and other

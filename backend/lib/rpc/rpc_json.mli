@@ -25,9 +25,16 @@ val config : Config.t -> Json.t
     error?}}]}]. *)
 val review_comment : Review_comment.t -> Json.t
 
-(** [{comments, approvals: [{root?, path, hash}]}] ([root] missing: approved
-    before worktrees were told apart, in the session's repository). *)
+(** [{comments, approvals: [{root?, path, hash}], snapshots: [{root, path,
+    action, by?, at_ms, content: {kind: text|absent|binary|too_large, md5?,
+    bytes?}}]}] ([root] missing: approved before worktrees were told apart,
+    in the session's repository; [snapshots] by file, each file's oldest
+    first, without their texts). *)
 val review : Review_state.t -> Json.t
+
+(** [{path, index, snapshot, current, changed, added, removed, diff, note?}]:
+    a snapshot and contents as in [review]'s [snapshots]. *)
+val review_since : Review_state.Since.t -> Json.t
 
 val model : Model.t -> Json.t
 
@@ -62,11 +69,13 @@ val subagent_summary : Subagent_log.Summary.t -> Json.t
 (** [{"subagent": summary, "messages": transcript}]. *)
 val subagent : Subagent_log.Summary.t * Timed_message.t list -> Json.t
 
-(** [{"steer_texts", "follow_up_texts", "confirms": [{call_id, agent_id,
-    name, summary, rules}], "questions": [{call_id, questions}]}]. *)
+(** [{"steer_texts", "follow_up_texts", "agents": [{agent_id, steer_texts,
+    follow_up_texts}], "confirms": [{call_id, agent_id, name, summary,
+    rules}], "questions": [{call_id, questions}]}]. *)
 val pending
   :  steer:string list
   -> follow_up:string list
+  -> agents:Subagent_inbox.Listing.t list
   -> confirms:Agent.Pending_confirm.t list
   -> questions:Agent.Pending_question.t list
   -> Json.t

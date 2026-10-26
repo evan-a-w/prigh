@@ -34,6 +34,7 @@ module Item = struct
     | Rename
     | Fork
     | New_worktree
+    | Switch_back (** the session goes back to its home *)
     | Switch_here
     | New_session_here
     | Review
@@ -58,6 +59,7 @@ module Item = struct
     | Rename
     | Fork
     | New_worktree
+    | Switch_back
     | Switch_here
     | New_session_here
     | Review
@@ -71,11 +73,16 @@ module Item = struct
   ;;
 end
 
-let session_items (s : Session_summary.t) ~current
+let session_items ?host_home (s : Session_summary.t) ~current
   : (Item.t * string * string) list
   =
   List.filter_opt
-    [ Option.some_if (not current) (Item.Open, "Open", "Enter")
+    [ Option.map s.home ~f:(fun home ->
+        ( Item.Switch_back
+        , "Switch back to "
+          ^ Session_home.label home ~tilde:(Tilde.of_path ?host_home)
+        , "/worktree back" ))
+    ; Option.some_if (not current) (Item.Open, "Open", "Enter")
     ; Some (Open_tab, "Open in new tab", "")
     ; Some (Rename, "Rename…", "/name")
     ; Some (Fork, "Fork…", "/fork")
@@ -113,13 +120,13 @@ let worktree_items (s : Session_summary.t) ~path
   ]
 ;;
 
-let items (target : Target.t) s ~current =
+let items ?host_home (target : Target.t) s ~current =
   match target with
-  | Session _ -> session_items s ~current
+  | Session _ -> session_items ?host_home s ~current
   | Worktree { path; _ } -> worktree_items s ~path
 ;;
 
-let picker target (s : Session_summary.t) ~current =
+let picker ?host_home target (s : Session_summary.t) ~current =
   let title =
     match target with
     | Target.Session _ -> "Session"
@@ -130,8 +137,10 @@ let picker target (s : Session_summary.t) ~current =
   in
   Picker.create
     ~title
-    (List.map (items target s ~current) ~f:(fun (item, label, detail) ->
-       Picker.Item.create ~id:(Item.id item) ~detail label))
+    (List.map
+       (items ?host_home target s ~current)
+       ~f:(fun (item, label, detail) ->
+         Picker.Item.create ~id:(Item.id item) ~detail label))
 ;;
 
 let worktree t =

@@ -40,7 +40,10 @@ let item ~current (s : P.Session_summary.t) =
     ~detail:
       (String.concat
          ~sep:" · "
-         (s.cwd :: List.filter [ worktrees ] ~f:(Fn.non String.is_empty)))
+         (s.cwd
+          :: List.filter
+               (worktrees :: Option.to_list (Session_worktrees.home s.home))
+               ~f:(Fn.non String.is_empty)))
     ~search:
       (String.concat
          ~sep:" "

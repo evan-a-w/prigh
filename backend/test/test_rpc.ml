@@ -666,11 +666,11 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
     state: approval_mode=ask
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -818,7 +818,38 @@ let%expect_test "remove_queued removes a queued message by queue and index" =
     {"type":"response","id":"r1","ok":true,"result":{"text":"later","attachments":[]}}
     {"type":"response","id":"r1","ok":false,"error":"param \"queue\" is \"later\": use \"steer\" or \"follow_up\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"index\" must be a natural number"}
-    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":["steer one"],"follow_up_texts":[],"confirms":[],"questions":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":["steer one"],"follow_up_texts":[],"agents":[],"confirms":[],"questions":[]}}
+    |}]
+;;
+
+let%expect_test
+    "steer_agent, dequeue_agent and remove_agent_queued say what is wrong"
+  =
+  with_agent [ Reply.text "done" ]
+  @@ fun t agent h ->
+  call t h ~params:{|{"agent_id": "a1", "text": "hi"}|} "steer_agent";
+  call t h ~params:{|{"text": "hi"}|} "steer_agent";
+  call
+    t
+    h
+    ~params:{|{"agent_id": "a1", "text": "hi", "mode": "later"}|}
+    "steer_agent";
+  call t h ~params:{|{"agent_id": "a1"}|} "dequeue_agent";
+  call
+    t
+    h
+    ~params:{|{"agent_id": "a1", "queue": "steer", "index": 0}|}
+    "remove_agent_queued";
+  call t h "get_pending";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":false,"error":"missing param \"agent_id\""}
+    {"type":"response","id":"r1","ok":false,"error":"param \"mode\" is \"later\": use \"steer\" or \"follow_up\""}
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown subagent \"a1\"; known: none"}
+    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":[],"follow_up_texts":[],"agents":[],"confirms":[],"questions":[]}}
     |}]
 ;;
 
@@ -1334,9 +1365,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1443,8 +1474,8 @@ let%expect_test "set_config: omitted fields keep their values" =
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
     {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
     |}]
 ;;
@@ -1485,13 +1516,13 @@ let%expect_test
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null}}
     (config_changed
      (snippets (((name review) (text  "Review the diff.\
                                      \nBe brief.")))))
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null}}
     {"type":"response","id":"r1","ok":false,"error":"config.snippets[0].name \"two words\" must be one word: non-empty, without spaces"}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null}}
     (Ok
      ((((name review) (text  "Review the diff.\
                             \nBe brief.")))
@@ -1597,7 +1628,8 @@ let%expect_test "git_diff, review and init" =
         (sprintf
            "cd %s && export GIT_CONFIG_GLOBAL=/dev/null GIT_AUTHOR_NAME=t \
             GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
-            && (%s) >/dev/null 2>&1"
+            GIT_AUTHOR_DATE=2026-01-01T00:00:00Z \
+            GIT_COMMITTER_DATE=2026-01-01T00:00:00Z && (%s) >/dev/null 2>&1"
            (Filename.quote t.dir)
            script)
       = 0)
@@ -1608,6 +1640,10 @@ let%expect_test "git_diff, review and init" =
   write t "new.txt" "hello\n";
   call t h ~params:{|{"path": "new.txt"}|} "git_diff";
   call t h ~params:{|{"path": 3}|} "git_diff";
+  call t h ~params:{|{"rev": "main"}|} "git_diff";
+  call t h "git_refs";
+  call t h ~params:{|{"rev": "main", "path": ".gitignore"}|} "git_show";
+  call t h ~params:{|{"rev": "main", "path": "new.txt"}|} "git_show";
   call t h "review";
   Agent.wait_idle (current h);
   call t h "init";
@@ -1616,8 +1652,12 @@ let%expect_test "git_diff, review and init" =
     {|
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
-    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false,"branch":"main","base":"HEAD","main":true,"branches":["main"]}}
+    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false,"branch":"main","base":"HEAD","main":true,"branches":["main"],"remote_branches":[],"tags":[],"commits":[{"sha":"<id><id>6a1a1555","subject":"init"}],"direct":false}}
     {"type":"response","id":"r1","ok":false,"error":"param \"path\" must be a string"}
+    {"type":"response","id":"r1","ok":false,"error":"nothing to compare main with: name a base (e.g. --base main)"}
+    {"type":"response","id":"r1","ok":true,"result":{"branches":["main"],"remote_branches":[],"tags":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"sessions\n","truncated":false}}
+    {"type":"response","id":"r1","ok":false,"error":"main has no file new.txt"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     |}]

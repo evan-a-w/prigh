@@ -14,7 +14,7 @@ module Target = struct
 
   let describe = function
     | Spawn -> "a local backend"
-    | Remote address -> address
+    | Remote address -> Prigh_ui.Server_address.display_string address
   ;;
 end
 
@@ -28,12 +28,27 @@ module Endpoint = struct
         { host : string
         ; port : int
         }
+    | Websocket of
+        { url : string
+        ; address : Prigh_ui.Server_address.t
+        ; headers : (string * string) list
+        }
   [@@deriving sexp_of]
 
   let open_ = function
     | Process { prog; args } ->
       Prigh_client_unix.Stdio_transport.spawn ~prog ~args ()
     | Tcp { host; port } -> Prigh_client_unix.Tcp_transport.connect ~host ~port
+    | Websocket { url; address; headers } ->
+      Prigh_client_unix.Websocket_transport.connect
+        ~headers
+        ~url
+        ~tls:address.tls
+        ~host:address.host
+        ~port:address.port
+        ~authority:(Prigh_ui.Server_address.authority address)
+        ~path:(Prigh_ui.Server_address.websocket_path address)
+        ()
   ;;
 end
 
@@ -116,6 +131,7 @@ type t =
   ; backend : string
   ; spawn_args : string list
   ; tools : Tools.t option
+  ; headers : (string * string) list
   ; hello : (string * Prigh_protocol.Json.t) list
   ; open_transport : Endpoint.t -> Transport.t Deferred.Or_error.t
   ; spawn_worker : unit -> Transport.t Deferred.Or_error.t
@@ -170,8 +186,10 @@ let endpoint t ~session : Target.t -> Endpoint.t Or_error.t = function
               | None -> [])
          })
   | Remote address ->
-    (match Server_link.parse_address address with
-     | Ok (host, port) -> Ok (Tcp { host; port })
+    (match Prigh_ui.Server_address.parse address with
+     | Ok { lines = true; host; port; _ } -> Ok (Tcp { host; port })
+     | Ok parsed ->
+       Ok (Websocket { url = address; address = parsed; headers = t.headers })
      | Error e -> Or_error.error_string e)
 ;;
 
@@ -221,6 +239,7 @@ let new_tool_host t =
 let create
       ?(open_transport = Endpoint.open_)
       ?spawn_worker
+      ?(headers = [])
       ~home
       ~backend
       ~spawn_args
@@ -249,6 +268,7 @@ let create
     ; backend
     ; spawn_args
     ; tools
+    ; headers
     ; hello
     ; open_transport
     ; spawn_worker =

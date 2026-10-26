@@ -52,7 +52,7 @@ let%expect_test "reconnecting after the backend goes away" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
@@ -203,7 +203,7 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
@@ -382,7 +382,7 @@ let%expect_test "an empty session the backend lost is replaced quietly" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     |}]
@@ -442,7 +442,7 @@ let%expect_test "the network and the page's visibility drive reconnecting" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
@@ -615,7 +615,7 @@ let%expect_test "losing the connection while a session loads" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
