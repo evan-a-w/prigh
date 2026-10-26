@@ -54,6 +54,8 @@ type t =
   | Search (** Ctrl+F: search the transcript *)
   | Prev_user_message (** Ctrl+Up: jump to the previous user message *)
   | Next_user_message (** Ctrl+Down: jump to the next user message *)
+  | Jump_to_bottom
+  (** Ctrl+End or a click on the indicator: back to the bottom, following *)
   | Toggle_archived (** Alt+A in the sessions picker *)
   | Review_highlighted (** Alt+R in the worktrees picker: review it *)
   | Toggle_sidebar (** Alt+L: the agents sidebar on wide terminals *)
