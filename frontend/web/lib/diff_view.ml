@@ -117,6 +117,35 @@ let highlighted lang rows =
   List.rev rev
 ;;
 
+let hunk_header text =
+  match String.chop_prefix text ~prefix:"@@ " with
+  | None -> [ Node.text text ]
+  | Some rest ->
+    (match String.substr_index rest ~pattern:" @@" with
+     | None -> [ Node.text text ]
+     | Some i ->
+       let range = "@@ " ^ String.prefix rest i ^ " @@" in
+       let context = String.strip (String.drop_prefix rest (i + 3)) in
+       [ Node.span ~attrs:[ Attr.class_ "hunk-range" ] [ Node.text range ] ]
+       @
+       if String.is_empty context
+       then []
+       else
+         [ Node.text " "
+         ; Node.span ~attrs:[ Attr.class_ "hunk-context" ] [ Node.text context ]
+         ])
+;;
+
+(* One number per row: the new one, or the old one of a removed line. *)
+let number_cell (kind : [ `Same | `Added | `Removed ]) ~old_line ~new_line =
+  match kind, old_line, new_line with
+  | `Removed, Some n, _ ->
+    Node.td ~attrs:[ Attr.class_ "ln old" ] [ Node.text (Int.to_string n) ]
+  | (`Same | `Added), _, Some n | `Removed, None, Some n ->
+    Node.td ~attrs:[ Attr.class_ "ln" ] [ Node.text (Int.to_string n) ]
+  | _, _, None -> Node.td ~attrs:[ Attr.class_ "ln" ] []
+;;
+
 let table ?lang ~numbers rows =
   let td cls text = Node.td ~attrs:[ Attr.class_ cls ] [ Node.text text ] in
   let tokens =
@@ -124,7 +153,6 @@ let table ?lang ~numbers rows =
     | Some lang -> highlighted lang rows
     | None -> List.map rows ~f:(fun _ -> None)
   in
-  let num = Option.value_map ~default:"" ~f:Int.to_string in
   Node.table
     ~attrs:[ Attr.class_ "diff" ]
     [ Node.tbody
@@ -135,8 +163,8 @@ let table ?lang ~numbers rows =
                ~attrs:[ Attr.class_ "hunk" ]
                [ Node.td
                    ~attrs:
-                     [ Attr.create "colspan" (if numbers then "4" else "2") ]
-                   [ Node.text text ]
+                     [ Attr.create "colspan" (if numbers then "3" else "2") ]
+                   (hunk_header text)
                ]
            | Line { kind; old_line; new_line; text } ->
              let cls, sign =
@@ -148,9 +176,12 @@ let table ?lang ~numbers rows =
              Node.tr
                ~attrs:[ Attr.class_ cls ]
                ((if numbers
-                 then [ td "ln" (num old_line); td "ln" (num new_line) ]
+                 then [ number_cell kind ~old_line ~new_line ]
                  else [])
-                @ [ td "sign" sign
+                @ [ Node.td
+                      ~attrs:
+                        [ Attr.class_ "sign"; Attr.create "aria-hidden" "true" ]
+                      [ Node.text sign ]
                   ; (match tokens with
                      | Some tokens ->
                        Node.td

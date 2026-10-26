@@ -46,9 +46,19 @@ let render (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
   in
   let comment (c : P.Review_comment.t) : Content.t =
     let range =
-      if c.first = c.last
-      then sprintf "line %d" c.first
-      else sprintf "lines %d–%d" c.first c.last
+      match c.range.columns with
+      | None -> P.Review_comment.Range.label c.range
+      | Some _ ->
+        let quote =
+          match String.split_lines (P.Review_comment.selected c) with
+          | [] -> ""
+          | [ line ] -> line
+          | line :: _ -> line ^ "…"
+        in
+        sprintf
+          "%s “%s”"
+          (P.Review_comment.Range.label c.range)
+          (Text_width.truncate quote ~width:40)
     in
     let state =
       match c.status with
@@ -108,7 +118,7 @@ let render (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
          Content.Line.of_string ("  " ^ c.path) :: comment c))
   @ [ Content.Line.of_string
         ~style:gray
-        "approve files and comment on lines in prigh-web's review page; \
-         /review HEAD has prigh review the changes itself"
+        "approve files and comment on code you select in prigh-web's review \
+         page; /review HEAD has prigh review the changes itself"
     ]
 ;;

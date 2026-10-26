@@ -70,28 +70,36 @@ let comment_json
       ?(status = "open")
       ?(thread = [])
       ?(anchor = "let c = 3 * 2\nlet d = 4")
+      ?side
+      ?columns
       id
       ~first
       ~last
       text
   =
+  let number n = `Number (Int.to_string n) in
   Jsonaf.to_string
     (`Object
-        [ "id", `String id
-        ; "root", `String "/home/me/proj"
-        ; "path", `String "src/main.ml"
-        ; "first", `Number (Int.to_string first)
-        ; "last", `Number (Int.to_string last)
-        ; "anchor", `String anchor
-        ; "status", `String status
-        ; ( "thread"
-          , `Array
-              (Jsonaf.of_string
-                 (sprintf
-                    {|{"author":"user","text":%S,"at_ms":1791194400000,"delivered":false}|}
-                    text)
-               :: List.map thread ~f:Jsonaf.of_string) )
-        ])
+        ([ "id", `String id
+         ; "root", `String "/home/me/proj"
+         ; "path", `String "src/main.ml"
+         ; "first", number first
+         ; "last", number last
+         ]
+         @ Option.value_map side ~default:[] ~f:(fun side ->
+           [ "side", `String side ])
+         @ Option.value_map columns ~default:[] ~f:(fun (a, b) ->
+           [ "start_col", number a; "end_col", number b ])
+         @ [ "anchor", `String anchor
+           ; "status", `String status
+           ; ( "thread"
+             , `Array
+                 (Jsonaf.of_string
+                    (sprintf
+                       {|{"author":"user","text":%S,"at_ms":1791194400000,"delivered":false}|}
+                       text)
+                  :: List.map thread ~f:Jsonaf.of_string) )
+           ]))
 ;;
 
 let review_event ?(approvals = "[]") comments =
@@ -158,11 +166,11 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     src/main.ml
     (Approve)
     @@ -2,3 +2,4 @@
-    2 2 let b = 2
+    2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
-    4 5 let e = 5
+    5 let e = 5
     |}];
   H.elements h ~selector:".app";
   [%expect {| <div class="app reviewing sidebar-open"> |}];
@@ -257,56 +265,111 @@ let%expect_test
     |}]
 ;;
 
+let point side line offset =
+  { Prigh_web.Code_selection.Point.side; line; offset }
+;;
+
+let select h ?pop start end_ =
+  H.act h (Review (Select_text { path = "src/main.ml"; start; end_; pop }))
+;;
+
 let%expect_test
-    "commenting on lines, sending, the agent's reply and its proposal"
+    "commenting on selected code, sending, the agent's reply and its proposal"
   =
   let h = opened () in
-  H.click h ~selector:"tr[data-line='3'] td.ln.pick";
-  H.act
+  (* The page reports text selected from line 3 into line 4: the Comment
+     button floats by its end. *)
+  select
     h
-    (Review (Select_line { path = "src/main.ml"; line = 4; extend = true }));
-  H.text h ~selector:".review-select-bar";
+    (point New 3 8)
+    (point New 4 5)
+    ~pop:{ Prigh_web.Code_review.Pop.left = 140; top = 96 };
+  H.show h ~selector:".review-pop";
   [%expect
     {|
     (Complete_accept (run true))
-    (Review (Select_line (path src/main.ml) (line 3) (extend false)))
-    (Comment on lines 3–4) (Clear)
+    <div class="review-pop" style={ left: 140px; top: 96px; }>
+      <button type="button"
+              title="Comment on the selected code (c)"
+              class="btn primary small"
+              @on_click
+              @on_mousedown>
+        <icon class="pencil"> </icon>
+        Comment
+        <kbd class="review-pop-key"> c </kbd>
+      </button>
+    </div>
     |}];
-  H.elements h ~selector:"tr.selected";
-  [%expect
-    {|
-    <tr class="add sel-first selected">
-    <tr class="add selected">
-    |}];
-  H.key h "c" ~target:Review;
-  H.input h ~selector:"#review-draft" "Why double it?";
-  H.click h ~selector:".review-draft-actions .btn.primary";
+  (* Rows are not drawn again for it: the page's own highlight shows it. *)
+  H.elements h ~selector:".review-diff tr.selected";
+  H.elements h ~selector:".review-diff mark";
+  [%expect {| |}];
+  (* c (wherever the focus is, but in a field) opens the comment box, the
+     selected text quoted. *)
+  H.key h "c" ~target:Page;
+  H.text h ~selector:".review-thread.draft";
   [%expect
     {|
     (Review Start_comment)
     (Focus review-draft)
+    Comment on lines 3–4
+    3 * 2
+    let d
+    []
+    Enter adds it · Shift+Enter a new line · Esc cancels (Cancel) (Add comment)
+    |}];
+  (* While it is written, its code stays marked. *)
+  H.elements h ~selector:".review-diff mark";
+  H.elements h ~selector:".review-pop";
+  [%expect
+    {|
+    <mark class="draft review-mark">
+    <mark class="draft review-mark">
+    |}];
+  H.input h ~selector:"#review-draft" "Why double it?";
+  H.click h ~selector:".review-draft-actions .btn.primary";
+  [%expect
+    {|
     (Review (Draft_input "Why double it?"))
     (Review Draft_send)
     (Rpc (method_ review_comment)
      (params
-      ((root /home/me/proj) (path src/main.ml) (first 3) (last 4)
-       (anchor  "let c = 3 * 2\
-               \nlet d = 4")
+      ((root /home/me/proj) (path src/main.ml) (first 3) (last 4) (side new)
+       (start_col 8) (end_col 5) (anchor  "let c = 3 * 2\
+                                         \nlet d = 4")
        (text "Why double it?")))
      (tag (Review Comment_added)))
     |}];
   H.reply
     h
     "review_comment"
-    (comment_json "c1" ~first:3 ~last:4 "Why double it?");
+    (comment_json "c1" ~first:3 ~last:4 ~columns:(8, 5) "Why double it?");
   H.text h ~selector:".review-thread";
   [%expect
     {|
     c1 lines 3–4
     (Resolve) (Delete the comment and its thread)
+    3 * 2
+    let d
     You 10:00 not sent yet
     Why double it?
     []
+    |}];
+  (* Its code stays marked; pointing at the thread lights it, and the other
+     way round. *)
+  H.elements h ~selector:".review-diff mark";
+  H.act h (Review (Hover (Some "c1")));
+  H.elements h ~selector:".review-diff mark.hot";
+  H.elements h ~selector:".review-thread.hot";
+  H.act h (Review (Hover None));
+  H.elements h ~selector:".hot";
+  [%expect
+    {|
+    <mark class="review-mark">
+    <mark class="review-mark">
+    <mark class="hot review-mark">
+    <mark class="hot review-mark">
+    <article class="hot review-thread">
     |}];
   H.text h ~selector:".review-controls .btn.primary";
   H.key h "s" ~target:Review;
@@ -326,6 +389,7 @@ let%expect_test
            "c1"
            ~first:3
            ~last:4
+           ~columns:(8, 5)
            "Why double it?"
            ~thread:
              [ {|{"author":"agent","text":"It **scales**. Or:","at_ms":1791194460000,"delivered":true,
@@ -337,6 +401,8 @@ let%expect_test
     {|
     c1 lines 3–4
     (Resolve) (Delete the comment and its thread)
+    3 * 2
+    let d
     You 10:00 not sent yet
     Why double it?
     prigh 10:01
@@ -360,6 +426,7 @@ let%expect_test
        "c1"
        ~first:3
        ~last:4
+       ~columns:(8, 5)
        "Why double it?"
        ~thread:
          [ {|{"author":"agent","text":"Or:","at_ms":1791194460000,"delivered":true,
@@ -402,17 +469,17 @@ let%expect_test
   [%expect
     {|
     (Complete_accept (run true))
-    c2 line 2 its lines changed
+    c2 line 2 its code changed
     (Resolve) (Delete the comment and its thread)
     You 10:00 not sent yet
     Gone?
     []
     @@ -2,3 +2,4 @@
-    2 2 let b = 2
+    2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
-    4 5 let e = 5
+    5 let e = 5
     c1 line 5
     (Resolve) (Delete the comment and its thread)
     You 10:00 not sent yet
@@ -433,25 +500,25 @@ let%expect_test "the whole file with the changes inline" =
     {|
     (Complete_accept (run true))
     (Review (Set_layout Full))
-    1 1 let a = 1
-    2 2 let b = 2
+    1 let a = 1
+    2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
-    4 5 let e = 5
-    5 6 let f = 6
+    5 let e = 5
+    6 let f = 6
     |}];
   H.act h (Review (Set_mode Comment));
   H.text h ~selector:".review-code";
   [%expect
     {|
-    1 1 let a = 1
-    2 2 let b = 2
+    1 let a = 1
+    2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
-    4 5 let e = 5
-    5 6 let f = 6
+    5 let e = 5
+    6 let f = 6
     |}]
 ;;
 
@@ -591,11 +658,11 @@ let%expect_test
     (Changes) (Whole file)
     (Review)
     @@ -2,3 +2,4 @@
-    2 2 let b = 2
+    2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
-    4 5 let e = 5
+    5 let e = 5
     |}];
   H.click h ~selector:".files-preview-body .review-open";
   [%expect
@@ -618,6 +685,183 @@ let%expect_test
   [%expect {| |}]
 ;;
 
+let%expect_test
+    "removed lines: their old text; a mixed selection keeps the file's own"
+  =
+  let h = opened () in
+  H.quiet h (fun () ->
+    select h (point Old 3 4) (point Old 3 5) ~pop:{ left = 60; top = 70 };
+    H.key h "c" ~target:Review);
+  H.text h ~selector:".review-thread.draft";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    (Review Start_comment)
+    Comment on old line 3 old text
+    c
+    []
+    Enter adds it · Shift+Enter a new line · Esc cancels (Cancel) (Add comment)
+    |}];
+  (* The box shows under the removed line. *)
+  H.elements h ~selector:"tr[data-side='old'] + tr.review-insert";
+  H.input h ~selector:"#review-draft" "Keep c?";
+  H.act h (Review Draft_send);
+  [%expect
+    {|
+    <tr class="review-insert">
+    (Review (Draft_input "Keep c?"))
+    (Rpc (method_ review_comment)
+     (params
+      ((root /home/me/proj) (path src/main.ml) (first 3) (last 3) (side old)
+       (start_col 4) (end_col 5) (anchor "let c = 3") (text "Keep c?")))
+     (tag (Review Comment_added)))
+    |}];
+  H.reply
+    h
+    "review_comment"
+    (comment_json
+       "c1"
+       ~first:3
+       ~last:3
+       ~side:"old"
+       ~columns:(4, 5)
+       ~anchor:"let c = 3"
+       "Keep c?");
+  H.text h ~selector:".review-thread";
+  H.elements h ~selector:"tr[data-side='old'] mark";
+  [%expect
+    {|
+    c1 old line 3 old text
+    (Resolve) (Delete the comment and its thread)
+    c
+    You 10:00 not sent yet
+    Keep c?
+    []
+    <mark class="review-mark">
+    |}];
+  (* From the removed line into the added one: only the added one's part. *)
+  select h (point Old 3 2) (point New 3 5);
+  H.key h "c" ~target:Page;
+  H.text h ~selector:".review-thread.draft .review-thread-head";
+  H.text h ~selector:".review-thread.draft .review-quote";
+  [%expect
+    {|
+    (Review Start_comment)
+    (Focus review-draft)
+    Comment on line 3
+    let c
+    |}];
+  (* Esc drops it, nothing sent. *)
+  H.key h "Escape" ~target:Review;
+  H.elements h ~selector:".review-thread.draft";
+  [%expect {| (Review Draft_cancel) |}]
+;;
+
+let%expect_test "a line's number selects it, Shift+click to another" =
+  let h = opened () in
+  H.click h ~selector:"tr[data-side='new'][data-line='3'] td.ln.pick";
+  H.act
+    h
+    (Review
+       (Select_line
+          { path = "src/main.ml"; side = New; line = 4; extend = true }));
+  H.text h ~selector:".review-select-bar";
+  H.elements h ~selector:"tr.selected";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    (Review (Select_line (path src/main.ml) (side New) (line 3) (extend false)))
+    Clear_text_selection
+    Clear_text_selection
+    (Comment on lines 3–4) (Clear)
+    <tr class="add sel-first selected">
+    <tr class="add selected">
+    |}];
+  H.key h "c" ~target:Review;
+  H.input h ~selector:"#review-draft" "Both?";
+  H.act h (Review Draft_send);
+  [%expect
+    {|
+    (Review Start_comment)
+    (Focus review-draft)
+    (Review (Draft_input Both?))
+    (Rpc (method_ review_comment)
+     (params
+      ((root /home/me/proj) (path src/main.ml) (first 3) (last 4) (side new)
+       (anchor  "let c = 3 * 2\
+               \nlet d = 4")
+       (text Both?)))
+     (tag (Review Comment_added)))
+    |}];
+  (* Without a selection, c says how to make one. *)
+  H.reply h "review_comment" (comment_json "c1" ~first:3 ~last:4 "Both?");
+  H.key h "c" ~target:Review;
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Review Start_comment)
+    (Expire_toast (id 0) (after_ms 4420))
+    Select the code to comment on first: drag across it, then Comment (or c).
+    |}]
+;;
+
+let%expect_test "the comment and reply fields' keys" =
+  let t = (H.model (opened ())).review in
+  List.iter
+    [ `Draft, "Enter", false, false
+    ; `Draft, "Enter", true, false
+    ; `Draft, "Enter", false, true
+    ; `Draft, "Escape", false, false
+    ; `Reply "c1", "Enter", false, false
+    ; `Reply "c1", "Enter", true, false
+    ; `Editor, "s", false, true
+    ]
+    ~f:(fun (field, key, shift, ctrl) ->
+      print_s
+        [%sexp
+          (key : string)
+        , ~~(shift : bool)
+        , ~~(ctrl : bool)
+        , (Prigh_web.Code_review.field_key
+             t
+             ~field
+             ~key
+             ~shift
+             ~ctrl
+             ~meta:false
+           : Prigh_web.Code_review.Action.t option)]);
+  [%expect
+    {|
+    (Complete_accept (run true))
+    (Enter (shift false) (ctrl false) (Draft_send))
+    (Enter (shift true) (ctrl false) ())
+    (Enter (shift false) (ctrl true) (Draft_send))
+    (Escape (shift false) (ctrl false) (Draft_cancel))
+    (Enter (shift false) (ctrl false) ((Reply_send c1)))
+    (Enter (shift true) (ctrl false) ())
+    (s (shift false) (ctrl true) ())
+    |}]
+;;
+
+let%expect_test "a comment saved before selections reads as whole lines" =
+  let h = opened () in
+  H.event
+    h
+    (review_event
+       [ comment_json "c1" ~first:3 ~last:3 ~anchor:"let c = 3 * 2" "Old" ]);
+  H.text h ~selector:".review-thread-head";
+  H.elements h ~selector:"tr.commented";
+  H.elements h ~selector:".review-diff mark";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    c1 line 3
+    (Resolve) (Delete the comment and its thread)
+    <tr class="add commented">
+    <mark class="review-mark">
+    |}]
+;;
+
 let%expect_test "help lists the review's keys" =
   List.iter Prigh_web.Keys.help ~f:(fun (key, what) ->
     if String.is_substring key ~substring:"review" || String.equal key "Alt+R"
@@ -626,8 +870,8 @@ let%expect_test "help lists the review's keys" =
     {|
     Alt+R: open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k): the next / previous changed file
-    a / c / e / v / s (reviewing): approve the file; comment on the selected lines (click a line number, Shift+click for a range); edit or comment; the whole file or the changes; send the new comments to prigh
+    a / c / e / v / s (reviewing): approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     Esc (reviewing): drop the comment or selection, then close the review
-    Ctrl+Enter / Ctrl+S (reviewing): add the comment or reply; save the file being edited
+    Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
     |}]
 ;;

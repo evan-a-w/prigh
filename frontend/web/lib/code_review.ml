@@ -17,12 +17,21 @@ module Layout = struct
   [@@deriving sexp_of, equal]
 end
 
+module Pop = struct
+  type t =
+    { left : int
+    ; top : int
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Selection = struct
   type t =
     { path : string
-    ; first : int
-    ; last : int
-    ; from : int
+    ; range : Review_comment.Range.t
+    ; anchor : string
+    ; from : Code_selection.Point.t option
+    ; pop : Pop.t option
     }
   [@@deriving sexp_of, equal]
 end
@@ -30,8 +39,8 @@ end
 module Draft = struct
   type t =
     { path : string
-    ; first : int
-    ; last : int
+    ; range : Review_comment.Range.t
+    ; anchor : string
     ; text : string
     ; busy : bool
     }
@@ -76,6 +85,7 @@ type t =
   ; layout : Layout.t
   ; selection : Selection.t option
   ; draft : Draft.t option
+  ; hover : string option
   ; replies : string String.Map.t
   ; busy : String.Set.t
   ; contents : Content.t String.Map.t
@@ -98,6 +108,7 @@ let empty =
   ; layout = Unified
   ; selection = None
   ; draft = None
+  ; hover = None
   ; replies = String.Map.empty
   ; busy = String.Set.empty
   ; contents = String.Map.empty
@@ -131,6 +142,7 @@ module Out = struct
         ; error : bool
         }
     | Focus of string
+    | Clear_text_selection
   [@@deriving sexp_of, equal]
 end
 
@@ -145,11 +157,19 @@ module Action = struct
     | Set_layout of Layout.t
     | Select_line of
         { path : string
+        ; side : Review_comment.Side.t
         ; line : int
         ; extend : bool
         }
+    | Select_text of
+        { path : string
+        ; start : Code_selection.Point.t
+        ; end_ : Code_selection.Point.t
+        ; pop : Pop.t option
+        }
     | Clear_selection
     | Start_comment
+    | Hover of string option
     | Draft_input of string
     | Draft_cancel
     | Draft_send
@@ -326,29 +346,134 @@ let step t by =
     show t (List.nth_exn paths i)
 ;;
 
-let comment_busy t id = { t with busy = Set.add t.busy id }
-
-let selected_anchor t (s : Selection.t) =
-  match Map.find t.contents s.path with
-  | Some (Loaded { text; _ }) ->
-    let lines = Array.of_list (String.split_lines text) in
-    List.range s.first (s.last + 1)
-    |> List.filter_map ~f:(fun i ->
-      if i - 1 < Array.length lines then Some lines.(i - 1) else None)
-    |> String.concat ~sep:"\n"
-  | Some (Loading | Failed _) | None ->
-    (* Without the text, the diff's lines. *)
-    (match file t s.path with
-     | None -> ""
-     | Some f ->
-       Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
-       |> List.filter_map ~f:(fun (row : Diff_view.Row.t) ->
-         match row with
-         | Line { new_line = Some n; text; _ } when n >= s.first && n <= s.last
-           -> Some text
-         | Line _ | Hunk _ -> None)
-       |> String.concat ~sep:"\n")
+(* The whole file with the hunks' changes inline: the lines between hunks
+   are the file's own. *)
+let full_rows (hunk_rows : Diff_view.Row.t list) (lines : string array) =
+  let out = ref [] in
+  let old_n = ref 1 in
+  let new_n = ref 1 in
+  let fill_to last =
+    while !new_n <= last && !new_n <= Array.length lines do
+      out
+      := Diff_view.Row.Line
+           { kind = `Same
+           ; old_line = Some !old_n
+           ; new_line = Some !new_n
+           ; text = lines.(!new_n - 1)
+           }
+         :: !out;
+      incr old_n;
+      incr new_n
+    done
+  in
+  List.iter hunk_rows ~f:(fun (row : Diff_view.Row.t) ->
+    match row with
+    | Hunk header ->
+      (match Diff_view.hunk_starts header with
+       | Some (o, n) ->
+         fill_to (n - 1);
+         old_n := Int.max o 1;
+         new_n := Int.max n 1
+       | None -> ())
+    | Line { kind; _ } ->
+      out := row :: !out;
+      (match kind with
+       | `Same ->
+         incr old_n;
+         incr new_n
+       | `Added -> incr new_n
+       | `Removed -> incr old_n));
+  fill_to (Array.length lines);
+  List.rev !out
 ;;
+
+let plain_rows lines =
+  Array.to_list
+    (Array.mapi lines ~f:(fun i text ->
+       Diff_view.Row.Line
+         { kind = `Same
+         ; old_line = Some (i + 1)
+         ; new_line = Some (i + 1)
+         ; text
+         }))
+;;
+
+let text_of t path =
+  match Map.find t.contents path with
+  | Some (Loaded { text; _ }) -> Some text
+  | Some (Loading | Failed _) | None -> None
+;;
+
+module Rows = struct
+  (* Made once per file version and layout, so that a key press or a
+     streamed delta does not split a file again, and so that the rows stay
+     the same values (the view's caches are keyed by them). *)
+  type key =
+    { path : string
+    ; hash : string option
+    ; text : string option
+    ; full : bool
+    }
+
+  let memo : (string, key * Diff_view.Row.t list) Hashtbl.t =
+    Hashtbl.create (module String)
+  ;;
+
+  let same a b =
+    String.equal a.path b.path
+    && Option.equal String.equal a.hash b.hash
+    && Option.equal phys_equal a.text b.text
+    && Bool.equal a.full b.full
+  ;;
+
+  let find key ~make =
+    match Hashtbl.find memo key.path with
+    | Some (k, rows) when same k key -> rows
+    | Some _ | None ->
+      let rows = make () in
+      Hashtbl.set memo ~key:key.path ~data:(key, rows);
+      rows
+  ;;
+end
+
+let rows t ~path =
+  let file = file t path in
+  let text = text_of t path in
+  let full = Layout.equal t.layout Full in
+  Rows.find
+    { path
+    ; hash = Option.map file ~f:(fun f -> f.hash)
+    ; text = (if full || Option.is_none file then text else None)
+    ; full
+    }
+    ~make:(fun () ->
+      let lines () =
+        Array.of_list (String.split_lines (Option.value text ~default:""))
+      in
+      match file with
+      | None -> plain_rows (lines ())
+      | Some f ->
+        let hunk_rows =
+          Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
+        in
+        if full && Option.is_some text
+        then full_rows hunk_rows (lines ())
+        else hunk_rows)
+;;
+
+let lines t path =
+  Option.map (text_of t path) ~f:(fun text ->
+    Array.of_list (String.split_lines text))
+;;
+
+let select t ~path ~start ~end_ ~pop =
+  Option.map
+    (Code_selection.resolve (rows t ~path) ~lines:(lines t path) ~start ~end_)
+    ~f:(fun (range, anchor) ->
+      { Selection.path; range; anchor; from = None; pop })
+;;
+
+let comment_busy t id = { t with busy = Set.add t.busy id }
 
 let update t (action : Action.t) =
   match action with
@@ -400,35 +525,55 @@ let update t (action : Action.t) =
     (match layout, t.current with
      | Full, Some path -> fetch_content t path
      | _ -> t, [])
-  | Select_line { path; line; extend } ->
-    let selection =
+  | Select_line { path; side; line; extend } ->
+    let here = { Code_selection.Point.side; line; offset = 0 } in
+    let from =
       match t.selection with
-      | Some s when extend && String.equal s.path path ->
-        { s with first = Int.min s.from line; last = Int.max s.from line }
-      | Some _ | None ->
-        { Selection.path; first = line; last = line; from = line }
+      | Some { path = p; from = Some from; _ }
+        when extend && String.equal p path -> from
+      | Some _ | None -> here
     in
     let t, outs = fetch_content t path in
-    { t with selection = Some selection }, outs
-  | Clear_selection -> { t with selection = None }, []
+    (match
+       Code_selection.whole_lines
+         (rows t ~path)
+         ~lines:(lines t path)
+         ~from
+         ~to_:here
+     with
+     | Some (range, anchor) ->
+       ( { t with
+           selection =
+             Some { path; range; anchor; from = Some from; pop = None }
+         }
+       , outs @ [ Out.Clear_text_selection ] )
+     | None -> t, outs @ [ toast "The file is still being read: try again." ])
+  | Select_text { path; start; end_; pop } ->
+    { t with selection = select t ~path ~start ~end_ ~pop }, []
+  | Clear_selection ->
+    if Option.is_some t.selection
+    then { t with selection = None }, [ Out.Clear_text_selection ]
+    else t, []
+  | Hover hover -> { t with hover }, []
   | Start_comment ->
     (match t.selection with
      | None ->
        ( t
        , [ toast
-             "Select lines first: click a line's number (Shift+click for a \
-              range)."
+             "Select the code to comment on first: drag across it, then \
+              Comment (or c)."
          ] )
      | Some s ->
        ( { t with
            draft =
              Some
                { path = s.path
-               ; first = s.first
-               ; last = s.last
+               ; range = s.range
+               ; anchor = s.anchor
                ; text = ""
                ; busy = false
                }
+         ; selection = None
          }
        , [ Out.Focus "review-draft" ] ))
   | Draft_input text ->
@@ -439,19 +584,13 @@ let update t (action : Action.t) =
      | Some d, _ when String.is_empty (String.strip d.text) ->
        t, [ toast "Write the comment first." ]
      | Some ({ busy = false; _ } as d), Some root ->
-       let anchor =
-         selected_anchor
-           t
-           { path = d.path; first = d.first; last = d.last; from = d.first }
-       in
        ( { t with draft = Some { d with busy = true } }
        , [ rpc
              (Review_comment
                 { root
                 ; path = d.path
-                ; first = d.first
-                ; last = d.last
-                ; anchor
+                ; range = d.range
+                ; anchor = d.anchor
                 ; text = d.text
                 })
              Comment_added
@@ -485,7 +624,7 @@ let update t (action : Action.t) =
   | Submit ->
     if unsent t = 0
     then
-      t, [ toast "No new comments to send: select lines to comment on them." ]
+      t, [ toast "No new comments to send: select some code to comment on it." ]
     else if t.submitting
     then t, []
     else { t with submitting = true }, [ rpc Review_submit Submitted ]
@@ -760,12 +899,12 @@ let toggle_key ~code ~shift ~ctrl ~alt ~meta =
   alt && (not (ctrl || shift || meta)) && String.equal code "KeyR"
 ;;
 
-let field_key t ~field ~key ~ctrl ~meta : Action.t option =
+let field_key t ~field ~key ~shift ~ctrl ~meta : Action.t option =
   let command = ctrl || meta in
   match field, key with
-  | `Draft, "Enter" when command -> Some Draft_send
+  | `Draft, "Enter" when command || not shift -> Some Draft_send
   | `Draft, "Escape" -> Some Draft_cancel
-  | `Reply id, "Enter" when command -> Some (Reply_send id)
+  | `Reply id, "Enter" when command || not shift -> Some (Reply_send id)
   | `Editor, ("s" | "S") when command && Option.is_some t.editor -> Some Save
   | _ -> None
 ;;

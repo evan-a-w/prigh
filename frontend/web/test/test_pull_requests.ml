@@ -178,9 +178,9 @@ let%expect_test "a pull request: state, branches, checks, description, diff" =
     Changes 1 file changed, +1 −0
     README.md +1 −0
     @@ -1,2 +1,3 @@
-    1 1 # prigh
+    1 # prigh
     2 + Git hosting.
-    2 3 A coding agent.
+    3 A coding agent.
     Esc closes (Open on GitHub) (Check out) (Done)
     |}];
   H.show h ~selector:".modal-buttons a";

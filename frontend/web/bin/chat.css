@@ -755,20 +755,33 @@ table.diff td.ln {
   color: var(--faint);
   text-align: right;
   min-width: 3.5ch;
-  padding: 0 6px 0 10px;
+  padding: 0 4px 0 10px;
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
-table.diff td.sign { padding: 0 6px; user-select: none; color: var(--faint); }
+/* One number per row: a removed line's is its old one, struck through. */
+table.diff td.ln.old {
+  color: color-mix(in srgb, var(--del-fg) 45%, var(--faint));
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--del-fg) 40%, transparent);
+}
+table.diff td.sign { padding: 0 6px 0 4px; user-select: none; color: var(--faint); }
 table.diff tr.add { background: var(--add-bg); }
 table.diff tr.add td.text, table.diff tr.add td.sign { color: var(--add-fg); }
 table.diff tr.del { background: var(--del-bg); }
 table.diff tr.del td.text, table.diff tr.del td.sign { color: var(--del-fg); }
+/* The bar down the gutter's edge says added or removed without colour too
+   (the sign does). */
+table.diff tr.add td.sign { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--add-fg) 70%, transparent); }
+table.diff tr.del td.sign { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--del-fg) 70%, transparent); }
 table.diff tr.hunk td {
-  color: var(--muted);
+  color: var(--faint);
   padding: 6px 10px 2px;
   font-size: 11.5px;
+  user-select: none;
 }
+table.diff tr.hunk .hunk-range { color: var(--faint); }
+table.diff tr.hunk .hunk-context { color: var(--muted); margin-left: 0.5ch; }
 .diff-view .fold { margin-top: 2px; }
 .diff-view .fold[aria-expanded="true"] { border-radius: 0; }
 

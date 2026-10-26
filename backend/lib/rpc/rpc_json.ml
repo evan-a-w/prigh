@@ -195,15 +195,21 @@ let review_comment (c : Review_comment.t) =
          ])
   in
   `Object
-    [ "id", str c.id
-    ; "root", str c.root
-    ; "path", str c.path
-    ; "first", int c.range.first
-    ; "last", int c.range.last
-    ; "anchor", str c.anchor
-    ; "status", str (Review_comment.Status.to_string c.status)
-    ; "thread", `Array (List.map c.thread ~f:post)
-    ]
+    ([ "id", str c.id
+     ; "root", str c.root
+     ; "path", str c.path
+     ; "first", int c.range.first
+     ; "last", int c.range.last
+     ; "side", str (Review_comment.Side.to_string c.range.side)
+     ]
+     @ (match c.range.columns with
+        | None -> []
+        | Some { start_col; end_col } ->
+          [ "start_col", int start_col; "end_col", int end_col ])
+     @ [ "anchor", str c.anchor
+       ; "status", str (Review_comment.Status.to_string c.status)
+       ; "thread", `Array (List.map c.thread ~f:post)
+       ])
 ;;
 
 let review (r : Review_state.t) =

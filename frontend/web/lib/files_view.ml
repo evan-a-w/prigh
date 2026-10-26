@@ -540,7 +540,11 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
          in
          ignore (text : string);
          [ code_review_bar m path ~inject
-         ; Review_code_view.view m ~path ~inject
+         ; (* The review page shows it (and the panel is hidden): one place
+              for its selection and comment box. *)
+           (if m.review.open_
+            then div ~cls:"files-note" [ Node.text "Shown in the review." ]
+            else Review_code_view.view m ~path ~inject)
          ]
        | Text { text; truncated; md5 = _ } -> text_preview p ~text ~truncated
        | Image { url = Some url; mime } ->

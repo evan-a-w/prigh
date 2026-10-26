@@ -37,6 +37,35 @@ let int params name =
   | None -> Or_error.errorf "missing param %S" name
 ;;
 
+let optional f params name =
+  match param params name with
+  | None | Some `Null -> Ok None
+  | Some _ -> Or_error.map (f params name) ~f:Option.some
+;;
+
+(* [side] defaults to new; [start_col] and [end_col] come together. *)
+let range params ~first ~last : Review_comment.Range.t Or_error.t =
+  let open Or_error.Let_syntax in
+  let%bind side =
+    match%bind optional string params "side" with
+    | None -> Ok Review_comment.Side.New
+    | Some s -> Review_comment.Side.of_string s
+  in
+  let%bind start_col = optional int params "start_col" in
+  let%bind end_col = optional int params "end_col" in
+  let%map columns =
+    match start_col, end_col with
+    | None, None -> Ok None
+    | Some start_col, Some end_col ->
+      Ok (Some { Review_comment.Columns.start_col; end_col })
+    | Some _, None | None, Some _ ->
+      Or_error.error_string
+        "a selection needs both start_col and end_col (or neither, for whole \
+         lines)"
+  in
+  { Review_comment.Range.first; last; side; columns }
+;;
+
 let bool params name =
   match param params name with
   | Some `True -> Ok true
@@ -66,17 +95,11 @@ let dispatch agent ~meth ~params =
        let%bind path = string params "path" in
        let%bind first = int params "first" in
        let%bind last = int params "last" in
+       let%bind range = range params ~first ~last in
        let%bind anchor = string params "anchor" in
        let%bind text = string params "text" in
        comment agent ~f:(fun r ->
-         Review_state.add
-           r
-           ~root
-           ~path
-           ~range:{ first; last }
-           ~anchor
-           ~text
-           ~at:(now agent)))
+         Review_state.add r ~root ~path ~range ~anchor ~text ~at:(now agent)))
   | "review_reply" ->
     Some
       (let%bind id = string params "id" in

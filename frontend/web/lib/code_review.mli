@@ -4,8 +4,9 @@ open! Import
 (** Reviewing the working tree's changes: the session's diff (kept fresh
     while something shows it), the review the backend keeps ([Review]: the
     comments with their threads and the files' approvals), and what the user
-    is doing with them: the review page's file and mode, a selection of lines
-    and the comment being written on them, replies being typed, the file
+    is doing with them: the review page's file and mode, the code selected
+    (text dragged across, or lines by their numbers) and the comment being
+    written on it, replies being typed, the file
     being edited. Shared by the review page and the file browser's preview of
     a changed file. Pure: [update] and [reply] return [Out.t]s, which [App]
     turns into requests and toasts.
@@ -15,7 +16,7 @@ open! Import
 
 module Mode : sig
   type t =
-    | Comment (** select lines and comment on them *)
+    | Comment (** select code and comment on it *)
     | Edit (** edit the file's text and save it on the tool host *)
   [@@deriving sexp_of, equal]
 end
@@ -27,23 +28,36 @@ module Layout : sig
   [@@deriving sexp_of, equal]
 end
 
+module Pop : sig
+  (** Where the selection's Comment button shows: pixels from the code
+      view's top left corner, below the selection's end. *)
+  type t =
+    { left : int
+    ; top : int
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Selection : sig
-  (** Lines of the file as it is now, 1-based, inclusive. *)
+  (** Code selected to comment on. *)
   type t =
     { path : string
-    ; first : int
-    ; last : int
-    ; from : int (** the line clicked first: shift-clicks extend from it *)
+    ; range : Review_comment.Range.t
+    ; anchor : string (** its lines' text *)
+    ; from : Code_selection.Point.t option
+      (** selected by a line's number: the line clicked first, which
+          Shift+clicks extend from *)
+    ; pop : Pop.t option (** selected as text: where its button shows *)
     }
   [@@deriving sexp_of, equal]
 end
 
 module Draft : sig
-  (** A comment being written on the selected lines. *)
+  (** A comment being written on the selection. *)
   type t =
     { path : string
-    ; first : int
-    ; last : int
+    ; range : Review_comment.Range.t
+    ; anchor : string
     ; text : string
     ; busy : bool (** sent, waiting for the backend *)
     }
@@ -90,6 +104,7 @@ type t =
   ; layout : Layout.t
   ; selection : Selection.t option
   ; draft : Draft.t option
+  ; hover : string option (** the comment pointed at: its thread or its code *)
   ; replies : string String.Map.t (** what is typed under a comment, by id *)
   ; busy : String.Set.t (** comments with a request on its way *)
   ; contents : Content.t String.Map.t
@@ -126,6 +141,7 @@ module Out : sig
         ; error : bool
         }
     | Focus of string (** an element's id, once rendered *)
+    | Clear_text_selection (** the page's: the selection is dropped *)
   [@@deriving sexp_of, equal]
 end
 
@@ -140,11 +156,19 @@ module Action : sig
     | Set_layout of Layout.t
     | Select_line of
         { path : string
+        ; side : Review_comment.Side.t
         ; line : int
         ; extend : bool (** shift-click: from the first line clicked *)
         }
+    | Select_text of
+        { path : string
+        ; start : Code_selection.Point.t
+        ; end_ : Code_selection.Point.t
+        ; pop : Pop.t option
+        } (** the page's selection changed (see {!Code_selection.resolve}) *)
     | Clear_selection
     | Start_comment (** on the selection *)
+    | Hover of string option (** a comment's thread or code, pointed at *)
     | Draft_input of string
     | Draft_cancel
     | Draft_send
@@ -202,6 +226,14 @@ val relative : t -> abs:string -> string option
 
 val file : t -> string -> Prigh_ui.Diff_files.File.t option
 
+(** The rows [path] shows: its hunks, the whole file with them inline
+    ([Full]), or an unchanged file's lines. The same value until the file,
+    its change or the layout changes. *)
+val rows : t -> path:string -> Diff_view.Row.t list
+
+(** [path]'s lines now, once read. *)
+val lines : t -> string -> string array option
+
 (** For the file browser's rows: whether [abs] is a changed file (with its
     approval) or a directory with changes inside. *)
 val mark
@@ -221,7 +253,7 @@ val unsent : t -> int
 
 (** The page's keys (focus on the page, not in a field): [\]] / [n] / [j]
     next file, [\[] / [p] / [k] previous, [a] approve, [c] comment on the
-    selection, [e] edit or comment mode, [v] the whole file or the hunks,
+    selected code, [e] edit or comment mode, [v] the whole file or the hunks,
     [s] send the comments, Esc clears the selection then closes. *)
 val key
   :  t
@@ -240,12 +272,13 @@ val toggle_key
   -> meta:bool
   -> bool
 
-(** In a comment or reply field: Ctrl/⌘+Enter sends, Esc cancels. In the
-    editor: Ctrl/⌘+S saves. *)
+(** In a comment or reply field: Enter (or Ctrl/⌘+Enter) sends, Shift+Enter
+    is a new line, Esc cancels. In the editor: Ctrl/⌘+S saves. *)
 val field_key
   :  t
   -> field:[ `Draft | `Reply of string | `Editor ]
   -> key:string
+  -> shift:bool
   -> ctrl:bool
   -> meta:bool
   -> Action.t option
