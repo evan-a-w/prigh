@@ -1519,8 +1519,258 @@ let sessions_command =
     ]
 ;;
 
+(* What the built-in tools' specifications add to each request, as
+   [Compaction_eval] counts tokens. *)
+let tools_overhead_tokens () =
+  List.sum
+    (module Int)
+    (Tools.all @ Tools.interaction)
+    ~f:(fun (t : Tool.t) ->
+      (String.length t.spec.name
+       + String.length t.spec.description
+       + String.length (Jsonaf.to_string t.spec.parameters))
+      / 4)
+;;
+
+(* A developer's tool, left out of the main help ([prigh compaction-eval]
+   runs it): replays saved sessions under each context-management strategy
+   (see [Compaction_eval]). *)
+let compaction_eval_command =
+  Command.basic
+    ~summary:
+      "Replay saved sessions under each context compaction strategy and \
+       compare their cost and what they keep (offline unless -live)"
+    (let%map_open.Command keys = anon (sequence ("SESSION" %: string))
+     and all = flag "-all" no_arg ~doc:" every saved session"
+     and min_messages =
+       flag
+         "-min-messages"
+         (optional_with_default 1 int)
+         ~doc:"N skip sessions with fewer messages (default 1)"
+     and window =
+       flag
+         "-window"
+         (optional int)
+         ~doc:"TOKENS context window (default: the session's model's)"
+     and threshold_tokens =
+       flag
+         "-threshold-tokens"
+         (optional int)
+         ~doc:"TOKENS summarise above this (default: 80% of the window)"
+     and keep_recent_tokens =
+       flag
+         "-keep-recent-tokens"
+         (optional_with_default
+            Compaction_eval.Config.default.keep_recent_tokens
+            int)
+         ~doc:"TOKENS kept verbatim by a summary (default 8000)"
+     and keep_turns =
+       flag
+         "-keep-turns"
+         (optional_with_default Compaction_eval.Config.default.keep_turns int)
+         ~doc:"N assistant messages never masked (default 10)"
+     and mask_min_bytes =
+       flag
+         "-mask-min-bytes"
+         (optional_with_default
+            Compaction_eval.Config.default.mask_min_bytes
+            int)
+         ~doc:"BYTES mask tool output at least this large (default 2048)"
+     and mask_at =
+       flag
+         "-mask-at"
+         (optional_with_default Compaction_eval.Config.default.mask_at float)
+         ~doc:
+           "FRACTION mask once the context is over this much of the window \
+            (0.5)"
+     and mask_min_saving =
+       flag
+         "-mask-min-saving"
+         (optional_with_default
+            Compaction_eval.Config.default.mask_min_saving
+            float)
+         ~doc:"FRACTION of the window a mask batch must free (0.1)"
+     and summary_tokens =
+       flag
+         "-summary-tokens"
+         (optional_with_default
+            Compaction_eval.Config.default.summary_tokens
+            int)
+         ~doc:"TOKENS size of the offline stub summary (default 2000)"
+     and overhead_tokens =
+       flag
+         "-overhead-tokens"
+         (optional int)
+         ~doc:
+           "TOKENS sent with each request besides the messages and the system \
+            prompt (default: the built-in tools' specifications)"
+     and strategies =
+       flag
+         "-strategies"
+         (optional string)
+         ~doc:
+           "LIST comma-separated: none,mask,summarise,mask+summarise (default \
+            all)"
+     and live =
+       flag
+         "-live"
+         no_arg
+         ~doc:
+           " summarise with a model and ask it about each final context (costs \
+            money)"
+     and model =
+       flag
+         "-model"
+         (optional string)
+         ~doc:"ID with -live, the model (default: each session's)"
+     and sexp = flag "-sexp" no_arg ~doc:" print the report as a sexp"
+     and json = flag "-json" no_arg ~doc:" print the report as JSON"
+     and auth_file = auth_file_path_flag in
+     fun () ->
+       let fail fmt =
+         ksprintf
+           (fun s ->
+              eprintf "%s\n" s;
+              exit 2)
+           fmt
+       in
+       if mask_min_bytes < 256 then fail "-mask-min-bytes: at least 256";
+       if List.is_empty keys && not all
+       then
+         fail
+           "name sessions (ids, as prigh sessions list shows, or files), or \
+            pass -all";
+       let strategies =
+         match strategies with
+         | None -> Compaction_eval.Strategy.all
+         | Some s ->
+           List.map (String.split s ~on:',') ~f:(fun s ->
+             match Compaction_eval.Strategy.of_string s with
+             | Ok s -> s
+             | Error e -> fail "-strategies: %s" (Error.to_string_hum e))
+       in
+       let config =
+         { Compaction_eval.Config.window
+         ; threshold_tokens
+         ; keep_recent_tokens
+         ; keep_turns
+         ; mask_min_bytes
+         ; mask_at
+         ; mask_min_saving
+         ; summary_tokens
+         ; overhead_tokens =
+             Option.value_or_thunk
+               overhead_tokens
+               ~default:tools_overhead_tokens
+         ; strategies
+         }
+       in
+       let dir = sessions_dir () in
+       let summaries = lazy (Session.list ~dir) in
+       let paths =
+         (if all
+          then
+            List.map (force summaries) ~f:(fun (s : Session.Summary.t) ->
+              s.path)
+          else [])
+         @ List.map keys ~f:(fun key ->
+           if Sys_unix.file_exists_exn key
+           then key
+           else (
+             match Session.find_summary (force summaries) key with
+             | Ok s -> s.path
+             | Error e ->
+               fail
+                 "%s: %s\nprigh sessions list shows the saved sessions (in %s)"
+                 key
+                 (Error.to_string_hum e)
+                 dir))
+       in
+       (* Loading only reads the files. *)
+       let sessions =
+         List.filter_map paths ~f:(fun path ->
+           match Session.load path with
+           | Error e ->
+             eprintf "skipping %s: %s\n%!" path (Error.to_string_hum e);
+             None
+           | Ok s ->
+             let messages =
+               List.count (Session.active_path s) ~f:(fun e ->
+                 match e.payload with
+                 | Message _ -> true
+                 | _ -> false)
+             in
+             Option.some_if (messages >= min_messages) s)
+       in
+       let evaluate ?live ?model () =
+         Compaction_eval.report
+           (List.map sessions ~f:(fun s ->
+              Compaction_eval.session ?live ?model config s))
+       in
+       let report =
+         if not live
+         then evaluate ()
+         else
+           Eio_main.run
+           @@ fun env ->
+           Eio.Switch.run
+           @@ fun sw ->
+           let { Namespace.World.home; store; getenv; _ } =
+             Namespace.World.legacy ~home:(home ()) ~auth_file
+           in
+           let models =
+             Model_registry.create ~env ~sw ~home ~store ~getenv ()
+           in
+           let provider =
+             Provider_router.create ~env ~getenv ~models ~store ()
+           in
+           let resolve id =
+             match Model_registry.resolve models id with
+             | Ok m -> m
+             | Error e ->
+               fail
+                 "-model: %s\nprigh models lists them all"
+                 (Error.to_string_hum e)
+           in
+           let model = Option.map model ~f:resolve in
+           let setup model =
+             { Compaction_eval.Live.Setup.provider
+             ; model
+             ; cancel = Cancellation.never
+             }
+           in
+           Compaction_eval.report
+             (List.map sessions ~f:(fun s ->
+                let model =
+                  match model with
+                  | Some m -> m
+                  | None ->
+                    (match Session.model s with
+                     | Some (key, _) -> resolve key
+                     | None -> default_model ~getenv ~models store)
+                in
+                Compaction_eval.session ~live:(setup model) ~model config s))
+       in
+       if sexp
+       then
+         print_endline
+           (Sexp.to_string_hum (Compaction_eval.Report.sexp_of_t report))
+       else if json
+       then
+         print_endline
+           (Jsonaf.to_string (Compaction_eval.Report.jsonaf_of_t report))
+       else print_string (Compaction_eval.Report.to_table report))
+;;
+
 let () =
   Random.self_init ();
+  (match Array.to_list (Sys.get_argv ()) with
+   | prog :: "compaction-eval" :: args ->
+     Command_unix.run
+       ~argv:((prog ^ " compaction-eval") :: args)
+       compaction_eval_command;
+     exit 0
+   | _ -> ());
   Command_unix.run
     ~version:Version.to_string
     (Command.group

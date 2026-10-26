@@ -396,3 +396,92 @@ let%expect_test
     [deepseek-flash] tokens: in=0 (cached 0) out=0 cost=$0.0000 session=$DIR/.prigh/sessions/<stamp>_<id>.jsonl
     |}]
 ;;
+
+let%expect_test "compaction-eval: a developer's tool, left out of the help" =
+  with_sandbox
+  @@ fun t ->
+  let dir = Filename.concat t.dir ".prigh/sessions" in
+  let s = Session.create ~dir ~cwd:"/proj" () in
+  let big = String.make 9000 'x' in
+  List.iter
+    ([ Message.user "Fix it. Don't touch the lexer." ]
+     @ List.concat_map (List.range 0 6) ~f:(fun i ->
+       let id = sprintf "c%d" i in
+       [ Message.Assistant
+           { content =
+               [ Tool_call
+                   { id
+                   ; name = "read"
+                   ; arguments = sprintf {|{"path":"f%d.ml"}|} i
+                   }
+               ]
+           ; stop_reason = Tool_use
+           ; usage = Usage.zero
+           ; model = "m"
+           }
+       ; Message.Tool_result
+           { tool_call_id = id
+           ; tool_name = "read"
+           ; text = big
+           ; is_error = false
+           ; images = []
+           }
+       ]))
+    ~f:(fun m -> ignore (Session.append_message s m : Session.Entry.t));
+  let before = In_channel.read_all (Session.path s) in
+  let p = spawn t [ "-help" ] in
+  Core_unix.close p.stdin;
+  let help = In_channel.input_all (Core_unix.in_channel_of_descr p.stdout) in
+  ignore (Core_unix.waitpid p.pid : (unit, _) Result.t);
+  printf
+    "in the help: %b\n"
+    (String.is_substring help ~substring:"compaction-eval");
+  prigh t [ "compaction-eval" ];
+  prigh t [ "compaction-eval"; "-all"; "-strategies"; "none,trim" ];
+  prigh t [ "compaction-eval"; "nope" ];
+  let prefix = String.prefix (Session.id s) 6 in
+  prigh
+    ~hide:[ prefix, "<prefix>" ]
+    t
+    [ "compaction-eval"
+    ; prefix
+    ; "-window"
+    ; "20000"
+    ; "-keep-turns"
+    ; "2"
+    ; "-overhead-tokens"
+    ; "0"
+    ];
+  printf
+    "file unchanged: %b\n"
+    (String.equal before (In_channel.read_all (Session.path s)));
+  [%expect {|
+    in the help: false
+    $ prigh compaction-eval
+    name sessions (ids, as prigh sessions list shows, or files), or pass -all
+    [exit 2]
+    $ prigh compaction-eval -all -strategies none,trim
+    -strategies: unknown strategy "trim": one of none, mask, summarise, mask+summarise
+    [exit 2]
+    $ prigh compaction-eval nope
+    nope: no session "nope"
+    prigh sessions list shows the saved sessions (in $DIR/.prigh/sessions)
+    [exit 2]
+    $ prigh compaction-eval <prefix> -window 20000 -keep-turns 2 -overhead-tokens 0
+    session <id> "Fix it. Don't touch the lexer."
+      deepseek/deepseek-flash (default), window 20.0k, summarise over 16.0k: 13 messages, recorded input 0
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               11.3k    0    33.9k    11.3k    16.4k     0     0     0  13.5k       1/0/1     6/6       -       -
+      mask                9027    0    27.2k    13.6k    18.4k     1     1     0   6850       1/0/1     6/6       -       -
+      summarise          11.3k    0    33.9k    11.3k    16.4k     0     0     0  13.5k       1/0/1     6/6       -       -
+      mask+summarise      9027    0    27.2k    13.6k    18.4k     1     1     0   6850       1/0/1     6/6       -       -
+
+    aggregate over 1 sessions
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               11.3k    0    33.9k    11.3k    16.4k     0     0     0  13.5k       1/0/1     6/6       -       -
+      mask                9027    0    27.2k    13.6k    18.4k     1     1     0   6850       1/0/1     6/6       -       -
+      summarise          11.3k    0    33.9k    11.3k    16.4k     0     0     0  13.5k       1/0/1     6/6       -       -
+      mask+summarise      9027    0    27.2k    13.6k    18.4k     1     1     0   6850       1/0/1     6/6       -       -
+    file unchanged: true
+    |}]
+;;

@@ -381,12 +381,17 @@ let compact_messages
       ?(cancel = Cancellation.never)
       ?cwd
       ?instructions
+      ?unmasked
       messages
   =
   match plan ~keep_recent_tokens messages with
   | None -> Or_error.error_string nothing_to_compact
   | Some { kept_from; pinned } ->
     let older = List.take messages kept_from in
+    let files_of =
+      Option.map unmasked ~f:(fun unmasked older ->
+        List.take unmasked (List.length older))
+    in
     Or_error.map
       (summarise
          ~provider
@@ -395,6 +400,7 @@ let compact_messages
          ~overflowed
          ~cancel
          ~cwd:(fun _ -> cwd)
+         ?files_of
          ?instructions
          older)
       ~f:(fun (outcome : Outcome.t) ->
