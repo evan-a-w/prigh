@@ -26,10 +26,10 @@ module Refusal = struct
   ;;
 
   let exempt =
-    "the proxy requires browser sign-in, which prigh-tui cannot do: exempt \
-     /ws and /terminal from it for prigh (prigh checks its own token; see \
-     DOCKER.md, \"Behind a reverse proxy\"), pass the proxy's credentials \
-     with -header, or use an SSH tunnel to the backend's HOST:PORT"
+    "the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws \
+     and /terminal from it for prigh (prigh checks its own token; see \
+     DOCKER.md, \"Behind a reverse proxy\"), pass the proxy's credentials with \
+     -header, or use an SSH tunnel to the backend's HOST:PORT"
   ;;
 
   let explain ~url ~host ~tls t =
@@ -52,11 +52,16 @@ module Refusal = struct
         url
     | Some code, Some location when code >= 300 && code < 400 ->
       sprintf
-        "%s answered with a login page (%s to %s): %s"
+        "%s answered with a login page (%s to %s): %s%s"
         host
         status
         location
         exempt
+        (if String.is_substring location ~substring:"goauthentik"
+         then
+           " (authentik: add ^/(ws|terminal)(\\?.*)?$ to the proxy provider's \
+            Unauthenticated Paths)"
+         else "")
     | Some (401 | 403 | 407), _ ->
       sprintf
         "%s refused the WebSocket (%s%s): %s"
@@ -69,8 +74,8 @@ module Refusal = struct
     | Some 404, _ ->
       sprintf
         "%s has no WebSocket at %s (%s): check the URL (with the path \
-         prigh-web is served under) and that the proxy forwards it to \
-         prigh's -web port"
+         prigh-web is served under) and that the proxy forwards it to prigh's \
+         -web port"
         host
         url
         status
@@ -90,15 +95,19 @@ module Refusal = struct
     | _ when is_html t ->
       sprintf
         "%s answered with a web page (%s, %s) instead of opening the \
-         WebSocket: if it is a login page, %s; otherwise check that %s goes \
-         to prigh's -web port"
+         WebSocket: if it is a login page, %s; otherwise check that %s goes to \
+         prigh's -web port"
         host
         status
         (Option.value (header t "Content-Type") ~default:"")
         exempt
         url
     | _ ->
-      sprintf "%s did not open the WebSocket at %s: it answered %s" host url status
+      sprintf
+        "%s did not open the WebSocket at %s: it answered %s"
+        host
+        url
+        status
   ;;
 end
 
@@ -110,7 +119,9 @@ let parse_header text =
     Ok (name, String.strip value)
   | _ ->
     Error
-      (sprintf "%S is not a header: expected Name: value (e.g. 'X-Auth: ...')" text)
+      (sprintf
+         "%S is not a header: expected Name: value (e.g. 'X-Auth: ...')"
+         text)
 ;;
 
 let guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -120,7 +131,9 @@ let accept_key key =
     (Digestif.SHA1.to_raw_string (Digestif.SHA1.digest_string (key ^ guid)))
 ;;
 
-let random_bytes n = String.init n ~f:(fun _ -> Char.of_int_exn (Random.int 256))
+let random_bytes n =
+  String.init n ~f:(fun _ -> Char.of_int_exn (Random.int 256))
+;;
 
 module Opcode = struct
   let text = 1
@@ -163,7 +176,8 @@ let read_exactly reader n =
   else (
     let buf = Bytes.create n in
     match%map Reader.really_read reader buf with
-    | `Ok -> Some (Bytes.unsafe_to_string ~no_mutation_while_string_reachable:buf)
+    | `Ok ->
+      Some (Bytes.unsafe_to_string ~no_mutation_while_string_reachable:buf)
     | `Eof _ -> None)
 ;;
 
@@ -209,7 +223,8 @@ let read_frame reader : Frame.t option Deferred.t =
               then payload
               else
                 String.mapi payload ~f:(fun i c ->
-                  Char.of_int_exn (Char.to_int c lxor Char.to_int mask.[i land 3]))
+                  Char.of_int_exn
+                    (Char.to_int c lxor Char.to_int mask.[i land 3]))
             in
             { Frame.fin = b0 land 0x80 <> 0; opcode = b0 land 0x0f; payload })))
 ;;
@@ -268,6 +283,14 @@ let handshake (channel : Channel.t) ~url ~host ~tls ~authority ~path ~headers =
       | _ -> None
     in
     (match status with
+     | None
+       when (not tls)
+            && (String.is_prefix status_line ~prefix:"\021"
+                || String.is_prefix status_line ~prefix:"\022") ->
+       Or_error.errorf
+         "%s answered in TLS: connect with wss:// (or https://) instead of %s"
+         host
+         url
      | None ->
        Or_error.errorf
          "%s answered %S, not HTTP: is it prigh-web's address?"
@@ -277,7 +300,9 @@ let handshake (channel : Channel.t) ~url ~host ~tls ~authority ~path ~headers =
        if
          Option.equal
            String.equal
-           (List.Assoc.find answer ~equal:String.Caseless.equal
+           (List.Assoc.find
+              answer
+              ~equal:String.Caseless.equal
               "Sec-WebSocket-Accept")
            (Some (accept_key key))
        then Ok ()
@@ -291,8 +316,11 @@ let handshake (channel : Channel.t) ~url ~host ~tls ~authority ~path ~headers =
             (Refusal.explain ~url ~host ~tls { status; headers = answer })))
 ;;
 
-let transport ?(ping_after = Time_float.Span.of_sec 20.)
-      ?(timeout = Time_float.Span.of_sec 60.) (channel : Channel.t) =
+let transport
+      ?(ping_after = Time_float.Span.of_sec 20.)
+      ?(timeout = Time_float.Span.of_sec 60.)
+      (channel : Channel.t)
+  =
   let closed = Ivar.create () in
   let lines_r, lines_w = Pipe.create () in
   let stderr_r, stderr_w = Pipe.create () in
@@ -309,11 +337,15 @@ let transport ?(ping_after = Time_float.Span.of_sec 20.)
     Pipe.close lines_w;
     Ivar.fill_if_empty closed ()
   in
+  (* The closing handshake: the server answers our close (or hangs up), so
+     nothing we sent is lost to a reset; it gets a second. *)
+  let closing = ref false in
   let close () =
-    if !is_open
+    if !is_open && not !closing
     then (
+      closing := true;
       send ~opcode:Opcode.close "\003\232";
-      finish ())
+      upon (Clock.after (Time_float.Span.of_sec 1.)) finish)
   in
   let heard = ref (Time_float.now ()) in
   let rec read_loop partial =
@@ -328,7 +360,9 @@ let transport ?(ping_after = Time_float.Span.of_sec 20.)
           then Pipe.write_without_pushback lines_w line)
       in
       (match frame.opcode, partial with
-       | 8, _ -> return (close ())
+       | 8, _ ->
+         if not !closing then send ~opcode:Opcode.close frame.payload;
+         return (finish ())
        | 9, _ ->
          send ~opcode:Opcode.pong frame.payload;
          read_loop partial
@@ -355,17 +389,19 @@ let transport ?(ping_after = Time_float.Span.of_sec 20.)
   let pinged = ref false in
   Clock.every'
     ~stop:(Ivar.read closed)
-    (Time_float.Span.of_sec 1.)
+    (Time_float.Span.min
+       (Time_float.Span.of_sec 1.)
+       (Time_float.Span.scale ping_after 0.5))
     (fun () ->
-      let quiet = Time_float.diff (Time_float.now ()) !heard in
-      if Time_float.Span.( >= ) quiet timeout
-      then finish ()
-      else if Time_float.Span.( >= ) quiet ping_after
-      then (
-        if not !pinged then send ~opcode:Opcode.ping "";
-        pinged := true)
-      else pinged := false;
-      return ());
+       let quiet = Time_float.diff (Time_float.now ()) !heard in
+       if Time_float.Span.( >= ) quiet timeout
+       then finish ()
+       else if Time_float.Span.( >= ) quiet ping_after
+       then (
+         if not !pinged then send ~opcode:Opcode.ping "";
+         pinged := true)
+       else pinged := false;
+       return ());
   { Transport.send_line = (fun line -> send ~opcode:Opcode.text line)
   ; lines = lines_r
   ; stderr_lines = stderr_r

@@ -1,5 +1,5 @@
-(executable
- (name e2e)
+(executables
+ (names e2e e2e_websocket)
  (preprocess
   (pps ppx_jane))
  (libraries
@@ -7,11 +7,15 @@
   core_unix
   core_unix.command_unix
   core_unix.filename_unix
+  core_unix.signal_unix
   re
   async
   prigh_protocol
   prigh_client
-  prigh_client_unix))
+  prigh_client_unix
+  prigh_client_unix_testing
+  prigh_ui
+  prigh_tui))
 
 ; Runs the real backend (`main.exe serve -faux`, built in the vanilla switch)
 ; through the real client and compares the normalised transcript.
@@ -25,3 +29,15 @@
     e2e.actual
     (run %{exe:e2e.exe}))
    (diff e2e.expected e2e.actual))))
+
+; The same backend's -web port over ws://, and wss:// through a TLS proxy.
+
+(rule
+ (aliases e2e runtest)
+ (deps e2e_websocket.expected)
+ (action
+  (progn
+   (with-stdout-to
+    e2e_websocket.actual
+    (run %{exe:e2e_websocket.exe}))
+   (diff e2e_websocket.expected e2e_websocket.actual))))

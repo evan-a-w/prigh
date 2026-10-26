@@ -40,8 +40,7 @@ let split_authority text authority =
     then (
       match String.lsplit2 authority ~on:']' with
       | Some (v6, "") -> v6 ^ "]", None
-      | Some (v6, rest) ->
-        v6 ^ "]", String.chop_prefix rest ~prefix:":"
+      | Some (v6, rest) -> v6 ^ "]", String.chop_prefix rest ~prefix:":"
       | None -> authority, None)
     else (
       match String.rsplit2 authority ~on:':' with
@@ -72,7 +71,8 @@ let parse_url text ~scheme ~rest =
   in
   Result.bind tls ~f:(fun tls ->
     let rest =
-      String.take_while rest ~f:(fun c -> not (Char.equal c '?' || Char.equal c '#'))
+      String.take_while rest ~f:(fun c ->
+        not (Char.equal c '?' || Char.equal c '#'))
     in
     let authority, path =
       match String.lsplit2 rest ~on:'/' with

@@ -867,11 +867,9 @@ let context_text (s : P.State.t) =
 let server_part (m : App.Model.t) =
   match Option.bind m.server ~f:(fun s -> s.address) with
   | Some address ->
-    [ 6
-    , [ span
-          ~style:gray
-          ("server:" ^ Server_address.display_string address)
-      ]
+    [ ( 6
+      , [ span ~style:gray ("server:" ^ Server_address.display_string address) ]
+      )
     ]
   | None -> []
 ;;

@@ -688,6 +688,44 @@ scenario_startup_signin() {
 	saved_connection
 }
 
+# prigh-tui -connect URL: the same backend's -web port over a WebSocket,
+# as through an HTTPS proxy (here plain ws://, on localhost).
+setup_connect_websocket() {
+	port=$((20000 + RANDOM % 20000))
+	mkdir -p "$tmp/server-home" "$tmp/server-cwd"
+	HOME="$tmp/server-home" "$backend" serve -faux -web "127.0.0.1:$port" \
+		-token s3cret -cwd "$tmp/server-cwd" \
+		-auth-file "$tmp/server-home/auth.json" >"$tmp/server.log" 2>&1 &
+	server_pid=$!
+	local i
+	for i in $(seq 1 100); do
+		if (echo >"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
+		sleep 0.1
+	done
+	tui_args="-connect http://127.0.0.1:$port/"
+}
+
+scenario_connect_websocket() {
+	wait_for "Sign in to"
+	settle
+	capture connect_websocket "refused at startup: the sign-in dialog names the URL"
+	keys Tab
+	type_text "s3cret"
+	keys Enter
+	wait_for "tools now run on"
+	settle
+	capture connect_websocket "signed in: server:ws://127.0.0.1:<port>"
+	saved_connection
+	type_text "hello"
+	keys Enter
+	wait_for "faux reply"
+	settle
+	capture connect_websocket "a turn over the WebSocket"
+	type_text "/connect "
+	settle
+	capture connect_websocket "/connect completes the URL"
+}
+
 # prigh-tui -detached: the TUI in a new session of the tmux in $PRIGH_TMUX
 # (here a wrapper for the private server). That server was started without
 # the caller's environment, so the TUI only works if it is passed on.

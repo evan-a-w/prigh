@@ -8,8 +8,8 @@ let system_authenticator () =
   | Ok authenticator -> Ok authenticator
   | Error (`Msg m) ->
     Or_error.errorf
-      "no CA certificates to check the server's TLS certificate with: %s \
-       (set $SSL_CERT_FILE to a PEM bundle)"
+      "no CA certificates to check the server's TLS certificate with: %s (set \
+       $SSL_CERT_FILE to a PEM bundle)"
       m
 ;;
 
@@ -23,10 +23,7 @@ let describe_failure ~host (failure : Tls.Engine.failure) =
       host
       (Format.asprintf "%a" X509.Validation.pp_validation_error error)
   | failure ->
-    sprintf
-      "TLS with %s failed: %s"
-      host
-      (Tls.Engine.string_of_failure failure)
+    sprintf "TLS with %s failed: %s" host (Tls.Engine.string_of_failure failure)
 ;;
 
 let run ~host ~(raw : Channel.t) ~state ~first =
@@ -54,6 +51,17 @@ let run ~host ~(raw : Channel.t) ~state ~first =
         (sprintf
            "%s closed the connection during the TLS handshake (is it serving \
             TLS? for plain HTTP use ws:// or http://)"
+           host);
+      return ()
+    | Ok (`Ok n)
+      when Tls.Engine.handshake_in_progress !state
+           && String.is_prefix
+                (Bytes.To_string.sub buf ~pos:0 ~len:n)
+                ~prefix:"HTTP/" ->
+      fail
+        (sprintf
+           "%s answered in plain HTTP, not TLS: connect with ws:// (or \
+            http://) instead"
            host);
       return ()
     | Ok (`Ok n) ->

@@ -8,7 +8,12 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
-let describe t = Option.value t.address ~default:"a local backend"
+let describe t =
+  Option.value_map
+    t.address
+    ~default:"a local backend"
+    ~f:Server_address.display_string
+;;
 
 (* The backend's [User_access.unauthorised]; other "unauthorised:" errors are
    about acting as another user. *)

@@ -281,9 +281,10 @@ let all =
   ; c
       ~argument:Argument.Server
       "connect"
-      "[HOST:PORT|local]"
-      "switch to the backend at HOST:PORT (saved for next time) or to a local \
-       one; none: asks, with the current address"
+      "[HOST:PORT|URL|local]"
+      "switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, \
+       through an HTTPS proxy; saved for next time) or to a local one; none: \
+       asks, with the current address"
   ; c "signin" "[user]" "sign in to the server, as another user or again"
   ; c
       "signout"
