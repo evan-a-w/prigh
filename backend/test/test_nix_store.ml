@@ -629,12 +629,14 @@ echo "/dev/x 1000 300 700 30% /nix"
 ;;
 
 (* A stand-in for the container's helper: takes one request from the FIFO,
-   writes a log and the result the way docker/prigh-docker does. *)
+   writes a log and the result the way docker/prigh-docker does. It gives up
+   after 10 seconds without a request, and is killed after 20, so that a
+   failing test leaves no process behind. *)
 let fake_helper ~dir ~result =
   sprintf
     {|exec 3<>%s/requests
 : > %s/ready
-read -r verb id gens by <&3
+read -r -t 10 verb id gens by <&3 || exit 1
 echo "$verb $gens $by" > %s/request
 printf 'by=%%s\nsince=5\ngenerations=%%s\n' "$by" "$gens" > %s/running
 echo "removing profile version 4" > %s/$id.log
@@ -695,11 +697,15 @@ let%expect_test "helper: requests through the FIFO" =
       Fiber.fork_promise ~sw (fun () ->
         Process.run
           ~env:t.env
+          ~timeout:(Time_ns.Span.of_int_sec 20)
           ~prog:"/bin/sh"
           ~args:[ "-c"; fake_helper ~dir ~result ]
           ())
     in
-    while not (Sys_unix.file_exists_exn ready) do
+    while
+      (not (Sys_unix.file_exists_exn ready))
+      && not (Promise.is_resolved helper)
+    do
       Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.01
     done;
     gc ();
