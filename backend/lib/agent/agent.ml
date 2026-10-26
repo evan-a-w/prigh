@@ -101,6 +101,7 @@ module State = struct
     ; plan_mode : bool
     ; plan : Plan.t option
     ; session_rules : string list
+    ; home : Session.Home.t option
     }
   [@@deriving sexp_of]
 end
@@ -424,6 +425,7 @@ let state t =
   ; plan_mode = t.plan_mode
   ; plan = t.plan
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
+  ; home = Session.home t.session
   }
 ;;
 
@@ -1249,6 +1251,72 @@ let apply_dir_change (outcome : Dir_change.Outcome.t) ~f =
   outcome
 ;;
 
+(* Where [cwd] on [host] is in git, asked at once ([None]: the host cannot
+   tell). *)
+let git_location_on t (host : Host.t) ~cwd =
+  if String.equal host.id Host.backend_id
+  then Option.some_if t.backend_host_enabled (Git_location.find ~cwd)
+  else if host.git_location
+  then
+    Result.ok
+      (Git_location.of_result
+         (host_exec_on
+            t
+            host
+            ~cancel:Cancellation.never
+            ~on_output:ignore
+            ~call_id:"git_location"
+            ~cwd
+            ~name:Git_location.op
+            ~arguments:(`Object [])))
+  else None
+;;
+
+let session_host (host : Host.t) ~pinned =
+  { Session.Host.id = host.id; name = host.name; pinned }
+;;
+
+(* Where the session is now, before it moves. *)
+let current_place t : Worktree_home.Place.t =
+  let repo =
+    match Session.repo t.session, find_host t t.active_host with
+    | Some repo, _ when String.equal (Session.cwd t.session) t.cwd -> Some repo
+    | _, Some host -> git_location_on t host ~cwd:t.cwd
+    | _, None -> None
+  in
+  { cwd = t.cwd; host = Option.map (location t) ~f:fst; repo }
+;;
+
+let place_on t (host : Host.t) ~pinned ~cwd : Worktree_home.Place.t =
+  { cwd
+  ; host = Some (session_host host ~pinned)
+  ; repo = git_location_on t host ~cwd
+  }
+;;
+
+(* [move] changes the directory; the home follows ({!Worktree_home}). Where
+   the session is in git is only asked when it matters: a worktree switch,
+   or a move with a home. *)
+let moving_home t ~worktree ~to_ ~move =
+  let home = Session.home t.session in
+  if (not worktree) && Option.is_none home
+  then move ()
+  else (
+    let from = current_place t in
+    move ();
+    let to_ : Worktree_home.Place.t = to_ () in
+    let change =
+      if worktree
+      then Worktree_home.switch home ~from ~to_
+      else Worktree_home.cd home ~from ~to_
+    in
+    match change with
+    | Keep -> ()
+    | Set home ->
+      ignore (Session.set_home t.session (Some home) : Session.Entry.t)
+    | Clear -> ignore (Session.set_home t.session None : Session.Entry.t))
+;;
+
 (* The session cwd is a property of the host, so switching hosts means
    choosing a directory there; without [cwd] the host's own is used. *)
 let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
@@ -1268,7 +1336,12 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
     Or_error.map
       outcome
       ~f:
-        (apply_dir_change ~f:(fun cwd -> activate_host t host ~cwd ~pinned:true))
+        (apply_dir_change ~f:(fun cwd ->
+           moving_home
+             t
+             ~worktree:false
+             ~to_:(fun () -> place_on t host ~pinned:true ~cwd)
+             ~move:(fun () -> activate_host t host ~cwd ~pinned:true)))
 ;;
 
 let executor t : Tool.executor =
@@ -3113,7 +3186,12 @@ let set_session_name t name =
   state_changed t
 ;;
 
-let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
+let set_cwd
+      ?(if_missing = Dir_change.If_missing.Fail)
+      ?(worktree = false)
+      t
+      ~path
+  =
   if is_running t
   then
     Or_error.error_string "cannot change directory while a run is in progress"
@@ -3125,8 +3203,69 @@ let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
         (change_dir_on t host (resolve_path t path) ~if_missing)
         ~f:
           (apply_dir_change ~f:(fun cwd ->
-             set_host_cwd t host ~cwd;
+             moving_home
+               t
+               ~worktree
+               ~to_:(fun () -> place_on t host ~pinned:t.host_pinned ~cwd)
+               ~move:(fun () -> set_host_cwd t host ~cwd);
              state_changed t)))
+;;
+
+let no_home_message =
+  "this session hasn't switched into a worktree; /worktree open TARGET switches"
+;;
+
+let switch_back ?(main = false) t =
+  match Session.home t.session with
+  | None -> Or_error.error_string no_home_message
+  | Some _ when is_running t ->
+    Or_error.error_string "cannot change directory while a run is in progress"
+  | Some (home : Session.Home.t) ->
+    let host_id =
+      Option.value_map home.host ~default:t.active_host ~f:(fun h -> h.id)
+    in
+    let host_name =
+      Option.value_map home.host ~default:t.active_host_name ~f:(fun h ->
+        h.name)
+    in
+    let root = Option.map home.repo ~f:(fun r -> r.root) in
+    (match find_host t host_id, main, root with
+     | None, _, _ ->
+       Or_error.errorf
+         "the tool host %s that %s is on is not connected: reconnect it (or \
+          /host picks another, and /cd a directory there)"
+         (if String.is_empty host_name then "(none)" else host_name)
+         home.cwd
+     | Some _, true, None ->
+       Or_error.errorf
+         "%s is not in a repository that prigh knows: /cd elsewhere"
+         home.cwd
+     | Some host, _, _ ->
+       let target = if main then Option.value_exn root else home.cwd in
+       (match resolve_dir_on t host target with
+        | Error _ when not main ->
+          Or_error.errorf
+            "%s is gone%s"
+            home.cwd
+            (match root with
+             | Some root ->
+               sprintf
+                 "; /worktree back main goes to the repository's main checkout \
+                  (%s) instead"
+                 root
+             | None -> "; /cd elsewhere (that forgets it)")
+        | Error _ as error -> error
+        | Ok cwd ->
+          let pinned =
+            Option.value_map home.host ~default:t.host_pinned ~f:(fun h ->
+              h.pinned)
+          in
+          if String.equal host.id t.active_host
+          then set_host_cwd t host ~cwd
+          else activate_host t host ~cwd ~pinned;
+          ignore (Session.set_home t.session None : Session.Entry.t);
+          state_changed t;
+          Ok (Dir_change.Outcome.Changed { cwd; created = false })))
 ;;
 
 let host_call

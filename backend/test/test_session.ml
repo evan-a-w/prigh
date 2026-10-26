@@ -965,6 +965,7 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; bytes = 0
     ; repo = None
     ; worktrees = []
+    ; home = None
     }
   in
   let all = List.map [ "abc1"; "abc12"; "abd"; "f00" ] ~f:summary in

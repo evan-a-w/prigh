@@ -366,6 +366,19 @@ repository's. The fold at the right of a session's second line (`⑂ 3`)
 hides its worktrees; the folds are kept with your preferences, so they
 follow you to other browsers.
 
+A session that switched into a worktree (`/worktree open`, `/worktree
+new`, `/pr checkout`, Switch session here) remembers where it came from,
+its home, and its row says so quietly (`from main`, the home's branch, or
+`from ~/projects/prigh`). Its menu then starts with Switch back to main
+(`/worktree back`, also in the TUI, whose `/sessions` shows the home too),
+which moves it back and forgets the home. Switching on from one worktree
+to another keeps the first home; a `/cd` within the repository's worktrees
+keeps it, and a `/cd` to the home itself or anywhere outside the
+repository forgets it. The home is kept in the session, so it survives
+reloads and restarts, and a fork has it too. When the home's tool host is
+not connected, switching back says so; when its directory is gone,
+`/worktree back main` goes to the repository's main checkout instead.
+
 Right-click a session or a worktree (or press Shift+F10 or the context
 menu key on it, long-press it on a phone, or use the ⋯ that shows while
 pointing at a session) for its menu; each item names the command that
@@ -1448,7 +1461,7 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
-| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|back [main]\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `back` moves the session back where it switched into worktrees from (`main`: the repository's main checkout, when that place is gone); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |

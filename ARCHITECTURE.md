@@ -1053,6 +1053,22 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   follows), less those removed since (`remove_worktree` appends
   `Worktree_removed` to every session, saved or live, that has it; entering
   it again records it again); `fork` copies all but `Agent_worktree`;
+  `Home {home}` (a `Session.Home.t`: the cwd, host and git location a
+  worktree switch took the session from, `None` once cleared; like `Cwd`
+  the last one on any branch counts: `home`, also in `Summary`, the
+  agent's state and `list_sessions`/`get_state`'s `home`). `set_cwd`'s
+  `worktree: true` (the frontends' `/worktree open`/`new`, `/pr checkout`,
+  the sidebar's Switch session here) is a worktree switch: it records the
+  home unless the session has one (A → B keeps the first), and switching
+  into the home's checkout clears it; any other move (`set_cwd`,
+  `set_active_host`) clears it when it lands on the home, on another host
+  or outside the home's repository, and keeps it within the repository's
+  worktrees (`Worktree_home`, which compares git locations asked of the
+  host at once, or paths for a host that cannot tell). `worktree_back
+  {main}` (`Agent.switch_back`) moves the session to the home on its host
+  (an error names a disconnected host, or a gone directory with `/worktree
+  back main`, the home's repository's main checkout, as the way out) and
+  clears it; `fork` copies it.
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when

@@ -15,6 +15,18 @@ module Host : sig
   [@@deriving sexp, jsonaf, equal]
 end
 
+(** Where a session was before a worktree switch moved it into a worktree
+    ({!home}), for switching it back. *)
+module Home : sig
+  type t =
+    { cwd : string
+    ; host : Host.t option (** [None]: the session had no host yet *)
+    ; repo : Git_location.t option
+      (** where [cwd] is in git, when known: its branch names it *)
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry : sig
   module Payload : sig
     type t =
@@ -84,6 +96,10 @@ module Entry : sig
       | Worktree_removed of { path : string }
       (** the worktree at [path] was removed: none of its worktrees
           ({!worktrees}) any more *)
+      | Home of { home : Home.t option }
+      (** where a worktree switch took it from; [None]: cleared (it went
+          back, or elsewhere). Like [Cwd], the last one on any branch
+          counts. *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -232,6 +248,11 @@ val add_agent_worktree : t -> Agent_worktree.t -> Entry.t
 val add_worktree : t -> Session_worktree.t -> Entry.t
 val worktree_removed : t -> path:string -> Entry.t
 
+(** The last [Home] entry, on any branch; [fork] copies it. *)
+val home : t -> Home.t option
+
+val set_home : t -> Home.t option -> Entry.t
+
 (** The [allow_rule] entries on the active path, oldest first. *)
 val allow_rules : t -> string list
 
@@ -312,6 +333,7 @@ module Summary : sig
     ; bytes : int (** {!disk_usage} *)
     ; repo : Git_location.t option option (** {!repo} *)
     ; worktrees : Session_worktree.t list (** {!worktrees} *)
+    ; home : Home.t option (** {!home} *)
     }
   [@@deriving sexp_of]
 
