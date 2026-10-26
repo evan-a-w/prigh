@@ -93,7 +93,7 @@ files() {
 	local f
 	for f in "$@"; do
 		echo "--- $f"
-		cat "$r$f"
+		sed -e "s|${PATH//|/\\|}|\$PATH|g" "$r$f"
 	done
 }
 
@@ -171,6 +171,73 @@ run_tests() {
 	nix_volume
 	pd prigh sessions list
 	pd PRIGH_DOCKER_UID=1000 prigh sessions list
+
+	section "Nix garbage collection: limits sized from the volume, the schedule"
+	fake_root
+	owned /home/prigh 1000
+	for kib in 8388608 209715200 2147483648; do
+		echo "$kib" >"$r/fs-kib"
+		pd PRIGH_TOKEN=tok PRIGH_MODE=web | grep garbage
+		files /run/prigh/nix.conf
+	done
+	files /run/prigh/nix-gc/schedule /nix/var/prigh/last-scheduled-gc
+	find "$r/run/prigh/nix-gc" -mindepth 1 -printf "%M %f\n" | LC_ALL=C sort -k2
+	# A day later: the collection that is due runs 5 minutes after start.
+	pd PRIGH_TOKEN=tok PRIGH_DOCKER_NOW=1700090000 PRIGH_NIX_GC_INTERVAL=12h PRIGH_NIX_GC_KEEP_DAYS=0 | grep -i 'garbage\|nix-gc'
+	files /run/prigh/nix-gc/schedule
+	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=0 PRIGH_NIX_GC_KEEP_DAYS=off | grep -i 'garbage\|nix-gc'
+	files /run/prigh/nix-gc/schedule
+	pd PRIGH_MODE=tui PRIGH_NIX_GC_INTERVAL=90m | grep -i 'garbage\|nix-gc'
+	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=daily
+	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=5
+	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_KEEP_DAYS=2w
+
+	section "Nix garbage collection: the backend's requests, prigh-docker nix-gc"
+	fake_root
+	owned /home/prigh 1000
+	pd PRIGH_TOKENS=alice=a,bob=b PRIGH_SUPERUSERS=alice >/dev/null
+	# alice has a profile with three generations and a second one; bob an
+	# old-style per-user profile; prigh none.
+	mkdir -p "$r/home/alice/.local/state/nix/profiles" "$r/nix/var/nix/profiles/per-user/bob"
+	for p in profile-1-link profile-2-link profile-3-link tools-1-link; do
+		ln -s "/nix/store/x-$p" "$r/home/alice/.local/state/nix/profiles/$p"
+	done
+	ln -s profile-3-link "$r/home/alice/.local/state/nix/profiles/profile"
+	ln -s tools-1-link "$r/home/alice/.local/state/nix/profiles/tools"
+	ln -s profile-7-link "$r/nix/var/nix/profiles/per-user/bob/profile"
+	cat >"$r/gc-output" <<'EOF'
+removing profile version 1
+removing profile version 2
+finding garbage collector roots...
+deleting '/nix/store/x-profile-1-link'
+deleting '/nix/store/x-profile-2-link'
+deleting unused links...
+2 store paths deleted, 1.50 GiB freed
+EOF
+	pd nix-gc-request "gc 1a2b 14d alice"
+	files /run/prigh/nix-gc/1a2b.log /run/prigh/nix-gc/1a2b.result /nix/var/prigh/last-gc /run/prigh/nix-gc/last-gc
+	ls "$r/run/prigh/nix-gc"
+	sed -i '/^removing profile version/d' "$r/gc-output"
+	pd nix-gc-request "gc 3c4d keep alice"
+	files /run/prigh/nix-gc/3c4d.log
+	ls "$r/run/prigh/nix-gc"
+	touch "$r/gc-fails"
+	echo "error: cannot delete path: disk on fire" >"$r/gc-output"
+	pd nix-gc-request "gc 5e6f all alice"
+	files /run/prigh/nix-gc/5e6f.result /nix/var/prigh/last-gc
+	rm "$r/gc-fails"
+	echo "0 store paths deleted, 0.00 MiB freed" >"$r/gc-output"
+	pd nix-gc-request "gc ../x keep alice"
+	pd nix-gc-request "gc a1 keep alice; rm -rf /"
+	pd nix-gc-request "gc a1 7 alice"
+	pd nix-gc-request "rm -rf /"
+	pd nix-gc-request ""
+	pd PRIGH_NIX_GC_KEEP_DAYS=30 nix-gc
+	pd nix-gc all
+	pd nix-gc keep
+	pd nix-gc forever
+	pd PRIGH_DOCKER_UID=1000 nix-gc
+	pd PRIGH_DOCKER_UID=1000 nix-gc-request "gc a1 keep alice"
 
 	section "uids from existing directories"
 	fake_root

@@ -46,7 +46,7 @@ let c ?argument name args help = { Spec.name; args; help; argument }
 (* In cycling order: "on" is the provider's default budget. *)
 let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
 
-let all =
+let every =
   [ c "help" "" "show commands and keys"
   ; c "hotkeys" "" "show keyboard shortcuts"
   ; c
@@ -294,11 +294,29 @@ let all =
       "setusr"
       "[user]"
       "act as another user (superusers only); without a user, list them"
+  ; c
+      "nix-gc"
+      "[run [DAYS|all]]"
+      "show the Nix store's size and free space; run collects garbage, first \
+       deleting every user's profile generations older than DAYS days (all: \
+       all but the current ones)"
   ; c "quit" "" "exit"
   ]
 ;;
 
-let find name = List.find all ~f:(fun s -> String.equal s.name name)
+let superuser_only = [ "nix-gc" ]
+
+let all ~superuser =
+  if superuser
+  then every
+  else
+    List.filter every ~f:(fun s ->
+      not (List.mem superuser_only s.name ~equal:String.equal))
+;;
+
+let find ~superuser name =
+  List.find (all ~superuser) ~f:(fun s -> String.equal s.name name)
+;;
 
 let usage (s : Spec.t) =
   let sep = if String.is_suffix s.name ~suffix:":" then "" else " " in
@@ -328,15 +346,17 @@ let parse input =
        Some { name; args; rest })
 ;;
 
-let closest name =
-  List.filter_map all ~f:(fun s ->
+let closest ~superuser name =
+  List.filter_map (all ~superuser) ~f:(fun s ->
     let d = Edit_distance.distance s.name name in
     Option.some_if (d <= 2 || String.is_prefix s.name ~prefix:name) (d, s))
   |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
   |> Option.map ~f:snd
 ;;
 
-let help = Help_table.render (List.map all ~f:(fun s -> usage s, s.help))
+let help ~superuser =
+  Help_table.render (List.map (all ~superuser) ~f:(fun s -> usage s, s.help))
+;;
 
 let input_help =
   Help_table.render

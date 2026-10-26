@@ -127,6 +127,8 @@ type t =
   (** something [list_sessions] shows changed, in any session *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
+  | Nix_gc_progress of Nix_gc_progress.t
+  (** how far the [nix_store_gc] we asked for got *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t
