@@ -10,14 +10,13 @@ type t =
 let create ?(named_only = false) sessions = { named_only; sessions }
 let title t = if t.named_only then "Sessions (named)" else "Sessions"
 
-(* The active ones by project, then the archived ones: [Picker] orders
-   sections as they first appear. *)
+(* Active first: [Picker] orders sections as they first appear. *)
 let active_first sessions =
   let active, archived =
     List.partition_tf sessions ~f:(fun (s : P.Session_summary.t) ->
       not s.archived)
   in
-  Project_tree.sessions (Project_tree.build active) @ archived
+  active @ archived
 ;;
 
 let shown t =
@@ -27,31 +26,36 @@ let shown t =
      else t.sessions)
 ;;
 
-let item ~tree ~current (s : P.Session_summary.t) =
+let item ~current (s : P.Session_summary.t) =
   let name = Option.value s.name ~default:"(unnamed)" in
   let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
   let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
   let background =
     if s.background > 0 then sprintf " ∣ %d in background" s.background else ""
   in
+  let place = Session_worktrees.place s in
+  let worktrees = Session_worktrees.summary (Session_worktrees.of_session s) in
   Picker.Item.create
     ~id:s.path
-    ~detail:s.cwd
+    ~detail:
+      (String.concat
+         ~sep:" · "
+         (s.cwd :: List.filter [ worktrees ] ~f:(Fn.non String.is_empty)))
     ~search:
       (String.concat
          ~sep:" "
-         [ name; first; s.cwd; date; Project_tree.place_label tree s ])
+         ([ name; first; s.cwd; date; worktrees ] @ Option.to_list place))
     ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
     ~dimmed:s.archived
-    ~section:
-      (if s.archived then "archived" else Project_tree.place_label tree s)
+    ~section:(if s.archived then "archived" else "")
     (sprintf
-       "%s%s ∣ %s ∣ %d msgs%s ∣ %s"
+       "%s%s ∣ %s ∣ %d msgs%s%s ∣ %s"
        (if s.running then "▶ " else if s.live then "● " else "")
        name
        date
        s.message_count
        background
+       (Option.value_map place ~default:"" ~f:(fun p -> " ∣ " ^ p))
        first)
 ;;
 
@@ -76,11 +80,7 @@ let nearest_shown t id =
 ;;
 
 let picker ?previous ?select t ~current =
-  let shown = shown t in
-  let tree =
-    Project_tree.build (List.filter shown ~f:(fun s -> not s.archived))
-  in
-  let items = List.map shown ~f:(item ~tree ~current) in
+  let items = List.map (shown t) ~f:(item ~current) in
   match previous with
   | None -> Picker.create ~title:(title t) items
   | Some previous ->

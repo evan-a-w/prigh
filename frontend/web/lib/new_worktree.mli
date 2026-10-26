@@ -2,7 +2,8 @@ open! Core
 open! Import
 
 (** The "New worktree" dialog: a branch (new, or an existing one to check
-    out) and the base a new branch starts from (empty: HEAD). *)
+    out) and the base a new branch starts from (empty: HEAD). The session
+    moves into it. *)
 
 module Field : sig
   type t =
@@ -19,21 +20,12 @@ type t =
   ; base : string
   ; head : string option (** the session's branch: what an empty base is *)
   ; project_dir : string option (** where it goes *)
-  ; repo : string option
-    (** the repository, from a project's row: a new session starts in the
-        worktree; [None]: the session's, which moves into it *)
   ; busy : bool (** created: waiting for the backend *)
   ; error : string option
   }
 [@@deriving sexp_of, equal]
 
-val create
-  :  ?repo:string
-  -> head:string option
-  -> project_dir:string option
-  -> unit
-  -> t
-
+val create : head:string option -> project_dir:string option -> unit -> t
 val set : t -> Field.t -> string -> t
 
 (** The branch and base to create, or what to fix first. *)

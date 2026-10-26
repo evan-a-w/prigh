@@ -253,17 +253,36 @@ let serve_terminal router terminals ~query ws =
   | None -> error Rpc_server.unauthorised
   | Some server ->
     let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
+    (* [dir]: a shell of its own there (a worktree's, say), not the
+       session's. *)
+    let dir = Option.filter (param "dir") ~f:(Fn.non String.is_empty) in
     let key =
       Rpc_server.terminal_key
         server
-        ~session:(Option.value session ~default:"default")
+        ~session:
+          (Option.value session ~default:"default"
+           ^ Option.value_map dir ~default:"" ~f:(fun dir -> "@" ^ dir))
     in
     let cols = size "cols" ~default:80 in
     let rows = size "rows" ~default:24 in
+    let in_dir cwd =
+      match dir with
+      | None -> cwd
+      | Some dir when Filename.is_relative dir -> Filename.concat cwd dir
+      | Some dir -> dir
+    in
     (match Rpc_server.terminal_target server ~session with
-     | `Backend cwd -> Terminals.serve terminals ~key ~cwd ~cols ~rows channel
+     | `Backend cwd ->
+       Terminals.serve terminals ~key ~cwd:(in_dir cwd) ~cols ~rows channel
      | `Host (host, cwd) ->
-       Rpc_server.relay_terminal server ~host ~key ~cwd ~cols ~rows channel
+       Rpc_server.relay_terminal
+         server
+         ~host
+         ~key
+         ~cwd:(in_dir cwd)
+         ~cols
+         ~rows
+         channel
      | `Unavailable reason -> error ("no terminal: " ^ reason))
 ;;
 
