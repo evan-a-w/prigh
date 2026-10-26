@@ -12,23 +12,33 @@ open! Import
     turns into requests and toasts.
 
     The page reviews one worktree at a time ([Target]): the session's own,
-    or another (from [/review WORKTREE], the worktree picker, the sidebar),
-    against its base or one chosen. [review] is that worktree's part of the
+    or another (from [/review WORKTREE], the page's pickers, the worktree
+    picker, the sidebar), or a branch that is not checked out (read-only:
+    its files are read with [git_show], it cannot be edited and proposals
+    cannot be accepted), against its base or one chosen. A base that is no
+    revision goes back to what was reviewed before, with a toast naming the
+    closest. [review] is that worktree's part of the
     session's review ([all]): comments and approvals of other worktrees stay
     out of it, and what is sent or approved here is the worktree's.
 
     Paths are relative to the worktree's root, as [git diff] names them. *)
 
 module Target : sig
-  (** What the page reviews: the worktree at [dir] ([None]: the session's)
-      compared with [base] ([None]: its default, see [git_diff]). *)
+  (** What the page reviews: a worktree ([Dir None]: the session's) or a
+      branch that is not checked out ([Rev]: read-only), compared with
+      [base] ([None]: its default, see [git_diff]) since their merge base,
+      or [direct]ly. *)
   type t =
-    { dir : string option
+    { reviewed : Git_diff.Target.t
     ; base : string option
+    ; direct : bool
     }
   [@@deriving sexp_of, equal]
 
   val default : t
+
+  (** Of the session's own worktree. *)
+  val own : t -> bool
 end
 
 module Mode : sig
@@ -110,6 +120,8 @@ end
 type t =
   { session : string option (** whose review this is *)
   ; target : Target.t
+  ; fallback : Target.t option
+    (** what was reviewed before [target], until its diff is in *)
   ; requested : Target.t (** of the [git_diff] on its way *)
   ; own_root : string option
     (** the session's worktree, once a diff of it came: approvals from
@@ -147,6 +159,7 @@ module Reply : sig
     | Changed of string option (** a comment's id *)
     | Decided of string (** a proposal of the comment's: the file changed *)
     | Content of string (** a path *)
+    | Shown of string (** a path, as a branch not checked out has it *)
     | Saved of string
     | Submitted
   [@@deriving sexp_of, equal]
@@ -248,7 +261,15 @@ val preview_text : t -> abs:string -> text:string -> md5:string option -> t
 (** The repository's root, once the diff is in. *)
 val root : t -> string option
 
-(** [abs] relative to the root, if inside it. *)
+(** The branch reviewed without a checkout. *)
+val read_only : t -> string option
+
+(** What the review keys the reviewed worktree's comments and approvals by
+    ({!Git_diff.review_root}), once the diff is in. *)
+val review_root : t -> string option
+
+(** [abs] relative to the root, if inside it (never for a branch not
+    checked out: its files are not on disk). *)
 val relative : t -> abs:string -> string option
 
 val file : t -> string -> Prigh_ui.Diff_files.File.t option

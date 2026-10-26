@@ -44,6 +44,7 @@ type t =
       { chip : Chip.t
       ; picker : Picker.t
       }
+  | Review_pick of Review_picker.t
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -99,6 +100,7 @@ type t =
 
 let per_session = function
   | Popover _
+  | Review_pick _
   | Rename _
   | Prompt _
   | Rewind_confirm _

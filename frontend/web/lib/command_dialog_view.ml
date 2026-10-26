@@ -589,6 +589,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
   | Picker _
   | Popover _
+  | Review_pick _
   | Help
   | Settings
   | Rename _

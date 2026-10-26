@@ -395,6 +395,10 @@ let execute
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name Git_diff.op
   then Git_diff.run ~env ~cancel ~cwd ~arguments
+  else if String.equal name Git_diff.show_op
+  then Git_diff.show ~env ~cancel ~cwd ~arguments
+  else if String.equal name Git_diff.refs_op
+  then Git_diff.list_refs ~env ~cancel ~cwd ~arguments
   else if String.equal name Git_forge.op
   then Git_forge.run ~env ~cancel ~cwd ~arguments
   else if String.equal name Git_location.op

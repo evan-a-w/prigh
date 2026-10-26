@@ -969,7 +969,7 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)

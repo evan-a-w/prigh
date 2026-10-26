@@ -814,22 +814,49 @@ are kept with the session (also across rewinds, reloads and restarts).
 In the TUI, `/review` alone lists the changed files with their approvals
 and the comments with their threads.
 
-Any worktree of the repository can be reviewed, not only the session's:
+Any worktree of the repository can be reviewed, not only the session's,
+and compared with anything. The review page's head reads "Reviewing
+BRANCH (PATH) against BASE (merge base SHA)", and both are pickers (click
+them, or `r` and `b` on the page): menus under the line that filter as you
+type, ↑ ↓ and Enter choose, Esc closes.
+
+- **Reviewing**: the repository's worktrees (the session's marked), then
+  its branches, local and remote, that are not checked out. Such a branch
+  is reviewed read-only, from its commits (`git diff BASE...BRANCH`; it has
+  no uncommitted or untracked changes): comments work and are sent naming
+  the branch, but Edit and accepting a proposed change are disabled, and
+  "Check out into a worktree" checks it out (as `/worktree new` does,
+  recorded with the session; a remote branch as its local branch) and
+  reviews it there.
+- **Against**: `HEAD` (the uncommitted changes only), local branches,
+  remote-tracking branches (`origin/main`), tags, the last 20 commits of
+  what is reviewed (short id and subject), or any revision typed (the last
+  choice of the menu); one git does not know is refused with the closest
+  names, and the page stays on what it showed.
+- **Since merge base** (the default, as a pull request shows it) or
+  **Directly** (`d`): the changes since the branch left the base, or every
+  difference from the base as it is now ("against origin/main directly").
+
 `/review WORKTREE` (its path, branch or directory name, as `/worktree`
-lists them; completed), the worktree picker's Alt+R, or the worktree
-pickers in the review page's head, which reads "Reviewing BRANCH (PATH)
-against BASE". A linked worktree (a subagent's, a feature branch, a `/pr`
-checkout) is compared with its base: the merge base with the branch it was
-made from (recorded when prigh created it, as git config
+lists them; completed) and the worktree picker's Alt+R open another
+worktree; `/review BRANCH --base REV [--direct]` a branch not checked out
+(the completion offers them, and remote branches and tags after
+`--base`). A linked worktree (a subagent's, a feature branch, a `/pr`
+checkout) is compared by default with its base: the merge base with the
+branch it was made from (recorded when prigh created it, as git config
 `branch.<branch>.prighBase`), else the remote's default branch
 (`origin/HEAD`), else `main` or `master`, so its commits show as well as
 what is uncommitted and untracked. The main checkout is compared with
-`HEAD`, as before. `--base REV` (or the base picker) compares with another
-branch or commit; `HEAD` shows only what is uncommitted. Comments and
-approvals are kept per worktree; comments sent to the agent name the
-worktree and each file's absolute path, and accepted proposals and the
-editor's saves go to that worktree's files. The page reads the reviewed
-worktree again whenever the agent or a subagent edits.
+`HEAD`, as before. prigh-web remembers the last comparison of each
+worktree or branch and what each worktree's sessions reviewed last (in
+your preferences, `web.review`), and opens there next time. Comments and
+approvals are kept per worktree (or branch); comments sent to the agent
+name the worktree and each file's absolute path, and accepted proposals
+and the editor's saves go to that worktree's files. The page reads the
+reviewed worktree again whenever the agent or a subagent edits. In the
+TUI, `/review` with the same arguments lists the files and comments under
+what was compared ("review feat/x (not checked out) against main
+directly").
 
 ### prigh-web for a backend elsewhere
 
@@ -1525,7 +1552,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [WORKTREE] [--base REV]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name) and `--base`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree against its base, see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
+| `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |

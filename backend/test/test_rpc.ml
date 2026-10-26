@@ -1628,7 +1628,8 @@ let%expect_test "git_diff, review and init" =
         (sprintf
            "cd %s && export GIT_CONFIG_GLOBAL=/dev/null GIT_AUTHOR_NAME=t \
             GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
-            && (%s) >/dev/null 2>&1"
+            GIT_AUTHOR_DATE=2026-01-01T00:00:00Z \
+            GIT_COMMITTER_DATE=2026-01-01T00:00:00Z && (%s) >/dev/null 2>&1"
            (Filename.quote t.dir)
            script)
       = 0)
@@ -1639,6 +1640,10 @@ let%expect_test "git_diff, review and init" =
   write t "new.txt" "hello\n";
   call t h ~params:{|{"path": "new.txt"}|} "git_diff";
   call t h ~params:{|{"path": 3}|} "git_diff";
+  call t h ~params:{|{"rev": "main"}|} "git_diff";
+  call t h "git_refs";
+  call t h ~params:{|{"rev": "main", "path": ".gitignore"}|} "git_show";
+  call t h ~params:{|{"rev": "main", "path": "new.txt"}|} "git_show";
   call t h "review";
   Agent.wait_idle (current h);
   call t h "init";
@@ -1647,8 +1652,12 @@ let%expect_test "git_diff, review and init" =
     {|
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
-    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false,"branch":"main","base":"HEAD","main":true,"branches":["main"]}}
+    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false,"branch":"main","base":"HEAD","main":true,"branches":["main"],"remote_branches":[],"tags":[],"commits":[{"sha":"<id><id>6a1a1555","subject":"init"}],"direct":false}}
     {"type":"response","id":"r1","ok":false,"error":"param \"path\" must be a string"}
+    {"type":"response","id":"r1","ok":false,"error":"nothing to compare main with: name a base (e.g. --base main)"}
+    {"type":"response","id":"r1","ok":true,"result":{"branches":["main"],"remote_branches":[],"tags":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"sessions\n","truncated":false}}
+    {"type":"response","id":"r1","ok":false,"error":"main has no file new.txt"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     |}]

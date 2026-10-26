@@ -584,6 +584,7 @@ let dialog (m : App.Model.t) ~inject =
     Context_menu_view.view m menu p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
+  | Some (Review_pick _) -> Chip_popover_view.backdrop ~inject
   | Some Help -> help m ~inject
   | Some Settings -> Settings_view.view m ~inject
   | Some (Rename name) -> rename name ~inject

@@ -123,6 +123,11 @@ module Method : sig
         ; path : string
         }
     | Fs_preview of { path : string } (** {!File_preview} *)
+    | Git_show of
+        { dir : string option
+        ; rev : string
+        ; path : string
+        } (** a file of a commit: {!Git_diff.shown_of_json} *)
     | Fs_write of
         { path : string
         ; text : string

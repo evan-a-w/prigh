@@ -55,17 +55,20 @@ module Reply_tag = struct
     | Compact_done
     | Git_diff
     | Review_comments of
-        { dir : string option
+        { target : P.Git_diff.Target.t
         ; base : string option
-        } (** [/review [WORKTREE] [--base REV]]: then the diff *)
+        ; direct : bool
+        } (** [/review [WORKTREE|BRANCH] [--base REV]]: then the diff *)
     | Review_status of
         { review : P.Review.t
-        ; dir : string option (** [None]: the session's own worktree *)
+        ; target : P.Git_diff.Target.t
+          (** [Dir None]: the session's own worktree *)
         }
     | Review_named of
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         } (** [/review NAME]: [list_worktrees], to find it *)
     | Review_started
@@ -108,6 +111,7 @@ module Reply_tag = struct
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker
     | Worktrees_for_autocomplete of string
+    | Refs_for_autocomplete of string
     | Worktree_target of
         { command : string
         ; action : Worktree_command.Action.t
@@ -245,6 +249,8 @@ module Model = struct
     ; sessions : P.Session_summary.t list option
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
+    ; refs : P.Git_diff.Refs.t Location_cache.t
+      (** the repository's branches and tags, for [/review]'s completion *)
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
     ; agent_queues : Agent_queues.t
@@ -576,6 +582,7 @@ let init =
   ; sessions = None
   ; skills = Location_cache.empty
   ; worktrees = Location_cache.empty
+  ; refs = Location_cache.empty
   ; known_paths = String.Set.empty
   ; queued_messages = []
   ; agent_queues = []
@@ -1928,6 +1935,7 @@ let reset_session m =
       ; notice = None
       ; skills = Location_cache.empty
       ; worktrees = Location_cache.empty
+      ; refs = Location_cache.empty
       ; agents = []
       ; focus = `Main
       ; queued_messages = []
@@ -2899,14 +2907,14 @@ let worktree_remove_failed m ~target ~force e =
 (* [/review]: the files' approvals of a worktree, or the model's review. *)
 let rec review_action m ~command (action : Review_command.Action.t) =
   match action with
-  | Show { dir; base } ->
+  | Show { target; base; direct } ->
     ( notice m "reading the review…"
-    , [ rpc "get_review" ~tag:(Review_comments { dir; base }) ] )
-  | Named { name; base; model } ->
+    , [ rpc "get_review" ~tag:(Review_comments { target; base; direct }) ] )
+  | Named { name; base; direct; model } ->
     ( m
     , [ call
           (List_worktrees { cwd = None })
-          ~tag:(Review_named { command; name; base; model })
+          ~tag:(Review_named { command; name; base; direct; model })
       ] )
   | Model args ->
     ( notice m "reading the changes to review…"
@@ -3559,16 +3567,26 @@ let fetch_autocomplete m ac =
      | Some skills ->
        ( { m with autocomplete = Some ac; skills }
        , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
-  | Autocomplete.Source.Argument { argument = Some (Worktree | Review); _ } ->
+  | Autocomplete.Source.Argument
+      { argument = Some ((Worktree | Review) as kind); _ } ->
     let key = worktree_key m in
-    (match Location_cache.request m.worktrees ~key with
-     | None -> { m with autocomplete = Some ac }, []
-     | Some worktrees ->
-       ( { m with autocomplete = Some ac; worktrees }
-       , [ call
-             (List_worktrees { cwd = None })
-             ~tag:(Worktrees_for_autocomplete key)
-         ] ))
+    let m, worktrees =
+      match Location_cache.request m.worktrees ~key with
+      | None -> m, []
+      | Some worktrees ->
+        ( { m with worktrees }
+        , [ call
+              (List_worktrees { cwd = None })
+              ~tag:(Worktrees_for_autocomplete key)
+          ] )
+    in
+    let m, refs =
+      match kind, Location_cache.request m.refs ~key with
+      | Review, Some refs ->
+        { m with refs }, [ rpc "git_refs" ~tag:(Refs_for_autocomplete key) ]
+      | _ -> m, []
+    in
+    { m with autocomplete = Some ac }, worktrees @ refs
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some (Commands.Argument.Sessions | Session_list) ->
@@ -3610,6 +3628,10 @@ let refresh_command_autocomplete m =
         (Option.map
            (Location_cache.find m.worktrees ~key:(worktree_key m))
            ~f:(fun (l : P.Worktree.Listing.t) -> l.worktrees))
+      ~refs:
+        (Option.value
+           (Location_cache.find m.refs ~key:(worktree_key m))
+           ~default:P.Git_diff.Refs.empty)
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
       ~server:m.server
@@ -4323,8 +4345,8 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        worktree_in_picker m listing picker ~f:(fun w ->
          review_action
            { m with mode = Editing }
-           ~command:(Review_command.command ~dir:w.path ())
-           (Show { dir = Some w.path; base = None }))
+           ~command:(Review_command.command ~target:(Dir (Some w.path)) ())
+           (Show { target = Dir (Some w.path); base = None; direct = false }))
      | _ -> m, [])
   | Picker_toggle_filter ->
     (match kind with
@@ -5256,6 +5278,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                ~key
                { root = ""; project_dir = ""; worktrees = [] }
          }
+     | Refs_for_autocomplete key ->
+       refresh_autocomplete
+         { m with refs = Location_cache.set m.refs ~key P.Git_diff.Refs.empty }
      | Worktree_removed { target; force } ->
        worktree_remove_failed m ~target ~force e
      | Archive_done _ ->
@@ -5345,6 +5370,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:P.Worktree.Listing.of_json (fun listing ->
          refresh_autocomplete
            { m with worktrees = Location_cache.set m.worktrees ~key listing })
+     | Refs_for_autocomplete key ->
+       decode json ~f:P.Git_diff.Refs.of_json (fun refs ->
+         refresh_autocomplete
+           { m with refs = Location_cache.set m.refs ~key refs })
      | Worktree_target { command; action } ->
        decode json ~f:P.Worktree.Listing.of_json (fun listing ->
          worktree_target m ~command action listing)
@@ -5399,33 +5428,37 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.against diff))
            , [] )
          else output m ~title:"Changes" (Diff_files.render diff), [])
-     | Review_comments { dir; base } ->
+     | Review_comments { target; base; direct } ->
        decode json ~f:P.Review.of_json (fun review ->
-         let status = Reply_tag.Review_status { review; dir } in
+         let status = Reply_tag.Review_status { review; target } in
          ( m
          , [ rpc
                "git_diff"
-               ~params:(P.Git_diff.params ?dir ?base ())
+               ~params:(P.Git_diff.params ?base ~direct ~target ())
                ~tag:
-                 (match dir, base with
-                  | None, None -> status
+                 (match target, base, direct with
+                  | Dir None, None, false -> status
                   | _ ->
                     Retry_in_editor
-                      { command = Review_command.command ?dir ?base ()
+                      { command =
+                          Review_command.command ~target ?base ~direct ()
                       ; hint = ""
                       ; then_ = status
                       })
            ] ))
-     | Review_named { command; name; base; model } ->
+     | Review_named { command; name; base; direct; model } ->
        decode json ~f:P.Worktree.Listing.of_json (fun listing ->
          review_action
            (cache_worktrees m listing)
            ~command
-           (Review_command.resolve listing ~name ~base ~model))
-     | Review_status { review; dir } ->
+           (Review_command.resolve listing ~name ~base ~direct ~model))
+     | Review_status { review; target } ->
        decode json ~f:P.Git_diff.of_json (fun diff ->
          let review =
-           P.Review.scope review ~root:diff.root ~own:(Option.is_none dir)
+           P.Review.scope
+             review
+             ~root:(P.Git_diff.review_root diff)
+             ~own:(P.Git_diff.Target.equal target (Dir None))
          in
          if String.is_empty diff.diff && List.is_empty review.comments
          then
