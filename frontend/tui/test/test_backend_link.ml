@@ -197,7 +197,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:1 hello {"name":"laptop","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (Rejected "unauthorised: bad user name or password")
     tool host: true
     |}];
@@ -217,7 +217,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","token":"nope","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:1 hello {"name":"laptop","token":"nope","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (rejected "unauthorised: bad user name or password")
     ((address (srv:1))
      (user    (alice))
@@ -226,7 +226,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
       (connect srv:1)
       (user    alice)))
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","token":"pw","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:1 hello {"name":"laptop","token":"pw","user":"alice","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (srv:1))
      (user    (alice))
@@ -262,7 +262,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:2 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (rejected "unauthorised: bad user name or password")
     ((address (srv:2)) (user ()) (saved (srv:1)))
     ((
@@ -270,7 +270,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
       (token   pw)
       (user    alice)))
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","token":"t2","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:2 hello {"name":"laptop","token":"t2","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (srv:2)) (user ()) (saved (srv:2)))
     ((
@@ -296,7 +296,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
      (saved (srv:2)))
     tool host: false
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","token":"t2","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:2 hello {"name":"laptop","token":"t2","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (srv:2)) (user ()) (saved (srv:2)))
     tool host: true
@@ -324,7 +324,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
     false
     tool host: false
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:2 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (Error "unauthorised: bad user name or password")
     |}];
   let%bind () = Link.close link in
@@ -353,7 +353,7 @@ let%expect_test
   [%expect
     {|
     open (Process (prog /bin/prigh) (args (serve -cwd /w -session /s/1.jsonl)))
-    spawned hello {"name":"laptop","session":"/s/1.jsonl","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    spawned hello {"name":"laptop","session":"/s/1.jsonl","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (Connected (
       (client_id c)
       (namespace null)
@@ -378,7 +378,7 @@ let%expect_test
   [%expect
     {|
     open (Process (prog /bin/prigh) (args (serve -cwd /w)))
-    spawned hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    spawned hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address ())
      (user    ())
@@ -436,9 +436,9 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     open (Tcp (host srv) (port 4))
-    srv:4 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:4 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (Error "superseded by another connection")
     ()
     |}];
@@ -479,10 +479,10 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     open (Tcp (host srv) (port 3))
     open (Tcp (host srv) (port 4))
-    srv:4 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}
+    srv:4 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (Error "superseded by another connection")
     (connected "")
     ((address (srv:4)) (user ()) (saved (srv:4)))

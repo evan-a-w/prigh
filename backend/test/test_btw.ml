@@ -159,7 +159,8 @@ let%expect_test
     {"type":"response","id":"r1","ok":true,"result":{}}
     messages before: 2
     ["Header",{"id":"<id>","cwd":"$DIR","created_at":"<time>"}]
-    ["Entry",{"id":"<id>","parent":null,"at":<at>,"payload":["System_promp
+    ["Entry",{"id":"<id>","parent":null,"at":<at>,"payload":["Repo",{"cwd"
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["System_pro
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Told_envir
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[

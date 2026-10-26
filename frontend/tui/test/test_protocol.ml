@@ -513,7 +513,8 @@ let%expect_test "subagent events are decoded recursively" =
       (agent_id p)
       (task     go)
       (model    m)
-      (tools (read ls))))
+      (tools (read ls))
+      (worktree ())))
     (Event (
       Subagent_end
       (call_id  p)
@@ -686,7 +687,10 @@ let%expect_test "auth status, models, sessions" =
      (background 0)
      (clients    0)
      (archived   false)
-     (bytes      0))
+     (bytes      0)
+     (host            ())
+     (repo            ())
+     (agent_worktrees ()))
     |}]
 ;;
 
@@ -739,7 +743,10 @@ let%expect_test "entries and session stats" =
      (background 0)
      (clients    0)
      (archived   false)
-     (bytes      0))
+     (bytes      0)
+     (host            ())
+     (repo            ())
+     (agent_worktrees ()))
     ((id e1) (parent ()) (kind (Message (User ((text "first\nsecond"))))))
     ((id e2)
      (parent (e1))
@@ -1201,7 +1208,10 @@ let%expect_test "archived sessions and deleting them" =
       (background 2)
       (clients    1)
       (archived   true)
-      (bytes      2048)))
+      (bytes      2048)
+      (host            ())
+      (repo            ())
+      (agent_worktrees ())))
     (Ok ((id e9) (parent (e8)) (kind (Archived (archived true)))))
     (Event Sessions_changed)
     ((deleted (
@@ -1282,20 +1292,22 @@ let%expect_test "reminders in the state, as the backend sends them" =
 
 let%expect_test "worktree requests and replies" =
   List.iter
-    [ Request.Method.List_worktrees
-    ; Create_worktree { branch = "feat/a"; base = None }
-    ; Create_worktree { branch = "b"; base = Some "main" }
-    ; Remove_worktree { path = "/t/repo/b"; force = false }
-    ; Remove_worktree { path = "/t/repo/b"; force = true }
+    [ Request.Method.List_worktrees { cwd = None }
+    ; List_worktrees { cwd = Some "/t/other" }
+    ; Create_worktree { branch = "feat/a"; base = None; cwd = None }
+    ; Create_worktree { branch = "b"; base = Some "main"; cwd = Some "/t/repo" }
+    ; Remove_worktree { path = "/t/repo/b"; force = false; cwd = None }
+    ; Remove_worktree { path = "/t/repo/b"; force = true; cwd = Some "/t/repo" }
     ]
     ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
   [%expect
     {|
     {"id":1,"method":"list_worktrees","params":{}}
+    {"id":1,"method":"list_worktrees","params":{"cwd":"/t/other"}}
     {"id":1,"method":"create_worktree","params":{"branch":"feat/a"}}
-    {"id":1,"method":"create_worktree","params":{"branch":"b","base":"main"}}
+    {"id":1,"method":"create_worktree","params":{"branch":"b","base":"main","cwd":"/t/repo"}}
     {"id":1,"method":"remove_worktree","params":{"path":"/t/repo/b"}}
-    {"id":1,"method":"remove_worktree","params":{"path":"/t/repo/b","force":true}}
+    {"id":1,"method":"remove_worktree","params":{"path":"/t/repo/b","force":true,"cwd":"/t/repo"}}
     |}];
   let show of_json sexp_of json =
     match Or_error.bind (Json.parse json) ~f:of_json with
@@ -1377,7 +1389,9 @@ let%expect_test "worktree requests and replies" =
        (behind  0)
        (current false)
        (sessions ())))
-     (new_branch true))
+     (new_branch true)
+     (root ())
+     (cwd  ()))
     (error (e "missing field \"path\""))
     |}]
 ;;

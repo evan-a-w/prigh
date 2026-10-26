@@ -62,6 +62,10 @@ module Created : sig
   type nonrec t =
     { worktree : t
     ; new_branch : bool (** the branch was created rather than checked out *)
+    ; root : string option (** the repository's main checkout *)
+    ; cwd : string option
+      (** the directory it was asked from, carried over: the same
+          subdirectory of the new worktree when it has it, else its top *)
     }
   [@@deriving sexp_of, equal]
 

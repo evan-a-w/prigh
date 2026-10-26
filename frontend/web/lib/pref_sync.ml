@@ -7,11 +7,20 @@ module Key = struct
   let notify = "web.notify"
   let verbosity = "web.verbosity"
   let terminal_open = "web.terminal-open"
+  let folded = "web.sidebar-folded"
   let history = "history"
   let migrated = "web.migrated"
 
   let all =
-    [ theme; accent; notify; verbosity; terminal_open; history; migrated ]
+    [ theme
+    ; accent
+    ; notify
+    ; verbosity
+    ; terminal_open
+    ; folded
+    ; history
+    ; migrated
+    ]
     @ List.map Resize.Handle.all ~f:Resize.Handle.pref_key
   ;;
 end

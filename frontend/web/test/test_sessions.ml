@@ -37,9 +37,12 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
-    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
-    (Refactor the lexer 15d ago ~/src/compiler) (Archive (A)) (Delete session (Delete))
+    (work) (New session in /work)
+    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
+    (docs) (New session in ~/docs)
+    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
+    (compiler) (New session in ~/src/compiler)
+    (Refactor the lexer 15d ago) (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -62,7 +65,7 @@ let%expect_test
           <span dir="auto" class="session-title"> fix the parser bug </span>
           <div class="session-meta">
             <span class="session-age"> just now </span>
-            <span title="/work" class="session-cwd"> /work </span>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           </div>
         </div>
@@ -111,8 +114,6 @@ let%expect_test
                         \n/home/ann/src/parser")
        (purpose (Sidebar 2)))))
     span "~/src/parser" -- /home/ann/src/parser
-    span "~/docs" -- /home/ann/docs
-    span "~/src/compiler" -- /home/ann/src/compiler
     |}];
   H.text h ~selector:".session.selected .session-meta";
   [%expect {| just now ~/src/parser |}];
@@ -435,8 +436,10 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (Rename (/name)) (Archive (A)) (Delete session (Delete))
-    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
+    (work) (New session in /work)
+    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
+    (docs) (New session in ~/docs)
+    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 

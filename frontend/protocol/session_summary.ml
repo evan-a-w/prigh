@@ -17,6 +17,11 @@ type t =
   ; clients : int (** frontends attached to it *)
   ; archived : bool
   ; bytes : int (** on disk *)
+  ; host : string option (** the tool host its cwd is on, when recorded *)
+  ; repo : Repo.t option
+    (** where its cwd is in git; [None] outside a repository, or unknown *)
+  ; agent_worktrees : Agent_worktree.t list
+    (** worktrees made for its subagents, not removed yet *)
   }
 [@@deriving sexp_of, equal]
 
@@ -31,7 +36,16 @@ let of_json j =
   let%bind updated_at = Json.string_opt_field j "updated_at" in
   let%bind first_prompt = Json.string_opt_field j "first_prompt" in
   let%bind message_count = Json.int_field j "message_count" in
-  let%map parent = Json.string_opt_field j "parent" in
+  let%bind parent = Json.string_opt_field j "parent" in
+  let%bind host = Json.string_opt_field j "host" in
+  let%bind repo =
+    match Json.field j "repo" with
+    | None | Some `Null -> Ok None
+    | Some r -> Repo.of_json r >>| Option.some
+  in
+  let%map agent_worktrees =
+    Json.optional_list_field j "agent_worktrees" ~f:Agent_worktree.of_json
+  in
   let opt_bool name =
     Result.ok (Json.bool_field j name) |> Option.value ~default:false
   in
@@ -54,6 +68,9 @@ let of_json j =
   ; clients = opt_int "clients"
   ; archived = opt_bool "archived"
   ; bytes = opt_int "bytes"
+  ; host
+  ; repo
+  ; agent_worktrees
   }
 ;;
 

@@ -344,11 +344,35 @@ a session the backend no longer has (it restarted before saving it)
 stays on show, read-only, with a banner offering a new session or the
 list.
 
-The sidebar lists the active sessions first (a session is running, with
-its lamp lit, while its turn or its background subagents and jobs run),
-each with its age and directory, then a faint "Archived 14" rule that
-unfolds the archived ones, muted (a search shows the matching ones
-either way). Hovering a session shows its archive (or unarchive) and delete
+The sidebar lists the active sessions as a tree of projects. A project is
+a git repository, named by its main checkout (its folder icon has a branch
+in it, and the main checkout's branch follows its name), or a plain folder
+(a session outside any repository). Sessions in the main checkout hang
+directly from the project; each other worktree of the repository (a branch
+being worked on, one made for a subagent, any other worktree of the
+repository the session is in) hangs from it as a branch off its rail, with
+its sessions under it, `● 3 changed` when it has uncommitted changes and ↑↓
+commits against its upstream. A subagent's worktree is tagged `subagent`
+and says which session it came from (click it to go there). Each session
+has its lamp (lit while its turn or its background subagents and jobs
+run), its age and, when it works in a subdirectory, that directory. The
+project and worktree the open session is in have the accent on their rail.
+Clicking a project or a worktree folds it (its row then counts its
+sessions, with the lamp when one is running); the folds are kept with your
+preferences, so they follow you to other browsers. Hovering a project shows
+"+" (a new session there) and, for a repository, "New worktree" (a branch,
+and a base that defaults to the main checkout's branch: Enter creates it
+under `worktrees_dir` and starts a new session in it, Esc cancels);
+hovering a worktree shows "+" (a new session there) and its bin, which asks
+to remove it ("Discard changes and remove" when it has changes; not the one
+the open session works in). Projects come most recently used first. Below
+the tree a faint "Archived 14" rule unfolds the archived sessions, muted,
+with their directory. A search (Ctrl+K) finds sessions in every project, by
+title, prompt, directory, project or branch, and shows the matches
+whatever is folded, the archived ones too. Where a session is in git is found on its
+tool host whenever its directory changes, by reading the repository's
+files (no git command), and kept in the session; a tool host running an
+older prigh cannot tell, and its sessions show as plain folders. Hovering a session shows its archive (or unarchive) and delete
 buttons; on a focused session A archives or unarchives it and Delete
 deletes it. "Select" (or `/delete` with no argument) turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
@@ -359,21 +383,10 @@ marked ones; "Delete archived" under the archived ones
 which ones the backend will keep (running, open in another tab or terminal,
 or the one you are in): those are not asked for, and with nothing left to
 delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
-sessions by name, id or path. The list follows the backend as it changes.
-
-Below the sessions, when the session is in a git repository, a
-"Worktrees" section lists the repository's worktrees (`/worktree`, above):
-each with its branch, `● 3 changed` when it has uncommitted changes, ↑↓
-commits against its upstream, its path (the full one on hover) and the
-sessions working in it as chips (click one to switch to it); the one the
-session is in has an accent edge. Clicking a worktree moves the session
-there, its hover "+" starts a new session there and its bin asks to remove
-it ("Discard changes and remove" when it has changes); the header folds
-the section, refreshes it and has "+" for a "New worktree" dialog (branch,
-and a base that defaults to where the session is; Enter creates it and
-moves the session there, Esc cancels). It is listed again when the
-session, its directory or its tool host changes, when a turn ends and
-after creating or removing one.
+sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
+repository the open session is in are listed again when the session, its
+directory or its tool host changes, when a turn ends and after creating or
+removing one.
 
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
@@ -566,8 +579,9 @@ other two; in a narrow composer the labels get short
 while the sidebar is open: the files, terminal and agents buttons sit
 quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
-the account. The session list marks which session it is (its row has the
-cwd as it is now, and a rename button). The card has whatever applies at
+the account, under the tree of projects. The tree marks which session it
+is (its row has the cwd as it is now, relative to its project or worktree,
+and a rename button). The card has whatever applies at
 the top — the goal, reminders, a scheduled resume, queued messages to take
 back, background agents and jobs, transfers, the verbosity, the plan chip
 `plan 2/5: step` that runs `/todos` — then the status on a grid: what the
@@ -907,8 +921,10 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-`/sessions` lists the active sessions first and then, after an `── archived
-──` divider and dimmed, the archived ones. `▶` marks a running session (its
+`/sessions` lists the active sessions first, grouped by project and
+worktree under a divider naming each (`── prigh ──`, `── prigh ⎇ feat/x
+──`, `── notes ──`; the filter matches these names too), and then, after an
+`── archived ──` divider and dimmed, the archived ones. `▶` marks a running session (its
 turn, or background subagents and jobs: `2 in background`), `●` one loaded
 in the backend and `*` the one you are in; the list follows changes made
 anywhere (other frontends, other sessions). In it Tab marks or unmarks a
@@ -973,6 +989,18 @@ message). The model also has `subagent_status` and `subagent_cancel`; there
 is no tool to block on a subagent, since its report wakes the main agent
 anyway. Subagents started by a subagent stay synchronous (and cannot
 delegate further).
+
+A subagent can work in a git worktree of its own, when the model (or you,
+asking it) sets the `subagent` tool's `worktree` option: a branch name, or
+`auto` for one named after the task (`agent/fix-the-parser-bug`, `-2` when
+taken). The worktree is made like `/worktree new` does, from where the
+session is (in the same subdirectory), and the subagent works there; its
+report ends with where the work is (`[worktree: the work is on branch
+agent/fix-the-parser-bug, checked out in ...]`) so that you can review it,
+merge the branch or remove the worktree. The session records the worktree
+until it is removed: prigh-web shows it in the project's tree, tagged
+`subagent`, and `/worktree` lists it like any other (open it, or start a
+session there, to look at the work).
 
 Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
 …, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
@@ -1361,8 +1389,8 @@ Removing asks first (saying what would be lost and which sessions work
 there), keeps the branch, and is refused for the main checkout, for the
 worktree the session itself is in (open another first) and, without
 `-f`, for one with uncommitted changes or locked; a worktree whose
-directory was deleted is pruned. prigh-web also has a Worktrees section in
-the sidebar (below).
+directory was deleted is pruned. prigh-web's sidebar shows the worktrees
+in its tree of projects (below).
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:
