@@ -237,7 +237,12 @@ other: `/setusr NAME` (in the TUI and prigh-web, where the account menu's
 "Act as…" does it too) switches the
 connection to NAME's sessions, logins and tool hosts (the TUI's status line
 shows `user:<me> as <them>`, prigh-web's sidebar and settings "acting as"), `/setusr` alone lists the users and `/setusr <me>`
-switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
+switches back. Everyone else gets an error. Superusers also clean the Nix
+store: `/nix-gc` shows its size and the free space and `/nix-gc run [DAYS|all]`
+collects garbage, first deleting every user's profile generations older
+than DAYS days (prigh-web: Settings, Nix store); in Docker through the
+container's root helper (DOCKER.md, "Garbage collection"), elsewhere as
+the backend's user. `-host-tokens NAME=TOKEN,...`
 (`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
 superuser, for tool hosts that should not hold the user's own token (the
 Docker image starts one per user with one).
