@@ -1532,8 +1532,6 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
-     (tag (Subagent a2)))
     |}]
 ;;
 

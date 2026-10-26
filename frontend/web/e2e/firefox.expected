@@ -1899,3 +1899,11 @@ in the editor: /agents steer a1 one more thing
 The survey is in.
 === firefox: steer: errors ===
 none
+=== firefox: subagent_paged: reloaded ===
+the call is loaded: false
+older messages to load: true
+=== firefox: subagent_paged: its transcript ===
+There are 3 files.
+<TIME>
+=== firefox: subagent_paged: errors ===
+none

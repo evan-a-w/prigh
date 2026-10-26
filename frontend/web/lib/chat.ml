@@ -7,6 +7,7 @@ type t =
   ; running : bool
   ; activity : Prigh_ui.Activity.t
   ; first : int
+  ; detached : detached String.Map.t [@sexp_drop_if Map.is_empty]
   }
 
 and entry =
@@ -35,6 +36,12 @@ and subagent =
   ; turns : int
   ; cost_usd : float option
   ; result : Event.Subagent_result.t option
+  }
+
+and detached =
+  { parent : string option
+  ; call_id : string
+  ; subagent : subagent
   }
 [@@deriving sexp_of]
 
@@ -81,6 +88,7 @@ let empty =
   ; running = false
   ; activity = Idle
   ; first = 0
+  ; detached = String.Map.empty
   }
 ;;
 
@@ -206,6 +214,71 @@ let of_messages ?(running = false) messages =
   if running then missed_output t else t
 ;;
 
+let rec find_subagent t agent_id =
+  let in_ (s : subagent) =
+    if String.equal s.agent_id agent_id
+    then Some s
+    else find_subagent s.chat agent_id
+  in
+  match
+    Map.data t.tools
+    |> List.find_map ~f:(fun tool -> Option.bind tool.subagent ~f:in_)
+  with
+  | Some _ as found -> found
+  | None -> Map.data t.detached |> List.find_map ~f:(fun d -> in_ d.subagent)
+;;
+
+let rec map_subagent t agent_id ~f =
+  let in_ (s : subagent) =
+    if String.equal s.agent_id agent_id
+    then f s
+    else { s with chat = map_subagent s.chat agent_id ~f }
+  in
+  { t with
+    tools =
+      Map.map t.tools ~f:(fun tool ->
+        match tool.subagent with
+        | None -> tool
+        | Some s -> { tool with subagent = Some (in_ s) })
+  ; detached =
+      Map.map t.detached ~f:(fun d -> { d with subagent = in_ d.subagent })
+  }
+;;
+
+let set_subagent t ~call_id subagent =
+  update_tool t call_id ~f:(fun tool ->
+    match tool.subagent with
+    | Some _ -> tool
+    | None -> { tool with subagent = Some subagent })
+;;
+
+(* Onto its call, once that is loaded. *)
+let place t (d : detached) =
+  let fits chat = Map.mem chat.tools d.call_id in
+  match d.parent with
+  | None ->
+    Option.some_if (fits t) (set_subagent t ~call_id:d.call_id d.subagent)
+  | Some parent ->
+    (match find_subagent t parent with
+     | Some s when fits s.chat ->
+       Some
+         (map_subagent t parent ~f:(fun s ->
+            { s with chat = set_subagent s.chat ~call_id:d.call_id d.subagent }))
+     | Some _ | None -> None)
+;;
+
+let rec settle t =
+  let placed =
+    Map.fold t.detached ~init:None ~f:(fun ~key ~data placed ->
+      match placed with
+      | Some _ -> placed
+      | None -> place { t with detached = Map.remove t.detached key } data)
+  in
+  match placed with
+  | Some t -> settle t
+  | None -> t
+;;
+
 let prepend t messages =
   let older = of_messages messages in
   { t with
@@ -215,6 +288,7 @@ let prepend t messages =
         newer)
   ; first = t.first - List.length older.rev_entries
   }
+  |> settle
 ;;
 
 let subagents_to_load t =
@@ -225,11 +299,20 @@ let subagents_to_load t =
     else None)
 ;;
 
-let set_subagent t ~call_id subagent =
-  update_tool t call_id ~f:(fun tool ->
-    match tool.subagent with
-    | Some _ -> tool
-    | None -> { tool with subagent = Some subagent })
+(* A detached subagent's events come for a call not loaded. *)
+let update_subagent t call_id ~f =
+  if Map.mem t.tools call_id
+  then
+    update_tool t call_id ~f:(fun tool ->
+      { tool with subagent = Option.map tool.subagent ~f })
+  else
+    { t with
+      detached =
+        Map.map t.detached ~f:(fun d ->
+          if Option.is_none d.parent && String.equal d.call_id call_id
+          then { d with subagent = f d.subagent }
+          else d)
+    }
 ;;
 
 let rec apply t (event : Event.t) =
@@ -287,24 +370,16 @@ let rec apply t (event : Event.t) =
             }
       })
   | Subagent { call_id; agent_id = _; event } ->
-    update_tool t call_id ~f:(fun tool ->
-      { tool with
-        subagent =
-          Option.map tool.subagent ~f:(fun s ->
-            let turns =
-              match event with
-              | Turn_start -> s.turns + 1
-              | _ -> s.turns
-            in
-            { s with chat = apply s.chat event; turns })
-      })
+    update_subagent t call_id ~f:(fun s ->
+      let turns =
+        match event with
+        | Turn_start -> s.turns + 1
+        | _ -> s.turns
+      in
+      { s with chat = apply s.chat event; turns })
   | Subagent_end { call_id; result; turns; cost_usd; _ } ->
-    update_tool t call_id ~f:(fun tool ->
-      { tool with
-        subagent =
-          Option.map tool.subagent ~f:(fun s ->
-            { s with result = Some result; turns; cost_usd = Some cost_usd })
-      })
+    update_subagent t call_id ~f:(fun s ->
+      { s with result = Some result; turns; cost_usd = Some cost_usd })
   | Compacted summary -> add t (Compaction summary)
   | Agent_start
   | Agent_end _
@@ -352,36 +427,13 @@ let rec received (event : Event.t) ~at : Event.t =
   | _ -> event
 ;;
 
-let rec find_subagent t agent_id =
-  Map.data t.tools
-  |> List.find_map ~f:(fun tool ->
-    Option.bind tool.subagent ~f:(fun s ->
-      if String.equal s.agent_id agent_id
-      then Some s
-      else find_subagent s.chat agent_id))
-;;
-
-let rec map_subagent t agent_id ~f =
-  { t with
-    tools =
-      Map.map t.tools ~f:(fun tool ->
-        match tool.subagent with
-        | None -> tool
-        | Some s when String.equal s.agent_id agent_id ->
-          { tool with subagent = Some (f s) }
-        | Some s ->
-          { tool with
-            subagent = Some { s with chat = map_subagent s.chat agent_id ~f }
-          })
-  }
-;;
-
-let set_nested_subagent t ~parent ~call_id subagent =
-  match parent with
-  | None -> set_subagent t ~call_id subagent
-  | Some parent ->
-    map_subagent t parent ~f:(fun s ->
-      { s with chat = set_subagent s.chat ~call_id subagent })
+let set_nested_subagent t ~parent ~call_id ~detach (subagent : subagent) =
+  let d = { parent; call_id; subagent } in
+  if not detach
+  then Option.value (place t d) ~default:t
+  else
+    settle
+      { t with detached = Map.set t.detached ~key:subagent.agent_id ~data:d }
 ;;
 
 let find_tool t ~agent_id ~call_id =
@@ -468,10 +520,12 @@ let reconcile ~old fresh =
     && Map.equal phys_equal old.tools tools
   then old
   else
-    { rev_entries
-    ; tools
-    ; running = fresh.running
-    ; activity = old.activity
-    ; first = old.first
-    }
+    settle
+      { rev_entries
+      ; tools
+      ; running = fresh.running
+      ; activity = old.activity
+      ; first = old.first
+      ; detached = old.detached
+      }
 ;;
