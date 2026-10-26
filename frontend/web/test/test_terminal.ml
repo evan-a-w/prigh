@@ -67,7 +67,6 @@ let%expect_test
            title="Drag to resize, double-click for the default size"
            data-resize="terminal"
            data-resize-var="--terminal-height"
-           data-resize-unit="px"
            data-resize-grows="-1"
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"
@@ -210,7 +209,9 @@ let%expect_test "the panel follows the session, the host and the user" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
@@ -336,7 +337,6 @@ let%expect_test "/terminal, the top bar's button and the height" =
          title="Drag to resize, double-click for the default size"
          data-resize="terminal"
          data-resize-var="--terminal-height"
-         data-resize-unit="px"
          data-resize-grows="-1"
          data-resize-target="#terminal-panel"
          class="resizer resizer-terminal"
@@ -355,7 +355,6 @@ let%expect_test "/terminal, the top bar's button and the height" =
            title="Drag to resize, double-click for the default size"
            data-resize="terminal"
            data-resize-var="--terminal-height"
-           data-resize-unit="px"
            data-resize-grows="-1"
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"

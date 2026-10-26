@@ -365,6 +365,17 @@ is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 
+To shrink the context without summarising it, rest the pointer on one of
+your messages and choose ✂ Trim everything before this (or press Delete on
+it in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
+messages and tokens it frees (Enter trims, Esc cancels). The transcript then
+starts at one divider, `✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
+Show unfolds the trimmed messages above it, dimmed and read-only (they are
+not in the model's context), and Undo (or `/trim undo`) brings them back.
+The rail draws what is trimmed as one dashed cut at its top, and the jump
+list ends with a "Trimmed: 142 messages" row; both go to the divider. See
+[Trimming the context](#trimming-the-context).
+
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
 top of the chat, and once back the session's new messages are merged into
@@ -475,12 +486,16 @@ types its character instead. What finished before your latest prompt
 folds under "Earlier"; switching sessions empties the panel. `/agents cancel
 <n|id>` and `/jobs kill <id>` open the item there and stop it.
 
-A running background subagent can be steered like the main agent. The one
-shown in the panel (or chosen with its Steer button) is who the composer
-writes to: a "Steering a1 · task" chip over the editor says so, Enter sends
-a steer (it reaches the subagent after its current tool calls) and
-Alt+Enter a follow-up (when it ends its turn, before it reports); Esc, the
-chip's × or going back to the panel's list write to the main agent again.
+A running background subagent can be steered like the main agent. Showing
+it in the panel leaves the composer on the main agent; its Steer button (in
+the panel's footer, next to Cancel) makes it who the composer writes to: a
+"Steering a1 · task" chip over the editor says so, Enter sends a steer (it
+reaches the subagent after its current tool calls) and Alt+Enter a
+follow-up (when it ends its turn, before it reports). That lasts while you
+browse the panel or close it, until Esc in the editor, the chip's × or the
+button again ("Steering") write to the main agent again. Unlike the TUI,
+where focusing a subagent is itself the mode that steers it, viewing one in
+prigh-web only reads it.
 What waits for a subagent is listed above the composer with the main
 agent's ("To a1, next step"), with Edit and remove, and Alt+↑ takes back the
 last message for whoever the composer writes to. Delivered messages show in
@@ -529,9 +544,13 @@ Docker container, or a laptop connected as a tool host), in the session's
 directory. The breadcrumbs (or the pencil, to type a path: absolute, `~/…`
 or relative to the directory shown), the up arrow and Backspace move
 around; the eye shows dot files; the columns sort by name, size or age
-(directories first). A file clicked (or reached with ↑↓) is previewed:
-text with line numbers (the first 256 KB), images (up to 20 MB), binaries
-only named. The selected entry's actions: Attach (to your next message),
+(directories first). A file clicked (or reached with ↑↓) is previewed
+in a pane of its own left of the list, between it and the chat: text
+with line numbers (the first 256 KB), images (up to 20 MB), binaries
+only named. Its close button (or Esc) leaves the list alone again. On a
+phone, with the drawer floating over a narrow window, or without room for
+both beside the chat, the preview takes the list's place, with a back
+arrow to it. The selected entry's actions: Attach (to your next message),
 Download (a directory as a `.tar.gz` archive: `tar -czf` of it, paths
 starting with its name), Mention (`@path` into the composer), Copy path,
 Rename (F2) and Delete (Delete; it asks first, and refuses `/` and the
@@ -591,16 +610,18 @@ worked. Errors are the backend's, saying what to do (`/login github`, `git
 remote add`…).
 
 Every panel resizes from a handle on its inner edge: the sessions
-sidebar's right edge, the file browser's and the agents panel's left
-edge, the terminal's top edge, and the line between the file list and
-its preview. The handle shows as a faint line under the pointer and turns
+sidebar's right edge; the left edges of the file browser's list, of its
+preview and of the agents panel; the terminal's top edge; on the review
+page, the edge between it and the chat beside it and the right edge of
+its list of changed files. The handle shows as a faint line under the pointer and turns
 sodium while it is dragged or focused; double-click it (or press Enter on
 it) for the default size. It is a focusable separator: Tab to it, then
 the arrow keys move it (Shift: four times as far), Home and End make the
-panel as small or as large as it goes. The chat always keeps 400px: when
-the window narrows, the side panels beside it shrink in proportion (down
-to their minimums) and grow back to the sizes you chose when it widens
-again. The sizes are kept with your preferences on the backend (below), so
+panel as small or as large as it goes. The chat always keeps 400px (while
+reviewing, the review page keeps 480px beside the chat, and its code
+320px beside its file list): when the window narrows, the side panels
+beside it shrink in proportion (down to their minimums) and grow back to
+the sizes you chose when it widens again. The sizes are kept with your preferences on the backend (below), so
 every browser you sign in on has them. On a phone the panels are sheets,
 without handles.
 
@@ -749,7 +770,7 @@ radio buttons or checkboxes with an "Other" field (keys as in the TUI, or
 clicks). Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
-lists them; `/help` and
+lists them (Delete there trims the context before one); `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
@@ -773,7 +794,8 @@ across the reconnect: their results wait for the backend to be back.
 
 `/review` (or Alt+R, or the Review button of the file browser and of
 `/diff`) opens the review page in the chat's place; the chat narrows to a
-column beside it and keeps working. Down its left are the changed files,
+column beside it and keeps working (drag the edge between them to share
+the width differently). Down its left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
 its hunks or, with Whole file (v), all of it with the changes inline, one
@@ -787,9 +809,13 @@ Select the code you want changed, as you would to copy it (drag across
 it, within a line or over several; on a phone, press and hold), here or in
 the file browser's preview of a changed file: a Comment button floats by
 the selection. Press it (or `c`), write what should change and Enter adds
-it (Shift+Enter for a new line, Esc drops it), under the code with the
-selected text quoted; that text stays marked while the comment is there,
-and pointing at either the comment or its code lights the other. Removed
+it (Shift+Enter for a new line, Esc drops it), with the selected text
+quoted. On a window wide enough, comments sit in a margin beside the code,
+each level with its first line (or just below the one above it), so the
+code never moves for them; drag the margin's edge to widen it. Narrower,
+and on a phone, they show under their lines. The selected text stays
+marked while the comment is there, and pointing at either the comment or
+its code lights the other. Removed
 lines can be commented on too: the comment says it is on the old text.
 (A line's number selects the whole line, Shift+click to another.)
 Comments collect until you send them (Send, or `s`): the agent then gets
@@ -800,10 +826,13 @@ Its replies show threaded under the comment; a reply may propose a change
 (exact replacements, like `edit`'s), which Accept applies to the file
 where the tools run and Reject declines, and the agent hears of either
 with the next comments you send. Reply in a thread to go on with it,
-Resolve it when it is done, or delete it. A comment keeps its code's
+Resolve it when it is done, which folds it to a small mark on its line
+(click it to unfold the thread), or delete it. A comment keeps its code's
 text, so when the file changes around it it moves with it (and, when
-only the rest of its lines changed, with the selected text); one whose
-code is gone shows above the file, marked so.
+only the rest of its lines changed, with the selected text); those whose
+code is gone are counted in one folded line above the file ("2 outdated
+comments", click to list them), as are those on lines the view does not
+show.
 
 Edit (e) switches to the file's text: edit it in place (highlighted) and
 Save (Ctrl+S) writes it on the tool host; a file that changed since you
@@ -817,14 +846,20 @@ and the comments with their threads.
 Each thing you do to a file in the review (approve or unapprove it,
 comment, reply, accept or reject a proposal, save it in Edit) records the
 file as it was then, so you can see just what changed in it afterwards:
-next to Changes and Whole file, "Since you approved · 14:32" (`l`) shows
-the file then against the file now, in the same view (select its current
-lines to comment on them). A file that changed after your last action
-opens in that view, and the file list says by how much (`+3 −1 since
-approved`); with several actions on a file, a menu next to it compares
-with an earlier one, and a file that has not changed says "Nothing
-changed since …". The file browser's preview of a changed file has the
-same view, and the TUI's `/review` says `changed since approved (+3 −1)`.
+next to Changes and Whole file, "Since latest (comment · 14:32)" (`l`)
+shows the file then against the file now, in the same view (select its
+current lines to comment on them). A file that changed after your last
+action opens in that view, and so does one you have just commented on,
+replied about or decided a proposal of: until something changes it shows
+the changes under "Nothing changed since your comment on line 6 · 14:32",
+then what changed since. The file list says by how much (`+3 −1 since
+approved`). Latest follows your newest action on the file as you act; the
+chevron beside it (or Shift+L) opens a menu (filtered as you type) of the
+earlier ones, named by what you did where ("Comment on line 6 · 20:59",
+"Approved · 20:41", "Edited · 20:30"), to compare with one of them
+instead, and Latest to follow again. The file browser's preview of a
+changed file has the same view, and the TUI's `/review` says `changed
+since approved (+3 −1)`.
 The texts are kept with the session's review, each distinct content once,
 read where the tools run (so remote tool hosts too); files over 1 MiB,
 binary files, and new contents once a session keeps 32 MiB of them record
@@ -877,7 +912,8 @@ directly").
 
 #### Committing, pushing and pull requests from the review
 
-Under the page's head, the git bar shows the reviewed worktree's branch, how
+At the page's foot, away from Send comments, the git bar shows the reviewed
+worktree's branch, how
 it stands with its upstream (`↑2 ↓0 origin/feat-x`, or "not pushed yet")
 and how many files are staged, unstaged and untracked. Each file with
 uncommitted changes has a box in the file list: approved files come ticked
@@ -896,6 +932,7 @@ changes again. Push pushes the branch to its upstream, setting one (on
 `origin`, else the only remote) when it has none, with the tool host's own
 git credentials: prigh never asks for a password. Create PR opens the
 pull-request dialog for that worktree's branch (see [Git hosting](#git-hosting)).
+Stage approved, Push and Create PR are at the bar's end.
 A branch reviewed without checking it out has no git bar, boxes or commit
 box: check it out into a worktree to commit there.
 Refusals say what to do: nothing ticked, an empty message, a detached HEAD
@@ -1144,7 +1181,7 @@ that no longer exists.
 | Ctrl+End / click on `↓ … · End` | back to the bottom of the transcript, following new output again |
 | PageUp / PageDown | scroll the transcript / list a page |
 | mouse wheel | scroll the transcript (selecting text needs Shift) |
-| Ctrl+Up / Ctrl+Down | jump to the previous/next user message |
+| Ctrl+Up / Ctrl+Down | jump to the previous/next user message (or the trimmed divider) |
 | Backspace / Ctrl+H | delete the character before the cursor |
 | Delete | delete the character under the cursor |
 | Ctrl+K / Ctrl+U | delete to the end / start of the line |
@@ -1532,6 +1569,26 @@ conversation as it is, in a request that shares the session's prompt
 cache; a conversation too long for that is sent as a shortened transcript
 instead. Subagents compact their own context the same way.
 
+#### Trimming the context
+
+`/trim` drops everything before one of your messages from the model's
+context, without a summary: pick the message (newest first, each with its
+time and the messages and tokens trimming there frees), confirm, and the
+next request starts at it. The session file keeps everything: the
+transcript folds the trimmed part into one divider (`──── 142 messages
+trimmed · ~38k tokens ────`; `/trim show` unfolds it read-only in the TUI,
+Show in prigh-web), and `/trim undo` brings back what the latest trim took
+out (trims stack: each undo cancels one). The context use in the status line
+goes down by the estimate at once. The cut is always at one of your
+messages, so a tool call never loses its result, and it is refused while a
+run is in progress (wait for it to end or abort it with Esc). It works with
+compaction both ways: a `/compact` after a trim summarises, and carries
+over, only your messages after it, and a trim after a compaction can start
+at one of the messages it carried over, or cut into what it kept, dropping
+those messages and the summary too. A fork or clone keeps the trim, and so does
+`/rewind` while the trimmed-to message stays on the path (rewinding to
+before it drops the trim).
+
 `/budget DOLLARS` sets a cost budget for the session (`/budget off` removes
 it, `/budget` shows it): once the session has cost that much — subagents and
 compactions included, counted as they happen — no further turn starts, the
@@ -1622,6 +1679,7 @@ it.
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
+| `/trim [undo\|show\|hide]` | drop everything before one of your messages from the model's context (a picker, then a confirmation); `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |

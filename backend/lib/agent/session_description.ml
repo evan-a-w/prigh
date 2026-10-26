@@ -15,8 +15,7 @@ let wanted session =
       | Message.User _ -> true
       | Assistant _ | Tool_result _ -> false)
   in
-  users >= min_user_messages
-  || Compaction.estimate_tokens messages >= min_tokens
+  users >= min_user_messages || Message.estimate_tokens messages >= min_tokens
 ;;
 
 let instructions =

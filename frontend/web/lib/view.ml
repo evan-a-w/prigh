@@ -205,9 +205,20 @@ let echoes (m : Model.t) =
 (* What is loaded of the transcript, after how much is not. *)
 let transcript (m : Model.t) ~inject =
   Node.fragment
-    [ Paging.view m.paging ~load:(inject Action.Load_older)
-    ; Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
-    ]
+    ([ Paging.view m.paging ~load:(inject Action.Load_older) ]
+     @ (match Option.bind m.state ~f:(fun s -> s.trim) with
+        | Some _ -> [ Trim_view.view m ~inject ]
+        | None -> [])
+     @ [ Chat_view.view
+           ~fold:(Model.fold m)
+           ~trim_after:
+             (* The first message in the context has nothing before it. *)
+             (if m.paging.older = 0
+              then Chat.first m.chat
+              else Chat.first m.chat - 1)
+           (Model.message_time m)
+           m.chat
+       ])
 ;;
 
 let view (m : Model.t) ~inject ~terminal =
@@ -286,6 +297,9 @@ let view (m : Model.t) ~inject ~terminal =
          -> layered Fn.id
        | _ -> under_drawer)
         (Review_page_view.view m ~inject)
+    ; (if m.review.open_
+       then Resize_view.handle m ~inject Review_chat
+       else Node.none)
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         (List.map

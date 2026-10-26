@@ -102,6 +102,7 @@ let%expect_test "every command does something (none is unknown)" =
     /clone                     rpc clone
     /fork                      loading Fork from: rpc push_pref, rpc get_entries
     /rewind                    loading Rewind to: rpc push_pref, rpc get_entries
+    /trim                      loading Trim the context: rpc push_pref, rpc get_trim_points
     /tree                      loading Session tree: rpc push_pref, rpc get_entries
     /cd                        path prompt
     /mkdir                     path prompt
@@ -187,6 +188,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
+    Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
@@ -199,7 +201,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
@@ -207,6 +209,7 @@ let%expect_test "/help <command> and /hotkeys" =
     ] / [ (reviewing; also n p, j k) the next / previous changed file
     a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
+    l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
@@ -1513,7 +1516,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Close (Alt+0))
     Loading the transcript…
     lint
-    (Steering) (Stopping…) (Show in chat) Running 30s m  1 turn
+    (Steer) (Stopping…) (Show in chat) Running 30s m  1 turn
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel a1") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
@@ -1532,8 +1535,6 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
-     (tag (Subagent a2)))
     |}]
 ;;
 
@@ -1697,7 +1698,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1750,7 +1753,9 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

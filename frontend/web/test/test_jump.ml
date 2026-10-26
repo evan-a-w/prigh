@@ -197,7 +197,7 @@ let%expect_test
     Keep_scroll_position
     (Scroll_to_entry -2)
     question 3
-    10:03
+    10:03 (✂ Trim everything before this)
     <button class="tick unloaded user">
     |}];
   (* Further up than a page brought: the next one, then there. *)
@@ -234,7 +234,7 @@ let%expect_test "a jump while a page is on its way waits for it" =
     |}];
   (* It fails: no jump left waiting. *)
   H.fail h "get_messages_page" "the disk is full";
-  print_s [%sexp ((H.model h).jump.pending : int option)];
+  print_s [%sexp ((H.model h).jump.pending : Jump.Target.t option)];
   H.text h ~selector:".toasts";
   [%expect
     {|
@@ -251,11 +251,11 @@ let%expect_test "Ctrl+J: the user's messages, newest first, filtered as typed" =
     {|
     Open_jump_list
     (Focus picker-input)
-    question 6 6 of 6  10:06
-    question 5 5 of 6  10:05
-    question 4 4 of 6  10:04
-    question 3 3 of 6  10:02
-    question 2 2 of 6  10:01
+    question 6 6 of 6  10:06 (Trim before)
+    question 5 5 of 6  10:05 (Trim before)
+    question 4 4 of 6  10:04 (Trim before)
+    question 3 3 of 6  10:02 (Trim before)
+    question 2 2 of 6  10:01 (Trim before)
     question 1 1 of 6  10:00
     |}];
   H.input h ~selector:"#picker-input" "qn2";
@@ -263,7 +263,7 @@ let%expect_test "Ctrl+J: the user's messages, newest first, filtered as typed" =
   [%expect
     {|
     (Picker_query qn2)
-    question 2 2 of 6  10:01
+    question 2 2 of 6  10:01 (Trim before)
     |}];
   (* Enter jumps there (loading it), the dialog closes. *)
   H.key h ~target:Field "Enter";
@@ -449,6 +449,7 @@ let%expect_test "past 120 marks the rail picks evenly, the newest always" =
             (H.model h).jump
             ~path:(Some "/sessions/s2.jsonl")
             ~paging:(H.model h).paging
+            ~trim:None
             (H.model h).chat)
        : int)];
   [%expect {| 300 |}]

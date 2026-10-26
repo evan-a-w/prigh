@@ -80,6 +80,16 @@ module Worktrees_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Trim_purpose = struct
+  type t =
+    | Picker
+    | Before of
+        { from_end : int
+        ; at : Time_ns.Alternate_sexp.t option
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -204,6 +214,10 @@ module Reply_tag = struct
     | Git of Git_bar.Reply.t
     | Nix_status of { open_settings : bool }
     | Nix_collected
+    | Trim_points of Trim_purpose.t
+    | Trimmed
+    | Untrimmed
+    | Trimmed_messages of string
   [@@deriving sexp_of, equal]
 end
 
@@ -243,6 +257,7 @@ module Command = struct
     | Jump_to_user_message of int
     | Scroll_to_entry of int
     | Scroll_to_bottom
+    | Scroll_to_trimmed
     | Focus_terminal
     | Notify of Prigh_ui.Notify.t
     | Request_notification_permission
@@ -429,6 +444,9 @@ module Action = struct
     | Jump_to of Jump.Target.t
     | Jump_older
     | Open_jump_list
+    | Ask_trim of Jump.Target.t
+    | Show_trimmed of bool
+    | Untrim
     | Chat_scrolled of { at_bottom : bool }
     | Jump_to_bottom
     | Run of string
@@ -524,6 +542,7 @@ module Model = struct
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
+    ; trimmed : Trimmed.t
     ; outputs_loading : String.Set.t (** [Fold] keys *)
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
@@ -567,7 +586,9 @@ module Model = struct
   let shown t =
     { Resize.Shown.sidebar = t.sidebar_open
     ; files = t.files.open_
+    ; preview = Option.is_some t.files.preview
     ; agents = t.agents.open_
+    ; reviewing = t.review.open_
     ; narrow = t.narrow
     }
   ;;
@@ -597,7 +618,8 @@ module Model = struct
 
   let ticking t =
     t.agents.open_
-    && Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
+    && (Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
+        || Agents.fetching t.agents)
   ;;
 
   let fold t = Fold.create ~verbosity:t.verbosity ~toggled:t.folds
@@ -686,6 +708,7 @@ let init =
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
   ; jump = Jump.empty
+  ; trimmed = Trimmed.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
   ; forges = Forges.empty
@@ -796,7 +819,9 @@ let close_dialog (m : Model.t) =
     , [ Command.Focus
           (match Review_picker.which p with
            | Target -> "review-target-button"
-           | Base -> "review-base-button")
+           | Base -> "review-base-button"
+           | Since _ when m.review.open_ -> "review-since-button"
+           | Since _ -> "files-since-button")
       ] )
   | _ ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
@@ -1011,6 +1036,10 @@ let set_state_without_files (m : Model.t) (state : State.t) =
           ~f:(Fn.non (Session_mode.equal (Session_mode.of_state state)))
     }
   in
+  let trim_changed =
+    Option.exists m.state ~f:(fun (old : State.t) ->
+      not ([%equal: Trim.t option] old.trim state.trim))
+  in
   let m = { m with state = Some state; pending } in
   if changed
   then (
@@ -1033,6 +1062,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; paging =
           Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
       ; jump = Jump.empty
+      ; trimmed = Trimmed.empty
       ; outputs_loading = String.Set.empty
       ; folds = String.Set.empty
       ; confirms = []
@@ -1063,6 +1093,22 @@ let set_state_without_files (m : Model.t) (state : State.t) =
         ; list_subagents
         ; list_jobs
         ] ))
+  else if trim_changed
+  then (
+    (* The context starts elsewhere: the transcript, which is the context,
+       again from the backend. *)
+    let path = state.session_path in
+    let m, fetch =
+      fetch_newest
+        { m with chat_cache = Chat_cache.remove m.chat_cache path }
+        path
+    in
+    ( { m with
+        chat = Chat.set_running m.chat state.running
+      ; jump = Jump.empty
+      ; trimmed = { m.trimmed with shown = Folded }
+      }
+    , background_changed @ fetch ))
   else
     { m with chat = Chat.set_running m.chat state.running }, background_changed
 ;;
@@ -1966,13 +2012,33 @@ let now_of (m : Model.t) = Option.value m.now ~default:Time_ns.epoch
 let with_agents (m : Model.t) ~f = { m with agents = f m.agents }
 let job_output id = rpc "job_output" [ "job_id", str id ] ~tag:(Job_output id)
 
-(* Top-level subagents' transcripts come with the chat (events, or
-   [get_subagent] after a reload); nested ones are fetched when shown. *)
+(* Subagents' transcripts come with their calls (events, or [get_subagent]
+   after a reload); those of calls not loaded, and nested ones, are fetched
+   when shown. *)
 let fetch_transcript (m : Model.t) id =
-  Agents.lineage m.agents id
-  |> List.filter ~f:(fun (a : Agents.Agent.t) ->
-    Option.is_none (Chat.find_subagent m.chat a.id))
-  |> List.map ~f:(fun (a : Agents.Agent.t) -> subagent_rpc a.id)
+  let wanted =
+    Agents.lineage m.agents id
+    |> List.filter ~f:(fun (a : Agents.Agent.t) ->
+      Option.is_none (Chat.find_subagent m.chat a.id)
+      &&
+      match Map.find m.agents.fetches a.id with
+      | Some (Asked _) -> false
+      | Some (Failed _) | None -> true)
+  in
+  ( with_agents m ~f:(fun agents ->
+      { agents with
+        fetches =
+          List.fold wanted ~init:agents.fetches ~f:(fun fetches a ->
+            Map.set fetches ~key:a.id ~data:(Asked m.now))
+      })
+  , List.map wanted ~f:(fun (a : Agents.Agent.t) -> subagent_rpc a.id) )
+;;
+
+(* After a new chat: the transcript on show, if it went with the old one. *)
+let refetch_shown (m : Model.t) =
+  match m.agents.selected with
+  | Some (Agent id) -> fetch_transcript m id
+  | Some (Job _) | None -> m, []
 ;;
 
 let select (m : Model.t) (item : Agents.Item.t) =
@@ -1988,7 +2054,7 @@ let select (m : Model.t) (item : Agents.Item.t) =
       })
   in
   match item with
-  | Agent id -> m, fetch_transcript m id
+  | Agent id -> fetch_transcript m id
   | Job id -> m, [ job_output id ]
 ;;
 
@@ -2097,27 +2163,9 @@ let unqueue (m : Model.t) (recipient : Recipient.t) q ~tag =
 ;;
 
 (* A finished subagent takes no messages: the composer goes back to the main
-   agent. On a desktop the subagent shown in the panel is the one steered
-   (until Esc), none once the panel closes. *)
-let follow_recipient (before : Model.t) ((m : Model.t), cmds) =
-  let m =
-    if
-      m.narrow
-      || (Option.equal
-            Agents.Item.equal
-            before.agents.selected
-            m.agents.selected
-          && Bool.equal before.agents.open_ m.agents.open_)
-    then m
-    else
-      { m with
-        recipient =
-          (match m.agents.open_, m.agents.selected with
-           | true, Some (Agent id)
-             when Option.is_none (Recipient.refusal m.agents id) -> Agent id
-           | _ -> Main)
-      }
-  in
+   agent. Showing a subagent in the panel does not steer it: only its Steer
+   button does. *)
+let follow_recipient ((m : Model.t), cmds) =
   match m.recipient with
   | Main -> m, cmds
   | Agent id ->
@@ -2149,9 +2197,15 @@ let show_in_chat (m : Model.t) id =
 (* While the panel is open, running jobs' last lines and the shown job's
    output are polled. *)
 let poll_interval = Time_ns.Span.of_sec 2.
+let transcript_timeout = Time_ns.Span.of_sec 20.
 
 let clock (m : Model.t) now =
-  let m = { m with now = Some now } in
+  let m =
+    { m with
+      now = Some now
+    ; agents = Agents.time_out_fetches m.agents ~now ~after:transcript_timeout
+    }
+  in
   let a = m.agents in
   let due =
     Option.value_map a.polled_at ~default:true ~f:(fun at ->
@@ -3128,6 +3182,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; paging = Paging.all
     ; chat_cache = Chat_cache.empty
     ; jump = Jump.empty
+    ; trimmed = Trimmed.empty
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
@@ -3834,68 +3889,72 @@ let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
 
 (* ---- the review page's pickers *)
 
-let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) d =
-  match which with
-  | Target ->
-    Review_picker.targets
-      ~worktrees:
-        (match worktrees with
-         | Some worktrees -> worktrees
-         | None ->
-           Option.value_map
-             (Worktrees.listing m.worktrees)
-             ~default:[]
-             ~f:(fun l -> l.worktrees))
-      ~reviewed:m.review.target.reviewed
-      d
-  | Base -> Review_picker.bases d
+let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) =
+  match which, m.review.diff with
+  | Target, Some d ->
+    Some
+      (Review_picker.targets
+         ~worktrees:
+           (match worktrees with
+            | Some worktrees -> worktrees
+            | None ->
+              Option.value_map
+                (Worktrees.listing m.worktrees)
+                ~default:[]
+                ~f:(fun l -> l.worktrees))
+         ~reviewed:m.review.target.reviewed
+         d)
+  | Base, Some d -> Some (Review_picker.bases d)
+  | (Target | Base), None -> None
+  | Since path, _ ->
+    Some
+      (Review_action.picker
+         m.review
+         ~path
+         ~me:(own_user m)
+         ~time:(Model.message_time m))
 ;;
 
 let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
-  match m.dialog, m.review.diff with
+  match m.dialog, review_picker m which with
   | Some (Review_pick p), _
     when Review_picker.Which.equal (Review_picker.which p) which ->
     close_dialog m
   | _, None -> toast m "The changes are still being read: try again."
-  | _, Some d ->
-    let m, cmds =
-      open_dialog
-        m
-        ~focus:"review-pick-filter"
-        (Review_pick (review_picker m which d))
-    in
+  | _, Some p when List.is_empty (Review_picker.visible p) ->
+    toast
+      m
+      "No review actions on this file yet: approve it or comment on it first."
+  | _, Some p ->
+    let m, cmds = open_dialog m ~focus:"review-pick-filter" (Review_pick p) in
     (* The worktrees as they are now: one may have been made since. *)
     ( m
     , cmds
       @
-      match which, Worktrees.place m.state with
-      | Target, Some place ->
-        [ call
-            (List_worktrees { cwd = None })
-            ~tag:(Worktrees { place; purpose = Review_pick })
-        ]
-      | Target, None | Base, _ -> [] )
+        (match which, Worktrees.place m.state with
+        | Target, Some place ->
+          [ call
+              (List_worktrees { cwd = None })
+              ~tag:(Worktrees { place; purpose = Review_pick })
+          ]
+        | Target, None | (Base | Since _), _ -> []) )
 ;;
 
-(* The diff or the worktrees were read again under an open picker: its
+(* The diff, the review or the worktrees changed under an open picker: its
    choices follow. *)
 let refresh_review_pick ?worktrees (m : Model.t) =
-  match m.dialog, m.review.diff with
-  | Some (Review_pick p), Some d ->
+  match m.dialog with
+  | Some (Review_pick p) ->
     let worktrees =
       match worktrees, Review_picker.worktrees p with
       | Some w, _ -> Some w
       | None, [] -> None
       | None, w -> Some w
     in
-    { m with
-      dialog =
-        Some
-          (Review_pick
-             (Review_picker.refresh
-                p
-                ~fresh:(review_picker m ?worktrees (Review_picker.which p) d)))
-    }
+    (match review_picker m ?worktrees (Review_picker.which p) with
+     | Some fresh ->
+       { m with dialog = Some (Review_pick (Review_picker.refresh p ~fresh)) }
+     | None -> m)
   | _ -> m
 ;;
 
@@ -3914,6 +3973,9 @@ let review_picked (m : Model.t) (item : Review_picker.Item.t) =
           base = Some base
         ; direct = target.direct && not (String.equal base "HEAD")
         }
+    | Since { path; index = None } -> review_update m (Follow_latest path)
+    | Since { path; index = Some index } ->
+      review_update m (Pick_since { path; index })
   in
   m, cmds
 ;;
@@ -4155,6 +4217,38 @@ let agents_message (m : Model.t) rest =
          ~draft:(String.strip ("/agents " ^ verb ^ " " ^ rest)))
 ;;
 
+(* Undoing the latest trim of the context ([/trim undo], the divider's Undo). *)
+
+let trim_state (m : Model.t) = Option.bind m.state ~f:(fun s -> s.trim)
+
+let untrim (m : Model.t) =
+  match trim_state m with
+  | None ->
+    error
+      m
+      "Nothing is trimmed from the context: /trim picks a message to trim \
+       before."
+  | Some _ when m.trimmed.restoring -> m, []
+  | Some _ ->
+    ( { m with trimmed = { m.trimmed with restoring = true } }
+    , [ call Untrim ~tag:Untrimmed ] )
+;;
+
+let untrimmed (m : Model.t) result =
+  let m = { m with trimmed = { m.trimmed with restoring = false } } in
+  match result with
+  | Ok json ->
+    decode m json Trim.Freed.of_json ~f:(fun (freed : Trim.Freed.t) ->
+      toast
+        m
+        (sprintf
+           "Back in the context: %d message%s (%s)"
+           freed.messages
+           (if freed.messages = 1 then "" else "s")
+           (Trim.tokens_label freed.tokens)))
+  | Error e -> error m (String.capitalize e)
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -4368,6 +4462,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     loading m "Fork from" [ rpc "get_entries" [] ~tag:(Entries Fork) ]
   | "rewind", _ ->
     loading m "Rewind to" [ rpc "get_entries" [] ~tag:(Entries Rewind) ]
+  | "trim", "" ->
+    loading
+      m
+      "Trim the context"
+      [ call Get_trim_points ~tag:(Trim_points Picker) ]
+  | "trim", "undo" -> untrim m
+  | "trim", _ ->
+    error m "Usage: /trim (pick the message to trim before) or /trim undo"
   | "tree", _ ->
     loading
       m
@@ -4645,6 +4747,15 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
   | _ -> m, []
 ;;
 
+(* The agents panel says so, with a retry. *)
+let transcript_failed (m : Model.t) id e =
+  if Map.mem m.agents.fetches id
+  then
+    with_agents m ~f:(fun a ->
+      { a with fetches = Map.set a.fetches ~key:id ~data:(Failed e) })
+  else m
+;;
+
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
   Or_error.map (Subagent_detail.of_json json) ~f:(fun (d : Subagent_detail.t) ->
@@ -4700,14 +4811,19 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
     | true, Some _, _
       when phys_equal entry.chat m.chat && not m.pending.messages -> m, prefetch
     | true, Some _, (`Unchanged | `Changed | `New) ->
-      ( { m with
-          chat = entry.chat
-        ; paging = entry.paging
-        ; scrolled_up = false
-        ; pending = { m.pending with messages = false }
-        }
+      let m, shown =
+        refetch_shown
+          { m with
+            chat = entry.chat
+          ; paging = entry.paging
+          ; scrolled_up = false
+          ; pending = { m.pending with messages = false }
+          }
+      in
+      ( m
       , (Command.Scroll_to_bottom
          :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
+        @ shown
         @ prefetch ))
 ;;
 
@@ -4728,42 +4844,55 @@ let fetch_outline (m : Model.t) =
 ;;
 
 let jump_points (m : Model.t) =
-  Jump.points m.jump ~path:(session_path m) ~paging:m.paging m.chat
+  Jump.points
+    m.jump
+    ~path:(session_path m)
+    ~paging:m.paging
+    ~trim:(trim_state m)
+    m.chat
 ;;
 
 let no_jump (m : Model.t) = { m with jump = { m.jump with pending = None } }
 
 (* A message not loaded: the pages from it down to those loaded, in one go,
-   then there. While a page is on its way, once it is in. *)
+   then there. While a page is on its way, once it is in. The divider of what
+   is trimmed is above the first message. *)
 let jump_to (m : Model.t) (target : Jump.Target.t) =
-  match target, session_path m, m.paging.before with
-  | Entry n, _, _ -> no_jump m, [ Command.Scroll_to_entry n ]
-  | Message index, Some path, Some before when index < m.paging.older ->
-    let m = { m with jump = { m.jump with pending = Some index } } in
-    if m.paging.loading
-    then m, []
-    else
-      ( { m with paging = { m.paging with loading = true } }
-      , [ call
-            (Get_messages_page
-               { session = path
-               ; before = Some before
-               ; from = None
-               ; limit = m.paging.older - index
-               })
-            ~tag:(Page { path; before = Some before })
-        ] )
-  | Message _, _, _ -> no_jump m, []
+  let load ~index =
+    match session_path m, m.paging.before with
+    | Some path, Some before when index < m.paging.older ->
+      let m = { m with jump = { m.jump with pending = Some target } } in
+      if m.paging.loading
+      then m, []
+      else
+        ( { m with paging = { m.paging with loading = true } }
+        , [ call
+              (Get_messages_page
+                 { session = path
+                 ; before = Some before
+                 ; from = None
+                 ; limit = m.paging.older - index
+                 })
+              ~tag:(Page { path; before = Some before })
+          ] )
+    | _ -> no_jump m, []
+  in
+  match target with
+  | Entry n -> no_jump m, [ Command.Scroll_to_entry n ]
+  | Message index -> load ~index
+  | Trimmed when m.paging.older > 0 -> load ~index:0
+  | Trimmed -> no_jump m, [ Command.Scroll_to_trimmed ]
 ;;
 
 (* An older page is in: there, if it was what a jump waited for. *)
 let continue_jump (m : Model.t) (page : Message_page.t) =
   match m.jump.pending with
-  | None -> m, []
-  | Some index ->
+  | None | Some (Entry _) -> m, []
+  | Some (Message index) ->
     (match Jump.entry_of_index ~page ~first:(Chat.first m.chat) index with
      | Some n -> no_jump m, [ Command.Scroll_to_entry n ]
      | None -> jump_to m (Message index))
+  | Some Trimmed -> jump_to m Trimmed
 ;;
 
 let older_page (m : Model.t) path ~before (page : Message_page.t) =
@@ -4805,6 +4934,150 @@ let jump_older (m : Model.t) =
   with
   | Some p -> jump_to m p.target
   | None -> load_older m
+;;
+
+(* ---- trimming the context before a message *)
+
+let trim_title = "Trim the context"
+
+(* "Trim everything before this": the backend says what that drops. *)
+let ask_trim (m : Model.t) target =
+  let points = jump_points m in
+  match Jump.from_end points target with
+  | Some (from_end, p) when Jump.trimmable ~paging:m.paging m.chat p ->
+    loading
+      m
+      trim_title
+      [ call Get_trim_points ~tag:(Trim_points (Before { from_end; at = p.at }))
+      ]
+  | Some _ ->
+    toast
+      m
+      "That is the first message in the model's context: there is nothing \
+       before it to trim."
+  | None -> m, []
+;;
+
+let trim_picker (m : Model.t) (points : Trim.Point.t list) =
+  let times = Model.message_time m in
+  Picker.create
+    ~title:"Trim the context before"
+    (List.rev_map points ~f:(fun (p : Trim.Point.t) ->
+       let text = Jump.headline p.text in
+       Picker.Item.create
+         ~id:p.before
+         ~detail:
+           (String.concat
+              ~sep:"  "
+              (Option.to_list (Option.map p.at ~f:(Message_time.short times))
+               @ [ Trim.label ~messages:p.messages ~tokens:p.tokens ]))
+         ~search:text
+         (if String.is_empty text then "(an image)" else text)))
+;;
+
+let trim_confirm (m : Model.t) point =
+  open_dialog m (Trim_confirm { point; busy = false; error = None })
+;;
+
+let trim_points_arrived (m : Model.t) (purpose : Trim_purpose.t) points =
+  match purpose, points with
+  | Picker, [] ->
+    toast
+      m
+      "Nothing to trim: the context starts at your first message. /trim drops \
+       what comes before a later one."
+  | Picker, points ->
+    open_picker m (Picker { kind = Trim points; picker = trim_picker m points })
+  | Before { from_end; at }, points ->
+    (match List.nth (List.rev points) from_end with
+     | Some (point : Trim.Point.t)
+       when Option.is_none at
+            || Option.is_none point.at
+            || [%equal: Time_ns.t option] at point.at -> trim_confirm m point
+     | _ ->
+       error
+         m
+         "That message is not in the model's context any more: /trim lists \
+          those you can trim before.")
+;;
+
+let trim (m : Model.t) =
+  match m.dialog with
+  | Some (Trim_confirm ({ busy = false; point; _ } as d)) ->
+    ( { m with
+        dialog = Some (Trim_confirm { d with busy = true; error = None })
+      ; trimmed = { m.trimmed with reveal = Some point.before }
+      }
+    , [ call (Trim { before = point.before }) ~tag:Trimmed ] )
+  | _ -> m, []
+;;
+
+let trimmed (m : Model.t) result =
+  match result with
+  | Ok json ->
+    decode m json Trim.Freed.of_json ~f:(fun (freed : Trim.Freed.t) ->
+      let m, close =
+        match m.dialog with
+        | Some (Trim_confirm { busy = true; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, cmds =
+        toast
+          m
+          (sprintf
+             "Trimmed %d message%s (%s) from the context: Undo on the divider \
+              at the top (or /trim undo) brings them back"
+             freed.messages
+             (if freed.messages = 1 then "" else "s")
+             (Trim.tokens_label freed.tokens))
+      in
+      m, close @ cmds)
+  | Error e ->
+    let m = { m with trimmed = { m.trimmed with reveal = None } } in
+    (match m.dialog with
+     | Some (Trim_confirm ({ busy = true; _ } as d)) ->
+       ( { m with
+           dialog =
+             Some
+               (Trim_confirm
+                  { d with busy = false; error = Some (String.capitalize e) })
+         }
+       , [] )
+     | _ -> error m (String.capitalize e))
+;;
+
+let show_trimmed (m : Model.t) show =
+  match session_path m, trim_state m, show, m.trimmed.shown with
+  | Some path, Some _, true, Folded ->
+    ( { m with trimmed = { m.trimmed with shown = Loading } }
+    , [ call Get_trimmed ~tag:(Trimmed_messages path) ] )
+  | _, _, false, _ -> { m with trimmed = { m.trimmed with shown = Folded } }, []
+  | _ -> m, []
+;;
+
+let trimmed_messages (m : Model.t) path result =
+  match m.trimmed.shown, result with
+  | Loading, Ok json when is_current m path ->
+    decode m json Trim.trimmed_of_json ~f:(fun messages ->
+      ( { m with
+          trimmed = { m.trimmed with shown = Shown (Chat.of_messages messages) }
+        }
+      , [ Command.Keep_scroll_position ] ))
+  | Loading, Error e when is_current m path ->
+    error
+      { m with trimmed = { m.trimmed with shown = Folded } }
+      (String.capitalize e)
+  | _ -> m, []
+;;
+
+(* The transcript reloaded after this page trimmed the context: the divider
+   it starts with, the trimmed message just below it. *)
+let reveal_trimmed (m : Model.t) path =
+  match m.trimmed.reveal, trim_state m with
+  | Some before, Some trim
+    when is_current m path && String.equal before trim.before ->
+    jump_to { m with trimmed = { m.trimmed with reveal = None } } Trimmed
+  | _ -> m, []
 ;;
 
 let prefetch_session (m : Model.t) path =
@@ -5426,6 +5699,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           ~questions:pending.questions
       in
       m, restored @ cmds)
+  | Subagent id, Error e when Map.mem m.agents.fetches id ->
+    transcript_failed m id e, []
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
@@ -5714,6 +5989,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     ( m
     , cmds
       @ [ call Nix_store_status ~tag:(Nix_status { open_settings = false }) ] )
+  | Trimmed, result -> trimmed m result
+  | Untrimmed, result -> untrimmed m result
+  | Trimmed_messages path, result -> trimmed_messages m path result
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -5748,7 +6026,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     decode m json Message_page.of_json ~f:(fun page ->
       let m, cmds = newest_page m path page in
       let m, outline = if is_current m path then fetch_outline m else m, [] in
-      m, cmds @ outline)
+      let m, reveal = reveal_trimmed m path in
+      m, cmds @ outline @ reveal)
+  | Trim_points purpose, Ok json ->
+    decode m json Trim.Point.list_of_json ~f:(trim_points_arrived m purpose)
   | Outline path, Ok json ->
     let m =
       if Option.equal String.equal m.jump.fetching (Some path)
@@ -5800,14 +6081,25 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
             "Started job %s: its result reaches the agent when it exits."
             id)
      | Error _ -> m, [])
-  | Subagent _, Ok json ->
+  | Subagent id, Ok json ->
     (match subagent_of_json json with
      | Ok (subagent, `Parent parent, `Call call_id) ->
        ( { m with
-           chat = Chat.set_nested_subagent m.chat ~parent ~call_id subagent
+           chat =
+             Chat.set_nested_subagent
+               m.chat
+               ~parent
+               ~call_id
+               ~detach:(Map.mem m.agents.fetches id)
+               subagent
+         ; agents =
+             { m.agents with
+               fetches =
+                 Map.remove (Map.remove m.agents.fetches id) subagent.agent_id
+             }
          }
        , [] )
-     | Error _ -> m, [])
+     | Error e -> transcript_failed m id (Error.to_string_hum e), [])
   | Subagents, Ok json ->
     decode m json (decode_list Agents.Agent.of_json) ~f:(fun agents ->
       with_agents m ~f:(fun a -> Agents.set_agents a agents), [])
@@ -6117,7 +6409,8 @@ let loads : Reply_tag.t -> bool = function
   | Users Picker
   | Skills { purpose = Picker _; _ }
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
-  | Mcp Picker -> true
+  | Mcp Picker
+  | Trim_points _ -> true
   | _ -> false
 ;;
 
@@ -6748,6 +7041,13 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
       (match Jump.Target.of_string item.id with
        | Some target -> jump_to m target
        | None -> m, [])
+    | Trim points ->
+      (match
+         List.find points ~f:(fun (p : Trim.Point.t) ->
+           String.equal p.before item.id)
+       with
+       | Some point -> trim_confirm m point
+       | None -> m, [])
     | Worktrees listing ->
       (match
          List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id)
@@ -6875,6 +7175,7 @@ let dialog_accept (m : Model.t) =
     let m, cmds = close_dialog m in
     let m, start = start_nix_gc m (Some generations) in
     m, cmds @ start
+  | Some (Trim_confirm _) -> trim m
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -7358,11 +7659,14 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
   | Jump_to target -> jump_to m target
   | Jump_older -> jump_older m
+  | Ask_trim target -> ask_trim m target
+  | Show_trimmed show -> show_trimmed m show
+  | Untrim -> untrim m
   | Open_jump_list ->
     (match jump_points m with
      | points
        when List.exists points ~f:(fun (p : Jump.Point.t) ->
-              Outline.Kind.equal p.kind User) ->
+              Jump.Kind.equal p.kind User) ->
        open_picker
          m
          (Picker
@@ -7455,7 +7759,7 @@ let settle (m : Model.t) cmds =
 let update (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
   let m', cmds = follow_worktrees m (m', cmds) in
-  let m', cmds = follow_recipient m (m', cmds) in
+  let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
   if

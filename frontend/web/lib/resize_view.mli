@@ -3,7 +3,7 @@ open! Import
 
 (** A panel's resize handle: a focusable separator on its inner edge with
     its size in [aria-valuenow] and, for the page's pointer listener
-    (app/resize_widget.ml), the CSS variable, the unit, the direction it
+    (app/resize_widget.ml), the CSS variable, the direction it
     grows in and the element that shows the size while dragging. Arrow keys
     on it go through [Keys]; a double click resets it. None on a phone. *)
 val handle

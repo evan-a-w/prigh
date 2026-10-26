@@ -1146,13 +1146,32 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (an error names a disconnected host, or a gone directory with `/worktree
   back main`, the home's repository's main checkout, as the way out) and
   clears it; `fork` copies it.
-  `Session.messages` is the message list for the next request with the
-  compaction summary replacing everything before `kept_from`, preceded by
-  the compaction's `pinned` messages (`Pinned_messages`: entry ids, each
-  `shortened` or not; the user's own earlier messages, cut to a head by
+  `Session.messages` is the message list for the next request, folding the
+  active path in order: a compaction's summary replaces everything before
+  its `kept_from` in the context so far, preceded by the compaction's
+  `pinned` messages (`Pinned_messages`: entry ids, each `shortened` or not;
+  the user's own earlier messages, cut to a head by
   `Pinned_messages.shorten`, and their latest verbatim; files from before
   there could be several have one id, which loads as one unshortened pin;
-  `context_ids` gives each message's entry id)
+  `context_ids` gives each message's entry id); a `Trim {before}` entry
+  (`append_trim`, only before a user message in the context other than the
+  first, and never parting a tool call from its result) drops everything
+  before that message, the summary and pinned messages too when it cuts
+  into a compaction's kept part (a pinned message can itself be the trim
+  point: the pins before it go), and `Untrim`
+  (`append_untrim`) puts back in front what the latest trim in effect
+  dropped (trims stack; a compaction after a trim summarised, and pinned,
+  only what was after it, so an undo puts the older messages ahead of its
+  pins and summary).
+  `trim` totals the trims in effect (the latest's `before`, messages and
+  estimated tokens, `Message.estimate_tokens` message by message),
+  `trimmed_messages` is what they dropped, and `context_tokens` is the
+  latest reply's input tokens moved by the estimate of what trims and
+  untrims since took out or brought back (the agent's `State.context_tokens`
+  and `trim`). `rewind` and `fork` keep the trim in effect: recorded again
+  after the head moves while its message is still in the context (rewinding
+  to before it drops it), cancelled when there was none. `Trim_point`
+  lists where a trim may go, with what each frees
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
   the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
@@ -1453,7 +1472,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
-  `export`, `import`, `fork`, `clone`, `rewind`,
+  `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
+  `get_trim_points`, `get_trimmed`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
@@ -1544,6 +1564,16 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   id) reads a session without opening it (the sidebar fetching ahead);
   sessions read from disk that way or evicted, and subagent logs, are
   kept (`File_cache`) while their files are unchanged.
+  `get_trim_points {session?}` (`Trim_point`) answers `{points: [{before,
+  index, text, at?, messages, tokens}]}` (the user's messages in the
+  context but the first, `index` and `text` as the outline's), `trim
+  {before}` and `untrim` answer `{messages, tokens}` (what they took out or
+  brought back; refused while a run is in progress), and `get_trimmed
+  {session?}` has the trimmed messages, as `get_messages` (long tool outputs
+  cut), oldest first; `get_state`'s `trim` (`{before, messages, tokens,
+  at?}`, only while something is trimmed) tells every client, which reload
+  their transcript when it changes. Pages and the outline are the context,
+  so they start at the trim.
   `get_outline {session?}` (`Outline`) answers `{points: [{index, kind,
   text, at?}]}`, the transcript's landmarks for a frontend that has only
   some pages loaded: the user's messages (what they wrote, or the title of
@@ -1835,7 +1865,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     disconnected and ignored.
   - Headless widgets: `Editor` (multi-line, kill ring, undo, chips for long
     pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
-    `Transcript` (items plus streaming tails; `Transcript.apply` is the one
+    `Transcript` (items plus streaming tails; a `Trimmed` item, the divider
+    of what `State.trim` says is out of the context, starts the transcript
+    of a trimmed session and unfolds with `/trim show`'s `get_trimmed`; a
+    changed `trim` in a state reloads the messages, `Trim_reload`; `/trim`
+    is a picker of `get_trim_points`, newest first, then a confirmation;
+    Ctrl+↑ stops at the divider; `Transcript.apply` is the one
     event→transcript function, used for the main transcript and each
     subagent; it renders items as `Log_line`s, lines with a two-column
     gutter that holds a turn's bar or a step's mark and survives wrapping,
@@ -2279,7 +2314,22 @@ terminal frontend and `web/` prigh-web, the browser one.
       tooltip (`tabindex=-1`: the list is the keyboard's way); made again
       only when the landmarks change, so not per streamed delta or key.
       Ctrl+J (`Open_jump_list`) is a `Picker` of the user's messages, newest
-      first. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
+      first. With a trim (`State.trim`), `Jump.Target.Trimmed` and
+      `Jump.Kind.Trimmed` stand for the divider: the rail's first mark (a
+      dashed cut) and the list's last row; jumping there loads the pages to
+      the top and sends `Scroll_to_trimmed`.
+    - Trimming: `Trimmed` holds the page's view of `State.trim` (the
+      trimmed messages folded, loading or shown, an `untrim` on its way, and
+      whether to scroll to the divider after this page's trim); a state
+      whose `trim` differs reloads the newest page (cache entry, outline
+      and Show state reset). `Trim_view` draws the divider above the first
+      message once `paging.older = 0`, and Show's messages (`get_trimmed`)
+      dimmed and read-only above it. A user message is matched to its
+      `get_trim_points` entry by counting from the newest end
+      (`Jump.from_end`), checked by its time; its hover action is a
+      `data-trim-entry` button handled by a page-level click listener, like
+      folds, and opens the confirmation dialog (`Dialog.Trim_confirm`), as
+      `/trim`'s picker and Delete in the jump list do. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
       `Jump_older` when none is above the first loaded. `app/`'s
       `Jump_listeners` marks the rail's mark of the landmark at the upper
       third of the view (`aria-current`, as the chat scrolls) and the entry
@@ -2288,7 +2338,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     - The transcript: `Chat` (one agent: a page of messages then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
-      has their reports; `!cmd` runs as `Shell` entries), `Chat_view` (each
+      has their reports; one whose call is not loaded (in an older page, or
+      under a parent not fetched yet) is kept detached, found and updated by
+      its events all the same, until the page with its call comes; the
+      agents panel's fetches (`Agents.fetches`) fail with what went wrong,
+      or after 20s without an answer, and offer a retry; `!cmd` runs as
+      `Shell` entries), `Chat_view` (each
       entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
       on the value: virtual_dom skips what did not change, so a streamed
       delta or a key press costs the same in a long session as in a short
@@ -2344,10 +2399,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       pinned under the scrolling body; the status line's
       summary and the toggle in the chat's corner or the bar). Steering:
       `Model.recipient` (`Recipient`: `Main` or a subagent's id) is who the
-      composer sends to; `follow_recipient`, after every update, makes it the
-      running top-level subagent shown in the panel when the selection
-      changes on a desktop (`Main` once the panel closes) and `Main` when
-      that subagent finishes, with a toast. `send` then calls `steer_agent`
+      composer sends to, set only by `Set_recipient` (the Steer button, the
+      chip's ×, Esc), not by what the panel shows; `follow_recipient`, after
+      every update, makes it `Main` when that subagent finishes, with a
+      toast. `send` then calls `steer_agent`
       (`mode: follow_up` for Alt+Enter, `Steered` puts the text back if it
       fails), `Dequeue` `dequeue_agent`; `Composer_view` shows the chip,
       `Agents_view` the Steer button (disabled, saying why, for nested
@@ -2395,13 +2450,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
       its dialog open, Enter and Esc.
     - Panel sizes: `Resize` (pure: per `Handle` — the sidebar, the file
-      browser, its list/preview split in percent, the agents panel, the
-      terminal — the user's preference (`web.<var>`, see below), and the window's
+      browser's list and its preview (left of it, or in its place when
+      `preview_alone`), the agents panel, the terminal, the chat beside
+      the review page, the review's file list and its comments' column —
+      the user's preference (`web.<var>`, see below), and the window's
       `Viewport`; `bounds` gives a handle's size, minimum and maximum in
       that window given what is open (`App.Model.shown`): the side panels
       docked beside the chat (the file browser floats over it below
       1100px, the agents panel below 1180px, as in the CSS) share its
-      width less `chat_min` (400px), shrinking in proportion to what they
+      width less `chat_min` (400px; while reviewing, the chat is one of
+      them and the review page keeps `review_min`), shrinking in proportion to what they
       have above their minimums when they would not fit, while the
       preferences stay; `update` returns the `Save`s, preferences to keep)
       and `Resize_view` (the handles: `role=separator`, focusable, with
@@ -2638,8 +2696,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       with them inline (`full_rows` fills the lines between hunks from its
       text), or the since-diff's (whose removed lines are the old
       snapshot's, so selections on them are refused), made once per file
-      version and layout. `Review_since_view` draws the since segment, the
-      older-actions menu and the note over it. Text selected in them
+      version and layout; a since-view with nothing changed since the
+      action (`since_diff` is `None`) has the page layout's rows.
+      Commenting, replying or deciding a proposal sets the file's view to
+      `Since` its latest action (`Follow_latest`). `Review_action` names
+      the actions (the comment acted on found by its post's time: "Comment
+      on line 6 · 20:59") and makes the since menu, a `Review_picker`
+      (`Since path`: Latest, then the earlier actions);
+      `Review_since_view` draws the since segment with its chevron (the
+      menu hangs from it, `Review_pick (Since path)`, Shift+L) and the
+      note over the view. Text selected in them
       comes from the page (`Selection_listeners`, in `app/`: once the
       selection settles, a mouse let go or a touch's long press, its ends
       as the rows' `data-side`/`data-line` and UTF-16 offsets into their
@@ -2656,9 +2722,17 @@ terminal frontend and `web/` prigh-web, the browser one.
       the page's selection), each comment's code in `<mark>`s (lit with
       its thread when either is pointed at), and each thread (the
       selected text quoted, posts, an agent's proposal as a diff with
-      Accept and Reject, the reply field, Resolve and Delete) under the
-      row its code ends on now, those whose code is gone or not shown
-      above the file. `Review_page_view` is the page: in
+      Accept and Reject, the reply field, Resolve and Delete): when
+      `Resize.review_room` (or the preview's width) leaves the code 440px
+      beside the margin (`--review-margin-width`, the `Review_margin`
+      handle), in an `aside.review-margin` beside the table, each item
+      carrying its first shown line (`data-side`/`data-line`), which
+      `Review_margin` (in `app/`: a `MutationObserver` on the code view and
+      a `ResizeObserver` on its items) moves to that line's height, below
+      the item above; otherwise (and on a phone) under the row its code ends
+      on now. A resolved thread is a mark on its line until unfolded
+      (`Code_review.unfolded`); those whose code is gone or not shown are
+      counted in folded lines above the file. `Review_page_view` is the page: in
       `.app.reviewing` it comes before `.main`, which narrows to a column
       (`review.css`); its head (the approvals strip, refresh, the mode and
       layout, Send N comments, close), the files with their approval
@@ -2667,7 +2741,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       transparent `textarea` over its own highlighted text, Ctrl+S saving
       with `fs_write`; after a conflict the next save overwrites). Keys
       (`Keys.Target.Review`, the page focused but not its fields): `]`
-      `[` n p j k, a, c, e, v, s, Esc; r, b, d; Alt+R everywhere; c also wherever
+      `[` n p j k, a, c, e, v, l, s, Esc; r, b, d, Shift+L; Alt+R everywhere; c also wherever
       code is selected but in a field. In the comment and reply fields
       Enter sends and Shift+Enter is a new line. The page's git bar is
       `Git_bar` (pure: the reviewed worktree's `git_status`, read with
@@ -2678,7 +2752,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       return `Out.t`s: requests tagged `Reply_tag.Git`, `Draft_message`
       (after staging the ticked files), `Changed` (read the diff again) and
       `Create_pr`, which opens `Pr_create` for its `dir`) drawn by
-      `Git_bar_view`: `strip` under the target bar (branch, upstream,
+      `Git_bar_view`: `strip` at the page's foot (branch, upstream,
       counts, Stage approved, Push, Create PR, the last notice or
       refusal), `tick`, a file's box in the list (`Git_bar.tick`: staged,
       or approved and not unticked, is ticked; partly staged is mixed),

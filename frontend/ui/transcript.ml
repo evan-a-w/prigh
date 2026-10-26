@@ -47,6 +47,11 @@ module Item = struct
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
+    | Trimmed of
+        { messages : int
+        ; tokens : int
+        ; shown : P.Message.t list option
+        }
     | Delivery of string
     | Skill of
         { skill : Skill_message.t
@@ -125,6 +130,18 @@ let add t (item : Item.t) =
 
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
+
+let show_trimmed t shown =
+  let found = ref false in
+  let items_rev =
+    List.map t.items_rev ~f:(function
+      | Item.Trimmed trimmed ->
+        found := true;
+        Item.Trimmed { trimmed with shown }
+      | item -> item)
+  in
+  { t with items_rev }, !found
+;;
 
 let flush t =
   match t.stream with
@@ -670,6 +687,65 @@ let render_thinking text ~(verbosity : Verbosity.t) =
       (Content.Line.of_string ~style:(Style.italic dim) line))
 ;;
 
+(* What is trimmed, unfolded: read-only and dim, on a rail of its own. *)
+let trimmed_rail : Content.Span.t = { text = "┆"; style = dim }
+
+let trimmed_message_lines (m : P.Message.t) =
+  let lines ~style text =
+    List.map
+      (String.split_lines (String.strip text))
+      ~f:(fun line ->
+        Log_line.bar trimmed_rail (Content.Line.of_string ~style line))
+  in
+  match m with
+  | User user ->
+    (match user_item user with
+     | Compaction _ -> lines ~style:dim "context compacted"
+     | Note { title; _ } -> lines ~style:dim title
+     | Delivery _ -> lines ~style:dim "background work delivered"
+     | Skill { skill; _ } ->
+       lines ~style:(Style.bold dim) ("skill " ^ skill.name)
+     | _ ->
+       Log_line.flush []
+       :: lines ~style:(Style.bold dim) (P.Message.User.body user))
+  | Assistant a ->
+    lines ~style:dim (assistant_text a)
+    @ List.filter_map a.content ~f:(function
+      | P.Content.Tool_call call ->
+        Some
+          (Log_line.bar
+             trimmed_rail
+             (Content.Line.of_string
+                ~style:dim
+                (sprintf "· %s %s" call.name (one_line call.arguments))))
+      | P.Content.Text _ | P.Content.Thinking _ | P.Content.Server_tool _ ->
+        None)
+  | Tool_result _ -> []
+;;
+
+let trimmed_rows ~messages ~tokens ~shown =
+  let label = P.Trim.label ~messages ~tokens in
+  let divider hint =
+    Log_line.flush
+      [ { text = "──── "; style = gray }
+      ; { text = label; style = cyan }
+      ; { text = " ──── "; style = gray }
+      ; { text = hint; style = dim }
+      ]
+  in
+  match shown with
+  | None -> [ turn_start; divider "/trim show · /trim undo" ]
+  | Some shown ->
+    (turn_start
+     :: Log_line.bar
+          trimmed_rail
+          (Content.Line.of_string
+             ~style:(Style.italic dim)
+             "not in the model's context")
+     :: List.concat_map shown ~f:trimmed_message_lines)
+    @ [ turn_start; divider "/trim hide · /trim undo" ]
+;;
+
 let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
   let markdown text =
     let width =
@@ -736,6 +812,7 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
             ]
         in
         header :: report ~verbosity (String.concat ~sep:"\n" section.body))
+  | Trimmed { messages; tokens; shown } -> trimmed_rows ~messages ~tokens ~shown
   | Compaction summary ->
     let heading =
       Log_line.indent (Content.Line.of_string ~style:cyan "context compacted")
@@ -806,6 +883,9 @@ let user_message_lines t ~width ~verbosity : int list =
         match item with
         (* Past the blank line that opens the turn. *)
         | Item.User _ | Item.Skill _ -> (offset + 1) :: acc
+        (* The divider, past the folded messages and the blank line. *)
+        | Item.Trimmed _ ->
+          (offset + List.length (render_item item ~width ~verbosity) - 1) :: acc
         | _ -> acc
       in
       go rest acc (offset + List.length (render_item item ~width ~verbosity))

@@ -106,6 +106,13 @@ module Item = struct
   include Comparable.Make_plain (T)
 end
 
+module Fetch = struct
+  type t =
+    | Asked of Time_ns.t option
+    | Failed of string
+  [@@deriving sexp_of]
+end
+
 type t =
   { open_ : bool
   ; selected : Item.t option
@@ -115,6 +122,7 @@ type t =
   ; stopping : Item.Set.t
   ; output : (string * string) option
   ; polled_at : Time_ns.t option
+  ; fetches : Fetch.t String.Map.t [@sexp_drop_if Map.is_empty]
   }
 [@@deriving sexp_of]
 
@@ -127,6 +135,7 @@ let empty =
   ; stopping = Item.Set.empty
   ; output = None
   ; polled_at = None
+  ; fetches = String.Map.empty
   }
 ;;
 
@@ -356,4 +365,24 @@ let format_span span =
   else if s < 3600
   then sprintf "%dm %02ds" (s / 60) (s % 60)
   else sprintf "%dh %02dm" (s / 3600) (s % 3600 / 60)
+;;
+
+let fetching t =
+  Map.exists t.fetches ~f:(function
+    | Fetch.Asked _ -> true
+    | Failed _ -> false)
+;;
+
+let time_out_fetches t ~now ~after =
+  if not (fetching t)
+  then t
+  else
+    { t with
+      fetches =
+        Map.map t.fetches ~f:(function
+          | Fetch.Asked None -> Fetch.Asked (Some now)
+          | Asked (Some at) when Time_ns.Span.( >= ) (Time_ns.diff now at) after
+            -> Failed (sprintf "no answer in %s" (format_span after))
+          | (Asked (Some _) | Failed _) as fetch -> fetch)
+    }
 ;;

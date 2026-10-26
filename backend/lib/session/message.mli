@@ -51,3 +51,7 @@ val user : ?images:Image.t list -> ?origin:Injected.t -> string -> t
 (** Each image becomes a line of text saying it was left out, for models that
     cannot see images. *)
 val omit_images : t -> t
+
+(** Roughly how many tokens the messages take in a request: a quarter of
+    their characters, plus a fixed amount per image. *)
+val estimate_tokens : t list -> int

@@ -465,7 +465,7 @@ let steer_button (m : App.Model.t) ~inject (a : Agent.t) =
       ~cls:
         (if steering
          then "ghost small agents-steer on"
-         else "ghost small agents-steer")
+         else "small agents-steer")
       ~title:
         (if steering
          then "Your messages go to it (Esc in the editor: to the main agent)"
@@ -511,9 +511,25 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
         ]
     | Some _ -> div ~cls:"agents-note" [ Html.lamp (); Node.text "Starting…" ]
     | None ->
-      div
-        ~cls:"agents-note"
-        [ Html.lamp (); Node.text "Loading the transcript…" ]
+      let retry why =
+        div
+          ~cls:"agents-note failed"
+          [ Node.text why
+          ; button
+              ~cls:"ghost small"
+              ~title:"Ask the backend for its transcript again"
+              ~on_click:(inject (Action.Select_item (Agent a.id)))
+              [ Node.text "Retry" ]
+          ]
+      in
+      (match Map.find m.agents.fetches a.id with
+       | Some (Asked _) ->
+         div
+           ~cls:"agents-note"
+           [ Html.lamp (); Node.text "Loading the transcript…" ]
+       | Some (Failed e) ->
+         retry (sprintf "Couldn't load the transcript: %s." e)
+       | None -> retry "The transcript is not loaded.")
   in
   (* The transcript ends with the report; how it stopped or failed is said
      below it. *)

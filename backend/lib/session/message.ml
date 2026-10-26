@@ -84,3 +84,39 @@ let omit_images = function
     Tool_result { r with text = with_image_notes text images; images = [] }
   | (User _ | Tool_result _ | Assistant _) as m -> m
 ;;
+
+(* Anthropic charges about (width * height) / 750 tokens for an image, at
+   most about 1600 after its own downscaling. *)
+let tokens_per_image = 1600
+
+let estimate_tokens messages =
+  let images =
+    List.sum
+      (module Int)
+      messages
+      ~f:(function
+        | User u -> List.length u.images
+        | Tool_result r -> List.length r.images
+        | Assistant _ -> 0)
+  in
+  let chars =
+    List.sum
+      (module Int)
+      messages
+      ~f:(function
+        | User u -> String.length u.text
+        | Tool_result r -> String.length r.text
+        | Assistant a ->
+          List.sum
+            (module Int)
+            a.content
+            ~f:(function
+              | Text s -> String.length s
+              | Thinking th -> String.length th.text
+              | Tool_call c -> String.length c.arguments + String.length c.name
+              | Server_tool s ->
+                String.length s.input
+                + Option.value_map s.output ~default:0 ~f:String.length))
+  in
+  (chars / 4) + (images * tokens_per_image)
+;;

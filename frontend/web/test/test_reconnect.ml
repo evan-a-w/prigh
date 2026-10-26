@@ -53,7 +53,9 @@ let%expect_test "reconnecting after the backend goes away" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -182,6 +184,7 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     README.md 2.0 KB (Remove README.md)
     ((connection (Reconnecting (attempt 1) (generation 1)))
@@ -204,7 +207,9 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -239,8 +244,10 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     third
+    (✂ Trim everything before this)
     three
     README.md 2.0 KB (Remove README.md)
     ((connection Connected) (draft "half a thought") (scrolled_up true)
@@ -293,6 +300,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     <textarea id="editor"
               placeholder="Session gone: /new starts one"
@@ -318,6 +326,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     This session is no longer on the backend: start a new one (/new) or pick another in the sidebar. Your message stays here. (Dismiss)
     still here
@@ -383,7 +392,9 @@ let%expect_test "an empty session the backend lost is replaced quietly" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     |}]
 ;;
@@ -443,7 +454,9 @@ let%expect_test "the network and the page's visibility drive reconnecting" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -616,7 +629,9 @@ let%expect_test "losing the connection while a session loads" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 60)))
@@ -713,8 +728,10 @@ let%expect_test "a message sent as the connection went" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     third
+    (✂ Trim everything before this)
     Reconnected
     (draft "")
     |}];
@@ -724,6 +741,7 @@ let%expect_test "a message sent as the connection went" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     Reconnected
     The connection went before your message reached the agent: it is back in the editor. (Dismiss)
@@ -775,9 +793,11 @@ let%expect_test "reconnecting keeps a shell card the backend does not have" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     bash ls
     third
+    (✂ Trim everything before this)
     three
     (same_entries 6)
     |}]

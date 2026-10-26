@@ -229,7 +229,7 @@ let run
     match !last_tokens with
     | Some (tokens, since) when not !compaction_failed ->
       let tokens =
-        tokens + Compaction.estimate_tokens (List.drop !messages since)
+        tokens + Message.estimate_tokens (List.drop !messages since)
       in
       if Compaction.should_compact config.model ~input_tokens:tokens
       then (
