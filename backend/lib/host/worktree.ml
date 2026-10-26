@@ -606,7 +606,7 @@ let op_tool name =
       ; description = "git worktrees"
       ; parameters = `Object []
       ; parallel_safe = true
-      ; destructive = false
+      ; destructive = Never
       ; on_host = true
       ; freeform = None
       }

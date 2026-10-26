@@ -8,7 +8,13 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
-  ; destructive = true
+  ; destructive =
+      Depends
+        (fun args ->
+          not
+            ([%equal: string option]
+               (Tool_args.string_opt args "action")
+               (Some "list")))
   ; description =
       "Git worktrees of the working directory's repository: create, list or \
        remove. create checks a branch out in a new worktree at the standard \

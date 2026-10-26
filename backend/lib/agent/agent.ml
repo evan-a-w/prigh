@@ -694,7 +694,7 @@ let approve t : Tool.approver =
         ~session:t.session_rules
         ~cwd:t.cwd
         ~home:(Tool.expand_home "~")
-        ~destructive:tool.spec.destructive
+        ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
         call
     in
     match decide () with
