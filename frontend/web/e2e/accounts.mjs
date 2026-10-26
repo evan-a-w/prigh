@@ -2,13 +2,14 @@
 // -superusers alice`: signing in, adding a second account, switching between
 // them (each sees its own sessions), acting as bob from alice and back, and
 // signing one out. Run by prigh_web.sh after prigh_web.mjs; prints normalised
-// snapshots (the expected output is in prigh_web.expected).
+// snapshots (the expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -164,10 +165,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  server.kill();
+  await end(() => server.kill(), () => browser.close());
 }

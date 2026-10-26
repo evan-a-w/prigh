@@ -2664,8 +2664,9 @@ Four layers, cheapest first.
 3. **Protocol e2e.** `frontend/tui/e2e` (in `@runtest`, also `@e2e`) runs the real
    `main.exe serve -faux` with an isolated `-auth-file` and `HOME` through
    the real client and diffs a normalised transcript.
-4. **Real terminal.** The cram test `frontend/tui/tmux-test/run.t` (in `@runtest`;
-   skipped when `tmux` is absent) runs each scenario of `run.t/harness.sh`:
+4. **Real terminal.** The cram tests `frontend/tui/tmux-test/*.t` (in `@runtest`;
+   skipped when `tmux` is absent; each a group of scenarios, which dune runs
+   in parallel) run the scenarios of `harness.sh`:
    the built TUI inside a detached tmux session, keys sent with `tmux
    send-keys`, panes captured and normalised (spinners, paths) into the
    cram output, so `dune promote` re-records. Scenarios: startup, prompt,
@@ -2767,10 +2768,12 @@ size and the precompressed siblings.
 
 prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
 `web-e2e` check, against the packaged backend and site), runs
-`prigh_web.mjs` in Chromium and Firefox. The driver owns the backend
+`prigh_web.mjs` and the scripts below in Chromium and Firefox (`ENGINES`
+picks), all at once, each with its own backend, browser and directory, and
+joins their outputs in a fixed order. The driver owns the backend
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
-(ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
+(ids, cwd, cost, context and messages' times replaced) diffed against `chromium.expected` or `firefox.expected`:
 the sign-in form and signing in with the token, the session's card, a scripted
 bash call and its output, a long output folded, unfolded and folded again,
 the model `read`ing a real PNG (`png.mjs` writes
@@ -2836,7 +2839,9 @@ every 2.5s (one reconnect, after which the session comes back; the old page
 dropped the working connection again and again), then closes each socket
 as the session's messages arrive (the page gives up after six, with the
 banner, never saying "Reconnected", and opens no more sockets; the old page
-opened 900 in 30s), then "Retry now" once the connection holds. Then
+opened 900 in 30s), then "Retry now" once the connection holds; the slow
+network and the dropping connection run as two parts, each loading the
+session first. Then
 `stability.mjs`: nothing redrawn or shifted that did not change while the
 page idles and a reply streams, the editor's height in every frame, and the
 session's status in the same place in every frame as turns start, run a
