@@ -577,6 +577,7 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
         [ "Tools", tools
         ; "Model changes", Int.to_string s.model_changes
         ; "Compactions", Int.to_string s.compactions
+        ; "Maskings", Int.to_string s.masks
         ]
     ]
 ;;

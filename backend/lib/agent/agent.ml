@@ -118,6 +118,7 @@ module Session_stats = struct
     ; context_percent : float
     ; model_changes : int
     ; compactions : int
+    ; masks : int
     ; duration_seconds : float
     }
   [@@deriving sexp_of]
@@ -1791,6 +1792,7 @@ let loop_config t =
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
   ; cache_key = Some (Session.id t.session)
+  ; mask_observations = t.config.mask_observations
   }
 ;;
 
@@ -1967,6 +1969,17 @@ let handover_message ~from ~(to_ : Model.t) ~error =
        (Model.key to_))
 ;;
 
+(* Masks [session]'s messages up to its [through]th, as [Agent_loop.run]'s
+   [mask]. *)
+let mask_session session ~through =
+  match List.nth (Session.context_ids session) through with
+  | Some (Some id) ->
+    ignore (Session.append_masked session ~through:id : Session.Entry.t);
+    Ok (Session.messages session)
+  | Some None | None ->
+    Or_error.error_s [%message "no entry to mask up to" (through : int)]
+;;
+
 let compacted t (outcome : Compaction.Outcome.t) =
   account
     t
@@ -2128,6 +2141,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                    t
                    (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
                  Error e)
+             ~mask:(fun ~through _messages -> mask_session session ~through)
              ~halt:(fun () ->
                let reason = budget_exhausted t in
                Option.iter reason ~f:(fun r -> halted := Some r);
@@ -2425,8 +2439,31 @@ and auto_describe t =
       Promise.resolve resolve ()))
 
 and auto_compact t =
-  let state = state t in
-  if Compaction.should_compact t.model ~input_tokens:state.context_tokens
+  let tokens = (state t).context_tokens in
+  let tokens =
+    match
+      Option.filter
+        (Observation_mask.plan (Session.messages t.session))
+        ~f:(fun plan ->
+          t.config.mask_observations
+          && Observation_mask.worth_masking
+               t.model
+               ~input_tokens:tokens
+               ~urgent:(Compaction.should_compact t.model ~input_tokens:tokens)
+               plan)
+    with
+    | None -> tokens
+    | Some plan ->
+      (match mask_session t.session ~through:plan.through with
+       | Error _ -> tokens
+       | Ok _ ->
+         broadcast
+           t
+           (Loop
+              (Masked { masked = plan.masked; tokens_saved = plan.tokens_saved }));
+         tokens - plan.tokens_saved)
+  in
+  if Compaction.should_compact t.model ~input_tokens:tokens
   then (
     match
       Compaction.compact
@@ -2621,7 +2658,11 @@ let create
           ~env
           ~sw
           ~first_subagent_id:(subagent_calls (Session.messages session) + 1)
-          ~first_job_id:(last_job_number (Session.messages session) + 1)
+          ~first_job_id:
+            (last_job_number
+               (List.map (Session.timed_messages session) ~f:(fun m ->
+                  m.Timed_message.message))
+             + 1)
           ()
     ; subagent_log = Subagent_log.create ()
     ; mcp
@@ -3718,6 +3759,12 @@ let session_stats t =
       | false, Compaction _ -> true
       | _ -> false)
   in
+  let masks =
+    List.count path ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Masked _ -> true
+      | _ -> false)
+  in
   let state = state t in
   let context_percent =
     match state.context_tokens with
@@ -3735,6 +3782,7 @@ let session_stats t =
   ; context_percent
   ; model_changes = count true
   ; compactions = count false
+  ; masks
   ; duration_seconds = Session.duration_seconds t.session
   }
 ;;

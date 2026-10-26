@@ -42,6 +42,7 @@ type t =
   ; snippets : Snippet.t list
   ; auto_background_seconds : float
   ; generate_model : string option
+  ; mask_observations : bool
   }
 [@@deriving sexp_of]
 
@@ -65,6 +66,7 @@ let default =
   ; snippets = []
   ; auto_background_seconds = 30.
   ; generate_model = None
+  ; mask_observations = true
   }
 ;;
 
@@ -116,6 +118,7 @@ let to_json t =
     ; ( "auto_background_seconds"
       , `Number (sprintf "%g" t.auto_background_seconds) )
     ; "generate_model", option (fun s -> `String s) t.generate_model
+    ; ("mask_observations", if t.mask_observations then `True else `False)
     ]
 ;;
 
@@ -262,6 +265,14 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.resume_on_limit_reset must be a boolean"
     in
+    let%bind mask_observations =
+      match find "mask_observations" with
+      | None | Some `Null -> Ok default.mask_observations
+      | Some `True -> Ok true
+      | Some `False -> Ok false
+      | Some _ ->
+        Or_error.error_string "config.mask_observations must be a boolean"
+    in
     let%bind snippets =
       Snippet.list_of_json (Option.value (find "snippets") ~default:`Null)
     in
@@ -299,6 +310,7 @@ let of_json json =
     ; snippets
     ; auto_background_seconds
     ; generate_model
+    ; mask_observations
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

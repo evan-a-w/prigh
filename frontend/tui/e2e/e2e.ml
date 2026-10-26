@@ -151,6 +151,8 @@ let rec summarise (e : Event.t) : string option =
   | Generate_delta { gen_id; delta } ->
     Some (sprintf "generate_delta %s %S" gen_id delta)
   | Agent_queues _ -> None
+  | Masked { masked; tokens_saved } ->
+    Some (sprintf "masked %d (%d tokens)" masked tokens_saved)
   | Review r ->
     Some (sprintf "review %d comments" (List.length r.comments))
 ;;

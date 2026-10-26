@@ -59,6 +59,10 @@ type t =
       ; usage : Usage.t (** of the summarising request *)
       ; cost_usd : float
       }
+  | Masked of
+      { masked : int (** how many messages *)
+      ; tokens_saved : int (** estimated *)
+      } (** Old tool outputs were masked ({!Observation_mask}) to make room. *)
   | Subagent_start of
       { call_id : string
       ; agent_id : string

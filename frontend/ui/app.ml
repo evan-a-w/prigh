@@ -1265,6 +1265,7 @@ let format_stats (s : P.Session_stats.t) : Content.t =
     ; "context", sprintf "%.1f%%" s.context_percent
     ; "model changes", Int.to_string s.model_changes
     ; "compactions", Int.to_string s.compactions
+    ; "maskings", Int.to_string s.masks
     ; "duration", sprintf "%.1fs" s.duration_seconds
     ]
   in
@@ -5411,6 +5412,7 @@ let event m (e : P.Event.t) =
   | Tool_output _
   | Tool_end _
   | Compacted _
+  | Masked _
   | Notice _
   | Subagent_start _
   | Subagent _

@@ -36,6 +36,7 @@ module Entry = struct
                 [@sexp.default []]
                 [@sexp_drop_default.equal]
           }
+      | Masked of { through : string }
       | Name of { name : string }
       | Description of { text : string }
       | Cwd of
@@ -117,6 +118,8 @@ type t =
         entries after them stay on the path *)
   ; mutable skipped : string list
   ; mutable torn : bool (** the file does not end with a newline *)
+  ; masked : Message.t String.Table.t
+    (** messages as {!Observation_mask.mask} makes them, by entry id *)
   }
 
 let id t = t.id
@@ -173,6 +176,7 @@ let worth_saving (line : Line.t) =
       { payload =
           ( Model _
           | Compaction _
+          | Masked _
           | Description _
           | Cwd _
           | System_prompt _
@@ -294,6 +298,7 @@ let create ~dir ~cwd ?parent () =
     ; unreadable = String.Table.create ()
     ; skipped = []
     ; torn = false
+    ; masked = String.Table.create ()
     }
   in
   t
@@ -327,6 +332,7 @@ let add_entry t (entry : Entry.t) =
   | Message _
   | Model _
   | Compaction _
+  | Masked _
   | Name _
   | Description _
   | System_prompt _
@@ -436,6 +442,7 @@ let load ?(yield = fun () -> ()) path =
            ; torn =
                (not (String.is_empty contents))
                && not (String.is_suffix contents ~suffix:"\n")
+           ; masked = String.Table.create ()
            }
          in
          let skip n reason =
@@ -554,6 +561,7 @@ let name t =
     | Message _
     | Model _
     | Compaction _
+    | Masked _
     | Description _
     | Cwd _
     | System_prompt _
@@ -583,6 +591,7 @@ let description t =
     | Message _
     | Model _
     | Compaction _
+    | Masked _
     | Name _
     | Cwd _
     | System_prompt _
@@ -608,6 +617,8 @@ let description t =
 let append_compaction ?(pinned = []) t ~summary ~kept_from =
   append t (Compaction { summary; kept_from; pinned })
 ;;
+
+let append_masked t ~through = append t (Masked { through })
 
 let active_path t =
   let rec go id acc =
@@ -732,6 +743,7 @@ let fold t path =
          | [] -> rev_context, []
          | (_, dropped) :: trims -> rev_context @ List.rev dropped, trims)
       | Model _
+      | Masked _
       | Name _
       | Description _
       | Cwd _
@@ -909,6 +921,7 @@ let context_cwds t =
         cwd
       | Model _
       | Compaction _
+      | Masked _
       | Name _
       | Description _
       | System_prompt _
@@ -936,8 +949,37 @@ let context_cwds t =
 
 let identified_messages = context
 
+(* The entries up to the last [Masked] entry's [through] on [path]. *)
+let masked_ids path =
+  match
+    List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
+      match e.payload with
+      | Masked { through } -> Some through
+      | _ -> acc)
+  with
+  | None -> String.Set.empty
+  | Some through ->
+    let rec go acc = function
+      | [] -> String.Set.empty
+      | (e : Entry.t) :: rest ->
+        let acc = Set.add acc e.id in
+        if String.equal e.id through then acc else go acc rest
+    in
+    go String.Set.empty path
+;;
+
 let messages t =
-  List.map (timed_messages t) ~f:(fun (m : Timed_message.t) -> m.message)
+  let path = active_path t in
+  let masked = masked_ids path in
+  List.map (fold t path).context ~f:(fun (id, (m : Timed_message.t)) ->
+    match id, m.message with
+    (* Masking leaves the user's messages as they are; a pinned one may be
+       shortened, which the cache by id would not tell apart. *)
+    | _, User _ -> m.message
+    | Some id, (Assistant _ | Tool_result _) when Set.mem masked id ->
+      Hashtbl.find_or_add t.masked id ~default:(fun () ->
+        Observation_mask.mask m.message)
+    | (Some _ | None), (Assistant _ | Tool_result _) -> m.message)
 ;;
 
 let system_prompt t =
@@ -947,6 +989,7 @@ let system_prompt t =
     | Message _
     | Model _
     | Compaction _
+    | Masked _
     | Name _
     | Description _
     | Cwd _
@@ -976,6 +1019,7 @@ let goal t =
     | Message _
     | Model _
     | Compaction _
+    | Masked _
     | Name _
     | Description _
     | Cwd _
@@ -1020,6 +1064,7 @@ let budget t =
     | Message _
     | Model _
     | Compaction _
+    | Masked _
     | Name _
     | Description _
     | Cwd _
@@ -1048,6 +1093,7 @@ let model t =
     | Model { model; thinking } -> Some (model, thinking)
     | Message _
     | Compaction _
+    | Masked _
     | Name _
     | Description _
     | Cwd _
@@ -1145,6 +1191,7 @@ let fork ?at t ~dir =
                          { pin with id = renamed pin.id })
                    })
             | Trim { before } -> Some (Trim { before = renamed before })
+            | Masked { through } -> Some (Masked { through = renamed through })
             | Review
                 (Snapshot
                    { snapshot = { content = Text { md5 }; _ } as s; text }) ->
@@ -1261,6 +1308,7 @@ let archived_and_activity t ~mtime =
         | Archived { archived } -> last_message, Some (archived, e.at)
         | Model _
         | Compaction _
+        | Masked _
         | Name _
         | Description _
         | Cwd _
@@ -1547,6 +1595,7 @@ let to_markdown t =
            (images r.images))
     | Model _
     | Compaction _
+    | Masked _
     | Name _
     | Description _
     | Cwd _

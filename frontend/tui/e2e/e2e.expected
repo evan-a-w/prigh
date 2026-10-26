@@ -85,7 +85,7 @@
  (session_rules ()))
 <- session_stats: ((message_count 2) (turns 1) (tool_calls ())
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 9e-06)
- (context_percent 0.001) (model_changes 2) (compactions 0)
+ (context_percent 0.001) (model_changes 2) (compactions 0) (masks 0)
  (duration_seconds <t>))
 <- get_entries: ((head <id>)
  (entries
