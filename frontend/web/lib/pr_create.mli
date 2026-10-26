@@ -31,12 +31,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** Loading the defaults; [title], if not empty, is kept over theirs. *)
-val create
-  :  ?back:Pull_requests.t
-  -> ?dir:string
-  -> title:string
-  -> unit
-  -> t
+val create : ?back:Pull_requests.t -> ?dir:string -> title:string -> unit -> t
 
 (** Fills what was not typed already; [push] is on when the branch is not
     all on the remote. *)

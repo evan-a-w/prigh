@@ -55,7 +55,8 @@ module Method : sig
     (** see {!Pr_list} *)
     | Pr_view of int (** see {!Pr_detail} *)
     | Pr_defaults of
-        { dir : string option (** a worktree's branch (default: the session's) *)
+        { dir : string option
+          (** a worktree's branch (default: the session's) *)
         } (** see {!Pr_defaults} *)
     | Pr_create of
         { dir : string option (** in that worktree's repository *)
@@ -125,7 +126,8 @@ module Method : sig
         ; text : string
         ; expected : string option (** the [md5] it was read with *)
         } (** [{path, md5}] *)
-    | Git_status of { dir : string option (** the worktree (default: the session's) *) }
+    | Git_status of
+        { dir : string option (** the worktree (default: the session's) *) }
     (** {!Git_status} *)
     | Git_stage of
         { dir : string option

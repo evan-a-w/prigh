@@ -17,8 +17,10 @@ module Target = struct
   ;;
 
   let source = function
-    | Pr -> "from the branch's commits, its diff and the repository's PR guidance"
-    | Commit_message -> "from the staged changes, the session's goal and recent commits"
+    | Pr ->
+      "from the branch's commits, its diff and the repository's PR guidance"
+    | Commit_message ->
+      "from the staged changes, the session's goal and recent commits"
     | Worktree_branch -> "from the task typed here (or the session's goal)"
     | Session_title -> "from the conversation"
   ;;
@@ -68,7 +70,10 @@ let delta t ~id piece =
 let finish t ~id =
   match t.running with
   | Some r when String.equal r.id id ->
-    ( { t with running = None; undo = Some { target = r.target; before = r.before } }
+    ( { t with
+        running = None
+      ; undo = Some { target = r.target; before = r.before }
+      }
     , Some r )
   | Some _ | None -> t, None
 ;;

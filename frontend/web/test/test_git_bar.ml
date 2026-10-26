@@ -54,7 +54,12 @@ let approved_main =
   {|{"comments":[],"approvals":[{"path":"src/main.ml","hash":"7f57d42d80a860a5b495b9ed7f7e860e"}]}|}
 ;;
 
-let status_json ?(root = "/home/me/proj") ?(branch = Some "feat/x") ?(ahead = 1) files =
+let status_json
+      ?(root = "/home/me/proj")
+      ?(branch = Some "feat/x")
+      ?(ahead = 1)
+      files
+  =
   sprintf
     {|{"root":"%s",%s"head":"abcdef0123","upstream":"origin/feat/x","ahead":%d,"behind":0,"files":[%s]}|}
     root
@@ -91,7 +96,8 @@ let%expect_test "the bar: branch, upstream, counts; approved files come ticked" 
   H.reply
     h
     "git_status"
-    (status_json [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   show_bar h;
   [%expect
     {|
@@ -125,7 +131,8 @@ let%expect_test "ticking stages and unstages; Stage approved" =
   H.reply
     h
     "git_status"
-    (status_json [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   (* Unticking an approved file leaves it out: nothing to tell git. *)
   H.click h ~selector:".git-tick";
   H.click h ~selector:".git-tick" ~nth:1;
@@ -146,9 +153,11 @@ let%expect_test "ticking stages and unstages; Stage approved" =
   H.reply
     h
     "git_stage"
-    (status_json [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~index:"A" ]);
+    (status_json
+       [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~index:"A" ]);
   H.text h ~selector:".review-files ul";
-  [%expect {|
+  [%expect
+    {|
     (☐) (✓ src/ main.ml +2 −1)
     (☑) (○ src/ util.ml +2 −0)
     |}];
@@ -163,7 +172,8 @@ let%expect_test "ticking stages and unstages; Stage approved" =
   H.reply
     h
     "git_unstage"
-    (status_json [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   H.click h ~selector:".git-actions button";
   [%expect
     {|
@@ -174,7 +184,9 @@ let%expect_test "ticking stages and unstages; Stage approved" =
     h
     "git_stage"
     (status_json
-       [ file "src/main.ml" ~index:"M" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+       [ file "src/main.ml" ~index:"M" ~worktree:"M"
+       ; file "src/util.ml" ~worktree:"?"
+       ]);
   H.text h ~selector:".review-files ul";
   H.names h ~selector:".git-tick";
   [%expect
@@ -186,12 +198,15 @@ let%expect_test "ticking stages and unstages; Stage approved" =
     |}]
 ;;
 
-let%expect_test "commit with a drafted message: staged first, streamed, undone, committed" =
+let%expect_test
+    "commit with a drafted message: staged first, streamed, undone, committed"
+  =
   let h = opened () in
   H.reply
     h
     "git_status"
-    (status_json [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   (* Refusals say what to do. *)
   H.click h ~selector:".git-commit-button";
   H.text h ~selector:".git-failure";
@@ -212,7 +227,8 @@ let%expect_test "commit with a drafted message: staged first, streamed, undone, 
   H.reply
     h
     "git_stage"
-    (status_json [ file "src/main.ml" ~index:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~index:"M"; file "src/util.ml" ~worktree:"?" ]);
   [%expect
     {|
     (Rpc (method_ generate_text) (params ((gen_id gen-1) (kind commit_message)))
@@ -221,7 +237,8 @@ let%expect_test "commit with a drafted message: staged first, streamed, undone, 
   H.event h {|{"event":"generate_delta","gen_id":"gen-1","delta":"Double "}|};
   H.event h {|{"event":"generate_delta","gen_id":"gen-1","delta":"c"}|};
   H.text h ~selector:".git-commit";
-  [%expect {|
+  [%expect
+    {|
     Commit message
     (Stop)
     [Double c]
@@ -302,7 +319,8 @@ let%expect_test "a draft that fails puts the text back and says why" =
   H.reply
     h
     "git_status"
-    (status_json [ file "src/main.ml" ~index:"M"; file "src/util.ml" ~worktree:"?" ]);
+    (status_json
+       [ file "src/main.ml" ~index:"M"; file "src/util.ml" ~worktree:"?" ]);
   H.input h ~selector:"#git-message" "mine";
   H.click h ~selector:".git-commit .generate-go";
   H.event h {|{"event":"generate_delta","gen_id":"gen-1","delta":"Half"}|};
@@ -357,7 +375,8 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     h
     "git_push"
     "git push origin feat/x was refused: ! [rejected] (the remote has commits \
-     this branch does not: pull first, e.g. git pull --rebase, then push again)";
+     this branch does not: pull first, e.g. git pull --rebase, then push \
+     again)";
   H.text h ~selector:".git-failure";
   [%expect
     {|
@@ -385,7 +404,10 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     Pushed feat/x to origin
     |}];
   H.quiet h (fun () -> H.act h (Review Refresh));
-  H.reply h "git_status" (status_json ~branch:None [ file "src/main.ml" ~index:"M" ]);
+  H.reply
+    h
+    "git_status"
+    (status_json ~branch:None [ file "src/main.ml" ~index:"M" ]);
   H.input h ~selector:"#git-message" "x";
   H.click h ~selector:".git-commit-button";
   H.text h ~selector:".git-bar";
@@ -402,7 +424,9 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     |}]
 ;;
 
-let%expect_test "another worktree: its status, and a pull request for its branch" =
+let%expect_test
+    "another worktree: its status, and a pull request for its branch"
+  =
   let h = H.create ~state:(state ()) () in
   let tree = "/home/me/.prigh/worktrees/proj/feat-y" in
   H.quiet h (fun () ->
@@ -440,7 +464,9 @@ let%expect_test "another worktree: its status, and a pull request for its branch
        (base main)))
      (tag (Generated gen-1)))
     |}];
-  H.event h {|{"event":"generate_delta","gen_id":"gen-1","delta":"Add the util module\n\nIt adds "}|};
+  H.event
+    h
+    {|{"event":"generate_delta","gen_id":"gen-1","delta":"Add the util module\n\nIt adds "}|};
   H.text h ~selector:".modal-body";
   [%expect
     {|

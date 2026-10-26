@@ -7,7 +7,11 @@ let button ?(label = "Generate") (g : Generate.t) target ~inject =
   let undo = Option.is_some (Generate.undo_for g target) in
   div
     ~cls:"generate"
-    ~attrs:[ Attr.create "data-target" (Sexp.to_string [%sexp (target : Generate.Target.t)]) ]
+    ~attrs:
+      [ Attr.create
+          "data-target"
+          (Sexp.to_string [%sexp (target : Generate.Target.t)])
+      ]
     [ (if running
        then
          Html.button
@@ -19,9 +23,15 @@ let button ?(label = "Generate") (g : Generate.t) target ~inject =
        else
          Html.button
            ~cls:"small ghost generate-go"
-           ~title:(sprintf "Draft it with the model %s (Alt+G)" (Generate.Target.source target))
+           ~title:
+             (sprintf
+                "Draft it with the model %s (Alt+G)"
+                (Generate.Target.source target))
            ~on_click:(inject (App.Action.Generate target))
-           [ span ~cls:"generate-spark" ~attrs:[ Attr.create "aria-hidden" "true" ] "✦"
+           [ span
+               ~cls:"generate-spark"
+               ~attrs:[ Attr.create "aria-hidden" "true" ]
+               "✦"
            ; Node.text label
            ])
     ; (if undo && not running
