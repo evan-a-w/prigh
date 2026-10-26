@@ -33,6 +33,7 @@
 .agents-locate .icon { width: 13px; height: 13px; }
 .agents-steer { white-space: nowrap; }
 .agents-steer .icon { width: 13px; height: 13px; }
+.btn.agents-steer:not(.ghost) { color: var(--sodium); border-color: var(--sodium-line); }
 .btn.agents-steer.on, .btn.agents-steer.on:hover { color: var(--sodium); background: var(--sodium-wash); }
 .agents-panel .sr-only {
   position: absolute;
