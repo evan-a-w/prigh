@@ -77,6 +77,7 @@ module Worktrees_purpose : sig
   type t =
     | Sidebar of int (** the [Worktrees] request's number *)
     | Picker (** [/worktree] *)
+    | Review_pick (** the review page's picker of what to review *)
     | Target of
         { command : string (** as typed: back to the editor if it fails *)
         ; action : Prigh_ui.Worktree_command.Action.t

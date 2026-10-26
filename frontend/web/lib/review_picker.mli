@@ -43,6 +43,9 @@ type t [@@deriving sexp_of, equal]
 val which : t -> Which.t
 val query : t -> string
 
+(** The worktrees a [targets] picker was made from. *)
+val worktrees : t -> Worktree.t list
+
 (** What the page reviews, of the repository's [worktrees] (prunable ones
     left out) and the branches [diff] lists; [reviewed] is marked. *)
 val targets
@@ -67,3 +70,7 @@ val set_query : t -> string -> t
 val move : t -> int -> t
 
 val find : t -> id:string -> Item.t option
+
+(** [fresh]'s choices (the diff was read again) with [t]'s query and
+    highlight. *)
+val refresh : t -> fresh:t -> t

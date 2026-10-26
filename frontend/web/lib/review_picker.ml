@@ -39,12 +39,14 @@ end
 type t =
   { which : Which.t
   ; items : Item.t list
+  ; worktrees : Worktree.t list
   ; query : string
   ; selected : int
   }
 [@@deriving sexp_of, equal]
 
 let which t = t.which
+let worktrees t = t.worktrees
 let query t = t.query
 
 let typed t =
@@ -70,9 +72,10 @@ let visible t =
   @ typed t
 ;;
 
-let create which items =
+let create ?(worktrees = []) which items =
   { which
   ; items
+  ; worktrees
   ; query = ""
   ; selected =
       Option.value_map
@@ -159,6 +162,7 @@ let targets ~worktrees ~(reviewed : Git_diff.Target.t) (d : Git_diff.t) =
     | Rev _ | Dir _ -> []
   in
   create
+    ~worktrees
     Target
     (worktree_items
      @ reviewed_rev
@@ -207,4 +211,9 @@ let bases (d : Git_diff.t) =
          ~marked:(String.equal d.base c.sha)
          (Base c.sha)
          (Git_diff.Commit.short c)))
+;;
+
+let refresh t ~fresh =
+  let t = { fresh with query = t.query; selected = t.selected } in
+  move t 0
 ;;
