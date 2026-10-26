@@ -95,6 +95,7 @@ end
 type t =
   { id : string
   ; path : string
+  ; initial_cwd : string (** the header's: before any [Cwd] entry *)
   ; mutable cwd : string
   ; mutable host : Host.t option
   ; host_cwds : string String.Table.t
@@ -273,6 +274,7 @@ let create ~dir ~cwd ?parent () =
   let t =
     { id
     ; path
+    ; initial_cwd = cwd
     ; cwd
     ; host = None
     ; host_cwds = String.Table.create ()
@@ -410,6 +412,7 @@ let load ?(yield = fun () -> ()) path =
          let t =
            { id
            ; path
+           ; initial_cwd = cwd
            ; cwd
            ; host = None
            ; host_cwds = String.Table.create ()
@@ -728,6 +731,41 @@ let context t =
 
 let timed_messages t = List.map (context t) ~f:snd
 let context_ids t = List.map (context t) ~f:fst
+
+let context_cwds t =
+  let cwds = String.Table.create () in
+  let (_ : string) =
+    List.fold (entries t) ~init:t.initial_cwd ~f:(fun cwd (e : Entry.t) ->
+      match e.payload with
+      | Cwd { cwd; host = _ } -> cwd
+      | Message _ ->
+        Hashtbl.set cwds ~key:e.id ~data:cwd;
+        cwd
+      | Model _
+      | Compaction _
+      | Name _
+      | Description _
+      | System_prompt _
+      | Goal _
+      | Reminders _
+      | Budget _
+      | Approval _
+      | Allow_rule _
+      | Archived _
+      | Spend _
+      | Resume_at _
+      | Told_environment _
+      | Repo _
+      | Agent_worktree _
+      | Worktree _
+      | Worktree_removed _
+      | Home _
+      | Review _ -> cwd)
+  in
+  List.map (context_ids t) ~f:(fun id ->
+    Option.value (Option.bind id ~f:(Hashtbl.find cwds)) ~default:t.cwd)
+;;
+
 let identified_messages = context
 
 let messages t =

@@ -77,7 +77,8 @@ val plan : keep_recent_tokens:int -> Message.t list -> Plan.t option
     context as too long) or the provider rejects it as too long, a rendered
     transcript goes in a request of its own instead. The files the
     summarised tool calls read and modified (and the earlier summary's) are
-    appended to the summary ({!Compaction_files}). *)
+    appended to the summary ({!Compaction_files}), relative ones resolved
+    against [cwd]. *)
 val compact_messages
   :  provider:Provider.t
   -> model:Model.t
@@ -85,12 +86,14 @@ val compact_messages
   -> ?overflowed:bool
   -> ?keep_recent_tokens:int
   -> ?cancel:Cancellation.t
+  -> ?cwd:string
   -> ?instructions:string
   -> Message.t list
   -> (Message.t list * Outcome.t) Or_error.t
 
 (** Like [compact_messages] on the session's {!Session.messages}, appending a
-    compaction entry. *)
+    compaction entry; paths are resolved against the cwd each message was
+    made in ({!Session.context_cwds}). *)
 val compact
   :  env:Env.t
   -> provider:Provider.t

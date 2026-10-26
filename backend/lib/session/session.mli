@@ -175,6 +175,10 @@ val messages : t -> Message.t list
 (** The entry id of each of [messages] ([None] for a compaction summary). *)
 val context_ids : t -> string option list
 
+(** The cwd each of [messages] was appended in: the last [cwd] entry written
+    before it, on any branch (the current cwd for the summary). *)
+val context_cwds : t -> string list
+
 (** A compaction summary as it appears in [messages]. *)
 val summary_message : string -> Message.t
 

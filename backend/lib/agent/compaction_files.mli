@@ -14,13 +14,18 @@ type t =
 
 val empty : t
 
-(** [t] with the files of the tool calls in [messages] after its own, each
-    once, in the order first seen. *)
-val add_calls : t -> Message.t list -> t
+(** [t] with the files of the tool calls in [messages] that succeeded (their
+    results are not errors), each once, in the order last seen (its own
+    first). Relative paths are resolved against [cwd i], the cwd the [i]th
+    of [messages] was made in, when known. *)
+val add_calls : ?cwd:(int -> string option) -> t -> Message.t list -> t
 
 (** [summary] with the section listing [t]'s files ([Files read: a, b],
-    [Files modified: c]); [summary] alone when there are none. *)
+    [Files modified: c]); [summary] alone when there are none. Each line
+    lists the 100 most recent, then how many more there are
+    ([(and 3 more)]). *)
 val append : string -> t -> string
 
-(** A summary split into the model's text and the files of its section. *)
+(** A summary split into the model's text and the files of its section (those
+    listed: not the ones a line says there are more of). *)
 val of_summary : string -> string * t

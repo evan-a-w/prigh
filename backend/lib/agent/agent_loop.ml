@@ -205,6 +205,7 @@ let run
           ~overflowed
           ~keep_recent_tokens
           ~cancel
+          ~cwd
           messages
   in
   (* Tokens of the latest response's request and reply, while they still

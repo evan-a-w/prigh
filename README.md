@@ -1526,7 +1526,8 @@ the newest first up to about 6k tokens. The summary has fixed sections
 (goal and constraints, decisions, failed approaches with their exact
 errors, files, current state, next steps), updates the previous one rather
 than summarising it again, and ends with the files read and modified,
-recorded from the tool calls. It is written by the model from the
+recorded from the tool calls that succeeded (absolute paths, the 100 most
+recent of each). It is written by the model from the
 conversation as it is, in a request that shares the session's prompt
 cache; a conversation too long for that is sent as a shortened transcript
 instead. Subagents compact their own context the same way.
