@@ -116,11 +116,21 @@ module Method : sig
         { root : string option
         ; path : string
         }
+    | Review_since of
+        { root : string
+        ; path : string option (** default: every file with actions *)
+        ; index : int option
+          (** of [path]'s action to compare with, in {!Review.history}
+              (default: the last) *)
+        } (** {!Review_since} *)
     | Fs_preview of { path : string } (** {!File_preview} *)
     | Fs_write of
         { path : string
         ; text : string
         ; expected : string option (** the [md5] it was read with *)
+        ; review_root : string option
+          (** saved in the review's editor, of that worktree: an action on
+              the file *)
         } (** [{path, md5}] *)
   [@@deriving sexp_of, equal]
 
