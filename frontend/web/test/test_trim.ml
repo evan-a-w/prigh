@@ -129,7 +129,8 @@ let%expect_test "the user's messages but the first have the action" =
     |}]
 ;;
 
-let%expect_test "trim before a message: confirmed, then the transcript starts there"
+let%expect_test
+    "trim before a message: confirmed, then the transcript starts there"
   =
   let h = session () in
   H.act h (Ask_trim (Entry 2));
@@ -158,7 +159,8 @@ let%expect_test "trim before a message: confirmed, then the transcript starts th
     |}];
   (* Esc: nothing is sent. *)
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}];
@@ -209,8 +211,7 @@ let%expect_test "trim before a message: confirmed, then the transcript starts th
     |}];
   (* The new first message has nothing before it to trim. *)
   H.act h (Ask_trim (Entry 0));
-  [%expect
-    {| (Expire_toast (id 1) (after_ms 4900)) |}];
+  [%expect {| (Expire_toast (id 1) (after_ms 4900)) |}];
   toasts h;
   [%expect
     {|
@@ -223,14 +224,17 @@ let%expect_test "trim before a message: confirmed, then the transcript starts th
 let trimmed () =
   let h =
     H.create
-      ~state:(state ~trim:(trim_json ~before:"u2" ~messages:2 ~tokens:19_000) ())
+      ~state:
+        (state ~trim:(trim_json ~before:"u2" ~messages:2 ~tokens:19_000) ())
       ()
   in
   newest h (exchanges [ 2; 3 ]);
   h
 ;;
 
-let%expect_test "the divider: Show the trimmed messages, read-only, and Hide them" =
+let%expect_test
+    "the divider: Show the trimmed messages, read-only, and Hide them"
+  =
   let h = trimmed () in
   H.names h ~selector:".trim-divider";
   H.names h ~selector:".trim-divider button";
@@ -277,8 +281,7 @@ let%expect_test "the divider: Show the trimmed messages, read-only, and Hide the
   H.act h (Show_trimmed false);
   H.text h ~selector:".trimmed-messages";
   divider h;
-  [%expect
-    {| ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo) |}];
+  [%expect {| ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo) |}];
   (* Another session: folded there. *)
   H.quiet h (fun () ->
     H.act h (Show_trimmed true);
@@ -293,7 +296,9 @@ let%expect_test "the divider: Show the trimmed messages, read-only, and Hide the
   [%expect {| ((shown Folded) (restoring false) (reveal ())) |}]
 ;;
 
-let%expect_test "Undo: restoring until the backend answers, then the messages are back" =
+let%expect_test
+    "Undo: restoring until the backend answers, then the messages are back"
+  =
   let h = trimmed () in
   H.act h Untrim;
   divider h;
@@ -341,7 +346,9 @@ let%expect_test "Undo: restoring until the backend answers, then the messages ar
     |}]
 ;;
 
-let%expect_test "while a run is in progress the backend refuses: said where asked" =
+let%expect_test
+    "while a run is in progress the backend refuses: said where asked"
+  =
   let h = session () in
   H.quiet h (fun () ->
     H.act h (Ask_trim (Entry 4));
@@ -515,7 +522,8 @@ let%expect_test "the rail and the jump list: one mark for what is trimmed" =
     |}];
   (* The mark and the list's row go to the divider. *)
   H.click h ~selector:".rail .tick.trimmed";
-  [%expect {|
+  [%expect
+    {|
     (Jump_to Trimmed)
     Scroll_to_trimmed
     |}];
@@ -560,7 +568,8 @@ let%expect_test "the rail and the jump list: one mark for what is trimmed" =
 let%expect_test "jumping to the divider loads the pages down to it" =
   let h =
     H.create
-      ~state:(state ~trim:(trim_json ~before:"u2" ~messages:2 ~tokens:19_000) ())
+      ~state:
+        (state ~trim:(trim_json ~before:"u2" ~messages:2 ~tokens:19_000) ())
       ()
   in
   newest h ~older:4 ~before:"e5" (exchanges [ 4; 5 ]);

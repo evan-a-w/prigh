@@ -18,13 +18,13 @@ module Target = struct
     match s with
     | "trimmed" -> Some Trimmed
     | s ->
-    match
-      ( String.length s > 1
-      , Option.try_with (fun () -> Int.of_string (String.drop_prefix s 1)) )
-    with
-    | true, Some n when Char.equal s.[0] 'e' -> Some (Entry n)
-    | true, Some i when Char.equal s.[0] 'm' && i >= 0 -> Some (Message i)
-    | _ -> None
+      (match
+         ( String.length s > 1
+         , Option.try_with (fun () -> Int.of_string (String.drop_prefix s 1)) )
+       with
+       | true, Some n when Char.equal s.[0] 'e' -> Some (Entry n)
+       | true, Some i when Char.equal s.[0] 'm' && i >= 0 -> Some (Message i)
+       | _ -> None)
   ;;
 end
 

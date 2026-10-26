@@ -132,8 +132,7 @@ let view (m : App.Model.t) ~inject =
       m.chat
   in
   let users =
-    List.count points ~f:(fun (p : Jump.Point.t) ->
-      Jump.Kind.equal p.kind User)
+    List.count points ~f:(fun (p : Jump.Point.t) -> Jump.Kind.equal p.kind User)
   in
   if users < 2
   then Node.none

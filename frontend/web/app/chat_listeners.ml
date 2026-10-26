@@ -65,13 +65,15 @@ let trim_before ~schedule (ev : Dom_html.mouseEvent Js.t) =
   Option.iter
     (Option.bind
        (Js.Opt.to_option ev##.target)
-       ~f:(fun el -> closest el (sprintf "[%s]" Prigh_web.Chat_view.trim_attribute)))
+       ~f:(fun el ->
+         closest el (sprintf "[%s]" Prigh_web.Chat_view.trim_attribute)))
     ~f:(fun el ->
       Js.Opt.iter
         (el##getAttribute (Js.string Prigh_web.Chat_view.trim_attribute))
         (fun n ->
-           Option.iter (Int.of_string_opt (Js.to_string n)) ~f:(fun n ->
-             schedule (Prigh_web.App.Action.Ask_trim (Entry n)))))
+           Option.iter
+             (Int.of_string_opt (Js.to_string n))
+             ~f:(fun n -> schedule (Prigh_web.App.Action.Ask_trim (Entry n)))))
 ;;
 
 let install ~schedule =
