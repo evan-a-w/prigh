@@ -34,7 +34,11 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
        div
          ~cls:"context-menu-head"
          [ span ~cls:"context-menu-title" (Session_list.title s)
-         ; Sidebar_view.place ~cls:"context-menu-sub" s ~cwd:s.cwd
+         ; Sidebar_view.place
+             ~cls:"context-menu-sub"
+             ?home:(Sidebar_view.session_home m s)
+             s
+             ~cwd:s.cwd
          ]
      | Worktree { path; _ } ->
        let label =
