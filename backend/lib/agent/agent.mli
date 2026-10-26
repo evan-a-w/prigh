@@ -19,6 +19,9 @@ module Host : sig
     ; exec_input : bool [@sexp.bool]
       (** it takes [Tool_exec_input] (its [hello] listed the [exec_input]
           feature) *)
+    ; git_location : bool [@sexp.bool]
+      (** it runs [$git_location] (the [git_location] feature): sessions
+          record where their cwd there is in git *)
     }
   [@@deriving sexp_of, equal]
 
@@ -94,6 +97,7 @@ module Event : sig
     | Compacted of { summary : string }
     | Notice of string
     | Config_changed of Config.t
+    | Review_changed of Review_state.t (** after every change *)
     | Queue_update of
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
@@ -439,19 +443,25 @@ val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
 (** {2 Worktrees}
 
     The repository's git worktrees, run on the active tool host in the
-    session cwd's repository; new ones go under the config's
-    [worktrees_dir] ({!Worktree}). *)
+    repository of [cwd] (default: the session's; relative to it); new ones
+    go under the config's [worktrees_dir] ({!Worktree}). *)
 
-val worktrees : t -> Worktree.Listing.t Or_error.t
+val worktrees : ?cwd:string -> t -> Worktree.Listing.t Or_error.t
 
 val create_worktree
-  :  t
+  :  ?cwd:string
+  -> t
   -> branch:string
   -> base:string option
   -> Worktree.Created.t Or_error.t
 
 (** Removes a worktree of the session cwd's repository ({!Worktree.remove}). *)
-val remove_worktree : t -> path:string -> force:bool -> Worktree.t Or_error.t
+val remove_worktree
+  :  ?cwd:string
+  -> t
+  -> path:string
+  -> force:bool
+  -> Worktree.t Or_error.t
 
 (** [/review ARGS]: a run reviewing the uncommitted changes, or the changes
     against a base when the first word of [ARGS] names a revision; the rest
@@ -463,6 +473,35 @@ val review : t -> args:string -> unit Or_error.t
 (** [/init]: a run asking the model to write or improve [AGENTS.md]
     ({!Init_prompt}), queued like [review]. *)
 val init : t -> unit Or_error.t
+
+(** {2 Review: comments and approvals}
+
+    The session's {!Review_state}, recorded in it. While it has comments the
+    main agent has [reply_to_comment] ({!Tool_review_reply}). Each change
+    emits [Review_changed]. *)
+
+val review_state : t -> Review_state.t
+
+(** Applies and records the changes [f] returns, giving back its result. *)
+val update_review
+  :  t
+  -> f:(Review_state.t -> ('a * Review_state.Change.t list) Or_error.t)
+  -> 'a Or_error.t
+
+(** Sends the posts of the user's the agent has not seen
+    ({!Review_state.submit}) as a message with the [Review_comments] source,
+    steering a running agent or starting a run; the comments it covers. *)
+val submit_review : t -> int Or_error.t
+
+(** Accepts (applies the edits to the comment's file on the active tool host,
+    with [edit]) or rejects a pending proposal; one that no longer applies is
+    [Failed]. *)
+val decide_proposal
+  :  t
+  -> id:string
+  -> post:int
+  -> accept:bool
+  -> Review_comment.t Or_error.t
 
 (** {2 Budget, goal and resume} *)
 

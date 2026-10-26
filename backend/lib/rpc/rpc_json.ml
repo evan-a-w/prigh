@@ -161,6 +161,67 @@ let model (m : Model.t) =
     ]
 ;;
 
+let review_comment (c : Review_comment.t) =
+  let post (p : Review_comment.Post.t) =
+    `Object
+      ([ ( "author"
+         , str
+             (match p.author with
+              | User -> "user"
+              | Agent -> "agent") )
+       ; "text", str p.text
+       ; "at_ms", ms p.at
+       ; "delivered", bool p.delivered
+       ]
+       @
+       match p.proposal with
+       | None -> []
+       | Some { edits; state } ->
+         [ ( "proposal"
+           , `Object
+               ([ ( "edits"
+                  , `Array
+                      (List.map edits ~f:(fun (e : Review_comment.Edit.t) ->
+                         `Object
+                           [ "old_text", str e.old_text
+                           ; "new_text", str e.new_text
+                           ])) )
+                ; "state", str (Review_comment.Proposal.State.to_string state)
+                ]
+                @
+                match state with
+                | Failed e -> [ "error", str e ]
+                | Pending | Accepted | Rejected -> []) )
+         ])
+  in
+  `Object
+    ([ "id", str c.id
+     ; "root", str c.root
+     ; "path", str c.path
+     ; "first", int c.range.first
+     ; "last", int c.range.last
+     ; "side", str (Review_comment.Side.to_string c.range.side)
+     ]
+     @ (match c.range.columns with
+        | None -> []
+        | Some { start_col; end_col } ->
+          [ "start_col", int start_col; "end_col", int end_col ])
+     @ [ "anchor", str c.anchor
+       ; "status", str (Review_comment.Status.to_string c.status)
+       ; "thread", `Array (List.map c.thread ~f:post)
+       ])
+;;
+
+let review (r : Review_state.t) =
+  `Object
+    [ "comments", `Array (List.map r.comments ~f:review_comment)
+    ; ( "approvals"
+      , `Array
+          (List.map (Map.to_alist r.approvals) ~f:(fun (path, hash) ->
+             `Object [ "path", str path; "hash", str hash ])) )
+    ]
+;;
+
 let config (c : Config.t) = Config.to_json c
 
 let reminder ~stops (r : Reminder.t) =
@@ -267,20 +328,45 @@ let job ~now task =
     ]
 ;;
 
-let session_summary (s : Session.Summary.t) =
+let agent_worktree (w : Agent_worktree.t) =
   `Object
-    [ "id", str s.id
-    ; "path", str s.path
-    ; "name", Option.value_map s.name ~default:`Null ~f:str
-    ; "description", Option.value_map s.description ~default:`Null ~f:str
-    ; "cwd", str s.cwd
-    ; "created_at", str s.created_at
-    ; "updated_at", str s.updated_at
-    ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
-    ; "message_count", int s.message_count
-    ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+    [ "agent", str w.agent
+    ; "task", str w.task
+    ; "path", str w.path
+    ; "branch", str w.branch
+    ; "root", str w.root
+    ]
+;;
+
+let repo (r : Git_location.t) =
+  `Object
+    [ "root", str r.root
+    ; "worktree", str r.worktree
+    ; "branch", Option.value_map r.branch ~default:`Null ~f:str
+    ; ("main", if r.main then `True else `False)
+    ]
+;;
+
+let session_summary (s : Session.Summary.t) =
+  [ "id", str s.id
+  ; "path", str s.path
+  ; "name", Option.value_map s.name ~default:`Null ~f:str
+  ; "description", Option.value_map s.description ~default:`Null ~f:str
+  ; "cwd", str s.cwd
+  ; "created_at", str s.created_at
+  ; "updated_at", str s.updated_at
+  ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
+  ; "message_count", int s.message_count
+  ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+  ; "host", Option.value_map s.host ~default:`Null ~f:str
+  ]
+  @ (match s.repo with
+     | None -> []
+     | Some r -> [ "repo", Option.value_map r ~default:`Null ~f:repo ])
+  @ [ "agent_worktrees", `Array (List.map s.agent_worktrees ~f:agent_worktree)
     ; "bytes", int s.bytes
     ]
+  |> fun fields -> `Object fields
 ;;
 
 let session_stats (s : Agent.Session_stats.t) =
@@ -332,6 +418,11 @@ let entry (e : Session.Entry.t) =
       ; "at", Option.value_map at ~default:`Null ~f:ms
       ]
     | Told_environment _ -> [ "kind", str "told_environment" ]
+    | Review _ -> [ "kind", str "review" ]
+    | Repo _ -> [ "kind", str "repo" ]
+    | Agent_worktree w -> [ "kind", str "agent_worktree"; "path", str w.path ]
+    | Worktree_removed { path } ->
+      [ "kind", str "worktree_removed"; "path", str path ]
   in
   `Object
     ([ "id", str e.id
@@ -425,6 +516,14 @@ let login_event (e : Login_manager.Event.t) =
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)
       ]
+    | Forge_done { host; user; method_ } ->
+      [ "kind", str "forge_done"
+      ; "host", str host
+      ; "user", Option.value_map user ~default:`Null ~f:str
+      ; "method", str (Forge_credential.Method.to_string method_)
+      ]
+    | Forge_logged_out host ->
+      [ "kind", str "forge_logged_out"; "host", str host ]
   in
   `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
@@ -492,7 +591,8 @@ let rec event ?now (e : Agent.Event.t) =
       ; "call", tool_call call
       ; "result", tool_result result
       ]
-    | Loop (Subagent_start { call_id; agent_id; task; model; tools }) ->
+    | Loop (Subagent_start { call_id; agent_id; task; model; tools; worktree })
+      ->
       [ "event", str "subagent_start"
       ; "call_id", str call_id
       ; "agent_id", str agent_id
@@ -500,6 +600,8 @@ let rec event ?now (e : Agent.Event.t) =
       ; "model", str model
       ; "tools", `Array (List.map tools ~f:str)
       ]
+      @ Option.value_map worktree ~default:[] ~f:(fun w ->
+        [ "worktree", agent_worktree w ])
     | Loop (Subagent { call_id; agent_id; event = inner }) ->
       [ "event", str "subagent"
       ; "call_id", str call_id
@@ -527,6 +629,7 @@ let rec event ?now (e : Agent.Event.t) =
     | Compacted { summary } ->
       [ "event", str "compacted"; "summary", str summary ]
     | Config_changed c -> [ "event", str "config_changed"; "config", config c ]
+    | Review_changed r -> [ "event", str "review"; "review", review r ]
     | Notice text -> [ "event", str "notice"; "text", str text ]
     | Queue_update { steer; follow_up } ->
       [ "event", str "queue_update"

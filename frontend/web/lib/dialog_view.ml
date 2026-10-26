@@ -139,13 +139,13 @@ let picker ~kind (p : Picker.t) ~inject =
                          ~f:Theme_view.sample)
                   | _ -> [])
                  @ [ span ~cls:"picker-label" item.label
-                 ; (if String.is_empty item.detail
-                    then Node.none
-                    else span ~cls:"picker-detail" item.detail)
-                 ; (if item.marked
-                    then Html.mark ~cls:"picker-check" Check
-                    else Node.none)
-                 ]
+                   ; (if String.is_empty item.detail
+                      then Node.none
+                      else span ~cls:"picker-detail" item.detail)
+                   ; (if item.marked
+                      then Html.mark ~cls:"picker-check" Check
+                      else Node.none)
+                   ]
                  @
                  match kind with
                  | Reminders ->
@@ -327,6 +327,12 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
       ( flow.purpose
       , List.find m.auth ~f:(fun s -> String.equal s.provider flow.provider) )
     with
+    | _ when Option.is_some flow.forge ->
+      "Sign in to "
+      ^ Option.value_map
+          (Forges.find m.forges flow.provider)
+          ~default:flow.provider
+          ~f:Forges.name
     | Logout, Some s -> "Log out of " ^ s.name
     | Logout, None -> "Log out of " ^ flow.provider
     | Login, Some { custom = Some _; name; _ } -> "Edit " ^ name
@@ -345,6 +351,25 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
         [ (if String.is_empty instructions
            then Node.none
            else Node.p [ Node.text instructions ])
+        ; (match Login_flow.device_code flow with
+           | None -> Node.none
+           | Some code ->
+             div
+               ~cls:"device-code copyable"
+               [ Node.code
+                   ~attrs:
+                     [ Attr.class_ "copy-text"
+                     ; Attr.create "aria-label" ("Your code: " ^ code)
+                     ]
+                   [ Node.text code ]
+               ; Node.button
+                   ~attrs:
+                     [ Attr.class_ "btn small copy"
+                     ; Attr.type_ "button"
+                     ; Attr.title "Copy the code"
+                     ]
+                   [ Node.text "Copy" ]
+               ])
         ; Node.a
             ~attrs:
               [ Attr.href url
@@ -414,9 +439,16 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | Some error, _ ->
       ( div
           ~cls:"login-failed"
-          [ (match flow.purpose with
-             | Login -> Node.textf "Login failed: %s. /login tries again." error
-             | Logout ->
+          [ (match flow.purpose, flow.forge with
+             | Login, Some again ->
+               Node.textf
+                 "Couldn't sign in to %s: %s. /login %s tries again."
+                 flow.provider
+                 error
+                 again
+             | Login, None ->
+               Node.textf "Login failed: %s. /login tries again." error
+             | Logout, _ ->
                Node.textf "Logout failed: %s. /logout tries again." error)
           ]
       , [ button
@@ -428,7 +460,12 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None, None ->
       ( div
           ~cls:"login-waiting"
-          [ Html.lamp (); Node.text "Waiting for the provider…" ]
+          [ Html.lamp ()
+          ; Node.text
+              (match flow.forge with
+               | Some _ -> "Waiting for " ^ flow.provider ^ "…"
+               | None -> "Waiting for the provider…")
+          ]
       , [ button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ] ]
       )
   in
@@ -440,7 +477,30 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     [ url; progress; prompt; status ]
 ;;
 
-let auth (statuses : Auth_status.t list) ~inject =
+let forge_host ~input ~error ~inject =
+  Modal.view
+    ~title:"Sign in to a Forgejo host"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:(cancel_accept ~inject "Continue")
+    [ Node.p
+        [ Node.text
+            "A Forgejo or Gitea instance, by its host name: codeberg.org is \
+             listed already."
+        ]
+    ; text_input
+        ~placeholder:"git.example.com"
+        ~label:"Host"
+        ~value:input
+        ~inject
+        ()
+    ; (match error with
+       | Some e ->
+         div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+       | None -> Node.none)
+    ]
+;;
+
+let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
   Modal.view
     ~cls:"auth-dialog"
     ~title:"Providers"
@@ -506,6 +566,10 @@ let auth (statuses : Auth_status.t list) ~inject =
                        ~on_click:(inject (Action.Start_login s.provider))
                        [ Node.text "Log in" ])
                 ])))
+    ; div
+        ~cls:"auth-git-hosts"
+        (Node.h3 [ Node.text "Git hosting" ]
+         :: Settings_view.git_hosts m ~inject)
     ]
 ;;
 
@@ -515,12 +579,19 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Picker { kind = Accounts; picker = p }) ->
     Account_view.menu m p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
+  | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some Help -> help ~inject
   | Some Settings -> Settings_view.view m ~inject
   | Some (Rename name) -> rename name ~inject
   | Some (Delete target) -> delete m target ~inject
   | Some (Login flow) -> login m flow ~inject
-  | Some (Auth statuses) -> auth statuses ~inject
+  | Some (Auth statuses) -> auth m statuses ~inject
+  | Some (Forge_host { input; error }) -> forge_host ~input ~error ~inject
+  | Some (Pulls l) -> Pull_requests_view.list l ~inject
+  | Some (Pull p) -> Pull_requests_view.page m p ~inject
+  | Some (Pr_create f) -> Pull_requests_view.create f ~inject
+  | Some (Pr_checked_out { number; checkout }) ->
+    Pull_requests_view.checked_out ~number checkout ~inject
   | Some dialog ->
     Option.value (Command_dialog_view.view m dialog ~inject) ~default:Node.none
 ;;

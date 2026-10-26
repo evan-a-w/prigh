@@ -155,7 +155,12 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
        {|{"event":"state","state":%s}|}
        (H.state_json ~fields:[ "model", sonnet ] ()));
   H.text h ~selector:".composer-controls";
-  [%expect {| (Claude Sonnet 5) (Thinking on) (Auto: never asks) |}];
+  [%expect
+    {|
+    (Claude Sonnet 5)
+    (Thinking on)
+    (Auto: never asks)
+    |}];
   H.elements h ~selector:".chip-button.awaiting";
   [%expect {| |}];
   (* A level the backend refuses: back to what it was, saying why. *)
@@ -168,7 +173,9 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     {|
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     (Thinking max)
-    (Claude Sonnet 5) (Thinking on) (Auto: never asks)
+    (Claude Sonnet 5)
+    (Thinking on)
+    (Auto: never asks)
     No such level (Dismiss)
     |}]
 ;;

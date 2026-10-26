@@ -272,7 +272,7 @@ let rec apply t (event : Event.t) =
   | Tool_output { call_id; chunk } ->
     update_tool t call_id ~f:(fun tool -> append_output tool chunk)
   | Tool_end { call = _; result } -> set_result t result
-  | Subagent_start { call_id; agent_id; task; model; tools = _ } ->
+  | Subagent_start { call_id; agent_id; task; model; _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
         subagent =
@@ -327,6 +327,7 @@ let rec apply t (event : Event.t) =
   | Terminal_close _
   | Terminal_kill _
   | Btw_delta _
+  | Review _
   | Sessions_changed
   | Prefs_changed _ -> t
 ;;

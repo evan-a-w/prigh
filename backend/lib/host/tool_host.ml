@@ -439,8 +439,11 @@ let serve_connection
                  ; Some ("host_id", `String host_id)
                  ; Some
                      ( "features"
-                     , `Array [ `String "exec_input"; `String "terminal_kill" ]
-                     )
+                     , `Array
+                         [ `String "exec_input"
+                         ; `String "terminal_kill"
+                         ; `String "git_location"
+                         ] )
                  ; Some
                      ( "running_execs"
                      , `Array

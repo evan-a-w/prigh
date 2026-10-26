@@ -70,7 +70,6 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     {|
     (Focus dialog)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -91,7 +90,6 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     <aside class="agents-panel">
@@ -148,7 +146,9 @@ let%expect_test "help lists every key and command" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model
+    Ctrl+L switch model: the model chip's menu
+    ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models
+    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
@@ -169,7 +169,14 @@ let%expect_test "help lists every key and command" =
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
+    Alt+R open or close the review page (/review): the changes file by file, beside the chat
+    ] / [ (reviewing; also n p, j k) the next / previous changed file
+    a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    Esc (reviewing) drop the comment or selection, then close the review
+    Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
@@ -195,7 +202,7 @@ let%expect_test "help lists every key and command" =
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
@@ -231,9 +238,10 @@ let%expect_test "help lists every key and command" =
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
-    /login [provider] log in to a model provider (or /login custom)
-    /logout [provider] remove a provider's login
-    /auth show which providers are logged in
+    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /logout [provider|HOST] remove a provider's login, or sign out of a git host (github: github.com)
+    /auth show which providers and git hosts are logged in
+    /pr [list [open|closed|all]|view N|new [title]|checkout N] the repository's pull requests: list and filter them, open one with its checks and diff, create one, or check one out in a worktree
     /setusr [user] act as another user (superusers); without a user, pick one
     /signout sign out of this account
     /retry-backend-connection reconnect to the backend now
@@ -273,6 +281,9 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     OpenAI API key
     DeepSeek API key
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
+    GitHub (github.com) not signed in
+    Forgejo (codeberg.org) not signed in
+    Forgejo: another host… a self-hosted Forgejo or Gitea: type its host
     |}];
   H.act h (Picker_query "open");
   H.key h "Enter" ~target:Field;
@@ -417,6 +428,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
      (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
     (Log out)
@@ -424,6 +436,15 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Log in)
     DeepSeek not logged in
     (Log in)
+    Git hosting
+    GitHub github.com
+    Not signed in.
+    (Use a token) (Connect)
+    Forgejo codeberg.org
+    Not signed in.
+    (Use a token) (Connect)
+    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    (Add host…)
     |}];
   H.act h (Logout "anthropic");
   [%expect
@@ -467,10 +488,10 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
      (tag Ignore))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
-    (Expire_toast (id 1) (after_ms 3420))
+    (Expire_toast (id 1) (after_ms 3900))
     (Focus editor)
     Logged out of anthropic
-    No provider is logged in: /login logs in to one.
+    No provider or git host is logged in: /login logs in to one.
     |}]
 ;;
 
@@ -533,12 +554,13 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -552,8 +574,7 @@ let%expect_test
   H.text h ~selector:".toast";
   [%expect {| |}];
   H.reply h "get_state" (H.state_json ());
-  [%expect
-    {| |}];
+  [%expect {| |}];
   (* Replies to an older connection's reconnects are ignored. *)
   H.act h (Reply (Reconnect 0, Error "late"));
   [%expect {| |}];
@@ -580,15 +601,15 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
 let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) |}];
+  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Sign out) |}];
+  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (A ann acting as bob) (Commands and keys (/help)) |}];
+  [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
@@ -612,7 +633,7 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus agents-panel)
     <aside class="sidebar">
-    <header class="topbar">
+    <header class="session-bar">
     <div class="chat-frame">
     <footer class="composer">
     |}];

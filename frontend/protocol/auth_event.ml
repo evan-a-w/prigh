@@ -78,6 +78,12 @@ type t =
       ; error : string
       }
   | Logged_out of string
+  | Forge_done of
+      { host : string
+      ; user : string option
+      ; method_ : string
+      }
+  | Forge_logged_out of string
 [@@deriving sexp_of, equal]
 
 let of_json j =
@@ -104,5 +110,12 @@ let of_json j =
     let%map error = Json.string_field j "error" in
     Failed { provider; error }
   | "logged_out" -> Json.string_field j "provider" >>| fun p -> Logged_out p
+  | "forge_done" ->
+    let%bind host = Json.string_field j "host" in
+    let%bind user = Json.string_opt_field j "user" in
+    let%map method_ = Json.string_field j "method" in
+    Forge_done { host; user; method_ }
+  | "forge_logged_out" ->
+    Json.string_field j "host" >>| fun h -> Forge_logged_out h
   | other -> Or_error.errorf "unknown auth event kind %S" other
 ;;

@@ -499,13 +499,17 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   H.text h ~selector:".composer-controls";
   [%expect
     {|
-    (GPT-6) (Thinking on) (Auto: never asks)
+    (GPT-6)
+    (Thinking on)
+    (Auto: never asks)
     (Expire_toast (id 0) (after_ms 5260))
     fix the build
     ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5
     [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
     openai/gpt-6: HTTP 429: quota (usage limit reached); handing over to anthropic/claude-opus-5-5
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     |}];
   run h "/fallback";
   H.text h ~selector:".toast:last-child";

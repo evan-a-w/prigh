@@ -72,6 +72,7 @@ type t =
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
+  | Review of Review.t
   | Notice of string
   | Queue_update of
       { steer : string list
@@ -83,6 +84,8 @@ type t =
       ; task : string
       ; model : string
       ; tools : string list
+      ; worktree : Agent_worktree.t option
+        (** a worktree made for it, which it works in *)
       }
   | Subagent of
       { call_id : string
@@ -192,6 +195,8 @@ let rec of_json j =
     >>= Config.of_json
     >>| fun c -> Config_changed c
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
+  | "review" ->
+    Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
   | "sessions_changed" -> Ok Sessions_changed
   | "prefs_changed" ->
     Json.object_field j "prefs"
@@ -207,8 +212,13 @@ let rec of_json j =
     let%bind agent_id = Json.string_field j "agent_id" in
     let%bind task = Json.string_field j "task" in
     let%bind model = Json.string_field j "model" in
-    let%map tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
-    Subagent_start { call_id; agent_id; task; model; tools }
+    let%bind tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
+    let%map worktree =
+      match Json.field j "worktree" with
+      | None -> Ok None
+      | Some w -> Agent_worktree.of_json w >>| Option.some
+    in
+    Subagent_start { call_id; agent_id; task; model; tools; worktree }
   | "subagent" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in
@@ -253,7 +263,8 @@ let rec of_json j =
     Terminal_frame { term_id; kind; data }
   | "terminal_close" ->
     Json.string_field j "term_id" >>| fun id -> Terminal_close id
-  | "terminal_kill" -> Json.string_field j "key" >>| fun key -> Terminal_kill key
+  | "terminal_kill" ->
+    Json.string_field j "key" >>| fun key -> Terminal_kill key
   | "btw_delta" ->
     let%bind btw_id = Json.string_field j "btw_id" in
     let%map delta = Json.string_field j "delta" in

@@ -49,6 +49,29 @@ module Mcp_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Forge_reply : sig
+  (** Git hosting's replies. [session]s are ids: replies for another
+      session are ignored. *)
+  type t =
+    | Status (** [forge_status] *)
+    | Logout of string (** the host *)
+    | List of
+        { session : string
+        ; filter : Pull_requests.Filter.t
+        } (** [pr_list], for the [/pr] dialog *)
+    | View of
+        { session : string
+        ; number : int
+        }
+    | Defaults of string (** [pr_defaults], for the create dialog *)
+    | Created (** [pr_create]: said whatever is on show by then *)
+    | Checkout of
+        { session : string
+        ; number : int
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Worktrees_purpose : sig
   (** Why we asked for [list_worktrees]. *)
   type t =
@@ -134,8 +157,11 @@ module Reply_tag : sig
         { place : string (** [Worktrees.place] *)
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of string
-    (** [create_worktree], as typed: the session moves into it *)
+    | Worktree_created of
+        { command : string (** as typed *)
+        ; new_session : bool
+          (** a new session starts in it; otherwise this one moves there *)
+        } (** [create_worktree] *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
     | Worktree_session of
@@ -152,6 +178,7 @@ module Reply_tag : sig
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
         ; images : Image.t list
@@ -176,6 +203,7 @@ module Reply_tag : sig
         }
     (** like [Reconnect generation], but the backend no longer has [session]
         (it restarted before saving it): we are on another one *)
+    | Forge of Forge_reply.t
     | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
   [@@deriving sexp_of, equal]
 end
@@ -203,6 +231,10 @@ module Command : sig
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
     | Focus of string (** the element with this id, once rendered *)
+    | Clear_text_selection (** the page's selected text, unselected *)
+    | Place_popover
+    (** a chip's menu, once rendered: above the composer, or below its chip
+        when only there is room; inside the composer sideways *)
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -331,10 +363,12 @@ module Action : sig
     | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
-    | Open_model_picker
+    | Open_chip of Chip.t
+    (** its menu over the composer (Ctrl+L: the model's); again closes it *)
+    | Chip_step of int
+    (** the next ([1]) or previous ([-1]) chip's menu, from the open one *)
     | Open_snippets of int option
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
-    | Open_thinking_picker
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
     | Open_rename
@@ -366,9 +400,14 @@ module Action : sig
     | Edit_queued of Queued.Message.t (** back into the editor *)
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string (** by name, from the [/remind] picker *)
-    | Toggle_worktrees (** fold or unfold the sidebar's worktrees *)
-    | Refresh_worktrees
-    | New_worktree (** its dialog *)
+    | Toggle_folded of string
+    (** fold or unfold a project or a worktree of the sidebar's tree (by its
+        directory) *)
+    | New_session_in of string
+    (** a new session working in this directory (a project, a worktree) *)
+    | New_worktree of { repo : string option }
+    (** its dialog; with a repository (a project's row), a new session
+        starts in the worktree *)
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -439,6 +478,8 @@ module Action : sig
         ; status : Terminal.Status.t
         } (** from the page's widget *)
     | Files of Files.Action.t (** the file browser and the attachments *)
+    | Review of Code_review.Action.t
+    (** the review page, comments and approvals *)
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
@@ -448,6 +489,11 @@ module Action : sig
     | Load_output of string (** a [Fold] key: the whole of an elided output *)
     | Network of bool
     (** the browser's [online] (reconnect now) and [offline] events *)
+    | Pr_filter of Pull_requests.Filter.t (** the [/pr] list's state *)
+    | Pr_open of int (** a pull request, from the list *)
+    | Pr_checkout of int
+    | New_pr (** the create dialog, from the list (Esc goes back to it) *)
+    | Pr_form of Pr_create.Action.t (** typed or toggled in it *)
     | Preview_accent of string
     (** a colour, while the settings' colour input is being dragged: shown,
         not saved ([Run "/accent #hex"] saves it) *)
@@ -502,11 +548,14 @@ module Model : sig
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
     ; worktrees : Worktrees.t (** the sidebar's, [/worktree]'s completion *)
-    ; worktrees_open : bool (** the sidebar's section is unfolded *)
+    ; folded : String.Set.t
+      (** the sidebar's folded projects and worktrees, by directory (a
+          preference) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; review : Code_review.t
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t
@@ -516,6 +565,10 @@ module Model : sig
     ; session_gone : string option
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
+    ; forges : Forges.t (** the user's git hosts *)
+    ; return_to_settings : bool
+    (** the login dialog showing was opened from the settings page: closing
+        it goes back there *)
     ; theme : Theme.t (** the user's ([/theme], [/accent]) *)
     ; theme_preview : Theme.t option
       (** an accent being picked in the settings, shown but not saved *)
@@ -525,6 +578,10 @@ module Model : sig
 
   (** The session's turn runs. *)
   val running : t -> bool
+
+  (** The sidebar is open beside the chat (not a phone's drawer): it shows
+      the session's status, which the header over the chat shows otherwise. *)
+  val docked : t -> bool
 
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
@@ -557,5 +614,9 @@ module Model : sig
 end
 
 val thinking_levels : string list
+
+(** A token count in a few characters: [200k], [1.2M]. *)
+val compact_tokens : int -> string
+
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list

@@ -157,7 +157,7 @@ sign-in dialog. Escaped, the TUI stays disconnected and the status line
 says `not signed in to HOST:PORT · /signin signs in · /connect switches
 server`; while connected to a remote backend it shows `server:HOST:PORT`
 next to `user:`. `/login` and `/logout` are unrelated: they manage model
-provider credentials.
+provider and git host credentials.
 
 By default a connected frontend runs the session's tools (bash, file
 edits, ...) on *its own* machine, in the `-cwd` it was started with, by
@@ -348,11 +348,35 @@ a session the backend no longer has (it restarted before saving it)
 stays on show, read-only, with a banner offering a new session or the
 list.
 
-The sidebar lists the active sessions first (a session is running, with
-its lamp lit, while its turn or its background subagents and jobs run),
-each with its age and directory, then a faint "Archived 14" rule that
-unfolds the archived ones, muted (a search shows the matching ones
-either way). Hovering a session shows its archive (or unarchive) and delete
+The sidebar lists the active sessions as a tree of projects. A project is
+a git repository, named by its main checkout (its folder icon has a branch
+in it, and the main checkout's branch follows its name), or a plain folder
+(a session outside any repository). Sessions in the main checkout hang
+directly from the project; each other worktree of the repository (a branch
+being worked on, one made for a subagent, any other worktree of the
+repository the session is in) hangs from it as a branch off its rail, with
+its sessions under it, `● 3 changed` when it has uncommitted changes and ↑↓
+commits against its upstream. A subagent's worktree is tagged `subagent`
+and says which session it came from (click it to go there). Each session
+has its lamp (lit while its turn or its background subagents and jobs
+run), its age and, when it works in a subdirectory, that directory. The
+project and worktree the open session is in have the accent on their rail.
+Clicking a project or a worktree folds it (its row then counts its
+sessions, with the lamp when one is running); the folds are kept with your
+preferences, so they follow you to other browsers. Hovering a project shows
+"+" (a new session there) and, for a repository, "New worktree" (a branch,
+and a base that defaults to the main checkout's branch: Enter creates it
+under `worktrees_dir` and starts a new session in it, Esc cancels);
+hovering a worktree shows "+" (a new session there) and its bin, which asks
+to remove it ("Discard changes and remove" when it has changes; not the one
+the open session works in). Projects come most recently used first. Below
+the tree a faint "Archived 14" rule unfolds the archived sessions, muted,
+with their directory. A search (Ctrl+K) finds sessions in every project, by
+title, prompt, directory, project or branch, and shows the matches
+whatever is folded, the archived ones too. Where a session is in git is found on its
+tool host whenever its directory changes, by reading the repository's
+files (no git command), and kept in the session; a tool host running an
+older prigh cannot tell, and its sessions show as plain folders. Hovering a session shows its archive (or unarchive) and delete
 buttons; on a focused session A archives or unarchives it and Delete
 deletes it. "Select" (or `/delete` with no argument) turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
@@ -363,21 +387,10 @@ marked ones; "Delete archived" under the archived ones
 which ones the backend will keep (running, open in another tab or terminal,
 or the one you are in): those are not asked for, and with nothing left to
 delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
-sessions by name, id or path. The list follows the backend as it changes.
-
-Below the sessions, when the session is in a git repository, a
-"Worktrees" section lists the repository's worktrees (`/worktree`, above):
-each with its branch, `● 3 changed` when it has uncommitted changes, ↑↓
-commits against its upstream, its path (the full one on hover) and the
-sessions working in it as chips (click one to switch to it); the one the
-session is in has an accent edge. Clicking a worktree moves the session
-there, its hover "+" starts a new session there and its bin asks to remove
-it ("Discard changes and remove" when it has changes); the header folds
-the section, refreshes it and has "+" for a "New worktree" dialog (branch,
-and a base that defaults to where the session is; Enter creates it and
-moves the session there, Esc cancels). It is listed again when the
-session, its directory or its tool host changes, when a turn ends and
-after creating or removing one.
+sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
+repository the open session is in are listed again when the session, its
+directory or its tool host changes, when a turn ends and after creating or
+removing one.
 
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
@@ -390,8 +403,8 @@ last line. Selecting one shows a subagent's live transcript at the panel's
 width or a job's output, with what it is pinned under it however far you
 scroll: its task (and who started it), how it stands or ended, its model,
 turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
-which scrolls to its card. It opens from the status ("2 agents running"), the top bar's
-robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
+which scrolls to its card. It opens from the status ("2 agents running"), the
+robot button at the chat's top right, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
 left to the browser (it moves the focus back), and on macOS Option+digit
@@ -416,7 +429,7 @@ backend elsewhere, `?session=ID` joins a session and `?name=` names the
 frontend in `/host`. Tools run on a tool host (a browser cannot host
 them). In Docker it is `PRIGH_MODE=web` (port 7790, see `DOCKER.md`).
 
-The terminal button in the top bar (or `/terminal`, or Ctrl+`) opens a
+The terminal button at the chat's top right (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its
 directory) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
@@ -430,7 +443,7 @@ the user you act as; when the shell exits, "New shell" starts another,
 and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
-The folder button in the top bar (or `/files [path]`, or Ctrl+Shift+F)
+The folder button at the chat's top right (or `/files [path]`, or Ctrl+Shift+F)
 opens the file browser, a drawer right of the chat (a full-screen sheet on
 a phone) on the machine where the session's tools run (the backend, the
 Docker container, or a laptop connected as a tool host), in the session's
@@ -448,6 +461,13 @@ uploads into the directory shown, with progress, asking before it
 replaces a file; New folder makes one. Every error says what to do next,
 dialogs own the keyboard (Enter accepts, Esc cancels without doing
 anything), and switching session or host starts the browser afresh.
+
+In a git repository the browser marks what changed (against `HEAD`,
+untracked files too): a changed file has a dot (a sage tick once you
+approved it, sodium when it changed after that), a directory the number
+of changed files inside. A changed file previews as its diff, the hunks
+or the whole file with the changes inline, highlighted; any text file of
+the repository can be commented on.
 
 Files go into a message too: drop them on the composer, paste them, or
 pick them with its paperclip. Images (PNG, JPEG, GIF, WebP) go as images,
@@ -468,6 +488,28 @@ valid 5 minutes, for that session's host only), then `GET
 /files/download?ticket=…` or `PUT /files/upload?ticket=…` on the same port
 streams the bytes, in chunks, to or from the host (uploads up to 2 GB). A
 tool host running an older prigh says to update prigh there.
+
+GitHub and Forgejo (Codeberg, or any self-hosted Forgejo or Gitea; setting
+them up: [Git hosting](#git-hosting)) are in the settings page's Git hosting
+section (also under `/auth`): each host
+with who is signed in and how, Connect (GitHub's device code shows big,
+with Copy and the page to open; Forgejo opens its authorize page), Use a
+token, Disconnect, and Add host… for another Forgejo; closing the sign-in
+goes back to the settings. `/login github [HOST] [token]`, `/login forgejo
+HOST [token]`, `/login HOST` and `/logout HOST` do the same, and the
+`/login`/`/logout` pickers list the hosts too. The branch in the session's
+card at the foot of the sidebar (or `/pr [list open|closed|all]`) opens
+the session's repository's pull requests: a list to filter by state and by typing; Enter opens one (`/pr
+view N`) with its state, author, branches, checks, description and diff,
+"Open on GitHub" and Check out (its branch in a worktree, as `/worktree`
+makes them, with "Work there" to `/cd` into it; `/pr checkout N` asks the
+same), Esc going
+back to the list. New pull request (`/pr new [title]`) is a form
+prefilled from the branch (title, description, base, draft, and "push
+first" when the remote lacks commits): Ctrl+Enter creates it, a refusal
+stays in the form with what you typed, and "#25 created: URL" says it
+worked. Errors are the backend's, saying what to do (`/login github`, `git
+remote add`…).
 
 Every panel resizes from a handle on its inner edge: the sessions
 sidebar's right edge, the file browser's and the agents panel's left
@@ -542,26 +584,50 @@ with its line counts); `/notify on|off`, the settings page and the
 account menu control browser notifications while the tab is hidden, and the
 title (`(2) prigh`) and favicon count what happened meanwhile.
 
-The composer is one box: the editor on top and, along its bottom edge, the
-model, the thinking level ("Thinking high", "No thinking" for a model
-without levels) and the approval mode ("Asks: edits & commands", "Asks:
-commands", "Auto: never asks", "Plan mode", lit), each opening its picker
-(the modes with what each asks first), then attach, stop and send on the
-right. Ctrl+L, Alt+T and Alt+M switch or cycle them; in a narrow composer
-the labels get short (`high`, `ask`, `plan`). The top bar has the session's
-title, cwd and branch on the left (the cwd losing its middle rather than
-the directory it ends in), the panel toggles and the settings gear on the
-right, and the status in the middle: the context (click for `/session`'s
-details), tokens and cost (or the budget), then what the agent is doing, in
-a slot of its own width so that nothing moves as a turn starts and ends.
-Whatever applies follows the status, beside the panel toggles (before it on
-a phone), so that it never moves the status either: the goal, reminders, a
-scheduled resume, queued messages to take back, background agents and jobs,
-transfers, the tool host, the verbosity, the plan chip `plan 2/5: step`
-that runs `/todos`. A narrower chat column drops the tokens and cost, then
-says what applies with icons alone; the bar never changes height.
+The composer is one box: the editor on top and, along its bottom edge in
+the box's own quiet text, the model, the thinking level ("Thinking high",
+"No thinking" for a model without levels) and the approval mode ("Asks:
+edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
+lit), each lit with a chevron when pointed at, then attach, stop and send
+on the right. A chip opens a small menu standing on it, above the composer
+(below it only when there is no room above), with its command's choices
+(`/model`, `/thinking`, `/mode`), the current one checked: the models under
+their providers with their context windows and a filter field to type in
+(the list scrolls; filtered, best match first), the thinking levels with
+how hard each thinks, the modes with what each asks first. ↑↓ move, Enter
+or a click takes the choice, Esc or a click beside the menu closes it
+unchanged and gives the editor back the focus; ← →, Tab and a click on
+another chip open the next chip's menu, one at a time. On a phone the menu
+is as wide as the composer. The commands themselves open the larger
+picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
+other two; in a narrow composer the labels get short
+(`high`, `ask`, `plan`, after an icon). There is no bar over the chat
+while the sidebar is open: the files, terminal and agents buttons sit
+quietly in the chat's top right corner (lit while their panel is open),
+and the session's status is in a card at the foot of the sidebar, above
+the account, under the tree of projects. The tree marks which session it
+is (its row has the cwd as it is now, relative to its project or worktree,
+and a rename button). The card has whatever applies at
+the top — the goal, reminders, a scheduled resume, queued messages to take
+back, background agents and jobs, transfers, the verbosity, the plan chip
+`plan 2/5: step` that runs `/todos` — then the status on a grid: what the
+agent is doing, with where tools run (click for the `/host` picker) and the
+branch across from it (click for the pull requests, `/pr`); the context across the card (click for
+`/session`'s details); the tokens and the cost (or the budget). Each part
+keeps its place, so nothing moves as a turn starts and ends. Your account
+is under it, with the settings gear; the account menu also has Settings
+and Commands and keys (`/help`). With the sidebar closed, and always on a
+phone (where the sidebar is a drawer), a slim bar over the chat keeps the
+essentials on one line: the sidebar's button and the title, what applies
+(with the tool host when it is not the backend), the status, the panel
+toggles and the settings gear. What applies comes before the status, and
+the activity has a slot of its own width, so that nothing moves the
+status; a narrower chat column drops the tokens and cost, then says what
+applies with icons alone, then shows the activity as a dot; the bar never
+changes height.
 
-The settings page (the gear, `/settings` or Ctrl+,) holds what is not
+The settings page (the gear beside your account at the foot of the
+sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session: the theme and accent, notifications (on or off, and
 what to do when the browser has not been asked, blocks them or cannot show
 them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),
@@ -623,6 +689,51 @@ backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
 across the reconnect: their results wait for the backend to be back.
+
+### Reviewing the changes
+
+`/review` (or Alt+R, or the Review button of the file browser and of
+`/diff`) opens the review page in the chat's place; the chat narrows to a
+column beside it and keeps working. Down its left are the changed files,
+each with its approval; the strip in its head shows them all at a glance
+(sage approved, sodium changed since approved). The current file shows
+its hunks or, with Whole file (v), all of it with the changes inline, one
+line number per row (a removed line's old one, struck through).
+`]` / `[` (or n / p, j / k) go to the next and previous file, `a`
+approves the file (again), Esc closes. It follows the agent: every edit,
+write or command of the agent or its subagents, and every run's end,
+reads the changes again; the arrow button reads them now.
+
+Select the code you want changed, as you would to copy it (drag across
+it, within a line or over several; on a phone, press and hold), here or in
+the file browser's preview of a changed file: a Comment button floats by
+the selection. Press it (or `c`), write what should change and Enter adds
+it (Shift+Enter for a new line, Esc drops it), under the code with the
+selected text quoted; that text stays marked while the comment is there,
+and pointing at either the comment or its code lights the other. Removed
+lines can be commented on too: the comment says it is on the old text.
+(A line's number selects the whole line, Shift+click to another.)
+Comments collect until you send them (Send, or `s`): the agent then gets
+one message with each comment's file, lines, the code they hold with the
+selection marked in it and quoted, and the thread (`✎ 2 review comments`
+in the transcript), and answers each with the `reply_to_comment` tool.
+Its replies show threaded under the comment; a reply may propose a change
+(exact replacements, like `edit`'s), which Accept applies to the file
+where the tools run and Reject declines, and the agent hears of either
+with the next comments you send. Reply in a thread to go on with it,
+Resolve it when it is done, or delete it. A comment keeps its code's
+text, so when the file changes around it it moves with it (and, when
+only the rest of its lines changed, with the selected text); one whose
+code is gone shows above the file, marked so.
+
+Edit (e) switches to the file's text: edit it in place (highlighted) and
+Save (Ctrl+S) writes it on the tool host; a file that changed since you
+opened it is not overwritten (save again to overwrite it, or Reload).
+Approving keys each file by a hash of its change, so a file approved and
+then changed is no longer approved, and says so. Comments and approvals
+are kept with the session (also across rewinds, reloads and restarts).
+In the TUI, `/review` alone lists the changed files with their approvals
+and the comments with their threads.
 
 ### prigh-web for a backend elsewhere
 
@@ -893,8 +1004,10 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-`/sessions` lists the active sessions first and then, after an `── archived
-──` divider and dimmed, the archived ones. `▶` marks a running session (its
+`/sessions` lists the active sessions first, grouped by project and
+worktree under a divider naming each (`── prigh ──`, `── prigh ⎇ feat/x
+──`, `── notes ──`; the filter matches these names too), and then, after an
+`── archived ──` divider and dimmed, the archived ones. `▶` marks a running session (its
 turn, or background subagents and jobs: `2 in background`), `●` one loaded
 in the backend and `*` the one you are in; the list follows changes made
 anywhere (other frontends, other sessions). In it Tab marks or unmarks a
@@ -959,6 +1072,18 @@ message). The model also has `subagent_status` and `subagent_cancel`; there
 is no tool to block on a subagent, since its report wakes the main agent
 anyway. Subagents started by a subagent stay synchronous (and cannot
 delegate further).
+
+A subagent can work in a git worktree of its own, when the model (or you,
+asking it) sets the `subagent` tool's `worktree` option: a branch name, or
+`auto` for one named after the task (`agent/fix-the-parser-bug`, `-2` when
+taken). The worktree is made like `/worktree new` does, from where the
+session is (in the same subdirectory), and the subagent works there; its
+report ends with where the work is (`[worktree: the work is on branch
+agent/fix-the-parser-bug, checked out in ...]`) so that you can review it,
+merge the branch or remove the worktree. The session records the worktree
+until it is removed: prigh-web shows it in the project's tree, tagged
+`subagent`, and `/worktree` lists it like any other (open it, or start a
+session there, to look at the work).
 
 Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
 …, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
@@ -1261,6 +1386,8 @@ it.
 | `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
 | `/default-dir [off\|path]` | show or set the directory new sessions start in |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
+| `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
+| `/pr [list [open\|closed\|all]\|view N\|new [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch, or check one out in a git worktree |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
@@ -1271,7 +1398,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [base] [instructions]` | have the model review the uncommitted changes, or those against `base`'s merge base, for prioritised findings with file and line |
+| `/review [base] [instructions]` | alone: the review page (prigh-web) or the files' approvals and the comments (TUI), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
@@ -1319,10 +1446,89 @@ error listing the closest ones, with the text back in the editor. `/mcp`
 also shows configuration problems, and says where to configure servers when
 there are none.
 
+### Git hosting
+
+prigh signs in to GitHub (github.com, or GitHub Enterprise with `/login
+github HOST`) and Forgejo or Gitea instances (codeberg.org, or any host with
+`/login forgejo HOST`) and calls their APIs from the backend; no `gh` or
+`tea` is needed. `/login github` uses GitHub's device flow (the login box
+shows the code to enter) when OAuth is configured, otherwise it asks for a
+token; `token` after the host goes straight to the token prompt. The
+`/login` picker lists the known hosts under "Git hosting" (and "Forgejo:
+another host…", which asks for the host), `/logout` the signed-in ones, and
+`/auth` shows each host's user and method, and why OAuth is unavailable.
+Accounts belong to the user, like model credentials.
+
+Setting up the sign-in (once per backend):
+
+- **GitHub** signs in with the OAuth device flow, which needs only the client
+  id of an OAuth app (no secret), so it works the same from a terminal and a
+  browser, local or remote. prigh ships no client id of its own: register one
+  at <https://github.com/settings/applications/new> (any name, e.g. "prigh";
+  homepage and callback URL can be `http://127.0.0.1`, they are not used),
+  tick **Enable Device Flow**, and give prigh its client id, either in
+  `~/.prigh/config.json`
+
+  ```json
+  { "forges": { "github.com": { "client_id": "Ov23li…" } } }
+  ```
+
+  or as `$PRIGH_GITHUB_CLIENT_ID` for the backend (the config wins). It
+  asks for the `repo` scope. GitHub Enterprise: `"ghe.example.com": {"kind":
+  "github", "client_id": "…"}` (API at `https://HOST/api/v3`). Without a
+  client id, `/login github` asks for a personal access token instead
+  (classic with `repo`, or fine-grained with Contents and Pull requests
+  read/write).
+- **Forgejo / Gitea** sign in with OAuth's authorization code flow with PKCE
+  as a public client. Every stock Forgejo and Gitea instance pre-registers
+  git-credential-oauth's public client (redirect `http://127.0.0.1`, any
+  port), so this works with no setup, but the consent page names
+  git-credential-oauth, and on Forgejo the token is not limited to scopes
+  (Forgejo does not implement OAuth scopes yet; Gitea limits it to the
+  requested `read:user write:repository`). An instance whose admin disabled
+  the default applications, or to see your own app's name, needs a public
+  OAuth2 application (Settings → Applications, untick "Confidential client",
+  redirect URI `http://127.0.0.1`) and `"git.example.com": {"kind":
+  "forgejo", "client_id": "…"}` in `forges`. The browser is sent back to a
+  one-shot server on the backend's `127.0.0.1`; when prigh runs on another
+  machine that page fails to load: paste its address into the login box.
+  `"url": "http://git.lan:3000"` sets an instance's address when it is not
+  `https://HOST`. Unknown hosts are taken for Forgejo; `"kind"` says
+  otherwise.
+- Either: `token` after the host (`/login forgejo codeberg.org token`) asks
+  for a personal access token (Forgejo: scopes `read:user` and
+  `write:repository`).
+
+Sign-ins are stored with the model credentials, in `auth.json` under
+`forge:HOST` (0600, written atomically under the same lock; per user with
+`-tokens`). Forgejo's OAuth tokens last an hour and are refreshed when
+needed; a failed refresh says to sign in again. Tokens never appear in
+errors or logs.
+
+`/pr` works on the repository of the session's directory on its tool host
+(found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
+picker of pull requests (`#24 Git hosting · lloyd · feat/x → main · draft`);
+Enter, or `/pr view 24` (`/pr 24`, `/pr #24`), shows its title, state,
+branches, URL, description, checks and diff. `/pr new [title]` opens a form
+prefilled from the branch (title, body, base, draft, and "push first" when
+the branch is not on the remote yet): Tab or ↑↓ move between fields, Space
+toggles, Ctrl+J starts a new line in the body, Enter creates it and the
+notice gives its URL. `/pr checkout 24` checks the branch `pr-24` (from
+`refs/pull/24/head`) out in a worktree where `/worktree` makes them
+(`worktrees_dir`, `~/.prigh/worktrees/<project>/pr-24`) and asks whether to
+`/cd` there; again later it fast-forwards that worktree. The
+repository is the current branch's remote, else `origin`, else the first
+remote on a known host; pull requests from forks are listed as
+`owner:branch`, but `/pr new` opens one from the current branch of that
+remote's repository. "Push first" runs `git push -u REMOTE HEAD:BRANCH` on
+the tool host with its own git credentials (never prompting). On Forgejo a
+draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
+`git remote add origin URL`, ...).
+
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the
 transcript, prigh-web in a dialog); a diff over 1 MB is cut short.
-`/review` and `/init` start a run with a prompt the backend writes (the
+`/review BASE` and `/init` start a run with a prompt the backend writes (the
 review prompt includes the diff when it is small enough, else tells the
 model how to read it); like a prompt they queue while a run is going, and
 an error (nothing to review, an unknown base, not a repository) says what
@@ -1347,8 +1553,8 @@ Removing asks first (saying what would be lost and which sessions work
 there), keeps the branch, and is refused for the main checkout, for the
 worktree the session itself is in (open another first) and, without
 `-f`, for one with uncommitted changes or locked; a worktree whose
-directory was deleted is pruned. prigh-web also has a Worktrees section in
-the sidebar (below).
+directory was deleted is pruned. prigh-web's sidebar shows the worktrees
+in its tree of projects (below).
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:

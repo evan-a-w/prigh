@@ -87,6 +87,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -767,8 +768,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 62
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 63
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -784,8 +785,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 62
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 63
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -801,8 +802,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 62
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 63
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1162,13 +1163,13 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
+      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
     >
@@ -1227,6 +1228,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_logout_picker))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
 
 
 
@@ -1351,13 +1353,13 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions (named)  (1)  Alt+A (un)archives
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
     >
@@ -1405,6 +1407,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
       earlier answer
     Sessions  (1)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ──────────────────────────────── Deleted 1 session (0 B) ───
     >
@@ -1452,14 +1455,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
     ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1469,11 +1472,13 @@ let%expect_test
     deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   picker_rows h;
-  [%expect {|
-      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+  [%expect
+    {|
       earlier [bold]answer[/]
+    [dim]  ── work ──[/]
     [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it[dim]  /work[/]
+    [dim]  ── tmp ──[/]
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
     [dim]  ── archived ──[/]
     [dim]   (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike[/][dim]  /old[/]
@@ -1511,14 +1516,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1536,14 +1541,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1563,14 +1568,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1599,14 +1604,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1627,14 +1632,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1650,16 +1655,16 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    ▌ earlier question
-      earlier answer
     ┌─ Warning ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Deleted 1 session (1.0 MB)                                                                       │
     │ Not deleted: session "deploy" is running: wait for it, or switch to it and /abort                │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1713,13 +1718,13 @@ let%expect_test
         Archive_done
         (name     "session 5")
         (archived true))))
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
       ── archived ──
@@ -1740,14 +1745,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1775,16 +1780,16 @@ let%expect_test
         Archive_done
         (name     "session \"old spike\"")
         (archived false))))
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── old ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -2156,15 +2161,15 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
+      ── work ──
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
-     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+      ── tmp ──
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
@@ -2190,16 +2195,16 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
+      ── work ──
      ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
-    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
-     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+      ── tmp ──
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -2306,7 +2311,8 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Rewind to "second question"? Later messages are abandon… │
+    │ Rewind to "second question"? Later messages are          │
+    │ abandoned (y/n)                                          │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
@@ -2776,6 +2782,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -2812,7 +2819,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 242 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 251 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -3805,6 +3812,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
        ; task = "index the repo"
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
+       ; worktree = None
        });
   H.event
     h
@@ -4022,6 +4030,8 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
   H.show h;
   [%expect
     {|
+    (Rpc (method_ get_subagent) (params ((id a3))) (tag Subagent_loaded))
+
     ▌ earlier question
       earlier answer
     ↩ subagent a1 "find auth"  finished
@@ -4032,7 +4042,100 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
         [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:1 running
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
+    |}]
+;;
+
+let%expect_test
+    "a switched-to session's subagents: listed, focusable, transcripts loaded"
+  =
+  let h = connected ~width:90 ~height:12 () in
+  H.reply ~quiet:true h (Reload_messages_notice "switched session") "{}";
+  H.reply
+    h
+    Initial_state
+    (state_json
+       ~subagents:[ "a1", "index the repo", true; "a2", "run tests", false ]
+       ());
+  [%expect
+    {|
+    (Rpc (method_ get_subagent) (params ((id a1))) (tag Subagent_loaded))
+    (Rpc (method_ get_subagent) (params ((id a2))) (tag Subagent_loaded))
+    |}];
+  (* Before the transcripts arrive: listed and focusable already. *)
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2    ⠋ running 0 turns  "index the repo"
+
+
+
+
+
+
+
+
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  H.reply
+    h
+    Subagent_loaded
+    {|{"subagent":{"id":"a1","call_id":"c1","task":"index the repo","model":"claude-haiku","state":"running","turns":1},"messages":[{"role":"user","text":"index the repo"},{"role":"assistant","content":[{"type":"text","text":"indexing src/"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"claude-haiku"}]}|};
+  H.reply
+    h
+    Subagent_loaded
+    {|{"subagent":{"id":"a2","call_id":"c2","task":"run tests","model":"claude-haiku","state":"complete","turns":2,"result":{"text":"all pass","is_error":false}},"messages":[{"role":"user","text":"run tests"}]}|};
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "index the repo"
+
+
+
+
+
+
+    ▌ index the repo
+      indexing src/
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  (* Its live events now land in the loaded transcript. *)
+  H.event h (Subagent { call_id = "c1"; agent_id = "a1"; event = Turn_start });
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 2 turns  "index the repo"
+
+
+
+
+
+
+    ▌ index the repo
+      indexing src/
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  H.esc h;
+  H.keys h "/agents";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Subagents  (2)
+    / ▏
+    ▸  index the repo  a1  running  claude-haiku
+       run tests       a2  done 2 turns $0.00  claude-haiku
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Enter focuses · Esc closes · Ctrl+D cancels
     |}]
 ;;
 
@@ -4072,6 +4175,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
        ; task = "find all auth code in the repository"
        ; model = "claude-haiku"
        ; tools = [ "read"; "grep" ]
+       ; worktree = None
        });
   H.event h (Tool_start call2);
   H.event
@@ -4082,6 +4186,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
        ; task = "run the test suite"
        ; model = "claude-sonnet"
        ; tools = [ "bash" ]
+       ; worktree = None
        });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
@@ -4289,6 +4394,7 @@ let%expect_test "verbosity applies inside an agent view" =
        ; task = "audit"
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
+       ; worktree = None
        });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   let call = tool_call ~name:"bash" ~arguments:{|{"command":"ls"}|} "t1" in
@@ -4367,6 +4473,7 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
        ; task = "find auth"
        ; model = "claude-haiku"
        ; tools = [ "read" ]
+       ; worktree = None
        });
   H.event
     h
@@ -4376,6 +4483,7 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
        ; task = "run tests"
        ; model = "claude-sonnet"
        ; tools = [ "bash" ]
+       ; worktree = None
        });
   H.event
     h
@@ -4438,6 +4546,7 @@ let%expect_test "new user prompt clears finished agents" =
        ; task = "look around"
        ; model = "claude-haiku"
        ; tools = [ "read" ]
+       ; worktree = None
        });
   H.event
     h
@@ -4499,6 +4608,7 @@ let%expect_test "session reload drops subagent transcripts and focus" =
        ; task = "look"
        ; model = "m"
        ; tools = []
+       ; worktree = None
        });
   H.event
     h
@@ -4564,6 +4674,7 @@ let%expect_test "nested subagent events recurse into the parent's children" =
        ; task = "outer task"
        ; model = "m1"
        ; tools = [ "subagent" ]
+       ; worktree = None
        });
   H.event
     h
@@ -4589,6 +4700,7 @@ let%expect_test "nested subagent events recurse into the parent's children" =
              ; task = "inner task"
              ; model = "m2"
              ; tools = [ "read" ]
+             ; worktree = None
              }
        });
   H.event
@@ -4999,7 +5111,13 @@ let%expect_test "Ctrl+X copies the last assistant message, or the focused \
   H.event
     h
     (Subagent_start
-       { call_id = "c1"; agent_id = "c1"; task = "t"; model = "m"; tools = [] });
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "t"
+       ; model = "m"
+       ; tools = []
+       ; worktree = None
+       });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
     h
@@ -5090,6 +5208,7 @@ let%expect_test
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -5400,6 +5519,7 @@ let%expect_test
        ; task = "find auth"
        ; model = "claude-haiku"
        ; tools = []
+       ; worktree = None
        });
   H.event
     h
@@ -5409,6 +5529,7 @@ let%expect_test
        ; task = "run tests"
        ; model = "claude-sonnet"
        ; tools = []
+       ; worktree = None
        });
   H.event
     h
@@ -6318,15 +6439,15 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
+      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     >
@@ -6343,7 +6464,9 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
       earlier answer
     Sessions  (2)  Alt+A (un)archives
     / ▏
+      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
+      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msg…
     ────────────────────────────────────────
     >
@@ -6891,7 +7014,13 @@ let with_agents ~width ~height =
       H.event
         h
         (Subagent_start
-           { call_id = id; agent_id = id; task; model; tools = [ "bash" ] }));
+           { call_id = id
+           ; agent_id = id
+           ; task
+           ; model
+           ; tools = [ "bash" ]
+           ; worktree = None
+           }));
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
     h
@@ -7250,6 +7379,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     |}];
@@ -7352,6 +7482,7 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     |}];
@@ -7694,6 +7825,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (host-abc)
@@ -8048,8 +8180,8 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 62
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 63
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8065,8 +8197,8 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 62
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 63
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8218,6 +8350,7 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
        ; task = "old work"
        ; model = "m"
        ; tools = []
+       ; worktree = None
        });
   H.event h (Agent_end []);
   H.next_agent h;
@@ -8562,6 +8695,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
 
 
@@ -8638,17 +8772,18 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_login_picker))
-
-
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    Log in to  (3)
+    Log in to  (4)
     / ▏
     ▸* DeepSeek (api_key)              API key  logged in via a…
        ollama (edit)                   custom: http://localhost…
        custom (add an OpenAI-compatible endpoint)  aiproxy, Lit…
+      ── Git hosting ──
+       Forgejo: another host…          Forgejo or Gitea on any …
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -8881,6 +9016,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -9195,7 +9331,13 @@ let%expect_test "/agents cancel: errors say what exists" =
   H.event
     h
     (Subagent_start
-       { call_id = "c1"; agent_id = "c1"; task = "t"; model = "m"; tools = [] });
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "t"
+       ; model = "m"
+       ; tools = []
+       ; worktree = None
+       });
   H.keys h "/agents cancel 3";
   H.enter h;
   H.show h;

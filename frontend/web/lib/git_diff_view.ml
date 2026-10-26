@@ -31,6 +31,10 @@ let file ~fold (f : Diff_files.File.t) =
     ]
 ;;
 
+let files ~fold ~scope (d : Git_diff.t) =
+  List.map (Diff_files.parse d.diff) ~f:(file ~fold:(Fold.scoped fold scope))
+;;
+
 let view ~fold (d : Git_diff.t) ~inject =
   let files = Diff_files.parse d.diff in
   Modal.view
@@ -39,6 +43,15 @@ let view ~fold (d : Git_diff.t) ~inject =
     ~on_close:(inject App.Action.Close_dialog)
     ~footer:
       [ span ~cls:"keys-hint" "/diff PATH shows one file or directory"
+      ; button
+          ~cls:"small"
+          ~title:"Approve and comment file by file (Alt+R, /review)"
+          ~on_click:
+            (Effect.Many
+               [ inject App.Action.Close_dialog
+               ; inject (App.Action.Review (Open None))
+               ])
+          [ Node.text "Review" ]
       ; button
           ~cls:"primary"
           ~on_click:(inject App.Action.Close_dialog)

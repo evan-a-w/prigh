@@ -232,6 +232,8 @@ module Row = struct
     ; uploading : bool
     ; mtime : string
     ; mtime_full : string option
+    ; change :
+        [ `File of Prigh_ui.File_approval.Status.t | `Dir of int | `None ]
     }
   [@@deriving equal]
 end
@@ -241,7 +243,7 @@ let row_id name = "files-row-" ^ name
 
 let row_view
       (e : File_listing.Entry.t)
-      ({ selected; uploading; mtime; mtime_full } : Row.t)
+      ({ selected; uploading; mtime; mtime_full; change } : Row.t)
       ~inject
   =
   let dir = File_listing.Kind.is_dir e.kind in
@@ -256,6 +258,10 @@ let row_view
             , match e.kind with
               | Link `Missing -> true
               | _ -> false )
+          ; ( "changed"
+            , match change with
+              | `File _ | `Dir _ -> true
+              | `None -> false )
           ]
       ; Attr.role "option"
       ; Attr.id (row_id e.name)
@@ -269,6 +275,31 @@ let row_view
         ~attrs:[ Attr.create "dir" "auto" ]
         (if dir then e.name ^ "/" else e.name)
     ; (if uploading then lamp () else Node.none)
+    ; (match change with
+       | `None -> Node.none
+       | `File Approved ->
+         Html.mark ~cls:"done files-change" ~label:"Changed, approved" Check
+       | `File Changed ->
+         span
+           ~cls:"files-change-dot stale"
+           ~attrs:[ Attr.title "Changed since you approved it" ]
+           ""
+       | `File Unapproved ->
+         span
+           ~cls:"files-change-dot"
+           ~attrs:[ Attr.title "Changed: not in the last commit" ]
+           ""
+       | `Dir n ->
+         span
+           ~cls:"files-change-count"
+           ~attrs:
+             [ Attr.title
+                 (sprintf
+                    "%d changed file%s inside"
+                    n
+                    (if n = 1 then "" else "s"))
+             ]
+           (Int.to_string n))
     ; span ~cls:"files-size" (Option.value_map e.size ~default:"" ~f:size)
     ; span
         ~cls:"files-mtime"
@@ -277,6 +308,11 @@ let row_view
              [ Attr.title t ]))
         mtime
     ]
+;;
+
+let entry_path (t : Files.t) name =
+  Option.value_map t.listing ~default:name ~f:(fun l ->
+    if String.equal l.path "/" then "/" ^ name else l.path ^ "/" ^ name)
 ;;
 
 let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
@@ -289,15 +325,11 @@ let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
     ; mtime = mtime m e.mtime
     ; mtime_full =
         Option.map e.mtime ~f:(Message_time.full (App.Model.message_time m))
+    ; change = Code_review.mark m.review ~abs:(entry_path t e.name)
     }
   in
   View_cache.find ~inject rows e ~deps ~equal:Row.equal ~f:(fun () ->
     row_view e deps ~inject)
-;;
-
-let entry_path (t : Files.t) name =
-  Option.value_map t.listing ~default:name ~f:(fun l ->
-    if String.equal l.path "/" then "/" ^ name else l.path ^ "/" ^ name)
 ;;
 
 (* What can be done with the selected entry. *)
@@ -401,6 +433,56 @@ let text_preview (p : File_preview.t) ~text ~truncated =
   ]
 ;;
 
+(* Above a file of the repository: its changes or all of it, and the review
+   page at it. *)
+let code_review_bar (m : App.Model.t) path ~inject =
+  let t = m.review in
+  let review action = App.Action.Review action in
+  match Code_review.file t path with
+  | None ->
+    div
+      ~cls:"files-review-bar"
+      [ span
+          ~cls:"files-note"
+          "Unchanged. Click a line number to comment on it."
+      ]
+  | Some f ->
+    let layout (l : Code_review.Layout.t) text title =
+      let on = Code_review.Layout.equal t.layout l in
+      Node.button
+        ~attrs:
+          [ classes [ "segment" ] [ "on", on ]
+          ; Attr.type_ "button"
+          ; Attr.create "aria-pressed" (Bool.to_string on)
+          ; Attr.title title
+          ; Attr.on_click (fun _ -> inject (review (Set_layout l)))
+          ]
+        [ Node.text text ]
+    in
+    div
+      ~cls:"files-review-bar"
+      [ (let status = Code_review.approval t f in
+         let label =
+           String.capitalize (Prigh_ui.File_approval.Status.to_string status)
+         in
+         match status with
+         | Approved -> Html.mark ~cls:"done" ~label Check
+         | Changed -> Html.mark ~cls:"now" ~label Warning
+         | Unapproved -> Html.mark ~cls:"todo" ~label Ring)
+      ; span ~cls:"files-review-counts" (sprintf "+%d −%d" f.added f.removed)
+      ; Node.div
+          ~attrs:
+            [ Attr.class_ "segmented"
+            ; Attr.role "group"
+            ; Attr.create "aria-label" "Show"
+            ]
+          [ layout Unified "Changes" "Only the changed hunks"
+          ; layout Full "Whole file" "The whole file with its changes inline"
+          ]
+      ; Review_page_view.open_button ~path m ~inject
+      ]
+;;
+
 let preview (m : App.Model.t) (t : Files.t) ~inject =
   let close =
     button
@@ -451,7 +533,20 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
       ~meta
       ~name:p.name
       (match p.content with
-       | Text { text; truncated } -> text_preview p ~text ~truncated
+       | Text { text; truncated = false; md5 = _ }
+         when Option.is_some (Code_review.relative m.review ~abs:p.path) ->
+         let path =
+           Option.value_exn (Code_review.relative m.review ~abs:p.path)
+         in
+         ignore (text : string);
+         [ code_review_bar m path ~inject
+         ; (* The review page shows it (and the panel is hidden): one place
+              for its selection and comment box. *)
+           (if m.review.open_
+            then div ~cls:"files-note" [ Node.text "Shown in the review." ]
+            else Review_code_view.view m ~path ~inject)
+         ]
+       | Text { text; truncated; md5 = _ } -> text_preview p ~text ~truncated
        | Image { url = Some url; mime } ->
          [ div
              ~cls:"files-image"
@@ -662,6 +757,9 @@ let view (m : App.Model.t) ~inject =
                   ~title:"Upload files here"
                   (Pick Here)
                   (glyph Upload)
+              ; (if List.is_empty m.review.files
+                 then Node.none
+                 else Review_page_view.open_button m ~inject)
               ; button
                   ~cls:"icon ghost files-close"
                   ~title:"Close (Ctrl+Shift+F)"

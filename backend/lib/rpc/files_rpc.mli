@@ -19,6 +19,9 @@ open! Import
       uploads directory {!File_ops.uploads_dir} under the session cwd, under
       a free name.
 
+    - [fs_write {path, text, expected?}]: {!File_ops.write}'s [{path,
+      md5}]; [expected] is the [md5] of the text the editor started from.
+
     URLs are paths on the web server ({!File_http}). *)
 
 val methods : string list

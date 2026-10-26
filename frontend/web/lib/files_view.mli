@@ -9,7 +9,7 @@ val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 (** Its dialog (new folder, rename, delete, overwrite), over the page. *)
 val dialog : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
-(** The top bar's button. *)
+(** The session's button (in its card or bar). *)
 val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** The composer's attachment chips: name, size, progress, remove. *)

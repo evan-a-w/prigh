@@ -411,7 +411,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 <td colspan="2"> edit 1 </td>
               </tr>
               <tr class="del">
-                <td class="sign"> - </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    greet name =
@@ -420,7 +420,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    salute name =
@@ -432,7 +432,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 <td colspan="2"> edit 2 </td>
               </tr>
               <tr class="del">
-                <td class="sign"> - </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                     print_endline (greet
                   <span class="hl-str"> "world" </span>
@@ -440,7 +440,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                     print_endline (salute
                   <span class="hl-str"> "world" </span>
@@ -475,12 +475,13 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
           <table class="diff">
             <tbody>
               <tr class="hunk">
-                <td colspan="4"> @@ -1,5 +1,5 @@ </td>
+                <td colspan="3">
+                  <span class="hunk-range"> @@ -1,5 +1,5 @@ </span>
+                </td>
               </tr>
               <tr class="del">
-                <td class="ln"> 1 </td>
-                <td class="ln">  </td>
-                <td class="sign"> - </td>
+                <td class="ln old"> 1 </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    greet name =
@@ -489,9 +490,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 1 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    salute name =
@@ -501,23 +501,20 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
               </tr>
               <tr class="same">
                 <td class="ln"> 2 </td>
-                <td class="ln"> 2 </td>
-                <td class="sign">   </td>
+                <td aria-hidden="true" class="sign">   </td>
                 <td class="text"> </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 3 </td>
-                <td class="ln"> 3 </td>
-                <td class="sign">   </td>
+                <td aria-hidden="true" class="sign">   </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    main () =
                 </td>
               </tr>
               <tr class="del">
-                <td class="ln"> 4 </td>
-                <td class="ln">  </td>
-                <td class="sign"> - </td>
+                <td class="ln old"> 4 </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                     print_endline (greet
                   <span class="hl-str"> "world" </span>
@@ -525,9 +522,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 4 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                     print_endline (salute
                   <span class="hl-str"> "world" </span>
@@ -536,8 +532,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
               </tr>
               <tr class="same">
                 <td class="ln"> 5 </td>
-                <td class="ln"> 5 </td>
-                <td class="sign">   </td>
+                <td aria-hidden="true" class="sign">   </td>
                 <td class="text">
                     exit
                   <span class="hl-num"> 0 </span>
@@ -577,7 +572,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 <td colspan="2"> edit 1 </td>
               </tr>
               <tr class="del">
-                <td class="sign"> - </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    greet name =
@@ -586,7 +581,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    salute name =
@@ -598,7 +593,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 <td colspan="2"> edit 2 </td>
               </tr>
               <tr class="del">
-                <td class="sign"> - </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
                     print_endline (greet
                   <span class="hl-str"> "world" </span>
@@ -606,7 +601,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                     print_endline (salute
                   <span class="hl-str"> "world" </span>
@@ -1237,21 +1232,21 @@ let%expect_test "apply_patch: one file's diff, like edit" =
           <table class="diff">
             <tbody>
               <tr class="hunk">
-                <td colspan="4"> @@ -3,2 +3,2 @@ </td>
+                <td colspan="3">
+                  <span class="hunk-range"> @@ -3,2 +3,2 @@ </span>
+                </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 3 </td>
-                <td class="ln"> 3 </td>
-                <td class="sign">   </td>
+                <td aria-hidden="true" class="sign">   </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    delay attempt =
                 </td>
               </tr>
               <tr class="del">
-                <td class="ln"> 4 </td>
-                <td class="ln">  </td>
-                <td class="sign"> - </td>
+                <td class="ln old"> 4 </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">
 
                   <span class="hl-num"> 0.1 </span>
@@ -1261,9 +1256,8 @@ let%expect_test "apply_patch: one file's diff, like edit" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 4 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
 
                   <span class="hl-num"> 0.1 </span>
@@ -1319,12 +1313,13 @@ let%expect_test "apply_patch: several files, each named above its diff" =
           <table class="diff">
             <tbody>
               <tr class="hunk">
-                <td colspan="4"> @@ -0,0 +1,2 @@ </td>
+                <td colspan="3">
+                  <span class="hunk-range"> @@ -0,0 +1,2 @@ </span>
+                </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 1 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    x =
@@ -1332,9 +1327,8 @@ let%expect_test "apply_patch: several files, each named above its diff" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 2 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    y =
@@ -1352,27 +1346,26 @@ let%expect_test "apply_patch: several files, each named above its diff" =
           <table class="diff">
             <tbody>
               <tr class="hunk">
-                <td colspan="4"> @@ -1,2 +1,2 @@ </td>
+                <td colspan="3">
+                  <span class="hunk-range"> @@ -1,2 +1,2 @@ </span>
+                </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 1 </td>
-                <td class="ln"> 1 </td>
-                <td class="sign">   </td>
+                <td aria-hidden="true" class="sign">   </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    f x =
                 </td>
               </tr>
               <tr class="del">
-                <td class="ln"> 2 </td>
-                <td class="ln">  </td>
-                <td class="sign"> - </td>
+                <td class="ln old"> 2 </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">   x </td>
               </tr>
               <tr class="add">
-                <td class="ln">  </td>
                 <td class="ln"> 2 </td>
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                     x +
                   <span class="hl-num"> 1 </span>
@@ -1423,7 +1416,7 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
           <table class="diff">
             <tbody>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    x =
@@ -1431,7 +1424,7 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
                 </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    y =
@@ -1452,11 +1445,11 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
                 <td colspan="2"> @@ let f x = </td>
               </tr>
               <tr class="del">
-                <td class="sign"> - </td>
+                <td aria-hidden="true" class="sign"> - </td>
                 <td class="text">   x </td>
               </tr>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                     x +
                   <span class="hl-num"> 1 </span>
@@ -1504,7 +1497,7 @@ let%expect_test "apply_patch: the files streamed so far" =
           <table class="diff">
             <tbody>
               <tr class="add">
-                <td class="sign"> + </td>
+                <td aria-hidden="true" class="sign"> + </td>
                 <td class="text">
                   <span class="hl-kw"> let </span>
                    x =

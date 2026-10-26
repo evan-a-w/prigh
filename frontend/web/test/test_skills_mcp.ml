@@ -304,6 +304,7 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\
@@ -341,6 +342,7 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     ()
     (Set_url_session s2)
     (Rpc (method_ get_messages_page)
@@ -773,6 +775,7 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\

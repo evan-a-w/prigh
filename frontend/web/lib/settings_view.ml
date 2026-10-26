@@ -166,6 +166,108 @@ let providers (m : App.Model.t) ~inject =
     ]
 ;;
 
+let git_host (m : App.Model.t) (a : Forge_account.t) ~inject =
+  let run command = inject (Action.Run command) in
+  let login = "/login " ^ Forge_account.login_arg a in
+  let note =
+    match a.oauth_note with
+    | Some note when a.oauth || Forge_account.signed_in a ->
+      Some ("muted", String.capitalize note)
+    | Some note -> Some ("warm", String.capitalize note)
+    | None -> None
+  in
+  div
+    ~cls:"setting git-host"
+    [ div
+        ~cls:"setting-text"
+        [ div
+            ~cls:"git-host-name"
+            [ span ~cls:"setting-name" a.label
+            ; span ~cls:"setting-about host" a.host
+            ]
+        ; span ~cls:"setting-about" (String.capitalize (Forges.describe a) ^ ".")
+        ; (match note with
+           | Some (level, text) -> span ~cls:("setting-note " ^ level) text
+           | None -> Node.none)
+        ]
+    ; div
+        ~cls:"setting-control"
+        (if Set.mem m.forges.signing_out a.host
+         then
+           [ button
+               ~cls:"small"
+               ~disabled:true
+               ~attrs:[ Attr.create "aria-busy" "true" ]
+               ~on_click:Effect.Ignore
+               [ Html.lamp (); Node.text "Disconnecting…" ]
+           ]
+         else if Forge_account.signed_in a
+         then
+           [ button
+               ~cls:"small"
+               ~title:("/logout " ^ a.host)
+               ~label:("Disconnect " ^ Forges.name a)
+               ~on_click:(run ("/logout " ^ a.host))
+               [ Node.text "Disconnect" ]
+           ]
+         else if a.oauth
+         then
+           [ button
+               ~cls:"small ghost"
+               ~title:(login ^ " token")
+               ~label:("Connect " ^ Forges.name a ^ " with a token")
+               ~on_click:(run (login ^ " token"))
+               [ Node.text "Use a token" ]
+           ; button
+               ~cls:"small primary"
+               ~title:login
+               ~label:("Connect " ^ Forges.name a)
+               ~on_click:(run login)
+               [ Node.text "Connect" ]
+           ]
+         else
+           [ button
+               ~cls:"small primary"
+               ~title:(login ^ " token")
+               ~label:("Connect " ^ Forges.name a ^ " with a token")
+               ~on_click:(run (login ^ " token"))
+               [ Node.text "Connect with a token" ]
+           ])
+    ]
+;;
+
+let git_hosts (m : App.Model.t) ~inject =
+  let another =
+    row
+      ~cls:"git-host-add"
+      ~name:"Another Forgejo host"
+      ~about:"A self-hosted Forgejo or Gitea, by its host name."
+      [ button
+          ~cls:"small"
+          ~title:"/login forgejo HOST"
+          ~on_click:(inject (Action.Run "/login forgejo"))
+          [ Node.text "Add host…" ]
+      ]
+  in
+  match m.forges.accounts with
+  | Loading ->
+    [ row
+        ~name:"Git hosts"
+        ~about:"GitHub, Codeberg and the Forgejo hosts you sign in to."
+        ~note:("muted", "Waiting for the backend…")
+        []
+    ]
+  | Failed e ->
+    [ row
+        ~name:"Git hosts"
+        ~about:"This backend can't sign in to git hosts."
+        ~note:("warm", String.capitalize e)
+        []
+    ]
+  | Loaded accounts ->
+    List.map accounts ~f:(fun a -> git_host m a ~inject) @ [ another ]
+;;
+
 let account (m : App.Model.t) ~inject =
   match Account_view.who m with
   | None ->
@@ -231,6 +333,7 @@ let view (m : App.Model.t) ~inject =
     [ section "Appearance" (Theme_view.rows m ~inject)
     ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
+    ; section "Git hosting" (git_hosts m ~inject)
     ; section "Account" (account m ~inject)
     ]
 ;;
