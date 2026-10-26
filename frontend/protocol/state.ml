@@ -64,7 +64,7 @@ type t =
   ; plan_mode : bool
   ; plan : Plan.t option
   ; session_rules : string list
-    ; trim : Trim.t option [@sexp.option]
+  ; trim : Trim.t option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 

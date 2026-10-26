@@ -69,6 +69,10 @@ module Reply_tag : sig
     | Models_catalog
     | Models_for_scoped
     | Compact_done
+    | Trim_points_picker
+    | Trimmed of [ `Trim | `Untrim ] (** what [trim] or [untrim] moved *)
+    | Trim_reload (** the context's messages, after the trim changed *)
+    | Trimmed_shown (** [/trim show]'s [get_trimmed] *)
     | Git_diff
     | Review_comments of
         { target : P.Git_diff.Target.t
