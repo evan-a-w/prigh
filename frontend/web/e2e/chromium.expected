@@ -1227,6 +1227,7 @@ Comment
 Edit
 Changes
 Whole file
+Since you commented · <TIME>
 Send 1 comment
 === chromium: review: page: the files ===
 src/
@@ -1316,6 +1317,7 @@ Comment
 Edit
 Changes
 Whole file
+Since you approved · <TIME>
 Send 4 comments
 === chromium: review: page: the files after the agent's edit ===
 README.md
@@ -1464,6 +1466,157 @@ util.ml
 1
 +3 −0
 3 files changed, +8 −2
+=== chromium: review: since: the files ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++1 −0 since approved
++4 −0
+3 files changed, +9 −2
+=== chromium: review: since: the view shown ===
+Comment
+Since you approved · <TIME>
+=== chromium: review: since: what changed since approved ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you approved · <TIME>: +1 −0
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+4		let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: the earlier actions ===
+you approved · <TIME>
+you accepted · <TIME>
+you commented · <TIME>
+=== chromium: review: since: since the comment ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+3	-	let twice f x = f (f x)
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: a comment in the since-view ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+c5
+line 2
+Resolve
+const
+You
+<TIME>
+not sent yet
+Is const used?
+3
+3	-	let twice f x = f (f x)
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== chromium: review: since: l, the changes again ===
+Comment
+Changes
+=== chromium: review: since: main.ml since its last action ===
+src/main.ml
+Changed since you approved it
+Approve again
+Nothing changed since you edited · <TIME>.
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+c4
+old line 12
+old text
+its code changed
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+=== chromium: review: since: the file browser ===
+Changes
+Whole file
+Since you commented · <TIME>
+Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
 === chromium: review: phone ===
 sheet: fixed
 Alt+R closed it

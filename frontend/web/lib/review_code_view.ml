@@ -667,7 +667,7 @@ let view (m : App.Model.t) ~path ~inject =
   in
   let empty =
     match rows, file, Map.find t.contents path with
-    | _ when since -> [ Review_since_view.note m path ]
+    | _ when since -> []
     | [], Some f, _ ->
       [ div
           ~cls:"review-empty"
@@ -700,7 +700,8 @@ let view (m : App.Model.t) ~path ~inject =
   div
     ~cls:"review-code"
     ~attrs:[ Attr.create "data-path" path ]
-    ([ (match elsewhere with
+    ([ (if since then Review_since_view.note m path else Node.none)
+     ; (match elsewhere with
         | [] -> Node.none
         | elsewhere ->
           div

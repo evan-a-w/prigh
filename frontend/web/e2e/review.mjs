@@ -4,8 +4,8 @@
 // a removed line) sent to the agent, its replies (one proposing a change,
 // accepted), the review page beside the chat (approvals, the keys, the
 // whole-file layout, edit mode saving a file), live updates as the agent
-// edits, another worktree (a branch with a commit) against its base, and a
-// phone. Run by prigh_web.sh; prints normalised snapshots (the
+// edits, another worktree (a branch with a commit) against its base, what
+// changed in a file since it was approved, and a phone. Run by prigh_web.sh; prints normalised snapshots (the
 // expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -63,6 +63,13 @@ writeFileSync(join(dir, "script.json"), JSON.stringify([
     ],
   },
   { text: "Replied to both comments and updated the README." },
+  {
+    text: "Tidying.",
+    tool_calls: [
+      { id: "e2", name: "edit", arguments: { path: "src/util.ml", edits: [{ old_text: "let id x = x\n", new_text: "let id x = x\nlet const x _ = x\n" }] } },
+    ],
+  },
+  { text: "Added const." },
 ]));
 
 const server = spawn(
@@ -366,6 +373,74 @@ try {
   await page.locator(".composer textarea").press("Enter");
   await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
   await show("worktree: back to the session's own", ".review-files");
+
+  // 9c. What changed since: approve util.ml, have the agent change it, and
+  //     it opens on what changed since the approval, with a badge in the
+  //     list and a menu of the file's earlier actions.
+  await page.locator(".review-file[data-path='src/util.ml']").click();
+  await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/util.ml");
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("a");
+  await page.locator(".review-file.current.approved[data-path='src/util.ml']").waitFor();
+  await page.locator(".composer textarea").fill("Add const to util.ml");
+  await page.locator(".composer textarea").press("Enter");
+  await idle();
+  await page.locator(".review-file[data-path='src/util.ml'] .review-file-since").waitFor();
+  section("since: the files");
+  console.log(clean(await page.locator(".review-files").innerText()));
+  await page.locator(".review-file[data-path='src/main.ml']").click();
+  await page.locator(".review-file[data-path='src/util.ml']").click();
+  await page.locator(".review-page .review-since-note").waitFor();
+  section("since: the view shown");
+  console.log(clean(await page.locator(".review-controls .segment.on").allInnerTexts().then(t => t.join("\n"))));
+  await show("since: what changed since approved", ".review-current");
+  section("since: the earlier actions");
+  console.log(clean((await page.locator(".review-since-menu option").allInnerTexts()).join("\n")));
+  // An earlier one: what the agent's proposal and the edit changed since
+  // the comment.
+  const first = await page.locator(".review-since-menu option").last().getAttribute("value");
+  await page.locator(".review-since-menu").selectOption(first);
+  await page.waitForFunction(() => /^Since you commented/.test(document.querySelector(".review-since-note")?.textContent ?? ""));
+  await show("since: since the comment", ".review-current");
+  // Comments on the current lines work there too.
+  await drag([row(".review-page", "new", 2), 4], [row(".review-page", "new", 2), 9]);
+  await page.locator(".review-page .review-pop").waitFor();
+  await page.keyboard.press("c");
+  await page.locator("#review-draft").fill("Is const used?");
+  await page.locator("#review-draft").press("Enter");
+  await page.locator('.review-page .review-thread[data-comment="c5"]').waitFor();
+  await show("since: a comment in the since-view", ".review-current");
+  // l toggles back to the changes; a file with nothing new says so.
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("l");
+  await page.locator(".review-since-note").waitFor({ state: "detached" });
+  section("since: l, the changes again");
+  console.log(clean(await page.locator(".review-controls .segment.on").allInnerTexts().then(t => t.join("\n"))));
+  await page.locator(".review-file[data-path='src/main.ml']").click();
+  await page.locator(".review-controls .segment", { hasText: "Since" }).click();
+  await page.locator(".review-since-same, .review-since-note").first().waitFor();
+  await show("since: main.ml since its last action", ".review-current");
+  // The file browser's preview has the view too (the review closed, as it
+  // takes the browser's place).
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".review-page", { state: "detached" });
+  // (It may still be open from before, behind the review.)
+  if (!(await page.locator(".files-panel").isVisible())) await page.keyboard.press("Control+Shift+F");
+  await page.locator('.files-row[data-name="util.ml"], .files-row[data-name="src"]').first().waitFor();
+  if (await page.locator('.files-row[data-name="src"]').count()) await page.locator('.files-row[data-name="src"]').click();
+  await page.locator('.files-row[data-name="util.ml"]').click();
+  await page.locator(".files-preview .segment", { hasText: "Since" }).waitFor();
+  await page.locator(".files-preview .segment", { hasText: "Since" }).click();
+  await page.locator(".files-preview .review-since-note").waitFor();
+  section("since: the file browser");
+  console.log(clean((await page.locator(".files-review-bar .segment").allInnerTexts()).join("\n")));
+  console.log(clean(await page.locator(".files-preview .review-since-note").innerText()));
+  await page.waitForTimeout(150);
+  await screenshot("since: the file browser");
+  await page.locator(".composer textarea").fill("/review");
+  await page.locator(".composer textarea").press("Enter");
+  await page.locator(".review-page").waitFor();
 
   // 10. A phone: a sheet over the chat.
   await page.setViewportSize({ width: 390, height: 800 });
