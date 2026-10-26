@@ -42,6 +42,9 @@ module Layout : sig
   type t =
     | Unified (** the changed hunks *)
     | Full (** the whole file with the changes inline *)
+    | Since
+    (** what changed since the user's last action on the file (or one
+        picked from its history): its snapshot then to the file now *)
   [@@deriving sexp_of, equal]
 end
 
@@ -133,6 +136,14 @@ type t =
   ; contents : Content.t String.Map.t
   ; editor : Editor.t option
   ; submitting : bool
+  ; since : Review_since.File.t String.Map.t
+    (** of the reviewed worktree's files with actions, since the last *)
+  ; since_loading : bool (** a [review_since] is on its way *)
+  ; since_again : bool
+  ; picked : (int * Review_since.File.t option) String.Map.t
+    (** an older action chosen to compare with, by file: its index in
+        {!Review.history} and, once in, what changed since *)
+  ; views : Layout.t String.Map.t (** the layout chosen for a file *)
   }
 [@@deriving sexp_of]
 
@@ -149,6 +160,12 @@ module Reply : sig
     | Content of string (** a path *)
     | Saved of string
     | Submitted
+    | Since of string (** the worktree's root *)
+    | Since_picked of
+        { root : string
+        ; path : string
+        ; index : int
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -180,7 +197,15 @@ module Action : sig
     | Go of string (** the page's file *)
     | Step of int (** the next (1) or previous (-1) file *)
     | Set_mode of Mode.t
-    | Set_layout of Layout.t
+    | Set_layout of Layout.t (** for the page's file, and the default *)
+    | Set_view of
+        { path : string
+        ; layout : Layout.t
+        } (** for that file (the file browser's), and the default *)
+    | Pick_since of
+        { path : string
+        ; index : int (** in {!Review.history} *)
+        } (** the since-view, against that action *)
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -253,8 +278,24 @@ val relative : t -> abs:string -> string option
 
 val file : t -> string -> Prigh_ui.Diff_files.File.t option
 
+(** How [path] shows: as chosen for it, else [Since] when it changed since
+    the last action on it, else the page's layout; never [Since] without
+    actions. *)
+val layout_of : t -> string -> Layout.t
+
+(** [path]'s review actions, oldest first. *)
+val history : t -> string -> Review.Snapshot.t list
+
+(** What changed in [path] since the action the since-view compares with
+    (the last, or the one picked), once read. *)
+val since : t -> string -> Review_since.File.t option
+
+(** Whether [path] changed after the last action on it. *)
+val changed_since : t -> string -> bool
+
 (** The rows [path] shows: its hunks, the whole file with them inline
-    ([Full]), or an unchanged file's lines. The same value until the file,
+    ([Full]), what changed since an action ([Since]), or an unchanged file's
+    lines. The same value until the file,
     its change or the layout changes. *)
 val rows : t -> path:string -> Diff_view.Row.t list
 
@@ -281,6 +322,7 @@ val unsent : t -> int
 (** The page's keys (focus on the page, not in a field): [\]] / [n] / [j]
     next file, [\[] / [p] / [k] previous, [a] approve, [c] comment on the
     selected code, [e] edit or comment mode, [v] the whole file or the hunks,
+    [l] what changed since the last action or not,
     [s] send the comments, Esc clears the selection then closes. *)
 val key
   :  t
