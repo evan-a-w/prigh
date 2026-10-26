@@ -71,13 +71,17 @@ module Item = struct
   ;;
 end
 
-let session_items (s : Session_summary.t) ~current : (Item.t * string * string) list =
+let session_items (s : Session_summary.t) ~current
+  : (Item.t * string * string) list
+  =
   List.filter_opt
     [ Option.some_if (not current) (Item.Open, "Open", "Enter")
     ; Some (Open_tab, "Open in new tab", "")
     ; Some (Rename, "Rename…", "/name")
     ; Some (Fork, "Fork…", "/fork")
-    ; Option.some_if (Option.is_some s.repo) (Item.New_worktree, "New worktree…", "/worktree new")
+    ; Option.some_if
+        (Option.is_some s.repo)
+        (Item.New_worktree, "New worktree…", "/worktree new")
     ; Some (Review, "Review changes", "/review")
     ; Some (Files, "Open in file browser", "/files")
     ; Some (Terminal, "Open terminal there", "/terminal")
@@ -90,11 +94,11 @@ let session_items (s : Session_summary.t) ~current : (Item.t * string * string) 
     ]
 ;;
 
-let worktree_items (s : Session_summary.t) ~path : (Item.t * string * string) list =
+let worktree_items (s : Session_summary.t) ~path
+  : (Item.t * string * string) list
+  =
   let target =
-    match
-      List.find s.worktrees ~f:(fun w -> String.equal w.path path)
-    with
+    match List.find s.worktrees ~f:(fun w -> String.equal w.path path) with
     | Some { branch = Some branch; _ } -> branch
     | Some { branch = None; _ } | None -> path
   in

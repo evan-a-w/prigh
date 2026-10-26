@@ -27,7 +27,11 @@ module Session_worktrees = Prigh_ui.Session_worktrees
 
 (* A context menu's event: at the pointer, or (from the keyboard, which
    gives no position) under the row. *)
-let open_menu ~inject target ~row (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t)
+let open_menu
+      ~inject
+      target
+      ~row
+      (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t)
   =
   let x = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientX)
   and y = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientY) in
@@ -104,12 +108,18 @@ let tag ?(cls = "") text ~title =
 
 (* A worktree under its session: its branch, what is in it, why it is
    there. Clicking (or right-clicking) opens its menu. *)
-let worktree_row ~inject ~entering (s : Session_summary.t) (n : Session_worktrees.Node.t)
+let worktree_row
+      ~inject
+      ~entering
+      (s : Session_summary.t)
+      (n : Session_worktrees.Node.t)
   =
   let w = n.worktree in
   let label = Session_worktrees.Node.label n in
   let id = Context_menu.worktree_dom_id ~session:s.id w.path in
-  let target = Context_menu.Target.Worktree { session = s.path; path = w.path } in
+  let target =
+    Context_menu.Target.Worktree { session = s.path; path = w.path }
+  in
   let gone = Option.exists n.listed ~f:(fun l -> l.prunable) in
   let opening = Option.equal String.equal entering (Some w.path) in
   Node.button
@@ -143,7 +153,9 @@ let worktree_row ~inject ~entering (s : Session_summary.t) (n : Session_worktree
            "subagent"
            ~title:(sprintf "Made for subagent %s: %s" agent task)
        | Pull_request number ->
-         tag (sprintf "#%d" number) ~title:(sprintf "Pull request #%d, checked out" number)
+         tag
+           (sprintf "#%d" number)
+           ~title:(sprintf "Pull request #%d, checked out" number)
        | Created | Entered -> Node.none)
     ; (if n.here
        then tag ~cls:"here" "here" ~title:"The session works in it"
@@ -153,9 +165,7 @@ let worktree_row ~inject ~entering (s : Session_summary.t) (n : Session_worktree
     ; (if Option.exists n.listed ~f:(fun l -> l.locked)
        then tag "locked" ~title:"git worktree unlock to remove it"
        else Node.none)
-    ; (if gone
-       then tag "gone" ~title:"Its directory was deleted"
-       else Node.none)
+    ; (if gone then tag "gone" ~title:"Its directory was deleted" else Node.none)
     ]
 ;;
 
@@ -248,7 +258,9 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
     ~attrs:
       [ classes
           [ "session-item" ]
-          [ "selected", selected; "has-worktrees", not (List.is_empty worktrees) ]
+          [ "selected", selected
+          ; "has-worktrees", not (List.is_empty worktrees)
+          ]
       ]
     [ Node.div
         ~attrs:
@@ -263,7 +275,8 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             (* Its transcript is fetched ahead while the pointer rests on it
                (or a finger or the keyboard is on it), so that the click shows
                it at once. *)
-          ; Attr.on_pointerenter (fun _ -> inject (Action.Prefetch_session s.path))
+          ; Attr.on_pointerenter (fun _ ->
+              inject (Action.Prefetch_session s.path))
           ; (if selecting
              then Attr.empty
              else Attr.on_contextmenu (open_menu ~inject target ~row:dom_id))
@@ -289,16 +302,21 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                   if selecting
                   then
                     inject
-                      (Action.Mark_session { path = s.path; range = shift_click ev })
+                      (Action.Mark_session
+                         { path = s.path; range = shift_click ev })
                   else inject (Action.Switch_session s.path))
-              ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
+              ; Attr.on_pointerdown (fun _ ->
+                  inject (Action.Prefetch_session s.path))
               ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
               ]
             [ (if selecting then check marked else Node.none)
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                [ span ~cls:"session-title" ~attrs:[ Attr.create "dir" "auto" ] title
+                [ span
+                    ~cls:"session-title"
+                    ~attrs:[ Attr.create "dir" "auto" ]
+                    title
                 ; div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
@@ -310,7 +328,9 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                            [ Node.text where ])
                     ; (if selecting
                        then
-                         span ~cls:"session-size" (Session_summary.size_string s.bytes)
+                         span
+                           ~cls:"session-size"
+                           (Session_summary.size_string s.bytes)
                        else Node.none)
                     ]
                 ]
@@ -321,7 +341,8 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
            else
              Node.span
                ~attrs:[ Attr.class_ "session-actions" ]
-               [ more_button ~inject ~id:("more-" ^ dom_id) ~label:title target ])
+               [ more_button ~inject ~id:("more-" ^ dom_id) ~label:title target
+               ])
         ]
     ; (if folded || selecting || List.is_empty worktrees
        then Node.none
@@ -373,7 +394,8 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     ; entering = Worktrees.entering m.worktrees
     }
   in
-  View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
+  View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () ->
+    row ~inject s deps)
 ;;
 
 (* Above the list: its name and how to select several sessions, or how
@@ -423,7 +445,8 @@ let selection_bar (m : App.Model.t) ~inject =
                sprintf
                  "Delete %s (%s)"
                  (if count = 1 then "1 session" else sprintf "%d sessions" count)
-                 (Session_summary.size_string (Session_summary.total_bytes marked)))
+                 (Session_summary.size_string
+                    (Session_summary.total_bytes marked)))
         ]
     ]
 ;;
@@ -436,7 +459,9 @@ let archived_divider ~inject ~shown archived =
       ; Attr.type_ "button"
       ; Attr.create "aria-expanded" (Bool.to_string shown)
       ; Attr.title
-          (if shown then "Hide the archived sessions" else "Show the archived sessions")
+          (if shown
+           then "Hide the archived sessions"
+           else "Show the archived sessions")
       ; Attr.on_click (fun _ -> inject Action.Toggle_archived)
       ]
     [ span ~cls:"divider-label" "Archived"
@@ -454,7 +479,8 @@ let delete_archived ~inject archived =
       ; Attr.title
           (sprintf
              "Delete every archived session, %s (/delete-archived)"
-             (Session_summary.size_string (Session_summary.total_bytes archived)))
+             (Session_summary.size_string
+                (Session_summary.total_bytes archived)))
       ; Attr.on_click (fun _ -> inject Action.Ask_delete_archived)
       ]
     [ Node.text "Delete archived" ]
@@ -479,8 +505,7 @@ let user_footer (m : App.Model.t) ~inject =
       [ icon Logout ]
   in
   match Account_view.trigger m ~inject with
-  | Some account ->
-    div ~cls:"sidebar-footer" [ account; settings ~inject ]
+  | Some account -> div ~cls:"sidebar-footer" [ account; settings ~inject ]
   | None ->
     div
       ~cls:"sidebar-footer"
@@ -568,19 +593,19 @@ let view (m : App.Model.t) ~inject ~session:card =
            in
            List.map active ~f:(session m ~inject ~current)
            @
-           (match archived with
-            | [] -> []
-            | archived ->
-              archived_divider ~inject ~shown archived
-              ::
-              (if shown
-               then
-                 List.map archived ~f:(session m ~inject ~current)
-                 @
-                 if m.marks.selecting
-                 then []
-                 else [ delete_archived ~inject archived ]
-               else [])))
+             (match archived with
+             | [] -> []
+             | archived ->
+               archived_divider ~inject ~shown archived
+               ::
+               (if shown
+                then
+                  List.map archived ~f:(session m ~inject ~current)
+                  @
+                  if m.marks.selecting
+                  then []
+                  else [ delete_archived ~inject archived ]
+                else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
     ; card
     ; user_footer m ~inject
