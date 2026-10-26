@@ -362,3 +362,56 @@ let%expect_test "parsing, sizes and spans" =
     2 days
     |}]
 ;;
+
+let%expect_test "decoding: nulls, the schedule off, superusers in hello" =
+  let decode of_json sexp_of json =
+    print_s
+      (Or_error.sexp_of_t sexp_of (Or_error.bind (P.Json.parse json) ~f:of_json))
+  in
+  (* Times print in the local zone: [running] without its start. *)
+  decode
+    (fun json ->
+      Or_error.map (P.Nix_store_status.of_json json) ~f:(fun s ->
+        ( { s with running = None }
+        , Option.map s.running ~f:(fun r -> r.by, r.generations) )))
+    [%sexp_of:
+      P.Nix_store_status.t * (string * P.Nix_generations.t option) option]
+    {|{"store_bytes":5000000000,"store_paths":2,"fs_total_bytes":9,"fs_free_bytes":0,
+       "last_gc":null,"running":{"by":"schedule","since_ms":1000,"generations":"all"},
+       "schedule":{"interval_seconds":0,"keep_days":null,"next_at_ms":null}}|};
+  decode
+    P.Nix_store_status.of_json
+    P.Nix_store_status.sexp_of_t
+    {|{"store_bytes":1,"store_paths":1,"fs_total_bytes":1,"fs_free_bytes":1}|};
+  decode
+    P.Hello_reply.of_json
+    P.Hello_reply.sexp_of_t
+    {|{"client_id":"c1","namespace":"alice","user":"alice","superuser":true}|};
+  [%expect {|
+    (Ok (
+      ((store_bytes    5000000000)
+       (store_paths    2)
+       (fs_total_bytes 9)
+       (fs_free_bytes  0)
+       (last_gc ())
+       (running ())
+       (schedule ((
+         (interval 0s)
+         (keep_days ())
+         (next_at   ())))))
+      ((schedule (All)))))
+    (Ok (
+      (store_bytes    1)
+      (store_paths    1)
+      (fs_total_bytes 1)
+      (fs_free_bytes  1)
+      (last_gc  ())
+      (running  ())
+      (schedule ())))
+    (Ok (
+      (client_id c1)
+      (namespace (alice))
+      (user      (alice))
+      (superuser true)))
+    |}]
+;;
