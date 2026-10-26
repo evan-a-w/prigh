@@ -3,12 +3,19 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 ## Layout and builds
 
+Run every suite with `./test` (about a minute warm: it builds both projects,
+runs their dune tests and prigh-web's browser e2e in Chromium, in parallel);
+`./test --full` adds the browser e2e in Firefox, the whole matrix the flake
+checks run: run it before merging. Both work from any shell (outside the dev
+shell they enter it) and test what they build. Run single suites as below
+while iterating.
+
 | Directory | What | Toolchain | Build and test |
 |---|---|---|---|
 | `backend/` | the agent, providers, RPC/web servers (`prigh`); `lib/` is grouped in subdirectories (see `backend/AGENTS.md`) | OxCaml 5.2, Eio | `nix develop`, then `cd backend && dune build @runtest` |
 | `frontend/` | the frontends' dune project: `protocol/`, `client/` (+ `client/unix/`) and `ui/` shared, `tui/` and `web/` | OxCaml 5.2, Bonsai | `nix develop`, then `cd frontend && dune build @runtest` |
 | `frontend/tui/` | the terminal frontend (`prigh-tui`): `lib/`, `bin/`, `test/`, `e2e/`, `tmux-test/` | OxCaml 5.2, Bonsai_term | `cd frontend && dune build @tui/test/runtest` (unit tests only) |
-| `frontend/web/` | prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`, `e2e/` | OxCaml 5.2, Bonsai_web | `cd frontend && dune build @web/test/runtest ./web/bin/site`; e2e: `bash frontend/web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
+| `frontend/web/` | prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`, `e2e/` | OxCaml 5.2, Bonsai_web | `cd frontend && dune build @web/test/runtest ./web/bin/site`; e2e: `ENGINES=chromium bash frontend/web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 
@@ -27,16 +34,25 @@ prigh is a coding agent. Read `README.md` for what it does and
   build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
   not see the backend binary as a dependency, so after changing only the
   backend, clear the stale results (`rm -rf
-  frontend/_build/default/frontend/tui/tmux-test/.cram.run.t`) or the tmux tests report the
-  old run. They need
-  a terminal multiplexer (`tmux`) and can be slow; `dune build
-  @tui/test/runtest` runs only the TUI's unit tests. `$PRIGH_BACKEND` overrides that path: unset it
+  frontend/_build/default/tui/e2e/e2e.actual
+  frontend/_build/default/tui/tmux-test/.cram.*`; `./test` does) or they
+  report the old run. The tmux tests need a terminal multiplexer (`tmux`);
+  each `.t` file in `tmux-test/` is a group of scenarios, and dune runs the
+  groups in parallel. `dune build @tui/test/runtest` runs only the TUI's
+  unit tests. `$PRIGH_BACKEND` overrides that path: unset it
   (e.g. when working inside prigh, which sets it) to test your build.
 - prigh-web's browser e2e (`frontend/web/e2e`) is Playwright scripts run
   with `node`, not dune; the flake's Linux checks run it (`nix build .#checks.x86_64-linux.web-e2e`). Locally, point
   `PLAYWRIGHT_MODULE` at the playwright package's `index.mjs` and
-  `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store), and
-  look at the screenshots (`SHOTS=dir`) as well as the text diff.
+  `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store: `nix
+  build --no-link --print-out-paths --inputs-from . nixpkgs#playwright-test
+  nixpkgs#playwright-driver.browsers`), and look at the screenshots
+  (`SHOTS=dir`) as well as the text diff. Its scripts all run at once, each
+  with its own backend, browser and directory, and print what they see;
+  `ENGINE.expected` is each browser's output. Wait for a condition, not a
+  time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
+  on a busy machine, and a wait that is meant to time out costs its whole
+  timeout.
 - The flake uses the binary cache `prigh.cachix.org`; pass
   `--accept-flake-config` to Nix in non-interactive use.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
@@ -84,6 +100,11 @@ Prefer expect tests (let%expect_test ...) with human readable output: print
 sexps or screens demonstrating state rather than asserting equality with a
 hand-written value (e.g. don't just [assert_true] some condition). Look at the
 output of `dune build @runtest`, and if the diffs are right, `dune promote`.
+
+Run `./test` before pushing and `./test --full` before merging (see "Layout
+and builds"). Keep them fast: tests wait for what they expect rather than
+sleeping, and output does not depend on timing (a test that passes only on an
+idle machine is broken).
 
 - Backend: drive the agent with `Faux_provider` and print event streams; no
   network.

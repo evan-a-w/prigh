@@ -1,7 +1,7 @@
 // Drives a real browser against `prigh serve -web ... -faux-script`
 // (see prigh_web.sh) and prints normalised snapshots of what the page shows.
 // It owns the backend so that it can restart it. The expected output lives
-// in prigh_web.expected.
+// in ENGINE.expected.
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE (the built site),
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -349,6 +350,11 @@ const popoverPlace = () => page.evaluate(() => {
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
 const bodyLacks = text => page.waitForFunction(t => !document.body.innerText.includes(t), text);
 const composer = () => page.locator(".composer textarea");
+// Clicks the toasts away, one at a time: each click removes the one under it.
+const dismissToasts = async () => {
+  const toasts = page.locator(".toast");
+  for (let i = 0; i < 20 && await toasts.count(); i++) await toasts.first().click({ timeout: 2000 }).catch(() => {});
+};
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 
 const send = async text => {
@@ -555,7 +561,7 @@ try {
   await page.waitForTimeout(100);
   console.log(`#fi: ${await popupShown()}`);
   await composer().fill("");
-  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
+  await dismissToasts();
 
   // Reminders (/remind): added, counted on the status line, listed in a
   // picker where Delete removes one, and removed by name; none is left to
@@ -590,7 +596,7 @@ try {
   await page.waitForSelector(".status-extras .reminders", { state: "detached" });
   console.log("status: no reminders");
   await composer().fill("");
-  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
+  await dismissToasts();
 
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");
@@ -701,7 +707,9 @@ try {
   await stopServer();
   await bodyHas("reconnecting");
   section("backend gone");
-  console.log(clean(await page.locator("body").innerText()).split("\n").filter(l => /connect/i.test(l)).join("\n"));
+  // Without the attempt count (that depends on timing).
+  console.log(clean(await page.locator("body").innerText()).split("\n").filter(l => /connect/i.test(l))
+    .map(l => l.replace(/reconnecting \(attempt \d+, next in [\d.]+s\)…/, "reconnecting…")).join("\n"));
   await screenshot("backend gone");
   await startServer(`127.0.0.1:${port}`, join(dir, "script2.json"));
   await bodyLacks("Connection lost");
@@ -860,7 +868,7 @@ try {
   };
   const git = (...args) => execFileSync("git", ["-c", "user.name=e2e", "-c", "user.email=e2e@example.com", ...args], { cwd, stdio: "ignore" });
   writeFileSync(join(cwd, "notes.txt"), "one\ntwo\nthree\n");
-  git("init", "-q");
+  git("init", "-q", "-b", "main");
   git("add", "notes.txt", "flag.png");
   git("commit", "-q", "-m", "start");
   writeFileSync(join(cwd, "notes.txt"), "one\n2\nthree\nfour\n");
@@ -979,6 +987,8 @@ try {
   await bodyHas("SQLite it is.");
   await idle();
   await showTurn("answered");
+  // Keys go where the focus is: back in the composer once the dialog closed.
+  await page.waitForFunction(() => document.activeElement?.closest(".composer"));
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
@@ -1280,6 +1290,15 @@ try {
   // Released: the model has the size once the handle says so.
   const drag = async (name, dx, dy) => {
     const before = await valueNow(name);
+    // Where the handle is once a panel that just opened stops moving.
+    await page.waitForFunction(async n => {
+      const at = () => JSON.stringify(document.querySelector(`.resizer[data-resize="${n}"]`)?.getBoundingClientRect());
+      const frame = () => new Promise(requestAnimationFrame);
+      const first = at();
+      await frame();
+      await frame();
+      return first !== undefined && first === at();
+    }, name);
     const box = await handle(name).boundingBox();
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
     await page.mouse.move(x, y);
@@ -1455,10 +1474,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  await stopServer();
+  await end(() => stopServer(), () => browser.close());
 }
