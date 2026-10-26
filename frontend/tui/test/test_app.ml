@@ -7599,6 +7599,59 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     |}]
 ;;
 
+let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
+  let h = connected ~width:70 () in
+  H.step ~quiet:true h (Set_home "/home/me");
+  let show_where ~active ~cwd =
+    let state =
+      Or_error.ok_exn
+        (P.State.of_json
+           (Or_error.ok_exn
+              (P.Json.parse
+                 (sprintf
+                    {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"%s","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"%s","hosts":[{"id":"backend","name":"srv","cwd":"/home/prigh","home":"/home/prigh"},{"id":"client-1","name":"laptop","cwd":"/Users/me","home":"/Users/me"},{"id":"client-2","name":"desk","cwd":"/home/me"}]}|}
+                    cwd
+                    active))))
+    in
+    H.step ~quiet:true h (Event (State state));
+    printf "%-9s %-16s -> %s\n" active cwd (App.tilde h.model cwd)
+  in
+  show_where ~active:"backend" ~cwd:"/home/prigh/x";
+  show_where ~active:"backend" ~cwd:"/home/me/x";
+  show_where ~active:"client-1" ~cwd:"/Users/me/proj";
+  show_where ~active:"client-1" ~cwd:"/home/me/proj";
+  (* A host that does not say its home: ours only if it is this TUI. *)
+  show_where ~active:"client-2" ~cwd:"/home/me/d";
+  H.step
+    ~quiet:true
+    h
+    (Hello
+       { client_id = "client-2"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       });
+  show_where ~active:"client-2" ~cwd:"/home/me/d";
+  [%expect {|
+    backend   /home/prigh/x    -> ~/x
+    backend   /home/me/x       -> /home/me/x
+    client-1  /Users/me/proj   -> ~/proj
+    client-1  /home/me/proj    -> /home/me/proj
+    client-2  /home/me/d       -> /home/me/d
+    client-2  /home/me/d       -> ~/d
+    |}];
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    ~/d  m  think:n/a  mode:auto  view:normal  ctx:0.0%/1.0k  $0.00
+    |}]
+;;
+
 let%expect_test "switching tool host asks for the directory there, prefilled \
                  with the current cwd"
   =

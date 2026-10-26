@@ -582,7 +582,7 @@ module Call = struct
     }
   [@@deriving sexp_of]
 
-  let create ~cwd ~tool args =
+  let create ?home ~cwd ~tool args =
     let field name =
       match args with
       | `Object fields ->
@@ -591,7 +591,7 @@ module Call = struct
          | _ -> None)
       | _ -> None
     in
-    let resolve p = normalize (Tool.resolve ~cwd p) in
+    let resolve p = normalize (Tool.resolve ?home ~cwd p) in
     let paths =
       match tool with
       | "read" | "write" | "edit" ->

@@ -8,6 +8,9 @@ type t =
   ; cwd : string
   ; session_id : string option (** absent for the backend *)
   ; session_name : string option
+  ; home : string option
+    (** its home directory, for showing paths under it as [~]; absent from
+        older backends and tool hosts *)
   }
 [@@deriving sexp_of, equal]
 

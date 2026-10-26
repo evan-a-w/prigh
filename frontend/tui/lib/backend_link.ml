@@ -65,11 +65,12 @@ module Tools = struct
   ;;
 end
 
-let connection_hello hello ~host_id =
+let connection_hello ?home hello ~host_id =
   match host_id with
   | None -> hello @ [ "tools", `False ]
   | Some id ->
     hello
+    @ Option.value_map home ~default:[] ~f:(fun home -> [ "home", `String home ])
     @ [ "tools", `True
       ; "host_id", `String id
       ; ( "features"
@@ -218,6 +219,7 @@ let hello t =
     Option.value_map ~default:[] ~f:(fun v -> [ name, `String v ])
   in
   connection_hello
+    ~home:t.home
     (t.hello @ opt "token" t.token @ opt "user" t.user @ opt "session" t.session)
     ~host_id:(if tools_here t then Some (host_id t) else None)
 ;;

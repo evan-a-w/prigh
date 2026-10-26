@@ -370,12 +370,15 @@ let%expect_test
   let print ?params meth =
     print_endline (mask t (Jsonaf.to_string (call ?params meth)))
   in
+  (* The session's home, not a tool host's home directory in [hosts]. *)
   let home_of json =
     let rec find : Jsonaf.t -> Jsonaf.t option = function
       | `Object fields ->
         (match List.Assoc.find fields ~equal:String.equal "home" with
          | Some home -> Some home
-         | None -> List.find_map fields ~f:(fun (_, v) -> find v))
+         | None ->
+           List.find_map fields ~f:(fun (k, v) ->
+             if String.equal k "hosts" then None else find v))
       | `Array items -> List.find_map items ~f:find
       | _ -> None
     in

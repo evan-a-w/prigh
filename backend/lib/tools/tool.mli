@@ -9,6 +9,11 @@ type t =
 and context =
   { env : Env.t
   ; cwd : string
+  ; home : unit -> string option
+    (** the home directory of the tool host [cwd] is on, for [~] in the
+        arguments of tools run in this process on that host's behalf (the
+        backend's [subagent]); [None]: this process's [$HOME]. Only called
+        for a path starting with [~] (it may ask the host). *)
   ; cancel : Cancellation.t
   ; on_output : string -> unit (** streamed partial output, e.g. from bash *)
   ; depth : int (** 0 for the main agent *)
@@ -66,6 +71,7 @@ module Context : sig
     -> ?halt:(unit -> string option)
     -> ?stdin:Stdin_feed.t
     -> ?approve:approver
+    -> ?home:(unit -> string option)
     -> ?ask_user:
          (call_id:string
           -> timeout_seconds:int option
@@ -90,10 +96,13 @@ val execute : t -> Context.t -> Json.t -> Result.t
 (** [execute] through the context's executor. *)
 val execute_via : Context.t -> t -> Json.t -> Result.t
 
-(** Resolves a user-supplied path against [cwd], expanding [~]. *)
-val resolve : cwd:string -> string -> string
+(** Resolves a user-supplied path against [cwd], expanding [~] to [home]
+    (default: [$HOME]). *)
+val resolve : ?home:string -> cwd:string -> string -> string
 
-(** Resolves a user-supplied path against the context cwd, expanding [~]. *)
+(** Resolves a user-supplied path against the context cwd, expanding [~] to
+    the context's [home]. *)
 val resolve_path : Context.t -> string -> string
 
-val expand_home : string -> string
+(** [~] and [~/...] with [home] (default: [$HOME]). *)
+val expand_home : ?home:string -> string -> string

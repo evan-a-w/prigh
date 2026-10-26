@@ -202,10 +202,12 @@ let session_json
       ?(bytes = 0)
       ?repo
       ?(worktrees = [])
+      ?host
       ?home
       id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
+  let host = Option.value_map host ~default:"" ~f:(sprintf {|"host":%S,|}) in
   let repo =
     match repo with
     | None -> ""
@@ -241,7 +243,7 @@ let session_json
            source))
   in
   sprintf
-    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s"worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
+    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s%s"worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
     id
     id
     (opt name)
@@ -251,6 +253,7 @@ let session_json
     (opt first_prompt)
     messages
     repo
+    host
     worktrees
     live
     running

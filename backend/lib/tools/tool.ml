@@ -9,6 +9,7 @@ type t =
 and context =
   { env : Env.t
   ; cwd : string
+  ; home : unit -> string option
   ; cancel : Cancellation.t
   ; on_output : string -> unit
   ; depth : int
@@ -65,6 +66,7 @@ module Context = struct
         ?(halt = fun () -> None)
         ?stdin
         ?(approve = fun _ _ _ -> None)
+        ?(home = fun () -> None)
         ?(ask_user =
           fun ~call_id:_ ~timeout_seconds:_ _ ->
             User_question.Reply.Unavailable "no user to ask")
@@ -74,6 +76,7 @@ module Context = struct
     =
     { env
     ; cwd
+    ; home
     ; cancel
     ; on_output
     ; depth
@@ -92,15 +95,19 @@ module Context = struct
   ;;
 end
 
-let expand_home path =
-  let home = Option.value (Sys.getenv "HOME") ~default:"/" in
+let expand_home ?home path =
+  let home =
+    match home with
+    | Some home -> home
+    | None -> Option.value (Sys.getenv "HOME") ~default:"/"
+  in
   match String.chop_prefix path ~prefix:"~/" with
   | Some rest -> Filename.concat home rest
   | None -> if String.equal path "~" then home else path
 ;;
 
-let resolve ~cwd path =
-  let path = expand_home path in
+let resolve ?home ~cwd path =
+  let path = expand_home ?home path in
   let path =
     if Filename.is_absolute path then path else Filename.concat cwd path
   in
@@ -114,4 +121,9 @@ let resolve ~cwd path =
   | _ -> String.concat parts ~sep:"/"
 ;;
 
-let resolve_path (context : Context.t) path = resolve ~cwd:context.cwd path
+let resolve_path (context : Context.t) path =
+  let home =
+    if String.is_prefix path ~prefix:"~" then context.home () else None
+  in
+  resolve ?home ~cwd:context.cwd path
+;;

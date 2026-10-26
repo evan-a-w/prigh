@@ -145,9 +145,9 @@ val run
 (** The ops as [on_host] tools, for [Tool.execute_via]: the [subagent] and
     [worktree] tools run them on the session's tool host. *)
 val list_tool : Tool.t
+
 val create_tool : Tool.t
 val remove_tool : Tool.t
-
 val listing_of_result : Tool_result.t -> Listing.t Or_error.t
 val created_of_result : Tool_result.t -> Created.t Or_error.t
 val removed_of_result : Tool_result.t -> t Or_error.t

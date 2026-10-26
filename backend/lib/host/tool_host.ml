@@ -435,6 +435,8 @@ let serve_connection
                  ; Option.map user ~f:(fun user -> "user", `String user)
                  ; Some ("name", `String name)
                  ; Some ("cwd", `String cwd)
+                 ; Option.map (Sys.getenv "HOME") ~f:(fun home ->
+                     "home", `String home)
                  ; Some ("tools", `True)
                  ; Some ("host_id", `String host_id)
                  ; Some

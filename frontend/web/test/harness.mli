@@ -109,6 +109,7 @@ val session_json
   -> ?worktrees:(string * string option * string * string) list
        (** its worktrees: path, branch, root and source ([created],
            [entered], [pr:N] or [agent:ID:TASK]) *)
+  -> ?host:string (** the tool host its cwd is on *)
   -> ?home:string * string option
        (** where a worktree switch took it from: its directory and branch *)
   -> string

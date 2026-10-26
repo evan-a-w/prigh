@@ -268,6 +268,7 @@ module Client = struct
           ([exec_input]: [tool_exec_input]; [terminal_kill]: the
           [terminal_kill] event; [git_location]: [$git_location]) *)
     ; mutable cwd : string option
+    ; mutable home : string option (** [hello]'s [home]: a tool host's *)
     ; mutable prefer_host : string option
       (** [hello]'s [prefer_host], for a client without tools: the host id
           of the tool host on its machine *)
@@ -436,6 +437,7 @@ let host_of (client : Client.t) =
   ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
   ; session_id = Some (session_id client.agent)
   ; session_name = Session.name (Agent.session client.agent)
+  ; home = client.home
   ; exec_input = List.mem client.features "exec_input" ~equal:String.equal
   ; git_location = List.mem client.features "git_location" ~equal:String.equal
   }
@@ -772,6 +774,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; tools = false
     ; features = []
     ; cwd = None
+    ; home = None
     ; prefer_host = None
     ; agent
     ; placeholder
@@ -1218,6 +1221,7 @@ let hello t (client : Client.t) params =
     Option.iter (param params "cwd") ~f:(function
       | `String cwd -> client.cwd <- Some cwd
       | _ -> ());
+    client.home <- string "home";
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
       let claimed =
         match string "host_id" with
@@ -1798,7 +1802,12 @@ let remove_worktree t (client : Client.t) params =
   let%bind force = bool_param params "force" ~default:false in
   let%bind repo_cwd = string_param_opt params "cwd" in
   let cwd = (Agent.state client.agent).cwd in
-  let target = Tool.resolve ~cwd path in
+  let home =
+    if String.is_prefix path ~prefix:"~"
+    then Agent.active_host_home client.agent
+    else None
+  in
+  let target = Tool.resolve ?home ~cwd path in
   let%bind () =
     if String.equal cwd target || String.is_prefix cwd ~prefix:(target ^ "/")
     then
