@@ -877,20 +877,29 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   before each turn, and handed to tools so subagents poll it too: the
   session budget). Every tool call
   always gets a result (a `[cancelled]` one if needed) so the context stays
-  valid. Before each turn after the first, when the latest response's
-  input and output tokens plus an estimate of what was appended since cross
-  `Compaction.should_compact`, the context is compacted through the
-  `compact` hook (default: `Compaction.compact_messages`, in memory; the
-  agent's compacts its session) and the run goes on with the result; a
-  failed compaction is not retried within the run. A request rejected as
-  too long (`Context_overflow.matches`: pi's and opencode's wordings,
-  excluding rate limits and usage limits) is compacted and sent again, the
-  failed reply dropped, with less kept the second time; after two, or when
+  valid. Before each turn after the first, the latest response's input
+  and output tokens plus an estimate of what was appended since decide the
+  two tiers of compaction. First, with `Config.mask_observations`, when
+  `Observation_mask.worth_masking` says so (see `Observation_mask`), the
+  context is masked through the `mask` hook (default:
+  `Observation_mask.apply`, in memory; the agent's appends a `Masked`
+  entry to its session and returns `Session.messages`), the estimate drops
+  by what it saved, and `Masked {masked; tokens_saved}` is emitted. Then,
+  when what is left still crosses `Compaction.should_compact`, the context
+  is compacted through the `compact` hook (default:
+  `Compaction.compact_messages`, in memory; the agent's compacts its
+  session) and the run goes on with the result; a failed compaction is not
+  retried within the run. A request rejected as too long
+  (`Context_overflow.matches`: pi's and opencode's wordings, excluding rate
+  limits and usage limits) is masked, when there is anything to mask, and
+  sent again; then it is compacted and sent again, the failed reply
+  dropped, with less kept the second time; after two compactions, or when
   compaction fails, the turn ends with the error plus what to do. Each
   compaction emits `Compacted {summary; usage; cost_usd}`. The request
   carries `Config.cache_key`.
 - `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
   `Message_*`, `Tool_start/output/end`, `Tool_confirm`, `Compacted`,
+  `Masked` (the RPC's `masked` event, a notice in the frontends),
   `Tool_confirm_done`, `Ask_user`, `Ask_user_done`, and the recursive
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
   `call_id`/`agent_id`), so the UI can build a transcript per agent. A
@@ -905,8 +914,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   texts to restore, `dequeue` = pops the last queued message,
   `remove_queued` = takes one message out of a queue by index, if its text
   still matches (the frontend's view may be stale), `shell` = runs
-  a `!cmd` through the bash machinery), automatic compaction at 80% of the
-  context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
+  a `!cmd` through the bash machinery), automatic compaction after a run
+  (masking first, as between turns, then summarising at 80% of the context
+  window), and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
   Queue_update | Subagent_queues`, the latter, `agent_queues` on the wire,
   listing the subagents with queued messages after every change; `get_pending`
@@ -1105,7 +1115,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   written before it load, without times; a fork keeps the copied entries'
   times), and the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
-  Entries are messages, model/thinking changes, compaction summaries, names,
+  Entries are messages, model/thinking changes, compaction summaries,
+  `Masked {through}` (observation masking up to the entry `through`; the
+  last on the path counts; `fork` renames `through` like a compaction's
+  ids; an older prigh skips the line, sending the session unmasked), names,
   descriptions, cwds with the tool host they are on (so a reload restores
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
@@ -1171,9 +1184,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   and `trim`). `rewind` and `fork` keep the trim in effect: recorded again
   after the head moves while its message is still in the context (rewinding
   to before it drops it), cancelled when there was none. `Trim_point`
-  lists where a trim may go, with what each frees
-  (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
-  the summary has none). Nothing is
+  lists where a trim may go, with what each frees. Every message up to
+  the last `Masked` entry's `through` is masked (`Observation_mask.mask`,
+  cached by entry id; pinned messages are the user's, which masking leaves
+  as they are). Masking is a pure function of the message, so a masked
+  context is the same on resume, on a branch and after a later compaction
+  or trim (kept messages stay masked); the messages the frontends see
+  (`identified_messages`, and `timed_messages`: each with its entry's time,
+  as a `Timed_message.t`, the summary has none) are never masked. Nothing is
   written to disk until the first message (or name): an abandoned empty
   session leaves no file. After that, entries are only appended to the
   existing file (no `O_CREAT`), so a session deleted while something still
@@ -1196,13 +1214,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `export` writes markdown or copies the JSONL,
   `import` copies a file in (the markdown has each message's time, in UTC,
   in its heading), and `session_stats` counts turns, tool calls by
-  name, tokens, cost, model changes and compactions. Under the RPC,
+  name, tokens, cost, model changes, compactions and maskings (`masks`).
+  Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view; entries carry `at` in milliseconds when
   known; an `Archived` entry is `{kind: "archived", archived}`, a `Spend`
   `{kind: "spend", usage, cost_usd}`, a `Resume_at` `{kind: "resume_at",
-  at}` (ms or null), a `Reminders` `{kind: "reminders"}`; the frontends
-  ignore the last three).
+  at}` (ms or null), a `Reminders` `{kind: "reminders"}`, a `Masked`
+  `{kind: "masked", through}`; the frontends ignore the last four).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
@@ -1234,13 +1253,33 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   listing the files the summarised `read`, `write`, `edit` and
   `apply_patch` calls touched (`Files read:`, `Files modified:`), starting
   from the previous summary's, so the list does not depend on the model:
-  only calls whose results are not errors count, relative paths are
+  only calls whose results are not errors count (in a session, read from
+  the messages as they were, not masked: a masked `apply_patch` has lost
+  its paths; the summary request itself sends them masked, as the agent
+  does, so the prompt cache serves it), relative paths are
   resolved against the cwd the call was made in (`Session.context_cwds`;
   a subagent's own), each path is listed once where last touched, and each
   line keeps the 100 most recent (`(and N more)`).
   `compact_messages` works on a list (subagents), `compact` on a session
   (appending a `Compaction` entry); both return the summary and its usage
   (of both requests when the first fell back).
+- `Observation_mask` — the first, cheap tier of compaction (JetBrains'
+  "The Complexity Trap" found it matches summarising at a fraction of the
+  cost): `mask` replaces a tool result's text (2 KB or more) and images
+  with a placeholder naming the tool, its lines and size, and string
+  arguments of 1 KB or more in a tool call's arguments (2 KB or more in
+  all) with one, keeping the JSON valid; errors and small results stay.
+  `plan` masks everything before the last 10 assistant messages
+  (`keep_turns`), saying where it ends (`through`) and the tokens it saves;
+  `worth_masking` takes it after an overflow (anything that helps) or when
+  the context is over half the window and it saves a tenth of the window,
+  over the summarisation threshold too: masking rewrites the prompt's
+  prefix, and so the provider's cache, so it is done in batches, not every
+  turn (a smaller floor past the threshold re-masked each turn's output as
+  it aged whenever no summary followed: nothing to summarise, or it
+  failed).
+  `mask_observations` in `config.json` (default true) turns it off, also
+  for subagents (`Tool_subagent.create ~mask_observations`).
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
   `git diff` against `HEAD` (or a base's merge base) plus untracked files
   as new ones, optionally one path, cut at 1 MB, in the session cwd's

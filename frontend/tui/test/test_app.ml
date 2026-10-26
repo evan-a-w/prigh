@@ -1327,7 +1327,7 @@ let%expect_test "/session prints the stats table" =
     │ cost           $0.0001                                   │
     │ context        1.5%                                      │
     │ model changes  1                                         │
-    └──────────── 1–7 of 9 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └─────────── 1–7 of 10 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5876,6 +5876,24 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
     ▌ third question
       third answer
       tail notice
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "masking old tool outputs is a notice" =
+  let h = connected () in
+  H.event h (Masked { masked = 3; tokens_saved = 5934 });
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      masked 3 old tool outputs to make room in the context
+      (about 5934 tokens)
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01

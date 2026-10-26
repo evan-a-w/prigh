@@ -44,6 +44,10 @@ module Entry : sig
                 the user's own, and their latest as it is, when the
                 compaction falls in the middle of the work on it *)
           }
+      | Masked of { through : string }
+      (** observation masking ({!Observation_mask}): the messages of the
+          active path up to the entry [through] are sent masked from here
+          on; the last one on the path counts *)
       | Name of { name : string }
       | Description of { text : string }
       (** model-written one-line summary, see [Session_description] *)
@@ -179,7 +183,9 @@ val active_path : t -> Entry.t list
     the pinned messages too, when it cuts into a compaction's kept part); an
     untrim puts back what the latest trim in effect dropped, in front of the
     context as it is now (a compaction after a trim summarised only what
-    came after it). *)
+    came after it). Those up to the last [Masked] entry's [through] are
+    masked ({!Observation_mask.mask}). The others ([timed_messages],
+    [identified_messages]) are what the user sees: not masked. *)
 val messages : t -> Message.t list
 
 module Trim : sig
@@ -334,6 +340,10 @@ val append_compaction
   -> summary:string
   -> kept_from:string
   -> Entry.t
+
+(** Masks the messages up to the entry [through] (on the active path) from
+    now on. *)
+val append_masked : t -> through:string -> Entry.t
 
 (** Moves [head] to [to_]. The trim in effect stays: it is recorded again
     when its message is still in the context (rewinding to before it drops

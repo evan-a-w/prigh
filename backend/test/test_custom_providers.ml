@@ -326,7 +326,8 @@ let%expect_test
       "notify": "bell",
       "snippets": [],
       "auto_background_seconds": 30,
-      "generate_model": null
+      "generate_model": null,
+      "mask_observations": true
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))

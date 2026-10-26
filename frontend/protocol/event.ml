@@ -71,6 +71,10 @@ type t =
       } (** answered (by any frontend), timed out or withdrawn *)
   | State of State.t
   | Compacted of string
+  | Masked of
+      { masked : int
+      ; tokens_saved : int
+      }
   | Config_changed of Config.t
   | Review of Review.t
   | Notice of string
@@ -198,6 +202,10 @@ let rec of_json j =
   | "state" ->
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s
   | "compacted" -> Json.string_field j "summary" >>| fun s -> Compacted s
+  | "masked" ->
+    let%bind masked = Json.int_field j "masked" in
+    let%map tokens_saved = Json.int_field j "tokens_saved" in
+    Masked { masked; tokens_saved }
   | "config_changed" ->
     Json.object_field j "config"
     >>= Config.of_json
@@ -287,4 +295,12 @@ let rec of_json j =
     let%map delta = Json.string_field j "delta" in
     Generate_delta { gen_id; delta }
   | other -> Or_error.errorf "unknown event %S" other
+;;
+
+let masked_notice ~masked ~tokens_saved =
+  sprintf
+    "masked %d old tool output%s to make room in the context (about %d tokens)"
+    masked
+    (if masked = 1 then "" else "s")
+    tokens_saved
 ;;
