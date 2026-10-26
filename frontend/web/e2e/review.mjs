@@ -130,6 +130,9 @@ const screenshot = async label => {
   });
 };
 const show = async (label, selector) => {
+  // What changed since an action, once read.
+  await page.waitForFunction(() =>
+    ![...document.querySelectorAll(".review-since-note")].some(n => n.textContent.startsWith("Reading what changed")));
   section(label);
   console.log(clean(await page.locator(selector).first().innerText()));
   await page.waitForTimeout(150);
@@ -430,6 +433,8 @@ try {
   await page.locator(".composer textarea").press("Enter");
   await idle();
   await page.locator(".review-file[data-path='src/util.ml'] .review-file-since").waitFor();
+  await page.waitForFunction(() =>
+    /\+4 −0/.test(document.querySelector(".review-file[data-path='src/util.ml'] .review-file-counts")?.textContent ?? ""));
   section("since: the files");
   console.log(clean(await page.locator(".review-files").innerText()));
   await page.locator(".review-file[data-path='src/main.ml']").click();
