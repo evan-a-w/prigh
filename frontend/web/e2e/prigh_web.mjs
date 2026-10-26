@@ -706,7 +706,9 @@ try {
   await stopServer();
   await bodyHas("reconnecting");
   section("backend gone");
-  console.log(clean(await page.locator("body").innerText()).split("\n").filter(l => /connect/i.test(l)).join("\n"));
+  // Without the attempt count (that depends on timing).
+  console.log(clean(await page.locator("body").innerText()).split("\n").filter(l => /connect/i.test(l))
+    .map(l => l.replace(/reconnecting \(attempt \d+, next in [\d.]+s\)…/, "reconnecting…")).join("\n"));
   await screenshot("backend gone");
   await startServer(`127.0.0.1:${port}`, join(dir, "script2.json"));
   await bodyLacks("Connection lost");
@@ -984,6 +986,8 @@ try {
   await bodyHas("SQLite it is.");
   await idle();
   await showTurn("answered");
+  // Keys go where the focus is: back in the composer once the dialog closed.
+  await page.waitForFunction(() => document.activeElement?.closest(".composer"));
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
