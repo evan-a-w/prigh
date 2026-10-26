@@ -16,6 +16,9 @@ module Host : sig
     ; cwd : string
     ; session_id : string option (** the session the client is attached to *)
     ; session_name : string option
+    ; home : string option [@sexp.option]
+      (** its home directory, for [~] in paths meant for it ([hello]'s
+          [home]; unknown for a host predating it) *)
     ; exec_input : bool [@sexp.bool]
       (** it takes [Tool_exec_input] (its [hello] listed the [exec_input]
           feature) *)
@@ -591,8 +594,15 @@ val fork : t -> ?at:string -> unit -> unit Or_error.t
 val rewind : t -> to_:string -> unit Or_error.t
 val set_session_name : t -> string -> unit
 
+(** The active tool host's home directory, for [~] in paths meant for it
+    (asked for once when its [hello] did not say); [None] while it is
+    unavailable. *)
+val active_home : t -> string option
+
 (** Changes the working directory used by tools and the system prompt, and
-    records it in the session. Fails while a run is in progress. A missing
+    records it in the session; [~] is the active tool host's home, a
+    relative [path] is under the session cwd. Fails while a run is in
+    progress. A missing
     directory fails, is created on the active tool host, or (when it could
     be) is answered [Missing] without changing anything, as [if_missing]
     (default [Fail]) says. *)

@@ -1550,6 +1550,7 @@ let with_remote_agent replies f =
       ; cwd = t.dir
       ; session_id = None
       ; session_name = None
+      ; home = Some t.dir
       ; exec_input = false
       ; git_location = false
       }

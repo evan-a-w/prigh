@@ -41,7 +41,7 @@ one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
 a client sends `hello` first (name, cwd, whether it can run tools and its
-host id, an optional session id or path, the `-token` if the backend requires one, and
+host id and home, an optional session id or path, the `-token` if the backend requires one, and
 with `-tokens` optionally the user, i.e. the namespace name).
 
 ### Tool hosts
@@ -51,7 +51,14 @@ read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
 backend itself or a connected client that advertised `tools: true` in
 `hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
 tool always runs in the backend but its tool calls follow the same active
-host. A client host is known by its *host id*: the `host_id` it sends in
+host. `~` in a path meant for a host (`/cd`, `/host`'s directory, a
+subagent's `cwd`, a worktree's directory, approval rules) is that host's
+home, not the backend's (they differ in the Docker deployment and with a
+remote backend): `/cd` sends the path as typed for the host's
+`$resolve_dir`/`$make_dir` to expand, and the rest use the home its
+`hello` gave (`Agent.Host.home`, listed in the state's `hosts` for the
+frontends' `~` abbreviation), asking an older host that gave none once with
+`$resolve_dir ~`. A client host is known by its *host id*: the `host_id` it sends in
 `hello`, or its client id without one, so a host that reconnects or
 restarts is the same host. `prigh tool-host -connect` and the TUI send the
 machine's: `Host_id` (`backend/lib`, and `client/unix/` in the TUI) reads

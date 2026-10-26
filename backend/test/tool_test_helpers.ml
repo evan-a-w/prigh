@@ -40,11 +40,26 @@ let duration_re = Re.compile (Re.Perl.re {|"duration_seconds":-?[0-9.eE+-]+|})
 let at_re = Re.compile (Re.Perl.re {|"at":[0-9.eE+-]+|})
 let session_bytes_re = Re.compile (Re.Perl.re {|"bytes":[0-9]+,"live"|})
 
-(* Replaces the sandbox dir, session ids, file stamps, timestamps (also
-   messages' and entries' ["at"]), durations and session sizes (["bytes"]: they
-   depend on the sandbox path). *)
+(* The backend host's home, in the state's [hosts] (JSON or sexp). *)
+let mask_home s =
+  match Sys.getenv "HOME" with
+  | Some home when String.length home > 1 ->
+    String.substr_replace_all
+      s
+      ~pattern:(sprintf {|"home":"%s"|} home)
+      ~with_:{|"home":"$HOME"|}
+    |> String.substr_replace_all
+         ~pattern:(sprintf "(home %s)" home)
+         ~with_:"(home $HOME)"
+  | Some _ | None -> s
+;;
+
+(* Replaces the sandbox dir, the home in [hosts], session ids, file stamps,
+   timestamps (also messages' and entries' ["at"]), durations and session
+   sizes (["bytes"]: they depend on the sandbox path). *)
 let mask t s =
   String.substr_replace_all s ~pattern:t.dir ~with_:"$DIR"
+  |> mask_home
   |> Re.replace_string time_re ~by:"<time>"
   |> Re.replace_string duration_re ~by:{|"duration_seconds":<t>|}
   |> Re.replace_string at_re ~by:{|"at":<at>|}
@@ -70,6 +85,9 @@ let mask t s =
 let mask_sexp t sexp =
   let rec go : Sexp.t -> Sexp.t = function
     | Atom s when String.equal s (Core_unix.gethostname ()) -> Atom "<host>"
+    | List [ Atom "home"; Atom home ]
+      when Option.exists (Sys.getenv "HOME") ~f:(String.equal home) ->
+      List [ Atom "home"; Atom "$HOME" ]
     | Atom s -> Atom (mask t s)
     | List l -> List (List.map l ~f:go)
   in

@@ -37,11 +37,7 @@ let serve_host t server host ~sw ~home stream =
         print_endline
           (mask
              t
-             (sprintf
-                "host: %s %s in %s"
-                name
-                (Json.to_string arguments)
-                cwd));
+             (sprintf "host: %s %s in %s" name (Json.to_string arguments) cwd));
         let result : Tool.Result.t =
           if String.equal name Host_ops.instructions_op
           then Tool.Result.ok "[]"
@@ -139,11 +135,14 @@ let show_cwd t agent =
   print_endline (mask t ("cwd: " ^ (Agent.state agent).cwd))
 ;;
 
-let%expect_test "~ is the tool host's home" =
+(* [says_home]: the host's [hello] gives its home; an older host's does not
+   (the backend asks it once). *)
+let scenario ~says_home =
   with_sandbox
   @@ fun t ->
-  List.iter [ "backend-home/sub"; "laptop-home/sub"; "laptop-home/x"; "work" ]
-  ~f:(fun dir -> Core_unix.mkdir_p (t.dir ^/ dir));
+  List.iter
+    [ "backend-home/sub"; "laptop-home/sub"; "laptop-home/x"; "work" ]
+    ~f:(fun dir -> Core_unix.mkdir_p (t.dir ^/ dir));
   with_home (t.dir ^/ "backend-home")
   @@ fun () ->
   Eio.Switch.run
@@ -178,16 +177,26 @@ let%expect_test "~ is the tool host's home" =
        laptop
        (Json.of_string
           (sprintf
-             {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true, "host_id": "laptop", "cwd": "%s/work"}}|}
-             t.dir))
+             {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true, "host_id": "laptop", "cwd": "%s/work"%s}}|}
+             t.dir
+             (if says_home
+              then sprintf {|, "home": "%s/laptop-home"|} t.dir
+              else "")))
      : Json.t);
   show_cwd t agent;
-  [%expect {| cwd: $DIR/work |}];
+  print_endline
+    (mask
+       t
+       (Json.to_string
+          (Option.value_exn
+             (Json.member "hosts" (Rpc_json.state (Agent.state agent))))));
+  print_endline "--- /cd ~, /cd ~/sub, Tab after /cd ~/s";
   call t server client ~params:{|{"path": "~"}|} "set_cwd";
   show_cwd t agent;
   call t server client ~params:{|{"path": "~/sub"}|} "set_cwd";
   show_cwd t agent;
   call t server client ~params:{|{"prefix": "~/s"}|} "list_dirs";
+  print_endline "--- /host laptop with the directory ~/x";
   call
     t
     server
@@ -195,28 +204,65 @@ let%expect_test "~ is the tool host's home" =
     ~params:{|{"host": "laptop", "cwd": "~/x"}|}
     "set_active_host";
   show_cwd t agent;
-  [%expect {|
-    host: $resolve_dir {"path":"$DIR/backend-home"} in $DIR/work
-    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/backend-home","created":false}}
-    cwd: $DIR/backend-home
-    host: $resolve_dir {"path":"$DIR/backend-home/sub"} in $DIR/backend-home
-    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/backend-home/sub","created":false}}
-    cwd: $DIR/backend-home/sub
-    host: $list_dirs {"prefix":"~/s"} in $DIR/backend-home/sub
-    {"type":"response","id":"r","ok":true,"result":["~/sub/"]}
-    host: $resolve_dir {"path":"$DIR/backend-home/x"} in $DIR/backend-home/sub
-    {"type":"response","id":"r","ok":false,"error":"laptop: not a directory: $DIR/backend-home/x"}
-    cwd: $DIR/backend-home/sub
-    |}];
+  print_endline "--- a subagent with cwd ~/sub";
   call t server client ~params:{|{"text": "go"}|} "prompt";
   Agent.wait_idle agent;
   while Agent.has_running_subagents agent do
     Eio.Fiber.yield ()
-  done;
-  [%expect {|
+  done
+;;
+
+let%expect_test "~ is the tool host's home" =
+  scenario ~says_home:true;
+  [%expect
+    {|
+    cwd: $DIR/work
+    [{"id":"laptop","name":"laptop","cwd":"$DIR/work","session_id":"<id>","session_name":null,"home":"$DIR/laptop-home"}]
+    --- /cd ~, /cd ~/sub, Tab after /cd ~/s
+    host: $resolve_dir {"path":"~"} in $DIR/work
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home","created":false}}
+    cwd: $DIR/laptop-home
+    host: $resolve_dir {"path":"~/sub"} in $DIR/laptop-home
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/sub","created":false}}
+    cwd: $DIR/laptop-home/sub
+    host: $list_dirs {"prefix":"~/s"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":["~/sub/"]}
+    --- /host laptop with the directory ~/x
+    host: $resolve_dir {"path":"~/x"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
+    cwd: $DIR/laptop-home/x
+    --- a subagent with cwd ~/sub
     {"type":"response","id":"r","ok":true,"result":{}}
-    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/backend-home/sub
-    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/backend-home/sub
-    host: ls {} in $DIR/backend-home/sub
+    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/x
+    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/sub
+    host: ls {} in $DIR/laptop-home/sub
+    |}]
+;;
+
+let%expect_test "~ is the tool host's home: an older host that does not say" =
+  scenario ~says_home:false;
+  [%expect
+    {|
+    cwd: $DIR/work
+    [{"id":"laptop","name":"laptop","cwd":"$DIR/work","session_id":"<id>","session_name":null}]
+    --- /cd ~, /cd ~/sub, Tab after /cd ~/s
+    host: $resolve_dir {"path":"~"} in $DIR/work
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home","created":false}}
+    cwd: $DIR/laptop-home
+    host: $resolve_dir {"path":"~/sub"} in $DIR/laptop-home
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/sub","created":false}}
+    cwd: $DIR/laptop-home/sub
+    host: $list_dirs {"prefix":"~/s"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":["~/sub/"]}
+    --- /host laptop with the directory ~/x
+    host: $resolve_dir {"path":"~/x"} in $DIR/laptop-home/sub
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/laptop-home/x","created":false}}
+    cwd: $DIR/laptop-home/x
+    --- a subagent with cwd ~/sub
+    {"type":"response","id":"r","ok":true,"result":{}}
+    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/x
+    host: $resolve_dir {"path":"~"} in $DIR/laptop-home/x
+    host: $instructions {"home":"$DIR","with_nix":true} in $DIR/laptop-home/sub
+    host: ls {} in $DIR/laptop-home/sub
     |}]
 ;;
