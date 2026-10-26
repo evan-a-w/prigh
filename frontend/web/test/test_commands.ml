@@ -179,7 +179,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
-    Alt+Enter / Delete (/worktree) start a new session in the highlighted worktree / remove it
+    Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar

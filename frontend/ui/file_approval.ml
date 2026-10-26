@@ -16,8 +16,8 @@ module Status = struct
 end
 
 let status (review : P.Review.t) (file : Diff_files.File.t) : Status.t =
-  match List.Assoc.find review.approvals ~equal:String.equal file.path with
-  | Some hash when String.equal hash file.hash -> Approved
+  match P.Review.approval review file.path with
+  | Some { hash; _ } when String.equal hash file.hash -> Approved
   | Some _ -> Changed
   | None -> Unapproved
 ;;
@@ -33,7 +33,8 @@ let render (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
   let files = Diff_files.parse d.diff in
   let head : Content.Line.t =
     [ { text = "review "; style = Style.bold Style.plain }
-    ; { text = d.root; style = Style.plain }
+    ; { text = Diff_files.where d; style = Style.plain }
+    ; { text = " against " ^ Diff_files.against d; style = dim }
     ; { text =
           sprintf
             "  %d of %d file%s approved"

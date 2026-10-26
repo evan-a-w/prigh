@@ -81,6 +81,12 @@ module Worktrees_purpose : sig
         { command : string (** as typed: back to the editor if it fails *)
         ; action : Prigh_ui.Worktree_command.Action.t
         } (** [/worktree open] or [rm]: the worktree it names *)
+    | Review_target of
+        { command : string
+        ; name : string
+        ; base : string option
+        ; model : string option
+        } (** [/review NAME]: the worktree it names, if any *)
   [@@deriving sexp_of, equal]
 end
 
@@ -480,6 +486,14 @@ module Action : sig
     | Files of Files.Action.t (** the file browser and the attachments *)
     | Review of Code_review.Action.t
     (** the review page, comments and approvals *)
+    | Review_worktree of
+        { path : string
+        ; base : string option
+        }
+    (** the review page on the worktree at [path] (any worktree of any
+        repository on the tool host), against [base] (default: its own, see
+        [git_diff]); the slash form is [/review PATH [--base REV]]. For the
+        sidebar's and the pickers' "Review changes" *)
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)

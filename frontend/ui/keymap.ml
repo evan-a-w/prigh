@@ -102,6 +102,10 @@ let bindings =
       [ Key.alt (Char "a") ]
       Toggle_archived
       "/sessions: archive or unarchive the highlighted session"
+  ; b
+      [ Key.alt (Char "r") ]
+      Review_highlighted
+      "/worktree: review the highlighted worktree's changes"
   ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
   ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
   ; b
@@ -154,6 +158,7 @@ let list_help =
          cancel · /jobs: kill · /queue, /remind, /worktree: remove" )
     ; "Tab", "/sessions: mark or unmark the highlighted session"
     ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
+    ; "Alt+R", "/worktree: review the highlighted worktree's changes"
     ; "Alt+D", "/sessions: delete every archived session"
     ; ( "Ctrl+N"
       , "/sessions: named only · /model: logged-in only · /worktree: open in a \

@@ -735,6 +735,23 @@ are kept with the session (also across rewinds, reloads and restarts).
 In the TUI, `/review` alone lists the changed files with their approvals
 and the comments with their threads.
 
+Any worktree of the repository can be reviewed, not only the session's:
+`/review WORKTREE` (its path, branch or directory name, as `/worktree`
+lists them; completed), the worktree picker's Alt+R, or the worktree
+pickers in the review page's head, which reads "Reviewing BRANCH (PATH)
+against BASE". A linked worktree (a subagent's, a feature branch, a `/pr`
+checkout) is compared with its base: the merge base with the branch it was
+made from (recorded when prigh created it, as git config
+`branch.<branch>.prighBase`), else the remote's default branch
+(`origin/HEAD`), else `main` or `master`, so its commits show as well as
+what is uncommitted and untracked. The main checkout is compared with
+`HEAD`, as before. `--base REV` (or the base picker) compares with another
+branch or commit; `HEAD` shows only what is uncommitted. Comments and
+approvals are kept per worktree; comments sent to the agent name the
+worktree and each file's absolute path, and accepted proposals and the
+editor's saves go to that worktree's files. The page reads the reviewed
+worktree again whenever the agent or a subagent edits.
+
 ### prigh-web for a backend elsewhere
 
 The page can also be served from your own machine for a backend on another
@@ -1398,7 +1415,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [base] [instructions]` | alone: the review page (prigh-web) or the files' approvals and the comments (TUI), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
+| `/review [WORKTREE] [--base REV]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name) and `--base`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree against its base, see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
@@ -1415,7 +1432,7 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
-| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
