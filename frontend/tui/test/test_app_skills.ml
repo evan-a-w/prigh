@@ -667,10 +667,10 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
 
     ▌ skill frontend-design
     ▌ /work/.claude/skills/frontend-design/SKILL.md
-    ▌ References are relative to
+    ▌ References are relative to                  ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h { (Key.plain Up) with ctrl = true };
   H.show h;
@@ -688,10 +688,10 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
     ▌ Pick a bold aesthetic direction.
     ▌ make it bold
     ▌ and blue
-
+                                                  ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
