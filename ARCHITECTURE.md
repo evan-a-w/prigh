@@ -621,8 +621,16 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the context carries the agent's `Background_tasks` and the call only spawns
   the loop there, with its own cancellation, and returns `started agent
   a<n> (...)`; deeper calls (no jobs) block and return the report.
-  `subagent_status`/`subagent_cancel` act on the jobs and are dropped below
-  depth 0. Nothing blocks on background work: its reports wake the agent.
+  `subagent_status`/`subagent_cancel`/`subagent_message` act on the jobs
+  and are dropped below depth 0. A background subagent gets a
+  `Subagent_inbox`: its loop's `steer` takes the inbox's steers (with
+  finished jobs' reports) at each step boundary, and its `wake` takes
+  everything queued when it ends its turn, so a follow-up makes it carry on
+  rather than report; while its jobs run, `wake` waits for a job or a
+  message (`take_next ~interrupt`). The inbox is closed, with nothing in
+  between that could take a message, when the loop stops; messages queued
+  then are dropped with a `Notice`. A delivered message is a user message
+  with an `Injected.Note.Steer {from_user; follow_up}` note. Nothing blocks on background work: its reports wake the agent.
   With `worktree` (a branch name, or `auto`/`true` for `agent/<the task's
   first words>`, made `fresh`: `-2`, ... when the branch exists) the call
   first makes a worktree through `Worktree.create_tool` (an `on_host`
@@ -647,7 +655,15 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (the agent turns a batch, subagents and jobs together, into one user
   message; `take_next` first blocks until a running task finishes) or by
   `cancel_and_wait` (`job_kill`/`subagent_cancel` results). Events and changes
-  go to the hooks `Agent` installs with `connect`.
+  go to the hooks `Agent` installs with `connect` (`on_queue_change` for the
+  subagents' inboxes). `send`/`inbox_of` reach a running subagent's inbox,
+  refusing a finished one (its report is on its way or delivered: tell the
+  main agent instead), a nested one (`a1/a1`: send it to `a1`) or an
+  unknown id.
+- `Steer_queue` — a steer queue and a follow-up queue (push, take the
+  steers, take one follow-up, `steers_first`, take back the last, remove by
+  index if it still matches): the main agent's queue of `Queued.t` and each
+  `Subagent_inbox`'s.
 - Background jobs — `bash` with `background: true` at depth 0 spawns a job
   whose fiber runs the same call in the foreground (`background` dropped,
   no timeout unless one was given) through the context's executor, so it
@@ -833,7 +849,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
-  Queue_update`). Background subagents and jobs (`Background_tasks`) run in
+  Queue_update | Subagent_queues`, the latter, `agent_queues` on the wire,
+  listing the subagents with queued messages after every change; `get_pending`
+  has them as `agents`). Background subagents and jobs (`Background_tasks`) run in
   the agent's switch, not the run's: `abort` leaves them running,
   `cancel_subagent`/`kill_job` stop one, `start_job` starts a job for a
   user's `!&cmd`. When one finishes, an idle agent starts a run whose prompts
@@ -1295,7 +1313,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
   `follow_up`, `abort`, `dequeue`, `remove_queued` (`{queue: "steer" |
   "follow_up", index, text?}`, returning `{text, attachments}` like
-  `dequeue`), `cancel_subagent`, `list_subagents`,
+  `dequeue`), `steer_agent` (`{agent_id, text, mode?: "steer" |
+  "follow_up"}`: a message for a running background subagent),
+  `dequeue_agent` (`{agent_id}`: `{text}` or null), `remove_agent_queued`
+  (`{agent_id, queue, index, text?}`: `{text}`), `cancel_subagent`, `list_subagents`,
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,

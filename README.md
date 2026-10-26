@@ -1119,7 +1119,9 @@ you can keep talking to it. When a subagent finishes (or fails, or is
 cancelled) its report is handed to the main agent as a message starting
 `[subagent a1 finished]`: an idle agent starts a turn for it, a running one
 gets it after its current tool calls (several finishing together arrive as one
-message). The model also has `subagent_status` and `subagent_cancel`; there
+message). The model also has `subagent_status`, `subagent_cancel` and
+`subagent_message` (tell a running subagent something, which it reads at its
+next step); there
 is no tool to block on a subagent, since its report wakes the main agent
 anyway. Subagents started by a subagent stay synchronous (and cannot
 delegate further).
