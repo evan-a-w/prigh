@@ -3,7 +3,6 @@ open! Import
 
 let keep_turns = 10
 let min_bytes = 2048
-let min_field_bytes = 1024
 
 let size bytes =
   if bytes < 1024
@@ -19,7 +18,7 @@ let lines s =
 
 let images n = if n = 1 then "1 image" else sprintf "%d images" n
 
-let mask_result (r : Message.Tool_result.t) =
+let mask_result ~min_bytes (r : Message.Tool_result.t) =
   if r.is_error
   then r
   else if String.length r.text >= min_bytes
@@ -51,7 +50,8 @@ let mask_result (r : Message.Tool_result.t) =
       })
 ;;
 
-let mask_call (c : Content.Tool_call.t) =
+let mask_call ~min_bytes (c : Content.Tool_call.t) =
+  let min_field_bytes = min_bytes / 2 in
   if String.length c.arguments < min_bytes
   then c
   else (
@@ -75,18 +75,18 @@ let mask_call (c : Content.Tool_call.t) =
       if !changed then { c with arguments = Json.to_string json } else c)
 ;;
 
-let mask (m : Message.t) : Message.t =
+let mask ?(min_bytes = min_bytes) (m : Message.t) : Message.t =
   match m with
   | User _ -> m
   | Tool_result r ->
-    let masked = mask_result r in
+    let masked = mask_result ~min_bytes r in
     if phys_equal masked r then m else Tool_result masked
   | Assistant a ->
     let changed = ref false in
     let content =
       List.map a.content ~f:(function
         | Tool_call c ->
-          let masked = mask_call c in
+          let masked = mask_call ~min_bytes c in
           if not (phys_equal masked c) then changed := true;
           Content.Tool_call masked
         | (Text _ | Thinking _ | Server_tool _) as c -> c)
@@ -105,7 +105,7 @@ module Plan = struct
   [@@deriving sexp_of]
 end
 
-let plan ?(keep_turns = keep_turns) messages =
+let plan ?(keep_turns = keep_turns) ?min_bytes messages =
   let assistants =
     List.filter_mapi messages ~f:(fun i (m : Message.t) ->
       match m with
@@ -120,7 +120,7 @@ let plan ?(keep_turns = keep_turns) messages =
         (List.take messages first_kept)
         ~init:{ Plan.through = -1; masked = 0; tokens_saved = 0 }
         ~f:(fun i (plan : Plan.t) m ->
-          let masked = mask m in
+          let masked = mask ?min_bytes m in
           if phys_equal masked m
           then plan
           else
@@ -132,6 +132,7 @@ let plan ?(keep_turns = keep_turns) messages =
     Option.some_if (plan.masked > 0) plan
 ;;
 
-let apply ~through messages =
-  List.mapi messages ~f:(fun i m -> if i <= through then mask m else m)
+let apply ?min_bytes ~through messages =
+  List.mapi messages ~f:(fun i m ->
+    if i <= through then mask ?min_bytes m else m)
 ;;
