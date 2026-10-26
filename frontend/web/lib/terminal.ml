@@ -18,6 +18,7 @@ module Target = struct
     ; online : bool
     ; as_user : string option
     ; generation : int
+    ; dir : string option
     }
   [@@deriving sexp_of, equal]
 
@@ -28,10 +29,21 @@ type t =
   { open_ : bool
   ; generation : int
   ; status : (string * Status.t) option
+  ; dir : (string * string) option
   }
 [@@deriving sexp_of]
 
-let closed = { open_ = false; generation = 0; status = None }
+let closed = { open_ = false; generation = 0; status = None; dir = None }
+
+let dir t (state : State.t) =
+  match t.dir with
+  | Some (session, dir) when String.equal session state.session_id -> Some dir
+  | Some _ | None -> None
+;;
+
+let set_dir t (state : State.t) dir =
+  { t with dir = Option.map dir ~f:(fun dir -> state.session_id, dir) }
+;;
 
 let active_host (state : State.t) =
   List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
@@ -43,6 +55,7 @@ let target t (state : State.t) ~hello =
   ; online = Option.is_some (active_host state)
   ; as_user = Option.bind hello ~f:Hello_reply.acting_as
   ; generation = t.generation
+  ; dir = dir t state
   }
 ;;
 
@@ -52,16 +65,19 @@ let status t target =
   | _ -> Connecting
 ;;
 
-let where (state : State.t) =
-  match active_host state with
-  | Some host -> host.name, host.cwd
-  | None ->
-    let name =
-      if String.is_empty state.active_host
-      then "no tool host"
-      else state.active_host ^ " (offline)"
-    in
-    name, state.cwd
+let where t (state : State.t) =
+  let name, cwd =
+    match active_host state with
+    | Some host -> host.name, host.cwd
+    | None ->
+      let name =
+        if String.is_empty state.active_host
+        then "no tool host"
+        else state.active_host ^ " (offline)"
+      in
+      name, state.cwd
+  in
+  name, Option.value (dir t state) ~default:cwd
 ;;
 
 let advice message =

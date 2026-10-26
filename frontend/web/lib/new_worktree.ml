@@ -18,21 +18,13 @@ type t =
   ; base : string
   ; head : string option
   ; project_dir : string option
-  ; repo : string option
   ; busy : bool
   ; error : string option
   }
 [@@deriving sexp_of, equal]
 
-let create ?repo ~head ~project_dir () =
-  { branch = ""
-  ; base = ""
-  ; head
-  ; project_dir
-  ; repo
-  ; busy = false
-  ; error = None
-  }
+let create ~head ~project_dir () =
+  { branch = ""; base = ""; head; project_dir; busy = false; error = None }
 ;;
 
 let set t (field : Field.t) text =

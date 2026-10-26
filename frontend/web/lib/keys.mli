@@ -13,6 +13,10 @@ module Target : sig
     | Control (** a button, link or fold: Enter and Space are its own *)
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)
+    | Worktree of
+        { session : string (** the id of the session it is under *)
+        ; path : string
+        } (** a worktree's row under a session in the sidebar *)
     | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
     | Files (** the file browser's list (not its fields) *)
     | Review (** the review page (not its fields or buttons) *)

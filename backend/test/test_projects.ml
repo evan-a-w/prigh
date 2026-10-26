@@ -157,37 +157,85 @@ let%expect_test "a session records its repository as its cwd changes" =
     |}]
 ;;
 
-let%expect_test "agent worktrees: recorded, removed, not forked" =
+let%expect_test
+    "a session's worktrees: entered, made, a pull request's, its subagents'; \
+     removed; forked"
+  =
   with_sandbox
   @@ fun t ->
   let session = Session.create ~dir:(Filename.concat t.dir "s") ~cwd:"/r" () in
   ignore (Session.set_name session ~name:"n" : Session.Entry.t);
-  let w path =
-    { Agent_worktree.agent = "1"
-    ; task = "t"
-    ; path
-    ; branch = Filename.basename path
-    ; root = "/r"
-    }
+  let add payload = ignore (payload : Session.Entry.t) in
+  let location ?(main = false) worktree branch =
+    Some { Git_location.root = "/r"; worktree; branch = Some branch; main }
   in
-  ignore (Session.add_agent_worktree session (w "/t/a") : Session.Entry.t);
-  ignore (Session.add_agent_worktree session (w "/t/b") : Session.Entry.t);
-  ignore (Session.worktree_removed session ~path:"/t/a" : Session.Entry.t);
+  let print s =
+    List.iter (Session.worktrees s) ~f:(fun (w : Session_worktree.t) ->
+      print_s [%sexp (w : Session_worktree.t)])
+  in
+  (* The main checkout is not one of them; moving into a worktree is, once
+     however often (its branch kept up to date). *)
+  add (Session.set_repo session ~cwd:"/r" (location ~main:true "/r" "main"));
+  add (Session.set_repo session ~cwd:"/t/a" (location "/t/a" "feat/a"));
+  add (Session.set_repo session ~cwd:"/t/a/sub" (location "/t/a" "feat/a2"));
+  add
+    (Session.add_worktree
+       session
+       { path = "/t/b"; branch = Some "feat/b"; root = "/r"; source = Created });
+  add
+    (Session.add_worktree
+       session
+       { path = "/t/pr-7"
+       ; branch = Some "pr-7"
+       ; root = "/r"
+       ; source = Pull_request { number = 7 }
+       });
+  add
+    (Session.add_agent_worktree
+       session
+       { agent = "1"; task = "t"; path = "/t/c"; branch = "agent/c"; root = "/r" });
+  (* Made, then moved into: still made. *)
+  add (Session.set_repo session ~cwd:"/t/b" (location "/t/b" "feat/b"));
+  print session;
+  [%expect
+    {|
+    ((path /t/a) (branch (feat/a2)) (root /r) (source Entered))
+    ((path /t/b) (branch (feat/b)) (root /r) (source Created))
+    ((path /t/pr-7) (branch (pr-7)) (root /r) (source (Pull_request (number 7))))
+    ((path /t/c) (branch (agent/c)) (root /r)
+     (source (Agent (agent 1) (task t))))
+    |}];
+  (* Removed: gone, until it is entered again. *)
+  add (Session.worktree_removed session ~path:"/t/a");
+  add (Session.worktree_removed session ~path:"/t/pr-7");
   let paths s =
-    List.map (Session.agent_worktrees s) ~f:(fun (w : Agent_worktree.t) ->
-      w.path)
+    List.map (Session.worktrees s) ~f:(fun (w : Session_worktree.t) -> w.path)
   in
   let loaded = Or_error.ok_exn (Session.load (Session.path session)) in
   let forked =
     Or_error.ok_exn (Session.fork session ~dir:(Filename.concat t.dir "s"))
   in
+  add (Session.set_repo session ~cwd:"/t/a" (location "/t/a" "feat/a"));
   print_s
     [%sexp
       { live = (paths session : string list)
       ; loaded = (paths loaded : string list)
       ; forked = (paths forked : string list)
+      ; summary =
+          (List.find_map_exn
+             (Session.list ~dir:(Filename.concat t.dir "s"))
+             ~f:(fun (s : Session.Summary.t) ->
+               Option.some_if
+                 (String.equal s.id (Session.id session))
+                 (List.map s.worktrees ~f:(fun (w : Session_worktree.t) ->
+                    w.path)))
+           : string list)
       }];
-  [%expect {| ((live (/t/b)) (loaded (/t/b)) (forked ())) |}]
+  [%expect
+    {|
+    ((live (/t/b /t/c /t/a)) (loaded (/t/b /t/c)) (forked (/t/b))
+     (summary (/t/b /t/c /t/a)))
+    |}]
 ;;
 
 let subagent ~provider ~trees =
@@ -288,26 +336,29 @@ let%expect_test "a subagent in a worktree of its own" =
     |}]
 ;;
 
-(* [list_sessions]' [repo] and [agent_worktrees] fields, as a client sees
-   them. *)
+(* [list_sessions]' [repo] and [worktrees] fields, as a client sees
+   them, by name: sessions made within the same second have no order. *)
 let print_sessions t json =
   match json with
   | `Object fields ->
     (match List.Assoc.find fields ~equal:String.equal "result" with
      | Some (`Array sessions) ->
-       List.iter sessions ~f:(fun s ->
-         let field name =
-           Option.value_map
-             (Jsonaf.member name s)
-             ~default:"absent"
-             ~f:(fun j -> show t (Jsonaf.to_string j))
-         in
+       let field s name =
+         Option.value_map
+           (Jsonaf.member name s)
+           ~default:"absent"
+           ~f:(fun j -> show t (Jsonaf.to_string j))
+       in
+       List.sort sessions ~compare:(fun a b ->
+         String.compare (field a "name") (field b "name"))
+       |> List.iter ~f:(fun s ->
+         let field = field s in
          printf
-           "%s cwd=%s\n  repo=%s\n  agent_worktrees=%s\n"
+           "%s cwd=%s\n  repo=%s\n  worktrees=%s\n"
            (field "name")
            (field "cwd")
            (field "repo")
-           (field "agent_worktrees"))
+           (field "worktrees"))
      | _ -> print_endline (show t (Jsonaf.to_string json)))
   | _ -> print_endline (show t (Jsonaf.to_string json))
 ;;
@@ -395,7 +446,13 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     "create_worktree";
   let wt = Filename.concat trees "repo/feat-w" in
   let _in_wt = session ~name:"in worktree" ~cwd:wt in
-  let _other = session ~name:"other" ~cwd:(Filename.concat t.dir "other") in
+  let other_session = session ~name:"other" ~cwd:(Filename.concat t.dir "other") in
+  (* Made from a session in another repository, naming the repository: that
+     session records it. *)
+  call_
+    other_session
+    ~params:(sprintf {|{"branch": "feat/for-other", "cwd": %S}|} repo)
+    "create_worktree";
   let _plain = session ~name:"plain" ~cwd:(Filename.concat t.dir "plain") in
   (* A session from before repositories were recorded: looked up from the
      backend's files. *)
@@ -412,21 +469,21 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   print_sessions t (call main "list_sessions");
   [%expect
     {|
-    "main" cwd="$DIR/repo"
-      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
-      agent_worktrees=[{"agent":"a1","task":"Tidy up","path":"$DIR/trees/repo/agent-tidy-up","branch":"agent/tidy-up","root":"$DIR/repo"}]
-    "old" cwd="$DIR/repo"
-      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
-      agent_worktrees=[]
-    "plain" cwd="$DIR/plain"
-      repo=null
-      agent_worktrees=[]
-    "other" cwd="$DIR/other"
-      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
-      agent_worktrees=[]
     "in worktree" cwd="$DIR/trees/repo/feat-w"
       repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
-      agent_worktrees=[]
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
+    "main" cwd="$DIR/repo"
+      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"created"},{"path":"$DIR/trees/repo/agent-tidy-up","branch":"agent/tidy-up","root":"$DIR/repo","source":"agent","agent":"a1","task":"Tidy up"}]
+    "old" cwd="$DIR/repo"
+      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
+      worktrees=[]
+    "other" cwd="$DIR/other"
+      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
+      worktrees=[{"path":"$DIR/trees/repo/feat-for-other","branch":"feat/for-other","root":"$DIR/repo","source":"created"}]
+    "plain" cwd="$DIR/plain"
+      repo=null
+      worktrees=[]
     |}];
   (* Removing it from any session (here one in another repository, naming
      the repository) forgets it. *)
@@ -439,24 +496,24 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   print_sessions t (call main "list_sessions");
   [%expect
     {|
-    "main" cwd="$DIR/repo"
-      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
-      agent_worktrees=[]
-    "remover" cwd="$DIR/other"
-      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
-      agent_worktrees=[]
-    "old" cwd="$DIR/repo"
-      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
-      agent_worktrees=[]
-    "plain" cwd="$DIR/plain"
-      repo=null
-      agent_worktrees=[]
-    "other" cwd="$DIR/other"
-      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
-      agent_worktrees=[]
     "in worktree" cwd="$DIR/trees/repo/feat-w"
       repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
-      agent_worktrees=[]
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
+    "main" cwd="$DIR/repo"
+      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"created"}]
+    "old" cwd="$DIR/repo"
+      repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
+      worktrees=[]
+    "other" cwd="$DIR/other"
+      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
+      worktrees=[{"path":"$DIR/trees/repo/feat-for-other","branch":"feat/for-other","root":"$DIR/repo","source":"created"}]
+    "plain" cwd="$DIR/plain"
+      repo=null
+      worktrees=[]
+    "remover" cwd="$DIR/other"
+      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
+      worktrees=[]
     |}];
   (* One removed outside prigh: removing it only forgets it. *)
   let gone = Filename.concat trees "repo/gone" in
@@ -474,10 +531,14 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
              ~params:(sprintf {|{"path": %S, "cwd": %S}|} gone repo)
              "remove_worktree")));
   print_s
-    [%sexp (List.length (Session.agent_worktrees (Agent.session agent)) : int)];
+    [%sexp
+      (List.map
+         (Session.worktrees (Agent.session agent))
+         ~f:(fun (w : Session_worktree.t) -> Filename.basename w.path)
+       : string list)];
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/gone","branch":"gone","head":null,"main":false,"managed":false,"locked":false,"prunable":true,"changes":null,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]}}}
-    0
+    (feat-w)
     |}]
 ;;

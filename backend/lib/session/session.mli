@@ -78,9 +78,12 @@ module Entry : sig
           } (** where [cwd] is in git, found on its host (see {!repo}) *)
       | Agent_worktree of Agent_worktree.t
       (** a worktree made for one of its subagents; not copied by [fork] *)
+      | Worktree of Session_worktree.t
+      (** a worktree it made or checked a pull request out in (those it
+          moves into are its [Repo] entries') *)
       | Worktree_removed of { path : string }
-      (** the worktree at [path] was removed: an [Agent_worktree] no
-          longer; not copied by [fork] *)
+      (** the worktree at [path] was removed: none of its worktrees
+          ({!worktrees}) any more *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -219,11 +222,14 @@ val repo : t -> Git_location.t option option
 
 val set_repo : t -> cwd:string -> Git_location.t option -> Entry.t
 
-(** The worktrees made for its subagents and not removed since, oldest
-    first. *)
-val agent_worktrees : t -> Agent_worktree.t list
+(** The worktrees that matter to it and were not removed since, by when
+    they first did: those it made ({!add_worktree}), moved into (its [Repo]
+    entries away from the main checkout) or made for its subagents. A fork
+    keeps them but its parent's subagents'. *)
+val worktrees : t -> Session_worktree.t list
 
 val add_agent_worktree : t -> Agent_worktree.t -> Entry.t
+val add_worktree : t -> Session_worktree.t -> Entry.t
 val worktree_removed : t -> path:string -> Entry.t
 
 (** The [allow_rule] entries on the active path, oldest first. *)
@@ -305,7 +311,7 @@ module Summary : sig
     ; resume_at : float option (** {!resume_at} *)
     ; bytes : int (** {!disk_usage} *)
     ; repo : Git_location.t option option (** {!repo} *)
-    ; agent_worktrees : Agent_worktree.t list (** {!agent_worktrees} *)
+    ; worktrees : Session_worktree.t list (** {!worktrees} *)
     }
   [@@deriving sexp_of]
 
