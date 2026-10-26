@@ -454,6 +454,43 @@ let%expect_test
 ;;
 
 let%expect_test
+    "what the UI sees: the end of a replaced connection, read before the next \
+     one is made, is not news either"
+  =
+  with_home
+  @@ fun home ->
+  let servers = servers () in
+  let link = make ~home ~servers ~target:(Remote "srv:3") ~saved:None () in
+  let%bind (_ : Prigh_ui.Server_link.Outcome.result) = Link.start link in
+  let seen = ref [] in
+  don't_wait_for
+    (Pipe.iter_without_pushback
+       (Client.incoming (Link.client link))
+       ~f:(fun i ->
+         Option.iter (Link.handle_incoming link i) ~f:(fun i ->
+           seen := i :: !seen)));
+  let%bind (_ : Prigh_ui.Server_link.Outcome.t) =
+    Link.relink link (Connect (Some "srv:4"))
+  in
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  print_s [%sexp (!seen : Client.Incoming.t list)];
+  [%expect
+    {|
+    open (Tcp (host srv) (port 3))
+    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    open (Tcp (host srv) (port 4))
+    srv:4 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    ()
+    |}];
+  (* Signing out drops the connection too. *)
+  let%bind (_ : (unit, string) Result.t) = Link.sign_out link in
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  print_s [%sexp (!seen : Client.Incoming.t list)];
+  [%expect {| () |}];
+  return ()
+;;
+
+let%expect_test
     "a switch while a reconnect is still connecting: the switch's connection \
      wins"
   =

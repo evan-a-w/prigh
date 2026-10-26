@@ -45,16 +45,26 @@ module Listener = struct
     Eio.Fiber.fork_daemon ~sw (fun () ->
       while true do
         let flow, _ = Eio.Net.accept ~sw socket in
+        let served, set_served = Eio.Promise.create () in
+        let shutdown how =
+          try Eio.Flow.shutdown flow how with
+          | _ -> ()
+        in
+        (* The server reads the end first and is done with the connection
+           before the peer hears of it: had it still been writing, it would
+           say that it could not. *)
         flows
         := (fun () ->
-             try Eio.Flow.shutdown flow `All with
-             | _ -> ())
+             shutdown `Receive;
+             Eio.Promise.await served;
+             shutdown `Send)
            :: !flows;
         Eio.Fiber.fork_daemon ~sw (fun () ->
           Rpc_router.serve_connection
             (Rpc_router.single server)
             ~input:flow
             ~output:flow;
+          Eio.Promise.resolve set_served ();
           `Stop_daemon)
       done;
       `Stop_daemon);

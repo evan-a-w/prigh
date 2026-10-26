@@ -145,6 +145,8 @@ type t =
   ; mutable pending : Transport.t option
     (** opened by [relink], for the client's next [connect] *)
   ; mutable switches : int
+  ; mutable dropped : int
+    (** connections dropped whose [Closed] has not come through yet *)
   ; mutable notice : string -> unit
   ; held_notices : string Queue.t
   }
@@ -279,6 +281,7 @@ let create
     ; tool_host = None
     ; pending = None
     ; switches = 0
+    ; dropped = 0
     ; notice = Queue.enqueue held_notices
     ; held_notices
     }
@@ -362,6 +365,7 @@ let drop_connection t =
   t.switches <- t.switches + 1;
   Option.iter t.tool_host ~f:Tool_host.close;
   t.tool_host <- None;
+  if Client.is_connected t.client then t.dropped <- t.dropped + 1;
   Client.disconnect t.client;
   Client.disconnected t.client
 ;;
@@ -431,11 +435,14 @@ let sign_out t =
     Ok ()
 ;;
 
-(* The transport is detached before its [Closed] is pushed, so a [Closed]
-   seen while connected is for a connection a switch already replaced. *)
+(* A connected client's transport is detached before its [Closed] is
+   pushed, so each one dropped sends exactly one, which may come after the
+   next connection's events: the UI must not see it, whenever it comes. *)
 let handle_incoming t (incoming : Client.Incoming.t) =
   match incoming, t.tool_host with
-  | Closed, _ when Client.is_connected t.client -> None
+  | Closed, _ when t.dropped > 0 ->
+    t.dropped <- t.dropped - 1;
+    None
   | Event e, Some host ->
     Tool_host.handle host e;
     Some incoming

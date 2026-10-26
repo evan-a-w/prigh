@@ -366,7 +366,12 @@ let%expect_test "Forgejo: the browser comes back to the loopback server" =
        | "/api/v1/user" -> 200, {|{"login":"lloyd"}|}
        | _ -> 404, "")
   @@ fun t _ forges ->
+  Eio.Switch.run
+  @@ fun sw ->
   let url = ref "" in
+  (* The browser runs apart from the prompt, which the callback cancels as
+     soon as it has the code: its page may come after the login goes on. *)
+  let browser = ref None in
   login
     forges
     "git.lan"
@@ -379,20 +384,25 @@ let%expect_test "Forgejo: the browser comes back to the loopback server" =
         let callback =
           sprintf "%s?code=c&state=%s" (get "redirect_uri") (get "state")
         in
-        (match Http_client.get ~env:t.env ~url:callback ~headers:[] () with
-         | Ok (response, _) -> printf "(browser: HTTP %d)\n" response.status
-         | Error e -> printf "(browser: %s)\n" (Http_client.Error.to_string e));
+        browser
+        := Some
+             (Eio.Fiber.fork_promise ~sw (fun () ->
+                Http_client.get ~env:t.env ~url:callback ~headers:[] ()));
         Eio.Fiber.await_cancel ()
       | _ -> no_answer ());
+  (match Option.map !browser ~f:Eio.Promise.await_exn with
+   | None -> print_endline "(no browser)"
+   | Some (Ok (response, _)) -> printf "(browser: HTTP %d)\n" response.status
+   | Some (Error e) -> printf "(browser: %s)\n" (Http_client.Error.to_string e));
   [%expect
     {|
     [url] https://git.lan/login/oauth/authorize?client_id=prigh-app&redirect_uri=http://127.0.0.1:<port>/&response_type=code&scope=read:user%20write:repository&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
       Open this page and authorize the app to sign in to git.lan. If the browser then cannot load 127.0.0.1 (prigh runs on another machine), paste that page's address here.
     [paste] Complete login in your browser, or paste the authorization code / redirect URL here: (http://127.0.0.1:<port>/?code=...&state=...)
-    (browser: HTTP 200)
     [progress] Exchanging the authorization code...
     [progress] Checking the sign-in with git.lan...
     ("signed in" (user (lloyd)) (method_ Oauth) (expires_ms (4600000)))
+    (browser: HTTP 200)
     |}]
 ;;
 
