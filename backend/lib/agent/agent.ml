@@ -64,6 +64,7 @@ module Host = struct
     ; cwd : string
     ; session_id : string option
     ; session_name : string option
+    ; home : string option [@sexp.option]
     ; exec_input : bool [@sexp.bool]
     ; git_location : bool [@sexp.bool]
     }
@@ -212,6 +213,8 @@ type t =
   ; host_cwds : string String.Table.t
     (** where this session last was on each client host, connected or not,
         overriding [Host.cwd] *)
+  ; host_homes : string String.Table.t
+    (** the homes of hosts that do not say theirs ([Host.home]), asked for *)
   ; mutable backend_cwd : string (** the backend host's own cwd *)
   ; mutable active_host : string
   ; mutable active_host_name : string (** as last seen, for when it is gone *)
@@ -286,6 +289,7 @@ let backend_host t =
   ; cwd = t.backend_cwd
   ; session_id = None
   ; session_name = None
+  ; home = Sys.getenv "HOME"
   ; exec_input = false (* runs in this process: no messages *)
   ; git_location = true
   }
@@ -637,51 +641,6 @@ let exit_plan_mode t context args =
            (match reason with
             | None -> ""
             | Some reason -> "; their feedback: " ^ reason)))
-;;
-
-let approve t : Tool.approver =
-  fun context tool args ->
-  let name = Tool.name tool in
-  if String.equal name Tool_exit_plan_mode.name
-  then Some (exit_plan_mode t context args)
-  else (
-    let call = Approval_rule.Call.create ~cwd:context.cwd ~tool:name args in
-    let decide () =
-      Approval.decide
-        ~mode:t.approval_mode
-        ~plan:t.plan_mode
-        ~rules:t.config.permissions
-        ~session:t.session_rules
-        ~cwd:t.cwd
-        ~home:(Tool.expand_home "~")
-        ~destructive:tool.spec.destructive
-        call
-    in
-    match decide () with
-    | Allow -> None
-    | Deny text -> Some (Tool.Result.error text)
-    | Ask { rules } ->
-      let recheck () =
-        match decide () with
-        | Allow -> true
-        | Ask _ | Deny _ -> false
-      in
-      (match
-         confirm
-           t
-           context
-           ~name
-           ~summary:(Agent_loop.tool_summary ~name args)
-           ~rules
-           ~recheck
-       with
-       | None -> Some (Tool.Result.error "[cancelled]")
-       | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
-       | Some (Allow | Always) ->
-         (* Plan mode may have started while the user was deciding. *)
-         (match decide () with
-          | Deny text -> Some (Tool.Result.error text)
-          | Allow | Ask _ -> None)))
 ;;
 
 let ask_user t ~cancel ~call_id ~timeout_seconds questions =
@@ -1226,6 +1185,82 @@ let make_dir_on t (host : Host.t) path ~check =
   | None, { is_error = false; text; _ } -> Ok text
 ;;
 
+(* [~] in a path meant for [host] is its home, not the backend's. A host
+   that does not say its home ([Host.home], older ones) is asked once, when
+   a path needs it: its [$resolve_dir] has always expanded [~]. *)
+let known_home t (host : Host.t) =
+  Option.first_some host.home (Hashtbl.find t.host_homes host.id)
+;;
+
+let host_home t (host : Host.t) =
+  match known_home t host with
+  | Some home -> Some home
+  | None ->
+    (match resolve_dir_on t host "~" with
+     | Ok home ->
+       Hashtbl.set t.host_homes ~key:host.id ~data:home;
+       Some home
+     | Error _ -> None)
+;;
+
+let active_home t = Option.bind (find_host t t.active_host) ~f:(host_home t)
+
+let approve t : Tool.approver =
+  fun context tool args ->
+  let name = Tool.name tool in
+  if String.equal name Tool_exit_plan_mode.name
+  then Some (exit_plan_mode t context args)
+  else (
+    (* Asking an older host for its home is only worth it for a [~] in the
+       call; rules with [~] use what is known (else the backend's home). *)
+    let home =
+      Option.bind (find_host t t.active_host) ~f:(fun host ->
+        if String.is_substring (Json.to_string args) ~substring:"~"
+        then host_home t host
+        else known_home t host)
+      |> Option.value_or_thunk ~default:(fun () -> Tool.expand_home "~")
+    in
+    let call =
+      Approval_rule.Call.create ~home ~cwd:context.cwd ~tool:name args
+    in
+    let decide () =
+      Approval.decide
+        ~mode:t.approval_mode
+        ~plan:t.plan_mode
+        ~rules:t.config.permissions
+        ~session:t.session_rules
+        ~cwd:t.cwd
+        ~home
+        ~destructive:tool.spec.destructive
+        call
+    in
+    match decide () with
+    | Allow -> None
+    | Deny text -> Some (Tool.Result.error text)
+    | Ask { rules } ->
+      let recheck () =
+        match decide () with
+        | Allow -> true
+        | Ask _ | Deny _ -> false
+      in
+      (match
+         confirm
+           t
+           context
+           ~name
+           ~summary:(Agent_loop.tool_summary ~name args)
+           ~rules
+           ~recheck
+       with
+       | None -> Some (Tool.Result.error "[cancelled]")
+       | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
+       | Some (Allow | Always) ->
+         (* Plan mode may have started while the user was deciding. *)
+         (match decide () with
+          | Deny text -> Some (Tool.Result.error text)
+          | Allow | Ask _ -> None)))
+;;
+
 (* Where [path] would take the session on [host], creating it or asking
    first as [if_missing] says. *)
 let change_dir_on t host path ~(if_missing : Dir_change.If_missing.t)
@@ -1263,7 +1298,7 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
       match cwd with
       | None ->
         Ok (Dir_change.Outcome.Changed { cwd = host.cwd; created = false })
-      | Some path -> change_dir_on t host (Tool.expand_home path) ~if_missing
+      | Some path -> change_dir_on t host path ~if_missing
     in
     Or_error.map
       outcome
@@ -1283,7 +1318,11 @@ let executor t : Tool.executor =
     || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
     || (String.equal (Tool.name tool) (Tool.name Tool_bash.tool)
         && Tool_bash.runs_in_backend context arguments)
-  then Tool.execute tool context arguments
+  then
+    Tool.execute
+      tool
+      { context with home = (fun () -> active_home t) }
+      arguments
   else
     active_host_exec
       t
@@ -2356,6 +2395,7 @@ let create
     ; shell_seq = 0
     ; hosts = []
     ; host_cwds = String.Table.create ()
+    ; host_homes = String.Table.create ()
     ; backend_cwd = cwd
     ; active_host = (if backend_host then Host.backend_id else "")
     ; active_host_name = ""
@@ -2683,22 +2723,38 @@ let git_diff ?path ?base ?dir ?default_base t =
   |> Git_diff.of_tool_result
 ;;
 
-let resolve_path t path =
-  let path = Tool.expand_home path in
-  if Filename.is_absolute path then path else Filename.concat t.cwd path
+(* A path for the active host, relative to the session cwd; [~] stays for
+   the host to expand ([$resolve_dir], [$make_dir]). *)
+let host_relative t path =
+  if Filename.is_absolute path || String.is_prefix path ~prefix:"~"
+  then path
+  else Filename.concat t.cwd path
+;;
+
+(* A directory on the active host as an absolute path, [~] expanded there. *)
+let host_dir t path =
+  if String.is_prefix path ~prefix:"~"
+  then (
+    match find_host t t.active_host with
+    | None -> Or_error.error_string (host_unavailable_message t)
+    | Some host -> resolve_dir_on t host path)
+  else Ok (host_relative t path)
 ;;
 
 (* ---- worktrees ------------------------------------------------------ *)
 
 let worktree_call ?cwd t ~name ~arguments =
-  host_exec
-    t
-    ~cancel:Cancellation.never
-    ~on_output:ignore
-    ~call_id:"worktree"
-    ~cwd:(Option.value_map cwd ~default:t.cwd ~f:(resolve_path t))
-    ~name
-    ~arguments
+  match Option.value_map cwd ~default:(Ok t.cwd) ~f:(host_dir t) with
+  | Error e -> Tool.Result.error (Error.to_string_hum e)
+  | Ok cwd ->
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"worktree"
+      ~cwd
+      ~name
+      ~arguments
 ;;
 
 let worktrees ?cwd t =
@@ -3122,7 +3178,7 @@ let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
     | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       Or_error.map
-        (change_dir_on t host (resolve_path t path) ~if_missing)
+        (change_dir_on t host (host_relative t path) ~if_missing)
         ~f:
           (apply_dir_change ~f:(fun cwd ->
              set_host_cwd t host ~cwd;
@@ -3219,7 +3275,7 @@ let export t ~format ?path () =
   then (
     let path =
       match path with
-      | Some p -> resolve_path t p
+      | Some p -> Tool.resolve ~cwd:t.cwd p
       | None -> Filename.concat (Filename.concat t.sessions_dir "exports") name
     in
     Or_error.try_with (fun () ->
