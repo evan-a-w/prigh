@@ -182,6 +182,7 @@ module Command = struct
         ; after_ms : int
         }
     | Focus of string
+    | Place_popover
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -294,9 +295,9 @@ module Action = struct
     | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
-    | Open_model_picker
+    | Open_chip of Chip.t
+    | Chip_step of int
     | Open_snippets of int option
-    | Open_thinking_picker
     | Open_help
     | Open_settings
     | Open_rename
@@ -504,6 +505,7 @@ module Model = struct
     | None -> false
   ;;
 
+  let docked t = t.sidebar_open && not t.narrow
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
   let active t =
@@ -965,13 +967,21 @@ let compact_tokens n =
   else Int.to_string n
 ;;
 
-let model_picker ?(query = "") (m : Model.t) =
+(* Those that can be used first, each provider's together. *)
+let models_picker ?(query = "") (m : Model.t) =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
+  let first (model : Llm.t) =
+    List.findi m.models ~f:(fun _ (other : Llm.t) ->
+      String.equal other.provider model.provider)
+    |> Option.value_map ~default:0 ~f:fst
+  in
   let models =
     List.stable_sort m.models ~compare:(fun a b ->
-      Bool.compare (usable b) (usable a))
+      match Bool.compare (usable b) (usable a) with
+      | 0 -> Int.compare (first a) (first b)
+      | c -> c)
   in
   let items =
     List.map models ~f:(fun model ->
@@ -988,11 +998,14 @@ let model_picker ?(query = "") (m : Model.t) =
         ~dimmed:(not (usable model))
         model.name)
   in
-  Dialog.Picker
-    { kind = Models; picker = Picker.create ~query ~title:"Switch model" items }
+  Picker.create ~query ~title:"Switch model" items
 ;;
 
-let thinking_picker (m : Model.t) =
+let model_picker ?query m =
+  Dialog.Picker { kind = Models; picker = models_picker ?query m }
+;;
+
+let thinking_levels_picker (m : Model.t) =
   let current = Option.value_map m.state ~default:"" ~f:(fun s -> s.thinking) in
   let detail = function
     | "off" -> "answer straight away"
@@ -1002,18 +1015,14 @@ let thinking_picker (m : Model.t) =
     | "max" -> "as much as the model allows"
     | _ -> ""
   in
-  Dialog.Picker
-    { kind = Thinking
-    ; picker =
-        Picker.create
-          ~title:"Thinking level"
-          (List.map thinking_levels ~f:(fun level ->
-             Picker.Item.create
-               ~id:level
-               ~detail:(detail level)
-               ~marked:(String.equal level current)
-               level))
-    }
+  Picker.create
+    ~title:"Thinking level"
+    (List.map thinking_levels ~f:(fun level ->
+       Picker.Item.create
+         ~id:level
+         ~detail:(detail level)
+         ~marked:(String.equal level current)
+         level))
 ;;
 
 let custom_detail (c : Auth_status.Custom.t) =
@@ -1144,7 +1153,10 @@ let no_thinking (m : Model.t) (state : State.t) =
 let open_thinking_picker (m : Model.t) =
   match m.state with
   | Some state when not state.model.supports_thinking -> no_thinking m state
-  | _ -> open_picker m (thinking_picker m)
+  | _ ->
+    open_picker
+      m
+      (Dialog.Picker { kind = Thinking; picker = thinking_levels_picker m })
 ;;
 
 let set_thinking (m : Model.t) level =
@@ -1648,9 +1660,7 @@ let open_terminal (m : Model.t) =
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
     }
-  , (if m.terminal.open_
-     then []
-     else save_pref m Key.terminal_open (Some `True))
+  , (if m.terminal.open_ then [] else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
 ;;
 
@@ -2021,25 +2031,69 @@ let cycle_mode (m : Model.t) =
     set_mode m (Session_mode.cycle (Session_mode.of_state s)))
 ;;
 
+let modes_picker (state : State.t) =
+  let current = Session_mode.of_state state in
+  Picker.create
+    ~title:"When tools ask first (Alt+M cycles)"
+    (List.map (Session_mode.choices ~current) ~f:(fun mode ->
+       Picker.Item.create
+         ~id:(Session_mode.label mode)
+         ~detail:(Session_mode.describe mode)
+         ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
+         ~marked:(Session_mode.equal mode current)
+         (Session_mode.title mode)))
+;;
+
 let mode_picker (m : Model.t) =
   current_state m ~f:(fun s ->
-    let current = Session_mode.of_state s in
-    open_picker
-      m
-      (Dialog.Picker
-         { kind = Modes
-         ; picker =
-             Picker.create
-               ~title:"When tools ask first (Alt+M cycles)"
-               (List.map (Session_mode.choices ~current) ~f:(fun mode ->
-                  Picker.Item.create
-                    ~id:(Session_mode.label mode)
-                    ~detail:(Session_mode.describe mode)
-                    ~search:
-                      (Session_mode.label mode ^ " " ^ Session_mode.title mode)
-                    ~marked:(Session_mode.equal mode current)
-                    (Session_mode.title mode)))
-         }))
+    open_picker m (Dialog.Picker { kind = Modes; picker = modes_picker s }))
+;;
+
+let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
+  | Model -> Models
+  | Thinking -> Thinking
+  | Mode -> Modes
+;;
+
+let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
+  | Thinking -> not state.model.supports_thinking
+  | Model | Mode -> false
+;;
+
+(* A chip's menu, over it; the same chip again closes it. *)
+let open_chip (m : Model.t) (chip : Chip.t) =
+  match m.dialog with
+  | Some (Popover { chip = shown; _ }) when Chip.equal shown chip ->
+    close_dialog m
+  | _ ->
+    current_state m ~f:(fun state ->
+      if chip_opens_nothing state chip
+      then no_thinking m state
+      else (
+        let picker =
+          match chip with
+          | Model -> models_picker m
+          | Thinking -> thinking_levels_picker m
+          | Mode -> modes_picker state
+        in
+        let m, cmds =
+          open_dialog
+            m
+            ~focus:
+              (match chip with
+               | Model -> "popover-filter"
+               | Thinking | Mode -> "popover-list")
+            (Popover { chip; picker })
+        in
+        m, cmds @ [ Command.Place_popover ]))
+;;
+
+(* ← → and Tab: the neighbouring chip's menu, as in a menu bar. *)
+let step_chip (m : Model.t) delta =
+  match m.dialog, m.state with
+  | Some (Popover { chip; _ }), Some state ->
+    open_chip m (Chip.step chip delta ~skip:(chip_opens_nothing state))
+  | _ -> m, []
 ;;
 
 let mode_by_name (m : Model.t) name =
@@ -2643,6 +2697,8 @@ let account_menu (m : Model.t) =
                     ~id:"notify on"
                     ~detail:"when a turn ends or something waits for you"
                     "Turn notifications on")
+             ; Picker.Item.create ~id:"settings" ~detail:"Ctrl+," "Settings"
+             ; Picker.Item.create ~id:"help" ~detail:"/help" "Commands and keys"
              ; Picker.Item.create
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
@@ -2732,6 +2788,8 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, "settings" -> open_dialog m Settings
+  | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
     let m, close = close_dialog m in
     let m, cmds = set_notifications m (String.equal id "notify on") in
@@ -3840,30 +3898,17 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
 
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
-  let open Or_error.Let_syntax in
-  let%bind summary = Json.object_field json "subagent" in
-  let%bind agent_id = Json.string_field summary "id" in
-  let%bind call_id = Json.string_field summary "call_id" in
-  let%bind parent = Json.string_opt_field summary "parent" in
-  let%bind task = Json.string_field summary "task" in
-  let%bind model = Json.string_field summary "model" in
-  let%bind turns = Json.int_field summary "turns" in
-  let%bind result =
-    match Json.field summary "result" with
-    | None -> Ok None
-    | Some r -> Or_error.map (Event.Subagent_result.of_json r) ~f:Option.some
-  in
-  let%map messages = Json.list_field json "messages" ~f:Message.of_json in
-  ( { Chat.Subagent.agent_id
-    ; task
-    ; model
-    ; chat = Chat.of_messages ~running:(Option.is_none result) messages
-    ; turns
-    ; cost_usd = None
-    ; result
-    }
-  , `Parent parent
-  , `Call call_id )
+  Or_error.map (Subagent_detail.of_json json) ~f:(fun (d : Subagent_detail.t) ->
+    ( { Chat.Subagent.agent_id = d.id
+      ; task = d.task
+      ; model = d.model
+      ; chat = Chat.of_messages ~running:(Option.is_none d.result) d.messages
+      ; turns = d.turns
+      ; cost_usd = None
+      ; result = d.result
+      }
+    , `Parent d.parent
+    , `Call d.call_id ))
 ;;
 
 (* ---- pages of the transcript, cached transcripts, whole outputs *)
@@ -5411,6 +5456,8 @@ let with_picker (m : Model.t) ~f =
   match m.dialog with
   | Some (Picker { kind; picker }) ->
     { m with dialog = Some (Picker { kind; picker = f picker }) }, []
+  | Some (Popover { chip; picker }) ->
+    { m with dialog = Some (Popover { chip; picker = f picker }) }, []
   | Some (Scoped_models { picker; checked }) ->
     { m with dialog = Some (Scoped_models { picker = f picker; checked }) }, []
   | _ -> m, []
@@ -5454,6 +5501,10 @@ let dialog_accept (m : Model.t) =
   | Some (Picker { kind; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind item
+     | None -> m, [])
+  | Some (Popover { chip; picker }) ->
+    (match Picker.selected_item picker with
+     | Some item -> picker_accept m ~kind:(chip_kind chip) item
      | None -> m, [])
   | Some (Rename name) ->
     let name = String.strip name in
@@ -5700,9 +5751,9 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with sidebar_open = m.sidebar_open && not m.narrow }, [ focus_editor ]
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
-  | Open_model_picker -> open_picker m (model_picker m)
+  | Open_chip chip -> open_chip m chip
+  | Chip_step delta -> step_chip m delta
   | Open_snippets cursor -> open_snippets m ~cursor
-  | Open_thinking_picker -> open_thinking_picker m
   | Open_help -> open_dialog m Help
   | Open_settings -> open_dialog m Settings
   | Open_rename -> open_rename m
@@ -5732,13 +5783,19 @@ let update_connected (m : Model.t) (action : Action.t) =
         with
         | Some item -> picker_accept m ~kind item
         | None -> m, [])
+     | Some (Popover { chip; picker }) ->
+       (match
+          List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id)
+        with
+        | Some item -> picker_accept m ~kind:(chip_kind chip) item
+        | None -> m, [])
      | _ -> m, [])
   | Dialog_input text ->
     (match m.dialog with
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with input = text }) }, []
-     | Some (Picker _ | Scoped_models _) ->
+     | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
      | _ -> m, [])
@@ -5746,7 +5803,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match m.dialog with
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
-     | Some (Picker _ | Scoped_models _) ->
+     | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.move p delta)
      | Some (Prompt prompt) ->
        { m with dialog = Some (Prompt (Prompt.move prompt delta)) }, []

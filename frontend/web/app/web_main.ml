@@ -146,6 +146,90 @@ let focus id =
     Option.iter (Dom_html.getElementById_opt id) ~f:(fun el -> el##focus))
 ;;
 
+(* Keeps the highlighted item of a picker, the completion popup or a chip's
+   menu in view. *)
+let reveal_selected () =
+  Browser.after_render (fun () ->
+    List.iter
+      [ ".picker-item.selected"
+      ; ".popup-item.selected"
+      ; ".popover-item.selected"
+      ]
+      ~f:(fun selector ->
+        Js.Opt.iter
+          (Dom_html.document##querySelector (Js.string selector))
+          (fun el ->
+             (Js.Unsafe.coerce el)##scrollIntoView
+               (Js.Unsafe.obj
+                  [| "block", Js.Unsafe.inject (Js.string "nearest") |]))))
+;;
+
+(* A chip's menu opens upward from its chip, standing clear of the composer's
+   box (raised by [--popover-lift]); below the chip only when there is not
+   room enough above and more below. The height it may take goes to style.css
+   as [--popover-room]. *)
+let place_popover () =
+  Browser.after_render (fun () ->
+    Option.iter (Dom_html.getElementById_opt "chip-popover") ~f:(fun el ->
+      Js.Opt.iter el##.parentNode (fun anchor ->
+        let anchor : Dom_html.element Js.t = Js.Unsafe.coerce anchor in
+        let chip = anchor##getBoundingClientRect in
+        let box =
+          match
+            Js.Opt.to_option
+              (Js.Unsafe.meth_call
+                 anchor
+                 "closest"
+                 [| Js.Unsafe.inject (Js.string ".composer-box") |]
+               : Dom_html.element Js.t Js.opt)
+          with
+          | Some box -> box##getBoundingClientRect
+          | None -> chip
+        in
+        let margin = 8. in
+        let lift = Js.to_float chip##.top -. Js.to_float box##.top in
+        let above = Js.to_float box##.top -. margin in
+        let below =
+          Float.of_int Dom_html.window##.innerHeight
+          -. Js.to_float chip##.bottom
+          -. margin
+        in
+        let wanted = Float.of_int el##.scrollHeight in
+        let down = Float.(above < wanted && below > above) in
+        let set name value =
+          el##.style##setProperty
+            (Js.string name)
+            (Js.string (sprintf "%.0fpx" value))
+            Js.undefined
+          |> ignore
+        in
+        el##setAttribute
+          (Js.string "data-placement")
+          (Js.string (if down then "below" else "above"));
+        set "--popover-lift" lift;
+        set "--popover-room" (if down then below else above);
+        (* Within the composer's box: a chip far right opens leftward. *)
+        set "--popover-shift" 0.;
+        let menu = el##getBoundingClientRect in
+        let right =
+          Float.min
+            (Js.to_float box##.right)
+            (Float.of_int Dom_html.window##.innerWidth -. margin)
+        in
+        let over = Js.to_float menu##.right -. right in
+        if Float.(over > 0.)
+        then (
+          let room = Js.to_float menu##.left -. Js.to_float box##.left in
+          set "--popover-shift" (-.Float.min over room));
+        (* The current choice in the middle of a long list. *)
+        Js.Opt.iter
+          (el##querySelector (Js.string ".popover-item.selected"))
+          (fun item ->
+             (Js.Unsafe.coerce item)##scrollIntoView
+               (Js.Unsafe.obj
+                  [| "block", Js.Unsafe.inject (Js.string "center") |])))))
+;;
+
 (* At once, so that a key typed before the next frame lands after the
    insert, and again once the page has rendered the draft, unless the text has
    changed since. *)
@@ -395,6 +479,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
+    | Place_popover -> Effect.of_sync_fun place_popover ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
@@ -662,20 +747,6 @@ let key (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.t =
   ; meta = Js.to_bool ev##.metaKey
   ; target = key_target ev
   }
-;;
-
-(* Keeps the highlighted item of a picker or the completion popup in view. *)
-let reveal_selected () =
-  Browser.after_render (fun () ->
-    List.iter
-      [ ".picker-item.selected"; ".popup-item.selected" ]
-      ~f:(fun selector ->
-        Js.Opt.iter
-          (Dom_html.document##querySelector (Js.string selector))
-          (fun el ->
-             (Js.Unsafe.coerce el)##scrollIntoView
-               (Js.Unsafe.obj
-                  [| "block", Js.Unsafe.inject (Js.string "nearest") |]))))
 ;;
 
 (* Tab and Shift+Tab go round the open dialog (the page behind is inert),

@@ -4026,6 +4026,8 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
   H.show h;
   [%expect
     {|
+    (Rpc (method_ get_subagent) (params ((id a3))) (tag Subagent_loaded))
+
     ▌ earlier question
       earlier answer
     ↩ subagent a1 "find auth"  finished
@@ -4036,7 +4038,100 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
         [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:1 running
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
+    |}]
+;;
+
+let%expect_test
+    "a switched-to session's subagents: listed, focusable, transcripts loaded"
+  =
+  let h = connected ~width:90 ~height:12 () in
+  H.reply ~quiet:true h (Reload_messages_notice "switched session") "{}";
+  H.reply
+    h
+    Initial_state
+    (state_json
+       ~subagents:[ "a1", "index the repo", true; "a2", "run tests", false ]
+       ());
+  [%expect
+    {|
+    (Rpc (method_ get_subagent) (params ((id a1))) (tag Subagent_loaded))
+    (Rpc (method_ get_subagent) (params ((id a2))) (tag Subagent_loaded))
+    |}];
+  (* Before the transcripts arrive: listed and focusable already. *)
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2    ⠋ running 0 turns  "index the repo"
+
+
+
+
+
+
+
+
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  H.reply
+    h
+    Subagent_loaded
+    {|{"subagent":{"id":"a1","call_id":"c1","task":"index the repo","model":"claude-haiku","state":"running","turns":1},"messages":[{"role":"user","text":"index the repo"},{"role":"assistant","content":[{"type":"text","text":"indexing src/"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"claude-haiku"}]}|};
+  H.reply
+    h
+    Subagent_loaded
+    {|{"subagent":{"id":"a2","call_id":"c2","task":"run tests","model":"claude-haiku","state":"complete","turns":2,"result":{"text":"all pass","is_error":false}},"messages":[{"role":"user","text":"run tests"}]}|};
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "index the repo"
+
+
+
+
+
+
+    ▌ index the repo
+      indexing src/
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  (* Its live events now land in the loaded transcript. *)
+  H.event h (Subagent { call_id = "c1"; agent_id = "a1"; event = Turn_start });
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 2 turns  "index the repo"
+
+
+
+
+
+
+    ▌ index the repo
+      indexing src/
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    |}];
+  H.esc h;
+  H.keys h "/agents";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Subagents  (2)
+    / ▏
+    ▸  index the repo  a1  running  claude-haiku
+       run tests       a2  done 2 turns $0.00  claude-haiku
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Enter focuses · Esc closes · Ctrl+D cancels
     |}]
 ;;
 

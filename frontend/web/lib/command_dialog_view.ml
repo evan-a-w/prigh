@@ -576,5 +576,12 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | New_worktree d -> Some (new_worktree d ~inject)
   | Remove_worktree { worktree; force; busy; error; repo = _ } ->
     Some (remove_worktree worktree ~force ~busy ~error ~inject)
-  | Picker _ | Help | Settings | Rename _ | Delete _ | Login _ | Auth _ -> None
+  | Picker _
+  | Popover _
+  | Help
+  | Settings
+  | Rename _
+  | Delete _
+  | Login _
+  | Auth _ -> None
 ;;
