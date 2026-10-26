@@ -84,6 +84,12 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
+  ; ( "Enter / Alt+Enter (steering a subagent)"
+    , "send it a message: at its next step / when it ends its turn (its Steer \
+       button, or a running subagent shown in the panel; /agents steer N TEXT)"
+    )
+  ; "Alt+↑ (steering a subagent)", "take its last queued message back"
+  ; "Esc (steering a subagent)", "write to the main agent again"
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
@@ -246,6 +252,8 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
+  | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
+    Some (Set_recipient Main)
   | "Escape", _ when App.Model.running m -> Some Abort
   | "ArrowUp", None
     when plain t

@@ -34,6 +34,7 @@ module Item = struct
     | Rename
     | Fork
     | New_worktree
+    | Switch_back (** the session goes back to its home *)
     | Switch_here
     | New_session_here
     | Review
@@ -58,6 +59,7 @@ module Item = struct
     | Rename
     | Fork
     | New_worktree
+    | Switch_back
     | Switch_here
     | New_session_here
     | Review
@@ -75,7 +77,11 @@ let session_items (s : Session_summary.t) ~current
   : (Item.t * string * string) list
   =
   List.filter_opt
-    [ Option.some_if (not current) (Item.Open, "Open", "Enter")
+    [ Option.map s.home ~f:(fun home ->
+        ( Item.Switch_back
+        , "Switch back to " ^ Session_home.label home ~tilde:Tilde.of_path
+        , "/worktree back" ))
+    ; Option.some_if (not current) (Item.Open, "Open", "Enter")
     ; Some (Open_tab, "Open in new tab", "")
     ; Some (Rename, "Rename…", "/name")
     ; Some (Fork, "Fork…", "/fork")

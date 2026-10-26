@@ -95,6 +95,7 @@ type t =
       ; busy : bool
       ; error : string option
       }
+  | Nix_gc_confirm of Nix_generations.t
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -141,5 +142,6 @@ let per_session = function
   | Delete _
   | Login _
   | Auth _
-  | Forge_host _ -> false
+  | Forge_host _
+  | Nix_gc_confirm _ -> false
 ;;

@@ -89,6 +89,22 @@ let browser_url ~host ~port =
   sprintf "http://%s:%d/" host port
 ;;
 
+let plaintext_warning ~flag addr =
+  let shown = Format.asprintf "%a" Eio.Net.Ipaddr.pp addr in
+  if String.is_prefix shown ~prefix:"127." || String.equal shown "::1"
+  then None
+  else
+    Some
+      (sprintf
+         "prigh: warning: %s %s is reachable from other machines without TLS: \
+          tokens and everything else travel in the clear. Put an HTTPS reverse \
+          proxy in front of -web (see DOCKER.md, \"Behind a reverse proxy\"; \
+          then prigh-tui -connect wss://HOST/ws), use an SSH tunnel, or listen \
+          on 127.0.0.1 only."
+         flag
+         shown)
+;;
+
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 

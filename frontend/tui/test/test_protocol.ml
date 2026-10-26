@@ -48,6 +48,7 @@ let%expect_test "state event and messages" =
         (session_name ("my session"))
         (session_description ())
         (cwd /work)
+        (home ())
         (git_branch (main))
         (model (
           (id                claude-fable-5-1)
@@ -385,6 +386,7 @@ let%expect_test "tool host events and state hosts" =
         (session_name        ())
         (session_description ())
         (cwd /work)
+        (home       ())
         (git_branch ())
         (model (
           (id                deepseek-flash)
@@ -690,7 +692,8 @@ let%expect_test "auth status, models, sessions" =
      (bytes      0)
      (host      ())
      (repo      ())
-     (worktrees ()))
+     (worktrees ())
+     (home      ()))
     |}]
 ;;
 
@@ -746,7 +749,8 @@ let%expect_test "entries and session stats" =
      (bytes      0)
      (host      ())
      (repo      ())
-     (worktrees ()))
+     (worktrees ())
+     (home      ()))
     ((id e1) (parent ()) (kind (Message (User ((text "first\nsecond"))))))
     ((id e2)
      (parent (e1))
@@ -1016,19 +1020,22 @@ let%expect_test "hello reply: client id and namespace" =
            : Hello_reply.t Or_error.t)]);
   [%expect
     {|
-    (Ok ((client_id client-1) (namespace (lloyd)) (user ())))
+    (Ok ((client_id client-1) (namespace (lloyd)) (user ()) (superuser false)))
     (Ok (
       (client_id client-1)
       (namespace ())
-      (user      ())))
+      (user      ())
+      (superuser false)))
     (Ok (
       (client_id client-1)
       (namespace ())
-      (user      ())))
+      (user      ())
+      (superuser false)))
     (Ok (
       (client_id host-abc)
       (namespace ())
-      (user      ())))
+      (user      ())
+      (superuser false)))
     (Error "missing field \"client_id\"")
     (Error "field \"namespace\": expected string, got 3")
     |}]
@@ -1211,7 +1218,8 @@ let%expect_test "archived sessions and deleting them" =
       (bytes      2048)
       (host      ())
       (repo      ())
-      (worktrees ())))
+      (worktrees ())
+      (home      ())))
     (Ok ((id e9) (parent (e8)) (kind (Archived (archived true)))))
     (Event Sessions_changed)
     ((deleted (

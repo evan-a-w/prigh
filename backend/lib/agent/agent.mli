@@ -71,6 +71,8 @@ module State : sig
     ; plan : Plan.t option (** the model's [update_plan] *)
     ; session_rules : string list
       (** rules the user allowed for this session ("don't ask again") *)
+    ; home : Session.Home.t option
+      (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
     }
   [@@deriving sexp_of]
 end
@@ -102,6 +104,9 @@ module Event : sig
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
         }
+    | Subagent_queues of Subagent_inbox.Listing.t list
+    (** the background subagents' queues, those with messages; after every
+        change of one *)
     | Tool_exec of
         { host : string (** only delivered to this host *)
         ; exec_id : string
@@ -286,7 +291,7 @@ val dequeue : t -> Queued.t option
     Emits [Queue_update]. *)
 val remove_queued
   :  t
-  -> queue:[ `Steer | `Follow_up ]
+  -> queue:Steer_queue.Kind.t
   -> index:int
   -> text:string option
   -> Queued.t Or_error.t
@@ -345,6 +350,35 @@ val subagent
 
 (** Cancels one; its partial report is still delivered. *)
 val cancel_subagent : t -> agent_id:string -> unit Or_error.t
+
+(** Sends the user's message to a running background subagent: a steer
+    reaches it at its next step boundary, a follow-up when it ends its turn
+    (it carries on with it rather than report). A subagent that finished, or
+    a subagent's own, refuses it, saying what to do instead; one that stops
+    before taking a message drops it with a [Notice]. Emits [Queue_update]
+    whenever a subagent's queue changes. *)
+val steer_subagent
+  :  t
+  -> agent_id:string
+  -> kind:Steer_queue.Kind.t
+  -> string
+  -> unit Or_error.t
+
+(** Takes back the subagent's most recently queued message (follow-ups
+    first), if any. *)
+val dequeue_subagent : t -> agent_id:string -> string option Or_error.t
+
+(** Like {!remove_queued}, for a subagent's queue. *)
+val remove_subagent_queued
+  :  t
+  -> agent_id:string
+  -> queue:Steer_queue.Kind.t
+  -> index:int
+  -> text:string option
+  -> string Or_error.t
+
+(** What [Queue_update]'s [agents] says. *)
+val subagent_queues : t -> Subagent_inbox.Listing.t list
 
 (** Cancels every running subagent and job; with [discard] their reports are
     dropped. *)
@@ -611,12 +645,22 @@ val set_session_name : t -> string -> unit
     records it in the session. Fails while a run is in progress. A missing
     directory fails, is created on the active tool host, or (when it could
     be) is answered [Missing] without changing anything, as [if_missing]
-    (default [Fail]) says. *)
+    (default [Fail]) says. With [worktree] it is a worktree switch, which
+    records the session's home unless it has one; any change of directory
+    may forget it ({!Worktree_home}). *)
 val set_cwd
   :  ?if_missing:Dir_change.If_missing.t
+  -> ?worktree:bool
   -> t
   -> path:string
   -> Dir_change.Outcome.t Or_error.t
+
+(** Moves the session back to its home ({!Session.home}) on the home's
+    host, or with [main] to the main checkout of the home's repository
+    (when the home's directory is gone), and forgets the home. Fails
+    without a home, while that host is disconnected and when the directory
+    is gone (saying what to do). *)
+val switch_back : ?main:bool -> t -> Dir_change.Outcome.t Or_error.t
 
 (** Paths under the session cwd matching [prefix], listed on the active tool
     host (for [@] completion). *)

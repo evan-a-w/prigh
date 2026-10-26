@@ -99,6 +99,10 @@ module Reply_tag = struct
         { text : string
         ; images : Image.t list
         }
+    | Steered of
+        { agent : string
+        ; draft : string
+        }
     | Sessions
     | Models
     | Reload_state
@@ -153,6 +157,10 @@ module Reply_tag = struct
     | Worktree_created of { command : string }
     | Review_checked_out of Code_review.Target.t
     | Worktree_entered of string
+    | Worktree_went_back of
+        { command : string
+        ; home : Session_home.t option
+        }
     | Worktree_session of
         { path : string
         ; notice : string
@@ -192,6 +200,8 @@ module Reply_tag = struct
         } (** reconnected, but the backend no longer has [session] *)
     | Forge of Forge_reply.t
     | Prefs
+    | Nix_status of { open_settings : bool }
+    | Nix_collected
   [@@deriving sexp_of, equal]
 end
 
@@ -358,8 +368,9 @@ module Action = struct
     | Cancel_subagent of string
     | Kill_job of string
     | Dequeue
-    | Edit_queued of Queued.Message.t
-    | Remove_queued of Queued.Message.t
+    | Edit_queued of Recipient.t * Queued.Message.t
+    | Remove_queued of Recipient.t * Queued.Message.t
+    | Set_recipient of Recipient.t
     | Remove_reminder of string
     | Toggle_folded of string
     | New_session_in of string
@@ -470,6 +481,8 @@ module Model = struct
     ; history : History.t
     ; images : Image.t list
     ; queue : Queued.t
+    ; agent_queues : Agent_queue.t list
+    ; recipient : Recipient.t
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
     ; questions : Question_dialog.t list
@@ -510,6 +523,7 @@ module Model = struct
       (** reconnected to a backend that no longer has this session: its
           transcript stays on show, read-only *)
     ; forges : Forges.t
+    ; nix_gc : Nix_gc.t
     ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
@@ -627,6 +641,8 @@ let init =
   ; history = History.empty
   ; images = []
   ; queue = Queued.empty
+  ; agent_queues = []
+  ; recipient = Main
   ; confirms = []
   ; confirm_reason = None
   ; questions = []
@@ -665,6 +681,7 @@ let init =
   ; outputs_loading = String.Set.empty
   ; session_gone = None
   ; forges = Forges.empty
+  ; nix_gc = Nix_gc.empty
   ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
@@ -757,7 +774,7 @@ let field json name =
 
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
-  | true, Some (Login _ | Forge_host _) ->
+  | true, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -995,6 +1012,8 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; confirm_reason = None
       ; questions = []
       ; queue = Queued.empty
+      ; agent_queues = []
+      ; recipient = Main
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
@@ -1203,6 +1222,57 @@ let loading (m : Model.t) title cmds =
   m, focus @ cmds
 ;;
 
+let superuser (m : Model.t) = Option.exists m.hello ~f:(fun h -> h.superuser)
+
+let fetch_nix_status (m : Model.t) ~open_settings =
+  ( { m with nix_gc = Nix_gc.loading m.nix_gc }
+  , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
+;;
+
+(* Superusers see the Nix store there, as it is now. *)
+let open_settings ?(fetch = true) (m : Model.t) =
+  let m, cmds = open_dialog m Settings in
+  if fetch && superuser m
+  then (
+    let m, fetch = fetch_nix_status m ~open_settings:false in
+    m, cmds @ fetch)
+  else m, cmds
+;;
+
+let nix_gc_still_running m =
+  error
+    m
+    "The Nix garbage collection you started is still running: Settings shows \
+     how far it got."
+;;
+
+let start_nix_gc (m : Model.t) generations =
+  if Option.is_some m.nix_gc.collecting
+  then nix_gc_still_running m
+  else (
+    let m, cmds =
+      toast
+        { m with nix_gc = Nix_gc.start m.nix_gc }
+        (String.capitalize (Prigh_ui.Nix_gc_command.starting generations))
+    in
+    ( m
+    , cmds
+      @ [ call
+            (Nix_store_gc { delete_generations = generations })
+            ~tag:Nix_collected
+        ] ))
+;;
+
+(* [/nix-gc]: Settings, with the store. *)
+let nix_gc_command (m : Model.t) rest =
+  match Prigh_ui.Nix_gc_command.parse rest with
+  | Status -> fetch_nix_status m ~open_settings:true
+  | Error e -> error m (String.capitalize e)
+  | Collect _ when Option.is_some m.nix_gc.collecting -> nix_gc_still_running m
+  | Collect None -> start_nix_gc m None
+  | Collect (Some generations) -> open_dialog m (Nix_gc_confirm generations)
+;;
+
 let start_login (m : Model.t) ~provider ~method_ =
   let m, cmds = open_dialog m (Login (Login_flow.start provider)) in
   ( m
@@ -1387,6 +1457,7 @@ let complete_draft (m : Model.t) ~skills =
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
+      ~superuser:(superuser m)
       ~text:m.draft
       ~cursor:m.cursor
       ~models:m.models
@@ -1929,6 +2000,105 @@ let agents_back (m : Model.t) =
   match m.agents.selected with
   | Some _ -> with_agents m ~f:(fun a -> { a with selected = None }), []
   | None -> close_agents m
+;;
+
+(* ---- steering a subagent *)
+
+let set_recipient (m : Model.t) (recipient : Recipient.t) =
+  match recipient with
+  | Main -> { m with recipient }, [ focus_editor ]
+  | Agent id ->
+    (match Recipient.refusal m.agents id with
+     | Some why -> error m why
+     | None ->
+       (* On a phone the panel covers the composer. *)
+       let m =
+         if m.narrow
+         then with_agents m ~f:(fun a -> { a with open_ = false })
+         else m
+       in
+       { m with recipient }, [ focus_editor ])
+;;
+
+(* [steer_agent]: [draft] (what was typed) goes back into the editor if it
+   fails. *)
+let message_agent (m : Model.t) ~agent ~text ~follow_up ~draft =
+  ( { m with pending = In_flight.sent m.pending None }
+  , [ rpc
+        "steer_agent"
+        ([ "agent_id", str agent; "text", str text ]
+         @ if follow_up then [ "mode", str "follow_up" ] else [])
+        ~tag:(Steered { agent; draft })
+    ] )
+;;
+
+let without_queued (m : Model.t) agent (q : Queued.Message.t) =
+  { m with
+    agent_queues =
+      List.filter_map m.agent_queues ~f:(fun (a : Agent_queue.t) ->
+        if not (String.equal a.agent_id agent)
+        then Some a
+        else (
+          let drop kind texts =
+            if Queued.Message.Kind.equal q.kind kind
+            then List.filteri texts ~f:(fun i _ -> i <> q.index)
+            else texts
+          in
+          match drop Steer a.steer, drop Follow_up a.follow_up with
+          | [], [] -> None
+          | steer, follow_up -> Some { a with steer; follow_up }))
+  }
+;;
+
+(* Taken out of the queue at once, before the backend confirms. *)
+let unqueue (m : Model.t) (recipient : Recipient.t) q ~tag =
+  let params = Queued.Message.remove_params q in
+  match recipient with
+  | Main ->
+    ( { m with queue = Queued.remove m.queue q }
+    , [ rpc "remove_queued" params ~tag ] )
+  | Agent agent ->
+    ( without_queued m agent q
+    , [ rpc "remove_agent_queued" (("agent_id", str agent) :: params) ~tag ] )
+;;
+
+(* A finished subagent takes no messages: the composer goes back to the main
+   agent. On a desktop the subagent shown in the panel is the one steered
+   (until Esc), none once the panel closes. *)
+let follow_recipient (before : Model.t) ((m : Model.t), cmds) =
+  let m =
+    if
+      m.narrow
+      || (Option.equal
+            Agents.Item.equal
+            before.agents.selected
+            m.agents.selected
+          && Bool.equal before.agents.open_ m.agents.open_)
+    then m
+    else
+      { m with
+        recipient =
+          (match m.agents.open_, m.agents.selected with
+           | true, Some (Agent id)
+             when Option.is_none (Recipient.refusal m.agents id) -> Agent id
+           | _ -> Main)
+      }
+  in
+  match m.recipient with
+  | Main -> m, cmds
+  | Agent id ->
+    (match Agents.find_agent m.agents id with
+     | None -> { m with recipient = Main }, cmds
+     | Some { status = Agents.Status.Running; _ } -> m, cmds
+     | Some { status = Complete | Failed; _ } ->
+       let m, toast_cmds =
+         toast
+           { m with recipient = Main }
+           (sprintf
+              "%s has finished: you are writing to the main agent again"
+              id)
+       in
+       m, cmds @ toast_cmds)
 ;;
 
 let show_in_chat (m : Model.t) id =
@@ -2760,12 +2930,12 @@ let prompt_succeeded (m : Model.t) =
 
 let help_command (m : Model.t) name =
   let name = String.chop_prefix_if_exists name ~prefix:"/" in
-  match Slash.find name with
+  match Slash.find ~superuser:(superuser m) name with
   | Some spec -> toast m (sprintf "%s: %s" (Slash.Spec.usage spec) spec.help)
   | None ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec -> sprintf "No command /%s. Did you mean /%s?" name spec.name
        | None -> sprintf "No command /%s: /help lists them." name)
 ;;
@@ -2931,6 +3101,8 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; confirm_reason = None
     ; questions = []
     ; queue = Queued.empty
+    ; agent_queues = []
+    ; recipient = Main
     ; dialog = None
     ; completion = None
     ; btw = None
@@ -2943,6 +3115,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; folds = String.Set.empty
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
+    ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     }
   in
   let m, cmds =
@@ -2969,7 +3142,7 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
-  | _, "settings" -> open_dialog m Settings
+  | _, "settings" -> open_settings m
   | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
     let m, close = close_dialog m in
@@ -3209,9 +3382,12 @@ let worktrees_picker (m : Model.t) (listing : Worktree.Listing.t) =
        })
 ;;
 
-let enter_worktree ~notice path =
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
   call
-    (Change_dir { target = Cwd; path; if_missing = Fail })
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
     ~tag:(Worktree_entered notice)
 ;;
 
@@ -3489,7 +3665,7 @@ let worktree_target
     | Ok w -> f w
   in
   match action with
-  | List | New _ | Error _ -> m, []
+  | List | New _ | Back _ | Error _ -> m, []
   | Open { target; new_session } ->
     resolve target ~f:(open_worktree m ~new_session)
   | Remove { target; force } ->
@@ -3792,6 +3968,19 @@ let worktree_command (m : Model.t) rest =
             (Create_worktree { branch; base; cwd = None })
             ~tag:(Worktree_created { command })
         ] )
+  | Back { main } ->
+    (match m.state with
+     | Some { home = None; _ } ->
+       error
+         (back_in_editor m command)
+         (String.capitalize Worktree_command.no_home ^ ".")
+     | Some { home; _ } ->
+       ( m
+       , [ call
+             (Worktree_back { main })
+             ~tag:(Worktree_went_back { command; home })
+         ] )
+     | None -> m, [])
   | (Open _ | Remove _) as action ->
     list_worktrees m (Target { command; action })
 ;;
@@ -3885,6 +4074,51 @@ let open_snippets (m : Model.t) ~cursor =
   snippet_action m (Prigh_ui.Snippet_command.pick (snippets m))
 ;;
 
+(* [/agents steer <n|id> TEXT], [/agents follow-up <n|id> TEXT]. *)
+let agents_message (m : Model.t) rest =
+  let split s =
+    let s = String.lstrip s in
+    match String.lfindi s ~f:(fun _ c -> Char.is_whitespace c) with
+    | Some i -> String.prefix s i, String.strip (String.drop_prefix s i)
+    | None -> s, ""
+  in
+  let verb, rest = split rest in
+  let target, text = split rest in
+  let usage =
+    sprintf "Usage: /agents %s <n|id> <message> (/agents lists them)" verb
+  in
+  match target, text with
+  | "", _ | _, "" -> error m usage
+  | target, text ->
+    let agent =
+      match Agents.resolve m.agents target with
+      | Some (Agent id) -> Ok id
+      | Some (Job id) ->
+        Error
+          (sprintf
+             "%s is a background job: it takes no messages (/agents lists the \
+              subagents)."
+             id)
+      | None when Option.is_some (Int.of_string_opt target) ->
+        Error
+          (sprintf
+             "No subagent %s: give its number (1-%d) or id; /agents lists them."
+             target
+             (List.length (Agents.listed m.agents)))
+      (* The backend knows the subagents we have not listed yet. *)
+      | None -> Ok target
+    in
+    (match agent with
+     | Error e -> error m e
+     | Ok agent ->
+       message_agent
+         m
+         ~agent
+         ~text
+         ~follow_up:(String.equal verb "follow-up")
+         ~draft:(String.strip ("/agents " ^ verb ^ " " ^ rest)))
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -3894,7 +4128,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
-  | "settings", _ -> open_dialog m Settings
+  | "settings", _ -> open_settings m
+  | "nix-gc", rest when superuser m -> nix_gc_command m rest
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
@@ -4173,6 +4408,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "agents", "" -> open_agents m None
   | "agents", _ ->
     (match words with
+     | ("steer" | "follow-up") :: _ -> agents_message m rest
      | [ "cancel"; arg ] -> with_item m arg ~f:stop_command
      | [ "cancel" ] ->
        error m "Usage: /agents cancel <n|id> (/agents lists them)"
@@ -4238,7 +4474,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | name, _ ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec ->
          sprintf
            "Unknown command /%s. Did you mean /%s? (/help lists them)"
@@ -4689,6 +4925,8 @@ module Rejoin = struct
         ; confirm_reason = None
         ; questions = []
         ; queue = Queued.empty
+        ; agent_queues = []
+        ; recipient = Main
         ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
         ; btw = None
         ; agents = { Agents.empty with open_ = m.agents.open_ }
@@ -4862,7 +5100,7 @@ let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
      | Some dir, _, _ when not (here dir) ->
        ( with_entering m (Some dir)
        , [ call
-             (Change_dir { target = Cwd; path = dir; if_missing = Fail })
+             (Enter_worktree dir)
              ~tag:(Plan_entered { plan with enter = None })
          ] )
      | _, Some command, _ ->
@@ -4999,6 +5237,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
                 Queued.empty
                 ~steer:pending.steer_texts
                 ~follow_up:pending.follow_up_texts
+          ; agent_queues = pending.agents
           }
           ~confirms:pending.confirms
           ~questions:pending.questions
@@ -5036,6 +5275,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     worktree_create_failed m ~command e
   | Worktree_entered _, Error e ->
     error (with_entering m None) (sprintf "Couldn't open the worktree: %s." e)
+  | Worktree_went_back { command; _ }, Error e ->
+    error (back_in_editor m command) (sprintf "Couldn't switch back: %s." e)
   | Worktree_session _, Error e ->
     reply_to (with_entering m None) Reload_state (Error e)
   | Plan_switched _, Error e -> reply_to m Reload_state (Error e)
@@ -5140,6 +5381,26 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
              diff.root
              (Prigh_ui.Diff_files.against diff))
       else open_dialog m (Diff diff))
+  | Steered { agent; draft }, Error e ->
+    let m = { m with pending = In_flight.answered m.pending ~failed:None } in
+    let e = String.chop_suffix e ~suffix:"." |> Option.value ~default:e in
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m draft)
+        (sprintf
+           "Couldn't send it to %s: %s. Your message is back in the editor."
+           agent
+           e)
+    else
+      error
+        m
+        (sprintf
+           "Couldn't send it to %s: %s. ↑ brings your message back."
+           agent
+           e)
+  | Steered _, Ok _ ->
+    { m with pending = In_flight.answered m.pending ~failed:None }, []
   | Sent { text; images }, Error "backend closed" ->
     let prompt = { In_flight.Prompt.text; images } in
     let pending = In_flight.answered m.pending ~failed:(Some prompt) in
@@ -5242,6 +5503,34 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        then { m with jump = { m.jump with fetching = None } }
        else m)
     , [] )
+  | Nix_status _, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Nix_store_status.of_json json) ~f:Error.to_string_hum)
+    in
+    let m = { m with nix_gc = Nix_gc.status m.nix_gc result } in
+    (match tag, result with
+     | Nix_status { open_settings = true }, Ok _ -> open_settings ~fetch:false m
+     | Nix_status { open_settings = true }, Error e ->
+       error m (String.capitalize e)
+     | _ -> m, [])
+  | Nix_collected, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Nix_gc_report.of_json json) ~f:Error.to_string_hum)
+    in
+    let m = { m with nix_gc = Nix_gc.finished m.nix_gc result } in
+    let m, cmds =
+      match result with
+      | Ok report ->
+        toast
+          m
+          ("Nix garbage collected: " ^ Prigh_ui.Nix_gc_command.report report)
+      | Error e -> error m ("Nix garbage collection failed: " ^ e)
+    in
+    ( m
+    , cmds
+      @ [ call Nix_store_status ~tag:(Nix_status { open_settings = false }) ] )
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -5310,6 +5599,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
               Queued.empty
               ~steer:pending.steer_texts
               ~follow_up:pending.follow_up_texts
+        ; agent_queues = pending.agents
         }
         ~confirms:pending.confirms
         ~questions:pending.questions)
@@ -5582,9 +5872,18 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Changed _ -> toast m notice
       | Missing path ->
         error m (sprintf "%s is gone: /worktree lists the others." path))
+  | Worktree_went_back { home; _ }, Ok json ->
+    decode m json Dir_change.Outcome.of_json ~f:(function
+      | Changed { cwd; _ } ->
+        toast
+          m
+          (String.capitalize
+             (Worktree_command.back_notice home ~cwd ~tilde:Tilde.of_path))
+      | Missing path -> error m (sprintf "%s is gone." path))
   | Worktree_session { path; notice }, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
-    with_entering m (Some path), cmds @ [ enter_worktree ~notice path ]
+    ( with_entering m (Some path)
+    , cmds @ [ enter_worktree ~new_session:true ~notice path ] )
   | Plan_switched plan, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
     (* Not if the user went on to another session meanwhile. *)
@@ -5753,6 +6052,16 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
   | (Prompt_cancelled _ | Progress _), _ -> m, []
 ;;
 
+(* A message the user sent a subagent ([steer_agent]), as its transcript has
+   it: the note in front says so. *)
+let user_steer (u : Message.User.t) =
+  Option.bind u.origin ~f:(fun (o : Origin.t) ->
+    List.find o.notes ~f:(fun n ->
+      match n.kind with
+      | Other "steer" -> String.is_prefix n.title ~prefix:"You"
+      | _ -> false))
+;;
+
 let main_event (m : Model.t) (event : Event.t) =
   match event with
   | State state when superseded m state -> m, []
@@ -5760,6 +6069,24 @@ let main_event (m : Model.t) (event : Event.t) =
   | Notice text -> toast m text
   | Queue_update { steer; follow_up } ->
     { m with queue = Queued.update m.queue ~steer ~follow_up }, []
+  | Agent_queues agent_queues -> { m with agent_queues }, []
+  | Subagent { agent_id; event = Message_start (User user); _ } ->
+    (match user_steer user with
+     | Some (note : Origin.Note.t) ->
+       toast
+         m
+         (sprintf
+            "%s delivered to %s: %s"
+            (if String.is_substring note.title ~substring:"follow-up"
+             then "Follow-up"
+             else "Steer")
+            agent_id
+            (clamp
+               (String.tr
+                  ~target:'\n'
+                  ~replacement:' '
+                  (Message.User.body user))))
+     | None -> m, [])
   | Agent_end _ -> { m with queue = Queued.forget_delivering m.queue }, []
   | Message_start (User user) ->
     (match Queued.delivered m.queue ~text:(Injected_note.typed user) with
@@ -5802,6 +6129,7 @@ let main_event (m : Model.t) (event : Event.t) =
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
   | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -5964,6 +6292,21 @@ let send (m : Model.t) ~follow_up =
       m
       "Not connected to the backend: your message stays here until it is back \
        (/retry-backend-connection tries now)."
+  | _ when not (Recipient.equal m.recipient Recipient.Main) ->
+    (match m.recipient with
+     | Main -> m, []
+     | Agent agent when attached || not (List.is_empty m.images) ->
+       error
+         m
+         (sprintf
+            "%s takes text only: remove the images and files, or Esc to send \
+             them to the main agent."
+            agent)
+     | Agent _ when String.is_empty text -> m, []
+     | Agent agent ->
+       let m, save = sent m in
+       let m, cmds = message_agent m ~agent ~text ~follow_up ~draft:text in
+       m, save @ cmds)
   | _ when attached && Or_error.is_error (Files.prompt_attachments m.files) ->
     (match Files.prompt_attachments m.files with
      | Error e -> error m (Error.to_string_hum e)
@@ -6044,7 +6387,7 @@ let accept_completion (m : Model.t) ~run =
       | Command, Some item ->
         (* Optional free text (e.g. /compact's instructions) can be left out;
            an argument with completions is offered next. *)
-        (match Slash.find item.id with
+        (match Slash.find ~superuser:(superuser m) item.id with
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
          (* [/review] alone is the common case: it runs at once. *)
@@ -6092,6 +6435,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Rename -> plan ~run:"/name" ()
      | Fork -> plan ~run:"/fork" ()
      | New_worktree -> plan ~run:"/worktree new" ()
+     | Switch_back -> plan ~run:"/worktree back" ()
      | Switch_here ->
        let label =
          List.find s.worktrees ~f:(fun w -> String.equal w.path dir)
@@ -6334,6 +6678,10 @@ let dialog_accept (m : Model.t) =
     , [ change_dir ~if_missing:Create ~target path ] )
   | Some (New_worktree d) -> create_worktree m d
   | Some (Remove_worktree _) -> remove_worktree m ~force:false
+  | Some (Nix_gc_confirm generations) ->
+    let m, cmds = close_dialog m in
+    let m, start = start_nix_gc m (Some generations) in
+    m, cmds @ start
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -6357,7 +6705,7 @@ let dialog_accept (m : Model.t) =
        , [ call request ~tag:(Forge Created) ] ))
   | Some (Pr_checked_out { checkout; _ }) ->
     let m, cmds = close_dialog m in
-    m, cmds @ [ change_dir ~target:Cwd checkout.path ]
+    m, cmds @ [ call (Enter_worktree checkout.path) ~tag:(Dir_changed Cwd) ]
   | Some (Forge_host { input; _ }) ->
     (match Forges.normalize_host input with
      | "" ->
@@ -6399,14 +6747,14 @@ let sent_to_bottom ((m : Model.t), cmds) =
 let update_connected (m : Model.t) (action : Action.t) =
   match action with
   | Start -> m, start_commands m
-  | Hello hello -> { m with hello = Some hello }, []
+  | Hello hello -> { m with hello = Some hello; nix_gc = Nix_gc.empty }, []
   | Saved_login -> { m with saved_login = true }, []
   (* What another session does is not this one's. *)
   | Event e
     when Option.is_some m.session_gone
          &&
          match e with
-         | Sessions_changed -> false
+         | Sessions_changed | Nix_gc_progress _ -> false
          | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in
@@ -6573,7 +6921,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Chip_step delta -> step_chip m delta
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
-  | Open_settings -> open_dialog m Settings
+  | Open_settings -> open_settings m
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -6662,10 +7010,15 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Logout provider -> logout m provider
   | Cancel_subagent id -> stop m (Agent id)
   | Kill_job id -> stop m (Job id)
-  | Dequeue -> m, [ rpc "dequeue" [] ~tag:Dequeued ]
-  | Edit_queued q ->
-    ( { m with queue = Queued.remove m.queue q }
-    , [ rpc "remove_queued" (Queued.Message.remove_params q) ~tag:Dequeued ] )
+  | Dequeue ->
+    ( m
+    , [ (match m.recipient with
+         | Main -> rpc "dequeue" [] ~tag:Dequeued
+         | Agent agent ->
+           rpc "dequeue_agent" [ "agent_id", str agent ] ~tag:Dequeued)
+      ] )
+  | Edit_queued (recipient, q) -> unqueue m recipient q ~tag:Dequeued
+  | Set_recipient recipient -> set_recipient m recipient
   | Remove_reminder name ->
     remind_action
       m
@@ -6713,18 +7066,15 @@ let update_connected (m : Model.t) (action : Action.t) =
               ; picker =
                   Context_menu.picker
                     menu.target
-                    s
+                    (match m.state with
+                     | Some state when is_current_path m s.path ->
+                       { s with home = state.home }
+                     | _ -> s)
                     ~current:(is_current_path m s.path)
               })
        in
        m, cmds @ [ Command.Place_menu menu.anchor ])
-  | Remove_queued q ->
-    ( { m with queue = Queued.remove m.queue q }
-    , [ rpc
-          "remove_queued"
-          (Queued.Message.remove_params q)
-          ~tag:(Unqueued q.text)
-      ] )
+  | Remove_queued (recipient, q) -> unqueue m recipient q ~tag:(Unqueued q.text)
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
@@ -6820,7 +7170,7 @@ let update_connected (m : Model.t) (action : Action.t) =
        (* A setting changed from the settings page leaves it open. *)
        (match m.dialog, m'.dialog with
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
-        | Some Settings, Some (Login _ | Forge_host _) ->
+        | Some Settings, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
           { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
@@ -6898,6 +7248,7 @@ let settle (m : Model.t) cmds =
 let update (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
   let m', cmds = follow_worktrees m (m', cmds) in
+  let m', cmds = follow_recipient m (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
   if

@@ -275,6 +275,7 @@ let%expect_test
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="card-status">
         <div class="status">
@@ -444,6 +445,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="status">
         <button type="button"
@@ -537,6 +539,7 @@ let%expect_test
   H.elements h ~selector:".composer-bar .btn";
   [%expect
     {|
+    <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <textarea class="editor">

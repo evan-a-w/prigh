@@ -77,11 +77,19 @@ module Reply_tag = struct
     | History
     | Prefs_history
     | Dequeued
+    | Agent_message of
+        { agent_id : string
+        ; kind : Queued_message.Kind.t
+        ; text : string
+        ; retry : string
+        }
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Nix_store_shown (** [/nix-gc] *)
+    | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
     | Jobs_picker
     | Job_output
@@ -110,6 +118,7 @@ module Reply_tag = struct
         }
     | Worktree_created
     | Worktree_entered of string
+    | Worktree_went_back of P.Session_home.t option
     | Worktree_session_started of
         { path : string
         ; notice : string
@@ -244,6 +253,7 @@ module Model = struct
       (** the repository's branches and tags, for [/review]'s completion *)
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
+    ; agent_queues : Agent_queues.t
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -255,6 +265,7 @@ module Model = struct
     ; client_id : string option (** our host id, from [hello] *)
     ; namespace : string option
     ; user : string option
+    ; superuser : bool
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -269,6 +280,7 @@ module Model = struct
     ; terminal_focus : Focus.t
     ; server : Server_link.t option
     ; notice : Notice.t option
+    ; nix_gc : P.Nix_gc_progress.t option
     ; sidebar : bool
     }
   [@@deriving sexp_of]
@@ -299,7 +311,11 @@ module Model = struct
 
   let acting_as t =
     P.Hello_reply.acting_as
-      { client_id = ""; namespace = t.namespace; user = t.user }
+      { client_id = ""
+      ; namespace = t.namespace
+      ; user = t.user
+      ; superuser = t.superuser
+      }
   ;;
 end
 
@@ -318,6 +334,18 @@ let call ?(tag = Reply_tag.Show_error) (method_ : P.Request.Method.t) =
 ;;
 
 let str = P.Json.str
+
+let focused_agent m =
+  match m.focus with
+  | `Main -> None
+  | `Agent id -> Agent_view.find m.agents id
+;;
+
+let shown_queue m =
+  match m.focus with
+  | `Main -> m.queued_messages
+  | `Agent agent_id -> Agent_queues.messages m.agent_queues ~agent_id
+;;
 
 let editor_row_count m =
   let inner = Int.max 1 (m.width - 2) in
@@ -557,6 +585,7 @@ let init =
   ; refs = Location_cache.empty
   ; known_paths = String.Set.empty
   ; queued_messages = []
+  ; agent_queues = []
   ; login_lines = []
   ; viewport = Viewport.Follow
   ; pending_quit = false
@@ -568,6 +597,7 @@ let init =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -582,6 +612,7 @@ let init =
   ; terminal_focus = Unknown
   ; server = None
   ; notice = None
+  ; nix_gc = None
   ; sidebar = false
   }
 ;;
@@ -1306,11 +1337,12 @@ let jobs_picker m (jobs : P.Job_info.t list) =
 ;;
 
 let queue_picker m =
-  if List.is_empty m.queued_messages
+  let queued = shown_queue m in
+  if List.is_empty queued
   then notice m "nothing queued", []
   else (
     let items =
-      List.map m.queued_messages ~f:(fun (q : Queued_message.t) ->
+      List.map queued ~f:(fun (q : Queued_message.t) ->
         Picker.Item.create
           ~id:(Queued_message.id q)
           ~detail:(Queued_message.Kind.describe q.kind)
@@ -1322,13 +1354,20 @@ let queue_picker m =
 (* [edit]: back into the editor, as [Dequeue] does. *)
 let unqueue m id ~edit =
   let m = { m with mode = Editing } in
-  match Queued_message.find m.queued_messages ~id with
+  match Queued_message.find (shown_queue m) ~id with
   | None -> notice m "that message is no longer queued", []
   | Some q ->
+    let method_, params =
+      match m.focus with
+      | `Main -> "remove_queued", Queued_message.remove_params q
+      | `Agent agent_id ->
+        ( "remove_agent_queued"
+        , ("agent_id", str agent_id) :: Queued_message.remove_params q )
+    in
     ( m
     , [ rpc
-          "remove_queued"
-          ~params:(Queued_message.remove_params q)
+          method_
+          ~params
           ~tag:
             (if edit
              then Dequeued
@@ -1658,12 +1697,7 @@ let subagent_loaded m (d : P.Subagent_detail.t) =
 
 (* [arg] is the agent's number in the strip or its id. *)
 let cancel_agent m arg =
-  let agent =
-    match Int.of_string_opt arg with
-    | Some n -> List.nth m.agents (n - 1)
-    | None -> Agent_view.find m.agents arg
-  in
-  match agent with
+  match Agents_command.find m.agents arg with
   | None when List.is_empty m.agents -> error m "no subagents to cancel", []
   | None ->
     ( error
@@ -1682,6 +1716,89 @@ let cancel_agent m arg =
           ~params:[ "agent_id", str a.id ]
           ~tag:(Notice_on_success (sprintf "cancelling subagent %s" a.id))
       ] )
+;;
+
+(* What the user types to a focused subagent, or with [/agents steer]: a
+   finished one takes nothing, and the text stays to send elsewhere. *)
+let message_agent
+      m
+      (a : Agent_view.t)
+      (kind : Queued_message.Kind.t)
+      text
+      ~retry
+      ~finished_hint
+      ~ack
+  =
+  match a.status with
+  | Done _ | Failed _ ->
+    ( error
+        (restore_command m retry)
+        (sprintf "%s has finished: %s" a.id finished_hint)
+    , [] )
+  | Running ->
+    let m =
+      { m with
+        agent_queues = Agent_queues.add m.agent_queues ~agent_id:a.id kind text
+      }
+    in
+    let m =
+      if ack
+      then
+        notice
+          m
+          (sprintf
+             "%s for %s queued: %s"
+             (Queued_message.Kind.name kind)
+             a.id
+             (match kind with
+              | Steer -> "it reads it at its next step"
+              | Follow_up -> "it reads it before it reports"))
+      else m
+    in
+    ( m
+    , [ rpc
+          "steer_agent"
+          ~params:
+            [ "agent_id", str a.id
+            ; "text", str text
+            ; "mode", str (Queued_message.Kind.wire kind)
+            ]
+          ~tag:(Agent_message { agent_id = a.id; kind; text; retry })
+      ; Command.Append_history text
+      ; push_history text
+      ] )
+;;
+
+let agent_message_failed m ~agent_id ~kind ~text ~retry e =
+  let m =
+    { m with
+      agent_queues = Agent_queues.remove m.agent_queues ~agent_id kind text
+    }
+  in
+  error (restore_command m retry) e
+;;
+
+let agents_command m rest =
+  match Agents_command.run rest with
+  | Pick -> agents_picker m
+  | Cancel arg -> cancel_agent m arg
+  | Error e -> error (restore_command m ("/agents " ^ rest)) e, []
+  | Message { agent; kind; text } ->
+    (match Agents_command.find m.agents agent with
+     | None ->
+       ( error
+           (restore_command m ("/agents " ^ rest))
+           (Agents_command.unknown m.agents agent)
+       , [] )
+     | Some a ->
+       message_agent
+         m
+         a
+         kind
+         text
+         ~retry:("/agents " ^ rest)
+         ~finished_hint:"tell the main agent instead"
+         ~ack:true)
 ;;
 
 let cycle_focus m =
@@ -1822,6 +1939,7 @@ let reset_session m =
       ; agents = []
       ; focus = `Main
       ; queued_messages = []
+      ; agent_queues = []
       ; transcript = Transcript.clear m.transcript
       ; activity = Idle
       }
@@ -1888,10 +2006,12 @@ let reset_connection m =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
   ; btw = None
+  ; nix_gc = None
   ; mode = Editing
   ; autocomplete = None
   ; pending_quit = false
@@ -1955,7 +2075,8 @@ let relink ?doing m change =
 ;;
 
 let connect_hint =
-  "/connect HOST:PORT (of prigh serve -listen), or /connect local"
+  "/connect HOST:PORT (of prigh serve -listen), /connect wss://HOST/ws (a \
+   prigh-web URL, e.g. behind an HTTPS proxy), or /connect local"
 ;;
 
 let connect m arg =
@@ -1969,7 +2090,8 @@ let connect m arg =
              Text_prompt
                { question =
                    sprintf
-                     "Connect to HOST:PORT or local (now: %s)"
+                     "Connect to HOST:PORT, a prigh-web URL (wss://…) or local \
+                      (now: %s)"
                      (Server_link.describe server)
                ; action = Connect
                }
@@ -1984,13 +2106,13 @@ let connect m arg =
        , [] )
      | "local" -> relink m (Connect None) ~doing:"starting a local backend…"
      | address ->
-       (match Server_link.parse_address address with
-        | Error e -> error m (sprintf "%s; %s" e connect_hint), []
-        | Ok _ ->
+       (match Server_address.parse address with
+        | Error e -> error m (sprintf "%s; or /connect local" e), []
+        | Ok parsed ->
           relink
             m
-            (Connect (Some address))
-            ~doing:(sprintf "connecting to %s…" address)))
+            (Connect (Some (Server_address.normalize address)))
+            ~doing:(sprintf "connecting to %s…" (Server_address.display parsed))))
 ;;
 
 let nothing_to_sign_in m what =
@@ -2019,7 +2141,11 @@ let sign_out m =
     warn m "still connecting; wait for it, or Ctrl+C quits", []
   | Some { address = Some address; _ }, _ ->
     let m = signed_out { m with mode = Editing } ~reason:"signed out" in
-    ( notice m (sprintf "signed out of %s; the saved token is forgotten" address)
+    ( notice
+        m
+        (sprintf
+           "signed out of %s; the saved token is forgotten"
+           (Server_address.display_string address))
     , [ Command.Sign_out ] )
 ;;
 
@@ -2027,6 +2153,7 @@ let connected_notice m (link : Server_link.t) =
   match link.address with
   | None -> "connected to a local backend"
   | Some address ->
+    let address = Server_address.display_string address in
     (match m.user, m.namespace with
      | Some user, _ | None, Some user ->
        sprintf "connected to %s as %s" address user
@@ -2074,8 +2201,8 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user } ->
-           { m with client_id = Some client_id; namespace; user }
+         | Ok { client_id; namespace; user; superuser } ->
+           { m with client_id = Some client_id; namespace; user; superuser }
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
@@ -2138,14 +2265,21 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user =
+       let client_id, namespace, user, superuser =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user } -> Some client_id, namespace, user
-         | Error _ -> m.client_id, m.namespace, m.user
+         | Ok { client_id; namespace; user; superuser } ->
+           Some client_id, namespace, user, superuser
+         | Error _ -> m.client_id, m.namespace, m.user, m.superuser
        in
        let m, session_commands =
          reset_session
-           { m with connection = Connected; client_id; namespace; user }
+           { m with
+             connection = Connected
+           ; client_id
+           ; namespace
+           ; user
+           ; superuser
+           }
        in
        let m =
          match session, m.state with
@@ -2550,6 +2684,51 @@ let reminder_picker m (reminders : P.Reminder.t list) =
   open_picker m Reminders (Picker.create ~title:"Reminders" items)
 ;;
 
+let nix_gc_still_running m =
+  ( warn
+      m
+      "the Nix garbage collection you started is still running (see the status \
+       line)"
+  , [] )
+;;
+
+let start_nix_gc m generations =
+  if Option.is_some m.nix_gc
+  then nix_gc_still_running m
+  else
+    ( notice
+        { m with
+          nix_gc =
+            Some { paths_deleted = 0; generations_deleted = 0; message = None }
+        }
+        (Nix_gc_command.starting generations)
+    , [ call
+          (Nix_store_gc { delete_generations = generations })
+          ~tag:Nix_gc_done
+      ] )
+;;
+
+let nix_gc_command m rest =
+  match Nix_gc_command.parse rest with
+  | Status ->
+    ( notice m "reading the Nix store…"
+    , [ call Nix_store_status ~tag:Nix_store_shown ] )
+  | Error e ->
+    error (restore_command m (String.strip ("/nix-gc " ^ rest))) e, []
+  | Collect _ when Option.is_some m.nix_gc -> nix_gc_still_running m
+  | Collect None -> start_nix_gc m None
+  | Collect (Some generations as g) ->
+    ( { m with
+        mode =
+          Confirm
+            { question = Option.value_exn (Nix_gc_command.warning g)
+            ; action = Nix_gc generations
+            }
+      ; autocomplete = None
+      }
+    , [] )
+;;
+
 let remind_action m ~command (action : Remind_command.Action.t) =
   match action with
   | Pick reminders -> reminder_picker m reminders, []
@@ -2610,9 +2789,12 @@ let worktrees_picker m listing =
     (Picker.create ~title:(worktrees_title m listing) (worktree_items listing))
 ;;
 
-let enter_worktree ~notice path =
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
   call
-    (Change_dir { target = Cwd; path; if_missing = Fail })
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
     ~tag:(Worktree_entered notice)
 ;;
 
@@ -2674,6 +2856,19 @@ let worktree_command m rest =
           ~tag:
             (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
       ] )
+  | Back { main } ->
+    let home = Option.bind m.state ~f:(fun (s : P.State.t) -> s.home) in
+    (match m.state with
+     | Some { home = None; _ } ->
+       error (restore_command m command) Worktree_command.no_home, []
+     | Some { home = Some _; _ } | None ->
+       ( m
+       , [ call
+             (Worktree_back { main })
+             ~tag:
+               (Retry_in_editor
+                  { command; hint = ""; then_ = Worktree_went_back home })
+         ] ))
   | (Open _ | Remove _) as action ->
     ( m
     , [ call
@@ -2690,7 +2885,7 @@ let worktree_target m ~command (action : Worktree_command.Action.t) listing =
     | Ok w -> f w
   in
   match action with
-  | List | New _ | Error _ -> m, []
+  | List | New _ | Back _ | Error _ -> m, []
   | Open { target; new_session } ->
     resolve target ~f:(open_worktree m ~new_session)
   | Remove { target; force } ->
@@ -2768,7 +2963,7 @@ let update_btw m id ~f =
    error names the closest command to fix it to. *)
 let unknown_command m name ~retry =
   let m = { m with editor = Editor.set_text m.editor (retry name) } in
-  match Commands.closest name with
+  match Commands.closest ~superuser:m.superuser name with
   | Some c ->
     error
       m
@@ -2796,7 +2991,7 @@ let run_command m (cmd : Commands.Parsed.t) =
         m
         ~title:"Help"
         (List.concat
-           [ help_heading "Commands" :: Commands.help
+           [ help_heading "Commands" :: Commands.help ~superuser:m.superuser
            ; [ []; help_heading "In the prompt" ]
            ; Commands.input_help
            ; [ []; help_heading "Keys" ]
@@ -2806,7 +3001,7 @@ let run_command m (cmd : Commands.Parsed.t) =
            ])
     , [] )
   | "help", name :: _ ->
-    (match Commands.find name with
+    (match Commands.find ~superuser:m.superuser name with
      | Some spec ->
        let usage = Commands.usage spec in
        ( output
@@ -3020,9 +3215,7 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "session named")
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
-  | "agents", [ "cancel"; arg ] -> cancel_agent m arg
-  | "agents", "cancel" :: _ -> error m "usage: /agents cancel <n|id>", []
-  | "agents", _ -> agents_picker m
+  | "agents", _ -> agents_command m cmd.rest
   | "jobs", [ "kill"; id ] -> kill_job m id
   | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
   | "jobs", [] -> m, [ rpc "list_jobs" ~tag:Jobs_picker ]
@@ -3144,6 +3337,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "connect", _ -> connect m cmd.rest
   | "signin", args -> sign_in m args
   | "signout", _ -> sign_out m
+  | "nix-gc", _ when m.superuser -> nix_gc_command m cmd.rest
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
     m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
@@ -3255,22 +3449,33 @@ let send_prompt m text =
   m, cmds @ [ Command.Append_history text; push_history text ]
 ;;
 
-let submit m =
+let submit ?(kind = Queued_message.Kind.Steer) m =
   let text, editor = Editor.submit m.editor in
   let m = follow { m with editor; autocomplete = None } in
   if String.is_empty (String.strip text)
   then m, []
   else (
-    match Commands.parse text with
-    | Some { name = "skill:"; _ } -> open_skills m
-    | Some { name; _ } when String.is_prefix name ~prefix:"skill:" ->
+    match Commands.parse text, focused_agent m with
+    | Some { name = "skill:"; _ }, _ -> open_skills m
+    | Some { name; _ }, _ when String.is_prefix name ~prefix:"skill:" ->
       send_prompt m (String.strip text)
-    | Some cmd -> run_command m cmd
-    | None -> send_prompt m text)
+    | Some cmd, _ -> run_command m cmd
+    | None, Some a when not (String.is_prefix text ~prefix:"!") ->
+      message_agent
+        m
+        a
+        kind
+        text
+        ~retry:text
+        ~finished_hint:"tell the main agent instead (Esc goes back to it)"
+        ~ack:false
+    | None, _ -> send_prompt m text)
 ;;
 
 let queue_follow_up m =
-  if not (Model.running m)
+  if Option.is_some (focused_agent m)
+  then submit ~kind:Follow_up m
+  else if not (Model.running m)
   then submit m
   else (
     let text, editor = Editor.submit m.editor in
@@ -3406,6 +3611,7 @@ let refresh_command_autocomplete m =
   let line_index = (Editor.position m.editor).line in
   match
     Autocomplete.compute
+      ~superuser:m.superuser
       ~current_session:(current_session m)
       ~line
       ~col
@@ -3417,6 +3623,7 @@ let refresh_command_autocomplete m =
       ~skills:(Location_cache.find m.skills ~key:(Location_cache.key m.state))
       ~snippets:(Option.value (snippets m) ~default:[])
       ~reminders:(Option.value (reminders m) ~default:[])
+      ~agents:m.agents
       ~worktrees:
         (Option.map
            (Location_cache.find m.worktrees ~key:(worktree_key m))
@@ -3490,9 +3697,10 @@ let accept_autocomplete m ~submit_now =
          match Autocomplete.source ac, submit_now with
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
-           (match Commands.find item.id with
-            (* [/review] alone is the common case: it runs at once. *)
-            | Some { argument = Some Review; _ } -> submit m
+           (match Commands.find ~superuser:m.superuser item.id with
+            (* [/review] and [/agents] alone are the common case: they run
+               at once. *)
+            | Some { argument = Some (Review | Agents); _ } -> submit m
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
@@ -3736,7 +3944,16 @@ let editing_intent m (intent : Intent.t) =
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Queue_follow_up -> queue_follow_up m
-  | Dequeue -> m, [ rpc "dequeue" ~tag:Dequeued ]
+  | Dequeue ->
+    (match m.focus with
+     | `Main -> m, [ rpc "dequeue" ~tag:Dequeued ]
+     | `Agent agent_id ->
+       ( m
+       , [ rpc
+             "dequeue_agent"
+             ~params:[ "agent_id", str agent_id ]
+             ~tag:Dequeued
+         ] ))
   | Copy_last -> copy_last m
   | Suspend -> m, [ Command.Suspend ]
   | Path_complete -> path_complete m
@@ -4472,12 +4689,14 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
     | Forge_logout host -> m, [ call (Forge_logout host) ]
-    | Cd_to_checkout path -> m, [ change_dir ~target:Cwd path ]
+    | Cd_to_checkout path ->
+      m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
     | Rewind id ->
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
+    | Nix_gc generations -> start_nix_gc m (Some generations)
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
     | Remove_worktree { worktree; force; back = _ } ->
@@ -4497,9 +4716,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
-    | Logout _ | Forge_logout _ | Rewind _ | Delete_sessions _ | Remove_worktree _
-      ->
-      notice m "cancelled", []
+    | Logout _
+    | Forge_logout _
+    | Rewind _
+    | Delete_sessions _
+    | Remove_worktree _
+    | Nix_gc _ -> notice m "cancelled", []
   in
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
@@ -4785,6 +5007,40 @@ let auth_event m (e : P.Auth_event.t) =
     , [ call Forge_status ~tag:Forge_refresh ] )
 ;;
 
+(* A message the user sent a subagent, once it takes it: a quiet line in the
+   main transcript. *)
+let note_agent_message m ~agent_id (user : P.Message.User.t) =
+  let from_user (n : P.Origin.Note.t) =
+    P.Origin.Kind.equal n.kind (Other "steer")
+    && String.is_prefix n.title ~prefix:"You"
+  in
+  match
+    Option.bind user.origin ~f:(fun o -> List.find o.notes ~f:from_user)
+  with
+  | None -> m
+  | Some note ->
+    let text =
+      String.split_lines (P.Message.User.body user)
+      |> List.map ~f:String.strip
+      |> List.filter ~f:(Fn.non String.is_empty)
+      |> String.concat ~sep:" "
+    in
+    let kind =
+      if String.is_substring note.title ~substring:"follow-up"
+      then " (follow-up)"
+      else ""
+    in
+    with_transcript m ~f:(fun t ->
+      Transcript.add
+        t
+        (Note
+           { kind = note.kind
+           ; title = sprintf "%s%s: %s" agent_id kind text
+           ; text = ""
+           ; joined = true
+           }))
+;;
+
 let event m (e : P.Event.t) =
   let m = with_transcript m ~f:(fun t -> Transcript.apply t e) in
   let m = { m with activity = Activity.apply m.activity e } in
@@ -4793,6 +5049,9 @@ let event m (e : P.Event.t) =
   | State state -> set_state m state
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
+  | Agent_queues agent_queues -> { m with agent_queues }, []
+  | Subagent { agent_id; event = Message_end (User user); _ } ->
+    note_agent_message m ~agent_id user, []
   | Config_changed config -> { m with config = Some config }, []
   | Review _ -> m, []
   | Auth a -> auth_event m a
@@ -4864,6 +5123,10 @@ let event m (e : P.Event.t) =
        |> Option.bind ~f:(fun c -> history_of_json c.value)
      with
      | Some entries -> set_backend_history m entries, []
+     | None -> m, [])
+  | Nix_gc_progress progress ->
+    (match m.nix_gc with
+     | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
@@ -4988,6 +5251,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
      | Skill_prompt text -> skill_prompt_failed m text e, []
+     | Agent_message { agent_id; kind; text; retry } ->
+       agent_message_failed m ~agent_id ~kind ~text ~retry e, []
      | Fallback_saved text | Default_dir_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
@@ -5026,12 +5291,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
         | Pr_form form ->
           { m with mode = Pr_form (Pr_form.failed form ~error:e) }, []
         | _ -> error m e, [])
+     | Nix_gc_done -> error { m with nix_gc = None } e, []
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
      | Retry_in_editor { then_; _ } -> reply m then_ result
      | Ignore | Show_error | Reconnect _ -> m, []
-     | Skill_prompt _ -> m, []
+     | Skill_prompt _ | Agent_message _ -> m, []
      | Skills_picker ->
        decode json ~f:decode_skills (fun skills -> skills_picker m skills, [])
      | Skills_for_autocomplete key ->
@@ -5040,6 +5306,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with skills = Location_cache.set m.skills ~key skills })
      | Mcp_picker ->
        decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Nix_store_shown ->
+       decode json ~f:P.Nix_store_status.of_json (fun status ->
+         ( output
+             m
+             ~title:"Nix store"
+             (Content.lines
+                (String.concat
+                   ~sep:"\n"
+                   (Nix_gc_command.status_lines ~utc_offset:m.utc_offset status)))
+         , [] ))
+     | Nix_gc_done ->
+       decode json ~f:P.Nix_gc_report.of_json (fun report ->
+         ( notice
+             { m with nix_gc = None }
+             ("Nix garbage collected: " ^ Nix_gc_command.report report)
+         , [] ))
      | Mcp_reconnected ->
        decode json ~f:P.Mcp_list.of_json (fun list ->
          let m = mcp_problems m list in
@@ -5056,6 +5338,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                Queued_message.of_queues
                  ~steer:pending.steer_texts
                  ~follow_up:pending.follow_up_texts
+           ; agent_queues = pending.agents
            }
          in
          ( add_pending_questions
@@ -5104,9 +5387,15 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          | Changed _ -> notice m text, []
          | Missing path ->
            error m (sprintf "%s is gone; /worktree lists the others" path), [])
+     | Worktree_went_back home ->
+       decode json ~f:P.Dir_change.Outcome.of_json (function
+         | Changed { cwd; _ } ->
+           ( notice m (Worktree_command.back_notice home ~cwd ~tilde:(tilde m))
+           , [] )
+         | Missing path -> error m (sprintf "%s is gone" path), [])
      | Worktree_session_started { path; notice } ->
        let m, commands = reset_session m in
-       follow m, commands @ [ enter_worktree ~notice path ]
+       follow m, commands @ [ enter_worktree ~new_session:true ~notice path ]
      | Worktree_removed _ ->
        decode json ~f:P.Worktree.removed_of_json (fun w ->
          ( notice
@@ -5248,7 +5537,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:P.Hello_reply.of_json
-         (fun { client_id; namespace; user } ->
+         (fun { client_id; namespace; user; superuser = _ } ->
             let m, session_commands =
               reset_session
                 { m with
@@ -5661,8 +5950,8 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello { client_id; namespace; user } ->
-        { m with client_id = Some client_id; namespace; user }, []
+      | Hello { client_id; namespace; user; superuser } ->
+        { m with client_id = Some client_id; namespace; user; superuser }, []
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []

@@ -42,6 +42,7 @@ type t =
   ; session_name : string option
   ; session_description : string option
   ; cwd : string
+  ; home : Session_home.t option
   ; git_branch : string option
   ; model : Model.t
   ; thinking : string
@@ -75,6 +76,7 @@ let of_json j =
     Json.string_opt_field j "session_description"
   in
   let%bind cwd = Json.string_field j "cwd" in
+  let%bind home = Session_home.field j in
   let%bind git_branch = Json.string_opt_field j "git_branch" in
   let%bind model = Json.object_field j "model" >>= Model.of_json in
   let%bind thinking = Json.string_field j "thinking" in
@@ -141,6 +143,7 @@ let of_json j =
   ; session_name
   ; session_description
   ; cwd
+  ; home
   ; git_branch
   ; model
   ; thinking

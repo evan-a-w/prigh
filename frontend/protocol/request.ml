@@ -37,6 +37,8 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
+    | Enter_worktree of string
+    | Worktree_back of { main : bool }
     | Forge_status
     | Forge_login of
         { host : string
@@ -110,6 +112,8 @@ module Method = struct
         ; text : string
         ; expected : string option
         }
+    | Nix_store_status
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -124,6 +128,8 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
+    | Enter_worktree _ -> "set_cwd"
+    | Worktree_back _ -> "worktree_back"
     | Forge_status -> "forge_status"
     | Forge_login _ -> "forge_login"
     | Forge_logout _ -> "forge_logout"
@@ -147,6 +153,8 @@ module Method = struct
     | Fs_preview _ -> "fs_preview"
     | Git_show _ -> "git_show"
     | Fs_write _ -> "fs_write"
+    | Nix_store_status -> "nix_store_status"
+    | Nix_store_gc _ -> "nix_store_gc"
   ;;
 
   let cwd_param = function
@@ -166,6 +174,10 @@ module Method = struct
     | Forge_status
     | Pr_defaults
     | Get_review
+    | Nix_store_status -> []
+    | Nix_store_gc { delete_generations = None } -> []
+    | Nix_store_gc { delete_generations = Some _ as generations } ->
+      [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []
     | Review_submit { root = Some root } -> [ "root", Json.str root ]
     | Review_comment { root; path; range; anchor; text } ->
@@ -226,6 +238,9 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
+    | Enter_worktree path ->
+      [ "path", Json.str path; "worktree", Json.bool true ]
+    | Worktree_back { main } -> if main then [ "main", Json.bool true ] else []
     | Forge_login { host; kind; method_ } ->
       [ "host", Json.str host ]
       @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])

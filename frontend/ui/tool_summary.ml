@@ -36,6 +36,28 @@ let job_input args =
   | Some id, Some input -> Some (id ^ " " ^ quoted input)
 ;;
 
+let worktree args =
+  let str = Tool_args.string args in
+  match str "action" with
+  | None -> None
+  | Some action ->
+    let target =
+      match action with
+      | "create" ->
+        Option.map (str "branch") ~f:(fun branch ->
+          match str "base" with
+          | Some base -> sprintf "%s from %s" branch base
+          | None -> branch)
+      | "remove" ->
+        Option.map (str "path") ~f:(fun path ->
+          if Option.value (Tool_args.bool args "force") ~default:false
+          then path ^ " (force)"
+          else path)
+      | _ -> None
+    in
+    Some (String.concat ~sep:" " (action :: Option.to_list target))
+;;
+
 let as_call (s : P.Content.Server_tool.t) =
   let call = { P.Tool_call.id = s.id; name = s.name; arguments = s.input } in
   ( call

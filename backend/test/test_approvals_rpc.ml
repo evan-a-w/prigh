@@ -176,7 +176,7 @@ let%expect_test "set_mode, confirmations with rules, the first answer wins" =
     {"type":"response","id":"r","ok":false,"error":"unknown approval mode \"yolo\"; the modes are ask, auto-edit, auto"}
     {"type":"response","id":"r","ok":false,"error":"param \"plan_mode\" must be a boolean"}
     {"type":"event","event":"tool_confirm","call_id":"c1","agent_id":null,"name":"bash","summary":"echo one","rules":["bash(echo:*)"]}
-    {"steer_texts":[],"follow_up_texts":[],"confirms":[{"call_id":"c1","agent_id":null,"name":"bash","summary":"echo one","rules":["bash(echo:*)"]}],"questions":[]}
+    {"steer_texts":[],"follow_up_texts":[],"agents":[],"confirms":[{"call_id":"c1","agent_id":null,"name":"bash","summary":"echo one","rules":["bash(echo:*)"]}],"questions":[]}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"no pending confirmation for tool call \"c1\""}
     {"type":"event","event":"tool_confirm_done","call_id":"c1","agent_id":null}

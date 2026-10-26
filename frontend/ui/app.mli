@@ -84,11 +84,19 @@ module Reply_tag : sig
     (** [get_prefs] of the history the backend keeps for the user (shared
         with prigh-web) *)
     | Dequeued
+    | Agent_message of
+        { agent_id : string
+        ; kind : Queued_message.Kind.t
+        ; text : string
+        ; retry : string
+        } (** [steer_agent]: on an error, back in the editor as [retry] *)
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Nix_store_shown (** [/nix-gc] *)
+    | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
     | Jobs_picker
     | Job_output
@@ -118,6 +126,8 @@ module Reply_tag : sig
         } (** [list_worktrees] to find the worktree [action] names *)
     | Worktree_created (** then [set_cwd] there *)
     | Worktree_entered of string (** [set_cwd] into one; the notice *)
+    | Worktree_went_back of P.Session_home.t option
+    (** [worktree_back], from that home *)
     | Worktree_session_started of
         { path : string
         ; notice : string
@@ -254,6 +264,8 @@ module Model : sig
       (** the repository's branches and tags, for [/review]'s completion *)
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
+    ; agent_queues : Agent_queues.t
+      (** the background subagents' queues, from [agent_queues] *)
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -267,6 +279,9 @@ module Model : sig
     ; client_id : string option
     ; namespace : string option (** the user whose sessions we see *)
     ; user : string option (** the user we signed in as *)
+    ; superuser : bool
+      (** [user] is a superuser (even when acting as another): has the
+          commands only superusers have ([/nix-gc]) *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -282,6 +297,8 @@ module Model : sig
     ; server : Server_link.t option (** [None] until the platform reports it *)
     ; notice : Notice.t option
       (** the latest acknowledgement, until it expires (Esc dismisses it) *)
+    ; nix_gc : P.Nix_gc_progress.t option
+      (** while our [nix_store_gc] runs: how far it got *)
     ; sidebar : bool
       (** whether the agents sidebar shows on wide terminals (Alt+L) *)
     }
@@ -304,6 +321,12 @@ module Model : sig
   (** [namespace] when a superuser acts as another user ([/setusr]). *)
   val acting_as : t -> string option
 end
+
+(** The subagent the view and the editor are on, if any. *)
+val focused_agent : Model.t -> Agent_view.t option
+
+(** The focused agent's queued messages (the main agent's or a subagent's). *)
+val shown_queue : Model.t -> Queued_message.t list
 
 (** The screen's zones for the model's size and editor. *)
 val layout : Model.t -> Layout.t

@@ -54,8 +54,8 @@ let rank ~prefix items =
   Fuzzy.rank ~query:prefix items ~key:(fun i -> i.Picker.Item.search)
 ;;
 
-let command_items ~prefix =
-  Commands.all
+let command_items ~superuser ~prefix =
+  Commands.all ~superuser
   |> Fuzzy.rank ~query:prefix ~key:(fun (c : Commands.Spec.t) -> c.name)
   |> List.map ~f:(fun (c : Commands.Spec.t) ->
     Picker.Item.create ~id:c.name ~detail:c.help ~search:c.name c.name)
@@ -63,11 +63,11 @@ let command_items ~prefix =
 
 let has_whitespace s = String.exists s ~f:Char.is_whitespace
 
-let compute_command ~line ~line_index =
+let compute_command ~superuser ~line ~line_index =
   match String.chop_prefix line ~prefix:"/" with
   | Some rest when not (has_whitespace rest) ->
     let prefix = rest in
-    let items = command_items ~prefix in
+    let items = command_items ~superuser ~prefix in
     Option.some_if
       (not (List.is_empty items))
       { source = Source.Command
@@ -276,7 +276,7 @@ let argument_items
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
-  | Remind | Worktree | Review -> None
+  | Remind | Worktree | Review | Agents -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -364,6 +364,7 @@ let compute_words ~spec ~line ~col ~line_index ~start ~first ~candidates =
 ;;
 
 let compute_argument
+      ~superuser
       ~line
       ~col
       ~line_index
@@ -373,6 +374,7 @@ let compute_argument
       ~sessions
       ~snippets
       ~reminders
+      ~agents
       ~worktrees
       ~refs
       ~current_session
@@ -386,7 +388,7 @@ let compute_argument
     (match String.lsplit2 body ~on:' ' with
      | None -> None
      | Some (name, rest) ->
-       (match Commands.find name with
+       (match Commands.find ~superuser name with
         | None -> None
         | Some spec ->
           let sessions =
@@ -441,10 +443,12 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
-              | Remind ->
+              | (Remind | Agents) as kind ->
                 let rest = String.drop_prefix line start in
                 Option.bind
-                  (Remind_command.complete ~reminders rest)
+                  (match kind with
+                   | Agents -> Agents_command.complete ~agents rest
+                   | _ -> Remind_command.complete ~reminders rest)
                   ~f:(fun (offset, candidates) ->
                     let prefix = String.drop_prefix rest offset in
                     let items =
@@ -617,6 +621,7 @@ let directory ~host ~text =
 ;;
 
 let compute
+      ~superuser
       ~current_session
       ~line
       ~col
@@ -628,6 +633,7 @@ let compute
       ~skills
       ~snippets
       ~reminders
+      ~agents
       ~worktrees
       ~refs
       ~logged_in
@@ -637,12 +643,13 @@ let compute
   match
     Option.first_some
       (compute_skill ~line ~line_index ~skills)
-      (compute_command ~line ~line_index)
+      (compute_command ~superuser ~line ~line_index)
   with
   | Some _ as t -> t
   | None ->
     (match
        compute_argument
+         ~superuser
          ~line
          ~col
          ~line_index
@@ -652,6 +659,7 @@ let compute
          ~sessions
          ~snippets
          ~reminders
+         ~agents
          ~worktrees
          ~refs
          ~current_session

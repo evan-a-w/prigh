@@ -161,8 +161,13 @@ let agent_meta (m : App.Model.t) (a : Agent.t) =
   let cost =
     Option.bind (Chat.find_subagent m.chat a.id) ~f:(fun s -> s.cost_usd)
   in
+  let queued =
+    let q = Agent_queue.find m.agent_queues a.id in
+    List.length q.steer + List.length q.follow_up
+  in
   List.filter_opt
-    [ Some a.model
+    [ Option.some_if (queued > 0) (sprintf "%d queued" queued)
+    ; Some a.model
     ; Option.some_if (a.turns > 0) (plural a.turns "turn")
     ; Option.some_if (a.tool_calls > 0) (plural a.tool_calls "tool call")
     ; Option.map cost ~f:(sprintf "$%.2f")
@@ -442,6 +447,35 @@ let detail_head ~(outcome : Outcome.t) ~title ~elapsed ~meta ~action =
     ]
 ;;
 
+(* The composer writes to it (again, when it does: back to the main agent);
+   a nested one, which takes no messages, says why. Finished, it has none. *)
+let steer_button (m : App.Model.t) ~inject (a : Agent.t) =
+  let steering = Recipient.equal m.recipient (Agent a.id) in
+  match Recipient.refusal m.agents a.id with
+  | Some _ when not (Agents.running m.agents (Agent a.id)) -> Node.none
+  | Some why ->
+    button
+      ~cls:"ghost small agents-steer"
+      ~title:why
+      ~disabled:true
+      ~on_click:Effect.Ignore
+      [ icon Target; Node.text "Steer" ]
+  | None ->
+    button
+      ~cls:
+        (if steering
+         then "ghost small agents-steer on"
+         else "ghost small agents-steer")
+      ~title:
+        (if steering
+         then "Your messages go to it (Esc in the editor: to the main agent)"
+         else sprintf "Write to %s from the composer (/agents steer)" a.id)
+      ~attrs:[ Attr.create "aria-pressed" (Bool.to_string steering) ]
+      ~on_click:
+        (inject (Action.Set_recipient (if steering then Main else Agent a.id)))
+      [ icon Target; Node.text (if steering then "Steering" else "Steer") ]
+;;
+
 let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
   let sub = Chat.find_subagent m.chat a.id in
   let outcome, ended = ending a in
@@ -522,7 +556,8 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
         ~meta:(agent_meta m a)
         ~action:
           (Node.fragment
-             [ (match outcome with
+             [ steer_button m ~inject a
+             ; (match outcome with
                 | Running ->
                   stop_button
                     m

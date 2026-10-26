@@ -26,6 +26,10 @@ val repo_name : P.Repo.t -> string
     [None] outside a repository (or unknown). *)
 val place : P.Session_summary.t -> string option
 
+(** [from main]: where a worktree switch took it from ({!P.Session_home}),
+    while it is set. *)
+val home : ?tilde:(string -> string) -> P.Session_home.t option -> string option
+
 (** Its worktrees, by when they first mattered. [listings]: repositories'
     worktrees as [list_worktrees] gives them; one its repository's listing
     does not have (removed outside prigh) is left out. [cwd]: where the
