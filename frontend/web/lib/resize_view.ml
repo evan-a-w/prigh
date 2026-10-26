@@ -5,10 +5,12 @@ module Handle = Resize.Handle
 (* Where the size shows while it is dragged, before the model has it. *)
 let target : Handle.t -> string = function
   | Sidebar -> ".sidebar"
-  | Files -> "#files-panel"
-  | Files_split -> ".files-body"
+  | Files | Files_preview -> "#files-panel"
   | Agents -> "#agents-panel"
   | Terminal -> "#terminal-panel"
+  | Review_chat -> "main.main"
+  | Review_files -> ".review-body"
+  | Review_margin -> "#review-page"
 ;;
 
 let handle (m : App.Model.t) ~inject h =
@@ -32,7 +34,6 @@ let handle (m : App.Model.t) ~inject h =
         ; Attr.title "Drag to resize, double-click for the default size"
         ; Attr.create "data-resize" (Handle.name h)
         ; Attr.create "data-resize-var" (Handle.var h)
-        ; Attr.create "data-resize-unit" (Handle.unit h)
         ; int "data-resize-grows" (Handle.grows h)
         ; Attr.create "data-resize-target" (target h)
         ; Attr.on_double_click (fun _ -> inject (App.Action.Resize (Reset h)))

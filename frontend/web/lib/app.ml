@@ -586,7 +586,9 @@ module Model = struct
   let shown t =
     { Resize.Shown.sidebar = t.sidebar_open
     ; files = t.files.open_
+    ; preview = Option.is_some t.files.preview
     ; agents = t.agents.open_
+    ; reviewing = t.review.open_
     ; narrow = t.narrow
     }
   ;;
@@ -616,7 +618,8 @@ module Model = struct
 
   let ticking t =
     t.agents.open_
-    && Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
+    && (Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
+        || Agents.fetching t.agents)
   ;;
 
   let fold t = Fold.create ~verbosity:t.verbosity ~toggled:t.folds
@@ -816,7 +819,9 @@ let close_dialog (m : Model.t) =
     , [ Command.Focus
           (match Review_picker.which p with
            | Target -> "review-target-button"
-           | Base -> "review-base-button")
+           | Base -> "review-base-button"
+           | Since _ when m.review.open_ -> "review-since-button"
+           | Since _ -> "files-since-button")
       ] )
   | _ ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
@@ -2007,13 +2012,33 @@ let now_of (m : Model.t) = Option.value m.now ~default:Time_ns.epoch
 let with_agents (m : Model.t) ~f = { m with agents = f m.agents }
 let job_output id = rpc "job_output" [ "job_id", str id ] ~tag:(Job_output id)
 
-(* Top-level subagents' transcripts come with the chat (events, or
-   [get_subagent] after a reload); nested ones are fetched when shown. *)
+(* Subagents' transcripts come with their calls (events, or [get_subagent]
+   after a reload); those of calls not loaded, and nested ones, are fetched
+   when shown. *)
 let fetch_transcript (m : Model.t) id =
-  Agents.lineage m.agents id
-  |> List.filter ~f:(fun (a : Agents.Agent.t) ->
-    Option.is_none (Chat.find_subagent m.chat a.id))
-  |> List.map ~f:(fun (a : Agents.Agent.t) -> subagent_rpc a.id)
+  let wanted =
+    Agents.lineage m.agents id
+    |> List.filter ~f:(fun (a : Agents.Agent.t) ->
+      Option.is_none (Chat.find_subagent m.chat a.id)
+      &&
+      match Map.find m.agents.fetches a.id with
+      | Some (Asked _) -> false
+      | Some (Failed _) | None -> true)
+  in
+  ( with_agents m ~f:(fun agents ->
+      { agents with
+        fetches =
+          List.fold wanted ~init:agents.fetches ~f:(fun fetches a ->
+            Map.set fetches ~key:a.id ~data:(Asked m.now))
+      })
+  , List.map wanted ~f:(fun (a : Agents.Agent.t) -> subagent_rpc a.id) )
+;;
+
+(* After a new chat: the transcript on show, if it went with the old one. *)
+let refetch_shown (m : Model.t) =
+  match m.agents.selected with
+  | Some (Agent id) -> fetch_transcript m id
+  | Some (Job _) | None -> m, []
 ;;
 
 let select (m : Model.t) (item : Agents.Item.t) =
@@ -2029,7 +2054,7 @@ let select (m : Model.t) (item : Agents.Item.t) =
       })
   in
   match item with
-  | Agent id -> m, fetch_transcript m id
+  | Agent id -> fetch_transcript m id
   | Job id -> m, [ job_output id ]
 ;;
 
@@ -2190,9 +2215,15 @@ let show_in_chat (m : Model.t) id =
 (* While the panel is open, running jobs' last lines and the shown job's
    output are polled. *)
 let poll_interval = Time_ns.Span.of_sec 2.
+let transcript_timeout = Time_ns.Span.of_sec 20.
 
 let clock (m : Model.t) now =
-  let m = { m with now = Some now } in
+  let m =
+    { m with
+      now = Some now
+    ; agents = Agents.time_out_fetches m.agents ~now ~after:transcript_timeout
+    }
+  in
   let a = m.agents in
   let due =
     Option.value_map a.polled_at ~default:true ~f:(fun at ->
@@ -3876,68 +3907,72 @@ let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
 
 (* ---- the review page's pickers *)
 
-let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) d =
-  match which with
-  | Target ->
-    Review_picker.targets
-      ~worktrees:
-        (match worktrees with
-         | Some worktrees -> worktrees
-         | None ->
-           Option.value_map
-             (Worktrees.listing m.worktrees)
-             ~default:[]
-             ~f:(fun l -> l.worktrees))
-      ~reviewed:m.review.target.reviewed
-      d
-  | Base -> Review_picker.bases d
+let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) =
+  match which, m.review.diff with
+  | Target, Some d ->
+    Some
+      (Review_picker.targets
+         ~worktrees:
+           (match worktrees with
+            | Some worktrees -> worktrees
+            | None ->
+              Option.value_map
+                (Worktrees.listing m.worktrees)
+                ~default:[]
+                ~f:(fun l -> l.worktrees))
+         ~reviewed:m.review.target.reviewed
+         d)
+  | Base, Some d -> Some (Review_picker.bases d)
+  | (Target | Base), None -> None
+  | Since path, _ ->
+    Some
+      (Review_action.picker
+         m.review
+         ~path
+         ~me:(own_user m)
+         ~time:(Model.message_time m))
 ;;
 
 let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
-  match m.dialog, m.review.diff with
+  match m.dialog, review_picker m which with
   | Some (Review_pick p), _
     when Review_picker.Which.equal (Review_picker.which p) which ->
     close_dialog m
   | _, None -> toast m "The changes are still being read: try again."
-  | _, Some d ->
-    let m, cmds =
-      open_dialog
-        m
-        ~focus:"review-pick-filter"
-        (Review_pick (review_picker m which d))
-    in
+  | _, Some p when List.is_empty (Review_picker.visible p) ->
+    toast
+      m
+      "No review actions on this file yet: approve it or comment on it first."
+  | _, Some p ->
+    let m, cmds = open_dialog m ~focus:"review-pick-filter" (Review_pick p) in
     (* The worktrees as they are now: one may have been made since. *)
     ( m
     , cmds
       @
-      match which, Worktrees.place m.state with
-      | Target, Some place ->
-        [ call
-            (List_worktrees { cwd = None })
-            ~tag:(Worktrees { place; purpose = Review_pick })
-        ]
-      | Target, None | Base, _ -> [] )
+        (match which, Worktrees.place m.state with
+        | Target, Some place ->
+          [ call
+              (List_worktrees { cwd = None })
+              ~tag:(Worktrees { place; purpose = Review_pick })
+          ]
+        | Target, None | (Base | Since _), _ -> []) )
 ;;
 
-(* The diff or the worktrees were read again under an open picker: its
+(* The diff, the review or the worktrees changed under an open picker: its
    choices follow. *)
 let refresh_review_pick ?worktrees (m : Model.t) =
-  match m.dialog, m.review.diff with
-  | Some (Review_pick p), Some d ->
+  match m.dialog with
+  | Some (Review_pick p) ->
     let worktrees =
       match worktrees, Review_picker.worktrees p with
       | Some w, _ -> Some w
       | None, [] -> None
       | None, w -> Some w
     in
-    { m with
-      dialog =
-        Some
-          (Review_pick
-             (Review_picker.refresh
-                p
-                ~fresh:(review_picker m ?worktrees (Review_picker.which p) d)))
-    }
+    (match review_picker m ?worktrees (Review_picker.which p) with
+     | Some fresh ->
+       { m with dialog = Some (Review_pick (Review_picker.refresh p ~fresh)) }
+     | None -> m)
   | _ -> m
 ;;
 
@@ -3956,6 +3991,9 @@ let review_picked (m : Model.t) (item : Review_picker.Item.t) =
           base = Some base
         ; direct = target.direct && not (String.equal base "HEAD")
         }
+    | Since { path; index = None } -> review_update m (Follow_latest path)
+    | Since { path; index = Some index } ->
+      review_update m (Pick_since { path; index })
   in
   m, cmds
 ;;
@@ -4727,6 +4765,15 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
   | _ -> m, []
 ;;
 
+(* The agents panel says so, with a retry. *)
+let transcript_failed (m : Model.t) id e =
+  if Map.mem m.agents.fetches id
+  then
+    with_agents m ~f:(fun a ->
+      { a with fetches = Map.set a.fetches ~key:id ~data:(Failed e) })
+  else m
+;;
+
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
   Or_error.map (Subagent_detail.of_json json) ~f:(fun (d : Subagent_detail.t) ->
@@ -4782,14 +4829,19 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
     | true, Some _, _
       when phys_equal entry.chat m.chat && not m.pending.messages -> m, prefetch
     | true, Some _, (`Unchanged | `Changed | `New) ->
-      ( { m with
-          chat = entry.chat
-        ; paging = entry.paging
-        ; scrolled_up = false
-        ; pending = { m.pending with messages = false }
-        }
+      let m, shown =
+        refetch_shown
+          { m with
+            chat = entry.chat
+          ; paging = entry.paging
+          ; scrolled_up = false
+          ; pending = { m.pending with messages = false }
+          }
+      in
+      ( m
       , (Command.Scroll_to_bottom
          :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
+        @ shown
         @ prefetch ))
 ;;
 
@@ -5665,6 +5717,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           ~questions:pending.questions
       in
       m, restored @ cmds)
+  | Subagent id, Error e when Map.mem m.agents.fetches id ->
+    transcript_failed m id e, []
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
@@ -6045,14 +6099,25 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
             "Started job %s: its result reaches the agent when it exits."
             id)
      | Error _ -> m, [])
-  | Subagent _, Ok json ->
+  | Subagent id, Ok json ->
     (match subagent_of_json json with
      | Ok (subagent, `Parent parent, `Call call_id) ->
        ( { m with
-           chat = Chat.set_nested_subagent m.chat ~parent ~call_id subagent
+           chat =
+             Chat.set_nested_subagent
+               m.chat
+               ~parent
+               ~call_id
+               ~detach:(Map.mem m.agents.fetches id)
+               subagent
+         ; agents =
+             { m.agents with
+               fetches =
+                 Map.remove (Map.remove m.agents.fetches id) subagent.agent_id
+             }
          }
        , [] )
-     | Error _ -> m, [])
+     | Error e -> transcript_failed m id (Error.to_string_hum e), [])
   | Subagents, Ok json ->
     decode m json (decode_list Agents.Agent.of_json) ~f:(fun agents ->
       with_agents m ~f:(fun a -> Agents.set_agents a agents), [])

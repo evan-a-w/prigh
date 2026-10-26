@@ -53,7 +53,9 @@ let%expect_test "reconnecting after the backend goes away" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -205,7 +207,9 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -388,7 +392,9 @@ let%expect_test "an empty session the backend lost is replaced quietly" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     |}]
 ;;
@@ -448,7 +454,9 @@ let%expect_test "the network and the page's visibility drive reconnecting" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -621,7 +629,9 @@ let%expect_test "losing the connection while a session loads" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 60)))

@@ -209,6 +209,7 @@ let%expect_test "/help <command> and /hotkeys" =
     ] / [ (reviewing; also n p, j k) the next / previous changed file
     a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
+    l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
@@ -1534,8 +1535,6 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
-     (tag (Subagent a2)))
     |}]
 ;;
 
@@ -1699,7 +1698,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1752,7 +1753,9 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

@@ -114,6 +114,7 @@ type t =
   ; since_again : bool
   ; picked : (int * Review_since.File.t option) String.Map.t
   ; views : Layout.t String.Map.t
+  ; unfolded : String.Set.t
   }
 [@@deriving sexp_of]
 
@@ -147,6 +148,7 @@ let empty =
   ; since_again = false
   ; picked = String.Map.empty
   ; views = String.Map.empty
+  ; unfolded = String.Set.empty
   }
 ;;
 
@@ -156,6 +158,7 @@ module Reply = struct
     | Review
     | Comment_added
     | Changed of string option
+    | Replied of string
     | Decided of string
     | Content of string
     | Shown of string
@@ -204,6 +207,8 @@ module Action = struct
         { path : string
         ; index : int
         }
+    | Follow_latest of string
+    | Unfold of string
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -331,6 +336,20 @@ let layout_of t path : Layout.t =
   match chosen with
   | Since when List.is_empty (history t path) -> Unified
   | layout -> layout
+;;
+
+let comment_path t id =
+  List.find_map t.review.comments ~f:(fun (c : Review_comment.t) ->
+    Option.some_if (String.equal c.id id) c.path)
+;;
+
+(* The user commented, replied or decided on [path]: it shows what changed
+   since, as of its latest action. *)
+let acted t path =
+  { t with
+    views = Map.set t.views ~key:path ~data:Layout.Since
+  ; picked = Map.remove t.picked path
+  }
 ;;
 
 let get_since t =
@@ -587,16 +606,24 @@ module Rows = struct
   ;;
 end
 
+let since_diff t path =
+  match layout_of t path, since t path with
+  | Since, Some { changed = true; diff; _ } when not (String.is_empty diff) ->
+    Some diff
+  | _ -> None
+;;
+
 let rows t ~path =
   let file = file t path in
   let text = text_of t path in
-  let layout = layout_of t path in
-  let full = Layout.equal layout Full in
-  let since =
-    match layout with
-    | Since ->
-      Some (Option.value_map (since t path) ~default:"" ~f:(fun s -> s.diff))
-    | Unified | Full -> None
+  let since = since_diff t path in
+  (* Until something changed since the action: the changes as the page's
+     layout shows them. *)
+  let full =
+    match layout_of t path with
+    | Full -> true
+    | Since -> Option.is_none since && Layout.equal t.layout Full
+    | Unified -> false
   in
   Rows.find
     { path
@@ -632,8 +659,7 @@ let lines t path =
 (* In the since-view the removed lines are the file as it was at the action,
    not what the change removed: they take no comments. *)
 let on_snapshot t ~path (range : Review_comment.Range.t) =
-  Layout.equal (layout_of t path) Since
-  && Review_comment.Side.equal range.side Old
+  Option.is_some (since_diff t path) && Review_comment.Side.equal range.side Old
 ;;
 
 let snapshot_lines =
@@ -691,6 +717,7 @@ let rec update t (action : Action.t) =
       ; since = String.Map.empty
       ; picked = String.Map.empty
       ; views = String.Map.empty
+      ; unfolded = String.Set.empty
       }
     in
     update (scoped t) (Open None)
@@ -750,6 +777,21 @@ let rec update t (action : Action.t) =
                 path)
          ] )
      | Unified | Since -> t, [])
+  | Follow_latest path ->
+    ( { t with
+        views = Map.set t.views ~key:path ~data:Since
+      ; picked = Map.remove t.picked path
+      ; selection = None
+      }
+    , [] )
+  | Unfold key ->
+    ( { t with
+        unfolded =
+          (if Set.mem t.unfolded key
+           then Set.remove t.unfolded key
+           else Set.add t.unfolded key)
+      }
+    , [] )
   | Pick_since { path; index } ->
     let t =
       { t with views = Map.set t.views ~key:path ~data:Since; selection = None }
@@ -842,8 +884,7 @@ let rec update t (action : Action.t) =
   | Reply_send id ->
     (match Map.find t.replies id with
      | Some text when not (String.is_empty (String.strip text)) ->
-       ( comment_busy t id
-       , [ rpc (Review_reply { id; text }) (Changed (Some id)) ] )
+       comment_busy t id, [ rpc (Review_reply { id; text }) (Replied id) ]
      | Some _ | None -> t, [ toast "Write the reply first." ])
   | Set_status { id; status } ->
     ( comment_busy t id
@@ -1011,17 +1052,25 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     let t = { t with draft = None; selection = None } in
     (match Review_comment.of_json json with
      | Ok c ->
-       ( map_comments t ~f:(fun comments ->
+       ( map_comments (acted t c.path) ~f:(fun comments ->
            if List.exists comments ~f:(fun o -> String.equal o.id c.id)
            then comments
            else comments @ [ c ])
        , [] )
      | Error _ -> t, [])
-  | Decided id, result ->
-    (* An accepted change edited the file. *)
+  | (Decided id | Replied id), result ->
+    let t =
+      match result, comment_path t id with
+      | Ok _, Some path -> acted t path
+      | _ -> t
+    in
     let t, outs = reply t (Changed (Some id)) result in
-    let t, diff = get_diff t in
-    t, outs @ diff
+    (match why with
+     | Replied _ -> t, outs
+     | _ ->
+       (* An accepted change edited the file. *)
+       let t, diff = get_diff t in
+       t, outs @ diff)
   | Changed id, result ->
     let t =
       match id with

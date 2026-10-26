@@ -193,7 +193,8 @@ let%expect_test "a file changed since its last action shows what changed since" 
   [%expect
     {|
     (Comment) (Edit)
-    (Changes) (Whole file) (Since bob approved · 10:00)
+    (Changes) (Whole file)
+    (Since latest (approval · 10:00)) (Compare with another action on this file: Latest follows your newest (Shift+L))
     (Send comments) (Close the review (Esc, Alt+R))
     |}];
   H.reply h "review_since" since_json;
@@ -204,8 +205,9 @@ let%expect_test "a file changed since its last action shows what changed since" 
     0/2 approved
     (Read the changes again (they also update as prigh edits))
     (Comment) (Edit)
-    (Changes) (Whole file) (Since bob approved · 10:00)
-    bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
+    (Changes) (Whole file)
+    (Since latest (approval · 10:00)) (Compare with another action on this file: Latest follows your newest (Shift+L))
+    (Send comments) (Close the review (Esc, Alt+R))
     Reviewing
     (main /work)
     against
@@ -216,7 +218,7 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Previous file ([, p, k)) (Next file (], n, j))
     a.ml
     (Approve)
-    Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then)
+    Since bob's approval · 10:00: +2 −1 (removed lines are the file as it was then)
     @@ -1,1 +1,2 @@
     1 let x = 2
     2 - let y = 3
@@ -228,9 +230,7 @@ let%expect_test "a file changed since its last action shows what changed since" 
   [%expect
     {|
     button "Comment" -- Select code and comment on it (e)
-    button "Since bob approved \194\183 10:00" -- What changed in the file since then: its text then to now (l)
-    option "bob approved \194\183 10:00"
-    option "you commented \194\183 09:00"
+    button "Since latest (approval \194\183 10:00)" -- What changed since your latest action on the file, whichever it is as you act: now Approved · 10:00 · by bob (l)
     |}];
   (* b.ml has not changed since it was approved: it shows its changes, and
      its since-view says nothing changed. *)
@@ -253,7 +253,10 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Previous file ([, p, k)) (Next file (], n, j))
     b.ml
     Changed since you approved it (Approve again)
-    Nothing changed since you approved · 10:00.
+    Nothing changed since your approval · 10:00 · the changes as they are, below
+    @@ -1 +1 @@
+    1 - let b = 1
+    1 + let b = 2
     |}];
   (* Changes takes a.ml back to its hunks; it stays so. *)
   H.key h "[" ~target:Review;
@@ -280,7 +283,15 @@ let%expect_test "an older action from the menu" =
      (tag (Review (Since_picked (root /work) (path a.ml) (index 0)))))
     |}];
   H.text h ~selector:".review-scroll";
-  [%expect {| Reading what changed since you commented · 09:00… |}];
+  [%expect
+    {|
+    Reading what changed since your comment · 09:00…
+    @@ -1,2 +1,3 @@
+    1 - let x = 1
+    1 + let x = 2
+    2 let y = 3
+    3 + let z = 4
+    |}];
   H.reply
     h
     "review_since"
@@ -302,9 +313,10 @@ let%expect_test "an older action from the menu" =
   [%expect
     {|
     (Comment) (Edit)
-    (Changes) (Whole file) (Since you commented · 09:00)
-    bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
-    Since you commented · 09:00: +1 −0
+    (Changes) (Whole file)
+    (Since comment · 09:00) (Compare with another action on this file: Latest follows your newest (Shift+L))
+    (Send comments) (Close the review (Esc, Alt+R))
+    Since your comment · 09:00: +1 −0
     @@ -1,0 +1,1 @@
     1 + let z = 4
     |}];
@@ -312,7 +324,7 @@ let%expect_test "an older action from the menu" =
   H.act h (Review (Pick_since { path = "a.ml"; index = 1 }));
   H.text h ~selector:".review-since-note";
   [%expect
-    {| Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then) |}]
+    {| Since bob's approval · 10:00: +2 −1 (removed lines are the file as it was then) |}]
 ;;
 
 let%expect_test "comments in the since-view are on the file as it is now" =
@@ -352,7 +364,7 @@ let%expect_test "comments in the since-view are on the file as it is now" =
   H.text h ~selector:".review-scroll";
   [%expect
     {|
-    Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then)
+    Since bob's approval · 10:00: +2 −1 (removed lines are the file as it was then)
     @@ -1,1 +1,2 @@
     1 let x = 2
     2 - let y = 3
@@ -386,6 +398,7 @@ let%expect_test "comments in the since-view are on the file as it is now" =
   H.text h ~selector:".review-scroll";
   [%expect
     {|
+    Nothing changed since your comment · 10:00 · the changes as they are, below
     @@ -1,2 +1,3 @@
     1 - let x = 1
     1 + let x = 2
@@ -446,5 +459,159 @@ let%expect_test "an older backend: no since-view" =
     (○ a.ml +2 −1)
     (⚠ b.ml +1 −1)
     2 files changed, +3 −2
+    |}]
+;;
+
+let comment_c1 ?(replies = "") () =
+  sprintf
+    {|{"id":"c1","root":"/work","path":"a.ml","first":2,"last":2,"anchor":"let y = 30","status":"open","thread":[{"author":"user","text":"Why 30?","at_ms":1791194400000,"delivered":false}%s]}|}
+    replies
+;;
+
+(* a.ml's review once commented on (at 10:00) and replied to (10:05). *)
+let review_commented ?(replied = false) () =
+  sprintf
+    {|{"type":"event","event":"review","review":{"comments":[%s],"approvals":[{"root":"/work","path":"b.ml","hash":"x"}],"snapshots":[%s,%s,%s%s,%s]}}|}
+    (comment_c1
+       ~replies:
+         (if replied
+          then
+            {|,{"author":"user","text":"Or 31?","at_ms":1791194700000,"delivered":false}|}
+          else "")
+       ())
+    (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791190800000" "m0")
+    (snapshot
+       ~path:"a.ml"
+       ~action:"approved"
+       ~by:"bob"
+       ~at:"1791194400000"
+       "m1")
+    (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791194400000" "now")
+    (if replied
+     then
+       "," ^ snapshot ~path:"a.ml" ~action:"replied" ~at:"1791194700000" "now"
+     else "")
+    (snapshot ~path:"b.ml" ~action:"approved" ~at:"1791194400000" "m2")
+;;
+
+let unchanged ~index ~action ~at =
+  sprintf
+    {|{"files":[%s]}|}
+    (file
+       ~changed:false
+       ~index
+       ~added:0
+       ~removed:0
+       "a.ml"
+       (snapshot ~path:"a.ml" ~action ~at "now")
+       "")
+;;
+
+let%expect_test
+    "commenting shows the since-view of the latest action; Latest follows \
+     newer ones; the menu names them"
+  =
+  let h = opened () in
+  H.reply h "review_since" since_json;
+  (* The hunks, chosen. *)
+  H.act h (Review (Set_layout Unified));
+  H.names h ~selector:".review-controls .segment.on";
+  [%expect
+    {|
+    button "Comment" -- Select code and comment on it (e)
+    button "Changes" -- Only the changed hunks (v)
+    |}];
+  H.quiet h (fun () ->
+    H.act
+      h
+      (Review
+         (Select_line { path = "a.ml"; side = New; line = 2; extend = false }));
+    H.key h "c" ~target:Review;
+    H.act h (Review (Draft_input "Why 30?"));
+    H.act h (Review Draft_send));
+  H.reply h "review_comment" (comment_c1 ());
+  H.event h (review_commented ());
+  H.reply
+    h
+    "review_since"
+    (unchanged ~index:2 ~action:"commented" ~at:"1791194400000");
+  [%expect
+    {|
+    (Review Start_comment)
+    (Rpc (method_ review_since) (params ((root /work)))
+     (tag (Review (Since /work))))
+    |}];
+  (* Since the comment, named by its line: nothing yet, so the changes
+     under the note, the comment by its line. *)
+  H.text h ~selector:".review-controls .segmented:last-of-type";
+  H.text h ~selector:".review-scroll";
+  [%expect
+    {|
+    (Changes) (Whole file)
+    (Since latest (comment · 10:00)) (Compare with another action on this file: Latest follows your newest (Shift+L))
+    Nothing changed since your comment on line 2 · 10:00 · the changes as they are, below
+    @@ -1,2 +1,3 @@
+    1 - let x = 1
+    1 + let x = 2
+    2 let y = 3
+    c1 line 2
+    (Resolve) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Why 30?
+    []
+    3 + let z = 4
+    |}];
+  (* A reply: Latest follows it. *)
+  H.quiet h (fun () ->
+    H.act h (Review (Set_layout Full));
+    H.act h (Review (Reply_input { id = "c1"; text = "Or 31?" }));
+    H.act h (Review (Reply_send "c1")));
+  H.reply h "review_reply" (comment_c1 ());
+  H.event h (review_commented ~replied:true ());
+  H.reply
+    h
+    "review_since"
+    (unchanged ~index:3 ~action:"replied" ~at:"1791194700000");
+  H.text h ~selector:".review-since";
+  H.text h ~selector:".review-since-note";
+  [%expect
+    {|
+    (Rpc (method_ review_since) (params ((root /work)))
+     (tag (Review (Since /work))))
+    (Since latest (reply · 10:05)) (Compare with another action on this file: Latest follows your newest (Shift+L))
+    Nothing changed since your reply on line 2 · 10:05 · the changes as they are, below
+    |}];
+  (* Shift+L: the menu, Latest first, then the earlier actions by what was
+     done where. *)
+  H.key h "L" ~shift:true ~target:Review;
+  H.names h ~selector:"#review-popover .review-pick-item";
+  [%expect
+    {|
+    (Review_pick (Since a.ml))
+    (Focus review-pick-filter)
+    [option] div "Latest follows your newest action: Reply on line 2 \194\183 10:05"
+    [option] div "Comment on line 2 \194\183 10:00"
+    [option] div "Approved \194\183 10:00 \194\183 by bob"
+    [option] div "Comment \194\183 09:00"
+    |}];
+  H.click h ~selector:"[data-id='since:2']";
+  H.text h ~selector:".review-since";
+  [%expect
+    {|
+    (Picker_choose since:2)
+    (Rpc (method_ review_since) (params ((root /work) (path a.ml) (index 2)))
+     (tag (Review (Since_picked (root /work) (path a.ml) (index 2)))))
+    (Since comment on line 2 · 10:00) (Compare with another action on this file: Latest follows your newest (Shift+L))
+    |}];
+  (* Latest again: the newest, whichever it is. *)
+  H.click h ~selector:"#review-since-button";
+  H.click h ~selector:"[data-id='since:latest']";
+  H.text h ~selector:".review-since";
+  [%expect
+    {|
+    (Review_pick (Since a.ml))
+    (Focus review-pick-filter)
+    (Picker_choose since:latest)
+    (Since latest (reply · 10:05)) (Compare with another action on this file: Latest follows your newest (Shift+L))
     |}]
 ;;
