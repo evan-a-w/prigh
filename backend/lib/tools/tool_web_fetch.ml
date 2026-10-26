@@ -11,7 +11,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "Fetch a URL (http or https) and return its content as readable text: \
        HTML is converted to markdown with links kept, other text is returned \

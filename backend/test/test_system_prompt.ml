@@ -300,3 +300,42 @@ let%expect_test "a subagent is told to block on commands and jobs, not sleep" =
   section [];
   [%expect {||}]
 ;;
+
+let%expect_test "agents with the worktree tool are told to use it" =
+  let subagent =
+    Tool_subagent.create
+      ~provider:(Faux_provider.create [])
+      ~current_model:(fun () -> Model.default)
+      ~current_thinking:(fun () -> Off)
+      ~home:"/home"
+      ()
+  in
+  let worktree = Tool_worktree.create () in
+  let show ~role tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"git worktree")
+    |> function
+    | [] -> print_endline "(no worktree guidance)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show ~role:Main (Tools.all @ [ subagent; worktree ]);
+  show ~role:Subagent (Tools.all @ [ subagent; worktree ]);
+  (* A nested subagent has no subagent tool. *)
+  show ~role:Subagent (Tools.all @ [ worktree ]);
+  show ~role:Main (Tools.all @ [ subagent ]);
+  [%expect
+    {|
+    - To work on a separate branch, use the worktree tool (or the subagent tool's worktree option for delegated work); never run git worktree add yourself. Work in the worktree by its path: cd there in bash, use paths under it in file tools, pass it as a subagent's cwd.
+    - To work on a separate branch, use the worktree tool (or the subagent tool's worktree option for delegated work); never run git worktree add yourself. Work in the worktree by its path: cd there in bash, use paths under it in file tools, pass it as a subagent's cwd.
+    - To work on a separate branch, use the worktree tool; never run git worktree add yourself. Work in the worktree by its path: cd there in bash, use paths under it in file tools.
+    (no worktree guidance)
+    |}]
+;;

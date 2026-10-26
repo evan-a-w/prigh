@@ -6,7 +6,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = Some Apply_patch.grammar
-  ; destructive = true
+  ; destructive = Always
   ; description = Apply_patch.description
   ; parameters =
       Tool_args.schema

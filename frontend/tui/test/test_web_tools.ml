@@ -674,3 +674,52 @@ let%expect_test "a subagent's card names its searches as its steps" =
         ↳ web_search "ocaml eio"
     |}]
 ;;
+
+let%expect_test "worktree: the action and its branch or path" =
+  show_item
+    (tool
+       "worktree"
+       {|{"action":"create","branch":"feat/x","base":"main"}|}
+       ~result:(false, "made worktree /w/repo/feat-x, a checkout of /repo"));
+  show_item
+    (tool
+       "worktree"
+       {|{"action":"remove","path":"/w/repo/feat-x","force":true}|});
+  show_item (tool "worktree" {|{"action":"list"}|});
+  [%expect
+    {|
+    == quiet ==
+    ✓ worktree create feat/x from main  1 line
+    == normal ==
+    ✓ worktree create feat/x from main
+        made worktree /w/repo/feat-x, a checkout of /repo
+    == verbose ==
+    ✓ worktree create feat/x from main
+        {
+          action: "create"
+          branch: "feat/x"
+          base: "main"
+        }
+        made worktree /w/repo/feat-x, a checkout of /repo
+    == quiet ==
+    … worktree remove /w/repo/feat-x (force)
+    == normal ==
+    … worktree remove /w/repo/feat-x (force)
+    == verbose ==
+    … worktree remove /w/repo/feat-x (force)
+        {
+          action: "remove"
+          path: "/w/repo/feat-x"
+          force: true
+        }
+    == quiet ==
+    … worktree list
+    == normal ==
+    … worktree list
+    == verbose ==
+    … worktree list
+        {
+          action: "list"
+        }
+    |}]
+;;

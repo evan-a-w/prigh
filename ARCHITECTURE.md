@@ -474,7 +474,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   bounds output by lines and bytes. `Tool_spec` carries the flags the
   harness reasons about: `parallel_safe` (safe to run concurrently with
   other tools), `destructive` (what the approval modes hold for
-  confirmation, see `Approval`), `on_host` (runs on the active tool host rather than always in
+  confirmation, see `Approval`: `Always`, `Never`, or `Depends` on the
+  call's arguments, as `worktree`'s `list` does not ask but `create` and
+  `remove` do), `on_host` (runs on the active tool host rather than always in
   the backend) and `freeform` (a Lark grammar: the Responses API sends the
   tool as an OpenAI custom tool, whose free-text input streams and is
   replayed as the `input` string argument; other providers send the JSON
@@ -644,6 +646,28 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   which `Agent.broadcast` records in the session (`add_agent_worktree`),
   and the report ends with `Agent_worktree.report_line` (where the branch
   is, how to review, merge or remove it).
+- `Tool_worktree` — the model's `worktree` tool (`action` create, list or
+  remove; `branch`, `base`, `path`, `force`, `cwd`), made in `bin/main.ml`
+  with closures for the agent's `worktrees_dir` and session. It runs
+  `Worktree`'s pseudo-tools (`list_tool`, `create_tool`, `remove_tool`)
+  with `Tool.execute_via`, so on the session's tool host; `remove` refuses
+  the worktree the calling agent's cwd or the session's cwd is in (and
+  `Worktree.remove` the main checkout, and changes without `force`). What
+  it makes or removes goes out as `Agent_event.Worktrees_changed {added;
+  removed}` through the context's `emit`, so a subagent's arrives wrapped in
+  its `Subagent` events. `Agent.broadcast` takes that event (at any depth)
+  out of the stream, never sending it to frontends, and records it on the
+  session: an added `Created` worktree from a subagent becomes `Agent
+  {agent; task}` (the task from `Subagent_log`), removed paths append
+  `Worktree_removed`. `Rpc_server` re-lists a session on every
+  `Message_end`, a subagent's too, so the sidebar follows.
+- `Worktree_watch` — the safety net for `git worktree add`/`remove`/`move`/
+  `prune` run in `bash`: `Agent.executor` wraps the call that actually runs
+  a matching command (not the backend-side wrapper of a job) in
+  `$worktree_list` listings before and after, in the call's cwd, and emits
+  the difference as `Worktrees_changed`; a new worktree outside the
+  project directory (`managed = false`) gets a note in the result telling
+  the model to use the `worktree` tool.
 - `Background_tasks` — one agent's background work, of two kinds:
   subagents (ids `a<n>`, seeded past the subagent calls already in the
   session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
@@ -778,7 +802,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (nested ones keep `subagent`) leaves that out and says instead to use
   foreground commands rather than sleep, that job reports wake it after its
   turn, and that it finishes only once its jobs have exited (so kill
-  servers first).
+  servers first). Either role, given the `worktree` tool, is told to make
+  worktrees with it (or `subagent`'s `worktree` option) rather than `git
+  worktree add`, and to work there by the worktree's path.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When

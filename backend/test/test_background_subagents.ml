@@ -112,7 +112,7 @@ let hold_tool promise =
       ; description = "wait"
       ; parameters = Tool_args.schema []
       ; parallel_safe = false
-      ; destructive = false
+      ; destructive = Never
       ; on_host = false
       ; freeform = None
       }
@@ -628,7 +628,7 @@ let noop_tool =
       ; description = "do a step"
       ; parameters = Tool_args.schema []
       ; parallel_safe = false
-      ; destructive = false
+      ; destructive = Never
       ; on_host = false
       ; freeform = None
       }
