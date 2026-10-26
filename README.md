@@ -981,14 +981,14 @@ that no longer exists.
 
 | Key | Action |
 |---|---|
-| Enter | send the prompt; accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
-| Alt+Enter | queue a follow-up to run after the current turn |
+| Enter | send the prompt (to a focused subagent: steer it); accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
+| Alt+Enter | queue a follow-up to run after the current turn (a focused subagent's: before it reports) |
 | Alt+S | send exactly what is typed, ignoring the completion popup (`/cd newdir` while it highlights an existing directory); Esc then Enter does the same |
 | Ctrl+J / Alt+J | insert a newline |
-| Esc | close the dialog, abort the running turn, or scroll back to the bottom |
+| Esc | close the dialog, go back to the main agent from a subagent, abort the running turn, or scroll back to the bottom |
 | Tab | accept the highlighted completion (a command, argument, `@path` or `#snippet`); on an empty prompt, list the commands |
 | Up / Down | move up/down (editor line, history, or list row) |
-| Alt+Up | pop the last queued steer/follow-up back into the editor |
+| Alt+Up | pop the last queued steer/follow-up (the focused agent's) back into the editor |
 | Left / Right | move the cursor |
 | Alt+B / Ctrl+Left | move back one word |
 | Alt+F / Ctrl+Right | move forward one word |
@@ -1129,6 +1129,19 @@ has been delivered, then until the next prompt. The status line shows an
 `agents:` strip, with `bg` while agents run and the main agent is idle; a
 delivered report shows as `↩ subagent a1 finished "task"` and the report's
 first lines.
+
+You can steer a running subagent like the main agent. With it focused, the
+editor talks to it (its placeholder and the status line say so: `→ a1`):
+Enter sends a steer, which it reads at its next step (after its current tool
+calls), Alt+Enter a follow-up, which it reads when it would otherwise report,
+and Alt+Up takes the last queued one back; its queue is listed above the
+rule as the main agent's is, and `/queue` edits or removes from it. Slash
+and `!` commands still go to the app. `/agents steer N TEXT` and `/agents
+follow-up N TEXT` send without focusing. Delivered messages show in its
+transcript as `→ You (steer)` and in the main one as a quiet `→ a1: text`.
+A subagent that has finished takes no more messages: the error says to tell
+the main agent instead, and the text stays in the editor. The main agent can
+message its subagents too (`subagent_message`).
 
 Long commands run as background jobs: the model calls `bash` with
 `background: true` (the system prompt tells it to for anything that may take
@@ -1454,7 +1467,7 @@ it.
 | `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
-| `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
+| `/agents [steer\|cancel ...]` | focus a subagent (Ctrl+D in the picker cancels one); `steer N TEXT` / `follow-up N TEXT` tell subagent N (its number or id) something; `cancel N` cancels it |
 | `/jobs [<id>\|kill <id>]` | list background jobs (Enter shows recent output, Ctrl+D kills one), or show/kill one |
 | `/queue` | the queued steers and follow-ups (Enter takes one back into the editor, Ctrl+D removes it) |
 | `/host [name\|backend]` | pick where tools run, and the directory there |

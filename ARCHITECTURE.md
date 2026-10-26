@@ -1644,8 +1644,14 @@ terminal frontend and `web/` prigh-web, the browser one.
     `State.subagents` lists it as undelivered, then until the next prompt;
     a delivered report, a subagent's or a job's, renders as a compact
     `Transcript` `Delivery` item; `/jobs` lists `list_jobs` in a picker,
-    Enter adds `job_output` to the transcript as a block, Ctrl+D kills),
-    `Commands` (slash table, parse, complete,
+    Enter adds `job_output` to the transcript as a block, Ctrl+D kills;
+    `Agent_queues` keeps the subagents' queues from `agent_queues` and
+    `get_pending`, reset with the session: with a subagent focused, Enter /
+    Alt+Enter / Alt+Up become `steer_agent` / `steer_agent mode:follow_up` /
+    `dequeue_agent`, tagged `Agent_message` so a refusal takes it off the
+    shown queue and puts the text back, and `App.shown_queue` lists the
+    focused agent's queue; `Agents_command` parses and completes `/agents
+    steer|follow-up|cancel N`), `Commands` (slash table, parse, complete,
     closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
     `Btw_box` (the `/btw` panel above the composer: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
