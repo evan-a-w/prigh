@@ -4,7 +4,8 @@
 // session's menu, one moved into that has uncommitted changes, one shared
 // with another session), their context menus (right-click, Shift+F10, a
 // long press on a phone) and what they do (a new worktree, a new session
-// there, a terminal there, removal: refused with changes, then forced),
+// there, a terminal there, switching back where the session came from,
+// removal: refused with changes, then forced),
 // folding, searching, /worktree's picker, and the list on a phone. Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // prigh_web.expected).
@@ -287,10 +288,19 @@ try {
   await screenshot("searching");
   await page.locator("#session-search").fill("");
 
+  // Switched into feat/login, then docs: its home is still main, and
+  // Switch back, first in its menu, goes there.
+  await first.locator(".session").click({ button: "right", position: { x: 60, y: 12 } });
+  await menuText("a switched session's menu");
+  await choose("switch_back");
+  await toastHas("Back in main");
+  await page.waitForFunction(() => !document.querySelector(".session-item.selected .worktree.here"));
+  await first.locator(".session-home").waitFor({ state: "detached" });
+  await page.mouse.move(1000, 400);
+  await tree("switched back");
+
   // Removing the one with changes, from its menu: refused, then forced
   // (once the session has moved out of it).
-  await run(`/cd ${repo}`);
-  await page.waitForFunction(() => !document.querySelector(".session-item.selected .worktree.here"));
   await worktree("docs", first).click({ button: "right" });
   await choose("remove");
   await page.locator(".remove-worktree-dialog").waitFor();

@@ -22,6 +22,8 @@ type t =
     (** where its cwd is in git; [None] outside a repository, or unknown *)
   ; worktrees : Session_worktree.t list
     (** those that matter to it, not removed yet, by when they first did *)
+  ; home : Session_home.t option
+    (** where a worktree switch took it from, for [/worktree back] *)
   }
 [@@deriving sexp_of, equal]
 

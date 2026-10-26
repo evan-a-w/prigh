@@ -711,7 +711,7 @@ let%expect_test "a worktree's menu and its items" =
     (Picker_choose switch_here)
     (Focus editor)
     (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/prigh/feat-login)))
+     (params ((path /home/u/.prigh/worktrees/prigh/feat-login) (worktree true)))
      (tag
       (Plan_entered
        ((switch (/sessions/s1.jsonl)) (enter ()) (run ())
@@ -842,5 +842,218 @@ let%expect_test "selecting: no menus, ranges in list order" =
     (Cancel) (Delete 2 sessions (0 B))
     <div class="marked selected session">
     <div class="marked session">
+    |}]
+;;
+
+(* A session that switched into a worktree remembers its home: the row says
+   where from, its menu offers to switch back. *)
+
+let home_sessions () =
+  sprintf
+    "[%s]"
+    (String.concat
+       ~sep:","
+       [ H.session_json
+           ~name:"Login form"
+           ~cwd:login
+           ~repo:(prigh, login, Some "feat/login")
+           ~live:true
+           ~worktrees:[ login, Some "feat/login", prigh, "entered" ]
+           ~home:(prigh, Some "main")
+           "s1"
+       ; H.session_json
+           ~name:"Notes"
+           ~cwd:redesign
+           ~repo:(site, redesign, Some "redesign")
+           ~worktrees:[ redesign, Some "redesign", site, "entered" ]
+           ~home:("/home/u/notes", None)
+           "s2"
+       ; H.session_json
+           ~name:"Landing page"
+           ~cwd:site
+           ~repo:(site, site, Some "trunk")
+           "s3"
+       ])
+;;
+
+let home_state ?home () =
+  H.state_json
+    ~fields:
+      ([ "session_id", `String "s1"
+       ; "session_path", `String "/sessions/s1.jsonl"
+       ; "cwd", `String login
+       ; "git_branch", `String "feat/login"
+       ]
+       @ Option.value_map home ~default:[] ~f:(fun home ->
+         [ "home", Jsonaf.of_string (H.home_json home) ]))
+    ()
+;;
+
+let%expect_test
+    "a switched session: from main on its row, Switch back first in its menu"
+  =
+  let h =
+    H.create
+      ~state:(home_state ~home:(prigh, Some "main") ())
+      ~sessions:(home_sessions ())
+      ()
+  in
+  list h;
+  H.elements h ~selector:".session-home";
+  [%expect
+    {|
+    (Login form 2m ago prigh feat/login from main) (1) (More (right-click, Shift+F10))
+    (feat/login here)
+    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10))
+    (redesign here)
+    (Landing page 2m ago site trunk) (More (right-click, Shift+F10))
+    <span class="session-home">
+    <span class="session-home">
+    |}];
+  H.right_click h ~selector:".session" ~nth:0;
+  menu h;
+  H.key h "Escape" ~target:Page;
+  H.right_click h ~selector:".session" ~nth:1;
+  menu h;
+  H.key h "Escape" ~target:Page;
+  H.right_click h ~selector:".session" ~nth:2;
+  menu h;
+  [%expect
+    {|
+    (Open_menu
+     ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
+    (Focus dialog)
+    (Place_menu (Element session-s1))
+    Login form prigh feat/login
+    Switch back to main /worktree back
+    Open in new tab
+    Rename… /name
+    Fork… /fork
+    New worktree… /worktree new
+    Review changes /review
+    Open in file browser /files
+    Open terminal there /terminal
+    Copy path
+    Copy session id
+    Archive A
+    Delete… Delete
+    Close_dialog
+    (Focus editor)
+    (Open_menu
+     ((target (Session /sessions/s2.jsonl)) (anchor (Element session-s2))))
+    (Focus dialog)
+    (Place_menu (Element session-s2))
+    Notes site redesign
+    Switch back to ~/notes /worktree back
+    Open Enter
+    Open in new tab
+    Rename… /name
+    Fork… /fork
+    New worktree… /worktree new
+    Review changes /review
+    Open in file browser /files
+    Open terminal there /terminal
+    Copy path
+    Copy session id
+    Archive A
+    Delete… Delete
+    Close_dialog
+    (Focus editor)
+    (Open_menu
+     ((target (Session /sessions/s3.jsonl)) (anchor (Element session-s3))))
+    (Focus dialog)
+    (Place_menu (Element session-s3))
+    Landing page site trunk
+    Open Enter
+    Open in new tab
+    Rename… /name
+    Fork… /fork
+    New worktree… /worktree new
+    Review changes /review
+    Open in file browser /files
+    Open terminal there /terminal
+    Copy path
+    Copy session id
+    Archive A
+    Delete… Delete
+    |}]
+;;
+
+let%expect_test "Switch back runs /worktree back; the session's home goes" =
+  let h =
+    H.create
+      ~state:(home_state ~home:(prigh, Some "main") ())
+      ~sessions:(home_sessions ())
+      ()
+  in
+  H.right_click h ~selector:".session" ~nth:0;
+  choose h "switch_back";
+  H.reply h "worktree_back" (sprintf {|{"cwd":%S,"created":false}|} prigh);
+  H.text h ~selector:".toast";
+  H.event h (sprintf {|{"event":"state","state":%s}|} (home_state ()));
+  list h;
+  [%expect
+    {|
+    (Open_menu
+     ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
+    (Focus dialog)
+    (Place_menu (Element session-s1))
+    (Picker_choose switch_back)
+    (Focus editor)
+    (Rpc (method_ worktree_back) (params ())
+     (tag
+      (Worktree_went_back (command "/worktree back")
+       (home
+        (((cwd /home/u/src/prigh) (host (backend)) (host_name (srv))
+          (repo
+           (((root /home/u/src/prigh) (worktree /home/u/src/prigh)
+             (branch (main)) (main true))))))))))
+    (Expire_toast (id 0) (after_ms 2540))
+    Back in main (~/src/prigh)
+    (Login form 2m ago prigh feat/login) (1) (More (right-click, Shift+F10))
+    (feat/login here)
+    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10))
+    (redesign here)
+    (Landing page 2m ago site trunk) (More (right-click, Shift+F10))
+    |}]
+;;
+
+let%expect_test "/worktree back: without a home, or when it fails" =
+  let h = H.create ~state:(home_state ()) ~sessions:(home_sessions ()) () in
+  H.type_ h "/worktree back";
+  H.act h Send;
+  H.text h ~selector:".toast";
+  let h =
+    H.create
+      ~state:(home_state ~home:(prigh, Some "main") ())
+      ~sessions:(home_sessions ())
+      ()
+  in
+  H.type_ h "/worktree back main";
+  H.act h Send;
+  H.fail
+    h
+    "worktree_back"
+    "the tool host srv that /home/u/src/prigh is on is not connected";
+  H.text h ~selector:".toast";
+  H.text h ~selector:".composer textarea";
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree back") (max 500))) (tag Ignore))
+    This session hasn't switched into a worktree; /worktree open TARGET switches. (Dismiss)
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree back main") (max 500)))
+     (tag Ignore))
+    (Rpc (method_ worktree_back) (params ((main true)))
+     (tag
+      (Worktree_went_back (command "/worktree back main")
+       (home
+        (((cwd /home/u/src/prigh) (host (backend)) (host_name (srv))
+          (repo
+           (((root /home/u/src/prigh) (worktree /home/u/src/prigh)
+             (branch (main)) (main true))))))))))
+    Couldn't switch back: the tool host srv that /home/u/src/prigh is on is not connected. (Dismiss)
+    [/worktree back main]
     |}]
 ;;

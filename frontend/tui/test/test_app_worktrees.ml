@@ -103,7 +103,9 @@ let%expect_test "/worktree picks among the worktrees; Enter works there" =
     deepseek-flash  ctx:0.1%/1.0M  Enter opens · Ctrl+D removes
     (Rpc
       (method_ set_cwd)
-      (params ((path /h/.prigh/worktrees/repo/feat-a)))
+      (params (
+        (path     /h/.prigh/worktrees/repo/feat-a)
+        (worktree true)))
       (tag (
         Worktree_entered
         "working in the worktree feat/a at /h/.prigh/worktrees/repo/feat-a")))
@@ -180,7 +182,9 @@ let%expect_test "Ctrl+N in the picker works there in a new session" =
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc
       (method_ set_cwd)
-      (params ((path /h/.prigh/worktrees/repo/feat-a)))
+      (params (
+        (path     /h/.prigh/worktrees/repo/feat-a)
+        (worktree true)))
       (tag (
         Worktree_entered
         "new session in the worktree feat/a at /h/.prigh/worktrees/repo/feat-a")))
@@ -589,7 +593,9 @@ let%expect_test "/worktree new creates one and works there" =
     deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     (Rpc
       (method_ set_cwd)
-      (params ((path /h/.prigh/worktrees/repo/feat-c)))
+      (params (
+        (path     /h/.prigh/worktrees/repo/feat-c)
+        (worktree true)))
       (tag (
         Worktree_entered
         "worktree feat/c at /h/.prigh/worktrees/repo/feat-c (new branch)")))
@@ -681,7 +687,9 @@ let%expect_test "/worktree open -n works there in a new session" =
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc
       (method_ set_cwd)
-      (params ((path /src/repo)))
+      (params (
+        (path     /src/repo)
+        (worktree true)))
       (tag (Worktree_entered "new session in the worktree main at /src/repo")))
     (Rpc
       (method_ list_worktrees)
@@ -701,7 +709,9 @@ let%expect_test "/worktree open -n works there in a new session" =
           (new_session false))))))
     (Rpc
       (method_ set_cwd)
-      (params ((path /src/repo)))
+      (params (
+        (path     /src/repo)
+        (worktree true)))
       (tag (Worktree_entered "working in the worktree main at /src/repo")))
     |}]
 ;;
@@ -758,7 +768,7 @@ let%expect_test "/worktree's mistakes say what to do, the command kept to fix" =
       earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ unknown subcommand "bogus": /worktree [list|new BRANCH [BASE]|open [-n]      │
-    │ TARGET|rm [-f] TARGET]                                                       │
+    │ TARGET|back [main]|rm [-f] TARGET]                                           │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > /worktree bogus▏
@@ -917,6 +927,7 @@ let%expect_test
     ((list "pick a worktree of this repository to work in")
      (new "new BRANCH [BASE]: create a worktree and work in it")
      (open "open [-n] TARGET: work in a worktree (-n: in a new session)")
+     (back "back [main]: back where the session switched into worktrees from")
      (rm "rm [-f] TARGET: remove a worktree (-f: with uncommitted changes)"))
     ((-n "in a new session")
      (main
@@ -1312,5 +1323,190 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
         (feat/a      "compare with feat/a")
         (main        "compare with main")
         (origin/main "compare with origin/main")))))
+    |}]
+;;
+
+(* /worktree back: where the session switched into worktrees from. *)
+
+let home_json =
+  {|{"cwd":"/src/repo","host":{"id":"backend","name":"srv"},"repo":{"root":"/src/repo","worktree":"/src/repo","branch":"main","main":true}}|}
+;;
+
+let with_home () =
+  let h = Test_app.connected ~width:80 ~height:12 () in
+  H.event
+    h
+    (State (state ~cwd ~git_branch:"fix/b" ~extra:[ "home", home_json ] ()));
+  h
+;;
+
+let%expect_test
+    "/worktree back goes home; without a home it says how to get one"
+  =
+  let h = connected ~height:12 () in
+  run h "/worktree back";
+  editor h;
+  H.show h;
+  let h = with_home () in
+  run h "/worktree back";
+  H.reply
+    h
+    (Retry_in_editor
+       { command = "/worktree back"
+       ; hint = ""
+       ; then_ =
+           Worktree_went_back (Option.bind h.H.model.state ~f:(fun s -> s.home))
+       })
+    {|{"cwd":"/src/repo","created":false}|};
+  H.show h;
+  [%expect
+    {|
+    editor: /worktree back
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ this session hasn't switched into a worktree; /worktree open TARGET switches │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ▸ back  back [main]: back where the session switched into worktrees from
+    ────────────────────────────────────────────────────────────────────────────────
+    > /worktree back▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
+    (Rpc
+      (method_ worktree_back)
+      (params ())
+      (tag (
+        Retry_in_editor
+        (command "/worktree back")
+        (hint    "")
+        (then_ (
+          Worktree_went_back ((
+            (cwd /src/repo)
+            (host      (backend))
+            (host_name (srv))
+            (repo ((
+              (root     /src/repo)
+              (worktree /src/repo)
+              (branch (main))
+              (main true)))))))))))
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ─────────────────────────────────────────────────── back in main (/src/repo) ───
+    > ▏
+    deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/worktree back main; a failure puts the command back" =
+  let h = with_home () in
+  run h "/worktree back main";
+  let tag : App.Reply_tag.t =
+    Retry_in_editor
+      { command = "/worktree back main"
+      ; hint = ""
+      ; then_ =
+          Worktree_went_back (Option.bind h.H.model.state ~f:(fun s -> s.home))
+      }
+  in
+  H.reply_error h tag "the tool host srv that /src/repo is on is not connected";
+  editor h;
+  H.show h;
+  let h = with_home () in
+  run h "/worktree back home";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ worktree_back)
+      (params ((main true)))
+      (tag (
+        Retry_in_editor
+        (command "/worktree back main")
+        (hint    "")
+        (then_ (
+          Worktree_went_back ((
+            (cwd /src/repo)
+            (host      (backend))
+            (host_name (srv))
+            (repo ((
+              (root     /src/repo)
+              (worktree /src/repo)
+              (branch (main))
+              (main true)))))))))))
+    editor: /worktree back main
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────── the tool host srv that /src/repo is on is not connected ───
+    > /worktree back main▏
+    deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ usage: /worktree back [main] (main: the repository's main checkout, when the │
+    │ place it came from is gone)                                                  │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > /worktree back home▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
+    |}]
+;;
+
+let%expect_test "/worktree completes back, then main" =
+  let h = with_home () in
+  H.keys h "/worktree b";
+  H.show h;
+  H.keys h "ack ";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Worktrees_for_autocomplete
+        "abc123 backend:/h/.prigh/worktrees/repo/fix-b")))
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ back  back [main]: back where the session switched into worktrees from
+    ────────────────────────────────────────────────────────────────────────────────
+    > /worktree b▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ main  the repository's main checkout instead
+    ────────────────────────────────────────────────────────────────────────────────
+    > /worktree back ▏
+    deepseek-flash  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
     |}]
 ;;
