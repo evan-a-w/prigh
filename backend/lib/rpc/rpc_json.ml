@@ -302,12 +302,14 @@ let state (s : Agent.State.t) =
           (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->
              let opt = Option.value_map ~default:`Null ~f:str in
              `Object
-               [ "id", str h.id
-               ; "name", str h.name
-               ; "cwd", str h.cwd
-               ; "session_id", opt h.session_id
-               ; "session_name", opt h.session_name
-               ])) )
+               ([ "id", str h.id
+                ; "name", str h.name
+                ; "cwd", str h.cwd
+                ; "session_id", opt h.session_id
+                ; "session_name", opt h.session_name
+                ]
+                @ Option.value_map h.home ~default:[] ~f:(fun home ->
+                  [ "home", str home ])))) )
     ; ( "subagents"
       , `Array
           (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->

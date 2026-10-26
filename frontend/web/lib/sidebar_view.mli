@@ -17,8 +17,23 @@ val view
 (** The gear opening the settings ([/settings]). *)
 val settings : inject:(App.Action.t -> unit Effect.t) -> Node.t
 
-(** [/home/USER/x] as [~/x]. *)
-val home_relative : string -> string
+(** {!Tilde.of_path}: [HOME/x] as [~/x], [host_home] being the home directory
+    of the tool host the path is on. *)
+val home_relative : ?host_home:string -> string -> string
 
-(** Where a session works: its repository and branch, else its directory. *)
-val place : ?cls:string -> Session_summary.t -> cwd:string -> Node.t
+(** The home directory of the model's session's active tool host, when it
+    said. *)
+val state_host_home : App.Model.t -> string option
+
+(** The home directory of the tool host where [s] works, when it is
+    connected. *)
+val session_host_home : App.Model.t -> Session_summary.t -> string option
+
+(** Where a session works: its repository and branch, else its directory
+    ([~] being [host_home]). *)
+val place
+  :  ?cls:string
+  -> ?host_home:string
+  -> Session_summary.t
+  -> cwd:string
+  -> Node.t

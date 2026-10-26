@@ -126,9 +126,11 @@ val close : t -> unit Deferred.t
     {!Prigh_client_unix.Host_id}), so that the backend knows our tool host
     again when we reconnect or restart (and resumes its sessions on it), and
     the [features] our tool host has ([exec_input]: it forwards
-    [Tool_exec_input] to running tools). *)
+    [Tool_exec_input] to running tools), and with [home] our tool host's home
+    directory, which [~] in paths for it means. *)
 val connection_hello
-  :  (string * Prigh_protocol.Json.t) list
+  :  ?home:string
+  -> (string * Prigh_protocol.Json.t) list
   -> host_id:string option
   -> (string * Prigh_protocol.Json.t) list
 

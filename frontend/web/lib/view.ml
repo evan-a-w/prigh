@@ -139,7 +139,11 @@ let empty (m : Model.t) =
        | Some state ->
          div
            ~cls:"empty-where"
-           [ Node.text (Sidebar_view.home_relative state.cwd) ]
+           [ Node.text
+               (Sidebar_view.home_relative
+                  ?host_home:(Sidebar_view.state_host_home m)
+                  state.cwd)
+           ]
        | None -> Node.none)
     ; Node.ul
         ~attrs:[ Attr.class_ "empty-hints" ]

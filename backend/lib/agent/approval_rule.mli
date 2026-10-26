@@ -41,8 +41,9 @@ module Call : sig
 
   (** From a tool call's arguments: [bash]'s [command]; [path] (default the
       cwd for [ls], [grep], [find]) of the file tools; the files an
-      [apply_patch] adds, updates, deletes or moves. *)
-  val create : cwd:string -> tool:string -> Json.t -> t
+      [apply_patch] adds, updates, deletes or moves, with [~] as [home]
+      (default: [$HOME]). *)
+  val create : ?home:string -> cwd:string -> tool:string -> Json.t -> t
 end
 
 (** Whether the rules together cover the whole call: a rule without a

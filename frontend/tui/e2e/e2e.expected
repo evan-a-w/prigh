@@ -11,7 +11,7 @@
  (context_tokens 0) (active_host backend)
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
-    (session_name null))))
+    (session_name null) (home $TMP))))
  (subagents ()) (jobs ()) (budget_usd null) (goal null) (reminders ())
  (resume_at_ms null) (approval_mode auto) (plan_mode false) (plan null)
  (session_rules ()))
@@ -79,7 +79,7 @@
  (context_tokens 10) (active_host backend)
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
-    (session_name null))))
+    (session_name null) (home $TMP))))
  (subagents ()) (jobs ()) (budget_usd null) (goal null) (reminders ())
  (resume_at_ms null) (approval_mode auto) (plan_mode false) (plan null)
  (session_rules ()))

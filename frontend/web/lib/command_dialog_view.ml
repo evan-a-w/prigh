@@ -343,7 +343,9 @@ let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
              | Some dir ->
                sprintf
                  "Created in %s, then this session works there."
-                 (Sidebar_view.home_relative dir)
+                 (Sidebar_view.home_relative
+                    ?host_home:(Sidebar_view.state_host_home m)
+                    dir)
              | None -> "This session works there once it is created.")
         ]
     ; dialog_error d.error

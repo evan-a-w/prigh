@@ -1618,7 +1618,7 @@ it.
 | `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
-| `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
+| `/cd [path]` | change the working directory (on the active tool host: `~` is that host's home, a relative path is under the current directory); a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
 | `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|back [main]\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `back` moves the session back where it switched into worktrees from (`main`: the repository's main checkout, when that place is gone); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |

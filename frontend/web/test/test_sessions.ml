@@ -819,3 +819,41 @@ let%expect_test "sessions clicked in quick succession" =
     ((session (s3)) (opening ()))
     |}]
 ;;
+
+let%expect_test "~ in places is the home of the tool host they are on" =
+  let sessions =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         [ H.session_json ~cwd:"/Users/ann/src" ~host:"laptop" "s1"
+         ; H.session_json ~cwd:"/Users/ann/docs" ~host:"laptop" "s2"
+         ; H.session_json ~cwd:"/home/ann/notes" ~host:"backend" "s3"
+         ; H.session_json ~cwd:"/home/prigh/x" ~host:"backend" "s4"
+         ; H.session_json ~cwd:"/home/bob/y" ~host:"gone" "s5"
+         ])
+  in
+  let state =
+    H.state_json
+      ~fields:
+        [ "cwd", `String "/Users/ann/src"
+        ; "active_host", `String "laptop"
+        ; ( "hosts"
+          , Jsonaf.of_string
+              {|[{"id":"backend","name":"srv","cwd":"/home/prigh","home":"/home/prigh"},{"id":"laptop","name":"laptop","cwd":"/Users/ann","home":"/Users/ann"}]|}
+          )
+        ]
+      ()
+  in
+  let h = H.create ~sessions ~state () in
+  H.names h ~selector:".session-cwd";
+  H.text h ~selector:".empty-where";
+  [%expect {|
+    span "~/src" -- /Users/ann/src
+    span "~/docs" -- /Users/ann/docs
+    span "/home/ann/notes"
+    span "~/x" -- /home/prigh/x
+    span "~/y" -- /home/bob/y
+    ~/src
+    |}]
+;;

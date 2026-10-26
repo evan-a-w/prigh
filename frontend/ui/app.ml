@@ -560,10 +560,26 @@ let output m ~title content =
 
 let follow m = { m with viewport = Viewport.Follow }
 
+(* Paths shown are on the active tool host, so [~] is its home. Ours when
+   that host is this frontend's own and did not say, or when no host says
+   (a backend predating [Host.home]). *)
+let host_home m =
+  match m.state with
+  | None -> m.home
+  | Some (s : P.State.t) ->
+    let says = List.exists s.hosts ~f:(fun h -> Option.is_some h.home) in
+    (match List.find s.hosts ~f:(fun h -> String.equal h.id s.active_host) with
+     | Some { home = Some home; _ } -> Some home
+     | Some h when Option.exists m.client_id ~f:(String.equal h.id) -> m.home
+     | Some _ | None -> if says then None else m.home)
+;;
+
 let tilde m path =
-  match m.home with
+  match host_home m with
   | Some home when String.equal path home -> "~"
-  | Some home when String.is_prefix path ~prefix:(home ^ "/") ->
+  | Some home
+    when (not (String.equal home "/"))
+         && String.is_prefix path ~prefix:(home ^ "/") ->
     "~" ^ String.drop_prefix path (String.length home)
   | _ -> path
 ;;

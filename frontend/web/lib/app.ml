@@ -6061,7 +6061,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         toast
           m
           (String.capitalize
-             (Worktree_command.back_notice home ~cwd ~tilde:Tilde.of_path))
+             (Worktree_command.back_notice
+                home
+                ~cwd
+                ~tilde:
+                  (Tilde.of_path
+                     ?host_home:(Option.bind m.state ~f:Tilde.active_host_home))))
       | Missing path -> error m (sprintf "%s is gone." path))
   | Worktree_session { path; notice }, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
@@ -7266,6 +7271,7 @@ let update_connected (m : Model.t) (action : Action.t) =
               { kind = Menu menu
               ; picker =
                   Context_menu.picker
+                    ?host_home:(Tilde.session_host_home m.state s)
                     menu.target
                     (match m.state with
                      | Some state when is_current_path m s.path ->

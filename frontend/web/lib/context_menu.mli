@@ -65,8 +65,14 @@ end
 
 (** As a [Picker]: ids from {!Item.id}, the label, the detail (the slash
     command that does the same). A session with a home ({!Session_summary.home}:
-    pass the current session's from its state) offers to switch back first. *)
-val picker : Target.t -> Session_summary.t -> current:bool -> Picker.t
+    pass the current session's from its state) offers to switch back first;
+    [host_home] is the home directory of the tool host its cwd is on. *)
+val picker
+  :  ?host_home:string
+  -> Target.t
+  -> Session_summary.t
+  -> current:bool
+  -> Picker.t
 
 (** The worktree's path, for a worktree's menu. *)
 val worktree : t -> string option
