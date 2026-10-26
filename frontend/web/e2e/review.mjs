@@ -294,12 +294,18 @@ try {
 
   // 8. Edit mode: the file's text, saved where the tools run.
   await page.locator(".review-controls .segment", { hasText: "Edit" }).click();
-  await page.locator("#review-editor").waitFor();
+  // Until the file is read the editor is disabled, and what is typed would
+  // go before its text.
+  await page.waitForFunction(() => {
+    const editor = document.querySelector("#review-editor");
+    return editor && !editor.disabled && editor.value.endsWith("let late = 0\n");
+  });
   await page.locator("#review-editor").press("Control+End");
   await page.keyboard.type("let edited = 1\n");
   await screenshot("page: editing");
+  await page.locator(".review-editor-state.dirty").waitFor();
   await page.locator("#review-editor").press("Control+s");
-  await page.locator(".review-editor-state", { hasText: /^Saved/ }).waitFor();
+  await page.locator(".review-editor-state:not(.dirty)", { hasText: /^Saved/ }).waitFor();
   console.log(`main.ml ends: ${JSON.stringify(readFileSync(join(cwd, "src", "main.ml"), "utf8").split("\n").slice(-3).join("\n"))}`);
   await page.locator(".review-controls .segment", { hasText: "Comment" }).click();
   await page.locator(".review-controls .segment", { hasText: "Whole file" }).click();
