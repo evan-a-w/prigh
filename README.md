@@ -429,6 +429,21 @@ types its character instead. What finished before your latest prompt
 folds under "Earlier"; switching sessions empties the panel. `/agents cancel
 <n|id>` and `/jobs kill <id>` open the item there and stop it.
 
+A running background subagent can be steered like the main agent. The one
+shown in the panel (or chosen with its Steer button) is who the composer
+writes to: a "Steering a1 · task" chip over the editor says so, Enter sends
+a steer (it reaches the subagent after its current tool calls) and
+Alt+Enter a follow-up (when it ends its turn, before it reports); Esc, the
+chip's × or going back to the panel's list write to the main agent again.
+What waits for a subagent is listed above the composer with the main
+agent's ("To a1, next step"), with Edit and remove, and Alt+↑ takes back the
+last message for whoever the composer writes to. Delivered messages show in
+its transcript as "You (steer)" / "You (follow-up)". A subagent that has
+finished, or one nested in another, takes no messages: refusals say what to
+do and keep your text in the editor, and when the subagent being steered
+finishes the composer goes back to the main agent. `/agents steer <n|id>
+TEXT` and `/agents follow-up <n|id> TEXT` send one without switching.
+
 `-web-root DIR` (`$PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
 `../share/prigh/web`. The Nix package (`nix run . -- -web`)
