@@ -1071,7 +1071,11 @@ let feat_diff_json =
 ;;
 
 let show_feat_review h ~dir ~base =
-  H.reply ~quiet:true h (Review_comments { dir; base }) feat_review_json;
+  H.reply
+    ~quiet:true
+    h
+    (Review_comments { target = Dir dir; base; direct = false })
+    feat_review_json;
   let review =
     P.Review.of_json (P.Json.parse feat_review_json |> Or_error.ok_exn)
     |> Or_error.ok_exn
@@ -1079,9 +1083,9 @@ let show_feat_review h ~dir ~base =
   H.reply
     h
     (Retry_in_editor
-       { command = Review_command.command ?dir ?base ()
+       { command = Review_command.command ~target:(Dir dir) ?base ()
        ; hint = ""
-       ; then_ = Review_status { review; dir }
+       ; then_ = Review_status { review; target = Dir dir }
        })
     feat_diff_json;
   H.show h
@@ -1096,6 +1100,7 @@ let%expect_test "/review WORKTREE: its approvals and comments, not the others'" 
        { command = "/review feat/a"
        ; name = "feat/a"
        ; base = None
+       ; direct = false
        ; model = None
        })
     listing_json;
@@ -1110,11 +1115,16 @@ let%expect_test "/review WORKTREE: its approvals and comments, not the others'" 
         (command "/review feat/a")
         (name    feat/a)
         (base ())
+        (direct false)
         (model (feat/a)))))
     (Rpc
       (method_ get_review)
       (params ())
-      (tag (Review_comments (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))))
+      (tag (
+        Review_comments
+        (target (Dir (/h/.prigh/worktrees/repo/feat-a)))
+        (base ())
+        (direct false))))
 
 
 
@@ -1151,6 +1161,7 @@ let%expect_test
        { command = "/review tests"
        ; name = "tests"
        ; base = None
+       ; direct = false
        ; model = Some "tests"
        })
     listing_json;
@@ -1161,9 +1172,31 @@ let%expect_test
        { command = "/review nope --base main"
        ; name = "nope"
        ; base = Some "main"
+       ; direct = false
        ; model = None
        })
     listing_json;
+  (* No worktree of that name: a branch to review read-only, which the
+     backend does not know either. *)
+  H.reply
+    ~quiet:true
+    h
+    (Review_comments { target = Rev "nope"; base = Some "main"; direct = false })
+    feat_review_json;
+  H.reply_error
+    h
+    (Retry_in_editor
+       { command = "/review nope --base main"
+       ; hint = ""
+       ; then_ =
+           Review_status
+             { review =
+                 P.Review.of_json (P.Json.parse feat_review_json |> Or_error.ok_exn)
+                 |> Or_error.ok_exn
+             ; target = Rev "nope"
+             }
+       })
+    "unknown revision \"nope\": name a branch to review (closest: old, main)";
   H.show h;
   editor h;
   [%expect
@@ -1172,9 +1205,7 @@ let%expect_test
       (method_ get_review)
       (params ())
       (tag (
-        Review_comments
-        (dir  (../feat-a))
-        (base (main)))))
+        Review_comments (target (Dir (../feat-a))) (base (main)) (direct false))))
     (Rpc
       (method_ list_worktrees)
       (params ())
@@ -1183,6 +1214,7 @@ let%expect_test
         (command "/review tests")
         (name    tests)
         (base ())
+        (direct false)
         (model (tests)))))
     (Rpc
       (method_ review)
@@ -1200,7 +1232,12 @@ let%expect_test
         (command "/review nope --base main")
         (name    nope)
         (base (main))
+        (direct false)
         (model ()))))
+    (Rpc
+      (method_ get_review)
+      (params ())
+      (tag (Review_comments (target (Rev nope)) (base (main)) (direct false))))
 
 
 
@@ -1214,10 +1251,116 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    ──────── no worktree "nope" (closest: old, repo, main); /worktree lists them ───
+    ────── unknown revision "nope": name a branch to review (closest: old, main) ───
     > /review nope --base main▏
     deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     editor: /review nope --base main
+    |}]
+;;
+
+let%expect_test
+    "/review BRANCH --base REV --direct: a branch not checked out, read-only, \
+     compared directly"
+  =
+  let h = connected () in
+  run h "/review feat/b --base main --direct";
+  H.reply
+    h
+    (Review_named
+       { command = "/review feat/b --base main --direct"
+       ; name = "feat/b"
+       ; base = Some "main"
+       ; direct = true
+       ; model = None
+       })
+    listing_json;
+  let review_json =
+    {|{"comments":[{"id":"c3","root":"branch:feat/b","path":"b.ml","first":1,"last":1,"anchor":"q","status":"open",
+       "thread":[{"author":"user","text":"On the branch","at_ms":3,"delivered":false}]}],"approvals":[]}|}
+  in
+  H.reply
+    h
+    (Review_comments { target = Rev "feat/b"; base = Some "main"; direct = true })
+    review_json;
+  H.reply
+    h
+    (Retry_in_editor
+       { command = "/review feat/b --base main --direct"
+       ; hint = ""
+       ; then_ =
+           Review_status
+             { review =
+                 P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
+                 |> Or_error.ok_exn
+             ; target = Rev "feat/b"
+             }
+       })
+    {|{"root":"/src/repo","against":"0123456789abcdef0123456789abcdef01234567","rev":"feat/b","direct":true,
+       "base":"main","main":false,"branches":["feat/b","main"],"truncated":false,
+       "diff":"diff --git a/b.ml b/b.ml\n--- a/b.ml\n+++ b/b.ml\n@@ -1 +1 @@\n-p\n+q\n"}|};
+  H.show h;
+  [%expect {|
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Review_named
+        (command "/review feat/b --base main --direct")
+        (name    feat/b)
+        (base (main))
+        (direct true)
+        (model ()))))
+    (Rpc
+      (method_ get_review)
+      (params ())
+      (tag (Review_comments (target (Rev feat/b)) (base (main)) (direct true))))
+    (Rpc
+      (method_ git_diff)
+      (params (
+        (base   main)
+        (rev    feat/b)
+        (direct true)))
+      (tag (
+        Retry_in_editor
+        (command "/review feat/b --base main --direct")
+        (hint    "")
+        (then_ (
+          Review_status
+          (review (
+            (comments ((
+              (id   c3)
+              (root branch:feat/b)
+              (path b.ml)
+              (range (
+                (first 1)
+                (last  1)
+                (side  New)))
+              (anchor q)
+              (status Open)
+              (thread ((
+                (author User)
+                (text   "On the branch")
+                (at ((1970-01-01 10:00:00.003000000+10:00)))
+                (proposal ())
+                (delivered false)))))))
+            (approvals ())))
+          (target (Rev feat/b)))))))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Review ─────────────────────────────────────────────────────────────────────┐
+    │ review feat/b (not checked out) against main directly  0 of 1 file approved  │
+    │   ○ b.ml  +1 −1  not approved                                                │
+    │     c3 line 1, not sent yet                                                  │
+    │       you: On the branch                                                     │
+    │ approve files and comment on code you select in prigh-web's review page;     │
+    │ /review HEAD has prigh review the changes itself                             │
+    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    ──────────────────────────────────────────────────────── reading the review… ───
+    > ▏
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
     |}]
 ;;
 
@@ -1232,6 +1375,9 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
     ; "main focus on errors"
     ; "--base"
     ; "a b --base main"
+    ; "--direct"
+    ; "feat/b --base main --direct"
+    ; "origin/feat/b --direct --base"
     ]
     ~f:(fun args ->
       print_s
@@ -1245,12 +1391,24 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
     ~f:(fun (name, model) ->
       print_s
         [%sexp
-          (Review_command.resolve listing ~name ~base:None ~model
+          (Review_command.resolve listing ~name ~base:None ~direct:false ~model
            : Review_command.Action.t)]);
-  print_endline (Review_command.command ~dir:"/w/x" ~base:"main" ());
+  print_s
+    [%sexp
+      (Review_command.resolve
+         listing
+         ~name:"origin/feat/b"
+         ~base:(Some "main")
+         ~direct:true
+         ~model:None
+       : Review_command.Action.t)];
+  print_endline
+    (Review_command.command ~target:(Dir (Some "/w/x")) ~base:"main" ());
+  print_endline
+    (Review_command.command ~target:(Rev "origin/feat/b") ~base:"v1" ~direct:true ());
   print_endline (Review_command.command ());
   List.iter
-    [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m" ]
+    [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m"; "feat/a --base main --direct " ]
     ~f:(fun rest ->
       print_s
         [%message
@@ -1258,59 +1416,90 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
             ~_:
               (Review_command.complete
                  ~worktrees:(List.take listing.worktrees 2)
-                 ~branches:[ "main"; "origin/main" ]
+                 ~refs:
+                   { branches = [ "feat/a"; "feat/b"; "main" ]
+                   ; remote_branches = [ "origin/main"; "origin/feat/b" ]
+                   ; tags = [ "v1" ]
+                   }
                  rest
                : (int * (string * string) list) option)]);
   [%expect
     {|
-    ("" (
-      Show
-      (dir  ())
-      (base ())))
-    (feat/a (Named (name feat/a) (base ()) (model (feat/a))))
-    (~/wt/x (Show (dir (~/wt/x)) (base ())))
+    ("" (Show (target (Dir ())) (base ()) (direct false)))
+    (feat/a (Named (name feat/a) (base ()) (direct false) (model (feat/a))))
+    (~/wt/x (Show (target (Dir (~/wt/x))) (base ()) (direct false)))
     ("./sub --base origin/main" (
-      Show
-      (dir  (./sub))
-      (base (origin/main))))
-    ("--base main" (Show (dir ()) (base (main))))
-    ("feat/a --base main" (Named (name feat/a) (base (main)) (model ())))
+      Show (target (Dir (./sub))) (base (origin/main)) (direct false)))
+    ("--base main" (Show (target (Dir ())) (base (main)) (direct false)))
+    ("feat/a --base main" (
+      Named (name feat/a) (base (main)) (direct false) (model ())))
     ("main focus on errors" (Model "main focus on errors"))
     (--base (Error "--base needs a revision: /review --base main"))
     ("a b --base main" (
       Error
-      "one worktree at a time: /review [WORKTREE] [--base REV], or /review [BASE] [instructions]"))
-    (Show (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))
-    (Show (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))
+      "one worktree or branch at a time: /review [WORKTREE|BRANCH] [--base REV] [--direct], or /review [BASE] [instructions]"))
+    (--direct (Show (target (Dir ())) (base ()) (direct true)))
+    ("feat/b --base main --direct" (
+      Named (name feat/b) (base (main)) (direct true) (model ())))
+    ("origin/feat/b --direct --base" (
+      Error "--base needs a revision: /review --base main"))
+    (Show
+      (target (Dir (/h/.prigh/worktrees/repo/feat-a)))
+      (base ())
+      (direct false))
+    (Show
+      (target (Dir (/h/.prigh/worktrees/repo/feat-a)))
+      (base ())
+      (direct false))
     (Model nope)
+    (Show (target (Rev origin/feat/b)) (base (main)) (direct true))
     /review /w/x --base main
+    /review origin/feat/b --base v1 --direct
     /review
     ("" ((
       0 (
-        (--base "compare with another base")
+        (--base "compare with another branch, tag or commit")
+        (--direct "compare with the base itself, not the merge base")
         (main
          "main \194\183 /src/repo \194\183 main worktree \194\183 \226\134\1451 \226\134\1470")
         (feat/a
-         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")))))
+         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")
+        (feat/b "not checked out: review it read-only (needs --base)")
+        (origin/main "not checked out: review it read-only (needs --base)")
+        (origin/feat/b "not checked out: review it read-only (needs --base)")))))
     (fe ((
       0 (
-        (--base "compare with another base")
+        (--base "compare with another branch, tag or commit")
+        (--direct "compare with the base itself, not the merge base")
         (main
          "main \194\183 /src/repo \194\183 main worktree \194\183 \226\134\1451 \226\134\1470")
         (feat/a
-         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")))))
-    ("feat/a " ((7 ((--base "compare with another base")))))
+         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")
+        (feat/b "not checked out: review it read-only (needs --base)")
+        (origin/main "not checked out: review it read-only (needs --base)")
+        (origin/feat/b "not checked out: review it read-only (needs --base)")))))
+    ("feat/a " ((
+      7 (
+        (--base "compare with another branch, tag or commit")
+        (--direct "compare with the base itself, not the merge base")))))
     ("--base " ((
       7 (
-        (HEAD        "the uncommitted changes only")
-        (feat/a      "compare with feat/a")
-        (main        "compare with main")
-        (origin/main "compare with origin/main")))))
+        (HEAD   "the uncommitted changes only")
+        (feat/a "compare with feat/a")
+        (feat/b "compare with feat/b")
+        (main   "compare with main")
+        (origin/main "compare with the remote branch origin/main")
+        (origin/feat/b "compare with the remote branch origin/feat/b")
+        (v1 "compare with the tag v1")))))
     ("feat/a --base m" ((
       14 (
-        (HEAD        "the uncommitted changes only")
-        (feat/a      "compare with feat/a")
-        (main        "compare with main")
-        (origin/main "compare with origin/main")))))
+        (HEAD   "the uncommitted changes only")
+        (feat/a "compare with feat/a")
+        (feat/b "compare with feat/b")
+        (main   "compare with main")
+        (origin/main "compare with the remote branch origin/main")
+        (origin/feat/b "compare with the remote branch origin/feat/b")
+        (v1 "compare with the tag v1")))))
+    ("feat/a --base main --direct " ())
     |}]
 ;;

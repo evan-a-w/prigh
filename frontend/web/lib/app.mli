@@ -85,6 +85,7 @@ module Worktrees_purpose : sig
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         } (** [/review NAME]: the worktree it names, if any *)
   [@@deriving sexp_of, equal]
@@ -164,6 +165,9 @@ module Reply_tag : sig
         ; purpose : Worktrees_purpose.t
         }
     | Worktree_created of { command : string (** as typed *) }
+    | Review_checked_out of Code_review.Target.t
+    (** [create_worktree] of the branch the review page shows read-only:
+        then the page reviews the new worktree, compared the same way *)
     (** [create_worktree]: the session moves there *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
@@ -495,6 +499,14 @@ module Action : sig
     | Files of Files.Action.t (** the file browser and the attachments *)
     | Review of Code_review.Action.t
     (** the review page, comments and approvals *)
+    | Review_pick of Review_picker.Which.t
+    (** the review page's menu of what to review or compare with (again
+        closes it) *)
+    | Review_direct of bool
+    (** compare with the base itself ([true]) or since the merge base *)
+    | Review_checkout
+    (** check the branch reviewed read-only out into a worktree, recorded
+        on the session (as [/worktree new] does), and review it there *)
     | Review_worktree of
         { path : string
         ; base : string option
@@ -581,6 +593,9 @@ module Model : sig
     ; notifications : Page_notify.t
     ; files : Files.t
     ; review : Code_review.t
+    ; review_memory : Review_memory.t
+      (** what the review page compared last, per worktree (a
+          preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t

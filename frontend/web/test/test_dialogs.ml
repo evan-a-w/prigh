@@ -173,6 +173,7 @@ let%expect_test "help lists every key and command" =
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k) the next / previous changed file
     a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     Esc (reviewing) drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
@@ -560,7 +561,7 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)

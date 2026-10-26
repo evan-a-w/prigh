@@ -374,6 +374,7 @@ let compute_argument
       ~snippets
       ~reminders
       ~worktrees
+      ~refs
       ~current_session
       ~logged_in
       ~default_dir_host
@@ -469,7 +470,7 @@ let compute_argument
                 Option.bind
                   (match kind with
                    | Review ->
-                     Review_command.complete ~worktrees:known ~branches:[] rest
+                     Review_command.complete ~worktrees:known ~refs rest
                    | _ -> Worktree_command.complete ~worktrees:known rest)
                   ~f:(fun (offset, candidates) ->
                     let prefix = String.drop_prefix rest offset in
@@ -628,6 +629,7 @@ let compute
       ~snippets
       ~reminders
       ~worktrees
+      ~refs
       ~logged_in
       ~default_dir_host
       ~server
@@ -651,6 +653,7 @@ let compute
          ~snippets
          ~reminders
          ~worktrees
+         ~refs
          ~current_session
          ~logged_in
          ~default_dir_host

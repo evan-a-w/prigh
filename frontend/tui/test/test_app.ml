@@ -7191,7 +7191,7 @@ let%expect_test "Alt+R in the /worktree picker reviews the highlighted one" =
     (Rpc
       (method_ get_review)
       (params ())
-      (tag (Review_comments (dir (/w/feat)) (base ()))))
+      (tag (Review_comments (target (Dir (/w/feat))) (base ()) (direct false))))
     editing
     |}]
 ;;

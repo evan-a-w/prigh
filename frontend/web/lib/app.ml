@@ -73,6 +73,7 @@ module Worktrees_purpose = struct
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         }
   [@@deriving sexp_of, equal]
@@ -149,6 +150,7 @@ module Reply_tag = struct
         ; purpose : Worktrees_purpose.t
         }
     | Worktree_created of { command : string }
+    | Review_checked_out of Code_review.Target.t
     | Worktree_entered of string
     | Worktree_session of
         { path : string
@@ -425,6 +427,9 @@ module Action = struct
         }
     | Files of Files.Action.t
     | Review of Code_review.Action.t
+    | Review_pick of Review_picker.Which.t
+    | Review_direct of bool
+    | Review_checkout
     | Review_worktree of
         { path : string
         ; base : string option
@@ -494,6 +499,7 @@ module Model = struct
     ; notifications : Page_notify.t
     ; files : Files.t
     ; review : Code_review.t
+    ; review_memory : Review_memory.t
     ; layout : Resize.t
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
@@ -650,6 +656,7 @@ let init =
   ; notifications = Page_notify.init
   ; files = Files.closed
   ; review = Code_review.empty
+  ; review_memory = Review_memory.empty
   ; layout = Resize.empty
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
@@ -756,6 +763,13 @@ let close_dialog (m : Model.t) =
       ; theme_preview = None
       }
     , [ Command.Focus "dialog" ] )
+  | _, Some (Review_pick p) ->
+    ( { m with dialog = None; return_to_settings = false; theme_preview = None }
+    , [ Command.Focus
+          (match Review_picker.which p with
+           | Target -> "review-target-button"
+           | Base -> "review-base-button")
+      ] )
   | _ ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
     , [ focus_editor ] )
@@ -800,11 +814,14 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
   List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_review.Out.t) ->
     match out with
     | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
-    | Get_diff { dir; base } ->
+    | Get_diff { reviewed; base; direct } ->
       ( m
       , cmds
-        @ [ rpc "git_diff" (Git_diff.params ?dir ?base ()) ~tag:(Review Diff) ]
-      )
+        @ [ rpc
+              "git_diff"
+              (Git_diff.params ?base ~direct ~target:reviewed ())
+              ~tag:(Review Diff)
+          ] )
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
@@ -1364,8 +1381,7 @@ let complete_draft (m : Model.t) ~skills =
            (Worktrees.listing m.worktrees)
            ~default:[]
            ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
-      ~branches:
-        (Option.value_map m.review.diff ~default:[] ~f:(fun d -> d.branches))
+      ?refs:(Option.map m.review.diff ~f:Git_diff.refs)
       ~sessions:m.sessions
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
@@ -1669,6 +1685,8 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
       | _ -> String.Set.empty
     in
     { m with folded })
+  else if String.equal key Key.review
+  then { m with review_memory = Review_memory.of_json value }
   else if String.equal key Key.terminal_open
   then
     if startup
@@ -3487,19 +3505,78 @@ let worktree_target
 
 module Review_command = Prigh_ui.Review_command
 
+(* A worktree or branch without a base named: compared as it was last. *)
+let remembered (m : Model.t) (target : Code_review.Target.t) =
+  match target.base with
+  | Some _ -> target
+  | None ->
+    (match
+       Option.bind
+         (Review_memory.key ~own:m.review.own_root target.reviewed)
+         ~f:(fun key -> Review_memory.compare m.review_memory ~key)
+     with
+     | Some c -> { target with base = c.base; direct = target.direct || c.direct }
+     | None -> target)
+;;
+
+let review_show (m : Model.t) (target : Code_review.Target.t) =
+  with_review m (Code_review.update m.review (Show (remembered m target)))
+;;
+
+(* What the page compares, once its diff is in: the next visit starts
+   there. *)
+let remember_review (m : Model.t) =
+  match m.review.diff, m.review.open_ with
+  | Some _, true ->
+    let target = m.review.target in
+    let memory =
+      Review_memory.remember
+        m.review_memory
+        ~own:m.review.own_root
+        target.reviewed
+        { base = target.base; direct = target.direct }
+    in
+    if Review_memory.equal memory m.review_memory
+    then m, []
+    else
+      ( { m with review_memory = memory }
+      , save_pref m Key.review (Some (Review_memory.to_json memory)) )
+  | _ -> m, []
+;;
+
+(* Opening the page on the session's worktree: where it was last. *)
+let review_update (m : Model.t) (action : Code_review.Action.t) =
+  let opening =
+    match action with
+    | Open None -> true
+    | Toggle -> not m.review.open_
+    | _ -> false
+  in
+  let last =
+    Option.bind m.review.own_root ~f:(fun own ->
+      Review_memory.last m.review_memory ~own)
+  in
+  match last with
+  | Some reviewed
+    when opening && Code_review.Target.equal m.review.target Code_review.Target.default
+    -> review_show m { Code_review.Target.default with reviewed }
+  | _ -> with_review m (Code_review.update m.review action)
+;;
+
 let review_worktree (m : Model.t) ~dir ~base =
-  with_review m (Code_review.update m.review (Show { dir; base }))
+  review_show m { reviewed = Dir dir; base; direct = false }
 ;;
 
 let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) =
   match action with
-  | Show { dir; base } -> review_worktree m ~dir ~base
-  | Named { name; base; model } ->
+  | Show { target; base; direct } ->
+    review_show m { reviewed = target; base; direct }
+  | Named { name; base; direct; model } ->
     (match
        Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
          Worktree_command.find l name)
      with
-     | Some (Ok w) -> review_worktree m ~dir:(Some w.path) ~base
+     | Some (Ok w) -> review_show m { reviewed = Dir (Some w.path); base; direct }
      | Some (Error _) | None ->
        (match Worktrees.place m.state with
         | Some place ->
@@ -3509,7 +3586,8 @@ let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) 
                 ~tag:
                   (Worktrees
                      { place
-                     ; purpose = Review_target { command; name; base; model }
+                     ; purpose =
+                         Review_target { command; name; base; direct; model }
                      })
             ] )
         | None ->
@@ -3531,8 +3609,123 @@ let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) 
   | Error e -> error (back_in_editor m command) (String.capitalize e ^ ".")
 ;;
 
-let review_target (m : Model.t) ~command ~name ~base ~model listing =
-  review_action m ~command (Review_command.resolve listing ~name ~base ~model)
+let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
+  review_action
+    m
+    ~command
+    (Review_command.resolve listing ~name ~base ~direct ~model)
+;;
+
+(* ---- the review page's pickers *)
+
+let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
+  match m.dialog, m.review.diff with
+  | Some (Review_pick p), _ when Review_picker.Which.equal (Review_picker.which p) which ->
+    close_dialog m
+  | _, None -> toast m "The changes are still being read: try again."
+  | _, Some d ->
+    let picker =
+      match which with
+      | Target ->
+        Review_picker.targets
+          ~worktrees:
+            (Option.value_map (Worktrees.listing m.worktrees) ~default:[] ~f:(fun l ->
+               l.worktrees))
+          ~reviewed:m.review.target.reviewed
+          d
+      | Base -> Review_picker.bases d
+    in
+    open_dialog m ~focus:"review-pick-filter" (Review_pick picker)
+;;
+
+let review_picked (m : Model.t) (item : Review_picker.Item.t) =
+  let m, _ = close_dialog m in
+  let target = m.review.target in
+  let m, cmds =
+    match item.choice with
+    | Review reviewed when Git_diff.Target.equal reviewed target.reviewed ->
+      m, []
+    | Review reviewed -> review_show m { reviewed; base = None; direct = false }
+    | Base base ->
+      review_show
+        m
+        { target with
+          base = Some base
+        ; direct = target.direct && not (String.equal base "HEAD")
+        }
+  in
+  m, cmds
+;;
+
+let review_direct (m : Model.t) direct =
+  let target = m.review.target in
+  match m.review.diff with
+  | Some d when not (Bool.equal d.direct direct && Bool.equal target.direct direct)
+    ->
+    (* The base the backend chose, named, so that it stays. *)
+    review_show m { target with base = Some d.base; direct }
+  | Some _ | None -> m, []
+;;
+
+(* A branch's name for [create_worktree]: a remote branch's local one. *)
+let checkout_branch (d : Git_diff.t) rev =
+  if List.mem d.branches rev ~equal:String.equal
+  then Some rev
+  else if List.mem d.remote_branches rev ~equal:String.equal
+  then Option.map (String.lsplit2 rev ~on:'/') ~f:snd
+  else None
+;;
+
+let review_checkout (m : Model.t) =
+  match Code_review.read_only m.review, m.review.diff with
+  | Some rev, Some d ->
+    (match checkout_branch d rev with
+     | None ->
+       error
+         m
+         (sprintf
+            "%s is not a branch: make one there first (/worktree new BRANCH              --base %s)."
+            rev
+            rev)
+     | Some branch ->
+       let m, cmds = toast m (sprintf "%s%s…" creating branch) in
+       ( m
+       , cmds
+         @ [ call
+               (Create_worktree { branch; base = None; cwd = None })
+               ~tag:
+                 (Review_checked_out
+                    { reviewed = Dir None; base = Some d.base; direct = d.direct })
+           ] ))
+  | _ -> m, []
+;;
+
+let review_checked_out
+      (m : Model.t)
+      (target : Code_review.Target.t)
+      (c : Worktree.Created.t)
+  =
+  let m =
+    { m with
+      worktrees = Worktrees.stale m.worktrees
+    ; repo_worktrees = Repo_listings.stale m.repo_worktrees
+    }
+  in
+  let m, toasts =
+    toast
+      m
+      ~replaces:creating
+      (sprintf
+         "Checked out %s into %s: edit it there."
+         (Worktree.label c.worktree)
+         c.worktree.path)
+  in
+  let m, cmds =
+    review_show
+      m
+      { target with reviewed = Dir (Some c.worktree.path) }
+  in
+  m, toasts @ cmds
 ;;
 
 let worktree_command (m : Model.t) rest =
@@ -4645,7 +4838,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     with_files m (Files.reply m.files reply result)
   | Files reply, result -> with_files m (Files.reply m.files reply result)
   | Review reply, result ->
-    with_review m (Code_review.reply m.review reply result)
+    let m, cmds = with_review m (Code_review.reply m.review reply result) in
+    (match reply with
+     | Diff ->
+       let m, more = remember_review m in
+       m, cmds @ more
+     | _ -> m, cmds)
   | Sent_with_files { text; images; attachments }, result ->
     let m, cmds = reply_to m (Sent { text; images }) result in
     (match result with
@@ -4781,6 +4979,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error
       (back_in_editor m command)
       (sprintf "Couldn't list the worktrees: %s." e)
+  | Review_checked_out _, Error e ->
+    error m (sprintf "Couldn't check it out: %s." e)
   | Worktree_created { command; _ }, Error e ->
     worktree_create_failed m ~command e
   | Worktree_entered _, Error e ->
@@ -5318,8 +5518,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         else m, []
       | Picker -> worktrees_picker m listing
       | Target { command; action } -> worktree_target m ~command action listing
-      | Review_target { command; name; base; model } ->
-        review_target m ~command ~name ~base ~model listing)
+      | Review_target { command; name; base; direct; model } ->
+        review_target m ~command ~name ~base ~direct ~model listing)
+  | Review_checked_out target, Ok json ->
+    decode m json Worktree.Created.of_json ~f:(review_checked_out m target)
   | Worktree_created _, Ok json ->
     decode m json Worktree.Created.of_json ~f:(worktree_created m)
   | Worktree_entered notice, Ok json ->
@@ -5850,7 +6052,9 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
          ~notice:(sprintf "Working in the worktree %s (%s)" label dir)
          ()
      | New_session_here -> new_session_in m dir
-     | Review -> plan ~run:(Prigh_ui.Review_command.command ?dir:worktree ()) ()
+     | Review -> plan
+         ~run:(Prigh_ui.Review_command.command ~target:(Dir worktree) ())
+         ()
      | Files -> plan ~run:("/files " ^ dir) ()
      | Terminal ->
        plan
@@ -6022,6 +6226,10 @@ let dialog_accept (m : Model.t) =
   | Some (Popover { chip; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind:(chip_kind chip) item
+     | None -> m, [])
+  | Some (Review_pick p) ->
+    (match Review_picker.selected_item p with
+     | Some item -> review_picked m item
      | None -> m, [])
   | Some (Rename name) ->
     let name = String.strip name in
@@ -6352,6 +6560,10 @@ let update_connected (m : Model.t) (action : Action.t) =
         with
         | Some item -> picker_accept m ~kind:(chip_kind chip) item
         | None -> m, [])
+     | Some (Review_pick p) ->
+       (match Review_picker.find p ~id with
+        | Some item -> review_picked m item
+        | None -> m, [])
      | _ -> m, [])
   | Dialog_input text ->
     (match m.dialog with
@@ -6364,9 +6576,13 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Forge_host _) ->
        { m with dialog = Some (Forge_host { input = text; error = None }) }, []
      | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
+     | Some (Review_pick p) ->
+       { m with dialog = Some (Review_pick (Review_picker.set_query p text)) }, []
      | _ -> m, [])
   | Dialog_move delta ->
     (match m.dialog with
+     | Some (Review_pick p) ->
+       { m with dialog = Some (Review_pick (Review_picker.move p delta)) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
      | Some (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
@@ -6563,7 +6779,10 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
-  | Review action -> with_review m (Code_review.update m.review action)
+  | Review action -> review_update m action
+  | Review_pick which -> open_review_pick m which
+  | Review_direct direct -> review_direct m direct
+  | Review_checkout -> review_checkout m
   | Review_worktree { path; base } ->
     let m, close =
       match m.dialog with

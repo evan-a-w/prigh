@@ -2183,6 +2183,7 @@ let%expect_test
       ~snippets:[]
       ~reminders:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2263,6 +2264,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~snippets:[]
       ~reminders:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2415,6 +2417,7 @@ let%expect_test
         ~snippets:[]
         ~reminders:[]
         ~worktrees:None
+        ~refs:Prigh_protocol.Git_diff.Refs.empty
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None

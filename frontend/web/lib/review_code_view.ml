@@ -291,8 +291,15 @@ let post_view
                ~cls:"review-proposal-actions"
                [ button
                    ~cls:"small primary"
-                   ~disabled:busy
-                   ~title:"Apply this change to the file"
+                   ~disabled:(busy || Option.is_some (Code_review.read_only m.review))
+                   ~title:
+                     (match Code_review.read_only m.review with
+                      | Some rev ->
+                        sprintf
+                          "%s is not checked out: Check out into a worktree \
+                           to apply it"
+                          rev
+                      | None -> "Apply this change to the file")
                    ~on_click:
                      (inject
                         (review (Decide { id = c.id; post = i; accept = true })))
