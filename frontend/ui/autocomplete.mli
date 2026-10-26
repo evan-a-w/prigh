@@ -51,6 +51,7 @@ val compute
   -> skills:P.Skill.t list option (** [None]: not fetched yet *)
   -> snippets:P.Snippet.t list
   -> reminders:P.Reminder.t list (** the session's, for [/remind rm] *)
+  -> agents:Agent_view.t list (** for [/agents steer] and the like *)
   -> worktrees:P.Worktree.t list option
        (** for [/worktree open] and [rm]; [None]: not fetched yet *)
   -> logged_in:(string -> bool)

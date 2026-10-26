@@ -74,6 +74,12 @@ module Reply_tag = struct
     | History
     | Prefs_history
     | Dequeued
+    | Agent_message of
+        { agent_id : string
+        ; kind : Queued_message.Kind.t
+        ; text : string
+        ; retry : string
+        }
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
@@ -238,6 +244,7 @@ module Model = struct
     ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
+    ; agent_queues : Agent_queues.t
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -312,6 +319,18 @@ let call ?(tag = Reply_tag.Show_error) (method_ : P.Request.Method.t) =
 ;;
 
 let str = P.Json.str
+
+let focused_agent m =
+  match m.focus with
+  | `Main -> None
+  | `Agent id -> Agent_view.find m.agents id
+;;
+
+let shown_queue m =
+  match m.focus with
+  | `Main -> m.queued_messages
+  | `Agent agent_id -> Agent_queues.messages m.agent_queues ~agent_id
+;;
 
 let editor_row_count m =
   let inner = Int.max 1 (m.width - 2) in
@@ -550,6 +569,7 @@ let init =
   ; worktrees = Location_cache.empty
   ; known_paths = String.Set.empty
   ; queued_messages = []
+  ; agent_queues = []
   ; login_lines = []
   ; viewport = Viewport.Follow
   ; pending_quit = false
@@ -1299,11 +1319,12 @@ let jobs_picker m (jobs : P.Job_info.t list) =
 ;;
 
 let queue_picker m =
-  if List.is_empty m.queued_messages
+  let queued = shown_queue m in
+  if List.is_empty queued
   then notice m "nothing queued", []
   else (
     let items =
-      List.map m.queued_messages ~f:(fun (q : Queued_message.t) ->
+      List.map queued ~f:(fun (q : Queued_message.t) ->
         Picker.Item.create
           ~id:(Queued_message.id q)
           ~detail:(Queued_message.Kind.describe q.kind)
@@ -1315,13 +1336,20 @@ let queue_picker m =
 (* [edit]: back into the editor, as [Dequeue] does. *)
 let unqueue m id ~edit =
   let m = { m with mode = Editing } in
-  match Queued_message.find m.queued_messages ~id with
+  match Queued_message.find (shown_queue m) ~id with
   | None -> notice m "that message is no longer queued", []
   | Some q ->
+    let method_, params =
+      match m.focus with
+      | `Main -> "remove_queued", Queued_message.remove_params q
+      | `Agent agent_id ->
+        ( "remove_agent_queued"
+        , ("agent_id", str agent_id) :: Queued_message.remove_params q )
+    in
     ( m
     , [ rpc
-          "remove_queued"
-          ~params:(Queued_message.remove_params q)
+          method_
+          ~params
           ~tag:
             (if edit
              then Dequeued
@@ -1651,12 +1679,7 @@ let subagent_loaded m (d : P.Subagent_detail.t) =
 
 (* [arg] is the agent's number in the strip or its id. *)
 let cancel_agent m arg =
-  let agent =
-    match Int.of_string_opt arg with
-    | Some n -> List.nth m.agents (n - 1)
-    | None -> Agent_view.find m.agents arg
-  in
-  match agent with
+  match Agents_command.find m.agents arg with
   | None when List.is_empty m.agents -> error m "no subagents to cancel", []
   | None ->
     ( error
@@ -1675,6 +1698,89 @@ let cancel_agent m arg =
           ~params:[ "agent_id", str a.id ]
           ~tag:(Notice_on_success (sprintf "cancelling subagent %s" a.id))
       ] )
+;;
+
+(* What the user types to a focused subagent, or with [/agents steer]: a
+   finished one takes nothing, and the text stays to send elsewhere. *)
+let message_agent
+      m
+      (a : Agent_view.t)
+      (kind : Queued_message.Kind.t)
+      text
+      ~retry
+      ~finished_hint
+      ~ack
+  =
+  match a.status with
+  | Done _ | Failed _ ->
+    ( error
+        (restore_command m retry)
+        (sprintf "%s has finished: %s" a.id finished_hint)
+    , [] )
+  | Running ->
+    let m =
+      { m with
+        agent_queues = Agent_queues.add m.agent_queues ~agent_id:a.id kind text
+      }
+    in
+    let m =
+      if ack
+      then
+        notice
+          m
+          (sprintf
+             "%s for %s queued: %s"
+             (Queued_message.Kind.name kind)
+             a.id
+             (match kind with
+              | Steer -> "it reads it at its next step"
+              | Follow_up -> "it reads it before it reports"))
+      else m
+    in
+    ( m
+    , [ rpc
+          "steer_agent"
+          ~params:
+            [ "agent_id", str a.id
+            ; "text", str text
+            ; "mode", str (Queued_message.Kind.wire kind)
+            ]
+          ~tag:(Agent_message { agent_id = a.id; kind; text; retry })
+      ; Command.Append_history text
+      ; push_history text
+      ] )
+;;
+
+let agent_message_failed m ~agent_id ~kind ~text ~retry e =
+  let m =
+    { m with
+      agent_queues = Agent_queues.remove m.agent_queues ~agent_id kind text
+    }
+  in
+  error (restore_command m retry) e
+;;
+
+let agents_command m rest =
+  match Agents_command.run rest with
+  | Pick -> agents_picker m
+  | Cancel arg -> cancel_agent m arg
+  | Error e -> error (restore_command m ("/agents " ^ rest)) e, []
+  | Message { agent; kind; text } ->
+    (match Agents_command.find m.agents agent with
+     | None ->
+       ( error
+           (restore_command m ("/agents " ^ rest))
+           (Agents_command.unknown m.agents agent)
+       , [] )
+     | Some a ->
+       message_agent
+         m
+         a
+         kind
+         text
+         ~retry:("/agents " ^ rest)
+         ~finished_hint:"tell the main agent instead"
+         ~ack:true)
 ;;
 
 let cycle_focus m =
@@ -1814,6 +1920,7 @@ let reset_session m =
       ; agents = []
       ; focus = `Main
       ; queued_messages = []
+      ; agent_queues = []
       ; transcript = Transcript.clear m.transcript
       ; activity = Idle
       }
@@ -3012,9 +3119,7 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "session named")
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
-  | "agents", [ "cancel"; arg ] -> cancel_agent m arg
-  | "agents", "cancel" :: _ -> error m "usage: /agents cancel <n|id>", []
-  | "agents", _ -> agents_picker m
+  | "agents", _ -> agents_command m cmd.rest
   | "jobs", [ "kill"; id ] -> kill_job m id
   | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
   | "jobs", [] -> m, [ rpc "list_jobs" ~tag:Jobs_picker ]
@@ -3247,22 +3352,33 @@ let send_prompt m text =
   m, cmds @ [ Command.Append_history text; push_history text ]
 ;;
 
-let submit m =
+let submit ?(kind = Queued_message.Kind.Steer) m =
   let text, editor = Editor.submit m.editor in
   let m = follow { m with editor; autocomplete = None } in
   if String.is_empty (String.strip text)
   then m, []
   else (
-    match Commands.parse text with
-    | Some { name = "skill:"; _ } -> open_skills m
-    | Some { name; _ } when String.is_prefix name ~prefix:"skill:" ->
+    match Commands.parse text, focused_agent m with
+    | Some { name = "skill:"; _ }, _ -> open_skills m
+    | Some { name; _ }, _ when String.is_prefix name ~prefix:"skill:" ->
       send_prompt m (String.strip text)
-    | Some cmd -> run_command m cmd
-    | None -> send_prompt m text)
+    | Some cmd, _ -> run_command m cmd
+    | None, Some a when not (String.is_prefix text ~prefix:"!") ->
+      message_agent
+        m
+        a
+        kind
+        text
+        ~retry:text
+        ~finished_hint:"tell the main agent instead (Esc goes back to it)"
+        ~ack:false
+    | None, _ -> send_prompt m text)
 ;;
 
 let queue_follow_up m =
-  if not (Model.running m)
+  if Option.is_some (focused_agent m)
+  then submit ~kind:Follow_up m
+  else if not (Model.running m)
   then submit m
   else (
     let text, editor = Editor.submit m.editor in
@@ -3399,6 +3515,7 @@ let refresh_command_autocomplete m =
       ~skills:(Location_cache.find m.skills ~key:(Location_cache.key m.state))
       ~snippets:(Option.value (snippets m) ~default:[])
       ~reminders:(Option.value (reminders m) ~default:[])
+      ~agents:m.agents
       ~worktrees:
         (Option.map
            (Location_cache.find m.worktrees ~key:(worktree_key m))
@@ -3469,8 +3586,9 @@ let accept_autocomplete m ~submit_now =
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
            (match Commands.find item.id with
-            (* [/review] alone is the common case: it runs at once. *)
-            | Some { argument = Some Review; _ } -> submit m
+            (* [/review] and [/agents] alone are the common case: they run
+               at once. *)
+            | Some { argument = Some (Review | Agents); _ } -> submit m
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
@@ -3714,7 +3832,16 @@ let editing_intent m (intent : Intent.t) =
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Queue_follow_up -> queue_follow_up m
-  | Dequeue -> m, [ rpc "dequeue" ~tag:Dequeued ]
+  | Dequeue ->
+    (match m.focus with
+     | `Main -> m, [ rpc "dequeue" ~tag:Dequeued ]
+     | `Agent agent_id ->
+       ( m
+       , [ rpc
+             "dequeue_agent"
+             ~params:[ "agent_id", str agent_id ]
+             ~tag:Dequeued
+         ] ))
   | Copy_last -> copy_last m
   | Suspend -> m, [ Command.Suspend ]
   | Path_complete -> path_complete m
@@ -4763,6 +4890,40 @@ let auth_event m (e : P.Auth_event.t) =
     , [ call Forge_status ~tag:Forge_refresh ] )
 ;;
 
+(* A message the user sent a subagent, once it takes it: a quiet line in the
+   main transcript. *)
+let note_agent_message m ~agent_id (user : P.Message.User.t) =
+  let from_user (n : P.Origin.Note.t) =
+    P.Origin.Kind.equal n.kind (Other "steer")
+    && String.is_prefix n.title ~prefix:"You"
+  in
+  match
+    Option.bind user.origin ~f:(fun o -> List.find o.notes ~f:from_user)
+  with
+  | None -> m
+  | Some note ->
+    let text =
+      String.split_lines (P.Message.User.body user)
+      |> List.map ~f:String.strip
+      |> List.filter ~f:(Fn.non String.is_empty)
+      |> String.concat ~sep:" "
+    in
+    let kind =
+      if String.is_substring note.title ~substring:"follow-up"
+      then " (follow-up)"
+      else ""
+    in
+    with_transcript m ~f:(fun t ->
+      Transcript.add
+        t
+        (Note
+           { kind = note.kind
+           ; title = sprintf "%s%s: %s" agent_id kind text
+           ; text = ""
+           ; joined = true
+           }))
+;;
+
 let event m (e : P.Event.t) =
   let m = with_transcript m ~f:(fun t -> Transcript.apply t e) in
   let m = { m with activity = Activity.apply m.activity e } in
@@ -4771,7 +4932,9 @@ let event m (e : P.Event.t) =
   | State state -> set_state m state
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
-  | Agent_queues _ -> m, []
+  | Agent_queues agent_queues -> { m with agent_queues }, []
+  | Subagent { agent_id; event = Message_end (User user); _ } ->
+    note_agent_message m ~agent_id user, []
   | Config_changed config -> { m with config = Some config }, []
   | Review _ -> m, []
   | Auth a -> auth_event m a
@@ -4967,6 +5130,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
      | Skill_prompt text -> skill_prompt_failed m text e, []
+     | Agent_message { agent_id; kind; text; retry } ->
+       agent_message_failed m ~agent_id ~kind ~text ~retry e, []
      | Fallback_saved text | Default_dir_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
@@ -5007,7 +5172,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
     (match tag with
      | Retry_in_editor { then_; _ } -> reply m then_ result
      | Ignore | Show_error | Reconnect _ -> m, []
-     | Skill_prompt _ -> m, []
+     | Skill_prompt _ | Agent_message _ -> m, []
      | Skills_picker ->
        decode json ~f:decode_skills (fun skills -> skills_picker m skills, [])
      | Skills_for_autocomplete key ->
@@ -5032,6 +5197,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                Queued_message.of_queues
                  ~steer:pending.steer_texts
                  ~follow_up:pending.follow_up_texts
+           ; agent_queues = pending.agents
            }
          in
          ( add_pending_questions
