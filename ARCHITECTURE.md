@@ -1044,9 +1044,15 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   see the harness), `Repo {cwd, repo}` (where `cwd` is in git, a
   `Git_location.t` or `None` outside a repository: `repo`, and
   `Summary.repo` for the summary's cwd, `None` when nothing was recorded
-  for it), `Agent_worktree` and `Worktree_removed {path}` (the worktrees
-  made for its subagents and not removed since: `agent_worktrees`, also in
-  `Summary`; neither is copied by `fork`);
+  for it), `Agent_worktree`, `Worktree` (a `Session_worktree.t`: one it
+  made with `create_worktree` or checked a pull request out in with
+  `pr_checkout`) and `Worktree_removed {path}`: `worktrees`, also in
+  `Summary`, the `Session_worktree.t`s that matter to the session, by when
+  they first did (its `Repo` entries away from a main checkout count as
+  `Entered`, `Agent_worktree`s as `Agent`; the first way stays, the branch
+  follows), less those removed since (`remove_worktree` appends
+  `Worktree_removed` to every session, saved or live, that has it; entering
+  it again records it again); `fork` copies all but `Agent_worktree`;
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -1241,7 +1247,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (`{root, worktree, branch, main}`, `null` outside a repository, absent
   when unknown: the session's `Repo` entry, else, for a session on the
   backend's host that recorded none, `Git_location.find` on the backend's
-  files, cached per cwd in `t.repos`), `agent_worktrees`, `bytes`, `live`
+  files, cached per cwd in `t.repos`), `worktrees` (`{path, branch, root,
+  source}`, `source` one of `created`, `entered`, `pull_request` with
+  `pr`, `agent` with `agent` and `task`), `bytes`, `live`
   (with `clients` when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
@@ -1473,7 +1481,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   allowed `set_user` ends `Rpc_server.serve_lines` and the router serves
   the rest of the connection from the new namespace's server, answering
   `set_user` with a `hello` of the first one's client details.
-  `/terminal` URLs carry `as_user` in their query instead. Without the backend host,
+  `/terminal` URLs carry `as_user` in their query instead (and `dir`, a
+  shell of its own in that directory, relative to the session's cwd unless
+  absolute). Without the backend host,
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
@@ -1647,12 +1657,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
   - Sessions: `/sessions` is a picker over `list_sessions` laid out by
-    `Session_selection` (active sessions first, grouped by project and
-    worktree in `Project_tree`'s order with a section each, named by
-    `Project_tree.place_label` (`prigh`, `prigh ⎇ feat/x`, which the filter
-    also matches), then the archived ones, dimmed: `Picker.Item.section`
-    keeps sections apart, also when filtering, and `Render` draws a divider
-    naming each). Tab marks rows
+    `Session_selection` (active sessions first in the backend's order,
+    each with `Session_worktrees.place` (`prigh ⎇ main`) and its
+    worktrees' `Session_worktrees.summary` beside its directory, which the
+    filter also matches; then the archived ones, dimmed:
+    `Picker.Item.section` keeps them apart, also when filtering, and
+    `Render` draws the divider). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
     highlighted) sessions and Alt+D every archived one but the current, with
     the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
@@ -1707,13 +1717,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     `new`/`open`/`rm` replies tagged so a refusal goes back to the editor
     (a removal refused for uncommitted changes puts `/worktree rm -f`
     there).
-  - Projects: `Project_tree` (shared with prigh-web) groups session
-    summaries into projects (a repository's main checkout from `repo.root`,
-    or the cwd of a session outside any repository), each with its main
-    checkout's sessions and its worktrees (from the sessions' `repo`, the
-    `agent_worktrees` of the sessions (and of `owners`, the archived ones
-    not shown), and a `list_worktrees` listing), in the order of first
-    mention; `sessions ~collapsed` flattens it in display order.
+  - Where a session works: `Session_worktrees` (shared with prigh-web)
+    names its repository and branch (`place`) and turns its `worktrees`
+    into nodes (`of_session`), each with what its repository's
+    `list_worktrees` listing says of it (changes, sync; one the listing no
+    longer has is left out) and whether the session's cwd is in it;
+    `roots` are the repositories to list.
   - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
     parses the result into files with their counts, which the transcript
     shows coloured; `/review` and `/init` send `review`/`init` tagged so
@@ -2100,9 +2109,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       not start — `Terminal.advice` says what to do — and the session's
       toggle). The view does not know xterm.js: `View.view` takes the
       widget as a function of a `Terminal.Target.t` (session, active host
-      and whether it is connected, the user acted as, generation), so
-      switching session, host or user, the host coming back or a new shell
-      is a new target and a new connection, and tests print the target.
+      and whether it is connected, the user acted as, generation, and
+      `dir`: `/terminal DIR`'s directory, for that session only), so
+      switching session, host, user or directory, the host coming back or
+      a new shell is a new target and a new connection, and tests print
+      the target. The URL's `dir` gets a shell of its own there (its tmux
+      key is the session's with `@DIR`), beside the session's.
       Keys inside the panel (`Keys.Target.Terminal`) are the shell's, Esc
       and Enter included, even with a dialog or a tool confirmation
       showing; only Ctrl+` (by `code`) is ours, toggling the panel.
@@ -2159,28 +2171,41 @@ terminal frontend and `web/` prigh-web, the browser one.
       `View_cache`) and `Diff_view` (`?lang`, from the edited path: the old
       and new sides each carry their own state, reset at each hunk).
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, also by
-      project and branch, ages from `Rel_time`; the active sessions as
-      `Session_list.tree`, a `Prigh_ui.Project_tree` built from the
-      summaries' `repo` and `agent_worktrees` plus `Worktrees`' listing of
-      the open session's repository: a section per project with its main
-      checkout's sessions, then its worktrees, each a row (changes and sync
-      from the listing, a subagent's tagged and linked to its session) with
-      its sessions; `Model.folded` (directories, kept in the
-      `web.sidebar-folded` preference) folds projects and worktrees, which
-      a search ignores; "+" is `New_session_in` (`new_session` then
-      `set_cwd`), a repository's "New worktree" `New_worktree {repo}`
-      (`create_worktree` with `cwd`, then a new session in the created
-      `cwd`), a worktree's bin `Ask_remove_worktree` (the listing's entry,
-      else the tree's with its repository, which `remove_worktree` gets as
-      `cwd`); then a divider with the archived ones'
+      repository, branch and the worktrees' branches, ages from
+      `Rel_time`): a flat list of the active sessions in the backend's
+      order (most recent first), each row with its repository and branch
+      (`Sidebar_view.place`) or directory, and under it its
+      `Prigh_ui.Session_worktrees` nodes (changes and sync from the
+      listings: `Worktrees`' of the open session's repository, and
+      `Repo_listings`, the other repositories the sessions' worktrees
+      belong to, each `list_worktrees {cwd: root}` asked once
+      (`Repo_worktrees`) and again once stale: a turn's end, a session's
+      worktrees changing, a worktree made or removed); `Model.folded`
+      (session ids, kept in the `web.sidebar-folded` preference) folds a
+      session's worktrees. Context menus (`Context_menu`, drawn by
+      `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
+      the keyboard like any picker; `Command.Place_menu` has
+      `Menu_listeners` put it at the pointer or under the row and keep it
+      in the window, a sheet on a phone): `Open_menu` from a right-click,
+      Shift+F10 or the ContextMenu key (`Keys.Target.Session`/`Worktree`),
+      a long press (`Menu_listeners.install` turns a still touch of 550ms
+      into a `contextmenu` and swallows the click after it) or the row's
+      ⋯; an item runs a `Context_menu.Plan.t` (`run_plan`): switch to the
+      session (`Plan_switched`) when it is not the open one, move it into
+      a directory (`Plan_entered`), then run the slash command the item
+      names (`/name`, `/fork`, `/worktree new`, `/review [PATH]`, `/files
+      PATH`, `/terminal PATH`, `/pr new`), or a notice; "New session here"
+      is `New_session_in` (`new_session` then `set_cwd`), Remove
+      `Ask_remove_worktree` (the listing's entry, else the session's record
+      with its repository, which `remove_worktree` gets as `cwd`). Then a
+      divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
-      the tree's order without what is folded, which keyboard navigation
-      and selection ranges follow; a search shows them), muted, and
+      the list's order, which keyboard navigation and selection ranges
+      follow; a search shows them), muted, and
       "Delete archived"; a session is running while its
       turn or background work runs (`list_sessions`' `running`, and
       `Model.active` for the current one); the list is refetched on
-      `sessions_changed`, never polled; each row's archive/unarchive and
-      delete buttons; `Session_marks`, the selection mode: clicks and
+      `sessions_changed`, never polled; `Session_marks`, the selection mode: clicks and
       Space mark, shift-click and Shift+Space mark the range from the last
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
