@@ -33,6 +33,10 @@ val is_empty : t -> bool
 val kill_ring : t -> string list
 val chips : t -> Chip.t list
 val set_text : t -> string -> t
+
+(** [set_text] as an edit: {!undo} brings back the text it replaced. *)
+val replace_text : t -> string -> t
+
 val set_history : t -> string list -> t
 val clear : t -> t
 val insert : t -> string -> t

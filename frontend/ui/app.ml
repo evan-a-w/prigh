@@ -15,8 +15,19 @@ module Reply_tag = struct
     | Forge_refresh
     | Prs_picker of string option (** the state asked for *)
     | Pr_shown
-    | Pr_form_defaults of string option (** the title typed *)
+    | Pr_form_defaults of
+        { title : string option (** the title typed *)
+        ; generate : bool
+        }
     | Pr_created
+    | Pr_drafted of string
+    | Commit_staged of
+        { command : string (** back in the editor if it fails *)
+        ; commit : Commit_command.t
+        }
+    | Committed of { amend : bool }
+    | Commit_drafted of string
+    | Pushed
     | Pr_checked_out of int
     | Models_for_picker of string
     | Models_for_switch of string
@@ -256,6 +267,8 @@ module Model = struct
     ; reconnect_generation : int
     ; btw : Btw_box.t option
     ; btw_seq : int
+    ; commit_draft : Commit_draft.t option
+    ; gen_seq : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -568,6 +581,8 @@ let init =
   ; reconnect_generation = 0
   ; btw = None
   ; btw_seq = 0
+  ; commit_draft = None
+  ; gen_seq = 0
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -936,12 +951,138 @@ let pr_command m rest =
   | Ok (View number) ->
     ( notice m (sprintf "reading pull request #%d…" number)
     , [ call (Pr_view number) ~tag:Pr_shown ] )
-  | Ok (New { title }) ->
+  | Ok (New { title; generate }) ->
     ( notice m "reading the branch…"
-    , [ call (Pr_defaults { dir = None }) ~tag:(Pr_form_defaults title) ] )
+    , [ call
+          (Pr_defaults { dir = None })
+          ~tag:(Pr_form_defaults { title; generate })
+      ] )
   | Ok (Checkout number) ->
     ( notice m (sprintf "checking out pull request #%d…" number)
     , [ call (Pr_checkout number) ~tag:(Pr_checked_out number) ] )
+;;
+
+(* ---- git: /commit, /push and drafts ---------------------------------- *)
+
+let next_gen_id m =
+  let seq = m.gen_seq + 1 in
+  { m with gen_seq = seq }, sprintf "gen-%d" seq
+;;
+
+let cancel_generation gen_id = call (Generate_cancel { gen_id }) ~tag:Ignore
+
+(* Closing what shows a draft stops it. *)
+let generation_cancels m =
+  List.map
+    (Option.to_list (Option.map m.commit_draft ~f:(fun d -> d.gen_id))
+     @
+     match m.mode with
+     | Pr_form form -> Option.to_list (Pr_form.generating form)
+     | _ -> [])
+    ~f:cancel_generation
+;;
+
+let draft_commit_message m ~amend =
+  let stale =
+    Option.to_list
+      (Option.map m.commit_draft ~f:(fun d -> cancel_generation d.gen_id))
+  in
+  let m, gen_id = next_gen_id m in
+  ( { m with commit_draft = Some (Commit_draft.create ~gen_id ~amend) }
+  , stale
+    @ [ call
+          (Generate_text
+             { gen_id
+             ; kind = Commit_message
+             ; dir = None
+             ; base = None
+             ; task = None
+             })
+          ~tag:(Commit_drafted gen_id)
+      ] )
+;;
+
+let stop_commit_draft m =
+  match m.commit_draft with
+  | None -> m, []
+  | Some d ->
+    ( notice { m with commit_draft = None } "stopped drafting the commit message"
+    , [ cancel_generation d.gen_id ] )
+;;
+
+let commit_now m ~command (c : Commit_command.t) =
+  match c.message with
+  | Generate -> draft_commit_message m ~amend:c.amend
+  | Text message ->
+    ( notice m (if c.amend then "amending the last commit…" else "committing…")
+    , [ call
+          (Git_commit { dir = None; message; amend = c.amend; paths = [] })
+          ~tag:
+            (Retry_in_editor
+               { command; hint = ""; then_ = Committed { amend = c.amend } })
+      ] )
+;;
+
+let commit_command m rest =
+  let command = String.strip ("/commit " ^ rest) in
+  match Commit_command.parse rest with
+  | Error e -> error (restore_command m command) e, []
+  | Ok commit when commit.stage_tracked ->
+    ( notice m "staging the changes to tracked files…"
+    , [ call
+          (Git_stage { dir = None; paths = []; tracked = true })
+          ~tag:
+            (Retry_in_editor
+               { command; hint = ""; then_ = Commit_staged { command; commit } })
+      ] )
+  | Ok commit -> commit_now m ~command commit
+;;
+
+(* The whole message goes into the editor as the command that commits it;
+   anything typed meanwhile is one undo away. *)
+let commit_drafted m (g : P.Generated.t) =
+  match m.commit_draft with
+  | Some d when String.equal d.gen_id g.gen_id ->
+    let typed = not (Editor.is_empty m.editor) in
+    let m =
+      { m with
+        commit_draft = None
+      ; editor =
+          Editor.replace_text
+            m.editor
+            (Commit_command.command ~amend:d.amend (String.strip g.text))
+      ; autocomplete = None
+      }
+    in
+    notice
+      m
+      (sprintf
+         "commit message drafted by %s ($%.4f): Enter commits it, or edit it \
+          first%s"
+         g.model
+         g.cost_usd
+         (if typed then "; Ctrl+_ brings back what you had typed" else ""))
+  | _ -> m
+;;
+
+let commit_draft_failed m gen_id e =
+  match m.commit_draft with
+  | Some d when String.equal d.gen_id gen_id ->
+    error
+      { m with commit_draft = None }
+      ("could not draft the commit message: " ^ e)
+  | _ -> m
+;;
+
+let push_command m rest =
+  if not (String.is_empty (String.strip rest))
+  then
+    ( error
+        (restore_command m "/push")
+        "usage: /push (it pushes the session's worktree's branch to its \
+         upstream)"
+    , [] )
+  else notice m "pushing…", [ call (Git_push { dir = None }) ~tag:Pushed ]
 ;;
 
 let prs_picker m ~state (list : P.Pr_list.t) =
@@ -1799,9 +1940,11 @@ let drop_pending m =
    (a switch, another user, a reconnect), and the requests that refill it. *)
 let reset_session m =
   let m = drop_pending m in
+  let cancels = generation_cancels m in
   ( follow
       { m with
-        mode =
+        commit_draft = None
+      ; mode =
           (match m.mode with
            | Output _
            | Pr_form _
@@ -1817,16 +1960,23 @@ let reset_session m =
       ; transcript = Transcript.clear m.transcript
       ; activity = Idle
       }
-  , [ rpc "get_state" ~tag:Initial_state
-    ; rpc "get_messages" ~tag:Initial_messages
-    ; rpc "get_pending" ~tag:Pending
-    ] )
+  , cancels
+    @ [ rpc "get_state" ~tag:Initial_state
+      ; rpc "get_messages" ~tag:Initial_messages
+      ; rpc "get_pending" ~tag:Pending
+      ] )
 ;;
 
 let backend_closed m =
   let m =
-    { (drop_pending m) with
+    let m = drop_pending m in
+    { m with
       state = Option.map m.state ~f:(fun s -> { s with running = false })
+    ; commit_draft = None
+    ; mode =
+        (match m.mode with
+         | Pr_form form -> Pr_form (Pr_form.stop form)
+         | mode -> mode)
     }
   in
   let m =
@@ -2986,6 +3136,8 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:Compact_done
       ] )
   | "pr", _ -> pr_command m cmd.rest
+  | "commit", _ -> commit_command m cmd.rest
+  | "push", _ -> push_command m cmd.rest
   | "diff", _ ->
     ( notice m "reading the changes…"
     , [ rpc
@@ -3735,6 +3887,8 @@ let editing_intent m (intent : Intent.t) =
    everything else edits the buffer and then recomputes the completion. *)
 let editing m (intent : Intent.t) =
   match intent with
+  | Cancel when Option.is_some m.commit_draft && Option.is_none m.autocomplete
+    -> stop_commit_draft m
   | Cancel when Option.is_some m.btw -> dismiss_btw m
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
@@ -4524,6 +4678,14 @@ let sign_in_mode m form (intent : Intent.t) =
 
 (* ---- the pull request form -------------------------------------------- *)
 
+let draft_pr ?title m form =
+  let m', gen_id = next_gen_id m in
+  match Pr_form.generate ?title form ~gen_id with
+  | None -> { m with mode = Pr_form form }, []
+  | Some (form, request) ->
+    { m' with mode = Pr_form form }, [ call request ~tag:(Pr_drafted gen_id) ]
+;;
+
 let pr_form_mode m form (intent : Intent.t) =
   let set form = { m with mode = Pr_form form }, [] in
   match intent with
@@ -4532,13 +4694,18 @@ let pr_form_mode m form (intent : Intent.t) =
      | `Wait form -> set form
      | `Create (form, request) ->
        { m with mode = Pr_form form }, [ call request ~tag:Pr_created ])
+  | Edit_externally -> draft_pr m form
+  | Undo -> set (Pr_form.undo form)
+  | Cancel when Option.is_some (Pr_form.generating form) ->
+    ( { m with mode = Pr_form (Pr_form.stop form) }
+    , List.map (Option.to_list (Pr_form.generating form)) ~f:cancel_generation )
   | Cancel | Interrupt ->
     ( notice
         { m with mode = Editing }
         (if Pr_form.submitting form
          then "closed; the pull request is still being created"
          else "no pull request created")
-    , [] )
+    , List.map (Option.to_list (Pr_form.generating form)) ~f:cancel_generation )
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Complete | Down -> set (Pr_form.next form)
   | Next_agent | Up -> set (Pr_form.prev form)
@@ -4843,7 +5010,14 @@ let event m (e : P.Event.t) =
      with
      | Some entries -> set_backend_history m entries, []
      | None -> m, [])
-  | Generate_delta _ -> m, []
+  | Generate_delta { gen_id; delta } ->
+    (match m.commit_draft, m.mode with
+     | Some d, _ when String.equal d.gen_id gen_id ->
+       { m with commit_draft = Some (Commit_draft.add_delta d delta) }, []
+     | _, Pr_form form ->
+       ( { m with mode = Pr_form (Pr_form.generated_delta form ~gen_id delta) }
+       , [] )
+     | _ -> m, [])
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
@@ -5002,6 +5176,16 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
         | Pr_form form ->
           { m with mode = Pr_form (Pr_form.failed form ~error:e) }, []
         | _ -> error m e, [])
+     | Pr_drafted gen_id ->
+       (match m.mode with
+        | Pr_form form ->
+          ( { m with
+              mode = Pr_form (Pr_form.generation_failed form ~gen_id ~error:e)
+            }
+          , [] )
+        | _ -> m, [])
+     | Commit_drafted gen_id -> commit_draft_failed m gen_id e, []
+     | Pushed -> error m e, []
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
@@ -5357,16 +5541,31 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
              ~title:(sprintf "Pull request #%d" detail.pr.number)
              (Pr_view.render detail)
          , [] ))
-     | Pr_form_defaults title ->
+     | Pr_form_defaults { title; generate } ->
        decode json ~f:P.Pr_defaults.of_json (fun defaults ->
          if Mode.is_dialog m.mode
          then warn m "close the current dialog first (Esc), then /pr new", []
-         else
-           ( { m with
-               mode = Pr_form (Pr_form.create ?title defaults)
-             ; autocomplete = None
-             }
-           , [] ))
+         else (
+           let form = Pr_form.create ?title defaults in
+           let m = { m with mode = Pr_form form; autocomplete = None } in
+           if generate
+           then draft_pr ~title:(Option.is_none title) m form
+           else m, []))
+     | Pr_drafted _ ->
+       decode json ~f:P.Generated.of_json (fun g ->
+         match m.mode with
+         | Pr_form form ->
+           { m with mode = Pr_form (Pr_form.generated form g) }, []
+         | _ -> m, [])
+     | Commit_staged { command; commit } -> commit_now m ~command commit
+     | Committed { amend } ->
+       decode json ~f:P.Git_status.Commit.of_json (fun c ->
+         log { m with notice = None } (Commit_command.committed ~amend c), [])
+     | Commit_drafted _ ->
+       decode json ~f:P.Generated.of_json (fun g -> commit_drafted m g, [])
+     | Pushed ->
+       decode json ~f:P.Git_status.Push.of_json (fun p ->
+         log { m with notice = None } (Commit_command.pushed p), [])
      | Pr_created ->
        decode json ~f:P.Pr_detail.of_json (fun { pr; _ } ->
          let m =

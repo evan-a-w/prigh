@@ -98,14 +98,14 @@ let%expect_test "/pr's arguments" =
       Error
       "not a pull request number: x; /pr view needs a number: /pr view 24 (/pr lists them)"))
     ("view 1 2" (Error "usage: /pr view N, e.g. /pr view 24"))
-    (new (Ok (New (title ()))))
-    ("new  Add the thing " (Ok (New (title ("Add the thing")))))
+    (new (Ok (New (title ()) (generate false))))
+    ("new  Add the thing " (Ok (New (title ("Add the thing")) (generate false))))
     ("checkout 7" (Ok (Checkout 7)))
     (checkout (
       Error "/pr checkout needs a number: /pr checkout 24 (/pr lists them)"))
     ("merge 3" (
       Error
-      "unknown /pr subcommand \"merge\": use list [open|closed|all], view N, new [title] or checkout N"))
+      "unknown /pr subcommand \"merge\": use list [open|closed|all], view N, new [--generate] [title] or checkout N"))
     |}]
 ;;
 
@@ -1052,7 +1052,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    (Rpc (method_ pr_defaults) (params ()) (tag (Pr_form_defaults ())))
+    (Rpc
+      (method_ pr_defaults)
+      (params ())
+      (tag (Pr_form_defaults (title ()) (generate false))))
 
 
 
@@ -1074,7 +1077,10 @@ let%expect_test
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
-  H.reply h (Pr_form_defaults None) (defaults_json ~pushed:false);
+  H.reply
+    h
+    (Pr_form_defaults { title = None; generate = false })
+    (defaults_json ~pushed:false);
   H.show h;
   [%expect
     {|
@@ -1090,8 +1096,8 @@ let%expect_test
     │ [ ] draft                                                                    │
     │ [x] push feat/x first  (not on the remote yet)                               │
     │ feat/x → main · 2 commits                                                    │
-    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Enter creates  │
-    │ · Esc cancels                                                                │
+    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Ctrl+G drafts  │
+    │ it with the model · Enter creates · Esc cancels                              │
     └──────────────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────── reading the branch… ───
     >
@@ -1118,8 +1124,8 @@ let%expect_test
     │ [ ] draft                                                                    │
     │ [x] push feat/x first  (not on the remote yet)                               │
     │ feat/x → main · 2 commits                                                    │
-    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Enter creates  │
-    │ · Esc cancels                                                                │
+    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Ctrl+G drafts  │
+    │ it with the model · Enter creates · Esc cancels                              │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     >
@@ -1146,8 +1152,8 @@ let%expect_test
     │ [x] draft                                                                    │
     │ [ ]▏push feat/x first  (not on the remote yet)                               │
     │ feat/x → main · 2 commits                                                    │
-    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Enter creates  │
-    │ · Esc cancels                                                                │
+    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Ctrl+G drafts  │
+    │ it with the model · Enter creates · Esc cancels                              │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     >
@@ -1181,8 +1187,8 @@ let%expect_test
     │ [ ]▏push feat/x first  (not on the remote yet)                               │
     │ feat/x → main · 2 commits                                                    │
     │ creating…                                                                    │
-    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Enter creates  │
-    │ · Esc cancels                                                                │
+    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Ctrl+G drafts  │
+    │ it with the model · Enter creates · Esc cancels                              │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     >
@@ -1209,8 +1215,8 @@ let%expect_test
     │ [ ]▏push feat/x first  (not on the remote yet)                               │
     │ feat/x → main · 2 commits                                                    │
     │ a pull request for feat/x already exists: #24 (/pr view 24)                  │
-    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Enter creates  │
-    │ · Esc cancels                                                                │
+    │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · Ctrl+G drafts  │
+    │ it with the model · Enter creates · Esc cancels                              │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     >
@@ -1262,7 +1268,7 @@ let%expect_test
   run h "/pr new Make it faster";
   H.reply
     h
-    (Pr_form_defaults (Some "Make it faster"))
+    (Pr_form_defaults { title = Some "Make it faster"; generate = false })
     (defaults_json ~pushed:true);
   H.show h;
   [%expect
@@ -1270,8 +1276,7 @@ let%expect_test
     (Rpc
       (method_ pr_defaults)
       (params ())
-      (tag (Pr_form_defaults ("Make it faster"))))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      (tag (Pr_form_defaults (title ("Make it faster")) (generate false))))
 
     ▌ earlier question
       earlier answer
@@ -1284,7 +1289,8 @@ let%expect_test
     │ [ ] push feat/x first  (it is on the remote)             │
     │ feat/x → main · 2 commits                                │
     │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the   │
-    │ body · Enter creates · Esc cancels                       │
+    │ body · Ctrl+G drafts it with the model · Enter creates · │
+    │ Esc cancels                                              │
     └──────────────────────────────────────────────────────────┘
     ──────────────────────────────────── reading the branch… ───
     >
@@ -1307,7 +1313,8 @@ let%expect_test
     │ feat/x → main · 2 commits                                │
     │ type a title                                             │
     │ Tab/↑↓ fields · Space toggles · Ctrl+J new line in the   │
-    │ body · Enter creates · Esc cancels                       │
+    │ body · Ctrl+G drafts it with the model · Enter creates · │
+    │ Esc cancels                                              │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     >
@@ -1396,7 +1403,11 @@ let%expect_test "switching sessions closes the pull request views" =
   H.reply ~quiet:true h Reload_messages {|null|};
   H.mode h;
   run h "/pr new";
-  H.reply ~quiet:true h (Pr_form_defaults None) (defaults_json ~pushed:true);
+  H.reply
+    ~quiet:true
+    h
+    (Pr_form_defaults { title = None; generate = false })
+    (defaults_json ~pushed:true);
   H.mode h;
   H.reply ~quiet:true h Reload_messages {|null|};
   H.mode h;
@@ -1405,7 +1416,10 @@ let%expect_test "switching sessions closes the pull request views" =
     (Rpc (method_ pr_list) (params ()) (tag (Prs_picker ())))
     picker
     editing
-    (Rpc (method_ pr_defaults) (params ()) (tag (Pr_form_defaults ())))
+    (Rpc
+      (method_ pr_defaults)
+      (params ())
+      (tag (Pr_form_defaults (title ()) (generate false))))
     pr_form
     editing
     |}]
