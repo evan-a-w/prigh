@@ -1290,6 +1290,15 @@ try {
   // Released: the model has the size once the handle says so.
   const drag = async (name, dx, dy) => {
     const before = await valueNow(name);
+    // Where the handle is once a panel that just opened stops moving.
+    await page.waitForFunction(async n => {
+      const at = () => JSON.stringify(document.querySelector(`.resizer[data-resize="${n}"]`)?.getBoundingClientRect());
+      const frame = () => new Promise(requestAnimationFrame);
+      const first = at();
+      await frame();
+      await frame();
+      return first !== undefined && first === at();
+    }, name);
     const box = await handle(name).boundingBox();
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
     await page.mouse.move(x, y);
