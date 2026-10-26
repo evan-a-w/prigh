@@ -3362,8 +3362,8 @@ let fetch_autocomplete m ac =
      | Some skills ->
        ( { m with autocomplete = Some ac; skills }
        , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
-  | Autocomplete.Source.Argument { argument = Some (Worktree | Review as kind); _ }
-    ->
+  | Autocomplete.Source.Argument
+      { argument = Some ((Worktree | Review) as kind); _ } ->
     let key = worktree_key m in
     let m, worktrees =
       match Location_cache.request m.worktrees ~key with
@@ -5151,7 +5151,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   | Dir None, None, false -> status
                   | _ ->
                     Retry_in_editor
-                      { command = Review_command.command ~target ?base ~direct ()
+                      { command =
+                          Review_command.command ~target ?base ~direct ()
                       ; hint = ""
                       ; then_ = status
                       })

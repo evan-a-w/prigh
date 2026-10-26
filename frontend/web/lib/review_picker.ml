@@ -133,7 +133,8 @@ let targets ~worktrees ~(reviewed : Git_diff.Target.t) (d : Git_diff.t) =
     | Some _ | None -> worktree_items
   in
   let branch_items group names =
-    List.filter names ~f:(fun b -> not (List.mem checked_out b ~equal:String.equal))
+    List.filter names ~f:(fun b ->
+      not (List.mem checked_out b ~equal:String.equal))
     |> List.map ~f:(fun b ->
       item
         ~group
@@ -146,11 +147,15 @@ let targets ~worktrees ~(reviewed : Git_diff.Target.t) (d : Git_diff.t) =
     match reviewed with
     | Rev rev
       when not
-             (List.mem
-                (d.branches @ d.remote_branches)
-                rev
-                ~equal:String.equal) ->
-      [ item ~group:"Branches" ~detail:"not checked out: read-only" ~marked:true (Review reviewed) rev ]
+             (List.mem (d.branches @ d.remote_branches) rev ~equal:String.equal)
+      ->
+      [ item
+          ~group:"Branches"
+          ~detail:"not checked out: read-only"
+          ~marked:true
+          (Review reviewed)
+          rev
+      ]
     | Rev _ | Dir _ -> []
   in
   create
@@ -167,7 +172,8 @@ let bases (d : Git_diff.t) =
     item ~group ?detail ~marked:(String.equal d.base name) (Base name) name
   in
   let names group names ~detail =
-    List.filter names ~f:(fun b -> not (Option.exists reviewed ~f:(String.equal b)))
+    List.filter names ~f:(fun b ->
+      not (Option.exists reviewed ~f:(String.equal b)))
     |> List.map ~f:(fun b -> base group ~detail b)
   in
   let known =
@@ -178,7 +184,8 @@ let bases (d : Git_diff.t) =
   let other =
     if String.equal d.base "HEAD" || List.mem known d.base ~equal:String.equal
     then []
-    else [ base "Typed" ~detail:"compare with this branch, tag or commit" d.base ]
+    else
+      [ base "Typed" ~detail:"compare with this branch, tag or commit" d.base ]
   in
   create
     Base
@@ -188,7 +195,10 @@ let bases (d : Git_diff.t) =
         [ base "Uncommitted" ~detail:"the uncommitted changes only" "HEAD" ])
      @ other
      @ names "Branches" d.branches ~detail:"local branch"
-     @ names "Remote branches" d.remote_branches ~detail:"remote-tracking branch"
+     @ names
+         "Remote branches"
+         d.remote_branches
+         ~detail:"remote-tracking branch"
      @ names "Tags" d.tags ~detail:"tag"
      @ List.map d.commits ~f:(fun c ->
        item

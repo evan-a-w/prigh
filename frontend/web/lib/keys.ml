@@ -167,7 +167,8 @@ let review_key (m : App.Model.t) t : App.Action.t option =
   | "r" when plain t -> Some (Review_pick Target)
   | "b" when plain t -> Some (Review_pick Base)
   | "d" when plain t ->
-    Option.map m.review.diff ~f:(fun d -> App.Action.Review_direct (not d.direct))
+    Option.map m.review.diff ~f:(fun d ->
+      App.Action.Review_direct (not d.direct))
   | _ ->
     Code_review.key m.review ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
     |> Option.map ~f:(fun a -> App.Action.Review a)
@@ -177,14 +178,25 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
   | ( "ArrowUp"
-    , (Picker _ | Popover _ | Review_pick _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
-    -> Some (Dialog_move (-1))
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Login _
+      | Scoped_models _
+      | Prompt _
+      | Pulls _ ) ) -> Some (Dialog_move (-1))
   | ( "ArrowDown"
-    , (Picker _ | Popover _ | Review_pick _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
-    -> Some (Dialog_move 1)
-  | "PageUp", (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _) ->
-    Some (Dialog_move (-8))
-  | "PageDown", (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _) ->
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Login _
+      | Scoped_models _
+      | Prompt _
+      | Pulls _ ) ) -> Some (Dialog_move 1)
+  | "PageUp", (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _)
+    -> Some (Dialog_move (-8))
+  | ( "PageDown"
+    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _) ) ->
     Some (Dialog_move 8)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }

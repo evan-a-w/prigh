@@ -62,19 +62,25 @@ let diff_json
            ; Some ("main", if String.equal root "/work" then `True else `False)
            ; Some
                ( "branches"
-               , `Array [ `String "feat/login"; `String "feat/old"; `String "main" ]
+               , `Array
+                   [ `String "feat/login"; `String "feat/old"; `String "main" ]
                )
            ; Some
                ( "remote_branches"
-               , `Array [ `String "origin/main"; `String "origin/feat/remote" ] )
+               , `Array [ `String "origin/main"; `String "origin/feat/remote" ]
+               )
            ; Some ("tags", `Array [ `String "v1.2"; `String "v1.1" ])
            ; Some
                ( "commits"
                , `Array
                    [ `Object
-                       [ "sha", `String (sha 'a'); "subject", `String "Fix the login" ]
+                       [ "sha", `String (sha 'a')
+                       ; "subject", `String "Fix the login"
+                       ]
                    ; `Object
-                       [ "sha", `String (sha 'b'); "subject", `String "Add a.ml" ]
+                       [ "sha", `String (sha 'b')
+                       ; "subject", `String "Add a.ml"
+                       ]
                    ] )
            ]))
 ;;
@@ -155,7 +161,8 @@ let%expect_test "the pickers: grouped, filtered, keyboard and Esc" =
   (* Esc closes it without a change, back on its button. *)
   H.key h "Escape";
   H.elements h ~selector:"#review-popover";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus review-target-button)
     |}];
@@ -186,7 +193,8 @@ let%expect_test "the pickers: grouped, filtered, keyboard and Esc" =
   (* The same button again closes it. *)
   H.click h ~selector:"#review-base-button";
   H.elements h ~selector:"#review-popover";
-  [%expect {|
+  [%expect
+    {|
     (Review_pick Base)
     (Focus review-base-button)
     |}]
@@ -206,10 +214,7 @@ let%expect_test "against origin/main, since the merge base or directly" =
     (Rpc (method_ git_diff) (params ((base origin/main))) (tag (Review Diff)))
     (Focus review-page)
     |}];
-  H.reply
-    h
-    "git_diff"
-    (diff_json ~base:"origin/main" ~against:(sha 'c') a_diff);
+  H.reply h "git_diff" (diff_json ~base:"origin/main" ~against:(sha 'c') a_diff);
   target h;
   [%expect
     {|
@@ -233,8 +238,7 @@ let%expect_test "against origin/main, since the merge base or directly" =
     (Since merge base) (Directly)
     |}];
   H.elements h ~selector:".review-target[title]";
-  [%expect
-    {| <div class="review-target"> |}];
+  [%expect {| <div class="review-target"> |}];
   (* Directly: two-dot, said in the header. *)
   H.key h "d" ~target:Review;
   [%expect
@@ -314,7 +318,8 @@ let%expect_test "a typed revision: checked, the closest names when unknown" =
   H.text h ~selector:".toast";
   H.reply h "git_diff" (diff_json a_diff);
   H.quiet h (fun () -> target h);
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Focus review-page)
     Unknown revision "mian": name a branch, tag or commit (closest: main, origin/main, v1.1) (Dismiss)
@@ -376,7 +381,8 @@ let%expect_test
   H.reply h "git_show" {|{"text":"let x = 2\n","truncated":false}|};
   H.key h "e" ~target:Review;
   H.text h ~selector:".toast";
-  [%expect {|
+  [%expect
+    {|
     (Review (Set_mode Edit))
     (Expire_toast (id 0) (after_ms 5220))
     feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
@@ -488,7 +494,8 @@ let%expect_test "remembered: the next visit opens where the last one was" =
   H.quiet h (fun () -> H.reply h "git_diff" (diff_json a_diff));
   H.key h "r" ~target:Review;
   H.click h ~selector:"[data-id='rev:feat/old']";
-  [%expect {|
+  [%expect
+    {|
     (Review_pick Target)
     (Focus review-pick-filter)
     (Picker_choose own)
@@ -503,7 +510,8 @@ let%expect_test "remembered: the next visit opens where the last one was" =
     |}]
 ;;
 
-let%expect_test "/review completes branches not checked out, remote ones and tags"
+let%expect_test
+    "/review completes branches not checked out, remote ones and tags"
   =
   let h = started () in
   H.quiet h (fun () -> H.key h "Escape" ~target:Review);
@@ -511,7 +519,8 @@ let%expect_test "/review completes branches not checked out, remote ones and tag
   H.text h ~selector:"#completion-list";
   H.type_ h "/review feat/old --base ";
   H.text h ~selector:"#completion-list";
-  [%expect {|
+  [%expect
+    {|
     (Review Close)
     --base compare with another branch, tag or commit
     --direct compare with the base itself, not the merge base

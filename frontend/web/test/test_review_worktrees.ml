@@ -298,7 +298,8 @@ let%expect_test
   (* The base picker: the uncommitted changes only. *)
   H.act
     h
-    (Review (Show { reviewed = Dir (Some feat); base = Some "HEAD"; direct = false }));
+    (Review
+       (Show { reviewed = Dir (Some feat); base = Some "HEAD"; direct = false }));
   [%expect {| (Focus review-page) |}];
   (* The first reply is for the default base: read again for HEAD. *)
   H.reply h "git_diff" (feat_diff ());

@@ -1191,7 +1191,8 @@ let%expect_test
        ; then_ =
            Review_status
              { review =
-                 P.Review.of_json (P.Json.parse feat_review_json |> Or_error.ok_exn)
+                 P.Review.of_json
+                   (P.Json.parse feat_review_json |> Or_error.ok_exn)
                  |> Or_error.ok_exn
              ; target = Rev "nope"
              }
@@ -1280,7 +1281,8 @@ let%expect_test
   in
   H.reply
     h
-    (Review_comments { target = Rev "feat/b"; base = Some "main"; direct = true })
+    (Review_comments
+       { target = Rev "feat/b"; base = Some "main"; direct = true })
     review_json;
   H.reply
     h
@@ -1299,7 +1301,8 @@ let%expect_test
        "base":"main","main":false,"branches":["feat/b","main"],"truncated":false,
        "diff":"diff --git a/b.ml b/b.ml\n--- a/b.ml\n+++ b/b.ml\n@@ -1 +1 @@\n-p\n+q\n"}|};
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ list_worktrees)
       (params ())
@@ -1405,10 +1408,20 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
   print_endline
     (Review_command.command ~target:(Dir (Some "/w/x")) ~base:"main" ());
   print_endline
-    (Review_command.command ~target:(Rev "origin/feat/b") ~base:"v1" ~direct:true ());
+    (Review_command.command
+       ~target:(Rev "origin/feat/b")
+       ~base:"v1"
+       ~direct:true
+       ());
   print_endline (Review_command.command ());
   List.iter
-    [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m"; "feat/a --base main --direct " ]
+    [ ""
+    ; "fe"
+    ; "feat/a "
+    ; "--base "
+    ; "feat/a --base m"
+    ; "feat/a --base main --direct "
+    ]
     ~f:(fun rest ->
       print_s
         [%message

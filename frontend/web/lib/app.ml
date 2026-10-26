@@ -3515,7 +3515,8 @@ let remembered (m : Model.t) (target : Code_review.Target.t) =
          (Review_memory.key ~own:m.review.own_root target.reviewed)
          ~f:(fun key -> Review_memory.compare m.review_memory ~key)
      with
-     | Some c -> { target with base = c.base; direct = target.direct || c.direct }
+     | Some c ->
+       { target with base = c.base; direct = target.direct || c.direct }
      | None -> target)
 ;;
 
@@ -3558,7 +3559,8 @@ let review_update (m : Model.t) (action : Code_review.Action.t) =
   in
   match last with
   | Some reviewed
-    when opening && Code_review.Target.equal m.review.target Code_review.Target.default
+    when opening
+         && Code_review.Target.equal m.review.target Code_review.Target.default
     -> review_show m { Code_review.Target.default with reviewed }
   | _ -> with_review m (Code_review.update m.review action)
 ;;
@@ -3576,7 +3578,8 @@ let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) 
        Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
          Worktree_command.find l name)
      with
-     | Some (Ok w) -> review_show m { reviewed = Dir (Some w.path); base; direct }
+     | Some (Ok w) ->
+       review_show m { reviewed = Dir (Some w.path); base; direct }
      | Some (Error _) | None ->
        (match Worktrees.place m.state with
         | Some place ->
@@ -3620,7 +3623,8 @@ let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
 
 let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
   match m.dialog, m.review.diff with
-  | Some (Review_pick p), _ when Review_picker.Which.equal (Review_picker.which p) which ->
+  | Some (Review_pick p), _
+    when Review_picker.Which.equal (Review_picker.which p) which ->
     close_dialog m
   | _, None -> toast m "The changes are still being read: try again."
   | _, Some d ->
@@ -3629,8 +3633,10 @@ let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
       | Target ->
         Review_picker.targets
           ~worktrees:
-            (Option.value_map (Worktrees.listing m.worktrees) ~default:[] ~f:(fun l ->
-               l.worktrees))
+            (Option.value_map
+               (Worktrees.listing m.worktrees)
+               ~default:[]
+               ~f:(fun l -> l.worktrees))
           ~reviewed:m.review.target.reviewed
           d
       | Base -> Review_picker.bases d
@@ -3660,8 +3666,8 @@ let review_picked (m : Model.t) (item : Review_picker.Item.t) =
 let review_direct (m : Model.t) direct =
   let target = m.review.target in
   match m.review.diff with
-  | Some d when not (Bool.equal d.direct direct && Bool.equal target.direct direct)
-    ->
+  | Some d
+    when not (Bool.equal d.direct direct && Bool.equal target.direct direct) ->
     (* The base the backend chose, named, so that it stays. *)
     review_show m { target with base = Some d.base; direct }
   | Some _ | None -> m, []
@@ -3684,7 +3690,8 @@ let review_checkout (m : Model.t) =
        error
          m
          (sprintf
-            "%s is not a branch: make one there first (/worktree new BRANCH              --base %s)."
+            "%s is not a branch: make one there first (/worktree new \
+             BRANCH              --base %s)."
             rev
             rev)
      | Some branch ->
@@ -3695,7 +3702,10 @@ let review_checkout (m : Model.t) =
                (Create_worktree { branch; base = None; cwd = None })
                ~tag:
                  (Review_checked_out
-                    { reviewed = Dir None; base = Some d.base; direct = d.direct })
+                    { reviewed = Dir None
+                    ; base = Some d.base
+                    ; direct = d.direct
+                    })
            ] ))
   | _ -> m, []
 ;;
@@ -3721,9 +3731,7 @@ let review_checked_out
          c.worktree.path)
   in
   let m, cmds =
-    review_show
-      m
-      { target with reviewed = Dir (Some c.worktree.path) }
+    review_show m { target with reviewed = Dir (Some c.worktree.path) }
   in
   m, toasts @ cmds
 ;;
@@ -6052,9 +6060,8 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
          ~notice:(sprintf "Working in the worktree %s (%s)" label dir)
          ()
      | New_session_here -> new_session_in m dir
-     | Review -> plan
-         ~run:(Prigh_ui.Review_command.command ~target:(Dir worktree) ())
-         ()
+     | Review ->
+       plan ~run:(Prigh_ui.Review_command.command ~target:(Dir worktree) ()) ()
      | Files -> plan ~run:("/files " ^ dir) ()
      | Terminal ->
        plan
@@ -6577,7 +6584,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with dialog = Some (Forge_host { input = text; error = None }) }, []
      | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Review_pick p) ->
-       { m with dialog = Some (Review_pick (Review_picker.set_query p text)) }, []
+       ( { m with dialog = Some (Review_pick (Review_picker.set_query p text)) }
+       , [] )
      | _ -> m, [])
   | Dialog_move delta ->
     (match m.dialog with

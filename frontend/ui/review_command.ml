@@ -55,7 +55,11 @@ let parse args : Action.t =
       Show { target = Dir (Some w); base = None; direct = false }
     | [ w ] ->
       Named
-        { name = w; base = None; direct = false; model = Some (String.strip args) }
+        { name = w
+        ; base = None
+        ; direct = false
+        ; model = Some (String.strip args)
+        }
     | _ -> Model (String.strip args))
   else (
     match options [] ~base:None ~direct:false all with
@@ -74,8 +78,7 @@ let resolve listing ~name ~base ~direct ~model : Action.t =
   | Error _, None -> Show { target = Rev name; base; direct }
 ;;
 
-let command ?(target = P.Git_diff.Target.Dir None) ?base ?(direct = false) ()
-  =
+let command ?(target = P.Git_diff.Target.Dir None) ?base ?(direct = false) () =
   String.concat
     ~sep:" "
     ("/review"
@@ -124,8 +127,8 @@ let complete ~worktrees ~(refs : P.Git_diff.Refs.t) rest =
                  ~f:(fun b -> b, "compare with " ^ b))
            @ List.map refs.remote_branches ~f:(fun b ->
              b, "compare with the remote branch " ^ b)
-           @ List.map refs.tags ~f:(fun tag -> tag, "compare with the tag " ^ tag)
-          ) )
+           @ List.map refs.tags ~f:(fun tag ->
+             tag, "compare with the tag " ^ tag)) )
   | _ ->
     let positional =
       Result.ok (options [] ~base:None ~direct:false completed)
@@ -144,9 +147,8 @@ let complete ~worktrees ~(refs : P.Git_diff.Refs.t) rest =
     (match positional with
      | [] ->
        let not_checked_out =
-         List.filter
-           (refs.branches @ refs.remote_branches)
-           ~f:(fun b -> not (List.mem checked_out b ~equal:String.equal))
+         List.filter (refs.branches @ refs.remote_branches) ~f:(fun b ->
+           not (List.mem checked_out b ~equal:String.equal))
        in
        Some
          ( offset

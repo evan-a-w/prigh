@@ -531,10 +531,11 @@ let view (m : App.Model.t) ~inject =
                   , (match Code_review.read_only t with
                      | Some rev ->
                        sprintf
-                         "%s is not checked out: Check out into a worktree \
-                          to edit it"
+                         "%s is not checked out: Check out into a worktree to \
+                          edit it"
                          rev
-                     | None -> "Edit the file and save it where the tools run (e)")
+                     | None ->
+                       "Edit the file and save it where the tools run (e)")
                   , Code_review.Mode.equal t.mode Edit
                   , inject (review (Set_mode Edit)) )
                 ]
@@ -599,6 +600,7 @@ let view (m : App.Model.t) ~inject =
         ]
       (* While a picker is open the rest of the page is out of reach. *)
       (match m.dialog with
-       | Some (Review_pick _) -> [ inert head; target_bar m ~inject; inert body ]
+       | Some (Review_pick _) ->
+         [ inert head; target_bar m ~inject; inert body ]
        | _ -> [ head; target_bar m ~inject; body ]))
 ;;
