@@ -3194,8 +3194,13 @@ let worktrees_picker (m : Model.t) (listing : Worktree.Listing.t) =
        })
 ;;
 
-let enter_worktree ~notice path =
-  call (Enter_worktree path) ~tag:(Worktree_entered notice)
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
+  call
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
+    ~tag:(Worktree_entered notice)
 ;;
 
 let with_entering (m : Model.t) entering =
@@ -5355,7 +5360,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Missing path -> error m (sprintf "%s is gone." path))
   | Worktree_session { path; notice }, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
-    with_entering m (Some path), cmds @ [ enter_worktree ~notice path ]
+    ( with_entering m (Some path)
+    , cmds @ [ enter_worktree ~new_session:true ~notice path ] )
   | Plan_switched plan, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
     (* Not if the user went on to another session meanwhile. *)

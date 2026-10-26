@@ -2603,8 +2603,13 @@ let worktrees_picker m listing =
     (Picker.create ~title:(worktrees_title m listing) (worktree_items listing))
 ;;
 
-let enter_worktree ~notice path =
-  call (Enter_worktree path) ~tag:(Worktree_entered notice)
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
+  call
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
+    ~tag:(Worktree_entered notice)
 ;;
 
 let open_worktree m (w : P.Worktree.t) ~new_session =
@@ -5096,7 +5101,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          | Missing path -> error m (sprintf "%s is gone" path), [])
      | Worktree_session_started { path; notice } ->
        let m, commands = reset_session m in
-       follow m, commands @ [ enter_worktree ~notice path ]
+       follow m, commands @ [ enter_worktree ~new_session:true ~notice path ]
      | Worktree_removed _ ->
        decode json ~f:P.Worktree.removed_of_json (fun w ->
          ( notice

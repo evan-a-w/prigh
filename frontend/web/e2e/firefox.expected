@@ -1099,7 +1099,7 @@ The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | 3 [selected]
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
 │ agent/tidy-the-docs | subagent [agent]
 │ feat/login
 │ docs | here | ● 2 [dirty here]
@@ -1126,9 +1126,32 @@ The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | 3 [folded selected]
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [folded selected]
 === firefox: worktrees: searching ===
 Tidy the docs in a worktree
+=== firefox: worktrees: a switched session's menu ===
+Tidy the docs in a worktree — prigh — docs
+▸ Switch back to main  /worktree back
+Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== firefox: worktrees: switched back ===
+Tidy the docs in a worktree | <age> | prigh | main | 3 [selected]
+│ agent/tidy-the-docs | subagent [agent]
+│ feat/login
+│ docs | ● 2 [dirty]
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === firefox: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)

@@ -290,6 +290,7 @@ try {
   console.log((await page.locator(".sessions .session-title").allTextContents()).join("\n"));
   await screenshot("searching");
   await page.locator("#session-search").fill("");
+  await session("Shopping list").waitFor();
 
   // Switched into feat/login, then docs: its home is still main, and
   // Switch back, first in its menu, goes there.

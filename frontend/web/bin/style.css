@@ -276,6 +276,10 @@ kbd {
 .session-repo { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
 .session-branch { min-width: 0; display: inline-flex; align-items: center; gap: 3px; overflow: hidden; text-overflow: ellipsis; }
 .place-icon { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.8; }
+/* Where a worktree switch took it from: quiet, and short of room the
+   place keeps its share. */
+.session-home { flex: 0 1000 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+.session-place:has(+ .session-home) { flex: 0 1 auto; }
 /* Its ⋯ menu, over the right end of the title line while the row is
    pointed at: the worktrees' fold is on the line below. */
 .session-actions {

@@ -182,9 +182,7 @@ let%expect_test "Ctrl+N in the picker works there in a new session" =
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc
       (method_ set_cwd)
-      (params (
-        (path     /h/.prigh/worktrees/repo/feat-a)
-        (worktree true)))
+      (params ((path /h/.prigh/worktrees/repo/feat-a)))
       (tag (
         Worktree_entered
         "new session in the worktree feat/a at /h/.prigh/worktrees/repo/feat-a")))
@@ -687,9 +685,7 @@ let%expect_test "/worktree open -n works there in a new session" =
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc
       (method_ set_cwd)
-      (params (
-        (path     /src/repo)
-        (worktree true)))
+      (params ((path /src/repo)))
       (tag (Worktree_entered "new session in the worktree main at /src/repo")))
     (Rpc
       (method_ list_worktrees)
