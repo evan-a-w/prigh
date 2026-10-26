@@ -42,6 +42,10 @@ type t =
       { kind : Picker_kind.t
       ; picker : Picker.t
       }
+  | Popover of
+      { chip : Chip.t
+      ; picker : Picker.t
+      } (** a composer chip's menu, over the chip *)
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -75,9 +79,22 @@ type t =
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)
   | Diff of Git_diff.t (** [/diff] *)
+  | Pulls of Pull_requests.t (** [/pr]: the repository's pull requests *)
+  | Pull of Pr_page.t (** one of them *)
+  | Pr_create of Pr_create.t (** [/pr new] *)
+  | Pr_checked_out of
+      { number : int
+      ; checkout : Pr_checkout.t
+      } (** [/pr checkout N] done: work there? *)
+  | Forge_host of
+      { input : string
+      ; error : string option
+      } (** [/login forgejo]: which host? *)
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
+      ; repo : string option
+        (** its repository when not the session's: removed from the tree *)
       ; force : bool (** also with uncommitted changes ([rm -f]) *)
       ; busy : bool (** removing: waiting for the backend *)
       ; error : string option

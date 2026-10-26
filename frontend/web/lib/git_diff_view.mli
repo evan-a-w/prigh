@@ -9,3 +9,6 @@ val view
   -> Git_diff.t
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
+
+(** The files alone, each a fold keyed under [scope], for another dialog. *)
+val files : fold:Fold.t -> scope:string -> Git_diff.t -> Node.t list

@@ -239,7 +239,20 @@ let server_items (server : Server_link.t option) =
       ]
 ;;
 
-let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in ~server =
+let pairs items =
+  List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
+;;
+
+let argument_items
+      ~kind
+      ~models
+      ~auth
+      ~forge
+      ~sessions
+      ~snippets
+      ~logged_in
+      ~server
+  =
   match (kind : Commands.Argument.t) with
   | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
@@ -254,8 +267,11 @@ let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in ~server =
              ~id:"custom"
              ~detail:"add an OpenAI-compatible endpoint"
              "custom"
-         ])
-  | Logout -> Some (provider_items auth)
+         ]
+       @ pairs (Forge_accounts.login_completions forge))
+  | Logout ->
+    Some (provider_items auth @ pairs (Forge_accounts.logout_completions forge))
+  | Pr -> Some (pairs Pr_command.subcommands)
   | Sessions | Session_list ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
@@ -353,6 +369,7 @@ let compute_argument
       ~line_index
       ~models
       ~auth
+      ~forge
       ~sessions
       ~snippets
       ~reminders
@@ -488,6 +505,7 @@ let compute_argument
                        ~kind
                        ~models
                        ~auth
+                       ~forge
                        ~sessions
                        ~snippets
                        ~logged_in
@@ -602,6 +620,7 @@ let compute
       ~line_index
       ~models
       ~auth
+      ~forge
       ~sessions
       ~skills
       ~snippets
@@ -625,6 +644,7 @@ let compute
          ~line_index
          ~models
          ~auth
+         ~forge
          ~sessions
          ~snippets
          ~reminders

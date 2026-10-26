@@ -37,14 +37,35 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
-    | List_worktrees
+    | Forge_status
+    | Forge_login of
+        { host : string
+        ; kind : string option
+        ; method_ : string option
+        }
+    | Forge_logout of string
+    | Pr_list of { state : string option }
+    | Pr_view of int
+    | Pr_defaults
+    | Pr_create of
+        { title : string
+        ; body : string
+        ; base : string option
+        ; head : string option
+        ; draft : bool
+        ; push : bool
+        }
+    | Pr_checkout of int
+    | List_worktrees of { cwd : string option }
     | Create_worktree of
         { branch : string
         ; base : string option
+        ; cwd : string option
         }
     | Remove_worktree of
         { path : string
         ; force : bool
+        ; cwd : string option
         }
     | Get_review
     | Review_comment of
@@ -94,7 +115,15 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
-    | List_worktrees -> "list_worktrees"
+    | Forge_status -> "forge_status"
+    | Forge_login _ -> "forge_login"
+    | Forge_logout _ -> "forge_logout"
+    | Pr_list _ -> "pr_list"
+    | Pr_view _ -> "pr_view"
+    | Pr_defaults -> "pr_defaults"
+    | Pr_create _ -> "pr_create"
+    | Pr_checkout _ -> "pr_checkout"
+    | List_worktrees _ -> "list_worktrees"
     | Create_worktree _ -> "create_worktree"
     | Remove_worktree _ -> "remove_worktree"
     | Get_review -> "get_review"
@@ -110,10 +139,19 @@ module Method = struct
     | Fs_write _ -> "fs_write"
   ;;
 
+  let cwd_param = function
+    | None -> []
+    | Some cwd -> [ "cwd", Json.str cwd ]
+  ;;
+
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | List_worktrees | Get_review | Review_submit -> []
+    | Delete_archived
+    | Forge_status
+    | Pr_defaults
+    | Get_review
+    | Review_submit -> []
     | Review_comment { root; path; range; anchor; text } ->
       [ "root", Json.str root
       ; "path", Json.str path
@@ -138,6 +176,8 @@ module Method = struct
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->
         [ "expected", Json.str e ])
+    | List_worktrees { cwd = None } -> []
+    | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
     | Mcp_approve { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
@@ -166,12 +206,28 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
-    | Create_worktree { branch; base } ->
+    | Forge_login { host; kind; method_ } ->
+      [ "host", Json.str host ]
+      @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])
+      @ Option.value_map method_ ~default:[] ~f:(fun m ->
+        [ "method", Json.str m ])
+    | Forge_logout host -> [ "host", Json.str host ]
+    | Pr_list { state } ->
+      Option.value_map state ~default:[] ~f:(fun s -> [ "state", Json.str s ])
+    | Pr_view number | Pr_checkout number -> [ "number", Json.int number ]
+    | Pr_create { title; body; base; head; draft; push } ->
+      [ "title", Json.str title; "body", Json.str body ]
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+      @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
+      @ [ "draft", Json.bool draft; "push", Json.bool push ]
+    | Create_worktree { branch; base; cwd } ->
       [ "branch", Json.str branch ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
-    | Remove_worktree { path; force } ->
+      @ cwd_param cwd
+    | Remove_worktree { path; force; cwd } ->
       [ "path", Json.str path ]
-      @ if force then [ "force", Json.bool true ] else []
+      @ (if force then [ "force", Json.bool true ] else [])
+      @ cwd_param cwd
   ;;
 end
 

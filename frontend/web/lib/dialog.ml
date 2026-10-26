@@ -39,6 +39,10 @@ type t =
       { kind : Picker_kind.t
       ; picker : Picker.t
       }
+  | Popover of
+      { chip : Chip.t
+      ; picker : Picker.t
+      }
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -69,9 +73,22 @@ type t =
   | Mcp_tools of Mcp_server.t
   | Loading of string
   | Diff of Git_diff.t
+  | Pulls of Pull_requests.t
+  | Pull of Pr_page.t
+  | Pr_create of Pr_create.t
+  | Pr_checked_out of
+      { number : int
+      ; checkout : Pr_checkout.t
+      }
+  | Forge_host of
+      { input : string
+      ; error : string option
+      }
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
+      ; repo : string option
+        (** its repository when not the session's: removed from the tree *)
       ; force : bool
       ; busy : bool
       ; error : string option
@@ -79,6 +96,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 let per_session = function
+  | Popover _
   | Rename _
   | Prompt _
   | Rewind_confirm _
@@ -88,6 +106,10 @@ let per_session = function
   | Mcp_tools _
   | Loading _
   | Diff _
+  | Pulls _
+  | Pull _
+  | Pr_create _
+  | Pr_checked_out _
   | New_worktree _
   | Remove_worktree _
   | Picker
@@ -109,6 +131,12 @@ let per_session = function
           | Accents )
       ; _
       }
-  | Help | Hotkeys | Settings | Scoped_models _ | Delete _ | Login _ | Auth _ ->
-    false
+  | Help
+  | Hotkeys
+  | Settings
+  | Scoped_models _
+  | Delete _
+  | Login _
+  | Auth _
+  | Forge_host _ -> false
 ;;

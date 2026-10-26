@@ -348,7 +348,9 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
@@ -391,7 +393,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /quit how to leave (close the tab; /signout signs out)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /login [provider] log in to a model provider (or /login custom)
+    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /switch [path] switch to a saved session

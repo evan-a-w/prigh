@@ -72,6 +72,15 @@ module Entry : sig
       | Review of Review_state.Change.t
       (** a change to the review of the working tree: a comment, an
           approval; see {!review} *)
+      | Repo of
+          { cwd : string
+          ; repo : Git_location.t option (** [None]: not in a repository *)
+          } (** where [cwd] is in git, found on its host (see {!repo}) *)
+      | Agent_worktree of Agent_worktree.t
+      (** a worktree made for one of its subagents; not copied by [fork] *)
+      | Worktree_removed of { path : string }
+      (** the worktree at [path] was removed: an [Agent_worktree] no
+          longer; not copied by [fork] *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -203,6 +212,19 @@ val set_told_environment : t -> Told_environment.t -> Entry.t
 val review : t -> Review_state.t
 
 val record_review : t -> Review_state.Change.t -> Entry.t
+(** Where the session's cwd is in git, as last recorded for that cwd:
+    [None] when nothing was (an older session, a host that cannot tell),
+    [Some None] outside a repository. *)
+val repo : t -> Git_location.t option option
+
+val set_repo : t -> cwd:string -> Git_location.t option -> Entry.t
+
+(** The worktrees made for its subagents and not removed since, oldest
+    first. *)
+val agent_worktrees : t -> Agent_worktree.t list
+
+val add_agent_worktree : t -> Agent_worktree.t -> Entry.t
+val worktree_removed : t -> path:string -> Entry.t
 
 (** The [allow_rule] entries on the active path, oldest first. *)
 val allow_rules : t -> string list
@@ -282,6 +304,8 @@ module Summary : sig
           mtime), or a later unarchiving *)
     ; resume_at : float option (** {!resume_at} *)
     ; bytes : int (** {!disk_usage} *)
+    ; repo : Git_location.t option option (** {!repo} *)
+    ; agent_worktrees : Agent_worktree.t list (** {!agent_worktrees} *)
     }
   [@@deriving sexp_of]
 
