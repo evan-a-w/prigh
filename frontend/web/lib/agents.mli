@@ -55,6 +55,14 @@ module Item : sig
   include Comparable.S_plain with type t := t
 end
 
+(** A subagent's transcript asked of the backend ([get_subagent]). *)
+module Fetch : sig
+  type t =
+    | Asked of Time_ns.t option (** when, once the clock has said *)
+    | Failed of string (** what to say *)
+  [@@deriving sexp_of]
+end
+
 type t =
   { open_ : bool
   ; selected : Item.t option (** shown in full; the list otherwise *)
@@ -64,6 +72,8 @@ type t =
   ; stopping : Item.Set.t (** asked to cancel or kill, still running *)
   ; output : (string * string) option (** a job's id and output *)
   ; polled_at : Time_ns.t option
+  ; fetches : Fetch.t String.Map.t
+    (** by agent id: the transcripts the panel has asked for and not got *)
   }
 [@@deriving sexp_of]
 
@@ -117,3 +127,9 @@ val job_elapsed : Job.t -> now:Time_ns.t -> Time_ns.Span.t
 
 (** ["9s"], ["3m 05s"], ["1h 02m"]. *)
 val format_span : Time_ns.Span.t -> string
+
+(** Some transcript is [Asked] for. *)
+val fetching : t -> bool
+
+(** Those [Asked] for [after] or longer have [Failed]. *)
+val time_out_fetches : t -> now:Time_ns.t -> after:Time_ns.Span.t -> t

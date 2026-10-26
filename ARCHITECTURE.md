@@ -2258,7 +2258,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     - The transcript: `Chat` (one agent: a page of messages then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
-      has their reports; `!cmd` runs as `Shell` entries), `Chat_view` (each
+      has their reports; one whose call is not loaded (in an older page, or
+      under a parent not fetched yet) is kept detached, found and updated by
+      its events all the same, until the page with its call comes; the
+      agents panel's fetches (`Agents.fetches`) fail with what went wrong,
+      or after 20s without an answer, and offer a retry; `!cmd` runs as
+      `Shell` entries), `Chat_view` (each
       entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
       on the value: virtual_dom skips what did not change, so a streamed
       delta or a key press costs the same in a long session as in a short
