@@ -114,6 +114,7 @@ module Reply_tag = struct
         }
     | Worktree_created
     | Worktree_entered of string
+    | Worktree_went_back of P.Session_home.t option
     | Worktree_session_started of
         { path : string
         ; notice : string
@@ -2780,9 +2781,12 @@ let worktrees_picker m listing =
     (Picker.create ~title:(worktrees_title m listing) (worktree_items listing))
 ;;
 
-let enter_worktree ~notice path =
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
   call
-    (Change_dir { target = Cwd; path; if_missing = Fail })
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
     ~tag:(Worktree_entered notice)
 ;;
 
@@ -2844,6 +2848,19 @@ let worktree_command m rest =
           ~tag:
             (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
       ] )
+  | Back { main } ->
+    let home = Option.bind m.state ~f:(fun (s : P.State.t) -> s.home) in
+    (match m.state with
+     | Some { home = None; _ } ->
+       error (restore_command m command) Worktree_command.no_home, []
+     | Some { home = Some _; _ } | None ->
+       ( m
+       , [ call
+             (Worktree_back { main })
+             ~tag:
+               (Retry_in_editor
+                  { command; hint = ""; then_ = Worktree_went_back home })
+         ] ))
   | (Open _ | Remove _) as action ->
     ( m
     , [ call
@@ -2860,7 +2877,7 @@ let worktree_target m ~command (action : Worktree_command.Action.t) listing =
     | Ok w -> f w
   in
   match action with
-  | List | New _ | Error _ -> m, []
+  | List | New _ | Back _ | Error _ -> m, []
   | Open { target; new_session } ->
     resolve target ~f:(open_worktree m ~new_session)
   | Remove { target; force } ->
@@ -4650,7 +4667,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
     | Forge_logout host -> m, [ call (Forge_logout host) ]
-    | Cd_to_checkout path -> m, [ change_dir ~target:Cwd path ]
+    | Cd_to_checkout path ->
+      m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
     | Rewind id ->
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Delete_sessions { paths; back } ->
@@ -5340,9 +5358,15 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          | Changed _ -> notice m text, []
          | Missing path ->
            error m (sprintf "%s is gone; /worktree lists the others" path), [])
+     | Worktree_went_back home ->
+       decode json ~f:P.Dir_change.Outcome.of_json (function
+         | Changed { cwd; _ } ->
+           ( notice m (Worktree_command.back_notice home ~cwd ~tilde:(tilde m))
+           , [] )
+         | Missing path -> error m (sprintf "%s is gone" path), [])
      | Worktree_session_started { path; notice } ->
        let m, commands = reset_session m in
-       follow m, commands @ [ enter_worktree ~notice path ]
+       follow m, commands @ [ enter_worktree ~new_session:true ~notice path ]
      | Worktree_removed _ ->
        decode json ~f:P.Worktree.removed_of_json (fun w ->
          ( notice

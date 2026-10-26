@@ -71,6 +71,8 @@ module State : sig
     ; plan : Plan.t option (** the model's [update_plan] *)
     ; session_rules : string list
       (** rules the user allowed for this session ("don't ask again") *)
+    ; home : Session.Home.t option
+      (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
     }
   [@@deriving sexp_of]
 end
@@ -627,12 +629,22 @@ val set_session_name : t -> string -> unit
     records it in the session. Fails while a run is in progress. A missing
     directory fails, is created on the active tool host, or (when it could
     be) is answered [Missing] without changing anything, as [if_missing]
-    (default [Fail]) says. *)
+    (default [Fail]) says. With [worktree] it is a worktree switch, which
+    records the session's home unless it has one; any change of directory
+    may forget it ({!Worktree_home}). *)
 val set_cwd
   :  ?if_missing:Dir_change.If_missing.t
+  -> ?worktree:bool
   -> t
   -> path:string
   -> Dir_change.Outcome.t Or_error.t
+
+(** Moves the session back to its home ({!Session.home}) on the home's
+    host, or with [main] to the main checkout of the home's repository
+    (when the home's directory is gone), and forgets the home. Fails
+    without a home, while that host is disconnected and when the directory
+    is gone (saying what to do). *)
+val switch_back : ?main:bool -> t -> Dir_change.Outcome.t Or_error.t
 
 (** Paths under the session cwd matching [prefix], listed on the active tool
     host (for [@] completion). *)

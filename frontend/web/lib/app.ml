@@ -154,6 +154,10 @@ module Reply_tag = struct
         }
     | Worktree_created of { command : string }
     | Worktree_entered of string
+    | Worktree_went_back of
+        { command : string
+        ; home : Session_home.t option
+        }
     | Worktree_session of
         { path : string
         ; notice : string
@@ -3359,9 +3363,12 @@ let worktrees_picker (m : Model.t) (listing : Worktree.Listing.t) =
        })
 ;;
 
-let enter_worktree ~notice path =
+(* A new session starts there: it has nowhere to switch back to. *)
+let enter_worktree ?(new_session = false) ~notice path =
   call
-    (Change_dir { target = Cwd; path; if_missing = Fail })
+    (if new_session
+     then Change_dir { target = Cwd; path; if_missing = Fail }
+     else Enter_worktree path)
     ~tag:(Worktree_entered notice)
 ;;
 
@@ -3639,7 +3646,7 @@ let worktree_target
     | Ok w -> f w
   in
   match action with
-  | List | New _ | Error _ -> m, []
+  | List | New _ | Back _ | Error _ -> m, []
   | Open { target; new_session } ->
     resolve target ~f:(open_worktree m ~new_session)
   | Remove { target; force } ->
@@ -3717,6 +3724,19 @@ let worktree_command (m : Model.t) rest =
             (Create_worktree { branch; base; cwd = None })
             ~tag:(Worktree_created { command })
         ] )
+  | Back { main } ->
+    (match m.state with
+     | Some { home = None; _ } ->
+       error
+         (back_in_editor m command)
+         (String.capitalize Worktree_command.no_home ^ ".")
+     | Some { home; _ } ->
+       ( m
+       , [ call
+             (Worktree_back { main })
+             ~tag:(Worktree_went_back { command; home })
+         ] )
+     | None -> m, [])
   | (Open _ | Remove _) as action ->
     list_worktrees m (Target { command; action })
 ;;
@@ -4836,7 +4856,7 @@ let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
      | Some dir, _, _ when not (here dir) ->
        ( with_entering m (Some dir)
        , [ call
-             (Change_dir { target = Cwd; path = dir; if_missing = Fail })
+             (Enter_worktree dir)
              ~tag:(Plan_entered { plan with enter = None })
          ] )
      | _, Some command, _ ->
@@ -5004,6 +5024,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     worktree_create_failed m ~command e
   | Worktree_entered _, Error e ->
     error (with_entering m None) (sprintf "Couldn't open the worktree: %s." e)
+  | Worktree_went_back { command; _ }, Error e ->
+    error (back_in_editor m command) (sprintf "Couldn't switch back: %s." e)
   | Worktree_session _, Error e ->
     reply_to (with_entering m None) Reload_state (Error e)
   | Plan_switched _, Error e -> reply_to m Reload_state (Error e)
@@ -5596,9 +5618,18 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Changed _ -> toast m notice
       | Missing path ->
         error m (sprintf "%s is gone: /worktree lists the others." path))
+  | Worktree_went_back { home; _ }, Ok json ->
+    decode m json Dir_change.Outcome.of_json ~f:(function
+      | Changed { cwd; _ } ->
+        toast
+          m
+          (String.capitalize
+             (Worktree_command.back_notice home ~cwd ~tilde:Tilde.of_path))
+      | Missing path -> error m (sprintf "%s is gone." path))
   | Worktree_session { path; notice }, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
-    with_entering m (Some path), cmds @ [ enter_worktree ~notice path ]
+    ( with_entering m (Some path)
+    , cmds @ [ enter_worktree ~new_session:true ~notice path ] )
   | Plan_switched plan, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
     (* Not if the user went on to another session meanwhile. *)
@@ -6150,6 +6181,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Rename -> plan ~run:"/name" ()
      | Fork -> plan ~run:"/fork" ()
      | New_worktree -> plan ~run:"/worktree new" ()
+     | Switch_back -> plan ~run:"/worktree back" ()
      | Switch_here ->
        let label =
          List.find s.worktrees ~f:(fun w -> String.equal w.path dir)
@@ -6414,7 +6446,7 @@ let dialog_accept (m : Model.t) =
        , [ call request ~tag:(Forge Created) ] ))
   | Some (Pr_checked_out { checkout; _ }) ->
     let m, cmds = close_dialog m in
-    m, cmds @ [ change_dir ~target:Cwd checkout.path ]
+    m, cmds @ [ call (Enter_worktree checkout.path) ~tag:(Dir_changed Cwd) ]
   | Some (Forge_host { input; _ }) ->
     (match Forges.normalize_host input with
      | "" ->
@@ -6766,7 +6798,10 @@ let update_connected (m : Model.t) (action : Action.t) =
               ; picker =
                   Context_menu.picker
                     menu.target
-                    s
+                    (match m.state with
+                     | Some state when is_current_path m s.path ->
+                       { s with home = state.home }
+                     | _ -> s)
                     ~current:(is_current_path m s.path)
               })
        in

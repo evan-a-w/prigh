@@ -173,12 +173,13 @@ let every =
       "create a directory (and its parents) and change to it"
   ; c
       ~argument:Worktree
-      ~args:"[list|new|open|rm ...]"
+      ~args:"[list|new|open|back|rm]"
       "worktree"
       "pick a git worktree of the repository to work in (Alt+Enter: in a new \
        session, Alt+R: review its changes, Delete removes it); new BRANCH \
        [BASE] creates one and works there; open [-n] TARGET (-n: in a new \
-       session); rm [-f] TARGET (-f: with uncommitted changes)"
+       session); back [main]: back where the session switched into worktrees \
+       from; rm [-f] TARGET (-f: with uncommitted changes)"
   ; c
       ~argument:Backend_directory
       ~args:"[path|off]"
