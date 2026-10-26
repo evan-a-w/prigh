@@ -2817,7 +2817,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 270 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 279 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -3903,8 +3903,8 @@ let%expect_test "background subagent: runs while main is idle, survives a \
 
     … bash $ ls -R
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] bg
+    > ▏Steer a1 · index the repo (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:main [1⠋] bg  → a1 · Esc: main agent
     |}];
   H.next_agent h;
   (* Ctrl+D in the picker cancels the highlighted running agent. *)
@@ -4075,8 +4075,8 @@ let%expect_test
 
 
     ──────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    > ▏Steer a1 · index the repo (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ctx:0.1%/1.0M  agents:main [1⠋] 2✓ bg  → a1 · Esc: main agent
     |}];
   H.reply
     h
@@ -4099,8 +4099,8 @@ let%expect_test
     ▌ index the repo
       indexing src/
     ──────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    > ▏Steer a1 · index the repo (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ctx:0.1%/1.0M  agents:main [1⠋] 2✓ bg  → a1 · Esc: main agent
     |}];
   (* Its live events now land in the loaded transcript. *)
   H.event h (Subagent { call_id = "c1"; agent_id = "a1"; event = Turn_start });
@@ -4117,8 +4117,8 @@ let%expect_test
     ▌ index the repo
       indexing src/
     ──────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓ bg
+    > ▏Steer a1 · index the repo (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ctx:0.1%/1.0M  agents:main [1⠋] 2✓ bg  → a1 · Esc: main agent
     |}];
   H.esc h;
   H.keys h "/agents";
@@ -4287,8 +4287,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     ▌ find all auth code in the repository
     … bash $ grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · find all auth code in the rep… (Enter: steer, Alt+Enter: follow-u…
+    deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ running tools · → c1 · Esc: main agent
     |}];
   H.next_agent h;
   H.show h;
@@ -4310,8 +4310,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     … bash $ dune runtest
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
+    > ▏c2 has finished · Esc goes back to the main agent
+    deepseek-flash  think:off  ⠋ running tools · → c2 (finished) · Esc: main agent
     |}];
   H.next_agent h;
   H.show h;
@@ -4352,8 +4352,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     … bash $ dune runtest
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
+    > ▏c2 has finished · Esc goes back to the main agent
+    deepseek-flash  think:off  ⠋ running tools · → c2 (finished) · Esc: main agent
     |}];
   H.esc h;
   H.show h;
@@ -4434,8 +4434,8 @@ let%expect_test "verbosity applies inside an agent view" =
         line 6
         line 7
     ──────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  think:off  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · audit (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ⠋ running tools · → c1 · Esc: main agent
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -4455,8 +4455,8 @@ let%expect_test "verbosity applies inside an agent view" =
         line 6
         line 7
     ────────────────────────────── view: verbose — everything is shown ───
-    > ▏
-    deepseek-flash  think:off  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · audit (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  ⠋ running tools · → c1 · Esc: main agent
     |}]
 ;;
 
@@ -4528,8 +4528,8 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
 
 
     ──────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    > ▏Steer c1 · find auth (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · → c1 · Esc: main agent
     |}]
 ;;
 
@@ -4634,8 +4634,8 @@ let%expect_test "session reload drops subagent transcripts and focus" =
 
 
     ──────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    > ▏c1 has finished · Esc goes back to the main agent
+    deepseek-flash  $0.01  ⠋ working · → c1 (finished) · Esc: main agent
     |}];
   H.reply h Reload_messages {|{}|};
   H.reply
@@ -4756,8 +4756,8 @@ let%expect_test "nested subagent events recurse into the parent's children" =
     ✓ subagent inner task  1 turn $0.00
         inner done
     ──────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    > ▏Steer p · outer task (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  ctx:0.1%/1.0M  ⠋ working · → p · Esc: main agent
     |}]
 ;;
 
@@ -5926,12 +5926,12 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     {|
     ┌─ Keys ───────────────────────────────────────────────────┐
     │ Keys                                                     │
-    │ Enter                   send the prompt / accept the     │
-    │ highlighted item                                         │
+    │ Enter                   send the prompt (steer a focused │
+    │ subagent) / accept the highlighted item                  │
     │ Alt+Enter               queue a follow-up to run after   │
-    │ the current turn                                         │
+    │ the current turn (a focused subagent's: before it        │
+    │ reports)                                                 │
     │ Alt+S                   send exactly what is typed,      │
-    │ ignoring the completion popup                            │
     └─────────── 1–7 of 98 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
@@ -7088,8 +7088,8 @@ let%expect_test
                                 │
      Alt+L hides · ⇧Tab focuses │
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · find all auth code in the rep… (Enter: steer, Alt+Enter: follow-up)
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · → c1 · Esc: main agent
     |}];
   (* The choice holds for the run. *)
   H.step ~quiet:true h (Resize { width = 150; height = 16 });
@@ -7109,8 +7109,8 @@ let%expect_test
                                 │
      Alt+L hides · ⇧Tab focuses │
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · find all auth code in the rep… (Enter: steer, Alt+Enter: follow-up)
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · → c1 · Esc: main agent
     |}];
   H.key h (Key.alt (Char "l"));
   H.show h;
@@ -7129,8 +7129,8 @@ let%expect_test
 
 
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · Esc aborts · Enter steers
+    > ▏Steer c1 · find all auth code in the rep… (Enter: steer, Alt+Enter: follow-up)
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] 2✓  jobs:1  ⠋ running tools · → c1 · Esc: main agent
     |}]
 ;;
 
@@ -7191,7 +7191,7 @@ let%expect_test "Alt+R in the /worktree picker reviews the highlighted one" =
     (Rpc
       (method_ get_review)
       (params ())
-      (tag (Review_comments (dir (/w/feat)) (base ()))))
+      (tag (Review_comments (target (Dir (/w/feat))) (base ()) (direct false))))
     editing
     |}]
 ;;
@@ -7611,7 +7611,14 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"laptop","cwd":"/home/me"}]}|})))
   in
   H.event h (State state);
-  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       });
   H.keys h "/host laptop";
   H.enter h;
   H.show h;
@@ -7876,7 +7883,14 @@ let%expect_test "the host picker shows which session other frontends are in" =
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-3","hosts":[{"id":"backend","name":"srv","cwd":"/work","session_id":null,"session_name":null},{"id":"client-1","name":"laptop","cwd":"/home/me","session_id":"abc123","session_name":null},{"id":"client-2","name":"desktop","cwd":"/home/me/other","session_id":"def456","session_name":"refactor"},{"id":"client-3","name":"pi","cwd":"/pi","session_id":"9876","session_name":null}]}|})))
   in
   H.event h (State state);
-  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       });
   H.keys h "/host";
   H.enter h;
   H.show h;
@@ -8413,8 +8427,14 @@ let%expect_test "logged-in user: shown in the status line, kept across \
                  reconnects; /signout asks the platform"
   =
   let h = connected ~width:80 () in
-  H.step h (Hello
-       { client_id = "client-1"; namespace = Some "lloyd"; user = Some "lloyd" });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = Some "lloyd"
+       ; user = Some "lloyd"
+       ; superuser = false
+       });
   H.show h;
   [%expect
     {|
@@ -8681,7 +8701,12 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   let h = connected ~width:80 () in
   H.step
     h
-    (Hello { client_id = "client-1"; namespace = Some "s"; user = Some "s" });
+    (Hello
+       { client_id = "client-1"
+       ; namespace = Some "s"
+       ; user = Some "s"
+       ; superuser = false
+       });
   H.keys h "/setusr";
   H.enter h;
   [%expect {| (Rpc (method_ list_users) (params ()) (tag Users_list)) |}];

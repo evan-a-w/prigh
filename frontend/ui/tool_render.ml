@@ -89,6 +89,7 @@ let arg (call : P.Tool_call.t) =
     | "web_search" ->
       Option.map (str "query") ~f:(Tool_summary.quoted ~width:Int.max_value)
     | "job_input" -> Tool_summary.job_input args
+    | "worktree" -> Tool_summary.worktree args
     | "apply_patch" ->
       (match
          Patch.parse

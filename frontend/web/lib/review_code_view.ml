@@ -291,8 +291,16 @@ let post_view
                ~cls:"review-proposal-actions"
                [ button
                    ~cls:"small primary"
-                   ~disabled:busy
-                   ~title:"Apply this change to the file"
+                   ~disabled:
+                     (busy || Option.is_some (Code_review.read_only m.review))
+                   ~title:
+                     (match Code_review.read_only m.review with
+                      | Some rev ->
+                        sprintf
+                          "%s is not checked out: Check out into a worktree to \
+                           apply it"
+                          rev
+                      | None -> "Apply this change to the file")
                    ~on_click:
                      (inject
                         (review (Decide { id = c.id; post = i; accept = true })))
@@ -560,6 +568,7 @@ let view (m : App.Model.t) ~path ~inject =
   let comments = Review.on t.review path in
   let lines_new = lazy (side_lines t ~path rows New) in
   let lines_old = lazy (side_lines t ~path rows Old) in
+  let since = Code_review.Layout.equal (Code_review.layout_of t path) Since in
   let located =
     List.map comments ~f:(fun (c : Review_comment.t) ->
       let line, count =
@@ -571,7 +580,12 @@ let view (m : App.Model.t) ~path ~inject =
       c, Comment_anchor.locate c ~line ~count)
   in
   let shown = List.filter_map rows ~f:Code_selection.key |> Set.Poly.of_list in
-  let shown_at (r : Review_comment.Range.t) = Set.mem shown (r.side, r.last) in
+  (* The since-view's removed lines are the file at the action, not what
+     the change removed: comments on those show above the file. *)
+  let shown_at (r : Review_comment.Range.t) =
+    (not (since && Review_comment.Side.equal r.side Old))
+    && Set.mem shown (r.side, r.last)
+  in
   let at_row =
     List.filter_map located ~f:(fun (c, l) ->
       match l with
@@ -661,6 +675,7 @@ let view (m : App.Model.t) ~path ~inject =
   in
   let empty =
     match rows, file, Map.find t.contents path with
+    | _ when since -> []
     | [], Some f, _ ->
       [ div
           ~cls:"review-empty"
@@ -677,7 +692,7 @@ let view (m : App.Model.t) ~path ~inject =
     | _ -> []
   in
   let full_hint =
-    match file, t.layout, Map.find t.contents path with
+    match file, Code_review.layout_of t path, Map.find t.contents path with
     | Some _, Full, Some Loading ->
       [ div ~cls:"review-note" [ lamp (); Node.text "Reading the whole file…" ]
       ]
@@ -693,7 +708,8 @@ let view (m : App.Model.t) ~path ~inject =
   div
     ~cls:"review-code"
     ~attrs:[ Attr.create "data-path" path ]
-    ([ (match elsewhere with
+    ([ (if since then Review_since_view.note m path else Node.none)
+     ; (match elsewhere with
         | [] -> Node.none
         | elsewhere ->
           div

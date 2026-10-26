@@ -14,9 +14,13 @@ let files (m : App.Model.t) =
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
 
+(* A branch reviewed without a checkout has nothing to stage or commit. *)
+let read_only (m : App.Model.t) = Option.is_some (Code_review.read_only m.review)
+
 let strip (m : App.Model.t) ~inject =
   let t = m.git_bar in
   match t.status, t.error with
+  | _ when read_only m -> Node.none
   | None, None -> Node.none
   | None, Some e ->
     div
@@ -126,6 +130,7 @@ let strip (m : App.Model.t) ~inject =
 let tick (m : App.Model.t) path ~inject =
   let t = m.git_bar in
   match Git_bar.tick t ~files:(files m) path with
+  | _ when read_only m -> Node.none
   | Clean -> span ~cls:"git-tick clean" ""
   | (Checked | Partly | Unchecked) as tick ->
     let checked =
@@ -199,6 +204,7 @@ let commit_key
 let commit_box (m : App.Model.t) ~inject =
   let t = m.git_bar in
   match t.status with
+  | _ when read_only m -> Node.none
   | None -> Node.none
   | Some _ ->
     let count = Git_bar.to_commit t ~files:(files m) in

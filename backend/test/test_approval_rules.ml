@@ -358,7 +358,8 @@ let%expect_test "which built-in tools ask in each mode" =
               ~session:[]
               ~cwd:"/w"
               ~home:"/h"
-              ~destructive:tool.spec.destructive
+              ~destructive:
+                (Tool_spec.Destructive.call tool.spec.destructive (`Object []))
               (Approval_rule.Call.create ~cwd:"/w" ~tool:name (`Object []))
           with
           | Allow -> None

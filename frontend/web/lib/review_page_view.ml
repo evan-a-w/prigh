@@ -86,6 +86,16 @@ let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
         ; (if comments > 0
            then span ~cls:"review-file-comments" (Int.to_string comments)
            else Node.none)
+        ; (match
+             Option.bind (Map.find t.since f.path) ~f:File_approval.since_label
+           with
+           | Some label ->
+             span
+               ~cls:"review-file-since"
+               ~attrs:
+                 [ Attr.title ("Changed after your last action: " ^ label) ]
+               label
+           | None -> Node.none)
         ; span
             ~cls:"review-file-counts"
             (match f.status with
@@ -292,69 +302,140 @@ let empty_state (t : Code_review.t) =
       ]
 ;;
 
-let select ~id ~label ~on_change options =
-  Node.select
-    ~attrs:
-      [ Attr.id id
-      ; Attr.class_ "review-select"
-      ; Attr.create "aria-label" label
-      ; Attr.title label
-      ; Attr.on_change (fun _ value -> on_change value)
-      ]
-    (List.map options ~f:(fun (value, text, on) ->
-       Node.option
-         ~attrs:[ Attr.value value; Attr.bool_property "selected" on ]
-         [ Node.text text ]))
+let picking (m : App.Model.t) (which : Review_picker.Which.t) =
+  match m.dialog with
+  | Some (Review_pick p)
+    when Review_picker.Which.equal (Review_picker.which p) which -> Some p
+  | _ -> None
 ;;
 
-(* What the page reviews, and pickers for another worktree or base:
-   "Reviewing feat/x (/path) against main". *)
+(* A picker's button, with its menu under it while open. *)
+let pick (m : App.Model.t) ~which ~id ~label ~key ~read_only ~inject children =
+  let open_ = picking m which in
+  div
+    ~cls:"review-pick"
+    [ Node.button
+        ~attrs:
+          [ Attr.id id
+          ; classes
+              [ "review-pick-button" ]
+              [ "open", Option.is_some open_; "read-only", read_only ]
+          ; Attr.type_ "button"
+          ; Attr.create "aria-haspopup" "dialog"
+          ; Attr.create "aria-expanded" (Bool.to_string (Option.is_some open_))
+          ; (if Option.is_some open_
+             then Attr.create "aria-controls" "review-popover"
+             else Attr.empty)
+          ; Attr.title (sprintf "%s (%s)" label key)
+          ; Attr.on_click (fun _ -> inject (App.Action.Review_pick which))
+          ]
+        (children @ [ icon ~cls:"chevron" Chevron ])
+    ; (match open_ with
+       | Some p -> Review_picker_view.view p ~inject
+       | None -> Node.none)
+    ]
+;;
+
+let short rev =
+  if String.length rev = 40 && String.for_all rev ~f:Char.is_alphanum
+  then String.prefix rev 8
+  else rev
+;;
+
+(* What the page reviews and what it is compared with, each a picker:
+   "Reviewing feat/x (/path) against main (merge base 1234abcd)", since the
+   merge base or directly; a branch not checked out is read-only, with a
+   way to check it out. *)
 let target_bar (m : App.Model.t) ~inject =
   let t = m.review in
   match t.diff with
   | None ->
-    (match t.target.dir with
-     | Some dir ->
+    (match t.target.reviewed with
+     | Dir (Some dir) ->
        div
          ~cls:"review-target"
          [ span ~cls:"review-target-text" ("Reviewing " ^ dir) ]
-     | None -> Node.none)
+     | Rev rev ->
+       div
+         ~cls:"review-target"
+         [ span ~cls:"review-target-text" ("Reviewing " ^ rev) ]
+     | Dir None -> Node.none)
   | Some d ->
-    let worktrees =
-      Option.value_map (Worktrees.listing m.worktrees) ~default:[] ~f:(fun l ->
-        List.filter l.worktrees ~f:(fun (w : Worktree.t) -> not w.prunable))
+    let read_only = Option.is_some d.rev in
+    let reviewed =
+      match d.rev with
+      | Some rev ->
+        [ icon ~cls:"review-pick-icon" Branch
+        ; span ~cls:"review-pick-name" rev
+        ; span ~cls:"review-pick-where" "not checked out"
+        ]
+      | None ->
+        [ span
+            ~cls:"review-pick-name"
+            (Option.value d.branch ~default:(Filename.basename d.root))
+        ; span ~cls:"review-pick-where" d.root
+        ]
     in
-    let worktree_options =
-      List.map worktrees ~f:(fun (w : Worktree.t) ->
-        ( w.path
-        , sprintf "%s (%s)" (Worktree.label w) w.path
-        , String.equal w.path d.root ))
+    let base =
+      if String.equal d.base "HEAD"
+      then
+        [ span ~cls:"review-pick-name" "HEAD"
+        ; span ~cls:"review-pick-where" "the uncommitted changes"
+        ]
+      else [ span ~cls:"review-pick-name" (short d.base) ]
     in
-    let worktree_options =
-      if List.exists worktree_options ~f:(fun (_, _, on) -> on)
-      then worktree_options
-      else (d.root, Diff_files.where d, true) :: worktree_options
-    in
-    let bases =
-      List.dedup_and_sort
-        ~compare:String.compare
-        (d.base
-         :: List.filter d.branches ~f:(fun b ->
-           not (Option.exists d.branch ~f:(String.equal b))))
-      |> List.filter ~f:(fun b -> not (String.equal b "HEAD"))
-    in
-    let base_options =
-      ("HEAD", "HEAD (the uncommitted changes)", String.equal d.base "HEAD")
-      :: List.map bases ~f:(fun b -> b, b, String.equal b d.base)
-    in
-    let merge_base =
+    let how =
       match Diff_files.against d with
       | "HEAD" -> Node.none
+      | _ when d.direct -> span ~cls:"review-merge-base" "directly"
       | against when String.equal against d.base -> Node.none
       | against ->
         (match String.chop_prefix against ~prefix:(d.base ^ " ") with
          | Some rest -> span ~cls:"review-merge-base" rest
          | None -> span ~cls:"review-merge-base" against)
+    in
+    let compare =
+      if String.equal d.base "HEAD"
+      then Node.none
+      else
+        segmented
+          ~label:"Compare"
+          [ ( "Since merge base"
+            , "What the branch changed since it left the base, as a pull \
+               request shows it (d)"
+            , not d.direct
+            , inject (App.Action.Review_direct false) )
+          ; ( "Directly"
+            , "Every difference from the base as it is now, its own changes \
+               too (d)"
+            , d.direct
+            , inject (App.Action.Review_direct true) )
+          ]
+    in
+    let checkout =
+      match d.rev with
+      | None -> Node.none
+      | Some rev ->
+        div
+          ~cls:"review-readonly"
+          [ span
+              ~cls:"review-readonly-note"
+              ~attrs:
+                [ Attr.title
+                    (sprintf
+                       "%s is not checked out: you can comment, not edit or \
+                        accept proposed changes"
+                       rev)
+                ]
+              "Read-only"
+          ; button
+              ~cls:"small review-checkout"
+              ~title:
+                "Check the branch out into a new worktree of this session's, \
+                 and review it there"
+              ~on_click:(inject App.Action.Review_checkout)
+              [ icon Branch_plus; Node.text "Check out into a worktree" ]
+          ]
     in
     div
       ~cls:"review-target"
@@ -366,20 +447,28 @@ let target_bar (m : App.Model.t) ~inject =
                (Diff_files.against d))
         ]
       [ span ~cls:"review-target-text" "Reviewing"
-      ; select
-          ~id:"review-worktree"
-          ~label:"The worktree to review"
-          ~on_change:(fun path ->
-            inject (App.Action.Review_worktree { path; base = None }))
-          worktree_options
+      ; pick
+          m
+          ~which:Target
+          ~id:"review-target-button"
+          ~label:"What to review: a worktree, or a branch read-only"
+          ~key:"r"
+          ~read_only
+          ~inject
+          reviewed
       ; span ~cls:"review-target-text" "against"
-      ; select
-          ~id:"review-base"
-          ~label:"What to compare it with"
-          ~on_change:(fun base ->
-            inject (review (Show { t.target with base = Some base })))
-          base_options
-      ; merge_base
+      ; pick
+          m
+          ~which:Base
+          ~id:"review-base-button"
+          ~label:"What to compare it with: a branch, tag or commit"
+          ~key:"b"
+          ~read_only:false
+          ~inject
+          base
+      ; how
+      ; compare
+      ; checkout
       ]
 ;;
 
@@ -451,21 +540,39 @@ let view (m : App.Model.t) ~inject =
                   , Code_review.Mode.equal t.mode Comment
                   , inject (review (Set_mode Comment)) )
                 ; ( "Edit"
-                  , "Edit the file and save it where the tools run (e)"
+                  , (match Code_review.read_only t with
+                     | Some rev ->
+                       sprintf
+                         "%s is not checked out: Check out into a worktree to \
+                          edit it"
+                         rev
+                     | None ->
+                       "Edit the file and save it where the tools run (e)")
                   , Code_review.Mode.equal t.mode Edit
                   , inject (review (Set_mode Edit)) )
                 ]
-            ; segmented
-                ~label:"Show"
-                [ ( "Changes"
-                  , "Only the changed hunks (v)"
-                  , Code_review.Layout.equal t.layout Unified
-                  , inject (review (Set_layout Unified)) )
-                ; ( "Whole file"
-                  , "The whole file with its changes inline (v)"
-                  , Code_review.Layout.equal t.layout Full
-                  , inject (review (Set_layout Full)) )
-                ]
+            ; (let layout =
+                 Option.value_map
+                   t.current
+                   ~default:t.layout
+                   ~f:(Code_review.layout_of t)
+               in
+               segmented
+                 ~label:"Show"
+                 ([ ( "Changes"
+                    , "Only the changed hunks (v)"
+                    , Code_review.Layout.equal layout Unified
+                    , inject (review (Set_layout Unified)) )
+                  ; ( "Whole file"
+                    , "The whole file with its changes inline (v)"
+                    , Code_review.Layout.equal layout Full
+                    , inject (review (Set_layout Full)) )
+                  ]
+                  @ Option.to_list
+                      (Option.bind t.current ~f:(fun path ->
+                         Review_since_view.segment m path ~inject))))
+            ; Option.value_map t.current ~default:Node.none ~f:(fun path ->
+                Review_since_view.menu m path ~inject)
             ; button
                 ~cls:(if unsent > 0 then "small primary" else "small")
                 ~disabled:(unsent = 0 || t.submitting)
@@ -515,5 +622,13 @@ let view (m : App.Model.t) ~inject =
         ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Review of the changes"
         ]
-      [ head; target_bar m ~inject; Git_bar_view.strip m ~inject; body ])
+      (* While a picker is open the rest of the page is out of reach. *)
+      (match m.dialog with
+       | Some (Review_pick _) ->
+         [ inert head
+         ; target_bar m ~inject
+         ; inert (Git_bar_view.strip m ~inject)
+         ; inert body
+         ]
+       | _ -> [ head; target_bar m ~inject; Git_bar_view.strip m ~inject; body ]))
 ;;

@@ -145,7 +145,12 @@ let%expect_test
     (Comment) (Edit)
     (Changes) (Whole file)
     (Send 1 comment) (Close the review (Esc, Alt+R))
-    Reviewing main (/work) feat/login (/home/u/.prigh/worktrees/work/feat-login) against HEAD (the uncommitted changes) main origin/main (merge base abcdef01)
+    Reviewing
+    (feat/login /home/u/.prigh/worktrees/work/feat-login)
+    against
+    (main)
+    (merge base abcdef01)
+    (Since merge base) (Directly)
     (○ a.ml 1 +1 −1)
     (⚠ login.ml +1 −0)
     2 files changed, +2 −1
@@ -167,25 +172,48 @@ let%expect_test
     <div title="Reviewing feat/login (/home/u/.prigh/worktrees/work/feat-login) against main (merge base abcdef01)"
          class="review-target">
       <span class="review-target-text"> Reviewing </span>
-      <select id="review-worktree"
-              aria-label="The worktree to review"
-              title="The worktree to review"
-              class="review-select"
-              @on_change>
-        <option #value="/work" #selected="false"> main (/work) </option>
-        <option #value="/home/u/.prigh/worktrees/work/feat-login" #selected="true"> feat/login (/home/u/.prigh/worktrees/work/feat-login) </option>
-      </select>
+      <div class="review-pick">
+        <button id="review-target-button"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                title="What to review: a worktree, or a branch read-only (r)"
+                class="review-pick-button"
+                @on_click>
+          <span class="review-pick-name"> feat/login </span>
+          <span class="review-pick-where"> /home/u/.prigh/worktrees/work/feat-login </span>
+          <icon class="chevron"> </icon>
+        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
       <span class="review-target-text"> against </span>
-      <select id="review-base"
-              aria-label="What to compare it with"
-              title="What to compare it with"
-              class="review-select"
-              @on_change>
-        <option #value="HEAD" #selected="false"> HEAD (the uncommitted changes) </option>
-        <option #value="main" #selected="true"> main </option>
-        <option #value="origin/main" #selected="false"> origin/main </option>
-      </select>
+      <div class="review-pick">
+        <button id="review-base-button"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                title="What to compare it with: a branch, tag or commit (b)"
+                class="review-pick-button"
+                @on_click>
+          <span class="review-pick-name"> main </span>
+          <icon class="chevron"> </icon>
+        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
       <span class="review-merge-base"> (merge base abcdef01) </span>
+      <div role="group" aria-label="Compare" class="segmented">
+        <button type="button"
+                aria-pressed="true"
+                title="What the branch changed since it left the base, as a pull request shows it (d)"
+                class="on segment"
+                @on_click> Since merge base </button>
+        <button type="button"
+                aria-pressed="false"
+                title="Every difference from the base as it is now, its own changes too (d)"
+                class="segment"
+                @on_click> Directly </button>
+      </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     |}];
   (* Approving and sending name the worktree. *)
@@ -230,7 +258,10 @@ let%expect_test
     (Comment) (Edit)
     (Changes) (Whole file)
     (Send 1 comment) (Close the review (Esc, Alt+R))
-    Reviewing main (/work) feat/login (/home/u/.prigh/worktrees/work/feat-login) against HEAD (the uncommitted changes) feat/login origin/main
+    Reviewing
+    (main /work)
+    against
+    (HEAD the uncommitted changes)
     (✓ a.ml 1 +1 −1)
     1 file changed, +1 −1
     (Previous file ([, p, k)) (Next file (], n, j))
@@ -272,7 +303,10 @@ let%expect_test
     (Focus review-page)
     |}];
   (* The base picker: the uncommitted changes only. *)
-  H.act h (Review (Show { dir = Some feat; base = Some "HEAD" }));
+  H.act
+    h
+    (Review
+       (Show { reviewed = Dir (Some feat); base = Some "HEAD"; direct = false }));
   [%expect {| (Focus review-page) |}];
   (* The first reply is for the default base: read again for HEAD. *)
   H.reply h "git_diff" (feat_diff ());
@@ -292,7 +326,26 @@ let%expect_test
     (Rpc (method_ fs_preview)
      (params ((path /home/u/.prigh/worktrees/work/feat-login/a.ml)))
      (tag (Review (Content a.ml))))
-    Reviewing main (/work) feat/login (/home/u/.prigh/worktrees/work/feat-login) against HEAD (the uncommitted changes) main origin/main
+    (Cache_prefs
+     (((key web.review)
+       (value
+        (((compare
+           ((/home/u/.prigh/worktrees/work/feat-login
+             ((base HEAD) (direct false)))))
+          (last ())))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.review
+          ((compare
+            ((/home/u/.prigh/worktrees/work/feat-login
+              ((base HEAD) (direct false)))))
+           (last ())))))))
+     (tag Show_error))
+    Reviewing
+    (feat/login /home/u/.prigh/worktrees/work/feat-login)
+    against
+    (HEAD the uncommitted changes)
     |}];
   (* The agent or a subagent edits: the reviewed worktree is read again. *)
   H.event
@@ -335,7 +388,7 @@ let%expect_test
      (tag (Worktrees (place  "s2\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    ((dir ()) (base ()))
+    ((reviewed (Dir ())) (base ()) (direct false))
     |}]
 ;;
 
@@ -389,7 +442,7 @@ let%expect_test "/review completes worktrees, --base and branches" =
   [%expect
     {|
     (browser default)
-    (--base main feat/login)
+    (--base --direct main feat/login origin/main)
     (HEAD feat/login main origin/main)
     |}]
 ;;

@@ -27,6 +27,11 @@ val parse : string -> t Or_error.t
 (** [HOST:PORT], or the WebSocket URL of the RPC ([wss://host/prigh/ws]). *)
 val to_string : t -> string
 
+(** A URL in the form {!to_string} gives (so that [https://host/] and
+    [wss://host/ws] are saved and matched as one), anything else as given
+    (stripped). The TUI's [Server_address.normalize] does the same. *)
+val normalize : string -> string
+
 (** The [Host] header for it. *)
 val authority : t -> string
 

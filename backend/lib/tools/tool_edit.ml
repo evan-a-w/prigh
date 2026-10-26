@@ -6,7 +6,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
-  ; destructive = true
+  ; destructive = Always
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \
        once in the file, and edits must not overlap. Use enough surrounding \

@@ -464,3 +464,31 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
     ✓ job_input j3 close stdin
     |}]
 ;;
+
+let%expect_test "worktree: the action and its branch or path" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_end
+           ~name:"worktree"
+           ~arguments:{|{"action":"create","branch":"feat/x","base":"main"}|}
+           "made worktree /w/repo/feat-x"
+       ; tool_end
+           ~id:"c2"
+           ~name:"worktree"
+           ~arguments:
+             {|{"action":"remove","path":"/w/repo/feat-x","force":true}|}
+           "removed worktree /w/repo/feat-x"
+       ; tool_end
+           ~id:"c3"
+           ~name:"worktree"
+           ~arguments:{|{"action":"list"}|}
+           "worktrees of /repo"
+       ]);
+  [%expect
+    {|
+    ✓ worktree create feat/x from main
+    ✓ worktree remove /w/repo/feat-x (force)
+    ✓ worktree list
+    |}]
+;;

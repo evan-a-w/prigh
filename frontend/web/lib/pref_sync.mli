@@ -25,6 +25,9 @@ module Key : sig
   (** The sidebar's sessions whose worktrees are folded away: their ids. *)
   val folded : string
 
+  (** What the review page compared last ({!Review_memory}). *)
+  val review : string
+
   (** ["history"]: the prompts sent, newest first, shared with the TUI. *)
   val history : string
 

@@ -93,6 +93,8 @@ let parse diff =
 let against (d : P.Git_diff.t) =
   if String.equal d.against "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
   then "nothing (no commits yet)"
+  else if d.direct
+  then d.base ^ " directly"
   else if String.length d.against = 40
   then (
     let commit = String.prefix d.against 8 in
@@ -103,9 +105,10 @@ let against (d : P.Git_diff.t) =
 ;;
 
 let where (d : P.Git_diff.t) =
-  match d.branch with
-  | Some branch -> sprintf "%s (%s)" branch d.root
-  | None -> d.root
+  match d.rev, d.branch with
+  | Some rev, _ -> rev ^ " (not checked out)"
+  | None, Some branch -> sprintf "%s (%s)" branch d.root
+  | None, None -> d.root
 ;;
 
 let summary files =

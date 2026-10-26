@@ -26,10 +26,37 @@ let approved review files =
   List.count files ~f:(fun f -> Status.equal (status review f) Approved)
 ;;
 
+let since_counts (s : P.Review_since.File.t) =
+  if not s.changed
+  then None
+  else (
+    match s.note with
+    | Some _ -> Some "changed"
+    | None -> Some (sprintf "+%d −%d" s.added s.removed))
+;;
+
+let since_label (s : P.Review_since.File.t) =
+  Option.map (since_counts s) ~f:(fun counts ->
+    sprintf "%s since %s" counts s.snapshot.action)
+;;
+
+let describe status (since : P.Review_since.File.t option) =
+  match status, since with
+  | Status.Changed, Some ({ snapshot = { action = "approved"; _ }; _ } as s) ->
+    (match since_counts s with
+     | Some counts -> sprintf "changed since approved (%s)" counts
+     | None -> Status.to_string status)
+  | _, Some s ->
+    (match since_label s with
+     | Some label -> sprintf "%s, %s" (Status.to_string status) label
+     | None -> Status.to_string status)
+  | _, None -> Status.to_string status
+;;
+
 let gray = Style.fg Gray
 let dim = Style.dim Style.plain
 
-let render (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
+let render ?(since = []) (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
   let files = Diff_files.parse d.diff in
   let head : Content.Line.t =
     [ { text = "review "; style = Style.bold Style.plain }
@@ -99,7 +126,14 @@ let render (d : P.Git_diff.t) (review : P.Review.t) : Content.t =
     ([ { Content.Span.text = "  " ^ mark ^ " "; style }
      ; { text = f.path; style = Style.bold Style.plain }
      ; { text =
-           sprintf "  +%d −%d  %s" f.added f.removed (Status.to_string status)
+           sprintf
+             "  +%d −%d  %s"
+             f.added
+             f.removed
+             (describe
+                status
+                (List.find since ~f:(fun (s : P.Review_since.File.t) ->
+                   String.equal s.path f.path)))
        ; style = dim
        }
      ]

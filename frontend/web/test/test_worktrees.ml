@@ -442,7 +442,7 @@ let%expect_test
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4620))
     (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/work/feat-search)))
+     (params ((path /home/u/.prigh/worktrees/work/feat-search) (worktree true)))
      (tag
       (Worktree_entered
        "Working in the worktree feat/search (/home/u/.prigh/worktrees/work/feat-search)")))
@@ -531,7 +531,7 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/work/feat-login)))
+     (params ((path /home/u/.prigh/worktrees/work/feat-login) (worktree true)))
      (tag
       (Worktree_entered
        "Working in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)")))
@@ -621,7 +621,7 @@ let%expect_test "/worktree's errors say what to do" =
     (Rpc (method_ push_pref)
      (params ((key history) (value "/worktree frobnicate") (max 500)))
      (tag Ignore))
-    Unknown subcommand "frobnicate": /worktree [list|new BRANCH [BASE]|open [-n] TARGET|rm [-f] TARGET]. (Dismiss)
+    Unknown subcommand "frobnicate": /worktree [list|new BRANCH [BASE]|open [-n] TARGET|back [main]|rm [-f] TARGET]. (Dismiss)
     /worktree frobnicate
     (Rpc (method_ push_pref)
      (params ((key history) (value "/worktree new a b c") (max 500)))
@@ -711,7 +711,7 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
         (Target (command "/worktree open feat-login")
          (action (Open (target feat-login) (new_session false))))))))
     (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/work/feat-login)))
+     (params ((path /home/u/.prigh/worktrees/work/feat-login) (worktree true)))
      (tag
       (Worktree_entered
        "Working in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)")))
@@ -828,6 +828,7 @@ let%expect_test "/worktree completes subcommands, worktrees and bases" =
     list pick a worktree of this repository to work in
     new new BRANCH [BASE]: create a worktree and work in it
     open open [-n] TARGET: work in a worktree (-n: in a new session)
+    back back [main]: back where the session switched into worktrees from
     rm rm [-f] TARGET: remove a worktree (-f: with uncommitted changes)
     |}];
   H.type_ h "/worktree op";

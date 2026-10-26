@@ -267,6 +267,30 @@ let%expect_test "remove: dirty, locked, main, unknown, gone" =
     error: $DIR/repo is the repository's main worktree: it cannot be removed
     error: not a worktree of $DIR/repo: ../nowhere (/worktree lists them)
     |}];
+  (* Nor one somebody works in: [keep]'s directories, as the host sees
+     them. *)
+  Core_unix.mkdir_p (Filename.concat t.dir "trees/repo/clean/sub");
+  let keep dir =
+    print_removed
+      t
+      (Worktree.remove
+         ~keep:[ dir ]
+         ~env:t.env
+         ~cancel:Cancellation.never
+         ~cwd:(Filename.concat t.dir "repo")
+         ~dir:(Filename.concat t.dir "trees")
+         ~path:"../trees/repo/clean"
+         ~force:true
+         ())
+  in
+  keep "../trees/repo/clean/sub/../sub";
+  keep (Filename.concat t.dir "trees/repo/clean");
+  [%expect
+    {|
+    error: $DIR/trees/repo/clean is in use: $DIR/trees/repo/clean/sub, inside it, is where the agent or the session works (work elsewhere first; the session moves with /cd)
+    error: $DIR/trees/repo/clean is in use: $DIR/trees/repo/clean, inside it, is where the agent or the session works (work elsewhere first; the session moves with /cd)
+    |}];
+  Core_unix.rmdir (Filename.concat t.dir "trees/repo/clean/sub");
   remove "../trees/repo/clean";
   remove ~force:true (Filename.concat t.dir "trees/repo/dirty");
   remove ~force:true (Filename.concat t.dir "trees/repo/locked");
@@ -421,7 +445,8 @@ let%expect_test "a tool host runs the operations; ~ is its home" =
         (Worktree.remove_args
            ~dir:"~/wt"
            ~path:"../home/wt/repo/x"
-           ~force:false);
+           ~force:false
+           ());
       exec Worktree.remove_op (`Object []));
   [%expect
     {|
