@@ -61,7 +61,7 @@
   border-top: 1px solid var(--rule);
   color: var(--muted);
   font-size: 14px;
-  z-index: 3;
+  z-index: var(--z-inset);
 }
 .terminal-notice.failed {
   top: 0;
@@ -78,13 +78,13 @@
 
 .terminal-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
 
-/* Phones: a full-screen sheet, under dialogs. */
+/* Phones: a full-screen sheet, under dialogs and the other sheets. */
 .app.narrow .terminal-panel {
   position: fixed;
   inset: 0;
   height: auto;
   max-height: none;
-  z-index: 35;
+  z-index: calc(var(--z-sheet) - 5);
   border-top: 0;
   animation: terminal-up 0.2s ease-out;
 }

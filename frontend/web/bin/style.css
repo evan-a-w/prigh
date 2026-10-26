@@ -8,6 +8,25 @@
      anything the machine reads or writes, casual for the agent thinking. */
   --mono: "Recursive Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Recursive Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* What stacks over what: every z-index on the page is one of these. The
+     first four only lift something over its own panel's content (the page
+     itself is not a stacking context, so they must stay under the rest). */
+  --z-inset: 3;   /* a panel's notice, the jump marks */
+  --z-tools: 4;   /* the chat's tools and its toasts */
+  --z-float: 5;   /* anchored in the page: banner, popup, jump, drop zone */
+  --z-handle: 6;  /* resize handles */
+  --z-panel: 20;  /* a side panel over the chat in a narrower window */
+  --z-scrim: 25;  /* behind a phone's drawer */
+  --z-drawer: 30; /* a phone's sidebar */
+  --z-sheet: 40;  /* a phone's full-screen sheet: files, agents, review */
+  --z-menu: 50;   /* a menu's backdrop: account, context, chip, picker */
+  --z-menu-anchor: 51;  /* live over that backdrop: the chips, only while
+                           their menu is open; the review page's pickers */
+  --z-menu-surface: 52; /* a chip's menu, over its composer on a phone */
+  --z-modal: 60;  /* dialogs */
+  --z-viewer: 70; /* an image, full screen */
+  --z-toast: 80;  /* the toast over a dialog or a sheet */
 }
 
 @font-face {
@@ -467,8 +486,6 @@ kbd {
 /* A session's or worktree's context menu: at the pointer (or under its
    row), the command doing the same at each item's right. Hidden until the
    page has put it in the window. */
-/* Over the composer's controls (41) too. */
-.menu-backdrop.context-menu-backdrop { z-index: 50; }
 .context-menu {
   position: fixed;
   min-width: 248px;
@@ -587,7 +604,7 @@ kbd {
   position: absolute;
   top: 8px;
   right: 12px;
-  z-index: 4;
+  z-index: var(--z-tools);
   padding: 2px;
   border-radius: var(--r-control);
   background: var(--bg);
@@ -654,7 +671,7 @@ kbd {
 }
 /* Over the top of the chat rather than above it: the transcript does not
    move when the connection comes and goes. */
-.banner-anchor { position: relative; height: 0; z-index: 5; }
+.banner-anchor { position: relative; height: 0; z-index: var(--z-float); }
 .banner-anchor > .banner {
   position: absolute;
   top: 0;
@@ -832,7 +849,7 @@ kbd {
   border-radius: var(--r-surface);
   box-shadow: var(--float-shadow);
   overflow: hidden;
-  z-index: 5;
+  z-index: var(--z-float);
   animation: rise 0.12s ease-out;
 }
 .popup-title {
@@ -921,7 +938,7 @@ kbd {
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 12px 12px;
-  z-index: 40;
+  z-index: var(--z-modal);
 }
 .modal {
   background: var(--slate);
@@ -1000,7 +1017,7 @@ kbd {
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
-  z-index: 4;
+  z-index: var(--z-tools);
   pointer-events: none;
 }
 .toast {
@@ -1041,7 +1058,7 @@ kbd {
   max-width: min(460px, calc(100vw - 24px));
   transform: translateX(-50%);
   align-items: center;
-  z-index: 45;
+  z-index: var(--z-toast);
 }
 .app:has(.modal-backdrop) .toast:not(:last-child),
 .app.narrow.files-open .toast:not(:last-child),
@@ -1116,12 +1133,12 @@ kbd {
   bottom: 0;
   left: 0;
   width: min(86vw, 320px);
-  z-index: 30;
+  z-index: var(--z-drawer);
   transform: translateX(-102%);
   transition: transform 0.2s ease-out;
 }
 .app.narrow.sidebar-open .sidebar { transform: none; box-shadow: var(--float-shadow); }
-.app.narrow .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: 25; }
+.app.narrow .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: var(--z-scrim); }
 
 @media (max-width: 760px) {
   .session-bar { gap: 8px; }
@@ -1157,7 +1174,7 @@ kbd {
 .avatar.small { width: 24px; height: 24px; font-size: 12px; background: var(--rule-2); color: var(--chalk); }
 .avatar.large { width: 38px; height: 38px; font-size: 16px; }
 
-.menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu); }
 /* What a menu floats on: the account's, a composer chip's. */
 .menu-surface {
   background: var(--slate);
@@ -1369,13 +1386,13 @@ kbd {
 }
 
 /* Jump back to the end of the chat while it is scrolled up */
-.jump-anchor { position: sticky; bottom: 0; height: 0; z-index: 5; }
+.jump-anchor { position: sticky; bottom: 0; height: 0; z-index: var(--z-float); }
 .jump-to-bottom {
   position: absolute;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 5;
+  z-index: var(--z-float);
   display: flex;
   align-items: center;
   height: 34px;
@@ -1679,8 +1696,11 @@ kbd {
    upward over the chat (below the chip only when there is no room above:
    web_main's place_popover, which also gives the height it may take). Its
    chip stays lit while it is open, and only the chips stay above the
-   backdrop, so a click on another chip opens that one's menu. */
-.composer-controls { position: relative; z-index: 41; }
+   backdrop, so a click on another chip opens that one's menu. Only then:
+   the rest of the time, what covers the page (a dialog, the image viewer,
+   a phone's drawer) covers the chips too. */
+.composer-controls { position: relative; }
+.composer-controls.menu-open { z-index: var(--z-menu-anchor); }
 .chip-anchor.open > .chip-button,
 .composer-box:focus-within .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
 .chip-anchor.open > .chip-button .chevron { opacity: 1; transform: rotate(180deg); }
@@ -1769,7 +1789,7 @@ kbd {
 @media (max-width: 760px) {
   .composer-box { position: relative; }
   .composer-controls, .chip-anchor { position: static; }
-  .chip-popover { z-index: 42; bottom: calc(100% + 8px); }
+  .chip-popover { z-index: var(--z-menu-surface); bottom: calc(100% + 8px); }
   .chip-popover,
   .chip-popover[data-chip] {
     left: 0;
