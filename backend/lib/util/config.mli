@@ -59,6 +59,13 @@ type t =
   ; mask_observations : bool
     (** replace old tool outputs with placeholders before summarising the
         conversation ({!Observation_mask}; default true) *)
+  ; compact_at_tokens : int
+    (** compact a conversation once its context exceeds this many tokens,
+        or 80% of the model's window if that comes first (default 200000; 0:
+        only at 80%) *)
+  ; compaction_model : string option
+    (** the model that writes compaction summaries; [None]: the
+        conversation's *)
   }
 [@@deriving sexp_of]
 
@@ -70,6 +77,9 @@ val auto_background : t -> float option
 
 (** [ask_user_timeout_seconds], [None] when off. *)
 val ask_user_timeout : t -> float option
+
+(** [compact_at_tokens], [None] when off. *)
+val compact_at : t -> int option
 
 (** The model for new sessions: [default_model], else the first of
     [fallback_models]. *)

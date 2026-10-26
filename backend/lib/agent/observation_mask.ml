@@ -135,10 +135,3 @@ let plan ?(keep_turns = keep_turns) messages =
 let apply ~through messages =
   List.mapi messages ~f:(fun i m -> if i <= through then mask m else m)
 ;;
-
-let worth_masking (model : Model.t) ~input_tokens ~overflowed (plan : Plan.t) =
-  let window = Float.of_int model.context_window in
-  overflowed
-  || (Float.(of_int input_tokens > window * 0.5)
-      && Float.(of_int plan.tokens_saved >= window * 0.1))
-;;

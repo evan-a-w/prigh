@@ -327,7 +327,9 @@ let%expect_test
       "snippets": [],
       "auto_background_seconds": 30,
       "generate_model": null,
-      "mask_observations": true
+      "mask_observations": true,
+      "compact_at_tokens": 200000,
+      "compaction_model": null
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))
@@ -1604,13 +1606,15 @@ let%expect_test "config problems: unknown default model and settings are told" =
   @@ fun sw ->
   write_config
     t
-    {|{"default_model": "anthropic/claude-opus-55", "scoped_modles": []}|};
+    {|{"default_model": "anthropic/claude-opus-55", "scoped_modles": [],
+       "compaction_model": "claude-haku"}|};
   let registry = registry t ~sw in
   show_models t registry;
   [%expect
     {|
     problem: unknown setting "scoped_modles" in $DIR/.prigh/config.json is ignored; did you mean "scoped_models"?
     problem: default_model "anthropic/claude-opus-55" (in $DIR/.prigh/config.json) is not a known model, so new sessions start on another; did you mean anthropic/claude-opus-5 or anthropic/claude-opus-5-5 or anthropic/claude-opus-4-5? (/change_default saves the current model as the default)
+    problem: compaction_model in $DIR/.prigh/config.json is ignored, so each conversation's own model summarises it (/compaction model MODEL sets another): unknown model "claude-haku"; did you mean: anthropic/claude-haiku-4-5 (Claude Haiku 4.5 (latest)), anthropic/claude-fable-5 (Claude Fable 5), anthropic/claude-haiku-4-5-20251001 (Claude Haiku 4.5)
     |}];
   (* A custom provider's model is known before its list is fetched. *)
   write_config

@@ -192,7 +192,7 @@ let%expect_test "a subagent may delegate once; the grandchild cannot" =
         ; max_tokens = None
         ; retries = 0
         ; cache_key = None
-        ; mask_observations = true
+        ; compaction = Compaction_settings.window_only
         }
       ~cwd:t.dir
       ~emit:(fun event ->

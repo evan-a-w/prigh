@@ -827,7 +827,7 @@ let%expect_test "apply_patch asks for confirmation naming its files" =
         ; max_tokens = None
         ; retries = 0
         ; cache_key = None
-        ; mask_observations = true
+        ; compaction = Compaction_settings.window_only
         }
       ~cwd:t.dir
       ~approve:(fun _ tool args ->

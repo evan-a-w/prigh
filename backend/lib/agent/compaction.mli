@@ -5,10 +5,6 @@ open! Import
     the context stays within the model's window: a session's (recorded as a
     compaction entry) or a subagent's in-memory one. *)
 
-(** True when the last request's input tokens exceed the model's window
-    threshold. *)
-val should_compact : Model.t -> input_tokens:int -> bool
-
 val render_transcript : Message.t list -> string
 
 (** How much of the conversation's end is kept verbatim by default. *)
@@ -70,8 +66,10 @@ val plan : keep_recent_tokens:int -> Message.t list -> Plan.t option
     approaches and exact errors, files, current state, next steps); an
     earlier summary among the summarised messages is updated rather than
     summarised again. The summarised part goes as it is, as the agent's next
-    request under [prompt], ending with the request for a summary; when that
-    would not fit the window, [overflowed] (the provider rejected the
+    request under [prompt], ending with the request for a summary, to
+    [model] (the summariser, which need not be the agent's model: then
+    thinking is off unless it supports it); when that would not fit
+    [model]'s window, [overflowed] (the provider rejected the
     context as too long) or the provider rejects it as too long, a rendered
     transcript goes in a request of its own instead. The files the
     summarised tool calls read and modified (and the earlier summary's) are
