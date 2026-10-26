@@ -180,7 +180,12 @@ let%expect_test "the panel follows the session, the host and the user" =
   H.reply h "get_messages_page" (H.page "[]");
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "alice"
+       ; superuser = false
+       });
   show ();
   [%expect
     {|

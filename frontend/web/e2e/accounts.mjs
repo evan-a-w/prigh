@@ -1,13 +1,15 @@
 // The account switcher against `prigh serve -tokens alice=a,bob=b
 // -superusers alice`: signing in, adding a second account, switching between
-// them (each sees its own sessions), acting as bob from alice and back, and
-// signing one out. Run by prigh_web.sh after prigh_web.mjs; prints normalised
-// snapshots (the expected output is in ENGINE.expected).
+// them (each sees its own sessions), acting as bob from alice and back,
+// the Nix store in alice's Settings (with a stand-in nix and df: no real
+// store is touched) and nowhere for bob, and signing one out. Run by
+// prigh_web.sh after prigh_web.mjs; prints normalised snapshots (the
+// expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -28,11 +30,32 @@ writeFileSync(
   JSON.stringify([{ text: "noted" }]),
 );
 
+// What the backend runs for the Nix store, instead of the real ones.
+const bin = join(dir, "bin");
+mkdirSync(bin, { recursive: true });
+const script = (name, body) => {
+  writeFileSync(join(bin, name), `#!/bin/sh\n${body}`);
+  chmodSync(join(bin, name), 0o755);
+};
+script("nix", `case "$1" in
+path-info) printf '/nix/store/aaa-x\\t3221225472\\n/nix/store/bbb-y\\t1073741824\\n' ;;
+store)
+  echo "finding garbage collector roots..." >&2
+  echo "deleting '/nix/store/aaa-x'" >&2
+  sleep 1
+  echo "deleting unused links..." >&2
+  echo "1 store paths deleted, 3.00 GiB freed" >&2 ;;
+esac
+`);
+script("df", `echo "Filesystem 1024-blocks Used Available Capacity Mounted on"
+echo "/dev/x 104857600 73400320 31457280 70% /nix"
+`);
+
 const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-tokens", "alice=a,bob=b", "-superusers", "alice", "-cwd", cwd],
-  { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+  { env: { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` }, stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -122,6 +145,33 @@ try {
   await send("I am bob");
   await bodyHas("noted");
   await sessions();
+  // Bob is no superuser: no Nix store in Settings, and no /nix-gc.
+  await page.locator(".settings-toggle").first().click();
+  await page.locator(".settings-dialog").waitFor();
+  section("bob's settings");
+  console.log((await page.locator(".settings-section h3").allInnerTexts()).join("\n"));
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".settings-dialog", { state: "detached" });
+  // What the composer offers for [typed]: waits until its list offers [name]
+  // or, when [gone] may be the answer, is gone (the earlier list may still be
+  // on show).
+  const offered = async (typed, name, { gone }) => {
+    await page.locator(".composer textarea").fill(typed);
+    await page.waitForFunction(([name, gone]) => {
+      const list = document.getElementById("completion-list");
+      return list === null ? gone : list.innerText.includes(name);
+    }, [name, gone]);
+    const labels = await page.locator("#completion-list .popup-label").allInnerTexts();
+    console.log(`${typed} offers: ${labels.join(", ") || "nothing"}`);
+  };
+  section("bob's commands");
+  await offered("/setus", "/setusr", { gone: false });
+  await offered("/nix-g", "/nix-gc", { gone: true });
+  await page.locator(".composer textarea").fill("/nix-gc");
+  await page.locator(".composer textarea").press("Control+Enter");
+  await bodyHas("Unknown command /nix-gc");
+  await show("bob's /nix-gc", ".toast.error");
+  await page.locator(".toast.error button").first().click();
 
   // One click back to alice, in her last session.
   await menu();
@@ -130,6 +180,24 @@ try {
   await page.locator(".account-button").waitFor();
   await bodyHas("I am alice");
   await sessions();
+
+  // Alice's Settings show the Nix store; Collect shows how it went.
+  const nixStore = async label => {
+    section(label);
+    console.log(clean(await page.locator(".settings-section", { hasText: "Nix store" }).innerText())
+      .replace(/\b\d{4}-\d\d-\d\d\b/g, "<DATE>")
+      .replace(/ in \d+ s\b/g, " in <N> s"));
+    await screenshot(label);
+  };
+  await page.locator(".settings-toggle").first().click();
+  await page.locator(".setting.nix-store .setting-about", { hasText: "GiB" }).waitFor();
+  await nixStore("alice's nix store");
+  await page.locator(".setting.nix-gc .btn.primary").click();
+  await page.locator(".setting.nix-gc", { hasText: "Freed 3.0 GiB" }).waitFor();
+  await page.locator(".setting.nix-store", { hasText: "by alice" }).waitFor();
+  await nixStore("collected");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".settings-dialog", { state: "detached" });
 
   // Acting as bob, and back.
   await menu();

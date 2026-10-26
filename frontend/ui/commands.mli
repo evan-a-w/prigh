@@ -47,8 +47,11 @@ module Spec : sig
   [@@deriving sexp_of, equal]
 end
 
-val all : Spec.t list
-val find : string -> Spec.t option
+(** The commands the user has: [superuser]'s include those only superusers
+    have ([/nix-gc]), which to everyone else do not exist. *)
+val all : superuser:bool -> Spec.t list
+
+val find : superuser:bool -> string -> Spec.t option
 
 (** [/name args], as [/help] shows it. *)
 val usage : Spec.t -> string
@@ -68,8 +71,8 @@ end
 (** [None] unless the input starts with [/]. *)
 val parse : string -> Parsed.t option
 
-val closest : string -> Spec.t option
-val help : Content.t
+val closest : superuser:bool -> string -> Spec.t option
+val help : superuser:bool -> Content.t
 
 (** The prefixes a prompt can start with ([!command], [@path], ...). *)
 val input_help : Content.t

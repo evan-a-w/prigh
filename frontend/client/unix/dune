@@ -9,5 +9,14 @@
   core_unix
   core_unix.sys_unix
   jsonaf
+  base64
+  digestif
+  tls
+  x509
+  ca-certs
+  domain-name
+  ipaddr
+  mirage-crypto-rng
+  mirage-crypto-rng.unix
   prigh_protocol
   prigh_client))

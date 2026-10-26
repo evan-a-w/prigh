@@ -85,6 +85,8 @@ module Reply_tag = struct
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Nix_store_shown (** [/nix-gc] *)
+    | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
     | Jobs_picker
     | Job_output
@@ -256,6 +258,7 @@ module Model = struct
     ; client_id : string option (** our host id, from [hello] *)
     ; namespace : string option
     ; user : string option
+    ; superuser : bool
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -270,6 +273,7 @@ module Model = struct
     ; terminal_focus : Focus.t
     ; server : Server_link.t option
     ; notice : Notice.t option
+    ; nix_gc : P.Nix_gc_progress.t option
     ; sidebar : bool
     }
   [@@deriving sexp_of]
@@ -300,7 +304,11 @@ module Model = struct
 
   let acting_as t =
     P.Hello_reply.acting_as
-      { client_id = ""; namespace = t.namespace; user = t.user }
+      { client_id = ""
+      ; namespace = t.namespace
+      ; user = t.user
+      ; superuser = t.superuser
+      }
   ;;
 end
 
@@ -581,6 +589,7 @@ let init =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -595,6 +604,7 @@ let init =
   ; terminal_focus = Unknown
   ; server = None
   ; notice = None
+  ; nix_gc = None
   ; sidebar = false
   }
 ;;
@@ -1987,10 +1997,12 @@ let reset_connection m =
   ; client_id = None
   ; namespace = None
   ; user = None
+  ; superuser = false
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
   ; btw = None
+  ; nix_gc = None
   ; mode = Editing
   ; autocomplete = None
   ; pending_quit = false
@@ -2054,7 +2066,8 @@ let relink ?doing m change =
 ;;
 
 let connect_hint =
-  "/connect HOST:PORT (of prigh serve -listen), or /connect local"
+  "/connect HOST:PORT (of prigh serve -listen), /connect wss://HOST/ws (a \
+   prigh-web URL, e.g. behind an HTTPS proxy), or /connect local"
 ;;
 
 let connect m arg =
@@ -2068,7 +2081,8 @@ let connect m arg =
              Text_prompt
                { question =
                    sprintf
-                     "Connect to HOST:PORT or local (now: %s)"
+                     "Connect to HOST:PORT, a prigh-web URL (wss://…) or local \
+                      (now: %s)"
                      (Server_link.describe server)
                ; action = Connect
                }
@@ -2083,13 +2097,13 @@ let connect m arg =
        , [] )
      | "local" -> relink m (Connect None) ~doing:"starting a local backend…"
      | address ->
-       (match Server_link.parse_address address with
-        | Error e -> error m (sprintf "%s; %s" e connect_hint), []
-        | Ok _ ->
+       (match Server_address.parse address with
+        | Error e -> error m (sprintf "%s; or /connect local" e), []
+        | Ok parsed ->
           relink
             m
-            (Connect (Some address))
-            ~doing:(sprintf "connecting to %s…" address)))
+            (Connect (Some (Server_address.normalize address)))
+            ~doing:(sprintf "connecting to %s…" (Server_address.display parsed))))
 ;;
 
 let nothing_to_sign_in m what =
@@ -2118,7 +2132,11 @@ let sign_out m =
     warn m "still connecting; wait for it, or Ctrl+C quits", []
   | Some { address = Some address; _ }, _ ->
     let m = signed_out { m with mode = Editing } ~reason:"signed out" in
-    ( notice m (sprintf "signed out of %s; the saved token is forgotten" address)
+    ( notice
+        m
+        (sprintf
+           "signed out of %s; the saved token is forgotten"
+           (Server_address.display_string address))
     , [ Command.Sign_out ] )
 ;;
 
@@ -2126,6 +2144,7 @@ let connected_notice m (link : Server_link.t) =
   match link.address with
   | None -> "connected to a local backend"
   | Some address ->
+    let address = Server_address.display_string address in
     (match m.user, m.namespace with
      | Some user, _ | None, Some user ->
        sprintf "connected to %s as %s" address user
@@ -2173,8 +2192,8 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user } ->
-           { m with client_id = Some client_id; namespace; user }
+         | Ok { client_id; namespace; user; superuser } ->
+           { m with client_id = Some client_id; namespace; user; superuser }
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
@@ -2237,14 +2256,21 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user =
+       let client_id, namespace, user, superuser =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user } -> Some client_id, namespace, user
-         | Error _ -> m.client_id, m.namespace, m.user
+         | Ok { client_id; namespace; user; superuser } ->
+           Some client_id, namespace, user, superuser
+         | Error _ -> m.client_id, m.namespace, m.user, m.superuser
        in
        let m, session_commands =
          reset_session
-           { m with connection = Connected; client_id; namespace; user }
+           { m with
+             connection = Connected
+           ; client_id
+           ; namespace
+           ; user
+           ; superuser
+           }
        in
        let m =
          match session, m.state with
@@ -2649,6 +2675,51 @@ let reminder_picker m (reminders : P.Reminder.t list) =
   open_picker m Reminders (Picker.create ~title:"Reminders" items)
 ;;
 
+let nix_gc_still_running m =
+  ( warn
+      m
+      "the Nix garbage collection you started is still running (see the status \
+       line)"
+  , [] )
+;;
+
+let start_nix_gc m generations =
+  if Option.is_some m.nix_gc
+  then nix_gc_still_running m
+  else
+    ( notice
+        { m with
+          nix_gc =
+            Some { paths_deleted = 0; generations_deleted = 0; message = None }
+        }
+        (Nix_gc_command.starting generations)
+    , [ call
+          (Nix_store_gc { delete_generations = generations })
+          ~tag:Nix_gc_done
+      ] )
+;;
+
+let nix_gc_command m rest =
+  match Nix_gc_command.parse rest with
+  | Status ->
+    ( notice m "reading the Nix store…"
+    , [ call Nix_store_status ~tag:Nix_store_shown ] )
+  | Error e ->
+    error (restore_command m (String.strip ("/nix-gc " ^ rest))) e, []
+  | Collect _ when Option.is_some m.nix_gc -> nix_gc_still_running m
+  | Collect None -> start_nix_gc m None
+  | Collect (Some generations as g) ->
+    ( { m with
+        mode =
+          Confirm
+            { question = Option.value_exn (Nix_gc_command.warning g)
+            ; action = Nix_gc generations
+            }
+      ; autocomplete = None
+      }
+    , [] )
+;;
+
 let remind_action m ~command (action : Remind_command.Action.t) =
   match action with
   | Pick reminders -> reminder_picker m reminders, []
@@ -2867,7 +2938,7 @@ let update_btw m id ~f =
    error names the closest command to fix it to. *)
 let unknown_command m name ~retry =
   let m = { m with editor = Editor.set_text m.editor (retry name) } in
-  match Commands.closest name with
+  match Commands.closest ~superuser:m.superuser name with
   | Some c ->
     error
       m
@@ -2895,7 +2966,7 @@ let run_command m (cmd : Commands.Parsed.t) =
         m
         ~title:"Help"
         (List.concat
-           [ help_heading "Commands" :: Commands.help
+           [ help_heading "Commands" :: Commands.help ~superuser:m.superuser
            ; [ []; help_heading "In the prompt" ]
            ; Commands.input_help
            ; [ []; help_heading "Keys" ]
@@ -2905,7 +2976,7 @@ let run_command m (cmd : Commands.Parsed.t) =
            ])
     , [] )
   | "help", name :: _ ->
-    (match Commands.find name with
+    (match Commands.find ~superuser:m.superuser name with
      | Some spec ->
        let usage = Commands.usage spec in
        ( output
@@ -3241,6 +3312,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "connect", _ -> connect m cmd.rest
   | "signin", args -> sign_in m args
   | "signout", _ -> sign_out m
+  | "nix-gc", _ when m.superuser -> nix_gc_command m cmd.rest
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
     m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
@@ -3504,6 +3576,7 @@ let refresh_command_autocomplete m =
   let line_index = (Editor.position m.editor).line in
   match
     Autocomplete.compute
+      ~superuser:m.superuser
       ~current_session:(current_session m)
       ~line
       ~col
@@ -3585,7 +3658,7 @@ let accept_autocomplete m ~submit_now =
          match Autocomplete.source ac, submit_now with
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
-           (match Commands.find item.id with
+           (match Commands.find ~superuser:m.superuser item.id with
             (* [/review] and [/agents] alone are the common case: they run
                at once. *)
             | Some { argument = Some (Review | Agents); _ } -> submit m
@@ -4583,6 +4656,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
+    | Nix_gc generations -> start_nix_gc m (Some generations)
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
     | Remove_worktree { worktree; force; back = _ } ->
@@ -4602,9 +4676,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
-    | Logout _ | Forge_logout _ | Rewind _ | Delete_sessions _ | Remove_worktree _
-      ->
-      notice m "cancelled", []
+    | Logout _
+    | Forge_logout _
+    | Rewind _
+    | Delete_sessions _
+    | Remove_worktree _
+    | Nix_gc _ -> notice m "cancelled", []
   in
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
@@ -5007,6 +5084,10 @@ let event m (e : P.Event.t) =
      with
      | Some entries -> set_backend_history m entries, []
      | None -> m, [])
+  | Nix_gc_progress progress ->
+    (match m.nix_gc with
+     | Some _ -> { m with nix_gc = Some progress }, []
+     | None -> m, [])
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
@@ -5167,6 +5248,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
         | Pr_form form ->
           { m with mode = Pr_form (Pr_form.failed form ~error:e) }, []
         | _ -> error m e, [])
+     | Nix_gc_done -> error { m with nix_gc = None } e, []
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
@@ -5181,6 +5263,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with skills = Location_cache.set m.skills ~key skills })
      | Mcp_picker ->
        decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Nix_store_shown ->
+       decode json ~f:P.Nix_store_status.of_json (fun status ->
+         ( output
+             m
+             ~title:"Nix store"
+             (Content.lines
+                (String.concat
+                   ~sep:"\n"
+                   (Nix_gc_command.status_lines ~utc_offset:m.utc_offset status)))
+         , [] ))
+     | Nix_gc_done ->
+       decode json ~f:P.Nix_gc_report.of_json (fun report ->
+         ( notice
+             { m with nix_gc = None }
+             ("Nix garbage collected: " ^ Nix_gc_command.report report)
+         , [] ))
      | Mcp_reconnected ->
        decode json ~f:P.Mcp_list.of_json (fun list ->
          let m = mcp_problems m list in
@@ -5382,7 +5480,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:P.Hello_reply.of_json
-         (fun { client_id; namespace; user } ->
+         (fun { client_id; namespace; user; superuser = _ } ->
             let m, session_commands =
               reset_session
                 { m with
@@ -5795,8 +5893,8 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello { client_id; namespace; user } ->
-        { m with client_id = Some client_id; namespace; user }, []
+      | Hello { client_id; namespace; user; superuser } ->
+        { m with client_id = Some client_id; namespace; user; superuser }, []
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []

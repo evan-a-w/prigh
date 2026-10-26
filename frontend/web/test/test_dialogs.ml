@@ -611,7 +611,12 @@ let%expect_test "signing out" =
   [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
   H.act
     h
-    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "ann"
+       ; superuser = false
+       });
   H.text h ~selector:".sidebar-footer";
   [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];
   H.act h Sign_out;

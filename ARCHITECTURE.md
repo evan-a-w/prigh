@@ -25,8 +25,10 @@ tools of MCP servers.
 
 The frontend either spawns `prigh serve` and talks to it over stdin/stdout,
 or connects over TCP to a backend started with `prigh serve -listen
-HOST:PORT` (possibly on another machine). Either way it exchanges one JSON
-object per line. Requests carry `{id, method, params}`; the backend answers
+HOST:PORT` (possibly on another machine), or opens a WebSocket on the `/ws`
+of its `-web` port, directly (`ws://`) or through a TLS-terminating reverse
+proxy (`wss://`), as prigh-web does. Either way it exchanges one JSON
+object per line (one per text message on a WebSocket). Requests carry `{id, method, params}`; the backend answers
 with `{type:"response", id, ok, result|error}` and pushes `{type:"event",
 event, ...}` for everything that happens asynchronously (streaming deltas,
 tool output, state changes, login prompts). The same binary also has headless
@@ -1472,7 +1474,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   proxy: the RPC goes over its `/ws`, `Websocket.connect` being the client
   side of the handshake, over `Http_client.tls_client` for `wss`).
   `Tool_host.connect` (so `prigh tool-host -connect`) and `prigh web` use
-  them.
+  them. The TUI, an Async program in another dune project, has the same
+  parsing in `ui/server_address.ml` and its own client side
+  (`client/unix/websocket_transport.ml`): keep the two in step.
 - `Web_connect` / `Web_proxy` / `Signin_handoff` — `prigh web`: prigh-web
   on this machine for a backend elsewhere, with nothing of a backend
   running locally. `Web_connect.Check` says `hello` once to tell an
@@ -1493,7 +1497,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
   (which has the same module in `client/unix/`): `prigh web` resolves and
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
-  passed, and only `HOST:PORT` addresses (the TUI connects to no URLs).
+  passed, URLs normalised (`Backend_address.normalize`: `https://host/`
+  is saved as `wss://host/ws`, as the TUI saves it).
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -1522,6 +1527,21 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   absolute). Without the backend host,
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
+- `Nix_store_rpc` (`nix/`) — `nix_store_status` and `nix_store_gc`, for
+  superusers only (the signed-in user, not whom they act as). To
+  everyone else, and on a backend without users, they do not exist:
+  `dispatch` passes, so they get the same "unknown method" as any other
+  name, and progress goes only to the superuser who asked. `Nix_store` runs one collection at a time for the whole backend
+  (in a fiber of its own, so a dropped connection does not stop it) and
+  reports progress to the caller as `nix_gc_progress` events, at most every
+  250 ms while only paths are being deleted (`Nix_gc_output` classifies
+  Nix's lines and tallies them). It reaches the store through
+  `Nix_store_ops.t`, a record of functions faked in tests: `local` runs
+  `nix store gc` or `nix-collect-garbage` as the backend's user; `helper`
+  writes `gc ID GENERATIONS BY` to the container's root helper's FIFO
+  (`-nix-gc-helper`, DOCKER.md "Garbage collection") and follows its log
+  and result files, also reading the helper's `last-gc`, `running` (a
+  scheduled collection) and `schedule`.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
@@ -1605,7 +1625,15 @@ terminal frontend and `web/` prigh-web, the browser one.
   with "not connected" in between; `received` and `waiting` count the lines
   received and the calls waiting, for prigh-web's probe). `client/unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
-  spawns the backend, `Tcp_transport` connects to `-listen` — and
+  spawns the backend, `Tcp_transport` connects to `-listen`,
+  `Websocket_transport` to a prigh-web URL's `/ws` (the RFC 6455 client
+  side: a masked text message per line, the server's pings answered, a
+  ping after 20s of quiet and a close after 60s, so the client reconnects;
+  an upgrade answered with a redirect, 401 or HTML page is explained as a
+  proxy's sign-in), over `Tls_channel` (the pure `tls` engine over Async,
+  certificates checked against the system's CAs via `ca-certs`) for
+  `wss`; both over `Channel` (a TCP byte stream with keepalive). The
+  tests' servers and throwaway CA are in `client/unix/testing/` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
   `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
   lines back as `tool_exec_*` requests, a result's `images` verbatim) and
@@ -1932,8 +1960,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     prompt history. Text selection therefore needs Shift.
   - `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
     as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
-    path). `-connect HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend
-    instead of spawning one, with `-token` (`$PRIGH_TOKEN`), `-user`
+    path). `-connect HOST:PORT` or a prigh-web URL (`$PRIGH_CONNECT`;
+    `ui/server_address.ml`) joins a running backend instead of spawning
+    one (`-header`/`$PRIGH_CONNECT_HEADERS` add headers to a URL's
+    WebSocket upgrade), with `-token` (`$PRIGH_TOKEN`), `-user`
     (`$PRIGH_USER`) and `-name`; the flags are remembered in
     `~/.prigh/tui-connection.sexp` (`client/unix/saved_connection.ml`, which
     resolves flag > environment > saved; `-local` ignores it, `-forget`
@@ -2321,8 +2351,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
       gear beside the account, the account menu, `/settings` or Ctrl+,:
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
-      providers, the account; its controls are `Action.Run` commands, which
-      leave it open),
+      providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
+      fetched as it opens, our collection's progress, also a chip in the
+      status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
+      words it for both frontends, and `Slash`/`Commands.all ~superuser`
+      leave it out for everyone else: no completion, `/help` or "did you
+      mean"), the account; its controls are
+      `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column; a repeat is counted rather than stacked, a notice's lifetime
       grows with its length, errors stay until dismissed, long paths are
@@ -2838,7 +2873,10 @@ closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
 with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
-back, and signs bob out, leaving alice on the sign-in page. Then
+back, and signs bob out, leaving alice on the sign-in page. Alice's
+Settings show the Nix store (stand-in `nix` and `df`) and collect it;
+bob sees no Nix store section, no `/nix-gc` completion, and `/nix-gc` is
+an unknown command. Then
 `reconnect.mjs`, at phone size: a long session scrolled halfway up with a
 draft and a pasted image; `context.setOffline` and back, then the backend
 killed and restarted: each time the same session, the same scroll
