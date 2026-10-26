@@ -463,8 +463,10 @@ mark.review-mark[data-comment] { cursor: default; }
   padding: 10px 12px 12px;
   border-top: 1px solid var(--rule);
 }
-.git-message { resize: vertical; min-height: 64px; font: 12.5px/1.45 var(--mono); }
+.git-commit .field-label { white-space: nowrap; }
+.git-message { resize: vertical; min-height: 84px; font: 12.5px/1.45 var(--mono); }
 .git-commit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.git-failure { font: 12px/1.4 var(--sans); color: var(--brick); }
-.git-notice { font: 12px/1.4 var(--mono); color: var(--sage); overflow-wrap: anywhere; }
+.git-failure, .git-notice { flex-basis: 100%; font: 12px/1.4 var(--sans); overflow-wrap: anywhere; }
+.git-failure { color: var(--brick); }
+.git-notice { color: var(--sage); }
 .app.narrow .git-actions { margin-left: 0; }

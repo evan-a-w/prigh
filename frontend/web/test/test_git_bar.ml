@@ -279,6 +279,7 @@ let%expect_test "commit with a drafted message: staged first, streamed, undone, 
     feat/x ↑2 ↓0 origin/feat/x
     0 staged 0 unstaged 1 untracked
     (Stage approved) (Push ↑2) (Create PR)
+    Committed 1234567 Double c on feat/x
     |}];
   (* Amending without a message keeps the commit's. *)
   H.click h ~selector:".git-amend";
@@ -381,6 +382,7 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     feat/x ↑0 ↓0 origin/feat/x
     0 staged 1 unstaged 0 untracked
     (Stage approved) (Push) (Create PR)
+    Pushed feat/x to origin
     |}];
   H.quiet h (fun () -> H.act h (Review Refresh));
   H.reply h "git_status" (status_json ~branch:None [ file "src/main.ml" ~index:"M" ]);
@@ -395,6 +397,7 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     detached HEAD ↑1 ↓0 origin/feat/x
     1 staged 0 unstaged 0 untracked
     (Stage approved) (Push ↑1) (Create PR)
+    HEAD is detached: commit on a branch (git switch -c NAME).
     HEAD is detached: commit on a branch (git switch -c NAME).
     |}]
 ;;

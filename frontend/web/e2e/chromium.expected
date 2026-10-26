@@ -1469,6 +1469,65 @@ sheet: fixed
 Alt+R closed it
 === chromium: review: errors ===
 none
+=== chromium: review git: the bar ===
+main
+↑0 ↓0 origin/main
+0 staged
+1 unstaged
+1 untracked
+Stage approved
+Push
+Create PR
+=== chromium: review git: the boxes ===
+src/main.ml: false
+src/util.ml: false
+=== chromium: review git: ticked ===
+src/main.ml: true (staged at the commit)
+src/util.ml: true
+=== chromium: review git: one staged ===
+1 staged
+1 unstaged
+0 untracked
+=== chromium: review git: drafted ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+=== chromium: review git: the commit box ===
+Commit message
+✦
+Generate
+Undo
+Amend
+Commit 2 files
+=== chromium: review git: both staged ===
+2 staged
+0 unstaged
+0 untracked
+=== chromium: review git: committed ===
+Committed <SHA> main: double v12, add util on main
+=== chromium: review git: ahead of origin ===
+main
+↑1 ↓0 origin/main
+0 staged
+0 unstaged
+0 untracked
+Stage approved
+Push ↑1
+Create PR
+Committed <SHA> main: double v12, add util on main
+=== chromium: review git: pushed ===
+Pushed main to origin
+=== chromium: review git: level with origin ===
+↑0 ↓0 origin/main
+=== chromium: review git: origin has it ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+src/main.ml | 2 +-
+src/util.ml | 3 +++
+2 files changed, 4 insertions(+), 1 deletion(-)
+=== chromium: review git: errors ===
+none
 === chromium: remote: prigh web ===
 http://127.0.0.1:<PORT>/#signin=<code>
 === chromium: remote: opened ===
