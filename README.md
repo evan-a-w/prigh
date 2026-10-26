@@ -875,6 +875,36 @@ TUI, `/review` with the same arguments lists the files and comments under
 what was compared ("review feat/x (not checked out) against main
 directly").
 
+#### Committing, pushing and pull requests from the review
+
+Under the page's head, the git bar shows the reviewed worktree's branch, how
+it stands with its upstream (`↑2 ↓0 origin/feat-x`, or "not pushed yet")
+and how many files are staged, unstaged and untracked. Each file with
+uncommitted changes has a box in the file list: approved files come ticked
+(drawn hollow until git has them: they are staged when you commit), staged
+ones are ticked, a file only partly staged is half-ticked. Ticking a file
+stages it (`git add`), unticking a staged one unstages it, and Stage approved
+stages every approved file's changes. Under the list, the commit box takes
+the message: ✦ Generate (Alt+G in it) drafts it with the model from the
+staged changes (the ticked files are staged first), the session's goal and
+plan and the repository's recent commits (their style) and commit guidance;
+it streams in, Stop or Esc keeps what came, Undo puts back what was there.
+Amend changes the last commit instead (an empty message keeps its own).
+Commit (Ctrl+Enter in the box) commits the ticked files; the bar says what
+it did (`Committed 1a2b3c4 Fix the parser on feat/x`) and the page reads the
+changes again. Push pushes the branch to its upstream, setting one (on
+`origin`, else the only remote) when it has none, with the tool host's own
+git credentials: prigh never asks for a password. Create PR opens the
+pull-request dialog for that worktree's branch (see [Git hosting](#git-hosting)).
+A branch reviewed without checking it out has no git bar, boxes or commit
+box: check it out into a worktree to commit there.
+Refusals say what to do: nothing ticked, an empty message, a detached HEAD
+(`git switch -c NAME`), a push the remote rejected (pull first, e.g. `git
+pull --rebase`), no remote (`git remote add origin URL`), missing
+credentials or committer identity on the tool host. Paths are checked to
+stay inside the worktree. In the TUI, `/commit` and `/push` do the same
+(see [Git hosting](#git-hosting)).
+
 ### prigh-web for a backend elsewhere
 
 The page can also be served from your own machine for a backend on another
@@ -1426,7 +1456,9 @@ it is replaced by `approval_mode` when prigh saves the file),
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
-command moves to the background and how long a wait lasts, above).
+command moves to the background and how long a wait lasts, above) and
+`generate_model` (the model ✦ Generate drafts commit messages, pull
+requests, branch names and session names with; default: the session's).
 Without a `default_thinking`, sessions start with thinking `on`; models that
 cannot think ignore it. A fallback model keeps the session's thinking level.
 
@@ -1558,7 +1590,7 @@ it.
 | `/default-dir [off\|path]` | show or set the directory new sessions start in |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
-| `/pr [list [open\|closed\|all]\|view N\|new [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch, or check one out in a git worktree |
+| `/pr [list [open\|closed\|all]\|view N\|new [--generate] [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch (`--generate`: the model drafts its title and body), or check one out in a git worktree |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
@@ -1568,6 +1600,8 @@ it.
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
+| `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
+| `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
 | `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
@@ -1694,7 +1728,42 @@ remote on a known host; pull requests from forks are listed as
 remote's repository. "Push first" runs `git push -u REMOTE HEAD:BRANCH` on
 the tool host with its own git credentials (never prompting). On Forgejo a
 draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
-`git remote add origin URL`, ...).
+`git remote add origin URL`, ...). The worktree context menu's "Create pull
+request…" and the review page's Create PR open it for that worktree's
+branch.
+
+**✦ Generate.** Every field that holds a description can be drafted by the
+model: the pull request's title and description (from the branch's commits
+and its diff against the base, the repository's pull request guidance in
+AGENTS.md, CLAUDE.md or CONTRIBUTING.md, and its
+`.github/pull_request_template.md`, filled in), the review's commit message
+(above), a new worktree's branch name (from the task typed in its field, else
+the session's goal) and the session's name (from the conversation). In
+prigh-web it is the ✦ Generate button in the field's corner (Alt+G): the
+draft streams into the field, Stop or Esc keeps what came, Undo puts the text
+back; it stays editable before use. In the TUI, `/pr new --generate [title]`
+drafts the form's title (unless one is given) and body, Ctrl+G in the form
+drafts on demand (Esc stops, Ctrl+_ swaps back to the text from before), and
+`/commit --generate` drafts a commit message. One tool-less request per
+draft, without thinking, on `generate_model` from `config.json` (a model name,
+id or prefix, e.g. a cheap fast one like `claude-haiku-4-5`), else the
+session's model; its cost counts towards the session's. Large diffs are cut
+down to fit (every file keeps a share of its hunks, the rest listed with
+their line counts).
+
+**Committing and pushing in the TUI.** `/commit [-a] [--amend] -m MESSAGE`
+commits what is staged in the session's worktree (`-a` first stages every
+change to tracked files; `-am MESSAGE` does both). The message is the rest
+of the line, newlines included, or a quoted string (`"..."` with `\"` and
+`\\` escapes, or `'...'`); flags go before `-m`, which completes them.
+`/commit --amend` without `-m` keeps the old message. `/commit [-a]
+[--amend] --generate` drafts the message from the staged changes into a
+"commit message" panel above the editor (Esc stops it), then leaves `/commit
+-m "<message>"` in the editor to edit and send; Ctrl+_ brings back what you
+had typed meanwhile. The transcript says what happened (`committed 1a2b3c4
+Fix the parser on main`); a refused commit goes back into the editor with
+the reason. `/push` pushes the worktree's branch to its upstream (set when
+there is none) and says `pushed main to origin` or why not.
 
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the

@@ -74,6 +74,37 @@ end
 
 val op : string
 
+(** [Request.to_json] for the worktree at [dir] (relative to the session's
+    directory) instead of the session's. *)
+val in_dir : string option -> Json.t -> Json.t
+
+exception Failed of string
+
+(** git as the commands run it: never prompting for credentials. *)
+module Runner : sig
+  type t =
+    { git :
+        ?timeout:Time_ns.Span.t
+        -> dir:string
+        -> string list
+        -> (string, string) Result.t
+      (** stdout, or stderr when it fails; raises [Failed] when git is
+        missing, times out or is cancelled *)
+    }
+end
+
+val runner : env:Env.t -> cancel:Cancellation.t -> Runner.t
+val info : runner:Runner.t -> cwd:string -> Info.t
+
+(** [git push --set-upstream REMOTE HEAD:refs/heads/BRANCH] in [root]:
+    git's complaint when it fails. *)
+val push_branch
+  :  runner:Runner.t
+  -> root:string
+  -> remote:string
+  -> branch:string
+  -> (unit, string) Result.t
+
 (** On the host. *)
 val run
   :  env:Env.t

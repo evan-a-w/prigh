@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models import permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions
     "sw" -> switch
     "xyz" ->
     |}]
@@ -663,11 +663,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+W / Alt+Backspace  delete the word before the cursor
     Ctrl+Y                  paste the most recent kill
     Alt+Y                   replace the last yank with an older kill
-    Ctrl+_                  undo the last edit
+    Ctrl+_                  undo the last edit (the /pr new form: back to the text before the model's draft)
     Ctrl+O                  cycle transcript verbosity
     Ctrl+R                  complete a file path at the cursor
     Ctrl+F                  search the transcript
-    Ctrl+G                  edit the prompt in $EDITOR
+    Ctrl+G                  edit the prompt in $EDITOR (the /pr new form: the model drafts the title and body)
     Ctrl+L                  pick a model
     Alt+N                   pick a snippet to insert (/snippet)
     Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
@@ -708,7 +708,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
-    /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [title] creates one from the current branch, checkout N checks one out in a git worktree
+    /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
+    /commit [-a] [-m MSG|--generate]   commit the staged changes of the session's worktree (-a: every change to tracked files first; MSG: the rest of the line, or quoted); --generate has the model draft the message into the editor to edit and send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping its message without -m
+    /push                              push the session's worktree's branch to its upstream (set to the remote's branch of the same name when there is none)
     /review [target] [--base REV ...]  the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session

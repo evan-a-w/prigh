@@ -386,8 +386,11 @@ let%expect_test
     (Focus worktree-branch)
     New worktree
     (Close (Esc))
-    Branch [] A new branch, or an existing one to check out
-    Base [] Where a new branch starts (empty: main, where this session is)
+    Branch
+    (✦ Generate name)
+    [] A new branch, or an existing one to check out (✦ names one from the task typed here)
+    Base
+    [] Where a new branch starts (empty: main, where this session is)
     Created in ~/.prigh/worktrees/work, then this session works there.
     Enter creates, Esc cancels (Cancel) (Create and switch)
     <input id="worktree-base"
@@ -477,8 +480,11 @@ let%expect_test
      (tag (Worktree_created (command "/worktree new fix/crash release-1"))))
     New worktree
     (Close (Esc))
-    Branch [fix/crash] A new branch, or an existing one to check out
-    Base [release-1] Where a new branch starts (empty: main, where this session is)
+    Branch
+    (✦ Generate name)
+    [fix/crash] A new branch, or an existing one to check out (✦ names one from the task typed here)
+    Base
+    [release-1] Where a new branch starts (empty: main, where this session is)
     Created in ~/.prigh/worktrees/work, then this session works there.
     Unknown base release-1: a branch, tag or commit (git branch -a lists them).
     Enter creates, Esc cancels (Cancel) (Create and switch)

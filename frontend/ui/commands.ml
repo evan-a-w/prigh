@@ -28,6 +28,7 @@ module Argument = struct
     | Review
     | Server
     | Pr
+    | Commit
     | Agents
   [@@deriving sexp_of, equal]
 end
@@ -162,8 +163,23 @@ let every =
       "[list|view N|new|checkout N]"
       "pull requests of the repository where the tools run: list \
        [open|closed|all] picks one (Enter shows it, its checks and diff), view \
-       N shows one, new [title] creates one from the current branch, checkout \
-       N checks one out in a git worktree"
+       N shows one, new [--generate] [title] creates one from the current \
+       branch (--generate, or Ctrl+G in the form: the model drafts the title \
+       and body), checkout N checks one out in a git worktree"
+  ; c
+      ~argument:Argument.Commit
+      "commit"
+      "[-a] [-m MSG|--generate]"
+      "commit the staged changes of the session's worktree (-a: every change \
+       to tracked files first; MSG: the rest of the line, or quoted); \
+       --generate has the model draft the message into the editor to edit and \
+       send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping \
+       its message without -m"
+  ; c
+      "push"
+      ""
+      "push the session's worktree's branch to its upstream (set to the \
+       remote's branch of the same name when there is none)"
   ; c
       ~argument:Argument.Review
       "review"

@@ -26,11 +26,12 @@ type t =
   ; busy : bool (** creating *)
   ; error : string option (** why it was refused, or what is missing *)
   ; back : Pull_requests.t option (** the list it was opened from *)
+  ; dir : string option (** the worktree's branch (default: the session's) *)
   }
 [@@deriving sexp_of, equal]
 
 (** Loading the defaults; [title], if not empty, is kept over theirs. *)
-val create : ?back:Pull_requests.t -> title:string -> unit -> t
+val create : ?back:Pull_requests.t -> ?dir:string -> title:string -> unit -> t
 
 (** Fills what was not typed already; [push] is on when the branch is not
     all on the remote. *)

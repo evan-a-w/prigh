@@ -946,7 +946,8 @@ let%expect_test
       "archive_after_days": 7,
       "notify": "bell",
       "snippets": [],
-      "auto_background_seconds": 30
+      "auto_background_seconds": 30,
+      "generate_model": null
     }
     |}]
 ;;

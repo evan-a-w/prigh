@@ -127,6 +127,9 @@ let%expect_test
     (Rpc (method_ git_diff)
      (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
+     (tag (Git Status)))
     (Focus review-page)
     |}];
   H.reply h "git_diff" (feat_diff ());
@@ -245,6 +248,7 @@ let%expect_test
     (Rpc (method_ push_pref) (params ((key history) (value /review) (max 500)))
      (tag Ignore))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     (Rpc (method_ fs_preview) (params ((path /work/a.ml)))
      (tag (Review (Content a.ml))))
@@ -293,6 +297,9 @@ let%expect_test
     (Rpc (method_ git_diff)
      (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
+     (tag (Git Status)))
     (Focus review-page)
     |}];
   (* The base picker: the uncommitted changes only. *)
@@ -308,6 +315,9 @@ let%expect_test
     (Rpc (method_ git_diff)
      (params ((base HEAD) (dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
+     (tag (Git Status)))
     |}];
   H.reply h "git_diff" (feat_diff ~base:"HEAD" ());
   target h;
@@ -346,6 +356,9 @@ let%expect_test
     (Rpc (method_ git_diff)
      (params ((base HEAD) (dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
+     (tag (Git Status)))
     |}];
   (* Another session starts over with its own worktree. *)
   H.event
@@ -401,6 +414,9 @@ let%expect_test "/worktree's picker: Alt+R reviews the highlighted worktree" =
     (Rpc (method_ git_diff)
      (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-login)))
+     (tag (Git Status)))
     (Focus review-page)
     |}]
 ;;

@@ -60,9 +60,13 @@ module Method : sig
         { state : string option (** [open] (default), [closed], [all] *) }
     (** see {!Pr_list} *)
     | Pr_view of int (** see {!Pr_detail} *)
-    | Pr_defaults (** see {!Pr_defaults} *)
+    | Pr_defaults of
+        { dir : string option
+          (** a worktree's branch (default: the session's) *)
+        } (** see {!Pr_defaults} *)
     | Pr_create of
-        { title : string
+        { dir : string option (** in that worktree's repository *)
+        ; title : string
         ; body : string
         ; base : string option (** default: the repository's default branch *)
         ; head : string option (** default: the current branch *)
@@ -143,6 +147,34 @@ module Method : sig
           (** saved in the review's editor, of that worktree: an action on
               the file *)
         } (** [{path, md5}] *)
+    | Git_status of
+        { dir : string option (** the worktree (default: the session's) *) }
+    (** {!Git_status} *)
+    | Git_stage of
+        { dir : string option
+        ; paths : string list (** relative to the worktree's top directory *)
+        ; tracked : bool (** and every change to tracked files ([git add -u]) *)
+        } (** {!Git_status} after *)
+    | Git_unstage of
+        { dir : string option
+        ; paths : string list
+        } (** {!Git_status} after *)
+    | Git_commit of
+        { dir : string option
+        ; message : string (** empty with [amend]: the commit's own *)
+        ; amend : bool
+        ; paths : string list (** staged first *)
+        } (** {!Git_status.Commit} *)
+    | Git_push of { dir : string option }
+    (** {!Git_status.Push}: to the upstream, set when there is none *)
+    | Generate_text of
+        { gen_id : string (** names its [Generate_delta] events *)
+        ; kind : Generated.Kind.t
+        ; dir : string option (** the worktree, for commits and PRs *)
+        ; base : string option (** [Pr]: what it merges into *)
+        ; task : string option (** [Branch_name]: what the branch is for *)
+        } (** {!Generated} *)
+    | Generate_cancel of { gen_id : string }
     | Nix_store_status (** superusers: {!Nix_store_status} *)
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can

@@ -48,9 +48,10 @@ module Method = struct
     | Forge_logout of string
     | Pr_list of { state : string option }
     | Pr_view of int
-    | Pr_defaults
+    | Pr_defaults of { dir : string option }
     | Pr_create of
-        { title : string
+        { dir : string option
+        ; title : string
         ; body : string
         ; base : string option
         ; head : string option
@@ -118,6 +119,31 @@ module Method = struct
         ; expected : string option
         ; review_root : string option
         }
+    | Git_status of { dir : string option }
+    | Git_stage of
+        { dir : string option
+        ; paths : string list
+        ; tracked : bool
+        }
+    | Git_unstage of
+        { dir : string option
+        ; paths : string list
+        }
+    | Git_commit of
+        { dir : string option
+        ; message : string
+        ; amend : bool
+        ; paths : string list
+        }
+    | Git_push of { dir : string option }
+    | Generate_text of
+        { gen_id : string
+        ; kind : Generated.Kind.t
+        ; dir : string option
+        ; base : string option
+        ; task : string option
+        }
+    | Generate_cancel of { gen_id : string }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
   [@@deriving sexp_of, equal]
@@ -141,7 +167,7 @@ module Method = struct
     | Forge_logout _ -> "forge_logout"
     | Pr_list _ -> "pr_list"
     | Pr_view _ -> "pr_view"
-    | Pr_defaults -> "pr_defaults"
+    | Pr_defaults _ -> "pr_defaults"
     | Pr_create _ -> "pr_create"
     | Pr_checkout _ -> "pr_checkout"
     | List_worktrees _ -> "list_worktrees"
@@ -160,9 +186,23 @@ module Method = struct
     | Fs_preview _ -> "fs_preview"
     | Git_show _ -> "git_show"
     | Fs_write _ -> "fs_write"
+    | Git_status _ -> "git_status"
+    | Git_stage _ -> "git_stage"
+    | Git_unstage _ -> "git_unstage"
+    | Git_commit _ -> "git_commit"
+    | Git_push _ -> "git_push"
+    | Generate_text _ -> "generate_text"
+    | Generate_cancel _ -> "generate_cancel"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
   ;;
+
+  let dir_param = function
+    | None -> []
+    | Some dir -> [ "dir", Json.str dir ]
+  ;;
+
+  let paths_param paths = [ "paths", `Array (List.map paths ~f:Json.str) ]
 
   let cwd_param = function
     | None -> []
@@ -177,11 +217,7 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
-    | Forge_status
-    | Pr_defaults
-    | Get_review
-    | Nix_store_status -> []
+    | Delete_archived | Forge_status | Get_review | Nix_store_status -> []
     | Nix_store_gc { delete_generations = None } -> []
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
@@ -263,8 +299,10 @@ module Method = struct
     | Pr_list { state } ->
       Option.value_map state ~default:[] ~f:(fun s -> [ "state", Json.str s ])
     | Pr_view number | Pr_checkout number -> [ "number", Json.int number ]
-    | Pr_create { title; body; base; head; draft; push } ->
-      [ "title", Json.str title; "body", Json.str body ]
+    | Pr_defaults { dir } -> dir_param dir
+    | Pr_create { dir; title; body; base; head; draft; push } ->
+      dir_param dir
+      @ [ "title", Json.str title; "body", Json.str body ]
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
       @ Option.value_map head ~default:[] ~f:(fun h -> [ "head", Json.str h ])
       @ [ "draft", Json.bool draft; "push", Json.bool push ]
@@ -276,6 +314,25 @@ module Method = struct
       [ "path", Json.str path ]
       @ (if force then [ "force", Json.bool true ] else [])
       @ cwd_param cwd
+    | Git_status { dir } | Git_push { dir } -> dir_param dir
+    | Git_stage { dir; paths; tracked } ->
+      dir_param dir
+      @ paths_param paths
+      @ if tracked then [ "tracked", Json.bool true ] else []
+    | Git_unstage { dir; paths } -> dir_param dir @ paths_param paths
+    | Git_commit { dir; message; amend; paths } ->
+      dir_param dir
+      @ [ "message", Json.str message ]
+      @ (if amend then [ "amend", Json.bool true ] else [])
+      @ if List.is_empty paths then [] else paths_param paths
+    | Generate_text { gen_id; kind; dir; base; task } ->
+      [ "gen_id", Json.str gen_id
+      ; "kind", Json.str (Generated.Kind.to_string kind)
+      ]
+      @ dir_param dir
+      @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
+      @ Option.value_map task ~default:[] ~f:(fun t -> [ "task", Json.str t ])
+    | Generate_cancel { gen_id } -> [ "gen_id", Json.str gen_id ]
   ;;
 end
 

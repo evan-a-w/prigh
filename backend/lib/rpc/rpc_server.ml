@@ -84,6 +84,8 @@ let methods =
   ; "ask_user_respond"
   ; "btw"
   ; "btw_cancel"
+  ; "generate_text"
+  ; "generate_cancel"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -103,6 +105,7 @@ let methods =
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
+  @ Git_rpc.methods
   @ Nix_store_rpc.methods
 ;;
 
@@ -281,6 +284,8 @@ module Client = struct
     ; mutable tab : string option
       (** [hello]'s [tab]: the page instance it comes from *)
     ; btws : Cancellation.t String.Table.t (** in-flight [btw] calls by id *)
+    ; generations : Cancellation.t String.Table.t
+      (** in-flight [generate_text] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
     }
 
@@ -318,6 +323,7 @@ type t =
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
   ; mutable btw_seq : int
+  ; mutable generate_seq : int
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
     (** how long the executions of a host that dropped its connection wait
@@ -552,6 +558,7 @@ let create
     ; clients = String.Table.create ()
     ; client_seq = 0
     ; btw_seq = 0
+    ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
     ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
@@ -774,6 +781,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; close
     ; tab = None
     ; btws = String.Table.create ()
+    ; generations = String.Table.create ()
     ; told = String.Set.empty
     }
   in
@@ -842,6 +850,7 @@ let hand_over_host_id t (gone : Client.t) =
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
+  Hashtbl.iter client.generations ~f:Cancellation.cancel;
   if client.tools && not (String.equal client.host_id client.id)
   then await_host t client
   else release_host_id t client ~text:"[tool host disconnected]";
@@ -1538,6 +1547,58 @@ let btw t (client : Client.t) params =
             ]))))
 ;;
 
+(* Like [btw]: the draft streams to the asking client only. *)
+let generate_text t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind kind =
+    Or_error.bind (string_param params "kind") ~f:Generate_text.Kind.of_string
+  in
+  let%bind gen_id = string_param_opt params "gen_id" in
+  let%bind dir = string_param_opt params "dir" in
+  let%bind base = string_param_opt params "base" in
+  let%bind task = string_param_opt params "task" in
+  let blank =
+    Option.filter ~f:(fun s -> not (String.is_empty (String.strip s)))
+  in
+  let gen_id =
+    match gen_id with
+    | Some id -> id
+    | None ->
+      t.generate_seq <- t.generate_seq + 1;
+      sprintf "gen-%d" t.generate_seq
+  in
+  if Hashtbl.mem client.generations gen_id
+  then Or_error.errorf "generation %S is already running" gen_id
+  else (
+    let cancel = Cancellation.create () in
+    Hashtbl.set client.generations ~key:gen_id ~data:cancel;
+    let%map result =
+      Exn.protect
+        ~finally:(fun () -> Hashtbl.remove client.generations gen_id)
+        ~f:(fun () ->
+          Generate_text.run
+            client.agent
+            kind
+            { dir = blank dir; base = blank base; task = blank task }
+            ~cancel
+            ~on_delta:(fun delta ->
+              client.send
+                (`Object
+                    [ "type", `String "event"
+                    ; "event", `String "generate_delta"
+                    ; "gen_id", `String gen_id
+                    ; "delta", `String delta
+                    ])))
+    in
+    match Generate_text.Result.to_json result with
+    | `Object fields ->
+      `Object
+        (("gen_id", `String gen_id)
+         :: ("kind", `String (Generate_text.Kind.to_string kind))
+         :: fields)
+    | json -> json)
+;;
+
 let switch_user (client : Client.t) params =
   match client.signed_in with
   | None -> Or_error.error_string User_access.no_users
@@ -1558,13 +1619,15 @@ let number_param params name =
 
 (* The repository is the client's session's, on its active tool host. *)
 let pull_requests t (client : Client.t) ~meth ~params =
+  let open Or_error.Let_syntax in
+  let%bind dir = string_param_opt params "dir" in
+  let dir = Option.filter dir ~f:(fun d -> not (String.is_empty d)) in
   let git request =
     Agent.host_call
       client.agent
       ~name:Git_forge.op
-      (Git_forge.Request.to_json request)
+      (Git_forge.in_dir dir (Git_forge.Request.to_json request))
   in
-  let open Or_error.Let_syntax in
   match meth with
   | "pr_list" ->
     let%bind state = string_param_opt params "state" in
@@ -1900,6 +1963,14 @@ let dispatch_server t (client : Client.t) ~meth ~params
       ~meth
       ~params
   | "btw" -> Some (btw t client params)
+  | "generate_text" -> Some (generate_text t client params)
+  | "generate_cancel" ->
+    Some
+      (Or_error.map (string_param params "gen_id") ~f:(fun gen_id ->
+         let found = Hashtbl.find client.generations gen_id in
+         Option.iter found ~f:Cancellation.cancel;
+         `Object
+           [ ("cancelled", if Option.is_some found then `True else `False) ]))
   | "btw_cancel" ->
     Some
       (Or_error.map (string_param params "btw_id") ~f:(fun btw_id ->
@@ -2520,7 +2591,9 @@ let handle t client (request : Json.t) : Json.t =
              (match
                 Option.first_some
                   (Files_rpc.dispatch ?by agent ~meth ~params)
-                  (Review_rpc.dispatch ?by agent ~meth ~params)
+                  (Option.first_some
+                     (Review_rpc.dispatch ?by agent ~meth ~params)
+                     (Git_rpc.dispatch agent ~meth ~params))
               with
               | Some result -> result
               | None -> dispatch agent t.login ~meth ~params))

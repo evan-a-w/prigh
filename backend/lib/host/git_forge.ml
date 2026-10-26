@@ -80,6 +80,12 @@ end
 
 let op = "$git_forge"
 
+let in_dir dir json =
+  match dir, json with
+  | Some dir, `Object fields -> `Object (fields @ [ "dir", `String dir ])
+  | _ -> json
+;;
+
 exception Failed of string
 
 let git ~env ~cancel ?(timeout = Time_ns.Span.of_sec 30.) ~dir args =
@@ -217,16 +223,18 @@ let log ~(runner : Runner.t) ~cwd ~remote ~base ~branch =
   { Log.commits; pushed }
 ;;
 
+let push_branch ~(runner : Runner.t) ~root ~remote ~branch =
+  runner.git
+    ~timeout:(Time_ns.Span.of_sec 120.)
+    ~dir:root
+    [ "push"; "--set-upstream"; remote; "HEAD:refs/heads/" ^ branch ]
+  |> Result.ignore_m
+;;
+
 let push ~(runner : Runner.t) ~cwd ~remote ~branch =
-  let git = runner.git in
   let root = (info ~runner ~cwd).root in
-  match
-    git
-      ~timeout:(Time_ns.Span.of_sec 120.)
-      ~dir:root
-      [ "push"; "--set-upstream"; remote; "HEAD:refs/heads/" ^ branch ]
-  with
-  | Ok _ -> `Object [ "pushed", `True ]
+  match push_branch ~runner ~root ~remote ~branch with
+  | Ok () -> `Object [ "pushed", `True ]
   | Error e ->
     raise
       (Failed
@@ -307,11 +315,18 @@ let checkout ~env ~cancel ~(runner : Runner.t) ~cwd ~remote ~number ~dir =
     { path = created.worktree.path; branch; created = true }
 ;;
 
+let runner ~env ~cancel =
+  { Runner.git = (fun ?timeout ~dir args -> git ~env ~cancel ?timeout ~dir args)
+  }
+;;
+
+(* [dir]: another worktree than the session's, relative to [cwd]. *)
 let run ~env ~cancel ~cwd ~arguments =
-  let runner =
-    { Runner.git =
-        (fun ?timeout ~dir args -> git ~env ~cancel ?timeout ~dir args)
-    }
+  let runner = runner ~env ~cancel in
+  let cwd =
+    match Json.member "dir" arguments with
+    | Some (`String dir) when not (String.is_empty dir) -> Tool.resolve ~cwd dir
+    | _ -> cwd
   in
   let str name =
     match Json.member name arguments with
