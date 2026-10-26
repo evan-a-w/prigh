@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Runs prigh's tests: builds the backend and the frontends, then runs the
+# backend's and the frontends' dune tests (unit and expect tests, the TUI's
+# e2e and tmux tests) one project after the other, while prigh-web's browser
+# e2e runs alongside.
+#
+#   ./test           the quick run, before pushing: the browser e2e in Chromium
+#   ./test --full    everything, before merging: the browser e2e in Chromium
+#                    and Firefox (what the flake's checks run)
+#
+# Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
+# comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
+# the flake's nixpkgs. It tests what it builds: PRIGH_BACKEND and
+# PRIGH_WEB_ROOT (set inside prigh) are ignored. Logs are kept in a temporary
+# directory; a failing step's log is printed. After an expect test fails,
+# `dune promote` in its project takes the new output.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+engines=chromium
+case "${1:-}" in
+"") ;;
+--full) engines="chromium firefox" ;;
+*)
+	echo "usage: ./test [--full]" >&2
+	exit 2
+	;;
+esac
+
+if ! command -v dune >/dev/null; then
+	exec nix develop --accept-flake-config "$root" -c "$0" "$@"
+fi
+
+if [ -z "${PLAYWRIGHT_MODULE:-}" ] || [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ]; then
+	mapfile -t playwright < <(nix build --accept-flake-config --no-link --print-out-paths \
+		--inputs-from "$root" nixpkgs#playwright-test nixpkgs#playwright-driver.browsers)
+	export PLAYWRIGHT_MODULE="${playwright[0]}/lib/node_modules/playwright/index.mjs"
+	export PLAYWRIGHT_BROWSERS_PATH="${playwright[1]}"
+fi
+export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
+unset PRIGH_WEB_ROOT
+
+logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
+start=$EPOCHREALTIME
+elapsed() { awk "BEGIN { printf \"%.0fs\", $EPOCHREALTIME - $1 }"; }
+failed=""
+# step NAME COMMAND...: runs it, its output in $logs/NAME.log.
+step() {
+	local name=$1 t=$EPOCHREALTIME
+	shift
+	if "$@" >"$logs/$name.log" 2>&1; then
+		echo "ok    $name ($(elapsed "$t"))"
+	else
+		echo "FAIL  $name ($(elapsed "$t")): $logs/$name.log"
+		cat "$logs/$name.log"
+		failed="$failed $name"
+	fi
+}
+
+step "build backend" dune build --root "$root/backend"
+step "build frontend" dune build --root "$root/frontend"
+if [ -n "$failed" ]; then
+	echo "the build failed:$failed" >&2
+	exit 1
+fi
+
+# The browser e2e only needs what was built: it runs while dune runs the
+# rest (one dune at a time).
+web_start=$EPOCHREALTIME
+ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
+web=$!
+
+# Dune does not know that the frontend's e2e and tmux tests use the backend:
+# they run again every time.
+rm -rf "$root"/frontend/_build/default/tui/e2e/e2e.actual \
+	"$root"/frontend/_build/default/tui/tmux-test/.cram.*
+step "backend tests" dune build --root "$root/backend" @runtest
+step "frontend tests" dune build --root "$root/frontend" @runtest
+
+if wait "$web"; then
+	echo "ok    web e2e: $engines ($(elapsed "$web_start"))"
+else
+	echo "FAIL  web e2e: $engines ($(elapsed "$web_start")): $logs/web e2e.log"
+	cat "$logs/web e2e.log"
+	failed="$failed web-e2e"
+fi
+
+echo "$(elapsed "$start") in all"
+if [ -n "$failed" ]; then
+	echo "failed:$failed (logs in $logs)" >&2
+	exit 1
+fi
+rm -rf "$logs"

@@ -2,7 +2,7 @@
 // -superusers alice`: signing in, adding a second account, switching between
 // them (each sees its own sessions), acting as bob from alice and back, and
 // signing one out. Run by prigh_web.sh after prigh_web.mjs; prints normalised
-// snapshots (the expected output is in prigh_web.expected).
+// snapshots (the expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, and
 // optionally SHOTS.

@@ -11,8 +11,11 @@
 //    (a backend that cannot serve the session): the page waits longer each
 //    time, never says "Reconnected", then stops and says what to do; once
 //    the connection holds, "Retry now" brings the session back.
+// The parts take a while (their timers are the page's), so they run apart:
+// `resilience.mjs ENGINE slow` is part 1, `resilience.mjs ENGINE drops` the
+// rest; each loads the session first.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
-// prigh_web.expected).
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
@@ -22,11 +25,11 @@ import { join } from "node:path";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
-const [engineName] = process.argv.slice(2);
+const [engineName, part] = process.argv.slice(2);
 const engine = { chromium, firefox, webkit }[engineName];
-if (!engine) throw new Error("usage: resilience.mjs chromium|firefox|webkit");
+if (!engine || !["slow", "drops"].includes(part)) throw new Error("usage: resilience.mjs chromium|firefox|webkit slow|drops");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
-const dir = join(process.env.TEST_DIR, "resilience");
+const dir = join(process.env.TEST_DIR, `resilience-${part}`);
 const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
@@ -105,11 +108,19 @@ const page = await context.newPage();
 // arrive, before the page sees them. [__wsOpened] counts the sockets.
 await page.addInitScript(() => {
   window.__wsOpened = 0;
+  // Counts each "Reconnected" as it shows: a new toast, a repeat (×2), or a
+  // toast whose element the page reused for it (another one went in the same
+  // frame).
   window.__reconnectedToasts = 0;
-  new MutationObserver(records => {
-    for (const r of records) for (const n of r.addedNodes)
-      if (n.nodeType === 1 && n.matches?.(".toast") && n.innerText.includes("Reconnected")) window.__reconnectedToasts++;
-  }).observe(document, { childList: true, subtree: true });
+  let onShow = 0;
+  new MutationObserver(() => {
+    let now = 0;
+    for (const t of document.querySelectorAll(".toast"))
+      if (t.textContent.includes("Reconnected"))
+        now += Number(t.querySelector(".toast-repeats")?.textContent.slice(1) || 1);
+    if (now > onShow) window.__reconnectedToasts += now - onShow;
+    onShow = now;
+  }).observe(document, { childList: true, subtree: true, characterData: true });
   const Real = window.WebSocket;
   window.WebSocket = class extends Real {
     constructor(url, protocols) {
@@ -153,7 +164,7 @@ const screenshot = async label => {
   if (!process.env.SHOTS) return;
   shot++;
   await page.screenshot({
-    path: join(process.env.SHOTS, `${engineName}-resilience-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
+    path: join(process.env.SHOTS, `${engineName}-resilience-${part}-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
 };
 const opened = () => page.evaluate(() => window.__wsOpened);
@@ -172,61 +183,63 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Answer 400."));
-  section("a long chat");
+  section(`a long chat (${part})`);
   console.log(`newest answer on show: ${await lastAnswer()}`);
   await screenshot("loaded");
 
-  // 1. A slow network; the connection goes once, and while the session comes
-  //    back over it the page is shown again every 2.5s.
-  const before = await opened();
-  await page.evaluate(() => {
-    sessionStorage.setItem("e2e-ws-rate", "8");
-    window.__reconnectedToasts = 0;
-    window.dispatchEvent(new Event("offline"));
-  });
-  for (let i = 0; i < 10; i++) {
-    await page.waitForTimeout(2500);
+  if (part === "slow") {
+    // 1. A slow network; the connection goes once, and while the session comes
+    //    back over it the page is shown again every 2.5s.
+    const before = await opened();
+    await page.evaluate(() => {
+      sessionStorage.setItem("e2e-ws-rate", "8");
+      window.__reconnectedToasts = 0;
+      window.dispatchEvent(new Event("offline"));
+    });
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(2500);
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    }
+    await back();
+    section("a slow network, the page shown again and again");
+    console.log(`sockets opened: ${(await opened()) - before}`);
+    console.log(`banner: ${await banner()}`);
+    console.log(`newest answer on show: ${await lastAnswer()}`);
+    console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
+    await screenshot("slow network");
+    await page.evaluate(() => sessionStorage.removeItem("e2e-ws-rate"));
+  } else {
+    // 2. The connection drops each time before the session's messages come.
+    const before2 = await opened();
+    await page.evaluate(() => {
+      sessionStorage.setItem("e2e-ws-drop", "1");
+      window.__reconnectedToasts = 0;
+      window.dispatchEvent(new Event("offline"));
+    });
+    await page.waitForSelector(".banner.gave-up", { timeout: 90000 });
+    section("a connection that drops while the session loads");
+    console.log(`sockets opened: ${(await opened()) - before2}`);
+    console.log(`banner: ${await banner()}`);
+    console.log(`status: ${await status()}`);
+    console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
+    console.log(`transcript still on show: ${await lastAnswer()}`);
+    await screenshot("gave up");
+    // It stays stopped: no more sockets, also when the network comes back.
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await page.waitForTimeout(3000);
+    console.log(`sockets opened since: ${(await opened()) - before2}`);
+
+    // 3. The connection holds again: Retry now.
+    await page.evaluate(() => sessionStorage.removeItem("e2e-ws-drop"));
+    await page.locator(".banner.gave-up button", { hasText: "Retry now" }).click();
+    await back();
+    section("retry now");
+    console.log(`banner: ${await banner()}`);
+    console.log(`newest answer on show: ${await lastAnswer()}`);
+    await page.waitForFunction(() => window.__reconnectedToasts > 0);
+    console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
+    await screenshot("retry now");
   }
-  await back();
-  section("a slow network, the page shown again and again");
-  console.log(`sockets opened: ${(await opened()) - before}`);
-  console.log(`banner: ${await banner()}`);
-  console.log(`newest answer on show: ${await lastAnswer()}`);
-  console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
-  await screenshot("slow network");
-  await page.evaluate(() => sessionStorage.removeItem("e2e-ws-rate"));
-
-  // 2. The connection drops each time before the session's messages come.
-  const before2 = await opened();
-  await page.evaluate(() => {
-    sessionStorage.setItem("e2e-ws-drop", "1");
-    window.__reconnectedToasts = 0;
-    window.dispatchEvent(new Event("offline"));
-  });
-  await page.waitForSelector(".banner.gave-up", { timeout: 90000 });
-  section("a connection that drops while the session loads");
-  console.log(`sockets opened: ${(await opened()) - before2}`);
-  console.log(`banner: ${await banner()}`);
-  console.log(`status: ${await status()}`);
-  console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
-  console.log(`transcript still on show: ${await lastAnswer()}`);
-  await screenshot("gave up");
-  // It stays stopped: no more sockets, also when the network comes back.
-  await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await page.waitForTimeout(3000);
-  console.log(`sockets opened since: ${(await opened()) - before2}`);
-
-  // 3. The connection holds again: Retry now.
-  await page.evaluate(() => sessionStorage.removeItem("e2e-ws-drop"));
-  await page.locator(".banner.gave-up button", { hasText: "Retry now" }).click();
-  await back();
-  section("retry now");
-  console.log(`banner: ${await banner()}`);
-  console.log(`newest answer on show: ${await lastAnswer()}`);
-  await page.waitForFunction(() => window.__reconnectedToasts > 0);
-  console.log(`"Reconnected" said: ${await page.evaluate(() => window.__reconnectedToasts)}`);
-  await screenshot("retry now");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

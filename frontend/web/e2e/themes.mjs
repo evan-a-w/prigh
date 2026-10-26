@@ -3,7 +3,7 @@
 // is in ~/.prigh/prefs.json, comes back before the first paint of a reload,
 // reaches a browser that signs in afresh, and changes another open browser
 // live, as does the prompt history. Run by prigh_web.sh; prints normalised
-// snapshots (the expected output is in prigh_web.expected) and, with SHOTS,
+// snapshots (the expected output is in ENGINE.expected) and, with SHOTS,
 // screenshots of a transcript (markdown, code, a diff, the terminal) in each
 // theme.
 //

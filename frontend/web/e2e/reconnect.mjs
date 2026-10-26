@@ -6,7 +6,7 @@
 // to the same session, scroll position and draft, also when the backend is
 // out of reach as it loads. Run by prigh_web.sh after
 // prigh_web.mjs; prints normalised results (the expected output is in
-// prigh_web.expected).
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.

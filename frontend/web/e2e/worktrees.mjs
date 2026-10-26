@@ -4,7 +4,7 @@
 // another repository, a plain folder), folding a project, searching, removing
 // a worktree (refused with changes, then forced; a subagent's), /worktree's
 // picker, and the tree on a phone. Run by prigh_web.sh; prints normalised
-// snapshots (the expected output is in prigh_web.expected).
+// snapshots (the expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
