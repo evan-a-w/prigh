@@ -36,9 +36,4 @@ val last : t -> own:string -> Git_diff.Target.t option
 (** Keeps the choice, the most recent first, at most 50 of each; the
     defaults (the session's own worktree, its default base) are forgotten
     instead. *)
-val remember
-  :  t
-  -> own:string option
-  -> Git_diff.Target.t
-  -> Compare.t
-  -> t
+val remember : t -> own:string option -> Git_diff.Target.t -> Compare.t -> t

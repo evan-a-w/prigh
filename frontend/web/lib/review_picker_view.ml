@@ -42,7 +42,9 @@ let row ~selected i (item : Review_picker.Item.t) ~inject =
    last). *)
 let rows (p : Review_picker.t) ~inject =
   let selected = Review_picker.selected p in
-  let numbered = List.mapi (Review_picker.visible p) ~f:(fun i item -> i, item) in
+  let numbered =
+    List.mapi (Review_picker.visible p) ~f:(fun i item -> i, item)
+  in
   if not (String.is_empty (Review_picker.query p))
   then List.map numbered ~f:(fun (i, item) -> row ~selected i item ~inject)
   else

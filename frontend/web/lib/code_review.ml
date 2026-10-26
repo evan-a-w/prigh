@@ -233,8 +233,8 @@ let read_only t =
 
 let not_checked_out rev =
   sprintf
-    "%s is not checked out, so it is read-only here: Check out into a \
-     worktree to change it."
+    "%s is not checked out, so it is read-only here: Check out into a worktree \
+     to change it."
     rev
 ;;
 
@@ -269,9 +269,9 @@ let relative t ~abs =
     (Option.bind (root t) ~f:(fun root ->
        Option.some_if (Option.is_none (read_only t)) root))
     ~f:(fun root ->
-    String.chop_prefix
-      abs
-      ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
+      String.chop_prefix
+        abs
+        ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
 ;;
 
 let absolute t path =
@@ -604,7 +604,8 @@ let rec update t (action : Action.t) =
   | Set_mode Edit ->
     (match t.current, read_only t with
      | _, Some rev -> t, [ toast (not_checked_out rev) ]
-     | None, None -> t, [ toast "No file to edit: the working tree has no changes." ]
+     | None, None ->
+       t, [ toast "No file to edit: the working tree has no changes." ]
      | Some path, None ->
        let t = { t with mode = Edit; selection = None } in
        let t, outs = fetch_content t path in
@@ -819,7 +820,9 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
        names are close. *)
     let back = Option.value_exn t.fallback in
     let t, outs =
-      update { t with loading = false; again = false; fallback = None } (Show back)
+      update
+        { t with loading = false; again = false; fallback = None }
+        (Show back)
     in
     t, toast ~error:true (error_text e) :: outs
   | Diff, Error e ->

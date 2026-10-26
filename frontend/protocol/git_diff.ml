@@ -115,7 +115,10 @@ module Refs = struct
 end
 
 let refs (t : t) =
-  { Refs.branches = t.branches; remote_branches = t.remote_branches; tags = t.tags }
+  { Refs.branches = t.branches
+  ; remote_branches = t.remote_branches
+  ; tags = t.tags
+  }
 ;;
 
 let shown_of_json j =

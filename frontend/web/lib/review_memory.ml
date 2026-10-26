@@ -40,7 +40,9 @@ let fields = function
 ;;
 
 let of_json json =
-  let section name = fields (List.Assoc.find (fields json) name ~equal:String.equal) in
+  let section name =
+    fields (List.Assoc.find (fields json) name ~equal:String.equal)
+  in
   { compares =
       List.map (section "compare") ~f:(fun (key, v) ->
         ( key
@@ -65,7 +67,8 @@ let to_json t =
           (List.map t.compares ~f:(fun (key, (c : Compare.t)) ->
              ( key
              , Json.obj
-                 (Option.to_list (Option.map c.base ~f:(fun b -> "base", Json.str b))
+                 (Option.to_list
+                    (Option.map c.base ~f:(fun b -> "base", Json.str b))
                   @ [ "direct", Json.bool c.direct ]) ))) )
     ; ( "last"
       , Json.obj
@@ -85,12 +88,13 @@ let last t ~own = List.Assoc.find t.lasts own ~equal:String.equal
 
 let front list ~key data =
   List.take
-    ((key, data)
-     :: List.filter list ~f:(fun (k, _) -> not (String.equal k key)))
+    ((key, data) :: List.filter list ~f:(fun (k, _) -> not (String.equal k key)))
     max
 ;;
 
-let without list ~key = List.filter list ~f:(fun (k, _) -> not (String.equal k key))
+let without list ~key =
+  List.filter list ~f:(fun (k, _) -> not (String.equal k key))
+;;
 
 (* Only what differs from the defaults is kept. *)
 let remember t ~own reviewed (compare : Compare.t) =
