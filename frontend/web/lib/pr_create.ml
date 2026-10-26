@@ -68,7 +68,8 @@ let request t : (Request.Method.t, string) Result.t =
     let base = String.strip t.base in
     Ok
       (Pr_create
-         { title
+         { dir = None
+         ; title
          ; body = t.body
          ; base = (if String.is_empty base then None else Some base)
          ; head = Some d.head

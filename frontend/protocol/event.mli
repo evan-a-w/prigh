@@ -123,6 +123,10 @@ type t =
       { btw_id : string
       ; delta : string
       } (** streamed answer to our own [btw] request *)
+  | Generate_delta of
+      { gen_id : string
+      ; delta : string
+      } (** streamed text of our own [generate_text] request *)
   | Sessions_changed
   (** something [list_sessions] shows changed, in any session *)
   | Prefs_changed of Prefs.Change.t list

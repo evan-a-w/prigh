@@ -793,10 +793,20 @@ let set_config t (config : Config.t) =
         Error.createf "fallback_models: %s" (Error.to_string_hum e)))
     |> Or_error.all
   in
+  let%bind generate_model =
+    match config.generate_model with
+    | None -> Ok None
+    | Some name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:(fun m -> Some (Model.key m))
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "generate_model: %s" (Error.to_string_hum e))
+  in
   let config =
     { config with
       fallback_models =
         List.stable_dedup fallback_models ~compare:String.compare
+    ; generate_model
     }
   in
   let%bind () =
@@ -3053,6 +3063,53 @@ let btw t ~question ~cancel ~on_delta =
   | Error e -> Or_error.error_string e
   | Aborted -> Or_error.error_string "cancelled"
   | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
+;;
+
+let generate_model t =
+  match t.config.generate_model with
+  | None -> Ok t.model
+  | Some name ->
+    Model_registry.resolve t.models name
+    |> Result.map_error ~f:(fun e ->
+      Error.createf
+        "generate_model: %s (fix it with /settings or in config.json)"
+        (Error.to_string_hum e))
+;;
+
+let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
+  let session = t.session in
+  let request =
+    { Provider.Request.model
+    ; system = Some system
+    ; messages = [ Message.user user ]
+    ; tools = []
+    ; thinking = Off
+    ; max_tokens = Some max_tokens
+    ; cache_key = None
+    }
+  in
+  let reply =
+    t.provider.stream request ~cancel ~on_event:(function
+      | Text_delta text -> on_delta text
+      | Thinking_delta _
+      | Thinking_signature _
+      | Tool_call_start _
+      | Tool_call_delta _
+      | Server_tool_use _
+      | Server_tool_result _ -> ())
+  in
+  let cost_usd = Model.cost_usd model reply.usage in
+  ignore
+    (Session.add_spend session ~usage:reply.usage ~cost_usd : Session.Entry.t);
+  if phys_equal session t.session then state_changed t;
+  match reply.stop_reason with
+  | Error e -> Or_error.errorf "%s: %s" (Model.key model) e
+  | Aborted -> Or_error.error_string "cancelled"
+  | End_turn | Tool_use | Length ->
+    (match String.strip (Message.Assistant.text reply) with
+     | "" ->
+       Or_error.errorf "%s replied with nothing: try again" (Model.key model)
+     | text -> Ok (text, cost_usd))
 ;;
 
 (* With [keep_host] (a new session or a fork) the session carries on where

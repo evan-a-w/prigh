@@ -120,7 +120,8 @@ let submit t =
       `Create
         ( { t with submitting = true; error = None }
         , P.Request.Method.Pr_create
-            { title
+            { dir = None
+            ; title
             ; body = t.body
             ; base = Option.some_if (not (String.is_empty base)) base
             ; head = Some t.defaults.head

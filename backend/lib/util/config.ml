@@ -41,6 +41,7 @@ type t =
   ; notify : Notify.t
   ; snippets : Snippet.t list
   ; auto_background_seconds : float
+  ; generate_model : string option
   }
 [@@deriving sexp_of]
 
@@ -63,6 +64,7 @@ let default =
   ; notify = Bell
   ; snippets = []
   ; auto_background_seconds = 30.
+  ; generate_model = None
   }
 ;;
 
@@ -113,6 +115,7 @@ let to_json t =
     ; "snippets", `Array (List.map t.snippets ~f:Snippet.to_json)
     ; ( "auto_background_seconds"
       , `Number (sprintf "%g" t.auto_background_seconds) )
+    ; "generate_model", option (fun s -> `String s) t.generate_model
     ]
 ;;
 
@@ -215,6 +218,15 @@ let of_json json =
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_model must be a string"
     in
+    let%bind generate_model =
+      match find "generate_model" with
+      | None | Some `Null | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ ->
+        Or_error.error_string
+          "config.generate_model must be a model's name (or null: the \
+           session's model)"
+    in
     let%bind max_budget_usd =
       match find "max_budget_usd" with
       | None | Some `Null -> Ok None
@@ -286,6 +298,7 @@ let of_json json =
     ; notify
     ; snippets
     ; auto_background_seconds
+    ; generate_model
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;
