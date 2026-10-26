@@ -65,6 +65,7 @@ module Worktrees_purpose = struct
   type t =
     | Sidebar of int
     | Picker
+    | Review_pick
     | Target of
         { command : string
         ; action : Prigh_ui.Worktree_command.Action.t
@@ -3621,6 +3622,23 @@ let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
 
 (* ---- the review page's pickers *)
 
+let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) d =
+  match which with
+  | Target ->
+    Review_picker.targets
+      ~worktrees:
+        (match worktrees with
+         | Some worktrees -> worktrees
+         | None ->
+           Option.value_map
+             (Worktrees.listing m.worktrees)
+             ~default:[]
+             ~f:(fun l -> l.worktrees))
+      ~reviewed:m.review.target.reviewed
+      d
+  | Base -> Review_picker.bases d
+;;
+
 let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
   match m.dialog, m.review.diff with
   | Some (Review_pick p), _
@@ -3628,20 +3646,45 @@ let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
     close_dialog m
   | _, None -> toast m "The changes are still being read: try again."
   | _, Some d ->
-    let picker =
-      match which with
-      | Target ->
-        Review_picker.targets
-          ~worktrees:
-            (Option.value_map
-               (Worktrees.listing m.worktrees)
-               ~default:[]
-               ~f:(fun l -> l.worktrees))
-          ~reviewed:m.review.target.reviewed
-          d
-      | Base -> Review_picker.bases d
+    let m, cmds =
+      open_dialog
+        m
+        ~focus:"review-pick-filter"
+        (Review_pick (review_picker m which d))
     in
-    open_dialog m ~focus:"review-pick-filter" (Review_pick picker)
+    (* The worktrees as they are now: one may have been made since. *)
+    ( m
+    , cmds
+      @
+      match which, Worktrees.place m.state with
+      | Target, Some place ->
+        [ call
+            (List_worktrees { cwd = None })
+            ~tag:(Worktrees { place; purpose = Review_pick })
+        ]
+      | Target, None | Base, _ -> [] )
+;;
+
+(* The diff or the worktrees were read again under an open picker: its
+   choices follow. *)
+let refresh_review_pick ?worktrees (m : Model.t) =
+  match m.dialog, m.review.diff with
+  | Some (Review_pick p), Some d ->
+    let worktrees =
+      match worktrees, Review_picker.worktrees p with
+      | Some w, _ -> Some w
+      | None, [] -> None
+      | None, w -> Some w
+    in
+    { m with
+      dialog =
+        Some
+          (Review_pick
+             (Review_picker.refresh
+                p
+                ~fresh:(review_picker m ?worktrees (Review_picker.which p) d)))
+    }
+  | _ -> m
 ;;
 
 let review_picked (m : Model.t) (item : Review_picker.Item.t) =
@@ -4849,7 +4892,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     let m, cmds = with_review m (Code_review.reply m.review reply result) in
     (match reply with
      | Diff ->
-       let m, more = remember_review m in
+       let m, more = remember_review (refresh_review_pick m) in
        m, cmds @ more
      | _ -> m, cmds)
   | Sent_with_files { text; images; attachments }, result ->
@@ -5514,7 +5557,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       let seq =
         match purpose with
         | Sidebar seq -> Some seq
-        | Picker | Target _ | Review_target _ -> None
+        | Picker | Review_pick | Target _ | Review_target _ -> None
       in
       let m =
         { m with worktrees = Worktrees.loaded m.worktrees ~place ?seq listing }
@@ -5525,6 +5568,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         then refresh_completion { m with completion = None }
         else m, []
       | Picker -> worktrees_picker m listing
+      | Review_pick -> refresh_review_pick m ~worktrees:listing.worktrees, []
       | Target { command; action } -> worktree_target m ~command action listing
       | Review_target { command; name; base; direct; model } ->
         review_target m ~command ~name ~base ~direct ~model listing)

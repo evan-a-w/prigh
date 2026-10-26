@@ -4,8 +4,10 @@
 // a removed line) sent to the agent, its replies (one proposing a change,
 // accepted), the review page beside the chat (approvals, the keys, the
 // whole-file layout, edit mode saving a file), live updates as the agent
-// edits, another worktree (a branch with a commit) against its base, and a
-// phone. Run by prigh_web.sh; prints normalised snapshots (the
+// edits, another worktree (a branch with a commit) against its base, the
+// pickers (against a remote-tracking branch, since the merge base or
+// directly; a branch not checked out, read-only, then checked out into a
+// worktree), and a phone. Run by prigh_web.sh; prints normalised snapshots (the
 // expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -96,6 +98,7 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 const clean = text => text
   .replaceAll(cwd, "<REPO>")
   .replaceAll(wt, "<WT>")
+  .replaceAll(home, "<HOME>")
   .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
   .replace(/\b[0-9a-f]{8}\b/g, "<SHA>")
   .split("\n")
@@ -351,13 +354,14 @@ try {
   await page.locator('.review-file[data-path="src/login.ml"]').waitFor();
   section("worktree: what is reviewed");
   console.log(clean(await page.locator(".review-target").getAttribute("title")));
-  console.log(`base: ${await page.locator("#review-base").inputValue()}`);
+  console.log(`base: ${await page.locator("#review-base-button .review-pick-name").innerText()}`);
   await show("worktree: the files", ".review-files");
   await page.locator(".review-file[data-path='README.md']").click();
   await page.locator(".review-page").focus();
   await page.keyboard.press("a");
   await page.locator(".review-file.current.approved").waitFor();
-  await page.locator("#review-base").selectOption("HEAD");
+  await page.locator("#review-base-button").click();
+  await page.locator("[data-id='base:HEAD']").click();
   await page.locator('.review-file[data-path="src/login.ml"]').waitFor({ state: "detached" });
   await show("worktree: against HEAD", ".review-files");
   section("worktree: against HEAD, what is reviewed");
@@ -366,6 +370,68 @@ try {
   await page.locator(".composer textarea").press("Enter");
   await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
   await show("worktree: back to the session's own", ".review-files");
+
+  // 9c. Choosing freely: against a remote-tracking branch (from a bare
+  //     origin), since the merge base then directly; a branch that is not
+  //     checked out, reviewed read-only, then checked out into a worktree.
+  const origin = join(dir, "origin.git");
+  gitIn(dir, "init", "-q", "--bare", origin);
+  git("remote", "add", "origin", origin);
+  git("push", "-q", "origin", "main");
+  git("branch", "-q", "feat/old", "main");
+  const scratch = join(dir, "wt-old");
+  git("worktree", "add", "-q", scratch, "feat/old");
+  writeFileSync(join(scratch, "src", "old.ml"), "let legacy = ()\n");
+  gitIn(scratch, "add", "-A");
+  gitIn(scratch, "commit", "-q", "-m", "old");
+  git("worktree", "remove", "--force", scratch);
+  git("fetch", "-q", "origin");
+  await page.locator(".review-refresh").click();
+  await page.locator("#review-base-button").click();
+  await page.locator("[data-id='base:origin/main']").waitFor();
+  await page.locator("#review-pick-filter").fill("origin/ma");
+  await page.waitForFunction(() =>
+    !document.querySelector("#review-popover .popover-group")
+    && document.querySelector(".review-pick-item.selected")?.dataset.id === "base:origin/main");
+  await show("compare: the base picker, filtered", "#review-popover");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => /against origin\/main/.test(document.querySelector(".review-target")?.title || ""));
+  section("compare: against origin/main");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  await page.locator(".review-target .segment", { hasText: "Directly" }).click();
+  await page.waitForFunction(() => /origin\/main directly/.test(document.querySelector(".review-target")?.title || ""));
+  section("compare: directly");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  await screenshot("compare: directly");
+  await page.locator(".review-target .segment", { hasText: "Since merge base" }).click();
+  await page.waitForFunction(() => /merge base/.test(document.querySelector(".review-target")?.title || ""));
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("r");
+  await page.locator("[data-id='rev:feat/old']").waitFor();
+  await page.locator(`[data-id='dir:${wt}']`).waitFor();
+  await show("compare: what to review", "#review-popover");
+  await page.locator("#review-pick-filter").fill("feat/old");
+  await page.waitForFunction(() =>
+    document.querySelector(".review-pick-item.selected")?.dataset.id === "rev:feat/old");
+  await page.keyboard.press("Enter");
+  await page.locator(".review-readonly").waitFor();
+  await page.locator('.review-file[data-path="src/old.ml"]').waitFor();
+  await page.locator(".review-page tr[data-line='1']").first().waitFor();
+  await show("compare: a branch not checked out", ".review-target");
+  section("compare: read-only, what is reviewed");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  console.log(`files: ${clean(await page.locator(".review-files").innerText())}`);
+  await page.locator(".review-controls .segment", { hasText: "Edit" }).click();
+  console.log(`edit: ${clean(await page.locator(".toast").last().innerText())}`);
+  await page.locator(".review-checkout").click();
+  await page.locator(".review-readonly").waitFor({ state: "detached" });
+  await page.locator('.review-file[data-path="src/old.ml"]').waitFor();
+  section("compare: checked out");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  await screenshot("compare: checked out");
+  await page.locator(".composer textarea").fill("/review");
+  await page.locator(".composer textarea").press("Enter");
+  await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
 
   // 10. A phone: a sheet over the chat.
   await page.setViewportSize({ width: 390, height: 800 });

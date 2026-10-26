@@ -27,6 +27,16 @@ let listing =
     feat
 ;;
 
+(* With feat/old checked out since. *)
+let listing_with_old =
+  sprintf
+    {|{"root":"/work","project_dir":"/home/u/.prigh/worktrees/work","worktrees":[
+       {"path":"/work","branch":"main","head":"0123456789abcdef","main":true,"current":true,"changes":1},
+       {"path":"%s","branch":"feat/login","head":"1111111111","managed":true,"changes":1,"ahead":1},
+       {"path":"/home/u/.prigh/worktrees/work/feat-old","branch":"feat/old","head":"2222222222","managed":true,"changes":0}]}|}
+    feat
+;;
+
 let a_diff =
   "diff --git a/a.ml b/a.ml\n\
    index 1111111..2222222 100644\n\
@@ -115,12 +125,30 @@ let%expect_test "the pickers: grouped, filtered, keyboard and Esc" =
     {|
     (Review_pick Target)
     (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
     [] r
     Worktrees
     ✓ main /work · this session's
     feat/login /home/u/.prigh/worktrees/work/feat-login
     Branches
     feat/old not checked out: read-only
+    Remote branches
+    origin/main not checked out: read-only
+    origin/feat/remote not checked out: read-only
+    ↑ ↓ and Enter choose, Esc closes
+    |}];
+  (* A worktree made since: the menu follows the listing read again. *)
+  H.reply h "list_worktrees" listing_with_old;
+  popover h;
+  [%expect {|
+    [] r
+    Worktrees
+    ✓ main /work · this session's
+    feat/login /home/u/.prigh/worktrees/work/feat-login
+    feat/old /home/u/.prigh/worktrees/work/feat-old
     Remote branches
     origin/main not checked out: read-only
     origin/feat/remote not checked out: read-only
@@ -134,8 +162,7 @@ let%expect_test "the pickers: grouped, filtered, keyboard and Esc" =
     [group] div "Worktrees"
     [option] div "main /work \194\183 this session's"
     [option] div "feat/login /home/u/.prigh/worktrees/work/feat-login"
-    [group] div "Branches"
-    [option] div "feat/old not checked out: read-only"
+    [option] div "feat/old /home/u/.prigh/worktrees/work/feat-old"
     [group] div "Remote branches"
     [option] div "origin/main not checked out: read-only"
     [option] div "origin/feat/remote not checked out: read-only"
@@ -344,6 +371,10 @@ let%expect_test
     {|
     (Review_pick Target)
     (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
     (Dialog_input old)
     Dialog_accept
     (Rpc (method_ git_diff) (params ((rev feat/old))) (tag (Review Diff)))
@@ -435,6 +466,10 @@ let%expect_test "a remote branch checks out as its local branch" =
     {|
     (Review_pick Target)
     (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
     (Picker_choose rev:origin/feat/remote)
     (Rpc (method_ git_diff) (params ((rev origin/feat/remote)))
      (tag (Review Diff)))
@@ -498,11 +533,19 @@ let%expect_test "remembered: the next visit opens where the last one was" =
     {|
     (Review_pick Target)
     (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
     (Picker_choose own)
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Focus review-page)
     (Review_pick Target)
     (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
     (Picker_choose rev:feat/old)
     (Rpc (method_ git_diff) (params ((base v1.1) (rev feat/old) (direct true)))
      (tag (Review Diff)))
