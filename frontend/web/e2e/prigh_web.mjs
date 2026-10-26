@@ -268,6 +268,31 @@ const showImages = async (label, locator) => {
   console.log(images.join("\n"));
 };
 
+// What is on top at the middle of each of the composer's chips: [cover]
+// (what should be over them), the chip itself, or something else. Hit
+// testing skips what is inert (what a dialog or a drawer covers is): it is
+// lifted for the test, so that it sees what is drawn.
+const showChips = async (label, cover) => {
+  const seen = await page.evaluate(cover => {
+    const inert = [...document.querySelectorAll("[inert]")];
+    inert.forEach(e => e.removeAttribute("inert"));
+    const seen = [...document.querySelectorAll(".composer-controls .chip-anchor")].map(anchor => {
+      const r = anchor.querySelector(".chip-button").getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const what = !top ? "nothing"
+        : top.closest(cover) ? `under ${cover}`
+        : anchor.contains(top) ? "the chip, on top"
+        : `${top.tagName.toLowerCase()}.${[...top.classList].join(".")}`;
+      return `${anchor.classList[1]}: ${what}`;
+    });
+    inert.forEach(e => e.setAttribute("inert", ""));
+    return seen;
+  }, cover);
+  section(label);
+  console.log(seen.join("\n"));
+  await screenshot(label);
+};
+
 // The agents panel, with its elapsed times replaced.
 const showPanel = async label => {
   section(label);
@@ -638,6 +663,20 @@ try {
   await idle();
   await showTurn("read an image");
   await showImages("the read tool's image", page.locator(".tool img.thumb"));
+  // Opened, it covers the whole page, the composer's chips too; a chip's
+  // menu keeps the chips over its backdrop.
+  await page.locator(".tool details.image summary").first().click();
+  await page.locator(".tool details.image[open] .lightbox").waitFor();
+  await page.waitForTimeout(200); // its fade
+  await showChips("an image open: the chips", ".lightbox");
+  await page.locator(".tool details.image[open] .lightbox").click();
+  await page.locator(".tool details.image[open]").waitFor({ state: "detached" });
+  await page.locator(".thinking-chip").click();
+  await page.locator("#chip-popover").waitFor();
+  await page.waitForTimeout(200); // its rise
+  await showChips("a chip's menu open: the chips", ".menu-backdrop");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
 
   // 4. An image pasted and one dropped into the composer go with the prompt.
   await deliver("paste", pasted, "pasted.png");
@@ -1047,6 +1086,14 @@ try {
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
+  // Its drawer is over the composer, chips and all.
+  await page.locator(".session-bar .toggle-sidebar").click();
+  await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open"));
+  await page.waitForTimeout(400); // the drawer's slide
+  await showChips("phone: the drawer open: the chips", ".sidebar, .scrim");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.waitForTimeout(400); // the drawer's slide
   // A chip's menu is as wide as the composer's box there.
   await page.locator(".thinking-chip").click();
   await page.locator("#chip-popover").waitFor();
@@ -1450,6 +1497,7 @@ try {
   await page.locator(".settings-dialog").waitFor();
   await page.waitForTimeout(200);
   await show("settings", ".settings-dialog");
+  await showChips("a dialog open: the chips", ".modal-backdrop");
   await page.locator(".settings-dialog .segment", { hasText: "Verbose" }).click();
   await page.locator(".settings-dialog .segment.on", { hasText: "Verbose" }).waitFor();
   console.log(`a choice keeps it open: ${await page.locator(".settings-dialog").isVisible()}`);
