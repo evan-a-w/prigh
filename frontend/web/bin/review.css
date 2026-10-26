@@ -268,7 +268,7 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-since-more .chevron { width: 12px; height: 12px; }
 .review-since-more.open .chevron { transform: rotate(180deg); color: var(--chalk); }
 .review-since .review-popover { left: auto; right: -2px; width: 380px; }
-.review-head:has(.review-since-more.open), .files-review-bar:has(.review-since-more.open) { position: relative; z-index: var(--z-menu-anchor, 42); }
+.review-head:has(.review-since-more.open), .files-review-bar:has(.review-since-more.open) { position: relative; z-index: var(--z-menu-anchor); }
 .review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted); font: 13px var(--sans); padding: 18px 4px; }
 .review-empty.big { flex-direction: column; align-items: flex-start; padding: 48px 28px; max-width: 62ch; }
 .review-empty.big p { margin: 0; font-size: 14px; color: var(--chalk); }
@@ -312,7 +312,7 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-margin-item { position: absolute; left: 0; right: 0; top: 0; transition: top 0.14s ease-out; }
 .review-margin-item .review-thread { max-width: none; box-shadow: 0 1px 0 var(--rule); }
 .review-margin-item.thread .review-thread.hot { box-shadow: 0 0 0 1px var(--sodium-line), 0 6px 18px color-mix(in srgb, var(--edge-shadow) 35%, transparent); }
-.review-margin-item:hover, .review-margin-item:focus-within { z-index: var(--z-inset, 3); }
+.review-margin-item:hover, .review-margin-item:focus-within { z-index: var(--z-inset); }
 /* A tick from the thread back towards the code. */
 .review-margin-item.thread::before, .review-margin-item.draft::before {
   content: "";
