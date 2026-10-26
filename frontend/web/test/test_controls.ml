@@ -539,6 +539,7 @@ let%expect_test
     {|
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <textarea class="editor">
     <div class="composer-bar">
     <div class="composer-controls">

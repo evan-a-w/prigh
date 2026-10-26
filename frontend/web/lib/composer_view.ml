@@ -242,6 +242,44 @@ let controls (m : App.Model.t) ~inject =
              [ view m state ~inject; Option.value menu ~default:Node.none ]))
 ;;
 
+let steered (m : App.Model.t) =
+  match m.recipient with
+  | Main -> None
+  | Agent id -> Some id
+;;
+
+(* Whom the composer writes to, while it is a subagent; the cross (or Esc)
+   goes back to the main agent. *)
+let steer_chip (m : App.Model.t) id ~inject =
+  let task =
+    Option.value_map (Agents.find_agent m.agents id) ~default:"" ~f:(fun a ->
+      Chat_html.first_line a.task)
+  in
+  div
+    ~cls:"steer-chip"
+    ~attrs:
+      [ Attr.title
+          (sprintf
+             "Your messages go to subagent %s: Enter reaches it at its next \
+              step, Alt+Enter when it ends its turn"
+             id)
+      ]
+    [ icon ~cls:"steer-chip-icon" Target
+    ; Node.span
+        ~attrs:[ Attr.class_ "steer-chip-label" ]
+        [ Node.text "Steering "; span ~cls:"steer-chip-id" id ]
+    ; (if String.is_empty task
+       then Node.none
+       else span ~cls:"steer-chip-task" task)
+    ; button
+        ~cls:"icon ghost steer-chip-close"
+        ~title:"Write to the main agent again (Esc)"
+        ~label:"Stop steering"
+        ~on_click:(inject (Action.Set_recipient Main))
+        [ icon Close ]
+    ]
+;;
+
 let connected (m : App.Model.t) =
   match m.connection, m.state with
   | Connected, Some _ -> Option.is_none m.session_gone
@@ -259,13 +297,19 @@ let placeholder (m : App.Model.t) =
     if cramped
     then "Offline: send once back"
     else "Offline: write now, send once it is back"
-  else if App.Model.running m && cramped
-  then "Steer the agent…"
-  else if App.Model.running m
-  then "Steer (Enter) or queue a follow-up (Alt+Enter)…"
-  else if cramped
-  then "Ask prigh…  / commands"
-  else "Ask prigh anything…  / commands, @ files"
+  else (
+    match steered m with
+    | Some id when cramped -> sprintf "Steer %s (Alt+Enter: after its turn)…" id
+    | Some id ->
+      sprintf
+        "Steer %s (Enter) or queue a follow-up for when it ends its turn \
+         (Alt+Enter)…"
+        id
+    | None when App.Model.running m && cramped -> "Steer the agent…"
+    | None when App.Model.running m ->
+      "Steer (Enter) or queue a follow-up (Alt+Enter)…"
+    | None when cramped -> "Ask prigh…  / commands"
+    | None -> "Ask prigh anything…  / commands, @ files")
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -292,7 +336,10 @@ let view (m : App.Model.t) ~inject =
     ; rest (Queue_view.view m ~inject)
     ; div
         ~cls:"composer-box"
-        [ rest (images m ~inject)
+        [ (match m.recipient with
+           | Main -> Node.none
+           | Agent id -> rest (steer_chip m id ~inject))
+        ; rest (images m ~inject)
         ; rest (Files_view.chips m ~inject)
         ; rest
           @@ Node.textarea
@@ -357,12 +404,16 @@ let view (m : App.Model.t) ~inject =
                         button
                           ~cls:"primary send"
                           ~title:
-                            (if not connected
-                             then "Not connected to the backend"
-                             else if running
-                             then "Steer (Enter)"
-                             else "Send (Enter)")
-                          ~label:(if running then "Steer" else "Send")
+                            (match steered m with
+                             | _ when not connected ->
+                               "Not connected to the backend"
+                             | Some id -> sprintf "Steer %s (Enter)" id
+                             | None when running -> "Steer (Enter)"
+                             | None -> "Send (Enter)")
+                          ~label:
+                            (if running || Option.is_some (steered m)
+                             then "Steer"
+                             else "Send")
                           ~disabled:((not has_input) || not connected)
                           ~on_click:(inject Action.Send)
                           [ icon Send ])

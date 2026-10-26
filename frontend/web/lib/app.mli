@@ -109,6 +109,10 @@ module Reply_tag : sig
         { text : string
         ; images : Image.t list
         } (** a prompt, steer or follow-up: back to the editor if it fails *)
+    | Steered of
+        { agent : string
+        ; draft : string (** what was sent, as typed *)
+        } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
@@ -410,9 +414,13 @@ module Action : sig
     | Logout of string (** provider *)
     | Cancel_subagent of string (** agent id *)
     | Kill_job of string (** job id *)
-    | Dequeue (** the last queued message back into the editor *)
-    | Edit_queued of Queued.Message.t (** back into the editor *)
-    | Remove_queued of Queued.Message.t
+    | Dequeue
+    (** the last message queued for the composer's recipient back into the
+        editor *)
+    | Edit_queued of Recipient.t * Queued.Message.t (** back into the editor *)
+    | Remove_queued of Recipient.t * Queued.Message.t
+    | Set_recipient of Recipient.t
+    (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
     | Toggle_folded of string
     (** fold or unfold the worktrees under a session of the sidebar (by its
@@ -544,6 +552,10 @@ module Model : sig
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
     ; queue : Queued.t
+    ; agent_queues : Agent_queue.t list
+      (** the background subagents' queues, those not empty *)
+    ; recipient : Recipient.t
+      (** who the composer sends to: a subagent while steering it *)
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)

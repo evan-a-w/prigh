@@ -31,6 +31,9 @@
 .agents-close { margin-left: auto; }
 .agents-locate { white-space: nowrap; }
 .agents-locate .icon { width: 13px; height: 13px; }
+.agents-steer { white-space: nowrap; }
+.agents-steer .icon { width: 13px; height: 13px; }
+.agents-steer.on { color: var(--sodium); background: var(--sodium-wash); }
 .agents-panel .sr-only {
   position: absolute;
   width: 1px;
