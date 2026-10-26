@@ -180,7 +180,8 @@ module Method = struct
       [ "id", Json.str id; "post", Json.int post; "accept", Json.bool accept ]
     | Review_approve { root; path; hash } ->
       root_param root @ [ "path", Json.str path; "hash", Json.str hash ]
-    | Review_unapprove { root; path } -> root_param root @ [ "path", Json.str path ]
+    | Review_unapprove { root; path } ->
+      root_param root @ [ "path", Json.str path ]
     | Fs_preview { path } -> [ "path", Json.str path ]
     | Fs_write { path; text; expected } ->
       [ "path", Json.str path; "text", Json.str text ]

@@ -33,7 +33,8 @@ val compute
   -> ?forges:Forge_account.t list (** for [/login] and [/logout] *)
   -> ?worktrees:Worktree.t list
        (** the repository's, for [/worktree] and [/review] *)
-  -> ?branches:string list (** the reviewed repository's, for [/review --base] *)
+  -> ?branches:string list
+       (** the reviewed repository's, for [/review --base] *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list

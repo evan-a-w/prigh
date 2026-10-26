@@ -132,10 +132,9 @@ let all =
       ~args:"[worktree] [--base REV]"
       "review"
       "the review page, the changes file by file to approve, comment on and \
-       edit (Alt+R): of the session's worktree or another (its branch, path \
-       or name), against its base or REV; /review BASE [instructions] (HEAD: \
-       the uncommitted changes) has the model review them for prioritised \
-       findings"
+       edit (Alt+R): of the session's worktree or another (its branch, path or \
+       name), against its base or REV; /review BASE [instructions] (HEAD: the \
+       uncommitted changes) has the model review them for prioritised findings"
   ; c "init" "write or improve the project's AGENTS.md"
   ; c ~args:"[name]" "name" "rename the session"
   ; c "session" "show the session's details and statistics"
@@ -177,9 +176,9 @@ let all =
       ~args:"[list|new|open|rm ...]"
       "worktree"
       "pick a git worktree of the repository to work in (Alt+Enter: in a new \
-       session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works \
-       there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: \
-       with uncommitted changes)"
+       session, Alt+R: review its changes, Delete removes it); new BRANCH \
+       [BASE] creates one and works there; open [-n] TARGET (-n: in a new \
+       session); rm [-f] TARGET (-f: with uncommitted changes)"
   ; c
       ~argument:Backend_directory
       ~args:"[path|off]"

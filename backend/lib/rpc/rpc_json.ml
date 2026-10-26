@@ -221,7 +221,8 @@ let review (r : Review_state.t) =
              (Map.to_alist r.approvals)
              ~f:(fun ({ Review_state.File_key.root; path }, hash) ->
                `Object
-                 (Option.value_map root ~default:[] ~f:(fun r -> [ "root", str r ])
+                 (Option.value_map root ~default:[] ~f:(fun r ->
+                    [ "root", str r ])
                   @ [ "path", str path; "hash", str hash ]))) )
     ]
 ;;

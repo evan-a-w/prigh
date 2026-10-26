@@ -313,7 +313,9 @@ let target_bar (m : App.Model.t) ~inject =
   | None ->
     (match t.target.dir with
      | Some dir ->
-       div ~cls:"review-target" [ span ~cls:"review-target-text" ("Reviewing " ^ dir) ]
+       div
+         ~cls:"review-target"
+         [ span ~cls:"review-target-text" ("Reviewing " ^ dir) ]
      | None -> Node.none)
   | Some d ->
     let worktrees =
@@ -356,7 +358,10 @@ let target_bar (m : App.Model.t) ~inject =
       ~cls:"review-target"
       ~attrs:
         [ Attr.title
-            (sprintf "Reviewing %s against %s" (Diff_files.where d) (Diff_files.against d))
+            (sprintf
+               "Reviewing %s against %s"
+               (Diff_files.where d)
+               (Diff_files.against d))
         ]
       [ span ~cls:"review-target-text" "Reviewing"
       ; select

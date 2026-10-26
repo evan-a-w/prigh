@@ -115,18 +115,25 @@ let run ~env ~cancel ~cwd ~arguments =
       Option.bind branch ~f:(fun b -> config ~dir (Worktree.base_key b))
     in
     let remotes =
-      Option.bind branch ~f:(fun b -> config ~dir (sprintf "branch.%s.remote" b))
+      Option.bind branch ~f:(fun b ->
+        config ~dir (sprintf "branch.%s.remote" b))
       |> Option.filter ~f:(fun r -> not (String.equal r "."))
       |> Option.to_list
       |> fun rs ->
-      rs @ List.filter [ "origin" ] ~f:(fun o -> not (List.mem rs o ~equal:String.equal))
+      rs
+      @ List.filter [ "origin" ] ~f:(fun o ->
+        not (List.mem rs o ~equal:String.equal))
     in
     let remote_heads =
       List.filter_map remotes ~f:(fun r ->
         match
           git
             ~dir
-            [ "symbolic-ref"; "--quiet"; "--short"; sprintf "refs/remotes/%s/HEAD" r ]
+            [ "symbolic-ref"
+            ; "--quiet"
+            ; "--short"
+            ; sprintf "refs/remotes/%s/HEAD" r
+            ]
         with
         | Ok head when not (String.is_empty (String.strip head)) ->
           Some (String.strip head)
@@ -165,14 +172,19 @@ let run ~env ~cancel ~cwd ~arguments =
     in
     let branch =
       match git ~dir:root [ "symbolic-ref"; "--quiet"; "--short"; "HEAD" ] with
-      | Ok b when not (String.is_empty (String.strip b)) -> Some (String.strip b)
+      | Ok b when not (String.is_empty (String.strip b)) ->
+        Some (String.strip b)
       | Ok _ | Error _ -> None
     in
     let main =
       match
         git
           ~dir:root
-          [ "rev-parse"; "--path-format=absolute"; "--git-dir"; "--git-common-dir" ]
+          [ "rev-parse"
+          ; "--path-format=absolute"
+          ; "--git-dir"
+          ; "--git-common-dir"
+          ]
       with
       | Ok out ->
         (match String.split_lines out with
@@ -213,7 +225,11 @@ let run ~env ~cancel ~cwd ~arguments =
       match
         git
           ~dir:root
-          [ "for-each-ref"; "--format=%(refname)"; "refs/heads"; "refs/remotes" ]
+          [ "for-each-ref"
+          ; "--format=%(refname)"
+          ; "refs/heads"
+          ; "refs/remotes"
+          ]
       with
       | Ok out ->
         List.filter_map (String.split_lines out) ~f:(fun ref_ ->

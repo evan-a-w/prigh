@@ -113,5 +113,11 @@ val decide
     there is nothing to send. *)
 val submit : ?root:string -> t -> (string * int * Change.t list) Or_error.t
 
-val approve : ?root:string -> path:string -> hash:string -> unit -> Change.t list
+val approve
+  :  ?root:string
+  -> path:string
+  -> hash:string
+  -> unit
+  -> Change.t list
+
 val unapprove : ?root:string -> t -> path:string -> Change.t list

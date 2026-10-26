@@ -790,7 +790,10 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     match out with
     | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
     | Get_diff { dir; base } ->
-      m, cmds @ [ rpc "git_diff" (Git_diff.params ?dir ?base ()) ~tag:(Review Diff) ]
+      ( m
+      , cmds
+        @ [ rpc "git_diff" (Git_diff.params ?dir ?base ()) ~tag:(Review Diff) ]
+      )
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
@@ -3496,8 +3499,7 @@ let review_worktree (m : Model.t) ~dir ~base =
   with_review m (Code_review.update m.review (Show { dir; base }))
 ;;
 
-let rec review_action (m : Model.t) ~command (action : Review_command.Action.t)
-  =
+let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) =
   match action with
   | Show { dir; base } -> review_worktree m ~dir ~base
   | Named { name; base; model } ->
@@ -3538,10 +3540,7 @@ let rec review_action (m : Model.t) ~command (action : Review_command.Action.t)
 ;;
 
 let review_target (m : Model.t) ~command ~name ~base ~model listing =
-  review_action
-    m
-    ~command
-    (Review_command.resolve listing ~name ~base ~model)
+  review_action m ~command (Review_command.resolve listing ~name ~base ~model)
 ;;
 
 let worktree_command (m : Model.t) rest =
@@ -4703,11 +4702,13 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     { m with worktrees = Worktrees.failed m.worktrees ~seq }, []
   | Worktrees { purpose = Picker; _ }, Error e ->
     error m (sprintf "Couldn't list the worktrees: %s." e)
-  | Worktrees { purpose = Review_target { command; model = Some args; _ }; _ }, Error _
-    ->
+  | ( Worktrees { purpose = Review_target { command; model = Some args; _ }; _ }
+    , Error _ ) ->
     (* Not a repository: no worktree by that name, the model reviews. *)
     review_action m ~command (Model args)
-  | Worktrees { purpose = Target { command; _ } | Review_target { command; _ }; _ }, Error e ->
+  | ( Worktrees
+        { purpose = Target { command; _ } | Review_target { command; _ }; _ }
+    , Error e ) ->
     error
       (back_in_editor m command)
       (sprintf "Couldn't list the worktrees: %s." e)

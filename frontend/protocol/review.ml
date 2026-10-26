@@ -36,11 +36,11 @@ let scope t ~root ~own =
       List.filter t.comments ~f:(fun c ->
         String.equal c.Review_comment.root root)
   ; approvals =
-      List.filter t.approvals ~f:mine
-      @
-      if own
-      then List.filter t.approvals ~f:(fun a -> Option.is_none a.root)
-      else []
+      (List.filter t.approvals ~f:mine
+       @
+       if own
+       then List.filter t.approvals ~f:(fun a -> Option.is_none a.root)
+       else [])
   }
 ;;
 

@@ -25,8 +25,7 @@ let words s =
 ;;
 
 let path_like word =
-  List.exists [ "/"; "~"; "." ] ~f:(fun prefix ->
-    String.is_prefix word ~prefix)
+  List.exists [ "/"; "~"; "." ] ~f:(fun prefix -> String.is_prefix word ~prefix)
 ;;
 
 let rec without_base acc = function
@@ -96,7 +95,7 @@ let complete ~worktrees ~branches rest =
       , List.map
           (List.dedup_and_sort
              ~compare:String.compare
-             ("HEAD" :: worktree_branches @ branches))
+             (("HEAD" :: worktree_branches) @ branches))
           ~f:(fun b ->
             ( b
             , if String.equal b "HEAD"

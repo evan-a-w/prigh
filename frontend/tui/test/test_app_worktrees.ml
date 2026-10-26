@@ -1093,7 +1093,11 @@ let%expect_test "/review WORKTREE: its approvals and comments, not the others'" 
   H.reply
     h
     (Review_named
-       { command = "/review feat/a"; name = "feat/a"; base = None; model = None })
+       { command = "/review feat/a"
+       ; name = "feat/a"
+       ; base = None
+       ; model = None
+       })
     listing_json;
   show_feat_review h ~dir:(Some "/h/.prigh/worktrees/repo/feat-a") ~base:None;
   [%expect
@@ -1134,8 +1138,9 @@ let%expect_test "/review WORKTREE: its approvals and comments, not the others'" 
     |}]
 ;;
 
-let%expect_test "/review: a path and --base go straight there; a word that \
-                 names no worktree has the model review"
+let%expect_test
+    "/review: a path and --base go straight there; a word that names no \
+     worktree has the model review"
   =
   let h = connected () in
   run h "/review ../feat-a --base main";
@@ -1235,7 +1240,8 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
     P.Worktree.Listing.of_json (P.Json.parse listing_json |> Or_error.ok_exn)
     |> Or_error.ok_exn
   in
-  List.iter [ "feat/a", None; "feat-a", None; "nope", Some "nope" ]
+  List.iter
+    [ "feat/a", None; "feat-a", None; "nope", Some "nope" ]
     ~f:(fun (name, model) ->
       print_s
         [%sexp
@@ -1243,16 +1249,18 @@ let%expect_test "Review_command: parsing, resolving and completing /review" =
            : Review_command.Action.t)]);
   print_endline (Review_command.command ~dir:"/w/x" ~base:"main" ());
   print_endline (Review_command.command ());
-  List.iter [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m" ] ~f:(fun rest ->
-    print_s
-      [%message
-        rest
-          ~_:
-            (Review_command.complete
-               ~worktrees:(List.take listing.worktrees 2)
-               ~branches:[ "main"; "origin/main" ]
-               rest
-             : (int * (string * string) list) option)]);
+  List.iter
+    [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m" ]
+    ~f:(fun rest ->
+      print_s
+        [%message
+          rest
+            ~_:
+              (Review_command.complete
+                 ~worktrees:(List.take listing.worktrees 2)
+                 ~branches:[ "main"; "origin/main" ]
+                 rest
+               : (int * (string * string) list) option)]);
   [%expect
     {|
     ("" (
