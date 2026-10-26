@@ -71,9 +71,9 @@ let bytes n =
     | unit :: _ -> sprintf "%.1f %s" value unit
     | [] -> assert false
   in
-  if n < 1024
-  then sprintf "%d B" n
-  else go (Float.of_int n /. 1024.) [ "KiB"; "MiB"; "GiB"; "TiB" ]
+  if Int64.(n < 1024L)
+  then sprintf "%Ld B" n
+  else go (Int64.to_float n /. 1024.) [ "KiB"; "MiB"; "GiB"; "TiB" ]
 ;;
 
 let span s =
@@ -114,9 +114,11 @@ let report (r : P.Nix_gc_report.t) =
     (span r.duration)
 ;;
 
-let progress (p : P.Nix_gc_progress.t) =
-  "nix-gc: " ^ deleted ~paths:p.paths_deleted ~generations:p.generations_deleted
+let deleted_so_far (p : P.Nix_gc_progress.t) =
+  deleted ~paths:p.paths_deleted ~generations:p.generations_deleted
 ;;
+
+let progress p = "nix-gc: " ^ deleted_so_far p
 
 let time at ~utc_offset =
   let date, ofday =
@@ -126,16 +128,27 @@ let time at ~utc_offset =
   sprintf "%s %02d:%02d" (Date.to_string date) parts.hr parts.min
 ;;
 
-let status_lines ~utc_offset (s : P.Nix_store_status.t) =
+let size (s : P.Nix_store_status.t) =
+  sprintf "store: %s in %d paths" (bytes s.store_bytes) s.store_paths
+;;
+
+let space (s : P.Nix_store_status.t) =
+  sprintf
+    "/nix: %s free of %s (%d%%)"
+    (bytes s.fs_free_bytes)
+    (bytes s.fs_total_bytes)
+    (if Int64.(s.fs_total_bytes > 0L)
+     then
+       Float.iround_down_exn
+         (100.
+          *. Int64.to_float s.fs_free_bytes
+          /. Int64.to_float s.fs_total_bytes)
+     else 0)
+;;
+
+let details ~utc_offset (s : P.Nix_store_status.t) =
   let time at = time at ~utc_offset in
-  let percent part whole = if whole > 0 then 100 * part / whole else 0 in
-  [ sprintf "store: %s in %d paths" (bytes s.store_bytes) s.store_paths
-  ; sprintf
-      "/nix: %s free of %s (%d%%)"
-      (bytes s.fs_free_bytes)
-      (bytes s.fs_total_bytes)
-      (percent s.fs_free_bytes s.fs_total_bytes)
-  ; (match s.last_gc with
+  [ (match s.last_gc with
      | None -> "last collection: none recorded"
      | Some r ->
        sprintf
@@ -170,6 +183,11 @@ let status_lines ~utc_offset (s : P.Nix_store_status.t) =
                   "deleting profile generations older than %s"
                   (plural days "day"))
              (time next)))
+;;
+
+let status_lines ~utc_offset s =
+  [ size s; space s ]
+  @ details ~utc_offset s
   @ [ "/nix-gc run collects garbage; run DAYS (or all) first deletes older \
        profile generations"
     ]

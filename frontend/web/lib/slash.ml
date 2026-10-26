@@ -289,6 +289,12 @@ let all =
       ~args:"[user]"
       "setusr"
       "act as another user (superusers); without a user, pick one"
+  ; c
+      ~args:"[run [DAYS|all]]"
+      "nix-gc"
+      "the Nix store's size and free space, in Settings; run collects garbage, \
+       first deleting every user's profile generations older than DAYS days \
+       (all: all but the current ones) (superusers)"
   ; c "signout" "sign out of this account"
   ; c "retry-backend-connection" "reconnect to the backend now"
   ; c "state" "show the session state as the backend reports it"

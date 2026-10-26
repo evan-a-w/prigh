@@ -10,7 +10,7 @@ type t =
   ; generations : Nix_generations.t option (** what it was asked to delete *)
   ; generations_deleted : int
   ; paths_deleted : int
-  ; freed_bytes : int
+  ; freed_bytes : Int64.t
   ; duration : Time_ns.Span.t
   }
 [@@deriving sexp_of, equal]

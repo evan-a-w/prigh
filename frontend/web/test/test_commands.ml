@@ -121,6 +121,7 @@ let%expect_test "every command does something (none is unknown)" =
     /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
     /pr                        pull requests: rpc push_pref, rpc pr_list
     /setusr                    loading Act as: rpc push_pref, rpc list_users
+    /nix-gc                    rpc nix_store_status
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
     /state                     text: Session state
