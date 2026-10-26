@@ -4,7 +4,7 @@ open Agent_events
 module H = Harness
 
 (* Steering a running background subagent from the composer: retargeting it
-   (the panel, its Steer button, Esc and the chip's cross back), sending
+   (its Steer button, not merely showing it; Esc and the chip's cross back), sending
    ([steer_agent]), its queue ([agent_queues]), errors, a subagent that
    finishes, [/agents steer] and switching sessions. *)
 
@@ -79,8 +79,9 @@ let composer h =
 ;;
 
 let%expect_test
-    "the panel's running subagent is the composer's; Enter steers it, \
-     Alt+Enter queues a follow-up, Esc goes back"
+    "showing a subagent leaves the composer on the main agent; its Steer \
+     button retargets it; Enter steers it, Alt+Enter queues a follow-up, Esc \
+     goes back"
   =
   let h = H.create () in
   started h;
@@ -93,7 +94,7 @@ let%expect_test
     icon "(no name)"
     draft:
     |}];
-  (* Shown in the panel, a1 is written to; a nested one takes no messages. *)
+  (* Shown in the panel, a nested one takes no messages. *)
   H.act h (Select_item (Agent "a1/n1"));
   recipient h;
   H.names h ~selector:".agents-steer";
@@ -102,12 +103,35 @@ let%expect_test
     Main
     button "Steer" -- a1/n1 runs inside a1 (a subagent's own subagent) and takes no messages: steer a1 instead.
     |}];
+  (* Showing a1 does not steer it: the composer stays the main agent's, and
+     its Steer button offers to. *)
   H.act h (Select_item (Agent "a1"));
+  composer h;
+  H.show h ~selector:".agents-steer";
+  [%expect
+    {|
+    Main
+    textarea "Message"
+    button "Steer" -- Steer (Enter)
+    icon "(no name)"
+    draft:
+    <button type="button"
+            title="Write to a1 from the composer (/agents steer)"
+            aria-pressed="false"
+            class="agents-steer btn small"
+            @on_click>
+      <icon class="target"> </icon>
+      Steer
+    </button>
+    |}];
+  H.click h ~selector:".agents-steer";
   composer h;
   H.show h ~selector:".steer-chip";
   H.names h ~selector:".agents-steer";
   [%expect
     {|
+    (Set_recipient (Agent a1))
+    (Focus editor)
     (Agent a1)
     Steering a1 Survey the repository (Write to the main agent again (Esc))
     textarea "Message"
@@ -201,13 +225,27 @@ let%expect_test
     (Focus editor)
     Main
     |}];
-  (* Steering again, then back to the list: the main agent's again. *)
+  (* Steering again: it outlasts going back to the list, showing another
+     one and closing the panel, until Esc. *)
   H.click h ~selector:".agents-steer";
   H.act h Agents_back;
+  H.act h (Select_item (Agent "a1/n1"));
+  H.act h Toggle_subagents;
+  composer h;
+  H.key h "Escape";
   recipient h;
   [%expect
     {|
     (Set_recipient (Agent a1))
+    (Focus editor)
+    (Focus editor)
+    (Agent a1)
+    Steering a1 Survey the repository (Write to the main agent again (Esc))
+    textarea "Message"
+    button "Steer" -- Steer a1 (Enter)
+    icon "(no name)"
+    draft:
+    (Set_recipient Main)
     (Focus editor)
     Main
     |}]
@@ -221,6 +259,7 @@ let%expect_test
   started h;
   H.quiet h (fun () ->
     H.act h (Select_item (Agent "a1"));
+    H.act h (Set_recipient (Agent "a1"));
     H.event
       h
       {|{"event":"queue_update","steer":1,"follow_up":0,"steer_texts":["main steer"],"follow_up_texts":[]}|};
@@ -362,7 +401,9 @@ let%expect_test
   =
   let h = H.create () in
   started h;
-  H.quiet h (fun () -> H.act h (Select_item (Agent "a1")));
+  H.quiet h (fun () ->
+    H.act h (Select_item (Agent "a1"));
+    H.click h ~selector:".agents-steer");
   H.type_ h "hurry up";
   H.quiet h (fun () -> H.key h "Enter");
   H.fail
@@ -374,6 +415,7 @@ let%expect_test
   composer h;
   [%expect
     {|
+    (Set_recipient (Agent a1))
     Send
     Couldn't send it to a1: a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor. (Dismiss)
     (Agent a1)
@@ -546,7 +588,7 @@ let%expect_test "switching sessions forgets the steering and the queues" =
   let h = H.create () in
   started h;
   H.quiet h (fun () ->
-    H.act h (Select_item (Agent "a1"));
+    H.act h (Set_recipient (Agent "a1"));
     H.event h (agent_queues [ "a1", [ "use the tests" ], [] ]));
   recipient h;
   H.elements h ~selector:".queue";

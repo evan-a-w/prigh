@@ -1946,8 +1946,18 @@ prefer_host: host-laptop
 Sign in
 === firefox: remote: errors ===
 none
-=== firefox: steer: the subagent shown is written to ===
+=== firefox: steer: showing it leaves the composer on the main agent ===
+(no chip); Steer the agent…
+Survey the project
+Steer
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== firefox: steer: Steer ===
 Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+editor focused: true
 Survey the project
 Steering
 Cancel
