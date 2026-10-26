@@ -398,10 +398,93 @@ What a user's agent (and `>_` shell) can and cannot see:
   sees what that Linux user may (the table above); the backend's own files
   are never reachable, since it runs no tools here. Transfer links are
   one-time tickets issued over the signed-in connection.
-- The token is the only authentication, and the traffic is plain HTTP/WS.
+- The token is the only authentication, and the traffic is plain HTTP/WS
+  (`prigh serve` warns about it when listening beyond loopback).
   Outside a trusted LAN, set `PRIGH_BIND=127.0.0.1` and put a
   TLS-terminating reverse proxy (Caddy, Traefik, nginx; it must pass
-  WebSockets on `/ws` and `/terminal`) or an SSH tunnel in front.
+  WebSockets on `/ws` and `/terminal`, see below) or an SSH tunnel in front.
+
+## Behind a reverse proxy
+
+Publish the web port on loopback only (`PRIGH_BIND=127.0.0.1`) and let a
+proxy terminate TLS in front of it. Browsers then open
+`https://prigh.example.com/`, and the TUI and tool hosts on other machines
+connect to the same site:
+
+```
+prigh-tui -connect https://prigh.example.com/ -token T ~/proj     # = wss://prigh.example.com/ws
+prigh tool-host -connect wss://prigh.example.com/ws -token T -cwd ~/proj
+```
+
+The proxy must pass WebSocket upgrades (`Upgrade`, `Connection`) on `/ws`
+(the RPC) and `/terminal` (the browser's terminal) and keep them open
+(prigh pings every 20s; give it a read timeout of a minute or more).
+
+If the proxy also signs users in (authentik, Authelia, oauth2-proxy,
+Cloudflare Access...), exempt `/ws` and `/terminal` from it: prigh checks
+its own token on both, and neither prigh-tui nor `prigh tool-host` can do
+a browser sign-in. prigh-tui tells you when it meets one instead of the
+WebSocket (`answered with a login page (HTTP 302 Found to https://login…)`).
+The page itself (`/`) can stay behind the sign-in. Otherwise send the
+proxy's own credentials with `prigh-tui -header 'NAME: VALUE'` (e.g. a
+service token; `$PRIGH_CONNECT_HEADERS` for several, one per line), or use
+an SSH tunnel to the published port.
+
+- **authentik** (proxy provider, forward auth or the embedded outpost): in
+  the provider's *Advanced protocol settings*, *Unauthenticated Paths*, add
+  `^/(ws|terminal)(\?.*)?$` (in *Forward auth (domain level)* mode the
+  regex is matched against the full URL:
+  `^https://prigh\.example\.com/(ws|terminal)(\?.*)?$`).
+- **Caddy** with `forward_auth`:
+
+  ```
+  prigh.example.com {
+      @prigh_sockets path /ws /terminal
+      handle @prigh_sockets {
+          reverse_proxy 127.0.0.1:7790
+      }
+      handle {
+          forward_auth authentik-server:9000 {
+              uri /outpost.goauthentik.io/auth/caddy
+              copy_headers X-Authentik-Username
+          }
+          reverse_proxy 127.0.0.1:7790
+      }
+  }
+  ```
+
+- **nginx** with `auth_request`:
+
+  ```
+  location ~ ^/(ws|terminal)$ {
+      auth_request off;
+      proxy_pass http://127.0.0.1:7790;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_read_timeout 1h;
+  }
+  location / {
+      auth_request /outpost.goauthentik.io/auth/nginx;
+      # ... the rest of the sign-in setup
+      proxy_pass http://127.0.0.1:7790;
+  }
+  ```
+
+- **Traefik**: a second router for the sockets, with a higher priority and
+  without the sign-in middleware (labels on the prigh container):
+
+  ```
+  traefik.http.routers.prigh.rule=Host(`prigh.example.com`)
+  traefik.http.routers.prigh.middlewares=authentik@docker
+  traefik.http.routers.prigh-sockets.rule=Host(`prigh.example.com`) && (Path(`/ws`) || Path(`/terminal`))
+  traefik.http.routers.prigh-sockets.priority=100
+  traefik.http.services.prigh.loadbalancer.server.port=7790
+  ```
+
+The proxy's certificate must be one the clients' system CAs trust (e.g.
+Let's Encrypt); `$SSL_CERT_FILE` points prigh-tui at another bundle.
 
 ## Data
 

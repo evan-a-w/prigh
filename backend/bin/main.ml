@@ -644,6 +644,13 @@ let serve_command =
          eprintf "-open needs -web\n";
          exit 2);
        let stdio = stdio || (Option.is_none listen && Option.is_none web) in
+       List.iter
+         [ "-listen", listen; "-web", web ]
+         ~f:(fun (flag, addr) ->
+           Option.iter
+             (Option.bind addr ~f:(fun (addr, _) ->
+                Web_server.plaintext_warning ~flag addr))
+             ~f:(eprintf "%s\n%!"));
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -918,7 +925,7 @@ let web_command =
            "HOST:PORT|URL the backend: its -web (or -listen) port, or its \
             prigh-web URL (wss://host/ws, https://host/prigh/) behind a TLS \
             proxy (default: $PRIGH_CONNECT, else the connection saved by \
-            prigh-tui or an earlier prigh web; -connect HOST:PORT is saved)"
+            prigh-tui or an earlier prigh web; -connect is saved)"
      and (_ : bool) =
        flag
          "-remote"
@@ -1009,8 +1016,16 @@ let web_command =
        let { Saved_connection.Resolved.settings; save } =
          Saved_connection.resolve
            ~saved
-           ~flags:{ connect; token; user }
-           ~env:env_settings
+           ~flags:
+             { connect = Option.map connect ~f:Backend_address.normalize
+             ; token
+             ; user
+             }
+           ~env:
+             { env_settings with
+               connect =
+                 Option.map env_settings.connect ~f:Backend_address.normalize
+             }
            ~local:false
        in
        let address =
@@ -1103,21 +1118,12 @@ let web_command =
             "%s"
             (Web_connect.Check.explain error remote ~source credentials));
        Option.iter save ~f:(fun connection ->
-         if remote.lines
-         then (
-           match Saved_connection.save ~home connection with
-           | Ok () -> ()
-           | Error e ->
-             eprintf
-               "prigh web: cannot save the connection: %s\n%!"
-               (Error.to_string_hum e))
-         else
+         match Saved_connection.save ~home connection with
+         | Ok () -> ()
+         | Error e ->
            eprintf
-             "prigh web: %s is not saved as the connection: prigh-tui, which \
-              shares it, only connects to HOST:PORT (set $PRIGH_CONNECT, or \
-              pass -connect again)\n\
-              %!"
-             address);
+             "prigh web: cannot save the connection: %s\n%!"
+             (Error.to_string_hum e));
        let log line = eprintf "prigh web: %s\n%!" line in
        let listen_addr =
          match listen with
