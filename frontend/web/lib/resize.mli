@@ -113,6 +113,13 @@ val bounds : t -> Shown.t -> Handle.t -> Bounds.t
     for both beside the chat. *)
 val preview_alone : t -> Shown.t -> bool
 
+(** The width of the review page's file view, beside its file list (the
+    page's own padding included). *)
+val review_room : t -> Shown.t -> int
+
+(** The file browser's preview's width. *)
+val preview_width : t -> Shown.t -> int
+
 (** Every size, as CSS variables for the page ([--sidebar-width: 280px]). *)
 val vars : t -> Shown.t -> (string * string) list
 

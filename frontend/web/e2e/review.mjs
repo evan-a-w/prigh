@@ -73,6 +73,13 @@ writeFileSync(join(dir, "script.json"), JSON.stringify([
     ],
   },
   { text: "Added const." },
+  {
+    text: "Renaming.",
+    tool_calls: [
+      { id: "e3", name: "edit", arguments: { path: "src/util.ml", edits: [{ old_text: "let const x _ = x", new_text: "let always x _ = x" }] } },
+    ],
+  },
+  { text: "Renamed const." },
 ]));
 
 const server = spawn(
@@ -431,13 +438,20 @@ try {
   section("since: the view shown");
   console.log(clean(await page.locator(".review-controls .segment.on").allInnerTexts().then(t => t.join("\n"))));
   await show("since: what changed since approved", ".review-current");
+  // The menu under the since segment's chevron: Latest, then the earlier
+  // actions, named by what was done where.
+  await page.locator("#review-since-button").click();
+  await page.locator('#review-popover[data-which="since"] .review-pick-item').first().waitFor();
   section("since: the earlier actions");
-  console.log(clean((await page.locator(".review-since-menu option").allInnerTexts()).join("\n")));
+  console.log(clean((await page.locator("#review-popover .review-pick-item").allInnerTexts()).join("\n")));
+  await page.waitForTimeout(150);
+  await screenshot("since: the menu");
   // An earlier one: what the agent's proposal and the edit changed since
   // the comment.
-  const first = await page.locator(".review-since-menu option").last().getAttribute("value");
-  await page.locator(".review-since-menu").selectOption(first);
-  await page.waitForFunction(() => /^Since you commented/.test(document.querySelector(".review-since-note")?.textContent ?? ""));
+  await page.locator("#review-popover .review-pick-item").last().click();
+  await page.waitForFunction(() => /^Since your comment on line 3/.test(document.querySelector(".review-since-note")?.textContent ?? ""));
+  section("since: the switch, an earlier action picked");
+  console.log(clean(await page.locator(".review-page .review-since").innerText()));
   await show("since: since the comment", ".review-current");
   // Comments on the current lines work there too.
   await drag([row(".review-page", "new", 2), 4], [row(".review-page", "new", 2), 9]);
@@ -446,7 +460,18 @@ try {
   await page.locator("#review-draft").fill("Is const used?");
   await page.locator("#review-draft").press("Enter");
   await page.locator('.review-page .review-thread[data-comment="c5"]').waitFor();
+  // Commenting shows what changed since the comment: Latest, which follows
+  // it; nothing yet, so the changes.
+  await page.waitForFunction(() => /^Nothing changed since your comment on line 2/.test(document.querySelector(".review-since-note")?.textContent ?? ""));
+  section("since: Latest follows the new comment");
+  console.log(clean(await page.locator(".review-page .review-since").innerText()));
   await show("since: a comment in the since-view", ".review-current");
+  // The agent changes the file: what changed since the comment.
+  await page.locator(".composer textarea").fill("Rename const in util.ml");
+  await page.locator(".composer textarea").press("Enter");
+  await idle();
+  await page.waitForFunction(() => /^Since your comment on line 2/.test(document.querySelector(".review-page .review-since-note")?.textContent ?? ""));
+  await show("since: what changed since the comment", ".review-current");
   // l toggles back to the changes; a file with nothing new says so.
   await page.locator(".review-page").focus();
   await page.keyboard.press("l");
@@ -457,6 +482,93 @@ try {
   await page.locator(".review-controls .segment", { hasText: "Since" }).click();
   await page.locator(".review-since-same, .review-since-note").first().waitFor();
   await show("since: main.ml since its last action", ".review-current");
+
+  // 9d. On a wide window the threads sit beside their lines, in a margin
+  //     that resizes, each at its line or just under the one above; a
+  //     resolved thread folds to a mark on its line. The git actions are at
+  //     the page's foot, Send comments at its head.
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await page.locator(".review-controls .segment", { hasText: "Changes" }).click();
+  await page.locator(".review-page .review-code.beside .review-margin-item").first().waitFor();
+  const margin = () => page.evaluate(() => {
+    const items = [...document.querySelectorAll(".review-page .review-margin-item")];
+    let bottom = -Infinity;
+    return items.map(item => {
+      const box = item.getBoundingClientRect();
+      const line = document.querySelector(`.review-page tr[data-side="${item.dataset.side}"][data-line="${item.dataset.line}"]`).getBoundingClientRect();
+      const placed = box.top >= line.top - 1 && box.top >= bottom;
+      const at = Math.abs(box.top - line.top) < 2 ? "at its line" : (box.top > line.top ? "below its line" : "ABOVE ITS LINE");
+      bottom = box.bottom;
+      const what = item.querySelector("[data-comment]")?.dataset.comment ?? "draft";
+      return `${what} ${item.classList.contains("folded") ? "folded" : "open"} ${item.dataset.side} ${item.dataset.line}: ${at}${placed ? "" : ", OVERLAPS"}`;
+    }).join("\n");
+  });
+  // Laid out once the transition settles.
+  const settled = () => page.waitForFunction(() =>
+    [...document.querySelectorAll(".review-page .review-margin-item")].every(item => {
+      const line = document.querySelector(`.review-page tr[data-side="${item.dataset.side}"][data-line="${item.dataset.line}"]`);
+      return item.getBoundingClientRect().top >= line.getBoundingClientRect().top - 1 && getComputedStyle(item).top === item.style.top;
+    }));
+  await settled();
+  await page.waitForTimeout(250);
+  section("margin: threads beside their lines");
+  console.log(await margin());
+  const rowsMoved = await page.evaluate(() => {
+    const a = document.querySelector('.review-page tr[data-side="new"][data-line="12"]').getBoundingClientRect();
+    const b = document.querySelector('.review-page tr[data-side="new"][data-line="13"]').getBoundingClientRect();
+    return Math.round(b.top - a.bottom);
+  });
+  console.log(`lines 12 and 13 adjacent: ${rowsMoved === 0}`);
+  await screenshot("margin: threads beside their lines");
+  await page.locator('.review-page .review-thread[data-comment="c1"] .btn', { hasText: "Resolve" }).click();
+  await page.locator('.review-page .review-folded-thread[data-comment="c1"]').waitFor();
+  await settled();
+  await page.waitForTimeout(250);
+  section("margin: c1 resolved, folded to its line");
+  console.log(await margin());
+  console.log(clean(await page.locator('.review-page .review-folded-thread[data-comment="c1"]').innerText()));
+  await screenshot("margin: a resolved thread folded");
+  await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+  await page.waitForTimeout(150);
+  await screenshot("margin: light theme");
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  await page.waitForTimeout(150);
+  await screenshot("margin: dark theme");
+  await page.evaluate(() => { document.documentElement.dataset.theme = "original"; });
+  await page.locator('.review-page .review-folded-thread[data-comment="c1"]').click();
+  await page.locator('.review-page .review-thread.resolved[data-comment="c1"]').waitFor();
+  section("margin: c1 unfolded");
+  console.log(clean(await page.locator('.review-page .review-thread[data-comment="c1"]').innerText()));
+  await page.locator('.review-page .review-thread[data-comment="c1"] .review-fold').click();
+  await page.locator('.review-page .review-folded-thread[data-comment="c1"]').waitFor();
+  // The margin's edge resizes it.
+  const marginHandle = page.locator('.review-page .resizer[data-resize="review-margin"]');
+  const marginBefore = Number(await marginHandle.getAttribute("aria-valuenow"));
+  const edge = await marginHandle.boundingBox();
+  await page.mouse.move(edge.x + edge.width / 2, edge.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + edge.width / 2 - 60, edge.y + 40, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForFunction(before =>
+    document.querySelector('.review-page .resizer[data-resize="review-margin"]').getAttribute("aria-valuenow") !== String(before), marginBefore);
+  section("margin: dragged wider");
+  console.log(`wider by: ${Number(await marginHandle.getAttribute("aria-valuenow")) - marginBefore}`);
+  await marginHandle.dblclick();
+  await page.waitForFunction(() =>
+    document.querySelector('.review-page .resizer[data-resize="review-margin"]').getAttribute("aria-valuenow") === "340");
+  section("git: the actions at the page's foot");
+  console.log(await page.evaluate(() => {
+    const bar = document.querySelector(".review-page .git-bar").getBoundingClientRect();
+    const scroll = document.querySelector(".review-page .review-scroll").getBoundingClientRect();
+    const send = [...document.querySelectorAll(".review-head .btn")].find(b => /Send/.test(b.textContent));
+    return [
+      `git bar under the code: ${bar.top >= scroll.bottom - 1}`,
+      `git bar at the foot: ${Math.abs(bar.bottom - innerHeight) < 2}`,
+      `Send comments in the head: ${!!send}`,
+      `git buttons in the head: ${document.querySelectorAll(".review-head .git-actions").length}`,
+    ].join("\n");
+  }));
+  await page.setViewportSize({ width: 1440, height: 900 });
   // The file browser's preview has the view too (the review closed, as it
   // takes the browser's place).
   await page.locator(".review-page").focus();

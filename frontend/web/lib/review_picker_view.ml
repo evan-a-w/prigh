@@ -9,6 +9,7 @@ let title (p : Review_picker.t) =
   match Review_picker.which p with
   | Target -> "What to review"
   | Base -> "What to compare it with"
+  | Since _ -> "What the since-view compares with"
 ;;
 
 let row ~selected i (item : Review_picker.Item.t) ~inject =
@@ -77,6 +78,7 @@ let view (p : Review_picker.t) ~inject =
     match Review_picker.which p with
     | Target -> "target"
     | Base -> "base"
+    | Since _ -> "since"
   in
   Node.div
     ~attrs:
@@ -102,7 +104,8 @@ let view (p : Review_picker.t) ~inject =
               ; Attr.placeholder
                   (match Review_picker.which p with
                    | Target -> "Filter worktrees and branches…"
-                   | Base -> "A branch, tag, commit or any revision…")
+                   | Base -> "A branch, tag, commit or any revision…"
+                   | Since _ -> "Filter the actions on this file…")
               ; Attr.value (Review_picker.query p)
               ; Attr.create "autocomplete" "off"
               ; Attr.create "spellcheck" "false"
@@ -113,7 +116,8 @@ let view (p : Review_picker.t) ~inject =
             ~cls:"popover-shortcut"
             (match Review_picker.which p with
              | Target -> "r"
-             | Base -> "b")
+             | Base -> "b"
+             | Since _ -> "L")
         ]
     ; (match visible with
        | [] ->
