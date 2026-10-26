@@ -7611,7 +7611,14 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"laptop","cwd":"/home/me"}]}|})))
   in
   H.event h (State state);
-  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       });
   H.keys h "/host laptop";
   H.enter h;
   H.show h;
@@ -7876,7 +7883,14 @@ let%expect_test "the host picker shows which session other frontends are in" =
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-3","hosts":[{"id":"backend","name":"srv","cwd":"/work","session_id":null,"session_name":null},{"id":"client-1","name":"laptop","cwd":"/home/me","session_id":"abc123","session_name":null},{"id":"client-2","name":"desktop","cwd":"/home/me/other","session_id":"def456","session_name":"refactor"},{"id":"client-3","name":"pi","cwd":"/pi","session_id":"9876","session_name":null}]}|})))
   in
   H.event h (State state);
-  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       });
   H.keys h "/host";
   H.enter h;
   H.show h;
@@ -8413,8 +8427,14 @@ let%expect_test "logged-in user: shown in the status line, kept across \
                  reconnects; /signout asks the platform"
   =
   let h = connected ~width:80 () in
-  H.step h (Hello
-       { client_id = "client-1"; namespace = Some "lloyd"; user = Some "lloyd" });
+  H.step
+    h
+    (Hello
+       { client_id = "client-1"
+       ; namespace = Some "lloyd"
+       ; user = Some "lloyd"
+       ; superuser = false
+       });
   H.show h;
   [%expect
     {|
@@ -8681,7 +8701,12 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   let h = connected ~width:80 () in
   H.step
     h
-    (Hello { client_id = "client-1"; namespace = Some "s"; user = Some "s" });
+    (Hello
+       { client_id = "client-1"
+       ; namespace = Some "s"
+       ; user = Some "s"
+       ; superuser = false
+       });
   H.keys h "/setusr";
   H.enter h;
   [%expect {| (Rpc (method_ list_users) (params ()) (tag Users_list)) |}];

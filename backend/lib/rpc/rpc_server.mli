@@ -59,6 +59,9 @@ val create
   -> ?forges:Forges.t
        (** git hosts (default: real HTTP, sign-ins in [login]'s store,
            settings in [home]'s config) *)
+  -> ?nix_store:Nix_store.t
+       (** for superusers' [nix_store_status] and [nix_store_gc] (without
+           it they fail) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string

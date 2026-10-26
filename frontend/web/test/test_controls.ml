@@ -275,6 +275,7 @@ let%expect_test
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="card-status">
         <div class="status">
@@ -435,6 +436,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
         <icon class="pencil"> </icon>
       </button>
       <div class="status-extras">
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>

@@ -133,8 +133,10 @@ let%expect_test "what counts as a slash command" =
     printf
       "%S -> %s\n"
       name
-      (Option.value_map (Slash.closest name) ~default:"none" ~f:(fun s ->
-         s.name)));
+      (Option.value_map
+         (Slash.closest ~superuser:false name)
+         ~default:"none"
+         ~f:(fun s -> s.name)));
   [%expect
     {|
     "hlep" -> help

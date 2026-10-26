@@ -163,7 +163,7 @@ user, `default`.
 | `PRIGH_MODE` | `web` | see above |
 | `PRIGH_TOKEN` | – | password of the single user `default`. **Required** for network modes (or `PRIGH_TOKENS`) |
 | `PRIGH_TOKENS` | – | several users, `name=token,name2=token2` (see [Users](#users)); replaces `PRIGH_TOKEN` |
-| `PRIGH_SUPERUSERS` | – | comma-separated users that can switch to any user with `/setusr` |
+| `PRIGH_SUPERUSERS` | – | comma-separated users that can switch to any user with `/setusr`, and clean the Nix store (`/nix-gc`, prigh-web's Settings) |
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container; tools and terminals run only on hosts the users connect |
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
@@ -171,6 +171,8 @@ user, `default`.
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
 | `PRIGH_CWD` | `/home/prigh` | working directory for `PRIGH_MODE=tui` only |
+| `PRIGH_NIX_GC_INTERVAL` | `1d` | how often the container collects Nix garbage: a number with `s`, `m`, `h` or `d` (`12h`, `7d`); `0` or `off`: never (see [Garbage collection](#garbage-collection)) |
+| `PRIGH_NIX_GC_KEEP_DAYS` | `14` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
@@ -222,19 +224,65 @@ How it fits together:
   them in `/opt/nix-seed`, and the entrypoint copies any that are missing
   into `/nix/store` and registers them at every start (the first start
   copies about 160 MB). `/usr/local/bin/nix*` link to the seeded nix.
-- **Garbage collection.** When Nix fetches or builds with less than 2 GiB
-  free on the volume's filesystem, it deletes unused paths until 8 GiB is
-  free. What users
-  installed with `nix profile` stays; what they only used with `nix shell`
-  or `nix run` may be deleted and is fetched again when needed. GC roots in
-  `/nix/var/nix/gcroots/prigh` keep the paths prigh and nix need. Collect by
-  hand with `docker compose exec prigh nix store gc`.
+- **Garbage collection**: see [below](#garbage-collection).
 - **Upgrades.** A new image brings its seed; the entrypoint adds what is new
   and moves the GC roots to it, so the old image's paths become garbage.
   Users' profiles and packages are kept. If an image ever ships an older
   Nix than the volume was used with, Nix may refuse the newer database: then
   remove the volume (`docker volume rm <project>_prigh-nix`; users reinstall
   their profile packages).
+
+### Garbage collection
+
+The shared `/nix` volume grows as agents fetch tools. What users installed
+with `nix profile` (the current generation of each profile) stays; what they
+only used with `nix shell` or `nix run` is garbage, fetched again when
+needed. GC roots in `/nix/var/nix/gcroots/prigh` keep the paths prigh and
+nix need. Three things clean it:
+
+- **While Nix works.** When it fetches or builds with less than 10% of the
+  volume's filesystem free, it deletes unused paths until 25% is (at least
+  1 and 3 GiB, at most 50 and 100 GiB). The entrypoint sizes these limits
+  from the filesystem at every start, in `/run/prigh/nix.conf` (included by
+  `/etc/nix/nix.conf`); the startup line says what they are.
+- **On a schedule.** Every `PRIGH_NIX_GC_INTERVAL` (default a day; the
+  first run at least 5 minutes after start, counted from the last one, so
+  restarts do not postpone it), the entrypoint deletes every user's profile
+  generations older than `PRIGH_NIX_GC_KEEP_DAYS` (default 14), as that user,
+  then runs `nix store gc` as root. Profiles are those under
+  `~/.local/state/nix/profiles` (where `nix profile` keeps them) and the
+  older `/nix/var/nix/profiles/per-user/NAME`; the current generation is
+  always kept. Users can no longer roll back (`nix profile rollback`) past
+  what was deleted.
+- **By a superuser** (`PRIGH_SUPERUSERS`), from prigh-web's Settings (Nix
+  store: its size, the free space on the volume, the last and the next
+  collection; Collect, or Also delete generations over N days…) or `/nix-gc`
+  in either frontend (`/nix-gc run`, `/nix-gc run DAYS`, `/nix-gc run all`),
+  with progress while it runs and what it freed at the end. Other users
+  see none of it: no `/nix-gc`, no Settings section, nothing about the
+  store from the backend. From the host:
+  `docker compose exec prigh prigh-docker nix-gc [keep|all|Nd]` (default:
+  `PRIGH_NIX_GC_KEEP_DAYS`).
+
+One collection runs at a time; the last one (whoever started it) is
+recorded in `/nix/var/prigh/last-gc` and shown in Settings, and each is
+logged in the container's output.
+
+**Privileges.** The backend runs as `prigh`, not root, and cannot delete
+other users' generations or collect for them. The entrypoint's root helper
+does it: it reads requests from the FIFO `/run/prigh/nix-gc/requests`
+(owned by root, writable only by the `prigh` group, which the users' tool
+hosts are not in) and accepts only lines `gc ID keep|all|Nd USER` (anything
+else is logged and ignored), so the backend can ask for a collection but
+not run anything else as root: the worst a forged request does is collect
+garbage. The backend checks that the user is a superuser
+before asking. The helper writes Nix's output to `/run/prigh/nix-gc/ID.log`
+and the outcome to `ID.result`, which the backend reads (with `running`,
+`last-gc` and `schedule` in the same directory) and streams to the
+frontend. `-nix-gc-helper DIR` (`$PRIGH_NIX_GC_HELPER`, set by the
+entrypoint) points the backend at it; without it (outside the container) the
+backend runs `nix store gc`, or `nix-collect-garbage` for generations, as
+its own user.
 
 ## Logging in
 
@@ -434,6 +482,7 @@ docker compose exec prigh prigh-docker users                 # name, uid, home, 
 docker compose exec -it prigh prigh-docker as alice bash     # a shell as alice, in alice's clean environment
 docker compose exec prigh prigh-docker prigh sessions list   # any other command runs as prigh
 docker compose exec prigh prigh-docker as alice nix profile list
+docker compose exec prigh prigh-docker nix-gc 30d             # collect Nix garbage now (root), deleting generations over 30 days
 docker compose run --rm prigh bash                           # likewise, in a new container
 ```
 
