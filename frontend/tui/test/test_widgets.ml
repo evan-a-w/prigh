@@ -599,6 +599,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M            Cycle_mode
     Ctrl+N           Picker_toggle_filter
     Alt+A            Toggle_archived
+    Alt+R            Review_highlighted
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
     Alt+L            Toggle_sidebar
@@ -658,6 +659,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter; /worktree: open in a new session
     Alt+A                   /sessions: archive or unarchive the highlighted session
+    Alt+R                   /worktree: review the highlighted worktree's changes
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Alt+L                   show or hide the agents sidebar (terminals of 120 columns and more)
@@ -690,7 +692,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
     /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [title] creates one from the current branch, checkout N checks one out in a git worktree
-    /review [base] [instructions]      alone: the changed files' approvals and review comments (prigh-web: the review page); with a base (HEAD: the uncommitted changes) or instructions, have the model review the changes for prioritised findings
+    /review [worktree] [--base REV]    the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
@@ -738,6 +740,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
+    Alt+R                    /worktree: review the highlighted worktree's changes
     Alt+D                    /sessions: delete every archived session
     Ctrl+N                   /sessions: named only · /model: logged-in only · /worktree: open in a new session
     Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none

@@ -56,8 +56,8 @@ let picker ~kind (p : Picker.t) ~inject =
            | Reminders ->
              "↑↓ to move, Enter to show, Delete to remove, Esc to close"
            | Worktrees _ ->
-             "Enter works there, Alt+Enter in a new session, Delete removes, \
-              Esc closes"
+             "Enter works there, Alt+Enter in a new session, Alt+R reviews, \
+              Delete removes, Esc closes"
            | _ -> "↑↓ to move, Enter to choose, Esc to close")
       ]
     [ div

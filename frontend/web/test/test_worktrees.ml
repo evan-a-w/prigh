@@ -515,7 +515,7 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
     feat/login /home/u/.prigh/worktrees/work/feat-login · 3 changed · ↑2 ↓1 · 1 session
     docs /home/u/.prigh/worktrees/work/docs
     old /home/u/.prigh/worktrees/work/old · gone
-    Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+    Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
     |}];
   H.key h "ArrowDown" ~target:Field;
   H.key h "Enter" ~target:Field;

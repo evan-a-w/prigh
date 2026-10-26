@@ -656,10 +656,10 @@ let%expect_test "a worktree's menu and its items" =
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose review)
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 2780))
-    (Rpc (method_ review)
-     (params ((args /home/u/.prigh/worktrees/prigh/feat-login)))
-     (tag (Command_prompt "/review /home/u/.prigh/worktrees/prigh/feat-login")))
+    (Rpc (method_ git_diff)
+     (params ((dir /home/u/.prigh/worktrees/prigh/feat-login)))
+     (tag (Review Diff)))
+    (Focus review-page)
     (Open_menu
      ((target
        (Worktree (session /sessions/s1.jsonl)
@@ -673,7 +673,6 @@ let%expect_test "a worktree's menu and its items" =
      (params ((path /home/u/.prigh/worktrees/prigh/feat-login) (hidden false)))
      (tag (Files (Listed /home/u/.prigh/worktrees/prigh/feat-login))))
     (Files (Focus files-list))
-    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Open_menu
      ((target
        (Worktree (session /sessions/s1.jsonl)
@@ -697,7 +696,7 @@ let%expect_test "a worktree's menu and its items" =
     (Picker_choose copy_path)
     (Focus editor)
     (Copy /home/u/.prigh/worktrees/prigh/feat-login)
-    (Expire_toast (id 1) (after_ms 3820))
+    (Expire_toast (id 0) (after_ms 3820))
     |}];
   on_login "switch_here";
   [%expect

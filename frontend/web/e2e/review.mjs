@@ -4,7 +4,8 @@
 // a removed line) sent to the agent, its replies (one proposing a change,
 // accepted), the review page beside the chat (approvals, the keys, the
 // whole-file layout, edit mode saving a file), live updates as the agent
-// edits, and a phone. Run by prigh_web.sh; prints normalised snapshots (the
+// edits, another worktree (a branch with a commit) against its base, and a
+// phone. Run by prigh_web.sh; prints normalised snapshots (the
 // expected output is in prigh_web.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -25,14 +26,16 @@ const cwd = join(dir, "repo");
 mkdirSync(home, { recursive: true });
 mkdirSync(join(cwd, "src"), { recursive: true });
 
-const git = (...args) =>
+const gitIn = (where, ...args) =>
   execFileSync("git", args, {
-    cwd,
+    cwd: where,
     env: {
       ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
       GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
     },
   });
+const git = (...args) => gitIn(cwd, ...args);
+const wt = join(dir, "wt-login");
 const lines = n => Array.from({ length: n }, (_, i) => `let v${i + 1} = ${i + 1}`).join("\n") + "\n";
 writeFileSync(join(cwd, "src", "main.ml"), lines(30));
 writeFileSync(join(cwd, "README.md"), "# Demo\n\nA small project.\n");
@@ -91,6 +94,7 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
 const clean = text => text
   .replaceAll(cwd, "<REPO>")
+  .replaceAll(wt, "<WT>")
   .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
   .replace(/\b[0-9a-f]{8}\b/g, "<SHA>")
   .split("\n")
@@ -325,6 +329,36 @@ try {
   await page.locator(".composer textarea").press("Enter");
   await page.locator(".review-page").waitFor();
   console.log(`/review opened it: true`);
+
+  // 9b. Another worktree: a branch with a commit and an uncommitted change,
+  //     reviewed against the branch it came from; HEAD shows only what is
+  //     not committed. Its approvals are its own.
+  git("worktree", "add", "-q", "-b", "feat/login", wt);
+  writeFileSync(join(wt, "src", "login.ml"), "let login user = user\n");
+  gitIn(wt, "add", "-A");
+  gitIn(wt, "commit", "-q", "-m", "login");
+  writeFileSync(join(wt, "README.md"), "# Demo\n\nA small project, with logins.\n");
+  await page.locator(".composer textarea").fill(`/review ${wt}`);
+  await page.locator(".composer textarea").press("Escape");
+  await page.locator(".composer textarea").press("Enter");
+  await page.locator('.review-file[data-path="src/login.ml"]').waitFor();
+  section("worktree: what is reviewed");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  console.log(`base: ${await page.locator("#review-base").inputValue()}`);
+  await show("worktree: the files", ".review-files");
+  await page.locator(".review-file[data-path='README.md']").click();
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("a");
+  await page.locator(".review-file.current.approved").waitFor();
+  await page.locator("#review-base").selectOption("HEAD");
+  await page.locator('.review-file[data-path="src/login.ml"]').waitFor({ state: "detached" });
+  await show("worktree: against HEAD", ".review-files");
+  section("worktree: against HEAD, what is reviewed");
+  console.log(clean(await page.locator(".review-target").getAttribute("title")));
+  await page.locator(".composer textarea").fill("/review");
+  await page.locator(".composer textarea").press("Enter");
+  await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
+  await show("worktree: back to the session's own", ".review-files");
 
   // 10. A phone: a sheet over the chat.
   await page.setViewportSize({ width: 390, height: 800 });

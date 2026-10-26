@@ -1101,7 +1101,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (appending a `Compaction` entry); both return the summary and its usage.
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
   `git diff` against `HEAD` (or a base's merge base) plus untracked files
-  as new ones, optionally one path, cut at 1 MB; errors say what to do
+  as new ones, optionally one path, cut at 1 MB, in the session cwd's
+  worktree or `dir`'s (any worktree on the host). With `default_base` (the
+  `git_diff` RPC), a linked worktree without a base is compared with the
+  branch it was made from (`Worktree.base_key`), else its remote's
+  `HEAD`, else `main`/`master`; the result names the worktree's `branch`,
+  the `base`, whether it is the `main` checkout and the repository's
+  `branches` (to pick another base). Errors say what to do
   (not a repository, no git, unknown base). `Review` writes `/review`'s
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
@@ -1137,12 +1143,16 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   without one, tracks the single remote branch of that name; it refuses a
   branch checked out in another worktree (with `fresh`, a branch that
   exists or is checked out gets `-2`, ... instead; `Created` has the
-  repository's `root` and the asker's `cwd` carried over). `remove` refuses the main
+  repository's `root` and the asker's `cwd` carried over). A new branch
+  made from a branch records it as git config `branch.<b>.prighBase`,
+  `Git_diff`'s default base. `remove` refuses the main
   worktree and, without force, one with changes or locked (`--force`
   twice for a locked one), prunes one whose directory is gone, and keeps
   the branch. Errors say what to do, like `Git_diff`'s.
-- `Review_comment`, `Review_state` — the session's review of the working
-  tree: comments (`c1`, `c2`, ... never reused) on a `Range` of a file
+- `Review_comment`, `Review_state` — the session's review of its
+  worktrees (each comment names its worktree's `root`; approvals are keyed
+  by `File_key` `{root, path}`, those saved before worktrees were told
+  apart without a root, read as the session's own): comments (`c1`, `c2`, ... never reused) on a `Range` of a file
   (relative to the repository's `root`, as `git_diff` names it: lines,
   their `Side` (`New`, the file as it is, or `Old`, lines the change
   removed, numbered as before it) and, for text the user selected,
@@ -1162,7 +1172,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   them, then a `Review_changed` event with the whole review) and offers
   `reply_to_comment` while there are comments. `submit_review` turns the
   user's undelivered posts into one message (instructions on replying,
-  then each comment with them as `<comment id file lines side? selection?
+  then each comment with them as `<comment id worktree file lines side? selection?
   status>` with its numbered `<code>` (a selection marked `⟦…⟧`, and
   quoted whole in `<selected>`) and `<post from new>`s; `Injected.Source.Review_comments
   {count}`), queued as a steer (it starts a run when idle) and marks them
@@ -1324,8 +1334,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
-  `resume_now`, `git_diff {path?}`
-  (`{root, against, diff, truncated}`), `review {args?}` (`[base]
+  `resume_now`, `git_diff {path?, base?, dir?}`
+  (`{root, against, diff, truncated, branch?, base, main, branches}`: `dir`
+  any worktree on the host, a linked one compared with its default base
+  when no `base` is given), `review {args?}` (`[base]
   [instructions]`) and `init`, `list_worktrees {cwd?}` (`{root,
   project_dir, worktrees}`), `create_worktree {branch, base?, cwd?}`
   (`{worktree, new_branch, root, cwd}`: `cwd` is the directory it was
@@ -1351,9 +1363,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   anchor, text}` (a selection's columns come together; `side` is `new`
   without one), `review_reply
   {id, text}`, `review_set_status {id, status}` (each answering the
-  comment), `review_delete {id}`, `review_submit` (`{count}`),
-  `review_decide {id, post, accept}`, `review_approve {path, hash}` and
-  `review_unapprove {path}` (answering the review); every change is also
+  comment), `review_delete {id}`, `review_submit {root?}` (`{count}`; with `root`,
+  that worktree's comments only),
+  `review_decide {id, post, accept}` (applied in the comment's worktree),
+  `review_approve {root?, path, hash}` and
+  `review_unapprove {root?, path}` (answering the review; `approvals` are
+  `{root?, path, hash}`); every change is also
   sent to the session's clients as a `review` event with the whole
   review.
   `get_messages_page {limit, before?, from?, session?}` (`Message_page`,

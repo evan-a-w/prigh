@@ -1050,3 +1050,267 @@ let%expect_test "another session closes the picker and forgets the listing" =
     ()
     |}]
 ;;
+
+(* /review WORKTREE: that worktree's files and their approvals, against its
+   base; Alt+R in the picker does the same for the highlighted one. *)
+
+let feat_review_json =
+  {|{"comments":[
+      {"id":"c1","root":"/src/repo","path":"a.ml","first":1,"last":1,"anchor":"x","status":"open",
+       "thread":[{"author":"user","text":"In main","at_ms":1,"delivered":false}]},
+      {"id":"c2","root":"/h/.prigh/worktrees/repo/feat-a","path":"a.ml","first":1,"last":1,"anchor":"x","status":"open",
+       "thread":[{"author":"user","text":"In feat/a","at_ms":2,"delivered":false}]}],
+     "approvals":[{"path":"a.ml","hash":"legacy"},
+                  {"root":"/h/.prigh/worktrees/repo/feat-a","path":"b.ml","hash":"stale"}]}|}
+;;
+
+let feat_diff_json =
+  {|{"root":"/h/.prigh/worktrees/repo/feat-a","against":"0123456789abcdef0123456789abcdef01234567",
+     "base":"main","branch":"feat/a","main":false,"branches":["feat/a","main"],"truncated":false,
+     "diff":"diff --git a/a.ml b/a.ml\n--- a/a.ml\n+++ b/a.ml\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/b.ml b/b.ml\n--- a/b.ml\n+++ b/b.ml\n@@ -1 +1 @@\n-p\n+q\n"}|}
+;;
+
+let show_feat_review h ~dir ~base =
+  H.reply ~quiet:true h (Review_comments { dir; base }) feat_review_json;
+  let review =
+    P.Review.of_json (P.Json.parse feat_review_json |> Or_error.ok_exn)
+    |> Or_error.ok_exn
+  in
+  H.reply
+    h
+    (Retry_in_editor
+       { command = Review_command.command ?dir ?base ()
+       ; hint = ""
+       ; then_ = Review_status { review; dir }
+       })
+    feat_diff_json;
+  H.show h
+;;
+
+let%expect_test "/review WORKTREE: its approvals and comments, not the others'" =
+  let h = connected ~height:20 () in
+  run h "/review feat/a";
+  H.reply
+    h
+    (Review_named
+       { command = "/review feat/a"
+       ; name = "feat/a"
+       ; base = None
+       ; model = None
+       })
+    listing_json;
+  show_feat_review h ~dir:(Some "/h/.prigh/worktrees/repo/feat-a") ~base:None;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Review_named
+        (command "/review feat/a")
+        (name    feat/a)
+        (base ())
+        (model (feat/a)))))
+    (Rpc
+      (method_ get_review)
+      (params ())
+      (tag (Review_comments (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Review ─────────────────────────────────────────────────────────────────────┐
+    │ review feat/a (/h/.prigh/worktrees/repo/feat-a) against main (merge base     │
+    │ 01234567)  0 of 2 files approved                                             │
+    │   ○ a.ml  +1 −1  not approved                                                │
+    │     c2 line 1, not sent yet                                                  │
+    │       you: In feat/a                                                         │
+    │   ● b.ml  +1 −1  changed since approved                                      │
+    │ approve files and comment on code you select in prigh-web's review page;     │
+    │ /review HEAD has prigh review the changes itself                             │
+    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    ──────────────────────────────────────────────────────── reading the review… ───
+    > ▏
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}]
+;;
+
+let%expect_test
+    "/review: a path and --base go straight there; a word that names no \
+     worktree has the model review"
+  =
+  let h = connected () in
+  run h "/review ../feat-a --base main";
+  run h "/review tests";
+  H.reply
+    h
+    (Review_named
+       { command = "/review tests"
+       ; name = "tests"
+       ; base = None
+       ; model = Some "tests"
+       })
+    listing_json;
+  run h "/review nope --base main";
+  H.reply
+    h
+    (Review_named
+       { command = "/review nope --base main"
+       ; name = "nope"
+       ; base = Some "main"
+       ; model = None
+       })
+    listing_json;
+  H.show h;
+  editor h;
+  [%expect
+    {|
+    (Rpc
+      (method_ get_review)
+      (params ())
+      (tag (
+        Review_comments
+        (dir  (../feat-a))
+        (base (main)))))
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Review_named
+        (command "/review tests")
+        (name    tests)
+        (base ())
+        (model (tests)))))
+    (Rpc
+      (method_ review)
+      (params ((args tests)))
+      (tag (
+        Retry_in_editor
+        (command "/review tests")
+        (hint    "")
+        (then_   Review_started))))
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Review_named
+        (command "/review nope --base main")
+        (name    nope)
+        (base (main))
+        (model ()))))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────── no worktree "nope" (closest: old, repo, main); /worktree lists them ───
+    > /review nope --base main▏
+    deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    editor: /review nope --base main
+    |}]
+;;
+
+let%expect_test "Review_command: parsing, resolving and completing /review" =
+  List.iter
+    [ ""
+    ; "feat/a"
+    ; "~/wt/x"
+    ; "./sub --base origin/main"
+    ; "--base main"
+    ; "feat/a --base main"
+    ; "main focus on errors"
+    ; "--base"
+    ; "a b --base main"
+    ]
+    ~f:(fun args ->
+      print_s
+        [%message args ~_:(Review_command.parse args : Review_command.Action.t)]);
+  let listing =
+    P.Worktree.Listing.of_json (P.Json.parse listing_json |> Or_error.ok_exn)
+    |> Or_error.ok_exn
+  in
+  List.iter
+    [ "feat/a", None; "feat-a", None; "nope", Some "nope" ]
+    ~f:(fun (name, model) ->
+      print_s
+        [%sexp
+          (Review_command.resolve listing ~name ~base:None ~model
+           : Review_command.Action.t)]);
+  print_endline (Review_command.command ~dir:"/w/x" ~base:"main" ());
+  print_endline (Review_command.command ());
+  List.iter
+    [ ""; "fe"; "feat/a "; "--base "; "feat/a --base m" ]
+    ~f:(fun rest ->
+      print_s
+        [%message
+          rest
+            ~_:
+              (Review_command.complete
+                 ~worktrees:(List.take listing.worktrees 2)
+                 ~branches:[ "main"; "origin/main" ]
+                 rest
+               : (int * (string * string) list) option)]);
+  [%expect
+    {|
+    ("" (
+      Show
+      (dir  ())
+      (base ())))
+    (feat/a (Named (name feat/a) (base ()) (model (feat/a))))
+    (~/wt/x (Show (dir (~/wt/x)) (base ())))
+    ("./sub --base origin/main" (
+      Show
+      (dir  (./sub))
+      (base (origin/main))))
+    ("--base main" (Show (dir ()) (base (main))))
+    ("feat/a --base main" (Named (name feat/a) (base (main)) (model ())))
+    ("main focus on errors" (Model "main focus on errors"))
+    (--base (Error "--base needs a revision: /review --base main"))
+    ("a b --base main" (
+      Error
+      "one worktree at a time: /review [WORKTREE] [--base REV], or /review [BASE] [instructions]"))
+    (Show (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))
+    (Show (dir (/h/.prigh/worktrees/repo/feat-a)) (base ()))
+    (Model nope)
+    /review /w/x --base main
+    /review
+    ("" ((
+      0 (
+        (--base "compare with another base")
+        (main
+         "main \194\183 /src/repo \194\183 main worktree \194\183 \226\134\1451 \226\134\1470")
+        (feat/a
+         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")))))
+    (fe ((
+      0 (
+        (--base "compare with another base")
+        (main
+         "main \194\183 /src/repo \194\183 main worktree \194\183 \226\134\1451 \226\134\1470")
+        (feat/a
+         "feat/a \194\183 /h/.prigh/worktrees/repo/feat-a \194\183 3 changed \194\183 2 sessions")))))
+    ("feat/a " ((7 ((--base "compare with another base")))))
+    ("--base " ((
+      7 (
+        (HEAD        "the uncommitted changes only")
+        (feat/a      "compare with feat/a")
+        (main        "compare with main")
+        (origin/main "compare with origin/main")))))
+    ("feat/a --base m" ((
+      14 (
+        (HEAD        "the uncommitted changes only")
+        (feat/a      "compare with feat/a")
+        (main        "compare with main")
+        (origin/main "compare with origin/main")))))
+    |}]
+;;

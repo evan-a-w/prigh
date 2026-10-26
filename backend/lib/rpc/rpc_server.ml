@@ -2226,10 +2226,13 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
         Or_error.map (Agent.compact ?instructions agent) ~f:(fun summary ->
           `Object [ "summary", `String summary ]))
   | "git_diff" ->
-    Or_error.bind (string_param_opt params "path") ~f:(fun path ->
-      Or_error.map
-        (Agent.git_diff ?path agent)
-        ~f:[%jsonaf_of: Git_diff.Result.t])
+    let open Or_error.Let_syntax in
+    let%bind path = string_param_opt params "path" in
+    let%bind base = string_param_opt params "base" in
+    let%bind dir = string_param_opt params "dir" in
+    Or_error.map
+      (Agent.git_diff ?path ?base ?dir ~default_base:true agent)
+      ~f:[%jsonaf_of: Git_diff.Result.t]
   | "review" ->
     Or_error.bind (string_param_opt params "args") ~f:(fun args ->
       unit_result (Agent.review agent ~args:(Option.value args ~default:"")))

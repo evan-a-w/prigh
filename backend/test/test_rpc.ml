@@ -1616,7 +1616,7 @@ let%expect_test "git_diff, review and init" =
     {|
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
     {"type":"response","id":"r1","ok":false,"error":"not a git repository: $DIR (git init starts one, or /cd into one)"}
-    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false}}
+    {"type":"response","id":"r1","ok":true,"result":{"root":"$DIR","against":"HEAD","diff":"diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..ce01362\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+hello\n","truncated":false,"branch":"main","base":"HEAD","main":true,"branches":["main"]}}
     {"type":"response","id":"r1","ok":false,"error":"param \"path\" must be a string"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}

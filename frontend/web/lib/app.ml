@@ -69,6 +69,12 @@ module Worktrees_purpose = struct
         { command : string
         ; action : Prigh_ui.Worktree_command.Action.t
         }
+    | Review_target of
+        { command : string
+        ; name : string
+        ; base : string option
+        ; model : string option
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -419,6 +425,10 @@ module Action = struct
         }
     | Files of Files.Action.t
     | Review of Code_review.Action.t
+    | Review_worktree of
+        { path : string
+        ; base : string option
+        }
     | Resize of Resize.Action.t
     | Load_older
     | Prefetch_session of string (** a path *)
@@ -790,7 +800,11 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
   List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_review.Out.t) ->
     match out with
     | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
-    | Get_diff -> m, cmds @ [ rpc "git_diff" [] ~tag:(Review Diff) ]
+    | Get_diff { dir; base } ->
+      ( m
+      , cmds
+        @ [ rpc "git_diff" (Git_diff.params ?dir ?base ()) ~tag:(Review Diff) ]
+      )
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
@@ -1350,6 +1364,8 @@ let complete_draft (m : Model.t) ~skills =
            (Worktrees.listing m.worktrees)
            ~default:[]
            ~f:(fun (l : Worktree.Listing.t) -> l.worktrees))
+      ~branches:
+        (Option.value_map m.review.diff ~default:[] ~f:(fun d -> d.branches))
       ~sessions:m.sessions
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
@@ -3467,6 +3483,58 @@ let worktree_target
       ask_remove_worktree m w ~force)
 ;;
 
+(* ---- /review: the review page on a worktree, or the model's review *)
+
+module Review_command = Prigh_ui.Review_command
+
+let review_worktree (m : Model.t) ~dir ~base =
+  with_review m (Code_review.update m.review (Show { dir; base }))
+;;
+
+let rec review_action (m : Model.t) ~command (action : Review_command.Action.t) =
+  match action with
+  | Show { dir; base } -> review_worktree m ~dir ~base
+  | Named { name; base; model } ->
+    (match
+       Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
+         Worktree_command.find l name)
+     with
+     | Some (Ok w) -> review_worktree m ~dir:(Some w.path) ~base
+     | Some (Error _) | None ->
+       (match Worktrees.place m.state with
+        | Some place ->
+          ( m
+          , [ call
+                (List_worktrees { cwd = None })
+                ~tag:
+                  (Worktrees
+                     { place
+                     ; purpose = Review_target { command; name; base; model }
+                     })
+            ] )
+        | None ->
+          review_action
+            m
+            ~command
+            (match model with
+             | Some args -> Model args
+             | None -> Error "no session yet: wait for it to load")))
+  | Model args ->
+    let m, cmds = toast m reading_review in
+    ( m
+    , cmds
+      @ [ rpc
+            "review"
+            [ "args", str args ]
+            ~tag:(Command_prompt (String.strip ("/review " ^ args)))
+        ] )
+  | Error e -> error (back_in_editor m command) (String.capitalize e ^ ".")
+;;
+
+let review_target (m : Model.t) ~command ~name ~base ~model listing =
+  review_action m ~command (Review_command.resolve listing ~name ~base ~model)
+;;
+
 let worktree_command (m : Model.t) rest =
   let command = String.strip ("/worktree " ^ rest) in
   match Worktree_command.parse rest with
@@ -3722,16 +3790,12 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
             (if String.is_empty path then [] else [ "path", str path ])
             ~tag:Git_diff
         ] )
-  | "review", "" -> with_review m (Code_review.update m.review (Open None))
+  | "review", "" -> review_worktree m ~dir:None ~base:None
   | "review", args ->
-    let m, cmds = toast m reading_review in
-    ( m
-    , cmds
-      @ [ rpc
-            "review"
-            [ "args", str args ]
-            ~tag:(Command_prompt (String.strip ("/review " ^ args)))
-        ] )
+    review_action
+      m
+      ~command:(String.strip ("/review " ^ args))
+      (Review_command.parse args)
   | "init", _ -> m, [ rpc "init" [] ~tag:(Command_prompt "/init") ]
   | "notify", "" -> toast m (Page_notify.describe m.notifications)
   | "notify", "on" -> set_notifications m true
@@ -4707,7 +4771,13 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     { m with worktrees = Worktrees.failed m.worktrees ~seq }, []
   | Worktrees { purpose = Picker; _ }, Error e ->
     error m (sprintf "Couldn't list the worktrees: %s." e)
-  | Worktrees { purpose = Target { command; _ }; _ }, Error e ->
+  | ( Worktrees { purpose = Review_target { command; model = Some args; _ }; _ }
+    , Error _ ) ->
+    (* Not a repository: no worktree by that name, the model reviews. *)
+    review_action m ~command (Model args)
+  | ( Worktrees
+        { purpose = Target { command; _ } | Review_target { command; _ }; _ }
+    , Error e ) ->
     error
       (back_in_editor m command)
       (sprintf "Couldn't list the worktrees: %s." e)
@@ -5236,7 +5306,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       let seq =
         match purpose with
         | Sidebar seq -> Some seq
-        | Picker | Target _ -> None
+        | Picker | Target _ | Review_target _ -> None
       in
       let m =
         { m with worktrees = Worktrees.loaded m.worktrees ~place ?seq listing }
@@ -5247,7 +5317,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         then refresh_completion { m with completion = None }
         else m, []
       | Picker -> worktrees_picker m listing
-      | Target { command; action } -> worktree_target m ~command action listing)
+      | Target { command; action } -> worktree_target m ~command action listing
+      | Review_target { command; name; base; model } ->
+        review_target m ~command ~name ~base ~model listing)
   | Worktree_created _, Ok json ->
     decode m json Worktree.Created.of_json ~f:(worktree_created m)
   | Worktree_entered notice, Ok json ->
@@ -5303,7 +5375,7 @@ let loads : Reply_tag.t -> bool = function
   | Session_stats | Entries _
   | Users Picker
   | Skills { purpose = Picker _; _ }
-  | Worktrees { purpose = Picker | Target _; _ }
+  | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
   | Mcp Picker -> true
   | _ -> false
 ;;
@@ -5721,11 +5793,13 @@ let accept_completion (m : Model.t) ~run =
         (match Slash.find item.id with
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
+         (* [/review] alone is the common case: it runs at once. *)
+         | Some { argument = Some Review; _ } -> true
          | Some { argument = Some _; _ } | None -> false)
       | Argument (Directory | Backend_directory | Path | Skill), _ -> false
       (* Their number comes next. *)
       | Argument Pr, Some { id = "view" | "checkout"; _ } -> false
-      | Argument Worktree, _ when Completion.takes_more c -> false
+      | Argument (Worktree | Review), _ when Completion.takes_more c -> false
       | Argument _, _ -> true
       | (Command | Path | Snippet), _ -> false
     in
@@ -5776,12 +5850,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
          ~notice:(sprintf "Working in the worktree %s (%s)" label dir)
          ()
      | New_session_here -> new_session_in m dir
-     | Review ->
-       plan
-         ~run:
-           (Option.value_map worktree ~default:"/review" ~f:(fun w ->
-              "/review " ^ w))
-         ()
+     | Review -> plan ~run:(Prigh_ui.Review_command.command ?dir:worktree ()) ()
      | Files -> plan ~run:("/files " ^ dir) ()
      | Terminal ->
        plan
@@ -6495,6 +6564,14 @@ let update_connected (m : Model.t) (action : Action.t) =
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
   | Review action -> with_review m (Code_review.update m.review action)
+  | Review_worktree { path; base } ->
+    let m, close =
+      match m.dialog with
+      | Some (Picker { kind = Worktrees _; _ }) -> close_dialog m
+      | _ -> m, []
+    in
+    let m, cmds = review_worktree m ~dir:(Some path) ~base in
+    m, close @ cmds
   | Resize action ->
     let layout, saves = Resize.update m.layout (Model.shown m) action in
     ( { m with layout }

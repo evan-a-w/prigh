@@ -63,8 +63,9 @@ let help =
        transcript's right edge)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
-  ; ( "Alt+Enter / Delete (/worktree)"
-    , "start a new session in the highlighted worktree / remove it" )
+  ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
+    , "start a new session in the highlighted worktree / review its changes / \
+       remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
   ; ( "Shift+F10 / ContextMenu (on a session or worktree)"
@@ -182,6 +183,9 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Ask_remove_worktree item.id)
+  | _, Picker { kind = Worktrees _; picker } when alt_letter t "r" ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Review_worktree { path = item.id; base = None })
   | "Enter", Picker { kind = Worktrees _; picker } when alt_only t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Open_worktree { path = item.id; new_session = true })
