@@ -148,6 +148,7 @@ let rec summarise (e : Event.t) : string option =
   | Sessions_changed -> None
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
   | Prefs_changed _ -> None
+  | Agent_queues _ -> None
   | Review r ->
     Some (sprintf "review %d comments" (List.length r.comments))
 ;;

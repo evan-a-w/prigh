@@ -16,6 +16,9 @@ module Kind : sig
 
   (** When it reaches the agent, in a few words. *)
   val describe : t -> string
+
+  (** ["steer"], ["follow_up"]: the RPCs' [queue] and [mode]. *)
+  val wire : t -> string
 end
 
 type t =

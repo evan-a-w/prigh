@@ -65,6 +65,9 @@ type t =
       { steer : string list (** the queued texts, oldest first *)
       ; follow_up : string list
       }
+  | Agent_queues of Agent_queue.t list
+  (** the background subagents' queues ({!Agent_queue}), those not empty;
+      after every change of one *)
   | Subagent_start of
       { call_id : string
       ; agent_id : string

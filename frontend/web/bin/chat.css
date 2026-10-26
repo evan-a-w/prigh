@@ -339,6 +339,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   line-height: 1.6;
 }
 .note[data-kind="plan_mode"] .glyph { color: var(--sodium); }
+/* What the user sent a subagent while it worked: their words follow. */
+.note[data-kind="steer"] .glyph, .note[data-kind="steer"] .title { color: var(--sodium); }
 .note .title {
   min-width: 0;
   white-space: nowrap;

@@ -636,15 +636,15 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
   print_endline (Content.to_plain Keymap.list_help);
   [%expect
     {|
-    Enter                   send the prompt / accept the highlighted item
-    Alt+Enter               queue a follow-up to run after the current turn
+    Enter                   send the prompt (steer a focused subagent) / accept the highlighted item
+    Alt+Enter               queue a follow-up to run after the current turn (a focused subagent's: before it reports)
     Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
-    Esc                     close the dialog, or abort the running turn
+    Esc                     close the dialog, back to the main agent from a subagent, or abort the running turn
     Tab                     complete a slash command, @path or #snippet / open the command picker / the next field of the sign-in and pull request dialogs
     Up                      move up (editor line, history, or list row)
     Down                    move down (editor line, history, or list row)
-    Alt+Up                  pop the last queued steer/follow-up back into the editor
+    Alt+Up                  pop the last queued steer/follow-up (the focused agent's) back into the editor
     Left                    move the cursor left
     Right                   move the cursor right
     Alt+B / Ctrl+Left       move the cursor back one word
@@ -719,7 +719,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /unarchive [session]               unarchive a session (the current one without an argument)
     /delete [session...]               delete sessions, after a confirmation (none: pick them in /sessions)
     /delete-archived                   delete every archived session, after a confirmation
-    /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
+    /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
@@ -2201,6 +2201,7 @@ let%expect_test
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~agents:[]
       ~worktrees:None
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
@@ -2282,6 +2283,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~agents:[]
       ~worktrees:None
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
@@ -2435,6 +2437,7 @@ let%expect_test
         ~skills:None
         ~snippets:[]
         ~reminders:[]
+        ~agents:[]
         ~worktrees:None
         ~logged_in:(fun _ -> true)
         ~default_dir_host

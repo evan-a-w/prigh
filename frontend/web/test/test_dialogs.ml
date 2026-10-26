@@ -169,6 +169,9 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Alt+↑ (steering a subagent) take its last queued message back
+    Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k) the next / previous changed file
@@ -237,7 +240,7 @@ let%expect_test "help lists every key and command" =
     /abort stop the current run
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
+    /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>] follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /logout [provider|HOST] remove a provider's login, or sign out of a git host (github: github.com)

@@ -43,6 +43,7 @@ module Task = struct
     ; finished : unit Promise.t
     ; output : Output_tail.t
     ; input : Stdin_feed.t option
+    ; inbox : Subagent_inbox.t option
     ; mutable outcome : Outcome.t option
     ; mutable finished_at : float option
     ; mutable activity : string
@@ -58,6 +59,7 @@ module Task = struct
   let finished_at t = t.finished_at
   let output t = t.output
   let input t = t.input
+  let inbox t = t.inbox
   let running t = Option.is_none t.outcome
 
   let report t =
@@ -92,6 +94,7 @@ type t =
   ; mutable next_job_id : int
   ; mutable emit : Agent_event.t -> unit
   ; mutable on_change : unit -> unit
+  ; mutable on_queue_change : unit -> unit
   ; mutable auto_background : unit -> float option
   }
 
@@ -103,13 +106,21 @@ let create ~env ~sw ~first_subagent_id ~first_job_id () =
   ; next_job_id = first_job_id
   ; emit = ignore
   ; on_change = ignore
+  ; on_queue_change = ignore
   ; auto_background = (fun () -> None)
   }
 ;;
 
-let connect ?(auto_background = fun () -> None) t ~emit ~on_change =
+let connect
+      ?(auto_background = fun () -> None)
+      ?(on_queue_change = ignore)
+      t
+      ~emit
+      ~on_change
+  =
   t.emit <- emit;
   t.on_change <- on_change;
+  t.on_queue_change <- on_queue_change;
   t.auto_background <- auto_background
 ;;
 
@@ -168,7 +179,7 @@ let next_id t (kind : Kind.t) =
   Kind.id_prefix kind ^ Int.to_string n
 ;;
 
-let make_task ?input ?output t ~kind ~label ~started_at ~cancel =
+let make_task ?input ?inbox ?output t ~kind ~label ~started_at ~cancel =
   let finished, resolve = Promise.create () in
   let task =
     { Task.id = next_id t kind
@@ -179,6 +190,7 @@ let make_task ?input ?output t ~kind ~label ~started_at ~cancel =
     ; finished
     ; output = Option.value_or_thunk output ~default:Output_tail.create
     ; input
+    ; inbox
     ; outcome = None
     ; finished_at = None
     ; activity = "starting"
@@ -210,10 +222,13 @@ let finish_on_switch_exit t task resolve =
   Promise.resolve resolve ()
 ;;
 
-let spawn ?input t ~kind ~label ~run =
+let spawn ?input ?inbox t ~kind ~label ~run =
+  Option.iter inbox ~f:(fun inbox ->
+    Subagent_inbox.set_on_change inbox (fun () -> t.on_queue_change ()));
   let task, resolve =
     make_task
       ?input
+      ?inbox
       t
       ~kind
       ~label
@@ -235,10 +250,16 @@ let spawn ?input t ~kind ~label ~run =
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
+        Option.iter inbox ~f:(fun inbox ->
+          ignore (Subagent_inbox.close inbox : string list));
         finish_on_switch_exit t task resolve;
         raise exn
       | exception exn -> failed_outcome kind exn
     in
+    (* Before it counts as finished, so no message is accepted that nothing
+       would take. *)
+    Option.iter inbox ~f:(fun inbox ->
+      ignore (Subagent_inbox.close inbox : string list));
     finish t task outcome;
     (* Its report is still delivered (and its waiters woken) when the
        agent's bookkeeping fails; the switch is the server's. *)
@@ -404,21 +425,81 @@ let find t ~kind id =
        | tasks -> String.concat ~sep:", " (List.map tasks ~f:Task.id))
 ;;
 
+let inbox_of t id =
+  match String.lsplit2 id ~on:'/' with
+  | Some (parent, _) ->
+    Or_error.errorf
+      "%s runs inside %s (a subagent's own subagent) and takes no messages: \
+       send it to %s"
+      id
+      parent
+      parent
+  | None ->
+    Or_error.bind (find t ~kind:Subagent id) ~f:(fun task ->
+      match task.inbox with
+      | None -> Or_error.errorf "subagent %s takes no messages" id
+      | Some inbox ->
+        if Task.running task && Subagent_inbox.is_open inbox
+        then Ok inbox
+        else if task.delivered
+        then
+          Or_error.errorf
+            "%s has finished and its report was delivered to the main agent: \
+             tell the main agent instead, or have it start a new subagent"
+            id
+        else
+          Or_error.errorf
+            "%s has finished and its report is on its way to the main agent: \
+             tell the main agent instead, or have it start a new subagent"
+            id)
+;;
+
+let send t ~id kind ~from text =
+  if String.is_empty (String.strip text)
+  then Or_error.error_string "the message is empty: type what to tell the agent"
+  else
+    Or_error.bind (inbox_of t id) ~f:(fun inbox ->
+      Subagent_inbox.push inbox kind ~from text)
+;;
+
+let queues t =
+  List.filter_map (tasks t ~kind:Subagent) ~f:(fun task ->
+    Option.bind task.inbox ~f:(fun inbox ->
+      match Subagent_inbox.texts inbox with
+      | [], [] -> None
+      | steer, follow_up ->
+        Some { Subagent_inbox.Listing.agent_id = task.id; steer; follow_up }))
+;;
+
 let await_any tasks =
   Fiber.any
     (List.map tasks ~f:(fun (task : Task.t) () -> Promise.await task.finished))
 ;;
 
-let rec take_next t ~cancel =
+let rec take_next ?interrupt t ~cancel =
   match take_undelivered t with
   | _ :: _ as tasks -> tasks
   | [] ->
     (match List.filter t.tasks ~f:Task.running with
      | [] -> []
      | running ->
-       (match Cancellation.protect cancel ~f:(fun () -> await_any running) with
-        | None -> []
-        | Some () -> take_next t ~cancel))
+       let wait () =
+         match interrupt with
+         | None ->
+           await_any running;
+           `Finished
+         | Some interrupt ->
+           Fiber.first
+             (fun () ->
+                await_any running;
+                `Finished)
+             (fun () ->
+                interrupt ();
+                `Interrupted)
+       in
+       (match Cancellation.protect cancel ~f:wait with
+        | None | Some `Interrupted -> []
+        | Some `Finished -> take_next ?interrupt t ~cancel))
 ;;
 
 let cancel t ~kind id =

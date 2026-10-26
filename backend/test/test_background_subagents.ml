@@ -600,3 +600,291 @@ let%expect_test "new_session in a single-agent embedding drops running agents" =
     --- new session: 0 messages, subagents running: false
     |}]
 ;;
+
+(* What the user sees of a subagent: its messages, its queue and notices. *)
+let log_subagent agent =
+  Agent.subscribe agent ~f:(fun (event : Agent.Event.t) ->
+    match event with
+    | Loop (Subagent { agent_id; event = Message_end m; _ }) ->
+      printf "  [%s] %s\n" agent_id (message_line m)
+    | Subagent_queues agents ->
+      printf
+        "queue: %s\n"
+        (String.concat
+           ~sep:", "
+           (List.map agents ~f:(fun (q : Subagent_inbox.Listing.t) ->
+              sprintf
+                "%s steer=[%s] follow_up=[%s]"
+                q.agent_id
+                (String.concat ~sep:"; " q.steer)
+                (String.concat ~sep:"; " q.follow_up))))
+    | Notice text -> printf "notice: %s\n" text
+    | _ -> ())
+;;
+
+let noop_tool =
+  { Tool.spec =
+      { Tool_spec.name = "step"
+      ; description = "do a step"
+      ; parameters = Tool_args.schema []
+      ; parallel_safe = false
+      ; destructive = false
+      ; on_host = false
+      ; freeform = None
+      }
+  ; run = (fun _ _ -> Tool.Result.ok "stepped")
+  }
+;;
+
+let send agent ?(kind : Steer_queue.Kind.t = Steer) text =
+  print_s
+    [%sexp
+      (Agent.steer_subagent agent ~agent_id:"a1" ~kind text : unit Or_error.t)]
+;;
+
+let%expect_test
+    "steering a running subagent: steers at its next step, follow-ups when it \
+     ends its turn, take-back"
+  =
+  let gates = Gates.create () in
+  Gates.hold gates "work";
+  with_agent
+    ~extra_tools:[ noop_tool ]
+    ~before:(Gates.before gates)
+    ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got the report" ]
+    [ ( "work"
+      , [ Reply.tool_call ~id:"t1" ~name:"step" ~arguments:"{}" ()
+        ; Reply.text "steered"
+        ; Reply.text "followed up"
+        ] )
+    ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  log_subagent agent;
+  print_endline "--- queue while it waits for the model";
+  send agent "use the tests";
+  send agent "and the docs";
+  send agent ~kind:Follow_up "then summarise";
+  send agent ~kind:Follow_up "oops";
+  send agent "   ";
+  print_s
+    [%sexp
+      (Agent.dequeue_subagent agent ~agent_id:"a1" : string option Or_error.t)];
+  print_s
+    [%sexp
+      (Agent.remove_subagent_queued
+         agent
+         ~agent_id:"a1"
+         ~queue:Steer
+         ~index:1
+         ~text:(Some "not this")
+       : string Or_error.t)];
+  print_s [%sexp (Agent.subagent_queues agent : Subagent_inbox.Listing.t list)];
+  print_endline
+    (Jsonaf.to_string
+       (Rpc_json.event (Subagent_queues (Agent.subagent_queues agent))));
+  print_endline "--- release";
+  Gates.release gates "work";
+  Agent.wait_idle agent;
+  print_endline "--- finished";
+  send agent "too late";
+  print_s
+    [%sexp
+      (Agent.dequeue_subagent agent ~agent_id:"a1" : string option Or_error.t)];
+  print_endline "--- a1's transcript";
+  let _, messages = Option.value_exn (Agent.subagent agent "a1") in
+  List.iter messages ~f:(fun (m : Timed_message.t) ->
+    print_endline (message_line m.message));
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    agent_end
+    state: running=false subagents=[a1 running]
+    --- queue while it waits for the model
+    queue: a1 steer=[use the tests] follow_up=[]
+    (Ok ())
+    queue: a1 steer=[use the tests; and the docs] follow_up=[]
+    (Ok ())
+    queue: a1 steer=[use the tests; and the docs] follow_up=[then summarise]
+    (Ok ())
+    queue: a1 steer=[use the tests; and the docs] follow_up=[then summarise; oops]
+    (Ok ())
+    (Error "the message is empty: type what to tell the agent")
+    queue: a1 steer=[use the tests; and the docs] follow_up=[then summarise]
+    (Ok (oops))
+    (Error
+     "that message is no longer queued: it was delivered or removed already")
+    (((agent_id a1) (steer ("use the tests" "and the docs"))
+      (follow_up ("then summarise"))))
+    {"type":"event","event":"agent_queues","agents":[{"agent_id":"a1","steer_texts":["use the tests","and the docs"],"follow_up_texts":["then summarise"]}]}
+    --- release
+      [a1] assistant:  step{}
+      [a1] tool_result step: stepped
+    queue: a1 steer=[] follow_up=[then summarise]
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | and the docs
+      [a1] assistant: steered
+    queue:
+      [a1] user: [The user sends you this as you finish: deal with it before you report.] |  | then summarise
+      [a1] assistant: followed up
+    subagent_end a1: ok followed up | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | followed up | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    assistant: got the report
+    agent_end
+    state: running=false subagents=[]
+    --- finished
+    (Error
+     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
+    (Error
+     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
+    --- a1's transcript
+    user: work
+    assistant:  step{}
+    tool_result step: stepped
+    user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    user: [The user sends you this while you work: take it into account and carry on.] |  | and the docs
+    assistant: steered
+    user: [The user sends you this as you finish: deal with it before you report.] |  | then summarise
+    assistant: followed up
+    |}]
+;;
+
+let%expect_test "messages a subagent never took are reported, not lost" =
+  let gates = Gates.create () in
+  Gates.hold gates "stuck";
+  with_agent
+    ~before:(Gates.before gates)
+    ~main:[ spawn "stuck"; Reply.text "waiting"; Reply.text "cancelled" ]
+    [ "stuck", [ Reply.text "never" ] ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  log_subagent agent;
+  send agent "hurry up";
+  print_s [%sexp (Agent.cancel_subagent agent ~agent_id:"a1" : unit Or_error.t)];
+  Agent.wait_idle agent;
+  print_s
+    [%sexp
+      (Agent.steer_subagent agent ~agent_id:"a9" ~kind:Steer "hi"
+       : unit Or_error.t)
+    , (Agent.steer_subagent agent ~agent_id:"a1/a1" ~kind:Steer "hi"
+       : unit Or_error.t)];
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"stuck"}
+    subagent_start a1: stuck
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (stuck); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: waiting
+    agent_end
+    state: running=false subagents=[a1 running]
+    queue: a1 steer=[hurry up] follow_up=[]
+    (Ok ())
+    (Ok ())
+      [a1] assistant:
+    subagent_end a1: error [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    queue:
+    notice: a1 stopped before it got your message "hurry up", which was not delivered: tell the main agent instead
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 failed] stuck | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: cancelled
+    agent_end
+    state: running=false subagents=[]
+    ((Error "unknown subagent \"a9\"; known: a1")
+     (Error
+      "a1/a1 runs inside a1 (a subagent's own subagent) and takes no messages: send it to a1"))
+    |}]
+;;
+
+let%expect_test "the main agent messages a running subagent" =
+  let gates = Gates.create () in
+  Gates.hold gates "work";
+  with_agent
+    ~extra_tools:[ noop_tool ]
+    ~before:(Gates.before gates)
+    ~main:
+      [ spawn "work"
+      ; Reply.tool_call
+          ~id:"m1"
+          ~name:"subagent_message"
+          ~arguments:{|{"id":"a1","text":"focus on lib/"}|}
+          ()
+      ; Reply.tool_call
+          ~id:"m2"
+          ~name:"subagent_message"
+          ~arguments:{|{"id":"a5","text":"hello"}|}
+          ()
+      ; Reply.text "told it"
+      ; Reply.text "thanks"
+      ]
+    [ ( "work"
+      , [ Reply.tool_call ~id:"t1" ~name:"step" ~arguments:"{}" ()
+        ; Reply.text "done in lib/"
+        ] )
+    ]
+  @@ fun _t agent ->
+  log_subagent agent;
+  (* The subagent waits until the main agent has sent its message. *)
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_end (Assistant a))
+      when String.equal (Message.Assistant.text a) "told it" ->
+      Gates.release gates "work"
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  let _, messages = Option.value_exn (Agent.subagent agent "a1") in
+  print_endline "--- a1's transcript";
+  List.iter messages ~f:(fun (m : Timed_message.t) ->
+    print_endline (message_line m.message));
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+      [a1] user: work
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant:  subagent_message{"id":"a1","text":"focus on lib/"}
+    queue: a1 steer=[focus on lib/] follow_up=[]
+    tool_result subagent_message: sent to a1: it gets the message at its next step
+    assistant:  subagent_message{"id":"a5","text":"hello"}
+    tool_result subagent_message: invalid arguments: unknown subagent "a5"; known: a1
+    assistant: told it
+    agent_end
+    state: running=false subagents=[a1 running]
+      [a1] assistant:  step{}
+      [a1] tool_result step: stepped
+    queue:
+      [a1] user: [Your caller sends you this while you work.] |  | focus on lib/
+      [a1] assistant: done in lib/
+    subagent_end a1: ok done in lib/ | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | done in lib/ | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    assistant: thanks
+    agent_end
+    state: running=false subagents=[]
+    --- a1's transcript
+    user: work
+    assistant:  step{}
+    tool_result step: stepped
+    user: [Your caller sends you this while you work.] |  | focus on lib/
+    assistant: done in lib/
+    |}]
+;;

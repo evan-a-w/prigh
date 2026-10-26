@@ -81,6 +81,12 @@ module Reply_tag : sig
     (** [get_prefs] of the history the backend keeps for the user (shared
         with prigh-web) *)
     | Dequeued
+    | Agent_message of
+        { agent_id : string
+        ; kind : Queued_message.Kind.t
+        ; text : string
+        ; retry : string
+        } (** [steer_agent]: on an error, back in the editor as [retry] *)
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
@@ -250,6 +256,8 @@ module Model : sig
     ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
+    ; agent_queues : Agent_queues.t
+      (** the background subagents' queues, from [agent_queues] *)
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -305,6 +313,12 @@ module Model : sig
   (** [namespace] when a superuser acts as another user ([/setusr]). *)
   val acting_as : t -> string option
 end
+
+(** The subagent the view and the editor are on, if any. *)
+val focused_agent : Model.t -> Agent_view.t option
+
+(** The focused agent's queued messages (the main agent's or a subagent's). *)
+val shown_queue : Model.t -> Queued_message.t list
 
 (** The screen's zones for the model's size and editor. *)
 val layout : Model.t -> Layout.t

@@ -50,6 +50,9 @@ module Task : sig
   (** A job's stdin. *)
   val input : t -> Stdin_feed.t option
 
+  (** A subagent's messages from the user and the main agent. *)
+  val inbox : t -> Subagent_inbox.t option
+
   (** [[<kind> <id> <status>] <label>] followed by the body. *)
   val report : t -> string
 end
@@ -84,9 +87,11 @@ val avoid_subagent_ids : t -> string list -> unit
     delivered, after its state is updated. [auto_background] (default: never)
     is how many seconds a foreground command may run before it is moved to
     the background ({!run_foreground}); it is asked each time, so it follows
-    the configuration. *)
+    the configuration. [on_queue_change] is called whenever a task's
+    {!Subagent_inbox} changes. *)
 val connect
   :  ?auto_background:(unit -> float option)
+  -> ?on_queue_change:(unit -> unit)
   -> t
   -> emit:(Agent_event.t -> unit)
   -> on_change:(unit -> unit)
@@ -96,9 +101,11 @@ val auto_background : t -> float option
 
 (** Starts [run] in a fiber of its own and returns the task id. [run] gets the
     id, the task's own cancellation token, the event sink (whose events also
-    update a subagent's last activity) and the output sink. *)
+    update a subagent's last activity) and the output sink. [inbox] is
+    closed when [run] returns, before the task counts as finished. *)
 val spawn
   :  ?input:Stdin_feed.t
+  -> ?inbox:Subagent_inbox.t
   -> t
   -> kind:Kind.t
   -> label:string
@@ -162,9 +169,30 @@ val has_undelivered : t -> bool
 val delivery_message : Task.t list -> Message.t
 
 (** [take_undelivered], but when nothing is undelivered and tasks are
-    running, it first blocks until one of them finishes (or [cancel]). [[]]
-    when nothing is running or on [cancel]. *)
-val take_next : t -> cancel:Cancellation.t -> Task.t list
+    running, it first blocks until one of them finishes (or [cancel], or
+    [interrupt] returns). [[]] when nothing is running, on [cancel] or on
+    [interrupt]. *)
+val take_next
+  :  ?interrupt:(unit -> unit)
+  -> t
+  -> cancel:Cancellation.t
+  -> Task.t list
+
+(** A running subagent's inbox, or an error saying what to do instead (it
+    finished, it is unknown, it is a subagent's own). *)
+val inbox_of : t -> string -> Subagent_inbox.t Or_error.t
+
+(** Queues a message for a running subagent ({!inbox_of}). *)
+val send
+  :  t
+  -> id:string
+  -> Steer_queue.Kind.t
+  -> from:Subagent_inbox.From.t
+  -> string
+  -> unit Or_error.t
+
+(** The subagents with queued messages, oldest first. *)
+val queues : t -> Subagent_inbox.Listing.t list
 
 (** Requests cancellation; the task still finishes and is delivered as
     usual. *)
