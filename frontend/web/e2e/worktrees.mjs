@@ -56,7 +56,9 @@ const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-token", token, "-cwd", repo],
-  { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+  // The terminal's tmux server is ours, so its shell is $SHELL.
+  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" },
+    stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -255,13 +257,20 @@ try {
   // A terminal in a worktree: a shell of its own there.
   await worktree("feat/login", first).click({ button: "right" });
   await choose("terminal");
+  // Connected, the shell drawn: closing earlier would cut the connection.
+  const shellUp = () => page.waitForFunction(() =>
+    !/connecting/.test(document.querySelector(".terminal-state")?.textContent ?? "")
+    && document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim());
   await page.locator(".terminal-panel .terminal-cwd", { hasText: "feat-login" }).waitFor();
+  await shellUp();
   section("a terminal in the worktree");
-  console.log(clean(await page.locator(".terminal-head").innerText()));
+  console.log(clean(await page.locator(".terminal-head .terminal-cwd").innerText()));
   await screenshot("a terminal in the worktree");
   await run("/terminal");
   await page.locator(".terminal-panel .terminal-cwd", { hasText: "docs" }).waitFor();
+  await shellUp();
   await page.keyboard.press("Control+`");
+  await page.locator(".terminal-panel").waitFor({ state: "detached" });
 
   // Folding a session's worktrees: their count stays on its row.
   await first.locator(".session-fold").click();
