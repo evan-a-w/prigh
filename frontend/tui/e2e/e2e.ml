@@ -147,6 +147,7 @@ let rec summarise (e : Event.t) : string option =
   (* A hint to refresh session lists: how many arrive depends on timing. *)
   | Sessions_changed -> None
   | Prefs_changed _ -> None
+  | Agent_queues _ -> None
   | Review r ->
     Some (sprintf "review %d comments" (List.length r.comments))
 ;;

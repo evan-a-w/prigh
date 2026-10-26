@@ -516,7 +516,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Sessions_changed
   | P.Event.Prefs_changed _
   | P.Event.Config_changed _
-  | P.Event.Review _ -> t
+  | P.Event.Review _
+  | P.Event.Agent_queues _ -> t
 ;;
 
 let gray = Style.fg Gray
