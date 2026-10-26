@@ -56,13 +56,15 @@ let comment_count (t : Code_review.t) path =
     Review_comment.Status.equal c.status Open)
 ;;
 
-let file_row (t : Code_review.t) (f : Diff_files.File.t) ~inject =
+let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
+  let t = m.review in
   let current = Option.exists t.current ~f:(String.equal f.path) in
   let dir, name = split_path f.path in
   let status = Code_review.approval t f in
   let comments = comment_count t f.path in
   Node.li
-    [ Node.button
+    [ Git_bar_view.tick m f.path ~inject
+    ; Node.button
         ~attrs:
           [ classes
               [ "review-file" ]
@@ -496,10 +498,11 @@ let view (m : App.Model.t) ~inject =
                 [ Attr.class_ "review-files"
                 ; Attr.create "aria-label" "Changed files"
                 ]
-              [ Node.ul (List.map files ~f:(file_row t ~inject))
+              [ Node.ul (List.map files ~f:(file_row m ~inject))
               ; div
                   ~cls:"review-files-foot"
                   [ Node.text (Diff_files.summary files) ]
+              ; Git_bar_view.commit_box m ~inject
               ]
           ; current_file m path ~inject
           ]
@@ -512,5 +515,5 @@ let view (m : App.Model.t) ~inject =
         ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Review of the changes"
         ]
-      [ head; target_bar m ~inject; body ])
+      [ head; target_bar m ~inject; Git_bar_view.strip m ~inject; body ])
 ;;

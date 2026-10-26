@@ -224,17 +224,21 @@ let cancel_accept ?(danger = false) ~inject label =
   ]
 ;;
 
-let rename name ~inject =
+let rename (m : App.Model.t) name ~inject =
   Modal.view
     ~title:"Rename session"
     ~on_close:(inject Action.Close_dialog)
     ~footer:(cancel_accept ~inject "Rename")
-    [ text_input
-        ~placeholder:"Session name"
-        ~label:"Session name"
-        ~value:name
-        ~inject
-        ()
+    [ div
+        ~cls:"generate-field"
+        [ text_input
+            ~placeholder:"Session name"
+            ~label:"Session name"
+            ~value:name
+            ~inject
+            ()
+        ; Generate_view.button m.generate Session_title ~inject
+        ]
     ]
 ;;
 
@@ -585,14 +589,14 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some Help -> help ~inject
   | Some Settings -> Settings_view.view m ~inject
-  | Some (Rename name) -> rename name ~inject
+  | Some (Rename name) -> rename m name ~inject
   | Some (Delete target) -> delete m target ~inject
   | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth m statuses ~inject
   | Some (Forge_host { input; error }) -> forge_host ~input ~error ~inject
   | Some (Pulls l) -> Pull_requests_view.list l ~inject
   | Some (Pull p) -> Pull_requests_view.page m p ~inject
-  | Some (Pr_create f) -> Pull_requests_view.create f ~inject
+  | Some (Pr_create f) -> Pull_requests_view.create m.generate f ~inject
   | Some (Pr_checked_out { number; checkout }) ->
     Pull_requests_view.checked_out ~number checkout ~inject
   | Some dialog ->

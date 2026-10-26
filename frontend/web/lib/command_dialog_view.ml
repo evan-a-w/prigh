@@ -270,11 +270,18 @@ let dialog_error = function
   | None -> Node.none
 ;;
 
-let new_worktree (d : New_worktree.t) ~inject =
-  let field (f : New_worktree.Field.t) ~label ~value ~placeholder ~note =
+let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
+  let field
+        ?(corner = Node.none)
+        (f : New_worktree.Field.t)
+        ~label
+        ~value
+        ~placeholder
+        ~note
+    =
     Node.label
       ~attrs:[ Attr.class_ "field" ]
-      [ span ~cls:"field-label" label
+      [ div ~cls:"field-head" [ span ~cls:"field-label" label; corner ]
       ; Node.input
           ~attrs:
             [ Attr.id (New_worktree.Field.id f)
@@ -308,10 +315,18 @@ let new_worktree (d : New_worktree.t) ~inject =
       ]
     [ field
         Branch
+        ~corner:
+          (Generate_view.button
+             ~label:"Generate name"
+             m.generate
+             Worktree_branch
+             ~inject)
         ~label:"Branch"
         ~value:d.branch
-        ~placeholder:"feature/name"
-        ~note:"A new branch, or an existing one to check out"
+        ~placeholder:"feature/name, or the task to name it from"
+        ~note:
+          "A new branch, or an existing one to check out (✦ names one from \
+           the task typed here)"
     ; field
         Base
         ~label:"Base"
@@ -569,7 +584,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Pull _
   | Pr_create _
   | Pr_checked_out _ -> None
-  | New_worktree d -> Some (new_worktree d ~inject)
+  | New_worktree d -> Some (new_worktree m d ~inject)
   | Remove_worktree { worktree; force; busy; error; repo = _ } ->
     Some (remove_worktree worktree ~force ~busy ~error ~inject)
 ;;

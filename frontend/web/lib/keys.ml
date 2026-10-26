@@ -104,6 +104,12 @@ let help =
        the shell" )
   ; ( "Esc (in a pull request)"
     , "back to the list it was opened from (/pr); Enter closes it" )
+  ; ( "Alt+G (a pull request, commit message, branch or session name)"
+    , "✦ Generate: the model drafts it from the changes, the commits and the \
+       session (Esc stops, keeping what came; Undo puts the text back)" )
+  ; ( "Ctrl+Enter (the review's commit message)"
+    , "commit the ticked files (approved files come ticked; untick to leave \
+       one out)" )
   ; ( "Ctrl+Enter (in a dialog's text box)"
     , "accept the dialog, e.g. create the pull request (Enter is a new line)" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
@@ -189,6 +195,9 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Enter", Picker { kind = Worktrees _; picker } when alt_only t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Open_worktree { path = item.id; new_session = true })
+  | _, Pr_create _ when alt_letter t "g" -> Some (Generate Pr)
+  | _, New_worktree _ when alt_letter t "g" -> Some (Generate Worktree_branch)
+  | _, Rename _ when alt_letter t "g" -> Some (Generate Session_title)
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete
