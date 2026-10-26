@@ -276,7 +276,7 @@ let argument_items
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
-  | Remind | Worktree -> None
+  | Remind | Worktree | Review -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -461,14 +461,16 @@ let compute_argument
                       ; selected = 0
                       ; navigated = false
                       })
-              | Worktree ->
+              | (Worktree | Review) as kind ->
                 (* While [worktrees] are fetched, a completion after the
                    subcommand opens empty and the app fills it in. *)
                 let rest = String.drop_prefix line start in
+                let known = Option.value worktrees ~default:[] in
                 Option.bind
-                  (Worktree_command.complete
-                     ~worktrees:(Option.value worktrees ~default:[])
-                     rest)
+                  (match kind with
+                   | Review ->
+                     Review_command.complete ~worktrees:known ~branches:[] rest
+                   | _ -> Worktree_command.complete ~worktrees:known rest)
                   ~f:(fun (offset, candidates) ->
                     let prefix = String.drop_prefix rest offset in
                     let items =

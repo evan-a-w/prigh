@@ -12,10 +12,14 @@ open! Import
     - [review_reply {id, text}], [review_set_status {id, status:
       open|resolved}]: the comment.
     - [review_delete {id}]: [{}].
-    - [review_submit {}]: [{count}], the comments sent to the agent.
+    - [review_submit {root?}]: [{count}], the comments sent to the agent
+      (with [root]: those on that worktree only).
     - [review_decide {id, post, accept}]: accepts (applies) or rejects the
       proposal of the [post]th post; the comment.
-    - [review_approve {path, hash}], [review_unapprove {path}]: the review. *)
+    - [review_approve {root?, path, hash}], [review_unapprove {root?,
+      path}]: the review. [root] is the worktree's top directory, as
+      [git_diff] says; without it, the approval is of the session's
+      repository (as before worktrees were told apart). *)
 
 val methods : string list
 

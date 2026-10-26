@@ -94,8 +94,18 @@ let against (d : P.Git_diff.t) =
   if String.equal d.against "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
   then "nothing (no commits yet)"
   else if String.length d.against = 40
-  then String.prefix d.against 8
+  then (
+    let commit = String.prefix d.against 8 in
+    if String.equal d.base "HEAD" || String.equal d.base d.against
+    then commit
+    else sprintf "%s (merge base %s)" d.base commit)
   else d.against
+;;
+
+let where (d : P.Git_diff.t) =
+  match d.branch with
+  | Some branch -> sprintf "%s (%s)" branch d.root
+  | None -> d.root
 ;;
 
 let summary files =

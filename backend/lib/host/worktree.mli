@@ -69,10 +69,16 @@ val list
   -> dir:string
   -> Listing.t Or_error.t
 
+(** The git config key ([branch.<branch>.prighBase]) where [create] records
+    the branch a new branch was made from, for {!Git_diff}'s default base. *)
+val base_key : string -> string
+
 (** Checks [branch] out in a new worktree at the standard location: an
     existing local branch as it is (no [base] then); otherwise a new branch
     from [base] (default: [HEAD] of [cwd]), or, without a base, tracking the
-    one remote branch of that name if there is exactly one. Fails when the
+    one remote branch of that name if there is exactly one. A new branch
+    made from a branch (the base, or the one checked out at [cwd]) records
+    it at [base_key]. Fails when the
     branch is checked out in another worktree already. With [fresh], a
     branch that exists or is checked out is not reused: [branch-2],
     [branch-3], ... is made instead. *)

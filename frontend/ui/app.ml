@@ -54,8 +54,20 @@ module Reply_tag = struct
     | Models_for_scoped
     | Compact_done
     | Git_diff
-    | Review_comments (** [/review]: then the diff *)
-    | Review_status of P.Review.t
+    | Review_comments of
+        { dir : string option
+        ; base : string option
+        } (** [/review [WORKTREE] [--base REV]]: then the diff *)
+    | Review_status of
+        { review : P.Review.t
+        ; dir : string option (** [None]: the session's own worktree *)
+        }
+    | Review_named of
+        { command : string
+        ; name : string
+        ; base : string option
+        ; model : string option
+        } (** [/review NAME]: [list_worktrees], to find it *)
     | Review_started
     | Abort_done
     | Notice_on_success of string
@@ -2682,6 +2694,34 @@ let worktree_remove_failed m ~target ~force e =
   else error (restore_command m (remove_command ~force target)) e, []
 ;;
 
+(* [/review]: the files' approvals of a worktree, or the model's review. *)
+let rec review_action m ~command (action : Review_command.Action.t) =
+  match action with
+  | Show { dir; base } ->
+    ( notice m "reading the review…"
+    , [ rpc "get_review" ~tag:(Review_comments { dir; base }) ] )
+  | Named { name; base; model } ->
+    ( m
+    , [ call
+          (List_worktrees { cwd = None })
+          ~tag:(Review_named { command; name; base; model })
+      ] )
+  | Model args ->
+    ( notice m "reading the changes to review…"
+    , [ rpc
+          "review"
+          ~params:[ "args", str args ]
+          ~tag:(Retry_in_editor { command; hint = ""; then_ = Review_started })
+      ] )
+  | Error e -> error (restore_command m command) e, []
+
+and review_command m rest =
+  review_action
+    m
+    ~command:(String.strip ("/review " ^ rest))
+    (Review_command.parse rest)
+;;
+
 let cancel_btw m =
   match m.btw with
   | Some box when Btw_box.is_streaming box ->
@@ -2947,20 +2987,7 @@ let run_command m (cmd : Commands.Parsed.t) =
             (if String.is_empty cmd.rest then [] else [ "path", str cmd.rest ])
           ~tag:Git_diff
       ] )
-  | "review", [] ->
-    notice m "reading the review…", [ rpc "get_review" ~tag:Review_comments ]
-  | "review", _ ->
-    ( notice m "reading the changes to review…"
-    , [ rpc
-          "review"
-          ~params:[ "args", str cmd.rest ]
-          ~tag:
-            (Retry_in_editor
-               { command = String.strip ("/review " ^ cmd.rest)
-               ; hint = ""
-               ; then_ = Review_started
-               })
-      ] )
+  | "review", _ -> review_command m cmd.rest
   | "init", _ -> m, [ rpc "init" ~tag:Review_started ]
   | "new", _ ->
     m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
@@ -3320,7 +3347,7 @@ let fetch_autocomplete m ac =
      | Some skills ->
        ( { m with autocomplete = Some ac; skills }
        , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
-  | Autocomplete.Source.Argument { argument = Some Worktree; _ } ->
+  | Autocomplete.Source.Argument { argument = Some (Worktree | Review); _ } ->
     let key = worktree_key m in
     (match Location_cache.request m.worktrees ~key with
      | None -> { m with autocomplete = Some ac }, []
@@ -3435,6 +3462,8 @@ let accept_autocomplete m ~submit_now =
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
            (match Commands.find item.id with
+            (* [/review] alone is the common case: it runs at once. *)
+            | Some { argument = Some Review; _ } -> submit m
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
@@ -3692,7 +3721,7 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
-  | Toggle_archived | Toggle_sidebar -> m, []
+  | Toggle_archived | Toggle_sidebar | Review_highlighted -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -3772,6 +3801,7 @@ let editing m (intent : Intent.t) =
         | Prev_user_message
         | Next_user_message
         | Toggle_archived
+        | Review_highlighted
         | Toggle_sidebar
         | Search ->
           let m, cmds = editing_intent m intent in
@@ -4063,6 +4093,15 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
      | Sessions selection, Toggle_archived -> toggle_archived m selection picker
      | Sessions selection, _ -> confirm_delete_archived m ~back selection
      | _ -> m, [])
+  | Review_highlighted ->
+    (match kind with
+     | Worktrees listing ->
+       worktree_in_picker m listing picker ~f:(fun w ->
+         review_action
+           { m with mode = Editing }
+           ~command:(Review_command.command ~dir:w.path ())
+           (Show { dir = Some w.path; base = None }))
+     | _ -> m, [])
   | Picker_toggle_filter ->
     (match kind with
      | Sessions selection ->
@@ -4191,6 +4230,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Review_highlighted
   | Toggle_sidebar
   | Newline -> m, []
   | Insert _
@@ -4385,6 +4425,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Review_highlighted
   | Toggle_sidebar -> m, []
 ;;
 
@@ -4906,6 +4947,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            (if String.is_empty hint then e else sprintf "%s; %s" e hint)
        , [] )
      | Ignore | Prefs_history -> m, []
+     | Review_named { command; model = Some args; _ } ->
+       (* Not a repository: no worktree by that name, the model reviews. *)
+       review_action m ~command (Model args)
+     | Review_named { command; _ } -> error (restore_command m command) e, []
      | Forge_refresh ->
        (* A backend without git hosting: the hosts stay unlisted. *)
        m, []
@@ -5058,18 +5103,41 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.against diff))
            , [] )
          else output m ~title:"Changes" (Diff_files.render diff), [])
-     | Review_comments ->
+     | Review_comments { dir; base } ->
        decode json ~f:P.Review.of_json (fun review ->
-         m, [ rpc "git_diff" ~tag:(Review_status review) ])
-     | Review_status review ->
+         let status = Reply_tag.Review_status { review; dir } in
+         ( m
+         , [ rpc
+               "git_diff"
+               ~params:(P.Git_diff.params ?dir ?base ())
+               ~tag:
+                 (match dir, base with
+                  | None, None -> status
+                  | _ ->
+                    Retry_in_editor
+                      { command = Review_command.command ?dir ?base ()
+                      ; hint = ""
+                      ; then_ = status
+                      })
+           ] ))
+     | Review_named { command; name; base; model } ->
+       decode json ~f:P.Worktree.Listing.of_json (fun listing ->
+         review_action
+           (cache_worktrees m listing)
+           ~command
+           (Review_command.resolve listing ~name ~base ~model))
+     | Review_status { review; dir } ->
        decode json ~f:P.Git_diff.of_json (fun diff ->
+         let review =
+           P.Review.scope review ~root:diff.root ~own:(Option.is_none dir)
+         in
          if String.is_empty diff.diff && List.is_empty review.comments
          then
            ( notice
                m
                (sprintf
                   "nothing to review: no changes in %s against %s"
-                  diff.root
+                  (Diff_files.where diff)
                   (Diff_files.against diff))
            , [] )
          else output m ~title:"Review" (File_approval.render diff review), [])

@@ -266,8 +266,10 @@ let to_prompt t =
   String.concat
     ~sep:"\n"
     ([ sprintf
-         "<comment id=\"%s\" file=\"%s\" lines=\"%s\"%s%s status=\"%s\">"
+         "<comment id=\"%s\" worktree=\"%s\" file=\"%s\" lines=\"%s\"%s%s \
+          status=\"%s\">"
          t.id
+         t.root
          (file t)
          (Range.to_string { t.range with side = New })
          (match t.range.side with

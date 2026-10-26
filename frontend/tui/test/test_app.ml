@@ -2817,7 +2817,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 251 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 256 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5932,7 +5932,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     │ the current turn                                         │
     │ Alt+S                   send exactly what is typed,      │
     │ ignoring the completion popup                            │
-    └─────────── 1–7 of 92 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └─────────── 1–7 of 96 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -7171,6 +7171,31 @@ let%expect_test "sidebar: hidden below 120 columns, where nothing else changes" 
     |}]
 ;;
 
+let%expect_test "Alt+R in the /worktree picker reviews the highlighted one" =
+  let h = connected () in
+  H.keys h "/worktree";
+  H.esc h;
+  H.enter h;
+  H.reply
+    h
+    Worktrees_picker
+    {|{"root":"/work","project_dir":"/w","worktrees":[
+       {"path":"/work","branch":"main","main":true,"current":true},
+       {"path":"/w/feat","branch":"feat","managed":true}]}|};
+  H.keys h "feat";
+  H.key h (Key.alt (Char "r"));
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ list_worktrees) (params ()) (tag Worktrees_picker))
+    (Rpc
+      (method_ get_review)
+      (params ())
+      (tag (Review_comments (dir (/w/feat)) (base ()))))
+    editing
+    |}]
+;;
+
 let%expect_test "keymap: every binding is covered by a scenario" =
   List.iter Keymap.bindings ~f:(fun b ->
     let keys = List.map b.keys ~f:Key.to_string |> String.concat ~sep:"/" in
@@ -7221,6 +7246,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Alt+M            Cycle_mode               covered
     Ctrl+N           Picker_toggle_filter     covered
     Alt+A            Toggle_archived          covered
+    Alt+R            Review_highlighted       covered
     Ctrl+X           Copy_last                covered
     Ctrl+Z           Suspend                  covered
     Alt+L            Toggle_sidebar           covered
