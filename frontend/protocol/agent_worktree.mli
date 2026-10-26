@@ -1,8 +1,8 @@
 open! Core
 
-(** A git worktree made for a subagent (the [subagent] tool's [worktree]),
-    which the session that ran it records until it is removed
-    ([list_sessions]' [agent_worktrees], [subagent_start]'s [worktree]). *)
+(** A git worktree made for a subagent (the [subagent] tool's [worktree]):
+    [subagent_start]'s [worktree]. The session that ran it records it until
+    it is removed ({!Session_worktree}, source [agent]). *)
 
 type t =
   { agent : string (** the subagent's id in its session *)

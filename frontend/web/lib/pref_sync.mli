@@ -22,7 +22,7 @@ module Key : sig
   val verbosity : string
   val terminal_open : string
 
-  (** The sidebar's folded projects and worktrees: their directories. *)
+  (** The sidebar's sessions whose worktrees are folded away: their ids. *)
   val folded : string
 
   (** ["history"]: the prompts sent, newest first, shared with the TUI. *)

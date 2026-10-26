@@ -161,6 +161,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
@@ -234,7 +235,7 @@ let%expect_test "help lists every key and command" =
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
-    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
+    /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one

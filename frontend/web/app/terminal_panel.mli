@@ -4,13 +4,15 @@ open! Core
 
 (** The [/terminal] URL (a shell on the backend, see
     backend/lib/terminal/terminals.mli) on the same server as the RPC
-    WebSocket [backend], with the credentials as in [hello]. *)
+    WebSocket [backend], with the credentials as in [hello]; [dir]: a
+    shell of its own there. *)
 val url
   :  backend:string
   -> user:string option
   -> as_user:string option
   -> token:string option
   -> session:string option
+  -> dir:string option
   -> string
 
 (** Whether a DOM event happened inside the panel, where keys, pastes and
