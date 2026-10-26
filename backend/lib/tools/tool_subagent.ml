@@ -269,8 +269,8 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
 
 let execute
       ?inbox
-      ~mask_observations
       ~provider
+      ~compaction
       ~home
       (context : Tool.Context.t)
       (p : Prepared.t)
@@ -320,12 +320,12 @@ let execute
     ; max_turns = Some p.turn_limit
     ; max_tokens = None
     ; retries = Agent_loop.Config.default_retries
+    ; compaction
     ; cache_key =
         Some
           (match context.cache_key with
            | Some parent -> parent ^ "/" ^ agent_id
            | None -> agent_id)
-    ; mask_observations
     }
   in
   context.emit
@@ -476,7 +476,7 @@ let execute
 let create
       ?(models = Model_registry.builtin ())
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
-      ?(mask_observations = fun () -> true)
+      ?(compaction = fun () -> Compaction_settings.window_only)
       ~provider
       ~current_model
       ~current_thinking
@@ -494,6 +494,7 @@ let create
            "could not make the subagent's worktree: %s"
            (Error.to_string_hum e))
     | Ok prepared ->
+      let compaction = compaction () in
       (match context.background with
        | Some background when context.depth = 0 ->
          let inbox = Subagent_inbox.create () in
@@ -507,8 +508,8 @@ let create
                let result =
                  execute
                    ~inbox
-                   ~mask_observations:(mask_observations ())
                    ~provider
+                   ~compaction
                    ~home
                    { context with cancel; emit; on_output = ignore }
                    prepared
@@ -532,13 +533,7 @@ let create
            | None -> context.call_id
            | Some parent -> parent ^ "/" ^ context.call_id
          in
-         execute
-           ~mask_observations:(mask_observations ())
-           ~provider
-           ~home
-           context
-           prepared
-           ~agent_id)
+         execute ~provider ~compaction ~home context prepared ~agent_id)
   in
   { Tool.spec; run }
 ;;

@@ -9,9 +9,10 @@ open! Import
 
     Masking changes the prompt's prefix, which the provider caches, so it is
     done in batches: everything before the last [keep_turns] assistant
-    messages at once, only when the context is large ({!worth_masking}). A
-    session records the boundary ({!Session.messages} masks up to it), so
-    that a resumed session sends the same context. *)
+    messages at once, only when the context is large
+    ({!Compaction_settings.worth_masking}). A session records the boundary
+    ({!Session.messages} masks up to it), so that a resumed session sends the
+    same context. *)
 
 (** Assistant messages at the end of the conversation never masked. *)
 val keep_turns : int
@@ -43,19 +44,3 @@ val plan : ?keep_turns:int -> Message.t list -> Plan.t option
 
 (** [mask]s the messages up to index [through]. *)
 val apply : through:int -> Message.t list -> Message.t list
-
-(** Whether to carry out [plan] on a context of [input_tokens]: when the
-    request [overflowed] the window (anything that helps), or when the
-    context is over half the model's window and masking frees at least a
-    tenth of the window. The floor holds over the summarisation threshold
-    too, and so keeps masking from re-masking (and so invalidating the
-    provider's cache) every turn: with less to free, the conversation is
-    summarised instead, and when it is not (nothing to summarise, or the
-    summary failed), masking waits until the batch is large. A smaller
-    floor would not do: one turn's output alone can exceed it. *)
-val worth_masking
-  :  Model.t
-  -> input_tokens:int
-  -> overflowed:bool
-  -> Plan.t
-  -> bool

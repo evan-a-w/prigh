@@ -6,12 +6,6 @@ let image_lines (images : Image.t list) =
   |> String.concat
 ;;
 
-let should_compact (model : Model.t) ~input_tokens =
-  Float.( > )
-    (Float.of_int input_tokens)
-    (Float.of_int model.context_window *. 0.8)
-;;
-
 let render_transcript messages =
   String.concat
     ~sep:"\n\n"
@@ -206,7 +200,9 @@ let with_user_instructions text = function
 
 (* The request the agent would send next, ending with the request for a
    summary: the same system prompt, tools, thinking and cache key, so the
-   provider's prompt cache serves the conversation. *)
+   provider's prompt cache serves the conversation. A summariser other than
+   the agent's model ([compaction_model]) gets the same request, which its
+   cache cannot serve, with thinking off if it has none. *)
 let full_request
       (model : Model.t)
       (prompt : Prompt.t)
@@ -232,18 +228,21 @@ let full_request
           else [])
        @ [ sections ])
   in
+  let thinking : Thinking.t =
+    if model.supports_thinking then prompt.thinking else Off
+  in
   { Provider.Request.model
   ; system = prompt.system
   ; messages =
       older @ [ Message.user (with_user_instructions ask instructions) ]
   ; tools = prompt.tools
-  ; thinking = prompt.thinking
+  ; thinking
   ; max_tokens =
       Some
         (Int.min
            model.max_output
            (summary_max_tokens
-            + Option.value (Thinking.budget_tokens prompt.thinking) ~default:0))
+            + Option.value (Thinking.budget_tokens thinking) ~default:0))
   ; cache_key = prompt.cache_key
   }
 ;;

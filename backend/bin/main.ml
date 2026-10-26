@@ -206,16 +206,16 @@ let common_params =
         | Some agent -> (Agent.config agent).worktrees_dir
         | None -> Config.default.worktrees_dir
       in
-      let mask_observations () =
+      let compaction () =
         match !agent_ref with
-        | Some agent -> (Agent.config agent).mask_observations
-        | None -> Config.default.mask_observations
+        | Some agent -> Agent.compaction_settings agent
+        | None -> Compaction_settings.window_only
       in
       let subagent =
         Tool_subagent.create
           ~models
           ~worktrees_dir
-          ~mask_observations
+          ~compaction
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)

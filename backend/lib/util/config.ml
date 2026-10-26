@@ -43,6 +43,8 @@ type t =
   ; auto_background_seconds : float
   ; generate_model : string option
   ; mask_observations : bool
+  ; compact_at_tokens : int
+  ; compaction_model : string option
   }
 [@@deriving sexp_of]
 
@@ -67,6 +69,8 @@ let default =
   ; auto_background_seconds = 30.
   ; generate_model = None
   ; mask_observations = true
+  ; compact_at_tokens = 200_000
+  ; compaction_model = None
   }
 ;;
 
@@ -81,6 +85,8 @@ let ask_user_timeout t =
     Float.(t.ask_user_timeout_seconds > 0.)
     t.ask_user_timeout_seconds
 ;;
+
+let compact_at t = Option.some_if (t.compact_at_tokens > 0) t.compact_at_tokens
 
 let start_model t =
   match t.default_model with
@@ -119,6 +125,8 @@ let to_json t =
       , `Number (sprintf "%g" t.auto_background_seconds) )
     ; "generate_model", option (fun s -> `String s) t.generate_model
     ; ("mask_observations", if t.mask_observations then `True else `False)
+    ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
+    ; "compaction_model", option (fun s -> `String s) t.compaction_model
     ]
 ;;
 
@@ -230,6 +238,29 @@ let of_json json =
           "config.generate_model must be a model's name (or null: the \
            session's model)"
     in
+    let%bind compaction_model =
+      match find "compaction_model" with
+      | None | Some `Null | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ ->
+        Or_error.error_string
+          "config.compaction_model must be a model's name (or null: the \
+           session's model)"
+    in
+    let%bind compact_at_tokens =
+      let error () =
+        Or_error.error_string
+          "config.compact_at_tokens must be a whole number of tokens (0: only \
+           at 80% of the model's window)"
+      in
+      match find "compact_at_tokens" with
+      | None | Some `Null -> Ok default.compact_at_tokens
+      | Some (`Number n) ->
+        (match Int.of_string_opt n with
+         | Some n when n >= 0 -> Ok n
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
     let%bind max_budget_usd =
       match find "max_budget_usd" with
       | None | Some `Null -> Ok None
@@ -311,6 +342,8 @@ let of_json json =
     ; auto_background_seconds
     ; generate_model
     ; mask_observations
+    ; compact_at_tokens
+    ; compaction_model
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

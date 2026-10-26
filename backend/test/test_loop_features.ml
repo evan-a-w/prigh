@@ -219,8 +219,10 @@ let%expect_test "an overflowing request in a session is compacted and retried" =
 (* ---- budget ------------------------------------------------------------ *)
 
 let%expect_test "the budget stops a run between turns and refuses prompts" =
-  (* deepseek-flash: $1.20 per million output tokens. *)
+  (* deepseek-flash: $1.20 per million output tokens. No cap on the context,
+     which these replies' tokens would cross. *)
   with_agent
+    ~config:[ "compact_at_tokens", `Number "0" ]
     [ call ~output:250_000 "c1" 10
     ; call ~output:250_000 "c2" 10
     ; call ~output:250_000 "c3" 10

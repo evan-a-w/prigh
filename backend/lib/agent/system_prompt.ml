@@ -114,6 +114,10 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
              yourself, and run independent tasks in parallel. Keep your own \
              context for planning, coordinating, reviewing their reports and \
              talking to the user; do small, quick things directly."
+          ; "- Delegate wide exploration (searching a large codebase, reading \
+             many files, long investigations) to subagents too, asking for a \
+             concise report: only the report enters your context, which stays \
+             small and sharp."
           ]
         else [])
      @ [ "" ]

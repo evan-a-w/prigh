@@ -414,6 +414,11 @@ val config : t -> Config.t
     [approval_mode] also switches this session's mode. *)
 val set_config : t -> Config.t -> unit Or_error.t
 
+(** When conversations (the session's and its subagents') are masked and
+    compacted and who summarises them: the config's [mask_observations],
+    [compact_at_tokens] and [compaction_model]. *)
+val compaction_settings : t -> Compaction_settings.t
+
 (** Saves the current model and thinking level as the defaults for new
     sessions. Rereads the config file first, so settings changed by other
     sessions are kept. *)
@@ -470,9 +475,10 @@ val pending_questions : t -> Pending_question.t list
 
 (** [instructions]: what the summary should focus on (the user's). Runs
     also compact by themselves: after a run whose last request crossed
-    {!Compaction.should_compact}'s threshold, between the turns of a run
+    {!compaction_settings}' threshold, between the turns of a run
     (see {!Agent_loop.run}), and when a request overflows the context
-    window. Each emits [Compacted]. *)
+    window. Each emits [Compacted], costed at the prices of the model that
+    summarised ({!Compaction_settings.summary_model}). *)
 val compact : ?instructions:string -> t -> string Or_error.t
 
 (** {2 Changes: /diff, /review, /init} *)

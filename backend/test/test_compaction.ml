@@ -84,7 +84,8 @@ let config =
   ; max_tokens = None
   ; retries = 0
   ; cache_key = None
-  ; mask_observations = false
+  ; compaction =
+      { Compaction_settings.window_only with mask_observations = false }
   }
 ;;
 
