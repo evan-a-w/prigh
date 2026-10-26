@@ -21,6 +21,7 @@ module Picker_kind = struct
     | Reminders
     | Mcp of Mcp_list.t
     | Jump
+    | Trim of Trim.Point.t list
     | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
@@ -60,6 +61,11 @@ type t =
   | Rewind_confirm of
       { id : string
       ; text : string
+      }
+  | Trim_confirm of
+      { point : Trim.Point.t
+      ; busy : bool
+      ; error : string option
       }
   | Create_dir of
       { target : Dir_change.Target.t
@@ -104,6 +110,7 @@ let per_session = function
   | Rename _
   | Prompt _
   | Rewind_confirm _
+  | Trim_confirm _
   | Create_dir _
   | Session _
   | Text _
@@ -117,7 +124,16 @@ let per_session = function
   | New_worktree _
   | Remove_worktree _
   | Picker
-      { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
+      { kind =
+          ( Fork _
+          | Rewind _
+          | Tree
+          | Hosts
+          | Skills
+          | Mcp _
+          | Modes
+          | Jump
+          | Trim _ )
       ; _
       }
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true

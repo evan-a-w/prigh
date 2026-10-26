@@ -182,6 +182,7 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     README.md 2.0 KB (Remove README.md)
     ((connection (Reconnecting (attempt 1) (generation 1)))
@@ -239,8 +240,10 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     third
+    (✂ Trim everything before this)
     three
     README.md 2.0 KB (Remove README.md)
     ((connection Connected) (draft "half a thought") (scrolled_up true)
@@ -293,6 +296,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     <textarea id="editor"
               placeholder="Session gone: /new starts one"
@@ -318,6 +322,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     This session is no longer on the backend: start a new one (/new) or pick another in the sidebar. Your message stays here. (Dismiss)
     still here
@@ -713,8 +718,10 @@ let%expect_test "a message sent as the connection went" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     third
+    (✂ Trim everything before this)
     Reconnected
     (draft "")
     |}];
@@ -724,6 +731,7 @@ let%expect_test "a message sent as the connection went" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     Reconnected
     The connection went before your message reached the agent: it is back in the editor. (Dismiss)
@@ -775,9 +783,11 @@ let%expect_test "reconnecting keeps a shell card the backend does not have" =
     first
     one
     second
+    (✂ Trim everything before this)
     two
     bash ls
     third
+    (✂ Trim everything before this)
     three
     (same_entries 6)
     |}]

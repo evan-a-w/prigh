@@ -80,6 +80,16 @@ module Worktrees_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Trim_purpose = struct
+  type t =
+    | Picker
+    | Before of
+        { from_end : int
+        ; at : Time_ns.Alternate_sexp.t option
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -204,6 +214,10 @@ module Reply_tag = struct
     | Git of Git_bar.Reply.t
     | Nix_status of { open_settings : bool }
     | Nix_collected
+    | Trim_points of Trim_purpose.t
+    | Trimmed
+    | Untrimmed
+    | Trimmed_messages of string
   [@@deriving sexp_of, equal]
 end
 
@@ -243,6 +257,7 @@ module Command = struct
     | Jump_to_user_message of int
     | Scroll_to_entry of int
     | Scroll_to_bottom
+    | Scroll_to_trimmed
     | Focus_terminal
     | Notify of Prigh_ui.Notify.t
     | Request_notification_permission
@@ -429,6 +444,9 @@ module Action = struct
     | Jump_to of Jump.Target.t
     | Jump_older
     | Open_jump_list
+    | Ask_trim of Jump.Target.t
+    | Show_trimmed of bool
+    | Untrim
     | Chat_scrolled of { at_bottom : bool }
     | Jump_to_bottom
     | Run of string
@@ -524,6 +542,7 @@ module Model = struct
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
+    ; trimmed : Trimmed.t
     ; outputs_loading : String.Set.t (** [Fold] keys *)
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
@@ -686,6 +705,7 @@ let init =
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
   ; jump = Jump.empty
+  ; trimmed = Trimmed.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
   ; forges = Forges.empty
@@ -1011,6 +1031,10 @@ let set_state_without_files (m : Model.t) (state : State.t) =
           ~f:(Fn.non (Session_mode.equal (Session_mode.of_state state)))
     }
   in
+  let trim_changed =
+    Option.exists m.state ~f:(fun (old : State.t) ->
+      not ([%equal: Trim.t option] old.trim state.trim))
+  in
   let m = { m with state = Some state; pending } in
   if changed
   then (
@@ -1033,6 +1057,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; paging =
           Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
       ; jump = Jump.empty
+      ; trimmed = Trimmed.empty
       ; outputs_loading = String.Set.empty
       ; folds = String.Set.empty
       ; confirms = []
@@ -1063,6 +1088,22 @@ let set_state_without_files (m : Model.t) (state : State.t) =
         ; list_subagents
         ; list_jobs
         ] ))
+  else if trim_changed
+  then (
+    (* The context starts elsewhere: the transcript, which is the context,
+       again from the backend. *)
+    let path = state.session_path in
+    let m, fetch =
+      fetch_newest
+        { m with chat_cache = Chat_cache.remove m.chat_cache path }
+        path
+    in
+    ( { m with
+        chat = Chat.set_running m.chat state.running
+      ; jump = Jump.empty
+      ; trimmed = { m.trimmed with shown = Folded }
+      }
+    , background_changed @ fetch ))
   else
     { m with chat = Chat.set_running m.chat state.running }, background_changed
 ;;
@@ -3128,6 +3169,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; paging = Paging.all
     ; chat_cache = Chat_cache.empty
     ; jump = Jump.empty
+    ; trimmed = Trimmed.empty
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
@@ -4155,6 +4197,38 @@ let agents_message (m : Model.t) rest =
          ~draft:(String.strip ("/agents " ^ verb ^ " " ^ rest)))
 ;;
 
+(* Undoing the latest trim of the context ([/trim undo], the divider's Undo). *)
+
+let trim_state (m : Model.t) = Option.bind m.state ~f:(fun s -> s.trim)
+
+let untrim (m : Model.t) =
+  match trim_state m with
+  | None ->
+    error
+      m
+      "Nothing is trimmed from the context: /trim picks a message to trim \
+       before."
+  | Some _ when m.trimmed.restoring -> m, []
+  | Some _ ->
+    ( { m with trimmed = { m.trimmed with restoring = true } }
+    , [ call Untrim ~tag:Untrimmed ] )
+;;
+
+let untrimmed (m : Model.t) result =
+  let m = { m with trimmed = { m.trimmed with restoring = false } } in
+  match result with
+  | Ok json ->
+    decode m json Trim.Freed.of_json ~f:(fun (freed : Trim.Freed.t) ->
+      toast
+        m
+        (sprintf
+           "Back in the context: %d message%s (%s)"
+           freed.messages
+           (if freed.messages = 1 then "" else "s")
+           (Trim.tokens_label freed.tokens)))
+  | Error e -> error m (String.capitalize e)
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -4368,6 +4442,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     loading m "Fork from" [ rpc "get_entries" [] ~tag:(Entries Fork) ]
   | "rewind", _ ->
     loading m "Rewind to" [ rpc "get_entries" [] ~tag:(Entries Rewind) ]
+  | "trim", "" ->
+    loading
+      m
+      "Trim the context"
+      [ call Get_trim_points ~tag:(Trim_points Picker) ]
+  | "trim", "undo" -> untrim m
+  | "trim", _ ->
+    error m "Usage: /trim (pick the message to trim before) or /trim undo"
   | "tree", _ ->
     loading
       m
@@ -4728,42 +4810,55 @@ let fetch_outline (m : Model.t) =
 ;;
 
 let jump_points (m : Model.t) =
-  Jump.points m.jump ~path:(session_path m) ~paging:m.paging m.chat
+  Jump.points
+    m.jump
+    ~path:(session_path m)
+    ~paging:m.paging
+    ~trim:(trim_state m)
+    m.chat
 ;;
 
 let no_jump (m : Model.t) = { m with jump = { m.jump with pending = None } }
 
 (* A message not loaded: the pages from it down to those loaded, in one go,
-   then there. While a page is on its way, once it is in. *)
+   then there. While a page is on its way, once it is in. The divider of what
+   is trimmed is above the first message. *)
 let jump_to (m : Model.t) (target : Jump.Target.t) =
-  match target, session_path m, m.paging.before with
-  | Entry n, _, _ -> no_jump m, [ Command.Scroll_to_entry n ]
-  | Message index, Some path, Some before when index < m.paging.older ->
-    let m = { m with jump = { m.jump with pending = Some index } } in
-    if m.paging.loading
-    then m, []
-    else
-      ( { m with paging = { m.paging with loading = true } }
-      , [ call
-            (Get_messages_page
-               { session = path
-               ; before = Some before
-               ; from = None
-               ; limit = m.paging.older - index
-               })
-            ~tag:(Page { path; before = Some before })
-        ] )
-  | Message _, _, _ -> no_jump m, []
+  let load ~index =
+    match session_path m, m.paging.before with
+    | Some path, Some before when index < m.paging.older ->
+      let m = { m with jump = { m.jump with pending = Some target } } in
+      if m.paging.loading
+      then m, []
+      else
+        ( { m with paging = { m.paging with loading = true } }
+        , [ call
+              (Get_messages_page
+                 { session = path
+                 ; before = Some before
+                 ; from = None
+                 ; limit = m.paging.older - index
+                 })
+              ~tag:(Page { path; before = Some before })
+          ] )
+    | _ -> no_jump m, []
+  in
+  match target with
+  | Entry n -> no_jump m, [ Command.Scroll_to_entry n ]
+  | Message index -> load ~index
+  | Trimmed when m.paging.older > 0 -> load ~index:0
+  | Trimmed -> no_jump m, [ Command.Scroll_to_trimmed ]
 ;;
 
 (* An older page is in: there, if it was what a jump waited for. *)
 let continue_jump (m : Model.t) (page : Message_page.t) =
   match m.jump.pending with
-  | None -> m, []
-  | Some index ->
+  | None | Some (Entry _) -> m, []
+  | Some (Message index) ->
     (match Jump.entry_of_index ~page ~first:(Chat.first m.chat) index with
      | Some n -> no_jump m, [ Command.Scroll_to_entry n ]
      | None -> jump_to m (Message index))
+  | Some Trimmed -> jump_to m Trimmed
 ;;
 
 let older_page (m : Model.t) path ~before (page : Message_page.t) =
@@ -4805,6 +4900,150 @@ let jump_older (m : Model.t) =
   with
   | Some p -> jump_to m p.target
   | None -> load_older m
+;;
+
+(* ---- trimming the context before a message *)
+
+let trim_title = "Trim the context"
+
+(* "Trim everything before this": the backend says what that drops. *)
+let ask_trim (m : Model.t) target =
+  let points = jump_points m in
+  match Jump.from_end points target with
+  | Some (from_end, p) when Jump.trimmable ~paging:m.paging m.chat p ->
+    loading
+      m
+      trim_title
+      [ call Get_trim_points ~tag:(Trim_points (Before { from_end; at = p.at }))
+      ]
+  | Some _ ->
+    toast
+      m
+      "That is the first message in the model's context: there is nothing \
+       before it to trim."
+  | None -> m, []
+;;
+
+let trim_picker (m : Model.t) (points : Trim.Point.t list) =
+  let times = Model.message_time m in
+  Picker.create
+    ~title:"Trim the context before"
+    (List.rev_map points ~f:(fun (p : Trim.Point.t) ->
+       let text = Jump.headline p.text in
+       Picker.Item.create
+         ~id:p.before
+         ~detail:
+           (String.concat
+              ~sep:"  "
+              (Option.to_list (Option.map p.at ~f:(Message_time.short times))
+               @ [ Trim.label ~messages:p.messages ~tokens:p.tokens ]))
+         ~search:text
+         (if String.is_empty text then "(an image)" else text)))
+;;
+
+let trim_confirm (m : Model.t) point =
+  open_dialog m (Trim_confirm { point; busy = false; error = None })
+;;
+
+let trim_points_arrived (m : Model.t) (purpose : Trim_purpose.t) points =
+  match purpose, points with
+  | Picker, [] ->
+    toast
+      m
+      "Nothing to trim: the context starts at your first message. /trim drops \
+       what comes before a later one."
+  | Picker, points ->
+    open_picker m (Picker { kind = Trim points; picker = trim_picker m points })
+  | Before { from_end; at }, points ->
+    (match List.nth (List.rev points) from_end with
+     | Some (point : Trim.Point.t)
+       when Option.is_none at
+            || Option.is_none point.at
+            || [%equal: Time_ns.t option] at point.at -> trim_confirm m point
+     | _ ->
+       error
+         m
+         "That message is not in the model's context any more: /trim lists \
+          those you can trim before.")
+;;
+
+let trim (m : Model.t) =
+  match m.dialog with
+  | Some (Trim_confirm ({ busy = false; point; _ } as d)) ->
+    ( { m with
+        dialog = Some (Trim_confirm { d with busy = true; error = None })
+      ; trimmed = { m.trimmed with reveal = Some point.before }
+      }
+    , [ call (Trim { before = point.before }) ~tag:Trimmed ] )
+  | _ -> m, []
+;;
+
+let trimmed (m : Model.t) result =
+  match result with
+  | Ok json ->
+    decode m json Trim.Freed.of_json ~f:(fun (freed : Trim.Freed.t) ->
+      let m, close =
+        match m.dialog with
+        | Some (Trim_confirm { busy = true; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, cmds =
+        toast
+          m
+          (sprintf
+             "Trimmed %d message%s (%s) from the context: Undo on the divider \
+              at the top (or /trim undo) brings them back"
+             freed.messages
+             (if freed.messages = 1 then "" else "s")
+             (Trim.tokens_label freed.tokens))
+      in
+      m, close @ cmds)
+  | Error e ->
+    let m = { m with trimmed = { m.trimmed with reveal = None } } in
+    (match m.dialog with
+     | Some (Trim_confirm ({ busy = true; _ } as d)) ->
+       ( { m with
+           dialog =
+             Some
+               (Trim_confirm
+                  { d with busy = false; error = Some (String.capitalize e) })
+         }
+       , [] )
+     | _ -> error m (String.capitalize e))
+;;
+
+let show_trimmed (m : Model.t) show =
+  match session_path m, trim_state m, show, m.trimmed.shown with
+  | Some path, Some _, true, Folded ->
+    ( { m with trimmed = { m.trimmed with shown = Loading } }
+    , [ call Get_trimmed ~tag:(Trimmed_messages path) ] )
+  | _, _, false, _ -> { m with trimmed = { m.trimmed with shown = Folded } }, []
+  | _ -> m, []
+;;
+
+let trimmed_messages (m : Model.t) path result =
+  match m.trimmed.shown, result with
+  | Loading, Ok json when is_current m path ->
+    decode m json Trim.trimmed_of_json ~f:(fun messages ->
+      ( { m with
+          trimmed = { m.trimmed with shown = Shown (Chat.of_messages messages) }
+        }
+      , [ Command.Keep_scroll_position ] ))
+  | Loading, Error e when is_current m path ->
+    error
+      { m with trimmed = { m.trimmed with shown = Folded } }
+      (String.capitalize e)
+  | _ -> m, []
+;;
+
+(* The transcript reloaded after this page trimmed the context: the divider
+   it starts with, the trimmed message just below it. *)
+let reveal_trimmed (m : Model.t) path =
+  match m.trimmed.reveal, trim_state m with
+  | Some before, Some trim
+    when is_current m path && String.equal before trim.before ->
+    jump_to { m with trimmed = { m.trimmed with reveal = None } } Trimmed
+  | _ -> m, []
 ;;
 
 let prefetch_session (m : Model.t) path =
@@ -5714,6 +5953,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     ( m
     , cmds
       @ [ call Nix_store_status ~tag:(Nix_status { open_settings = false }) ] )
+  | Trimmed, result -> trimmed m result
+  | Untrimmed, result -> untrimmed m result
+  | Trimmed_messages path, result -> trimmed_messages m path result
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -5748,7 +5990,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     decode m json Message_page.of_json ~f:(fun page ->
       let m, cmds = newest_page m path page in
       let m, outline = if is_current m path then fetch_outline m else m, [] in
-      m, cmds @ outline)
+      let m, reveal = reveal_trimmed m path in
+      m, cmds @ outline @ reveal)
+  | Trim_points purpose, Ok json ->
+    decode m json Trim.Point.list_of_json ~f:(trim_points_arrived m purpose)
   | Outline path, Ok json ->
     let m =
       if Option.equal String.equal m.jump.fetching (Some path)
@@ -6117,7 +6362,8 @@ let loads : Reply_tag.t -> bool = function
   | Users Picker
   | Skills { purpose = Picker _; _ }
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
-  | Mcp Picker -> true
+  | Mcp Picker
+  | Trim_points _ -> true
   | _ -> false
 ;;
 
@@ -6748,6 +6994,13 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
       (match Jump.Target.of_string item.id with
        | Some target -> jump_to m target
        | None -> m, [])
+    | Trim points ->
+      (match
+         List.find points ~f:(fun (p : Trim.Point.t) ->
+           String.equal p.before item.id)
+       with
+       | Some point -> trim_confirm m point
+       | None -> m, [])
     | Worktrees listing ->
       (match
          List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id)
@@ -6875,6 +7128,7 @@ let dialog_accept (m : Model.t) =
     let m, cmds = close_dialog m in
     let m, start = start_nix_gc m (Some generations) in
     m, cmds @ start
+  | Some (Trim_confirm _) -> trim m
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -7358,11 +7612,14 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
   | Jump_to target -> jump_to m target
   | Jump_older -> jump_older m
+  | Ask_trim target -> ask_trim m target
+  | Show_trimmed show -> show_trimmed m show
+  | Untrim -> untrim m
   | Open_jump_list ->
     (match jump_points m with
      | points
        when List.exists points ~f:(fun (p : Jump.Point.t) ->
-              Outline.Kind.equal p.kind User) ->
+              Jump.Kind.equal p.kind User) ->
        open_picker
          m
          (Picker

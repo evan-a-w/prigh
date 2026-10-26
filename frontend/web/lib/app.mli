@@ -92,6 +92,19 @@ module Worktrees_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Trim_purpose : sig
+  (** Why we asked for [get_trim_points]. *)
+  type t =
+    | Picker (** [/trim] *)
+    | Before of
+        { from_end : int
+        (** the user's message, from the newest ({!Jump.from_end}) *)
+        ; at : Time_ns.Alternate_sexp.t option
+        (** when it was sent: the point found must be the same *)
+        } (** its "Trim everything before this" *)
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -233,6 +246,10 @@ module Reply_tag : sig
     | Nix_status of { open_settings : bool }
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
+    | Trim_points of Trim_purpose.t
+    | Trimmed (** [trim]: the confirmation closes, or says why not *)
+    | Untrimmed
+    | Trimmed_messages of string (** [get_trimmed] of this session's path *)
   [@@deriving sexp_of, equal]
 end
 
@@ -284,6 +301,9 @@ module Command : sig
     (** the main chat to this entry ([Jump.Target.Entry]), once rendered,
         marking it for a moment *)
     | Scroll_to_bottom (** and follow new output again *)
+    | Scroll_to_trimmed
+    (** the main chat to the divider of what is trimmed from the context,
+        once rendered, marking it for a moment *)
     | Focus_terminal (** the terminal panel's shell, once mounted *)
     | Notify of Prigh_ui.Notify.t (** a browser notification *)
     | Request_notification_permission
@@ -502,6 +522,14 @@ module Action : sig
     (** from the page: Ctrl+↑ found none of the user's messages above, the
         previous one is not loaded *)
     | Open_jump_list (** Ctrl+J: the user's messages, a picker *)
+    | Ask_trim of Jump.Target.t
+    (** trim the context before this message of the user's (its "Trim
+        everything before this", or Delete in the jump list): confirmed
+        first *)
+    | Show_trimmed of bool
+    (** the messages trimmed from the context, above the divider, or folded
+        again *)
+    | Untrim (** the divider's Undo, [/trim undo] *)
     | Chat_scrolled of { at_bottom : bool }
     (** from the page: the user scrolled the chat away from (or back to) its
         end *)
@@ -628,6 +656,7 @@ module Model : sig
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
+    ; trimmed : Trimmed.t
     ; outputs_loading : String.Set.t
     (** [Fold] keys of elided outputs being fetched whole *)
     ; session_gone : string option

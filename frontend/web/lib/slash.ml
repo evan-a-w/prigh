@@ -29,6 +29,7 @@ module Argument = struct
     | Pr
     | Worktree
     | Review
+    | Trim
   [@@deriving sexp_of, equal]
 end
 
@@ -160,6 +161,12 @@ let every =
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"
+  ; c
+      ~argument:Trim
+      ~args:"[undo]"
+      "trim"
+      "drop everything before one of your messages from the model's context \
+       (the transcript keeps it folded); undo brings back the last trim"
   ; c "tree" "show the session tree and move to any message in it"
   ; c
       ~argument:Directory
