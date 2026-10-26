@@ -97,6 +97,7 @@ let methods =
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
+  @ Nix_store_rpc.methods
 ;;
 
 let param params name =
@@ -313,6 +314,7 @@ type t =
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
+  ; nix_store : Nix_store.t option
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -482,6 +484,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?nix_store
       ~login
       ~sessions_dir
       ~cwd
@@ -531,6 +534,7 @@ let create
     ; on_session_deleted = []
     ; loading = String.Table.create ()
     ; repos = String.Table.create ()
+    ; nix_store
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -1819,6 +1823,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->
     Some (prefs t client ~meth ~params)
+  | "nix_store_status" | "nix_store_gc" ->
+    Nix_store_rpc.dispatch
+      t.nix_store
+      ~signed_in:client.signed_in
+      ~send:client.send
+      ~meth
+      ~params
   | "btw" -> Some (btw t client params)
   | "btw_cancel" ->
     Some

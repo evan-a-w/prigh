@@ -10,12 +10,14 @@ $ PRIGH_TOKENS= alice=tok-a , bob=tok-b PRIGH_SUPERUSERS=alice PRIGH_GH_TOKENS=b
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 + setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
 + setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
 supervise in /home/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-alice -cwd /home/alice
 supervise in /home/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-bob -cwd /home/bob
-prigh-docker: mode=web users: alice(10000,superuser) bob(10001); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=alice=tok-a\,bob=tok-b PRIGH_HOST_TOKENS=alice=host-token-alice\,bob=host-token-bob PRIGH_SUPERUSERS=alice prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790 -model m
+prigh-docker: mode=web users: alice(10000,superuser) bob(10001); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=alice=tok-a\,bob=tok-b PRIGH_HOST_TOKENS=alice=host-token-alice\,bob=host-token-bob PRIGH_SUPERUSERS=alice prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790 -model m
 --- /run/prigh/extrausers/passwd
 alice:x:10000:10000:prigh user alice:/home/alice:/bin/bash
 bob:x:10001:10001:prigh user bob:/home/bob:/bin/bash
@@ -109,11 +111,13 @@ $ PRIGH_TOKENS=carol=tok-c,bob=tok-b,alice=tok-a PRIGH_SUPERUSERS=alice, bob PRI
 + chmod 700 /home/carol
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/carol: setpriv --reuid=10003 --regid=10003 --init-groups env -i HOME=/home/carol USER=carol LOGNAME=carol SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/carol/.nix-profile/bin:/home/carol/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-carol PRIGH_USER=carol prigh tool-host -connect 127.0.0.1:7777 -name container -host-id container-carol -cwd /home/carol
 supervise in /home/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7777 -name container -host-id container-bob -cwd /home/bob
 supervise in /home/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7777 -name container -host-id container-alice -cwd /home/alice
-prigh-docker: mode=server,web users: carol(10003) bob(10001,superuser) alice(10000,superuser); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=carol=tok-c\,bob=tok-b\,alice=tok-a PRIGH_HOST_TOKENS=carol=host-token-carol\,bob=host-token-bob\,alice=host-token-alice PRIGH_SUPERUSERS=alice\,bob prigh serve -cwd /home/prigh -no-backend-host -listen 0.0.0.0:7777 -web 0.0.0.0:7790
+prigh-docker: mode=server,web users: carol(10003) bob(10001,superuser) alice(10000,superuser); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=carol=tok-c\,bob=tok-b\,alice=tok-a PRIGH_HOST_TOKENS=carol=host-token-carol\,bob=host-token-bob\,alice=host-token-alice PRIGH_SUPERUSERS=alice\,bob prigh serve -cwd /home/prigh -no-backend-host -listen 0.0.0.0:7777 -web 0.0.0.0:7790
 --- /run/prigh/extrausers/group
 carol:x:10003:
 bob:x:10001:
@@ -130,17 +134,21 @@ $ PRIGH_TOKEN=tok prigh-docker
 + chmod 700 /home/default
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 $ PRIGH_TOKEN=tok prigh-docker 
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (2 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 --- /nix/store
 aaaa-glibc-2.40
 bbbb-nix-2.35
@@ -166,9 +174,11 @@ prigh-docker: /nix/store/eeee-openssl-3 is in the store but not registered: repl
 prigh-docker: adding the image's store paths to /nix (1 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 eeee-openssl-3
 --- /nix/store
 aaaa-glibc-2.40
@@ -212,6 +222,190 @@ exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USE
 $ PRIGH_DOCKER_UID=1000 prigh-docker prigh sessions list
 exec prigh sessions list
 
+=== Nix garbage collection: limits sized from the volume, the schedule
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 1 GiB free, up to 3 GiB, and every 1d deleting profile generations older than 14 days
+--- /run/prigh/nix.conf
+# Written by prigh-docker at start, for the 8 GiB filesystem of /nix.
+min-free = 1073741824
+max-free = 3221225472
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 20 GiB free, up to 50 GiB, and every 1d deleting profile generations older than 14 days
+--- /run/prigh/nix.conf
+# Written by prigh-docker at start, for the 200 GiB filesystem of /nix.
+min-free = 21474836480
+max-free = 53687091200
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 50 GiB free, up to 100 GiB, and every 1d deleting profile generations older than 14 days
+--- /run/prigh/nix.conf
+# Written by prigh-docker at start, for the 2048 GiB filesystem of /nix.
+min-free = 53687091200
+max-free = 107374182400
+--- /run/prigh/nix-gc/schedule
+interval=86400
+keep_days=14
+next_at=1700086400
+--- /nix/var/prigh/last-scheduled-gc
+1700000000
+prw--w---- requests
+-rw-r--r-- schedule
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700090300
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 50 GiB free, up to 100 GiB, and every 12h deleting all old profile generations
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+--- /run/prigh/nix-gc/schedule
+interval=43200
+keep_days=0
+next_at=1700090300
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at never
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 50 GiB free, up to 100 GiB, none scheduled
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+--- /run/prigh/nix-gc/schedule
+interval=0
+keep_days=off
+next_at=
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700005400
+prigh-docker: mode=tui cwd=/home/prigh (single user: tools run as prigh); nix: daemon started; garbage: collects below 50 GiB free, up to 100 GiB, and every 90m deleting profile generations older than 14 days
+$ PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=daily prigh-docker 
+prigh-docker: PRIGH_NIX_GC_INTERVAL='daily': use a number with s, m, h or d (e.g. 1d, 12h), or 0 to turn the scheduled garbage collection off
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=5 prigh-docker 
+prigh-docker: PRIGH_NIX_GC_INTERVAL='5': use a number with s, m, h or d (e.g. 1d, 12h), or 0 to turn the scheduled garbage collection off
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_NIX_GC_KEEP_DAYS=2w prigh-docker 
+prigh-docker: PRIGH_NIX_GC_KEEP_DAYS='2w': use a number of days (0 deletes every old profile generation), or off to keep them all
+[exit 2]
+
+=== Nix garbage collection: the backend's requests, prigh-docker nix-gc
+$ prigh-docker nix-gc-request gc 1a2b 14d alice
+prigh-docker: nix garbage collection (by alice): deleted 2 profile generations and 2 store paths, freed 1.5 GiB
+--- /run/prigh/nix-gc/1a2b.log
+deleting old generations of /home/alice/.local/state/nix/profiles/profile
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/profile --delete-generations 14d
+deleting old generations of /home/alice/.local/state/nix/profiles/tools
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/tools --delete-generations 14d
+deleting old generations of /nix/var/nix/profiles/per-user/bob/profile
++ setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /nix/var/nix/profiles/per-user/bob/profile --delete-generations 14d
+collecting garbage
++ env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix store gc -v
+removing profile version 1
+removing profile version 2
+finding garbage collector roots...
+deleting '/nix/store/x-profile-1-link'
+deleting '/nix/store/x-profile-2-link'
+deleting unused links...
+2 store paths deleted, 1.50 GiB freed
+--- /run/prigh/nix-gc/1a2b.result
+status=ok
+error=
+at=1700000000
+by=alice
+generations=14d
+generations_deleted=2
+paths_deleted=2
+freed_bytes=1610612736
+seconds=0
+--- /nix/var/prigh/last-gc
+at=1700000000
+by=alice
+generations=14d
+generations_deleted=2
+paths_deleted=2
+freed_bytes=1610612736
+seconds=0
+--- /run/prigh/nix-gc/last-gc
+at=1700000000
+by=alice
+generations=14d
+generations_deleted=2
+paths_deleted=2
+freed_bytes=1610612736
+seconds=0
+1a2b.log
+1a2b.result
+last-gc
+requests
+schedule
+$ prigh-docker nix-gc-request gc 3c4d keep alice
+prigh-docker: nix garbage collection (by alice): deleted 0 profile generations and 2 store paths, freed 1.5 GiB
+--- /run/prigh/nix-gc/3c4d.log
+collecting garbage
++ env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix store gc -v
+finding garbage collector roots...
+deleting '/nix/store/x-profile-1-link'
+deleting '/nix/store/x-profile-2-link'
+deleting unused links...
+2 store paths deleted, 1.50 GiB freed
+3c4d.log
+3c4d.result
+last-gc
+requests
+schedule
+$ prigh-docker nix-gc-request gc 5e6f all alice
+prigh-docker: nix garbage collection (by alice) failed: nix store gc failed: error: cannot delete path: disk on fire
+--- /run/prigh/nix-gc/5e6f.result
+status=error
+error=nix store gc failed: error: cannot delete path: disk on fire
+at=1700000000
+by=alice
+generations=all
+generations_deleted=0
+paths_deleted=0
+freed_bytes=0
+seconds=0
+--- /nix/var/prigh/last-gc
+at=1700000000
+by=alice
+generations=keep
+generations_deleted=0
+paths_deleted=2
+freed_bytes=1610612736
+seconds=0
+$ prigh-docker nix-gc-request gc ../x keep alice
+prigh-docker: nix garbage collection: ignoring a malformed request (18 characters)
+$ prigh-docker nix-gc-request gc a1 keep alice; rm -rf /
+prigh-docker: nix garbage collection: ignoring a malformed request (26 characters)
+$ prigh-docker nix-gc-request gc a1 7 alice
+prigh-docker: nix garbage collection: ignoring a malformed request (13 characters)
+$ prigh-docker nix-gc-request rm -rf /
+prigh-docker: nix garbage collection: ignoring a malformed request (8 characters)
+$ prigh-docker nix-gc-request 
+prigh-docker: nix garbage collection: ignoring a malformed request (0 characters)
+$ PRIGH_NIX_GC_KEEP_DAYS=30 prigh-docker nix-gc
+prigh-docker: nix garbage collection (by console): deleted 0 profile generations and 0 store paths, freed 0 B
+deleting old generations of /home/alice/.local/state/nix/profiles/profile
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/profile --delete-generations 30d
+deleting old generations of /home/alice/.local/state/nix/profiles/tools
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/tools --delete-generations 30d
+deleting old generations of /nix/var/nix/profiles/per-user/bob/profile
++ setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /nix/var/nix/profiles/per-user/bob/profile --delete-generations 30d
+collecting garbage
++ env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix store gc -v
+0 store paths deleted, 0.00 MiB freed
+$ prigh-docker nix-gc all
+prigh-docker: nix garbage collection (by console): deleted 0 profile generations and 0 store paths, freed 0 B
+deleting old generations of /home/alice/.local/state/nix/profiles/profile
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/profile --delete-generations old
+deleting old generations of /home/alice/.local/state/nix/profiles/tools
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /home/alice/.local/state/nix/profiles/tools --delete-generations old
+deleting old generations of /nix/var/nix/profiles/per-user/bob/profile
++ setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 nix-env --profile /nix/var/nix/profiles/per-user/bob/profile --delete-generations old
+collecting garbage
++ env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix store gc -v
+0 store paths deleted, 0.00 MiB freed
+$ prigh-docker nix-gc keep
+prigh-docker: nix garbage collection (by console): deleted 0 profile generations and 0 store paths, freed 0 B
+collecting garbage
++ env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix store gc -v
+0 store paths deleted, 0.00 MiB freed
+$ prigh-docker nix-gc forever
+prigh-docker: usage: prigh-docker nix-gc [keep|all|Nd] (keep: no profile generations, all: all but the current ones, Nd: those older than N days; default: PRIGH_NIX_GC_KEEP_DAYS)
+[exit 2]
+$ PRIGH_DOCKER_UID=1000 prigh-docker nix-gc
+prigh-docker: nix-gc needs root: docker compose exec prigh prigh-docker nix-gc
+[exit 2]
+$ PRIGH_DOCKER_UID=1000 prigh-docker nix-gc-request gc a1 keep alice
+prigh-docker: nix garbage collection (by alice): deleted 0 profile generations and 0 store paths, freed 0 B
+
 === uids from existing directories
 $ PRIGH_TOKENS=alice=a,bob=b,carol=c,dave=d,erin=e PRIGH_NO_BACKEND_HOST=1 prigh-docker 
 + chmod 700 /home/prigh
@@ -231,8 +425,10 @@ prigh-docker: /home/erin is owned by uid 10003, not 10005: chowning it recursive
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
-prigh-docker: mode=web users: alice(10001) bob(10002) carol(10004) dave(10003) erin(10005); tool hosts: none in the container (PRIGH_NO_BACKEND_HOST=1); nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=alice=a\,bob=b\,carol=c\,dave=d\,erin=e prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
+prigh-docker: mode=web users: alice(10001) bob(10002) carol(10004) dave(10003) erin(10005); tool hosts: none in the container (PRIGH_NO_BACKEND_HOST=1); nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=alice=a\,bob=b\,carol=c\,dave=d\,erin=e prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 --- /run/prigh/users
 alice	10001	
 bob	10002	
@@ -261,9 +457,11 @@ prigh-docker: /home/prigh is owned by uid 0, not 1000: chowning it recursively
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 .
 ./default
 ./default/.bashrc
@@ -294,17 +492,21 @@ prigh-docker: /workspace/proj is from an older image: users now work in their ho
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-alice -cwd /home/alice
 supervise in /home/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-bob -cwd /home/bob
-prigh-docker: mode=web users: alice(10000) bob(10001); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=alice=a\,bob=b PRIGH_HOST_TOKENS=alice=host-token-alice\,bob=host-token-bob prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: alice(10000) bob(10001); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=alice=a\,bob=b PRIGH_HOST_TOKENS=alice=host-token-alice\,bob=host-token-bob prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 $ PRIGH_MODE=tui prigh-docker 
 prigh-docker: /workspace/bob is from an older image: users now work in their homes and nothing uses /workspace. Move it: docker compose exec prigh sh -c 'cp -a /workspace/bob /home/NAME/ && chown -R NAME: /home/NAME/bob', then remove the /workspace mount (see DOCKER.md, Migrating from /workspace)
 prigh-docker: /workspace/prigh is from an older image: users now work in their homes and nothing uses /workspace. Move it: docker compose exec prigh sh -c 'cp -a /workspace/prigh/. /home/prigh/ && chown -R prigh: /home/prigh', then remove the /workspace mount (see DOCKER.md, Migrating from /workspace)
 prigh-docker: /workspace/proj is from an older image: users now work in their homes and nothing uses /workspace. Move it: docker compose exec prigh sh -c 'cp -a /workspace/proj /home/NAME/ && chown -R NAME: /home/NAME/proj', then remove the /workspace mount (see DOCKER.md, Migrating from /workspace)
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
-prigh-docker: mode=tui cwd=/home/prigh (single user: tools run as prigh); nix: daemon started
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
+prigh-docker: mode=tui cwd=/home/prigh (single user: tools run as prigh); nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /home/prigh --
 
 === old layout and /home/prigh both present
@@ -321,9 +523,11 @@ $ PRIGH_TOKEN=tok PRIGH_MODE=web prigh-docker
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /home/prigh -no-backend-host -web 0.0.0.0:7790
 $ PRIGH_TOKEN=tok PRIGH_MODE=prigh-web prigh-docker 
 prigh-docker: PRIGH_MODE=prigh-web is now PRIGH_MODE=web (prigh-web on port 7790)
 [exit 2]
@@ -343,9 +547,11 @@ $ PRIGH_ALLOW_NO_TOKEN=1 PRIGH_MODE=server PRIGH_SUPERUSERS= prigh-docker
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 supervise in /home/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh tool-host -connect 127.0.0.1:7777 -name container -host-id container-default -cwd /home/default
-prigh-docker: mode=server users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh serve -cwd /home/prigh -no-backend-host -listen 0.0.0.0:7777
+prigh-docker: mode=server users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_NIX_GC_HELPER=/run/prigh/nix-gc prigh serve -cwd /home/prigh -no-backend-host -listen 0.0.0.0:7777
 --- /run/prigh/extrausers/passwd
 default:x:10000:10000:prigh user default:/home/default:/bin/bash
 
@@ -356,14 +562,18 @@ $ PRIGH_MODE=tui PRIGH_TUI_ARGS=-model m PRIGH_GIT_EMAIL=me@example.com GH_TOKEN
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 + setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh '' me@example.com
-prigh-docker: mode=tui cwd=/home/prigh (single user: tools run as prigh); nix: daemon started
+prigh-docker: mode=tui cwd=/home/prigh (single user: tools run as prigh); nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /home/prigh -model m --
 $ PRIGH_MODE=tui PRIGH_CWD=/home/prigh/proj prigh-docker 
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
++ chown 0:prigh /run/prigh/nix-gc/requests
+supervise nix-gc helper: requests from /run/prigh/nix-gc/requests, next scheduled collection at 1700086400
 + chown 1000:1000 /home/prigh/proj
-prigh-docker: mode=tui cwd=/home/prigh/proj (single user: tools run as prigh); nix: daemon started
+prigh-docker: mode=tui cwd=/home/prigh/proj (single user: tools run as prigh); nix: daemon started; garbage: collects below 10 GiB free, up to 25 GiB, and every 1d deleting profile generations older than 14 days
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /home/prigh/proj --
 $ PRIGH_MODE=tui prigh-docker tui
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /home/prigh --
