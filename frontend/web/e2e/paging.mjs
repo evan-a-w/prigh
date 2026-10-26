@@ -7,13 +7,14 @@
 // to one not loaded (loading the pages down to it), the jump list (Ctrl+J)
 // and, on a phone, its button.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
-// prigh_web.expected).
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -294,7 +295,8 @@ try {
   section("jump: the list");
   console.log(clean(await page.locator(".picker-dialog .picker-item").first().innerText()));
   await page.keyboard.type("Step 17:");
-  await page.waitForFunction(() => document.querySelectorAll(".picker-dialog .picker-item").length < 40);
+  // Filtered by all of it, not only the keys typed so far ("Step 1").
+  await page.waitForFunction(() => document.querySelector(".picker-dialog .picker-item")?.innerText.includes("Step 17:"));
   console.log(clean(await page.locator(".picker-dialog .picker-item").first().innerText()));
   await screenshot("jump list");
   await page.keyboard.press("Enter");
@@ -320,10 +322,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  await stopServer();
+  await end(() => stopServer(), () => browser.close());
 }
