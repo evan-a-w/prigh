@@ -40,7 +40,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review remote"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

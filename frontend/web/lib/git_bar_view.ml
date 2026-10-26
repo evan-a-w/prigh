@@ -105,6 +105,12 @@ let strip (m : App.Model.t) ~inject =
               ~on_click:(inject (git Create_pr))
               [ icon Pull_request; Node.text "Create PR" ]
           ]
+      ; (* What the last action did, or why it was refused: here, where it
+           shows whatever the page lists. *)
+        (match t.failure, t.notice with
+         | Some e, _ -> div ~cls:"git-failure" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+         | None, Some n -> div ~cls:"git-notice" ~attrs:[ Attr.role "status" ] [ Node.text n ]
+         | None, None -> Node.none)
       ]
 ;;
 
@@ -194,7 +200,7 @@ let commit_box (m : App.Model.t) ~inject =
             ; Attr.create "aria-label" "Commit message"
             ; Attr.placeholder
                 (if t.amend then "Empty: keep the commit's message" else "What the change does, and why")
-            ; Attr.rows 3
+            ; Attr.rows 4
             ; Attr.string_property "value" t.message
             ; Attr.on_input (fun _ text -> inject (git (Message text)))
             ; Attr.on_keydown (commit_key m ~inject)
@@ -229,9 +235,5 @@ let commit_box (m : App.Model.t) ~inject =
                      | n -> sprintf "Commit %s" (plural n "file"))
               ]
           ]
-      ; (match t.failure, t.notice with
-         | Some e, _ -> div ~cls:"git-failure" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
-         | None, Some n -> div ~cls:"git-notice" ~attrs:[ Attr.role "status" ] [ Node.text n ]
-         | None, None -> Node.none)
       ]
 ;;
