@@ -35,6 +35,8 @@ module Created = struct
   type t =
     { worktree : worktree
     ; new_branch : bool
+    ; root : string
+    ; cwd : string
     }
   [@@deriving sexp, jsonaf, equal]
 end
@@ -290,7 +292,38 @@ let free_path project_dir slug =
   go 1
 ;;
 
-let create ~env ~cancel ~cwd ~dir ~branch ~base =
+(* [branch], else [branch-2], [branch-3], ...: the first neither a local
+   branch nor checked out. *)
+let fresh_branch ~env ~cancel ~cwd ~(listing : Listing.t) branch =
+  let taken name =
+    rev_exists ~env ~cancel ~dir:cwd ("refs/heads/" ^ name)
+    || List.exists listing.worktrees ~f:(fun w ->
+      Option.exists w.branch ~f:(String.equal name))
+  in
+  let rec go i =
+    let name = if i = 1 then branch else sprintf "%s-%d" branch i in
+    if taken name && i < 1000 then go (i + 1) else name
+  in
+  go 1
+;;
+
+(* [cwd]'s subdirectory of its checkout, in [path] when it exists there. *)
+let counterpart ~env ~cancel ~cwd path =
+  match git ~env ~cancel ~dir:cwd [ "rev-parse"; "--show-prefix" ] with
+  | Ok prefix ->
+    (match String.strip prefix with
+     | "" -> path
+     | prefix ->
+       let sub =
+         Filename.concat path (String.rstrip ~drop:(Char.equal '/') prefix)
+       in
+       (match Sys_unix.is_directory sub with
+        | `Yes -> sub
+        | `No | `Unknown -> path))
+  | Error _ -> path
+;;
+
+let create ?(fresh = false) ~env ~cancel ~cwd ~dir ~branch ~base () =
   protect (fun () ->
     let branch = String.strip branch in
     let base =
@@ -304,6 +337,9 @@ let create ~env ~cancel ~cwd ~dir ~branch ~base =
      | Error _ ->
        fail "not a valid branch name: %S (e.g. feat/my-change)" branch);
     let listing, common = list_exn ~env ~cancel ~cwd ~dir in
+    let branch =
+      if fresh then fresh_branch ~env ~cancel ~cwd ~listing branch else branch
+    in
     (match
        List.find listing.worktrees ~f:(fun w ->
          Option.exists w.branch ~f:(String.equal branch))
@@ -370,7 +406,12 @@ let create ~env ~cancel ~cwd ~dir ~branch ~base =
       List.find listing.worktrees ~f:(fun w ->
         String.equal w.path real || String.equal w.path path)
     with
-    | Some worktree -> { Created.worktree; new_branch }
+    | Some worktree ->
+      { Created.worktree
+      ; new_branch
+      ; root = listing.root
+      ; cwd = counterpart ~env ~cancel ~cwd worktree.path
+      }
     | None -> fail "git worktree add did not create %s" path)
 ;;
 
@@ -449,10 +490,11 @@ let is_op name =
 
 let list_args ~dir = `Object [ "dir", `String dir ]
 
-let create_args ~dir ~branch ~base =
+let create_args ?(fresh = false) ~dir ~branch ~base () =
   `Object
     ([ "dir", `String dir; "branch", `String branch ]
-     @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", `String b ]))
+     @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", `String b ])
+     @ if fresh then [ "fresh", `True ] else [])
 ;;
 
 let remove_args ~dir ~path ~force =
@@ -481,9 +523,14 @@ let run ~env ~cancel ~cwd ~name ~arguments =
     match string "branch" with
     | None -> Tool_result.error "missing branch"
     | Some branch ->
+      let fresh =
+        match Json.member "fresh" arguments with
+        | Some `True -> true
+        | _ -> false
+      in
       reply
         [%jsonaf_of: Created.t]
-        (create ~env ~cancel ~cwd ~dir ~branch ~base:(string "base")))
+        (create ~fresh ~env ~cancel ~cwd ~dir ~branch ~base:(string "base") ()))
   else if String.equal name remove_op
   then (
     match string "path" with
@@ -509,3 +556,24 @@ let of_result of_json (result : Tool_result.t) =
 let listing_of_result = of_result [%of_jsonaf: Listing.t]
 let created_of_result = of_result [%of_jsonaf: Created.t]
 let removed_of_result = of_result [%of_jsonaf: t]
+
+let create_tool =
+  { Tool.spec =
+      { Tool_spec.name = create_op
+      ; description = "a git worktree"
+      ; parameters = `Object []
+      ; parallel_safe = true
+      ; destructive = false
+      ; on_host = true
+      ; freeform = None
+      }
+  ; run =
+      (fun (context : Tool.Context.t) arguments ->
+        run
+          ~env:context.env
+          ~cancel:context.cancel
+          ~cwd:context.cwd
+          ~name:create_op
+          ~arguments)
+  }
+;;

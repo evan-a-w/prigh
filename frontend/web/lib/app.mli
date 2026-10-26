@@ -157,8 +157,11 @@ module Reply_tag : sig
         { place : string (** [Worktrees.place] *)
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of string
-    (** [create_worktree], as typed: the session moves into it *)
+    | Worktree_created of
+        { command : string (** as typed *)
+        ; new_session : bool
+          (** a new session starts in it; otherwise this one moves there *)
+        } (** [create_worktree] *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
     | Worktree_session of
@@ -228,6 +231,9 @@ module Command : sig
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
     | Focus of string (** the element with this id, once rendered *)
+    | Place_popover
+    (** a chip's menu, once rendered: above the composer, or below its chip
+        when only there is room; inside the composer sideways *)
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -356,10 +362,12 @@ module Action : sig
     | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
-    | Open_model_picker
+    | Open_chip of Chip.t
+    (** its menu over the composer (Ctrl+L: the model's); again closes it *)
+    | Chip_step of int
+    (** the next ([1]) or previous ([-1]) chip's menu, from the open one *)
     | Open_snippets of int option
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
-    | Open_thinking_picker
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
     | Open_rename
@@ -391,9 +399,14 @@ module Action : sig
     | Edit_queued of Queued.Message.t (** back into the editor *)
     | Remove_queued of Queued.Message.t
     | Remove_reminder of string (** by name, from the [/remind] picker *)
-    | Toggle_worktrees (** fold or unfold the sidebar's worktrees *)
-    | Refresh_worktrees
-    | New_worktree (** its dialog *)
+    | Toggle_folded of string
+    (** fold or unfold a project or a worktree of the sidebar's tree (by its
+        directory) *)
+    | New_session_in of string
+    (** a new session working in this directory (a project, a worktree) *)
+    | New_worktree of { repo : string option }
+    (** its dialog; with a repository (a project's row), a new session
+        starts in the worktree *)
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -534,7 +547,9 @@ module Model : sig
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
     ; worktrees : Worktrees.t (** the sidebar's, [/worktree]'s completion *)
-    ; worktrees_open : bool (** the sidebar's section is unfolded *)
+    ; folded : String.Set.t
+      (** the sidebar's folded projects and worktrees, by directory (a
+          preference) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
@@ -562,6 +577,10 @@ module Model : sig
 
   (** The session's turn runs. *)
   val running : t -> bool
+
+  (** The sidebar is open beside the chat (not a phone's drawer): it shows
+      the session's status, which the header over the chat shows otherwise. *)
+  val docked : t -> bool
 
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
@@ -594,5 +613,9 @@ module Model : sig
 end
 
 val thinking_levels : string list
+
+(** A token count in a few characters: [200k], [1.2M]. *)
+val compact_tokens : int -> string
+
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list

@@ -42,6 +42,10 @@ type t =
       { kind : Picker_kind.t
       ; picker : Picker.t
       }
+  | Popover of
+      { chip : Chip.t
+      ; picker : Picker.t
+      } (** a composer chip's menu, over the chip *)
   | Help
   | Rename of string
   | Delete of Delete_target.t
@@ -89,6 +93,8 @@ type t =
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
+      ; repo : string option
+        (** its repository when not the session's: removed from the tree *)
       ; force : bool (** also with uncommitted changes ([rm -f]) *)
       ; busy : bool (** removing: waiting for the backend *)
       ; error : string option

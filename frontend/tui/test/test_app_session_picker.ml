@@ -34,14 +34,95 @@ let%expect_test "the picker lists active sessions first, whatever the order" =
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
+      ── work ──
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
-       (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
        release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
+      ── tmp ──
+       (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
       ── archived ──
     ▸* build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
        (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
+    >
+    |}]
+;;
+
+let%expect_test
+    "the picker groups sessions by project and worktree; the filter finds them \
+     by project"
+  =
+  let h = Test_app.connected ~width:100 ~height:20 () in
+  H.keys h "/sessions";
+  H.enter h;
+  let repo root worktree branch =
+    sprintf
+      {|"repo":{"root":"%s","worktree":"%s","branch":"%s","main":%b}|}
+      root
+      worktree
+      branch
+      (String.equal root worktree)
+  in
+  let session id name cwd repo =
+    sprintf
+      {|{"id":"%s","path":"/s/%s.jsonl","name":"%s","cwd":"%s","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-0%sT10:00:00Z","first_prompt":"go","message_count":2%s}|}
+      id
+      id
+      name
+      cwd
+      id
+      (if String.is_empty repo then "" else "," ^ repo)
+  in
+  H.reply
+    h
+    Sessions_picker
+    (sprintf
+       "[%s]"
+       (String.concat
+          ~sep:","
+          [ session
+              "9"
+              "login form"
+              "/wt/prigh/feat-login"
+              (repo "/src/prigh" "/wt/prigh/feat-login" "feat/login")
+          ; session
+              "8"
+              "main work"
+              "/src/prigh"
+              (repo "/src/prigh" "/src/prigh" "main")
+          ; session
+              "7"
+              "landing"
+              "/src/site"
+              (repo "/src/site" "/src/site" "trunk")
+          ; session
+              "6"
+              "backend"
+              "/src/prigh/backend"
+              (repo "/src/prigh" "/src/prigh" "main")
+          ; session "5" "notes" "/home/u/notes" ""
+          ]));
+  rows h;
+  H.keys h "site";
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── prigh ──
+    ▸  main work ∣ 2025-06-08T10:00 ∣ 2 msgs ∣ go   /src/prigh
+       backend ∣ 2025-06-06T10:00 ∣ 2 msgs ∣ go     /src/prigh/backend
+      ── prigh ⎇ feat/login ──
+       login form ∣ 2025-06-09T10:00 ∣ 2 msgs ∣ go  /wt/prigh/feat-login
+      ── site ──
+       landing ∣ 2025-06-07T10:00 ∣ 2 msgs ∣ go     /src/site
+      ── notes ──
+       notes ∣ 2025-06-05T10:00 ∣ 2 msgs ∣ go       /home/u/notes
+    >
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── site ──
+    ▸  landing ∣ 2025-06-07T10:00 ∣ 2 msgs ∣ go  /src/site
     >
     |}]
 ;;
@@ -56,7 +137,6 @@ let%expect_test
   H.reply ~quiet:true h Sessions_picker sessions_json;
   (* Mark the unnamed scratch session; the filter hides it. *)
   H.key h (Key.plain Up);
-  H.key h (Key.plain Up);
   H.key h (Key.plain Tab);
   H.key h (Key.ctrl 'n');
   H.key h (Key.ctrl 'n');
@@ -64,13 +144,14 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
+      ── work ──
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
+       release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
+      ── tmp ──
      ✓ (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
-    ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
       ── archived ──
-     * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸* build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
        (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
     >
     |}];
@@ -82,13 +163,15 @@ let%expect_test
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
+      ── work ──
        deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
-    ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
+       release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
       ── archived ──
-     * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸* build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
     >
     |}];
   (* The hidden mark still counts, and is deleted with the others. *)
+  H.key h (Key.plain Up);
   H.key h (Key.plain Tab);
   H.key h (Key.ctrl 'd');
   H.enter h;

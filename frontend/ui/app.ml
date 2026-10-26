@@ -82,6 +82,8 @@ module Reply_tag = struct
     | Pending
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Subagent_loaded
+    (** [get_subagent], for a subagent whose events we missed *)
     | Dir_changed of P.Dir_change.Target.t
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker
@@ -1592,6 +1594,48 @@ let prune_agents m =
   { m with agents; focus }
 ;;
 
+(* The session's subagents whose events this client missed (it switched
+   session or reconnected) join the list at once and their transcripts
+   follow. *)
+let set_state m (state : P.State.t) =
+  let missed =
+    List.filter state.subagents ~f:(fun a ->
+      Option.is_none (Agent_view.find m.agents a.id))
+  in
+  let adopted =
+    List.map missed ~f:(fun a ->
+      let agent =
+        Agent_view.create ~call_id:"" ~agent_id:a.id ~task:a.task ~model:""
+      in
+      if a.running
+      then agent
+      else { agent with status = Done { turns = 0; cost_usd = 0. } })
+  in
+  ( { m with state = Some state; agents = m.agents @ adopted }
+  , List.map missed ~f:(fun a ->
+      rpc "get_subagent" ~params:[ "id", str a.id ] ~tag:Subagent_loaded) )
+;;
+
+let subagent_loaded m (d : P.Subagent_detail.t) =
+  update_agents m ~f:(fun agents ->
+    Agent_view.replace agents d.id (fun a ->
+      { a with
+        call_id = d.call_id
+      ; model = d.model
+      ; turns = d.turns
+      ; status =
+          (match d.result with
+           | None -> a.status
+           | Some result ->
+             Agent_view.status_of_result ~turns:d.turns ~cost_usd:0. result)
+      ; transcript =
+          List.fold
+            d.messages
+            ~init:(Transcript.clear a.transcript)
+            ~f:Transcript.add_message
+      }))
+;;
+
 (* [arg] is the agent's number in the strip or its id. *)
 let cancel_agent m arg =
   let agent =
@@ -2595,16 +2639,20 @@ let worktree_command m rest =
   let command = String.strip ("/worktree " ^ rest) in
   match Worktree_command.parse rest with
   | Error text -> error (restore_command m command) text, []
-  | List -> m, [ call List_worktrees ~tag:Worktrees_picker ]
+  | List -> m, [ call (List_worktrees { cwd = None }) ~tag:Worktrees_picker ]
   | New { branch; base } ->
     ( notice m (sprintf "creating a worktree for %s…" branch)
     , [ call
-          (Create_worktree { branch; base })
+          (Create_worktree { branch; base; cwd = None })
           ~tag:
             (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
       ] )
   | (Open _ | Remove _) as action ->
-    m, [ call List_worktrees ~tag:(Worktree_target { command; action }) ]
+    ( m
+    , [ call
+          (List_worktrees { cwd = None })
+          ~tag:(Worktree_target { command; action })
+      ] )
 ;;
 
 let worktree_target m ~command (action : Worktree_command.Action.t) listing =
@@ -3278,7 +3326,10 @@ let fetch_autocomplete m ac =
      | None -> { m with autocomplete = Some ac }, []
      | Some worktrees ->
        ( { m with autocomplete = Some ac; worktrees }
-       , [ call List_worktrees ~tag:(Worktrees_for_autocomplete key) ] ))
+       , [ call
+             (List_worktrees { cwd = None })
+             ~tag:(Worktrees_for_autocomplete key)
+         ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some (Commands.Argument.Sessions | Session_list) ->
@@ -4362,7 +4413,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
-            (Remove_worktree { path = worktree.path; force })
+            (Remove_worktree { path = worktree.path; force; cwd = None })
             ~tag:
               (Worktree_removed
                  { target = Worktree_command.target worktree; force })
@@ -4669,7 +4720,7 @@ let event m (e : P.Event.t) =
   let m = { m with activity = Activity.apply m.activity e } in
   let m = update_agents m ~f:(fun agents -> Agent_view.apply_all agents e) in
   match e with
-  | State state -> { m with state = Some state }, []
+  | State state -> set_state m state
   | Queue_update { steer; follow_up } ->
     { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
   | Config_changed config -> { m with config = Some config }, []
@@ -4936,10 +4987,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Mode_set text ->
        decode json ~f:P.State.of_json (fun state ->
-         notice { m with state = Some state } text, [])
-     | Refresh_state ->
-       decode json ~f:P.State.of_json (fun state ->
-         { m with state = Some state }, [])
+         let m, commands = set_state m state in
+         notice m text, commands)
+     | Refresh_state -> decode json ~f:P.State.of_json (set_state m)
+     | Subagent_loaded ->
+       decode json ~f:P.Subagent_detail.of_json (fun d ->
+         subagent_loaded m d, [])
      | Btw id ->
        decode
          json
@@ -5049,8 +5102,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
-         let m = { m with state = Some state } in
-         log_block m [ banner m state ], [])
+         let m, commands = set_state m state in
+         log_block m [ banner m state ], commands)
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
          let transcript =

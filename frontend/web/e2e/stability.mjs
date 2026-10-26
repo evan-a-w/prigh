@@ -1,10 +1,10 @@
 // Nothing flickers: what did not change keeps its DOM nodes and its place.
 // While a reply streams, then ends, and while the page idles, the earlier
-// messages, the top bar and the composer are not redrawn, the transcript
+// messages, the session's card or bar and the composer are not redrawn, the transcript
 // does not shift, a streamed reply keeps the nodes (and the selection) it
 // was drawn with, and the editor grows with its text in the frame that shows
-// the text, and the top bar's status keeps its place in every frame as turns
-// start and end, on a desktop and on a phone. Run by prigh_web.sh; prints normalised results (the expected
+// the text, and the session's status keeps its place in every frame as turns
+// start and end, in the sidebar on a desktop and in the bar on a phone. Run by prigh_web.sh; prints normalised results (the expected
 // output is in prigh_web.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -96,8 +96,8 @@ await page.addInitScript(() => {
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) {
         const where = (entry.sources || []).map(s => s.node).filter(n => n && n.nodeType === 1);
-        if (where.some(n => n.closest("#chat, header.topbar"))) window.__shifts.push(entry.value);
-        if (where.some(n => n.closest("header.topbar .status"))) window.__statusShifts?.push(entry.value);
+        if (where.some(n => n.closest("#chat, .session-card, .session-bar"))) window.__shifts.push(entry.value);
+        if (where.some(n => n.closest(":is(.session-card, .session-bar) .status"))) window.__statusShifts?.push(entry.value);
       }
     }).observe({ type: "layout-shift" });
   } catch {}
@@ -112,7 +112,7 @@ await page.addInitScript(() => {
       });
     // Where the status's items are (the activity is the one that is not a
     // counter).
-    const status = document.querySelector("header.topbar .status");
+    const status = document.querySelector(":is(.session-card, .session-bar) .status");
     if (status && window.__status)
       window.__status.push({
         activity: status.querySelector(":scope > :not(.context, .tokens, .cost)")?.textContent.trim(),
@@ -157,7 +157,7 @@ const watch = () => page.evaluate(() => {
   const stable = [
     ...document.querySelectorAll("#chat .entries > *"),
     ...document.querySelectorAll("#chat .entries .md-part, #chat .entries p, #chat .tool"),
-    document.querySelector("header.topbar"),
+    document.querySelector(".session-card, .session-bar"),
     document.querySelector(".composer"),
     document.getElementById("editor"),
     document.querySelector(".sidebar"),
@@ -185,7 +185,7 @@ const report = async label => {
   console.log(`nodes watched: ${r.nodes > 10}`);
   console.log(`all kept: ${r.kept}`);
   console.log(`removed: ${r.removed.length ? r.removed.join(", ") : "none"}`);
-  console.log(`layout shift in the transcript and top bar: ${r.shift < 0.005 ? "none" : r.shift.toFixed(4)}`);
+  console.log(`layout shift in the transcript and the session's status: ${r.shift < 0.005 ? "none" : r.shift.toFixed(4)}`);
   await screenshot(label);
 };
 
@@ -262,9 +262,9 @@ try {
   const turn = async (label, reply) => {
     await page.evaluate(() => { window.__status = []; window.__statusShifts = []; });
     await send("check it");
-    await page.locator(".topbar .status > *", { hasText: "Running tools" }).waitFor();
+    await page.locator(":is(.session-card, .session-bar) .status > *", { hasText: "Running tools" }).waitFor();
     await send("and the rest");
-    await page.locator(".topbar .queued").waitFor();
+    await page.locator(".status-extras .queued").waitFor();
     await bodyHas(reply);
     await idle();
     await page.waitForTimeout(300);
@@ -281,11 +281,11 @@ try {
     console.log(`layout shift in the status: ${r.shift < 0.0001 ? "none" : r.shift.toFixed(4)}`);
     await screenshot(label);
   };
-  await turn("a turn starts and ends: the top bar's status", "Checked.");
+  await turn("a turn starts and ends: the status in the sidebar", "Checked.");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400);
-  await turn("a turn starts and ends on a phone: the top bar's status", "Checked again.");
+  await turn("a turn starts and ends on a phone: the status in the bar", "Checked again.");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

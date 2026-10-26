@@ -304,6 +304,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       ; task = "go"
       ; model = "m"
       ; tools = [ "read"; "ls" ]
+      ; worktree = None
       }
   in
   print_endline (Json.to_string (Rpc_json.event (Agent.Event.Loop start)));
@@ -341,7 +342,13 @@ let%expect_test
     log
     ~now:1791210700.
     (Subagent_start
-       { call_id = "p"; agent_id = "p"; task = "go"; model = "m"; tools = [] });
+       { call_id = "p"
+       ; agent_id = "p"
+       ; task = "go"
+       ; model = "m"
+       ; tools = []
+       ; worktree = None
+       });
   Subagent_log.record log ~now:1791210730.25 message_end;
   print_endline
     (Json.to_string

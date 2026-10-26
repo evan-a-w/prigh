@@ -12,6 +12,11 @@ prigh
 web
 New session
 No sessions yet: send a message to start one.
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === chromium: signed in: chat ===
@@ -22,13 +27,12 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
-=== chromium: signed in: top bar ===
-New session
-<CWD>
+=== chromium: signed in: the session's card ===
 0%
 ↑0 ↓0
 $<COST>
 Ready
+<HOSTNAME>
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -110,13 +114,12 @@ two
 three
 three lines
 <TIME>
-=== chromium: top bar after a run ===
-count some lines
-<CWD>
+=== chromium: the session's card after a run ===
 0%
 ↑0 ↓0
 $<COST>
 Ready
+<HOSTNAME>
 === chromium: a budget in the status line ===
 0%
 ↑0 ↓0
@@ -163,11 +166,16 @@ same session after reload: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
+cwd
 count some lines
 <AGE>
-<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === chromium: new session ===
@@ -187,21 +195,24 @@ new session in the url: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
+cwd
 hello again
 <AGE>
-<CWD>
 count some lines
 <AGE>
-<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === chromium: switching ===
 Loading the session…
 marked in the sidebar: count some lines
 <AGE>
-<CWD>
 switched back: true
 === chromium: switched back ===
 count some lines
@@ -361,21 +372,35 @@ DeepSeek V4.1 Flash
 Thinking
 on
 Auto: never asks
-=== chromium: the thinking picker ===
-Thinking level
-off
-answer straight away
-low
-a little
-on
-the provider's default budget
-high
-more
-max
-as much as the model allows
+=== chromium: the host picker, from the session's card ===
+Where tools run
+<HOSTNAME>
+<CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
-=== chromium: the mode picker ===
-When tools ask first (Alt+M cycles)
+=== chromium: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
+answer straight away
+Low
+a little
+On
+the provider's default budget
+High
+more
+Max
+as much as the model allows
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== chromium: the mode chip's menu, from the model's with → → ===
+When tools ask first
+Alt+M cycles
 Asks: edits & commands
 bash, job_input, edits and MCP tools ask first
 Asks: commands
@@ -384,7 +409,8 @@ Auto: never asks
 tools run without asking
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
-↑↓ to move, Enter to choose, Esc to close
+Enter chooses, ← → the next setting, Esc closes
+mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: mode ask ===
 DeepSeek V4.1 Flash
 Thinking
@@ -456,11 +482,11 @@ Thinking
 high
 Auto: never asks
 === chromium: the plan approved: the status line ===
+plan 0/2: Write the schema
 0%
 ↑0 ↓0
 $<COST>
 Ready
-plan 0/2: Write the schema
 === chromium: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -502,22 +528,28 @@ also check the docs
 <TIME>
 Done waiting.
 <TIME>
+=== chromium: phone: a chip's menu ===
+thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 count some lines
 <AGE>
-<CWD>/sub
+sub/
 Archived
 1
 === chromium: archived ===
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 count some lines
 <AGE>
-<CWD>/sub
+sub/
 Archived
 1
 hello again
@@ -540,9 +572,11 @@ Delete 2
 session files before: 3
 === chromium: deleted ===
 Deleted 2 sessions (<SIZE>)
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 session files after: 1
 === chromium: /cd: the directory popup ===
 Directories
@@ -687,18 +721,21 @@ on a phone: 0 handles
 === chromium: resize: highlighted code in a reply ===
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
-=== chromium: top bar: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: 0%, Ready; title at least 100px: true; top bar 54px high
-.topbar: fits
+=== chromium: the session: a 700px chat column ===
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
-=== chromium: top bar: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, Ready; title at least 100px: true; top bar 54px high
-.topbar: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== chromium: the session: a 520px chat column ===
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
-=== chromium: top bar: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
-.topbar: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== chromium: the session: a 400px chat column ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
 Appearance
@@ -750,9 +787,17 @@ Keyboard shortcuts
 Done
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
-=== chromium: top bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
-.topbar: fits
+=== chromium: the session's bar: a 900px chat column without the sidebar ===
+chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== chromium: the session's bar: a 600px chat column without the sidebar ===
+chat 600; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== chromium: the session's bar: a 400px chat column without the sidebar ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
 .composer: fits
 === chromium: errors ===
 none
@@ -769,6 +814,10 @@ Add account…
 sign in as another user, or to another backend
 Turn notifications off
 stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
 Sign out
 forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
@@ -803,6 +852,10 @@ Add account…
 sign in as another user, or to another backend
 Turn notifications off
 stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
 Sign out
 forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
@@ -950,12 +1003,12 @@ none
 nodes watched: true
 all kept: true
 removed: none
-layout shift in the transcript and top bar: none
+layout shift in the transcript and the session's status: none
 === chromium: stability: a reply streamed ===
 nodes watched: true
 all kept: true
 removed: none
-layout shift in the transcript and top bar: none
+layout shift in the transcript and the session's status: none
 === chromium: stability: the streamed reply once ended ===
 its parts kept: true
 selection kept: true
@@ -963,11 +1016,11 @@ selection kept: true
 frames sampled: true
 frames with lines out of view: 0
 frames empty but still tall: 0
-=== chromium: stability: a turn starts and ends: the top bar's status ===
+=== chromium: stability: a turn starts and ends: the status in the sidebar ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
-=== chromium: stability: a turn starts and ends on a phone: the top bar's status ===
+=== chromium: stability: a turn starts and ends on a phone: the status in the bar ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
@@ -1002,53 +1055,81 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
 none
-=== chromium: worktrees: the sidebar ===
-main | <DIR>/repo [current]
-docs | 2 changed | <DIR>/docs [dirty]
-=== chromium: worktrees: the section's buttons ===
-Worktrees 2, Refresh worktrees, New worktree
 === chromium: worktrees: the new worktree dialog ===
-New worktree
+New worktree of prigh
 Branch
 A new branch, or an existing one to check out
 Base
-Where a new branch starts (empty: main, where this session is)
-Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Where a new branch starts (empty: main)
+A new session starts there once it is created.
 Enter creates, Esc cancels
 Cancel
-Create and switch
-=== chromium: worktrees: created and moved there ===
-main | <DIR>/repo
-docs | 2 changed | <DIR>/docs [dirty]
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+Create and start a session
+=== chromium: worktrees: the project tree ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+│ agent/tidy-the-docs | subagent [agent]
+│ │ from Tidy the docs in a worktree
+│ docs | 2 changed [dirty]
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
+=== chromium: worktrees: a folded project ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+│ agent/tidy-the-docs | subagent [agent]
+│ │ from Tidy the docs in a worktree
+│ docs | 2 changed [dirty]
+notes
+│ Shopping list | <age>
+site | trunk | 1 [folded]
+=== chromium: worktrees: searching ===
+prigh › feat/login › The login form
 === chromium: worktrees: remove: asked first ===
 Remove worktree with changes?
-Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
 Enter removes, Esc cancels
 Cancel
 Discard changes and remove
 Remove
 === chromium: worktrees: remove: refused with changes ===
 Remove worktree with changes?
-Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
-<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/prigh-docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
 Enter removes, Esc cancels
 Cancel
 Discard changes and remove
 Remove
 === chromium: worktrees: removed ===
-main | <DIR>/repo
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
 === chromium: worktrees: the /worktree picker ===
-Worktrees of <DIR>/repo
+Worktrees of <DIR>/prigh
 main
-<DIR>/repo · main worktree
+<DIR>/prigh · main worktree · here · 1 session
 feat/login
-<DIR>/home/.prigh/worktrees/repo/feat-login · here
+<DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
 Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
-=== chromium: worktrees: back in main ===
-main | <DIR>/repo [current]
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== chromium: worktrees: on a phone ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
 === chromium: worktrees: errors ===
 none
 === chromium: review: files: changes marked ===
@@ -1243,6 +1324,11 @@ prigh
 web
 New session
 No sessions yet: send a message to start one.
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === firefox: signed in: chat ===
@@ -1253,13 +1339,12 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
-=== firefox: signed in: top bar ===
-New session
-<CWD>
+=== firefox: signed in: the session's card ===
 0%
 ↑0 ↓0
 $<COST>
 Ready
+<HOSTNAME>
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -1341,13 +1426,12 @@ two
 three
 three lines
 <TIME>
-=== firefox: top bar after a run ===
-count some lines
-<CWD>
+=== firefox: the session's card after a run ===
 0%
 ↑0 ↓0
 $<COST>
 Ready
+<HOSTNAME>
 === firefox: a budget in the status line ===
 0%
 ↑0 ↓0
@@ -1394,11 +1478,16 @@ same session after reload: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
+cwd
 count some lines
 <AGE>
-<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === firefox: new session ===
@@ -1418,21 +1507,24 @@ new session in the url: true
 prigh
 web
 New session
-Sessions
+Projects
 Select
+cwd
 hello again
 <AGE>
-<CWD>
 count some lines
 <AGE>
-<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
 T
 token
 === firefox: switching ===
 Loading the session…
 marked in the sidebar: count some lines
 <AGE>
-<CWD>
 switched back: true
 === firefox: switched back ===
 count some lines
@@ -1592,21 +1684,35 @@ DeepSeek V4.1 Flash
 Thinking
 on
 Auto: never asks
-=== firefox: the thinking picker ===
-Thinking level
-off
-answer straight away
-low
-a little
-on
-the provider's default budget
-high
-more
-max
-as much as the model allows
+=== firefox: the host picker, from the session's card ===
+Where tools run
+<HOSTNAME>
+<CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
-=== firefox: the mode picker ===
-When tools ask first (Alt+M cycles)
+=== firefox: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
+answer straight away
+Low
+a little
+On
+the provider's default budget
+High
+more
+Max
+as much as the model allows
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== firefox: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== firefox: the mode chip's menu, from the model's with → → ===
+When tools ask first
+Alt+M cycles
 Asks: edits & commands
 bash, job_input, edits and MCP tools ask first
 Asks: commands
@@ -1615,7 +1721,8 @@ Auto: never asks
 tools run without asking
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
-↑↓ to move, Enter to choose, Esc to close
+Enter chooses, ← → the next setting, Esc closes
+mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: mode ask ===
 DeepSeek V4.1 Flash
 Thinking
@@ -1687,11 +1794,11 @@ Thinking
 high
 Auto: never asks
 === firefox: the plan approved: the status line ===
+plan 0/2: Write the schema
 0%
 ↑0 ↓0
 $<COST>
 Ready
-plan 0/2: Write the schema
 === firefox: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -1733,22 +1840,28 @@ also check the docs
 <TIME>
 Done waiting.
 <TIME>
+=== firefox: phone: a chip's menu ===
+thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === firefox: archived, folded ===
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 count some lines
 <AGE>
-<CWD>/sub
+sub/
 Archived
 1
 === firefox: archived ===
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 count some lines
 <AGE>
-<CWD>/sub
+sub/
 Archived
 1
 hello again
@@ -1771,9 +1884,11 @@ Delete 2
 session files before: 3
 === firefox: deleted ===
 Deleted 2 sessions (<SIZE>)
+cwd
+main
 one more
 <AGE>
-<CWD>/sub
+sub/
 session files after: 1
 === firefox: /cd: the directory popup ===
 Directories
@@ -1918,18 +2033,21 @@ on a phone: 0 handles
 === firefox: resize: highlighted code in a reply ===
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
-=== firefox: top bar: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: 0%, Ready; title at least 100px: true; top bar 54px high
-.topbar: fits
+=== firefox: the session: a 700px chat column ===
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
-=== firefox: top bar: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, Ready; title at least 100px: true; top bar 54px high
-.topbar: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== firefox: the session: a 520px chat column ===
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
-=== firefox: top bar: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
-.topbar: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== firefox: the session: a 400px chat column ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
 .composer: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: settings ===
 Settings
 Appearance
@@ -1982,9 +2100,17 @@ Keyboard shortcuts
 Done
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
-=== firefox: top bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
-.topbar: fits
+=== firefox: the session's bar: a 900px chat column without the sidebar ===
+chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== firefox: the session's bar: a 600px chat column without the sidebar ===
+chat 600; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== firefox: the session's bar: a 400px chat column without the sidebar ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
 .composer: fits
 === firefox: errors ===
 none
@@ -2001,6 +2127,10 @@ Add account…
 sign in as another user, or to another backend
 Turn notifications off
 stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
 Sign out
 forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
@@ -2035,6 +2165,10 @@ Add account…
 sign in as another user, or to another backend
 Turn notifications off
 stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
 Sign out
 forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
@@ -2182,12 +2316,12 @@ none
 nodes watched: true
 all kept: true
 removed: none
-layout shift in the transcript and top bar: none
+layout shift in the transcript and the session's status: none
 === firefox: stability: a reply streamed ===
 nodes watched: true
 all kept: true
 removed: none
-layout shift in the transcript and top bar: none
+layout shift in the transcript and the session's status: none
 === firefox: stability: the streamed reply once ended ===
 its parts kept: true
 selection kept: true
@@ -2195,11 +2329,11 @@ selection kept: true
 frames sampled: true
 frames with lines out of view: 0
 frames empty but still tall: 0
-=== firefox: stability: a turn starts and ends: the top bar's status ===
+=== firefox: stability: a turn starts and ends: the status in the sidebar ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
-=== firefox: stability: a turn starts and ends on a phone: the top bar's status ===
+=== firefox: stability: a turn starts and ends on a phone: the status in the bar ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
@@ -2234,53 +2368,81 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === firefox: themes: errors ===
 none
-=== firefox: worktrees: the sidebar ===
-main | <DIR>/repo [current]
-docs | 2 changed | <DIR>/docs [dirty]
-=== firefox: worktrees: the section's buttons ===
-Worktrees 2, Refresh worktrees, New worktree
 === firefox: worktrees: the new worktree dialog ===
-New worktree
+New worktree of prigh
 Branch
 A new branch, or an existing one to check out
 Base
-Where a new branch starts (empty: main, where this session is)
-Created in <DIR>/home/.prigh/worktrees/repo, then this session works there.
+Where a new branch starts (empty: main)
+A new session starts there once it is created.
 Enter creates, Esc cancels
 Cancel
-Create and switch
-=== firefox: worktrees: created and moved there ===
-main | <DIR>/repo
-docs | 2 changed | <DIR>/docs [dirty]
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+Create and start a session
+=== firefox: worktrees: the project tree ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+│ agent/tidy-the-docs | subagent [agent]
+│ │ from Tidy the docs in a worktree
+│ docs | 2 changed [dirty]
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
+=== firefox: worktrees: a folded project ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+│ agent/tidy-the-docs | subagent [agent]
+│ │ from Tidy the docs in a worktree
+│ docs | 2 changed [dirty]
+notes
+│ Shopping list | <age>
+site | trunk | 1 [folded]
+=== firefox: worktrees: searching ===
+prigh › feat/login › The login form
 === firefox: worktrees: remove: asked first ===
 Remove worktree with changes?
-Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
 Enter removes, Esc cancels
 Cancel
 Discard changes and remove
 Remove
 === firefox: worktrees: remove: refused with changes ===
 Remove worktree with changes?
-Remove the worktree docs at <DIR>/docs; it has 2 uncommitted changes? (the branch stays)
-<DIR>/docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/prigh-docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
 Enter removes, Esc cancels
 Cancel
 Discard changes and remove
 Remove
 === firefox: worktrees: removed ===
-main | <DIR>/repo
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login [current]
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
 === firefox: worktrees: the /worktree picker ===
-Worktrees of <DIR>/repo
+Worktrees of <DIR>/prigh
 main
-<DIR>/repo · main worktree
+<DIR>/prigh · main worktree · here · 1 session
 feat/login
-<DIR>/home/.prigh/worktrees/repo/feat-login · here
+<DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
 Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
-=== firefox: worktrees: back in main ===
-main | <DIR>/repo [current]
-feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
+=== firefox: worktrees: on a phone ===
+prigh | main [here]
+│ Tidy the docs in a worktree | <age> [selected]
+│ feat/login
+│ │ The login form | <age>
+notes
+│ Shopping list | <age>
+site | trunk
+│ A landing page | <age>
 === firefox: worktrees: errors ===
 none
 === firefox: review: files: changes marked ===

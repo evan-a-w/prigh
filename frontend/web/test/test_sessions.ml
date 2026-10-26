@@ -37,9 +37,12 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (Archive (A)) (Delete session (Delete))
-    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
-    (Refactor the lexer 15d ago ~/src/compiler) (Archive (A)) (Delete session (Delete))
+    (work) (New session in /work)
+    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
+    (docs) (New session in ~/docs)
+    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
+    (compiler) (New session in ~/src/compiler)
+    (Refactor the lexer 15d ago) (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -62,12 +65,19 @@ let%expect_test
           <span dir="auto" class="session-title"> fix the parser bug </span>
           <div class="session-meta">
             <span class="session-age"> just now </span>
-            <span class="session-cwd"> /work </span>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           </div>
         </div>
       </button>
       <span class="session-actions">
+        <button type="button"
+                title="Rename (/name)"
+                aria-label="Rename fix the parser bug"
+                class="btn ghost icon rename"
+                @on_click>
+          <icon class="pencil"> </icon>
+        </button>
         <button type="button"
                 title="Archive (A)"
                 aria-label="Archive fix the parser bug"
@@ -88,13 +98,48 @@ let%expect_test
   H.show h ~selector:".session.running .lamp";
   [%expect
     {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
-  (* The topbar names the session after its first prompt until it has a name. *)
-  H.text h ~selector:".topbar .title";
+  (* The current session's row has its cwd as it is now: [/cd] moves it. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json ~fields:[ "cwd", `String "/home/ann/src/parser" ] ()));
+  H.names h ~selector:".session-cwd";
   [%expect
     {|
-    (fix the parser bug)
-    /work (main)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag
+      (Worktrees (place  "s1\
+                        \nbackend\
+                        \n/home/ann/src/parser")
+       (purpose (Sidebar 2)))))
+    span "~/src/parser" -- /home/ann/src/parser
     |}];
+  H.text h ~selector:".session.selected .session-meta";
+  [%expect {| just now ~/src/parser |}];
+  (* Only the current one has a rename button: it opens what /name opens. *)
+  H.elements h ~selector:".session .rename";
+  H.click h ~selector:".session.selected .rename";
+  let clicked = (H.model h).dialog in
+  H.quiet h (fun () -> H.act h Close_dialog);
+  H.quiet h (fun () -> H.act h (Run "/name"));
+  print_s
+    [%sexp
+      (Option.equal Prigh_web.Dialog.equal clicked (H.model h).dialog : bool)];
+  H.quiet h (fun () -> H.act h Close_dialog);
+  [%expect
+    {|
+    <button class="btn ghost icon rename">
+    Open_rename
+    (Focus dialog-input)
+    true
+    |}];
+  (* Without the sidebar, the bar names it after its first prompt until it
+     has a name. *)
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.text h ~selector:".session-bar .session-name";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  [%expect {| (fix the parser bug) |}];
   (* The clock moves the ages on, and refreshes the list. *)
   H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_min 5.)));
   H.text h ~selector:".session-age";
@@ -391,8 +436,10 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (Archive (A)) (Delete session (Delete))
-    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
+    (work) (New session in /work)
+    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
+    (docs) (New session in ~/docs)
+    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 
