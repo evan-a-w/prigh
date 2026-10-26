@@ -567,7 +567,9 @@ module Model = struct
   let shown t =
     { Resize.Shown.sidebar = t.sidebar_open
     ; files = t.files.open_
+    ; preview = Option.is_some t.files.preview
     ; agents = t.agents.open_
+    ; reviewing = t.review.open_
     ; narrow = t.narrow
     }
   ;;
