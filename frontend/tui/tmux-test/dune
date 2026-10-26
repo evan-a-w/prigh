@@ -1,6 +1,8 @@
 ; Real-terminal scenarios: the built TUI inside tmux, panes captured and
-; compared by cram (dune promote re-records). Skipped when tmux is absent.
+; compared by cram (dune promote re-records). Each .t file is a group of
+; scenarios from harness.sh; dune runs the groups in parallel. Skipped when
+; tmux is absent.
 
 (cram
- (deps %{bin:prigh-tui})
+ (deps harness.sh %{bin:prigh-tui})
  (enabled_if %{bin-available:tmux}))

@@ -29,6 +29,9 @@ nix develop -c sh -c 'cd frontend && dune build @runtest'
 # and the web-layer tests (they run under node, via js_of_ocaml)
 
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
+
+./test                  # builds both, runs every suite, the browser e2e in Chromium (~1 min)
+./test --full           # ... and in Firefox: the full matrix, before merging
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
@@ -1836,6 +1839,11 @@ off.
 
 ### Testing
 
+`./test` runs everything below (the dune tests one project after the other,
+prigh-web's browser e2e in Chromium alongside); `./test --full` runs the
+browser e2e in Firefox as well, like the flake's checks. Run the quick one
+before pushing and the full one before merging.
+
 Four layers, cheapest first; `dune build @runtest` in each project runs all
 of them (the last two need the backend binary built first), and `dune
 promote` accepts new output everywhere:
@@ -1852,14 +1860,15 @@ promote` accepts new output everywhere:
 3. **Protocol e2e** — `frontend/tui/e2e` (also `dune build @e2e`) runs the real
    `backend/_build/default/bin/main.exe serve -faux` through the real client
    with an isolated `HOME`/`-auth-file` and diffs a normalised transcript.
-4. **Real terminal** — the cram test `frontend/tui/tmux-test/run.t` (skipped without
-   `tmux`) runs each scenario of `run.t/harness.sh` with the built TUI inside
-   tmux and compares the captured panes, including a backend kill and
-   reconnect.
+4. **Real terminal** — the cram tests `frontend/tui/tmux-test/*.t` (skipped
+   without `tmux`; each a group of scenarios, run in parallel) run the
+   scenarios of `harness.sh` with the built TUI inside tmux and compare the
+   captured panes, including a backend kill and reconnect.
 
 prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
 and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
-against the real backend; the flake runs it as a check.
+against the real backend, its scripts all at once; the flake runs it as a
+check.
 
 ## Layout
 

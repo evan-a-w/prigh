@@ -221,7 +221,8 @@ let%expect_test
     {|
     (Switching
       (generation 1)
-      (previous   Connected))
+      (previous   Connected)
+      (notices ()))
     (Append_history hello)
 
 
@@ -281,6 +282,47 @@ let%expect_test
      (queued  0)
      (pending 0)
      (client_id (c2)))
+    |}]
+;;
+
+let%expect_test
+    "/connect: a notice the new server sends before its hello reply is kept"
+  =
+  let h = on (remote "10.0.0.5:7777") in
+  H.keys h "/connect 10.0.0.6:7777";
+  H.enter h;
+  [%expect {| (Relink (generation 1) (change (Connect (10.0.0.6:7777)))) |}];
+  H.event h (Notice "tools now run on laptop in /srv");
+  relinked
+    h
+    ~link:(remote ~saved:(Some "10.0.0.6:7777") "10.0.0.6:7777")
+    (Connected (hello {|{"client_id":"c2"}|}));
+  H.reply ~quiet:true h Initial_state (state_json ~cwd:"/srv" ());
+  H.reply ~quiet:true h Initial_messages "[]";
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+
+
+
+
+
+
+
+
+
+      tools now run on laptop in /srv
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ───────────────────────────────────────────────────────────────────── connected to 10.0.0.6:7777 ───
+    > ▏
+    /srv  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  server:10.0.0.6:7777
     |}]
 ;;
 

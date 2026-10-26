@@ -2,13 +2,14 @@
 // "another" (two homes, two directories): the page opens signed in by its
 // one-time link, its tools run on this machine's tool host, a reload stays
 // signed in, and the spent link signs nobody else in. Run by prigh_web.sh;
-// prints normalised snapshots (the expected output is in prigh_web.expected).
+// prints normalised snapshots (the expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -142,11 +143,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot(page, "failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  laptop?.kill();
-  server.kill();
+  await end(() => laptop?.kill(), () => server.kill(), () => browser.close());
 }
