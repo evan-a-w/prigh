@@ -51,6 +51,14 @@ module Item : sig
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
+    | Trimmed of
+        { messages : int
+        ; tokens : int
+        ; shown : P.Message.t list option
+          (** unfolded ([/trim show]): the messages out of the context *)
+        }
+    (** the divider standing for what is trimmed from the model's context,
+        at the transcript's start *)
     | Delivery of string
     (** finished background subagents' reports handed to the main agent *)
     | Skill of
@@ -91,6 +99,10 @@ val add_message : t -> P.Message.t -> t
 val apply : t -> P.Event.t -> t
 
 val notice : ?severity:Severity.t -> t -> string -> t
+
+(** Unfolds ([Some messages]) or folds the [Trimmed] divider; [false] when
+    there is none. *)
+val show_trimmed : t -> P.Message.t list option -> t * bool
 val clear : t -> t
 
 (** Streaming: [append] accumulates; a kind change or [flush] turns the
@@ -133,7 +145,9 @@ val line_count : t -> width:int -> verbosity:Verbosity.t -> int
 (** Every wrapped line, oldest first. *)
 val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
 
-(** Wrapped line index of each user turn's first line, oldest first. *)
+(** Wrapped line index of each user turn's first line, oldest first, and of
+    the [Trimmed] divider's (its messages are not turns of the
+    transcript). *)
 val user_message_lines : t -> width:int -> verbosity:Verbosity.t -> int list
 
 (** Renders the wrapped lines in [\[top, top + rows)]. *)

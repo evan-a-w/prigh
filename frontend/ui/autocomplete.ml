@@ -301,6 +301,18 @@ let argument_items
           ~detail:"stay stopped until you send a message"
           "cancel"
       ]
+  | Trim ->
+    Some
+      [ Picker.Item.create
+          ~id:"undo"
+          ~detail:"bring the latest trim's messages back into the context"
+          "undo"
+      ; Picker.Item.create
+          ~id:"show"
+          ~detail:"unfold the trimmed messages (read-only)"
+          "show"
+      ; Picker.Item.create ~id:"hide" ~detail:"fold them again" "hide"
+      ]
   | Path | Directory | Default_directory | Skill -> None
 ;;
 

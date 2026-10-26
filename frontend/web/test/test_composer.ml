@@ -407,6 +407,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
+    /trim [undo] drop everything before one of your messages from the model's context (the transcript keeps it folded); undo brings back the last trim
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
@@ -423,7 +424,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
-    /copy copy the last reply to the clipboard
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

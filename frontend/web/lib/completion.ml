@@ -201,6 +201,8 @@ let argument_items
         ; "rm", "rm NAME: delete a snippet"
         ]
   | Budget -> simple [ "off", "no budget: turns start whatever it costs" ]
+  | Trim ->
+    simple [ "undo", "bring back what the last trim took out of the context" ]
   | Goal ->
     simple [ "off", "clear the goal"; "resume", "make a stopped goal active" ]
   | Resume ->

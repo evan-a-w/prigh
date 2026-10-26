@@ -67,8 +67,10 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 4) (before (e5)) (loading false))
     (Show earlier messages) 4 more
     question 3
+    (✂ Trim everything before this)
     answer 3
     question 4
+    (✂ Trim everything before this)
     answer 4
     |}];
   (* The page asks as the user scrolls near the top; asking again while it
@@ -84,8 +86,10 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 4) (before (e5)) (loading true))
     Loading earlier messages…
     question 3
+    (✂ Trim everything before this)
     answer 3
     question 4
+    (✂ Trim everything before this)
     answer 4
     |}];
   (* Added above, what shows stays in place. *)
@@ -100,10 +104,13 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
+    (✂ Trim everything before this)
     answer 2
     question 3
+    (✂ Trim everything before this)
     answer 3
     question 4
+    (✂ Trim everything before this)
     answer 4
     |}];
   Harness.click h ~selector:".load-older";
@@ -120,10 +127,13 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     question 1
     answer 1
     question 2
+    (✂ Trim everything before this)
     answer 2
     question 3
+    (✂ Trim everything before this)
     answer 3
     question 4
+    (✂ Trim everything before this)
     answer 4
     |}];
   (* Everything is loaded. *)
@@ -173,6 +183,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
+    (✂ Trim everything before this)
     answer 2
     Couldn't load earlier messages: the disk is full. Scroll up to try again. (Dismiss)
     |}];
@@ -364,12 +375,15 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
     question 1
     answer 1
     question 3
+    (✂ Trim everything before this)
     ((older 0) (before ()) (loading false))
     question 1
     answer 1
     question 2
+    (✂ Trim everything before this)
     answer 2
     question 3
+    (✂ Trim everything before this)
     answer 3
     (same_entries 2)
     |}]
@@ -558,12 +572,16 @@ let%expect_test "reconnecting with older pages loaded" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
+    (✂ Trim everything before this)
     answer 2
     question 3
+    (✂ Trim everything before this)
     answer 3
     question 4
+    (✂ Trim everything before this)
     answer 4
     question 5
+    (✂ Trim everything before this)
     answer 5
     (kept 6)
     |}]
@@ -647,6 +665,7 @@ let%expect_test "compacted while on show" =
     question 21
     answer 21
     question 22
+    (✂ Trim everything before this)
     answer 22
     Context compacted Worked on the parser.
     Worked on the parser.
@@ -692,6 +711,7 @@ let%expect_test "scrolling up after the session was compacted" =
     ((older 0) (before ()) (loading false))
     Worked on the parser.
     question 22
+    (✂ Trim everything before this)
     answer 22
     Earlier messages were compacted: showing the session from its summary
     |}]

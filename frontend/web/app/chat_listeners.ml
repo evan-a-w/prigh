@@ -61,6 +61,21 @@ let toggle_fold ~schedule (ev : Dom_html.mouseEvent Js.t) =
            schedule (Prigh_web.App.Action.Toggle_fold (Js.to_string key))))
 ;;
 
+let trim_before ~schedule (ev : Dom_html.mouseEvent Js.t) =
+  Option.iter
+    (Option.bind
+       (Js.Opt.to_option ev##.target)
+       ~f:(fun el ->
+         closest el (sprintf "[%s]" Prigh_web.Chat_view.trim_attribute)))
+    ~f:(fun el ->
+      Js.Opt.iter
+        (el##getAttribute (Js.string Prigh_web.Chat_view.trim_attribute))
+        (fun n ->
+           Option.iter
+             (Int.of_string_opt (Js.to_string n))
+             ~f:(fun n -> schedule (Prigh_web.App.Action.Ask_trim (Entry n)))))
+;;
+
 let install ~schedule =
   let listen event handler =
     ignore
@@ -75,5 +90,6 @@ let install ~schedule =
   in
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
+  listen Dom_html.Event.click (trim_before ~schedule);
   listen Dom_html.Event.keydown close_image
 ;;

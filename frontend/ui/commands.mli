@@ -26,6 +26,7 @@ module Argument : sig
     | Budget (** [off], or dollars *)
     | Goal (** [off], [resume], or the goal *)
     | Resume (** [now] or [cancel] *)
+    | Trim (** [undo], [show] or [hide] *)
     | Snippet (** a snippet name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
     | Worktree

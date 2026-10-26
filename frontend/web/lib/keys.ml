@@ -61,6 +61,9 @@ let help =
   ; ( "Ctrl+J"
     , "jump to one of your messages: a list to filter (or the marks at the \
        transcript's right edge)" )
+  ; ( "Delete (in the jump list)"
+    , "trim the model's context before the highlighted message (confirmed \
+       first; /trim undo brings it back)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
   ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
@@ -226,6 +229,12 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Reminders; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Remove_reminder item.id)
+  | "Delete", Picker { kind = Jump; picker } when plain t ->
+    Option.bind (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      match Jump.Target.of_string item.id with
+      | Some ((Entry _ | Message _) as target) ->
+        Some (App.Action.Ask_trim target)
+      | Some Trimmed | None -> None)
   | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Ask_remove_worktree item.id)
