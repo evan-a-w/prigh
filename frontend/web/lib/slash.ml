@@ -246,8 +246,11 @@ let all =
        conversation)"
   ; c "abort" "stop the current run"
   ; c
+      ~argument:Directory
+      ~args:"[dir]"
       "terminal"
-      "open a shell where the tools run, in the session's directory (Ctrl+`)"
+      "open a shell where the tools run, in the session's directory (Ctrl+`), \
+       or a shell of its own in DIR (a worktree, say)"
   ; c
       ~argument:Directory
       ~args:"[path]"

@@ -69,7 +69,7 @@ let view (m : App.Model.t) ~inject ~widget =
       | Some state ->
         let target = Terminal.target t state ~hello:m.hello in
         let status = Terminal.status t target in
-        let name, cwd = Terminal.where state in
+        let name, cwd = Terminal.where t state in
         ( [ span ~cls:"terminal-machine" name
           ; span
               ~cls:"terminal-cwd where"
