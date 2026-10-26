@@ -896,6 +896,8 @@ changes again. Push pushes the branch to its upstream, setting one (on
 `origin`, else the only remote) when it has none, with the tool host's own
 git credentials: prigh never asks for a password. Create PR opens the
 pull-request dialog for that worktree's branch (see [Git hosting](#git-hosting)).
+A branch reviewed without checking it out has no git bar, boxes or commit
+box: check it out into a worktree to commit there.
 Refusals say what to do: nothing ticked, an empty message, a detached HEAD
 (`git switch -c NAME`), a push the remote rejected (pull first, e.g. `git
 pull --rebase`), no remote (`git remote add origin URL`), missing

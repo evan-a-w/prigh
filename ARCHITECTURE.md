@@ -2629,8 +2629,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       code is selected but in a field. In the comment and reply fields
       Enter sends and Shift+Enter is a new line. The page's git bar is
       `Git_bar` (pure: the reviewed worktree's `git_status`, read with
-      every `git_diff` the open page makes (`Git_bar.watch`, starting over
-      for another worktree), the approved files unticked (`excluded`), the
+      every `git_diff` the open page makes of a worktree (`Git_bar.watch`,
+      starting over for another worktree; a branch not checked out has no
+      bar, and `App` ignores its actions), the approved files unticked (`excluded`), the
       commit message, Amend, and the action on its way; `update`/`reply`
       return `Out.t`s: requests tagged `Reply_tag.Git`, `Draft_message`
       (after staging the ticked files), `Changed` (read the diff again) and
