@@ -26,10 +26,10 @@ module Schedule : sig
 end
 
 type t =
-  { store_bytes : int
+  { store_bytes : Int64.t
   ; store_paths : int
-  ; fs_total_bytes : int (** of [/nix]'s file system *)
-  ; fs_free_bytes : int
+  ; fs_total_bytes : Int64.t (** of [/nix]'s file system *)
+  ; fs_free_bytes : Int64.t
   ; last_gc : Nix_gc_report.t option (** [None]: never *)
   ; running : Running.t option
   ; schedule : Schedule.t option (** [None]: not in the container *)

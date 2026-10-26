@@ -324,7 +324,7 @@ let%expect_test "parsing, sizes and spans" =
     ; 5 * 1099511627776
     ; 2000 * 1099511627776
     ]
-    ~f:(fun n -> print_endline (Nix_gc_command.bytes n));
+    ~f:(fun n -> print_endline (Nix_gc_command.bytes (Int64.of_int n)));
   List.iter [ 0; 59; 60; 3599; 3600; 86399; 86400; 172800 ] ~f:(fun s ->
     print_endline (Nix_gc_command.span (Time_ns.Span.of_int_sec s)));
   [%expect

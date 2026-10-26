@@ -6,7 +6,7 @@ type t =
   ; generations : Nix_generations.t option
   ; generations_deleted : int
   ; paths_deleted : int
-  ; freed_bytes : int
+  ; freed_bytes : Int64.t
   ; duration : Time_ns.Span.t
   }
 [@@deriving sexp_of, equal]
@@ -25,7 +25,7 @@ let of_json j =
   let%bind generations = Nix_generations.of_json (Json.field j "generations") in
   let%bind generations_deleted = Json.int_field j "generations_deleted" in
   let%bind paths_deleted = Json.int_field j "paths_deleted" in
-  let%bind freed_bytes = Json.int_field j "freed_bytes" in
+  let%bind freed_bytes = Json.int64_field j "freed_bytes" in
   let%map duration_ms = Json.int_field j "duration_ms" in
   { at
   ; by

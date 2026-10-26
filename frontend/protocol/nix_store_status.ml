@@ -49,10 +49,10 @@ module Schedule = struct
 end
 
 type t =
-  { store_bytes : int
+  { store_bytes : Int64.t
   ; store_paths : int
-  ; fs_total_bytes : int
-  ; fs_free_bytes : int
+  ; fs_total_bytes : Int64.t
+  ; fs_free_bytes : Int64.t
   ; last_gc : Nix_gc_report.t option
   ; running : Running.t option
   ; schedule : Schedule.t option
@@ -61,10 +61,10 @@ type t =
 
 let of_json j =
   let open Or_error.Let_syntax in
-  let%bind store_bytes = Json.int_field j "store_bytes" in
+  let%bind store_bytes = Json.int64_field j "store_bytes" in
   let%bind store_paths = Json.int_field j "store_paths" in
-  let%bind fs_total_bytes = Json.int_field j "fs_total_bytes" in
-  let%bind fs_free_bytes = Json.int_field j "fs_free_bytes" in
+  let%bind fs_total_bytes = Json.int64_field j "fs_total_bytes" in
+  let%bind fs_free_bytes = Json.int64_field j "fs_free_bytes" in
   let%bind last_gc = optional j "last_gc" ~f:Nix_gc_report.of_json in
   let%bind running = optional j "running" ~f:Running.of_json in
   let%map schedule = optional j "schedule" ~f:Schedule.of_json in

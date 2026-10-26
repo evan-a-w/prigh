@@ -244,6 +244,7 @@ let%expect_test "help lists every key and command" =
     /auth show which providers and git hosts are logged in
     /pr [list [open|closed|all]|view N|new [title]|checkout N] the repository's pull requests: list and filter them, open one with its checks and diff, create one, or check one out in a worktree
     /setusr [user] act as another user (superusers); without a user, pick one
+    /nix-gc [run [DAYS|all]] the Nix store's size and free space, in Settings; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones) (superusers)
     /signout sign out of this account
     /retry-backend-connection reconnect to the backend now
     /state show the session state as the backend reports it

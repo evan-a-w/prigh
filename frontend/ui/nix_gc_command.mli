@@ -29,7 +29,7 @@ val starting : P.Nix_generations.t option -> string
 val describe_generations : P.Nix_generations.t option -> string option
 
 (** ["1.5 GiB"] *)
-val bytes : int -> string
+val bytes : Int64.t -> string
 
 (** ["3 min"], ["2 h"], ["4 days"] *)
 val span : Time_ns.Span.t -> string
@@ -38,8 +38,16 @@ val span : Time_ns.Span.t -> string
     [prigh-docker nix-gc]; otherwise the superuser. *)
 val describe_by : string -> string
 
-(** The store, its file system, the last and the running collection and the
-    schedule, one line each, then how to collect. *)
+(** [store: 12.0 GiB in 4321 paths] *)
+val size : P.Nix_store_status.t -> string
+
+(** [/nix: 40.0 GiB free of 100.0 GiB (40%)] *)
+val space : P.Nix_store_status.t -> string
+
+(** The last and the running collection and the schedule, a line each. *)
+val details : utc_offset:Time_ns.Span.t -> P.Nix_store_status.t -> string list
+
+(** {!size}, {!space} and {!details}, then how to collect. *)
 val status_lines
   :  utc_offset:Time_ns.Span.t
   -> P.Nix_store_status.t
@@ -51,6 +59,9 @@ val time : Time_ns.t -> utc_offset:Time_ns.Span.t -> string
 (** [nix-gc: 12 paths, 1 generation deleted]: while one runs, for status
     lines. *)
 val progress : P.Nix_gc_progress.t -> string
+
+(** [12 paths, 1 generation deleted] *)
+val deleted_so_far : P.Nix_gc_progress.t -> string
 
 (** What a finished collection did. *)
 val report : P.Nix_gc_report.t -> string

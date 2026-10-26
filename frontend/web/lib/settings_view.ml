@@ -268,6 +268,113 @@ let git_hosts (m : App.Model.t) ~inject =
     List.map accounts ~f:(fun a -> git_host m a ~inject) @ [ another ]
 ;;
 
+module Nix_gc_command = Prigh_ui.Nix_gc_command
+
+(* The days of profile generations kept: the schedule's, or two weeks. *)
+let keep_days (n : Nix_gc.t) =
+  match n.status with
+  | Loaded { schedule = Some { keep_days = Some days; _ }; _ } when days > 0 ->
+    days
+  | _ -> 14
+;;
+
+let nix_store (m : App.Model.t) ~inject =
+  let run command = inject (Action.Run command) in
+  let n = m.nix_gc in
+  let about = "The packages agents fetch with Nix, on the shared /nix volume." in
+  let refresh label =
+    button
+      ~cls:"small ghost"
+      ~title:"Read the store again (/nix-gc)"
+      ~on_click:(run "/nix-gc")
+      [ Node.text label ]
+  in
+  let store =
+    match n.status with
+    | Unknown | Loading ->
+      row
+        ~cls:"nix-store"
+        ~name:"Nix store"
+        ~about
+        ~note:("muted", "Reading the store…")
+        []
+    | Failed e ->
+      row
+        ~cls:"nix-store"
+        ~name:"Nix store"
+        ~about
+        ~note:("warm", String.capitalize e)
+        [ refresh "Retry" ]
+    | Loaded s ->
+      div
+        ~cls:"setting nix-store"
+        [ div
+            ~cls:"setting-text"
+            ([ span ~cls:"setting-name" "Nix store"
+             ; span
+                 ~cls:"setting-about"
+                 (String.capitalize
+                    (sprintf
+                       "%s; %s."
+                       (Nix_gc_command.size s)
+                       (Nix_gc_command.space s)))
+             ]
+             @ List.map
+                 (Nix_gc_command.details ~utc_offset:m.utc_offset s)
+                 ~f:(fun line ->
+                   span ~cls:"setting-note muted" (String.capitalize line)))
+        ; div ~cls:"setting-control" [ refresh "Refresh" ]
+        ]
+  in
+  let days = keep_days n in
+  let collect =
+    row
+      ~cls:"nix-gc"
+      ~name:"Collect garbage"
+      ~about:
+        "Delete the store paths no profile or GC root uses. Deleting users' \
+         old profile generations first frees more, but they can no longer \
+         roll back to them."
+      ?note:
+        (match n.collecting, n.outcome with
+         | Some p, _ ->
+           Some
+             ( "muted"
+             , String.concat
+                 ~sep:" · "
+                 (("Collecting: " ^ Nix_gc_command.deleted_so_far p)
+                  :: Option.to_list p.message) )
+         | None, Some (Ok report) ->
+           Some ("muted", String.capitalize (Nix_gc_command.report report))
+         | None, Some (Error e) -> Some ("warm", String.capitalize e)
+         | None, None -> None)
+      (match n.collecting with
+       | Some _ ->
+         [ button
+             ~cls:"small"
+             ~disabled:true
+             ~attrs:[ Attr.create "aria-busy" "true" ]
+             ~on_click:Effect.Ignore
+             [ Html.lamp (); Node.text "Collecting…" ]
+         ]
+       | None ->
+         let deleting = sprintf "/nix-gc run %d" days in
+         [ button
+             ~cls:"small ghost"
+             ~title:deleting
+             ~on_click:(run deleting)
+             [ Node.text (sprintf "Also delete generations over %d days…" days)
+             ]
+         ; button
+             ~cls:"small primary"
+             ~title:"/nix-gc run"
+             ~on_click:(run "/nix-gc run")
+             [ Node.text "Collect" ]
+         ])
+  in
+  [ store; collect ]
+;;
+
 let account (m : App.Model.t) ~inject =
   match Account_view.who m with
   | None ->
@@ -334,6 +441,9 @@ let view (m : App.Model.t) ~inject =
     ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
+    ; (if Nix_gc.shown m.nix_gc ~superuser:(App.superuser m)
+       then section "Nix store" (nix_store m ~inject)
+       else Node.none)
     ; section "Account" (account m ~inject)
     ]
 ;;
