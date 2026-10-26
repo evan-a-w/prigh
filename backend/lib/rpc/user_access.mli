@@ -38,6 +38,9 @@ module Signed_in : sig
 
   (** Every user's name, for superusers. *)
   val users : t -> string list Or_error.t
+
+  (** The superusers' names, in the order they were given. *)
+  val superusers : t -> string list
 end
 
 (** Checks a [hello]'s [token] (and [user], when given, against the token's

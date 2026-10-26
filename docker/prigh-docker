@@ -10,6 +10,7 @@
 #   prigh-docker login NAME PROVIDER [ARGS] log namespace NAME in to a provider
 #   prigh-docker ssh-key [NAME]             create NAME's ~/.ssh/id_ed25519 if missing; print the public key
 #   prigh-docker users                      list the users
+#   prigh-docker nix-gc [keep|all|Nd]       collect Nix garbage now, first deleting old profile generations (default: PRIGH_NIX_GC_KEEP_DAYS)
 #   prigh-docker healthcheck                exit 0 when every enabled port accepts connections
 #   prigh-docker CMD [ARGS]                 run CMD as the prigh service user
 #
@@ -18,7 +19,12 @@
 # privileged steps (chown, setpriv, exec, the tool host loops, Nix) instead
 # of running them, records ownership in $PRIGH_DOCKER_ROOT/owners and the
 # valid store paths in $PRIGH_DOCKER_ROOT/nix/var/nix/db/valid, and pretends
-# to be root (unless PRIGH_DOCKER_UID says otherwise).
+# to be root (unless PRIGH_DOCKER_UID says otherwise). There the time is
+# PRIGH_DOCKER_NOW, /nix's filesystem has $PRIGH_DOCKER_ROOT/fs-kib KiB, and
+# Nix's garbage collector prints $PRIGH_DOCKER_ROOT/gc-output (and fails if
+# $PRIGH_DOCKER_ROOT/gc-fails exists);
+# `prigh-docker nix-gc-request LINE` handles one line the way the Nix GC
+# helper does.
 set -euo pipefail
 shopt -s nullglob
 
@@ -42,6 +48,10 @@ nix_seed=/opt/nix-seed
 nix_seed_stamp=/nix/var/prigh/seed
 nix_roots=/nix/var/nix/gcroots/prigh
 nix_socket=/nix/var/nix/daemon-socket/socket
+nix_conf="$state/nix.conf"
+nix_gc_dir="$state/nix-gc"
+nix_gc_last=/nix/var/prigh/last-gc
+nix_gc_scheduled=/nix/var/prigh/last-scheduled-gc
 
 die() {
 	echo "prigh-docker: $*" >&2
@@ -56,6 +66,10 @@ trim() {
 	local s="$1"
 	s="${s#"${s%%[![:space:]]*}"}"
 	printf '%s' "${s%"${s##*[![:space:]]}"}"
+}
+
+now() {
+	if [ -n "$dry_run" ]; then echo "${PRIGH_DOCKER_NOW:-1700000000}"; else date +%s; fi
 }
 
 # --- Privileged steps (stubbed by PRIGH_DOCKER_DRY_RUN) -----------------------
@@ -615,14 +629,278 @@ start_nix_daemon() {
 	fi
 }
 
+# --- Nix garbage collection ---------------------------------------------------
+
+# parse_interval VALUE: seconds (0 = off) from 0, off, or N with s, m, h or d.
+parse_interval() {
+	case "$1" in
+	0 | off) echo 0 ;;
+	*s) echo $((10#${1%s})) ;;
+	*m) echo $((10#${1%m} * 60)) ;;
+	*h) echo $((10#${1%h} * 3600)) ;;
+	*d) echo $((10#${1%d} * 86400)) ;;
+	esac
+}
+
+# Sets gc_interval (seconds, 0 = off) and gc_keep (Nd, all or keep) from
+# PRIGH_NIX_GC_INTERVAL and PRIGH_NIX_GC_KEEP_DAYS.
+load_gc_settings() {
+	local interval="${PRIGH_NIX_GC_INTERVAL:-1d}" keep="${PRIGH_NIX_GC_KEEP_DAYS:-14}"
+	[[ $interval =~ ^(0|off|[0-9]{1,6}[smhd])$ ]] ||
+		die "PRIGH_NIX_GC_INTERVAL='$interval': use a number with s, m, h or d (e.g. 1d, 12h), or 0 to turn the scheduled garbage collection off"
+	gc_interval=$(parse_interval "$interval")
+	case "$keep" in
+	off) gc_keep=keep ;;
+	*)
+		[[ $keep =~ ^[0-9]{1,5}$ ]] ||
+			die "PRIGH_NIX_GC_KEEP_DAYS='$keep': use a number of days (0 deletes every old profile generation), or off to keep them all"
+		if [ $((10#$keep)) = 0 ]; then gc_keep=all; else gc_keep="$((10#$keep))d"; fi
+		;;
+	esac
+}
+
+# fs_kib PATH: the size of PATH's filesystem in KiB.
+fs_kib() {
+	if [ -n "$dry_run" ]; then
+		cat "$root/fs-kib" 2>/dev/null || echo 104857600
+	else
+		df -Pk -- "$1" | awk 'NR == 2 { print $2 }'
+	fi
+}
+
+# clamp VALUE MIN MAX
+clamp() {
+	local v="$1"
+	[ "$v" -ge "$2" ] || v="$2"
+	[ "$v" -le "$3" ] || v="$3"
+	echo "$v"
+}
+
+# /etc/nix/nix.conf includes this file: Nix collects garbage while it builds
+# or fetches when less than 10% of the volume's filesystem is free, until 25%
+# is (at least 1 and 3 GiB, at most 50 and 100 GiB).
+write_nix_conf() {
+	local gib=$((1024 * 1024 * 1024)) bytes min max
+	bytes=$(($(fs_kib "$root/nix") * 1024))
+	min=$(clamp $((bytes / 10)) "$gib" $((50 * gib)))
+	max=$(clamp $((bytes / 4)) $((min + 2 * gib)) $((100 * gib)))
+	[ "$max" -gt "$min" ] || max=$((min + gib))
+	mkdir -p "$root$state"
+	printf '%s\n' "# Written by prigh-docker at start, for the $((bytes / gib)) GiB filesystem of /nix." \
+		"min-free = $min" "max-free = $max" >"$root$nix_conf"
+	chmod 644 "$root$nix_conf"
+	nix_gc_summary="collects below $((min / gib)) GiB free, up to $((max / gib)) GiB"
+}
+
+# user_profiles NAME HOME: NAME's Nix profiles (not their generations).
+user_profiles() {
+	local p
+	for p in "$root$2"/.local/state/nix/profiles/* "$root"/nix/var/nix/profiles/per-user/"$1"/*; do
+		[ -L "$p" ] || continue
+		[[ ${p##*/} =~ -[0-9]+-link$ ]] && continue
+		echo "${p#"$root"}"
+	done
+}
+
+# delete_generations GENS: the profile generations of every user (and prigh)
+# older than GENS (Nd; all: all but the current one), as that user, so that
+# nothing in their homes is touched as root.
+delete_generations() {
+	local arg name profile
+	case "$1" in
+	all) arg=old ;;
+	*) arg="$1" ;;
+	esac
+	local -a names=("$service_user")
+	if [ -f "$root$users_file" ]; then
+		while IFS=$'\t' read -r name _; do names+=("$name"); done <"$root$users_file"
+	fi
+	for name in "${names[@]}"; do
+		lookup_user "$name"
+		while read -r profile; do
+			echo "deleting old generations of $profile"
+			clean "$name" nix-env --profile "$profile" --delete-generations "$arg"
+			run "${cmd[@]}" || echo "could not delete the generations of $profile"
+		done < <(user_profiles "$name" "$u_home")
+	done
+}
+
+store_gc() {
+	nix_root_env
+	if [ -n "$dry_run" ]; then
+		show + env -i "${nix_root_vars[@]}" nix store gc -v
+		cat "$root/gc-output" 2>/dev/null || true
+		[ ! -e "$root/gc-fails" ]
+	else
+		env -i "${nix_root_vars[@]}" nix store gc -v
+	fi
+}
+
+# to_bytes NUMBER UNIT
+to_bytes() {
+	awk -v n="$1" -v u="$2" 'BEGIN {
+		s = (u == "KiB") ? 1024 : (u == "MiB") ? 1048576 : (u == "GiB") ? 1073741824 : (u == "TiB") ? 1099511627776 : 1
+		printf "%.0f\n", n * s }'
+}
+
+# human BYTES
+human() {
+	awk -v b="$1" 'BEGIN { split("B KiB MiB GiB TiB", u, " "); i = 1
+		while (b >= 1024 && i < 5) { b /= 1024; i++ }
+		printf (i == 1 ? "%d %s\n" : "%.1f %s\n"), b, u[i] }'
+}
+
+# write_fields FILE KEY=VALUE...: atomically, world-readable.
+write_fields() {
+	local file="$1"
+	shift
+	printf '%s\n' "$@" >"$file.tmp"
+	chmod 644 "$file.tmp"
+	mv -f -- "$file.tmp" "$file"
+}
+
+# nix_gc GENS BY LOG [RESULT]: deletes old profile generations (unless GENS is
+# keep), collects garbage and records it as the last collection (also in
+# RESULT for the backend). Nix's output goes to LOG.
+nix_gc() {
+	local gens="$1" by="$2" log_file="$3" result="${4:-}" dir="$root$nix_gc_dir"
+	local started finished summary size unit deleted=0 freed=0 generations status=ok error=""
+	mkdir -p "$dir" "$root${nix_gc_last%/*}"
+	started=$(now)
+	write_fields "$dir/running" "by=$by" "since=$started" "generations=$gens"
+	{
+		[ "$gens" = keep ] || delete_generations "$gens"
+		echo "collecting garbage"
+		store_gc || echo "nix store gc failed (exit $?)"
+	} >>"$log_file" 2>&1
+	generations=$(grep -c '^removing profile version ' "$log_file" || true)
+	summary=$(grep -E '^[0-9]+ store paths? deleted, [0-9.]+ [KMGT]?i?B freed$' "$log_file" | tail -1 || true)
+	if grep -q '^nix store gc failed' "$log_file"; then
+		status=error
+		error="nix store gc failed: $(grep -v '^nix store gc failed' "$log_file" | tail -1)"
+	elif [ -n "$summary" ]; then
+		read -r deleted _ _ _ size unit _ <<<"$summary"
+		freed=$(to_bytes "$size" "$unit")
+	fi
+	finished=$(now)
+	local fields=("at=$finished" "by=$by" "generations=$gens" "generations_deleted=$generations"
+		"paths_deleted=$deleted" "freed_bytes=$freed" "seconds=$((finished - started))")
+	if [ "$status" = ok ]; then
+		write_fields "$root$nix_gc_last" "${fields[@]}"
+		cp -f "$root$nix_gc_last" "$dir/last-gc"
+		log "nix garbage collection (by $by): deleted $generations profile generations and $deleted store paths, freed $(human "$freed")"
+	else
+		log "nix garbage collection (by $by) failed: $error"
+	fi
+	[ -z "$result" ] || write_fields "$result" "status=$status" "error=$error" "${fields[@]}"
+	rm -f "$dir/running"
+}
+
+# with_gc_lock CMD...: one collection at a time (the backend's, the
+# schedule's and prigh-docker nix-gc's).
+with_gc_lock() {
+	if [ -n "$dry_run" ]; then
+		"$@"
+	else
+		mkdir -p "$root$nix_gc_dir"
+		(
+			flock 9
+			"$@"
+		) 9>"$root$nix_gc_dir/lock"
+	fi
+}
+
+# One line from the backend: gc ID GENS BY. Anything else is ignored.
+nix_gc_request() {
+	local dir="$root$nix_gc_dir" id gens by f
+	if [[ $1 =~ ^gc\ ([a-z0-9]{1,32})\ (keep|all|[0-9]{1,5}d)\ ([A-Za-z_][A-Za-z0-9_-]{0,31})$ ]]; then
+		id="${BASH_REMATCH[1]}" gens="${BASH_REMATCH[2]}" by="${BASH_REMATCH[3]}"
+		for f in "$dir"/*.log "$dir"/*.result; do rm -f -- "$f"; done
+		: >"$dir/$id.log"
+		chmod 644 "$dir/$id.log"
+		with_gc_lock nix_gc "$gens" "$by" "$dir/$id.log" "$dir/$id.result"
+	else
+		log "nix garbage collection: ignoring a malformed request (${#1} characters)"
+	fi
+}
+
+write_gc_schedule() {
+	local keep="${gc_keep%d}"
+	case "$gc_keep" in
+	keep) keep=off ;;
+	all) keep=0 ;;
+	esac
+	write_fields "$root$nix_gc_dir/schedule" "interval=$gc_interval" "keep_days=$keep" "next_at=${1:-}"
+}
+
+# The root helper (see DOCKER.md, "Garbage collection"): serves the backend's
+# requests from a FIFO that only prigh may write, and runs the scheduled
+# collection every gc_interval (the first one at least 5 minutes after
+# start), deleting the profile generations older than gc_keep.
+start_nix_gc_helper() {
+	local dir="$root$nix_gc_dir" fifo="$root$nix_gc_dir/requests" last now_s next=""
+	load_gc_settings
+	mkdir -p "$dir" "$root${nix_gc_scheduled%/*}"
+	chmod 755 "$dir"
+	rm -f "$fifo"
+	mkfifo -m 600 "$fifo"
+	if [ -n "$dry_run" ]; then show + chown "0:$service_user" "$fifo"; else chown "0:$service_user" "$fifo"; fi
+	chmod 620 "$fifo"
+	[ ! -f "$root$nix_gc_last" ] || cp -f "$root$nix_gc_last" "$dir/last-gc"
+	now_s=$(now)
+	[ -f "$root$nix_gc_scheduled" ] || echo "$now_s" >"$root$nix_gc_scheduled"
+	if [ "$gc_interval" -gt 0 ]; then
+		last=$(cat "$root$nix_gc_scheduled")
+		next=$((last + gc_interval))
+		[ "$next" -ge $((now_s + 300)) ] || next=$((now_s + 300))
+		nix_gc_summary+=", and every ${PRIGH_NIX_GC_INTERVAL:-1d}"
+		case "$gc_keep" in
+		keep) nix_gc_summary+=" keeping all profile generations" ;;
+		all) nix_gc_summary+=" deleting all old profile generations" ;;
+		*) nix_gc_summary+=" deleting profile generations older than ${gc_keep%d} days" ;;
+		esac
+	else
+		nix_gc_summary+=", none scheduled"
+	fi
+	write_gc_schedule "$next"
+	if [ -n "$dry_run" ]; then
+		echo "supervise nix-gc helper: requests from ${fifo#"$root"}, next scheduled collection at ${next:-never}"
+		return
+	fi
+	(
+		exec 3<>"$fifo"
+		while :; do
+			line=""
+			if [ "$gc_interval" -gt 0 ]; then
+				wait_s=$((next - $(now)))
+				if [ "$wait_s" -le 0 ]; then
+					: >"$dir/scheduled.log"
+					with_gc_lock nix_gc "$gc_keep" schedule "$dir/scheduled.log"
+					now >"$root$nix_gc_scheduled"
+					next=$(($(now) + gc_interval))
+					write_gc_schedule "$next"
+					continue
+				fi
+				read -r -t "$wait_s" line <&3 || continue
+			else
+				read -r line <&3 || continue
+			fi
+			nix_gc_request "$line"
+		done
+	) </dev/null &
+}
+
 # --- Commands -----------------------------------------------------------------
 
 start_tui_mode() {
 	local cwd="${PRIGH_CWD:-/home/$service_user}"
+	load_gc_settings
 	setup_service_home
 	warn_old_workspace "$service_user"
 	seed_nix
+	write_nix_conf
 	start_nix_daemon
+	start_nix_gc_helper
 	lookup_user "$service_user"
 	local prigh_uid="$u_uid"
 	if [ ! -e "$root$cwd" ]; then
@@ -638,7 +916,7 @@ start_tui_mode() {
 	fi
 	cd "$root$cwd"
 	service prigh-tui -cwd "$cwd" "${tui_args[@]}" -- "${extra_args[@]}"
-	log "mode=tui cwd=$cwd (single user: tools run as $service_user); nix: $nix_status"
+	log "mode=tui cwd=$cwd (single user: tools run as $service_user); nix: $nix_status; garbage: $nix_gc_summary"
 	run_exec "${cmd[@]}"
 }
 
@@ -648,6 +926,7 @@ start() {
 		start_tui_mode
 	fi
 	[ ${#flags[@]} -gt 0 ] || die "PRIGH_MODE='$mode' enables nothing"
+	load_gc_settings
 	load_users
 	setup_service_home
 	allocate_uids
@@ -658,7 +937,9 @@ start() {
 	done
 	warn_old_workspace "${users[@]}"
 	seed_nix
+	write_nix_conf
 	start_nix_daemon
+	start_nix_gc_helper
 
 	local host_tokens=() summary=() hello
 	for name in "${users[@]}"; do
@@ -684,7 +965,7 @@ start() {
 	for i in "${!flags[@]}"; do
 		serve_args+=("${flags[$i]}" "0.0.0.0:${ports[$i]}")
 	done
-	local backend_env=(-u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS)
+	local backend_env=(-u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS PRIGH_NIX_GC_HELPER="$nix_gc_dir")
 	if [ "$auth" = tokens ]; then
 		local specs=()
 		for name in "${users[@]}"; do
@@ -709,7 +990,7 @@ start() {
 	fi
 	local hosts="one per user, as that user"
 	! $no_backend_host || hosts="none in the container (PRIGH_NO_BACKEND_HOST=1)"
-	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts; nix: $nix_status"
+	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts; nix: $nix_status; garbage: $nix_gc_summary"
 	cd "$root/home/$service_user"
 	service "${backend_env[@]}" prigh serve "${serve_args[@]}" "${extra_args[@]}"
 	run_exec "${cmd[@]}"
@@ -794,6 +1075,18 @@ list_users() {
 	done <"$root$users_file"
 }
 
+nix_gc_now() {
+	[ "$my_uid" = 0 ] || die "nix-gc needs root: docker compose exec prigh prigh-docker nix-gc"
+	load_gc_settings
+	local gens="${1:-$gc_keep}" log_file="$root$nix_gc_dir/console.log"
+	[[ $gens =~ ^(keep|all|[0-9]{1,5}d)$ ]] ||
+		die "usage: prigh-docker nix-gc [keep|all|Nd] (keep: no profile generations, all: all but the current ones, Nd: those older than N days; default: PRIGH_NIX_GC_KEEP_DAYS)"
+	mkdir -p "$root$nix_gc_dir"
+	: >"$log_file"
+	with_gc_lock nix_gc "$gens" console "$log_file"
+	cat "$log_file"
+}
+
 port_open() {
 	(exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
@@ -830,6 +1123,14 @@ ssh-key)
 	ssh_key "$@"
 	;;
 users) list_users ;;
+nix-gc)
+	shift
+	nix_gc_now "$@"
+	;;
+nix-gc-request)
+	[ -n "$dry_run" ] || die "nix-gc-request is for tests"
+	nix_gc_request "${2:-}"
+	;;
 healthcheck) healthcheck ;;
 *)
 	if [ "$my_uid" != 0 ]; then

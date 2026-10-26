@@ -559,6 +559,14 @@ let serve_command =
             build)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
+     and nix_gc_helper =
+       flag
+         "-nix-gc-helper"
+         (optional string)
+         ~doc:
+           "DIR superusers' Nix garbage collection goes through the root \
+            helper listening there (the container's; see DOCKER.md) instead of \
+            running nix as the backend's user (default: $PRIGH_NIX_GC_HELPER)"
      in
      fun () ->
        if Option.is_some tokens && Option.is_some token
@@ -640,6 +648,14 @@ let serve_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
+       let nix_store =
+         Nix_store.create
+           ~sw
+           ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+           (match from_env nix_gc_helper "PRIGH_NIX_GC_HELPER" with
+            | Some dir -> Nix_store_ops.helper ~env ~dir
+            | None -> Nix_store_ops.local ~env)
+       in
        let create_server ?token ?namespace ?world () =
          let { Setup.session; cwd; new_agent; world; models } =
            make_agent ~env ~sw ~backend_host ?world ()
@@ -669,6 +685,7 @@ let serve_command =
              ?namespace
              ~backend_host
              ~home:world.home
+             ~nix_store
              ~login
              ~sessions_dir:world.sessions_dir
              ~cwd
