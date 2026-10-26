@@ -2,7 +2,6 @@ open! Core
 open! Import
 open Html
 module Action = App.Action
-module Worktree_command = Prigh_ui.Worktree_command
 
 let home_relative cwd =
   match String.chop_prefix cwd ~prefix:"/home/" with
