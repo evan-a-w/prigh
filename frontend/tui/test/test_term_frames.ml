@@ -188,6 +188,12 @@ module H = struct
          { kind = Scroll dir; position = { x = 10; y = 5 }; mods = [] })
   ;;
 
+  let click t ~x ~y =
+    send
+      t
+      (Bonsai_term.Event.Mouse { kind = Left; position = { x; y }; mods = [] })
+  ;;
+
   let viewport () =
     match !Term_app.latest_result with
     | Some r -> Sexp.to_string [%sexp (r.model.viewport : Prigh_ui.Viewport.t)]
@@ -515,16 +521,16 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
     H.show h;
     [%expect
       {|
-      after wheel up: (Anchored(top 8)(new_lines 0))
+      after wheel up: (Anchored(top 8)(new_lines 0)(new_items 0))
       === Vt.to_plain ===
 
       ▌ line 2
 
       ▌ line 3
-
+                                                                        ↓ bottom · End
       ────────────────────────────────────────────────────────────────────────────────
       > ▏
-      /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     H.wheel h `Down;
@@ -544,6 +550,66 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       ▌ line 5
       ────────────────────────────────────────────────────────────────────────────────
       > hello▏
+      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      same: true
+      |}];
+    return ())
+;;
+
+let%expect_test
+    "the jump indicator: styled, a click on it and Ctrl+End go to the bottom"
+  =
+  H.run ~width:80 ~height:8 (fun h ->
+    let%bind () = H.paint h in
+    let message text =
+      H.incoming
+        h
+        (Prigh_ui.App.Action.Event (P.Event.Message_start (user text)))
+    in
+    List.iter (List.range 0 6) ~f:(fun i -> message (sprintf "line %d" i));
+    let%bind () = H.paint h in
+    H.wheel h `Up;
+    message "below";
+    let%bind () = H.paint h in
+    print_endline (Vt.to_styled h.vt);
+    [%expect
+      {|
+      [yellow]▌ [/][bold]line 2[/]
+
+      [yellow]▌ [/][bold]line 3[/]
+                                                                         [yellow]↓ 1 new[/][gray] · End[/]
+      [gray]────────────────────────────────────────────────────────────────────────────────[/]
+      [yellow][bold]>[/]
+      [gray]/work[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/]
+      |}];
+    (* A click beside it does nothing. *)
+    H.click h ~x:10 ~y:4;
+    let%bind () = H.paint h in
+    printf "beside: %s\n" (H.viewport ());
+    H.click h ~x:79 ~y:4;
+    let%bind () = H.paint h in
+    printf "on it: %s\n" (H.viewport ());
+    H.wheel h `Up;
+    let%bind () = H.paint h in
+    printf "wheel up: %s\n" (H.viewport ());
+    H.send h (Bonsai_term.Event.Key_press { key = End; mods = [ Mod.Ctrl ] });
+    let%bind () = H.paint h in
+    printf "Ctrl+End: %s\n" (H.viewport ());
+    H.show h;
+    [%expect
+      {|
+      beside: (Anchored(top 8)(new_lines 2)(new_items 1))
+      on it: Follow
+      wheel up: (Anchored(top 10)(new_lines 0)(new_items 0))
+      Ctrl+End: Follow
+      === Vt.to_plain ===
+      ▌ line 4
+
+      ▌ line 5
+
+      ▌ below
+      ────────────────────────────────────────────────────────────────────────────────
+      > ▏
       /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];

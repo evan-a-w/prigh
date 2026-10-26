@@ -190,6 +190,38 @@ scenario_quit() {
 	capture quit "exited (tty flags)"
 }
 
+# Scrolled back, the jump indicator shows; Ctrl+End (End with text in the
+# editor moves its cursor) and a click on it go back.
+scenario_scroll() {
+	resize 100 12
+	wait_for "Ctrl+C"
+	local i
+	for i in 1 2 3 4; do
+		type_text "prompt $i"
+		keys Enter
+		wait_for "prompt $i"
+		settle
+	done
+	keys PPage
+	wait_for "bottom · End"
+	settle
+	capture scroll "scrolled back"
+	type_text "draft"
+	wait_for "bottom · Ctrl+End"
+	keys C-End
+	wait_for "▌ prompt 4"
+	settle
+	capture scroll "Ctrl+End: at the bottom"
+	keys PPage
+	wait_for "bottom · Ctrl+End"
+	# A left click (an SGR mouse report, 1-based) on the indicator's last
+	# column, in the transcript's last row.
+	tmux send-keys -t "$session" -l $'\e[<0;100;9M\e[<0;100;9m'
+	wait_for "▌ prompt 4"
+	settle
+	capture scroll "clicked: at the bottom"
+}
+
 # A scripted provider run: a bash tool call, then two background subagents in
 # one turn, then the main agent ends its turn and is woken by their reports.
 # The replies are one shared script:
