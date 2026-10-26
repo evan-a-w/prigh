@@ -465,7 +465,7 @@ let steer_button (m : App.Model.t) ~inject (a : Agent.t) =
       ~cls:
         (if steering
          then "ghost small agents-steer on"
-         else "ghost small agents-steer")
+         else "small agents-steer")
       ~title:
         (if steering
          then "Your messages go to it (Esc in the editor: to the main agent)"

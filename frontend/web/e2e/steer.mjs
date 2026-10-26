@@ -1,5 +1,6 @@
-// Steering a background subagent from the composer: the subagent shown in
-// the agents panel is written to (a chip over the editor says so), Enter
+// Steering a background subagent from the composer: showing it in the agents
+// panel leaves the composer on the main agent; its Steer button makes the
+// composer write to it (a chip over the editor says so), Enter
 // steers it and Alt+Enter queues a follow-up, both listed above the
 // composer until they reach it; its transcript then has them; once it
 // finishes the composer is the main agent's again. Run by prigh_web.sh;
@@ -123,13 +124,21 @@ try {
   await page.locator(".agents-row.running").first().click();
   await page.waitForSelector(".agents-detail .agents-transcript .entries");
   await page.waitForFunction(() => document.querySelector(".agents-transcript")?.innerText.includes("sub-go"));
-  await page.locator(".steer-chip").waitFor();
-  section("the subagent shown is written to");
+  section("showing it leaves the composer on the main agent");
   console.log(await recipient());
+  console.log(clean(await page.locator(".agents-foot").innerText()));
+  await screenshot("showing a1");
+
+  // Its Steer button writes to it; the editor has the focus.
+  await page.locator(".agents-steer").click();
+  await page.locator(".steer-chip").waitFor();
+  section("Steer");
+  console.log(await recipient());
+  console.log(`editor focused: ${await composer.evaluate(e => e === document.activeElement)}`);
   console.log(clean(await page.locator(".agents-foot").innerText()));
   await screenshot("steering a1");
 
-  // Esc goes back to the main agent; its Steer button comes back to it.
+  // Esc goes back to the main agent; Steer again writes to it.
   await composer.click();
   await page.keyboard.press("Escape");
   await page.locator(".steer-chip").waitFor({ state: "detached" });
