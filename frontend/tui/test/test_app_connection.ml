@@ -95,7 +95,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    ┌─ Connect to HOST:PORT or local (now: 10.0.0.5:7777) ─────────────────────────────────────────────┐
+    ┌─ Connect to HOST:PORT, a prigh-web URL (wss://…) or local (now: 10.0.0.5:7777) ──────────────────┐
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? 10.0.0.5:7777▏
@@ -138,7 +138,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    ┌─ Connect to HOST:PORT or local (now: a local backend) ───────────────────────────────────────────┐
+    ┌─ Connect to HOST:PORT, a prigh-web URL (wss://…) or local (now: a local backend) ────────────────┐
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
@@ -186,8 +186,8 @@ let%expect_test "/connect: a bad address says what to type" =
     ▌ earlier question
       earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
-    │ "a b:1" is not HOST:PORT (e.g. 127.0.0.1:7777); /connect HOST:PORT (of prigh serve -listen), or  │
-    │ /connect local                                                                                   │
+    │ "a b:1" is not HOST:PORT (prigh serve -listen, e.g. 127.0.0.1:7777) or a prigh-web URL (e.g.     │
+    │ wss://server/ws or https://server/prigh/); or /connect local                                     │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
@@ -858,5 +858,161 @@ let%expect_test "in the browser the platform owns the connection" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test
+    "/connect a prigh-web URL: normalised, shown as wss://host; completed when \
+     saved"
+  =
+  let h = on (remote "10.0.0.5:7777") in
+  H.keys h "/connect https://ai.example.com/";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Relink (generation 1) (change (Connect (wss://ai.example.com/ws))))
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────────────────────────────────────────────── connecting to wss://ai.example.com… ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  connecting…
+    |}];
+  relinked
+    h
+    ~link:
+      (remote
+         ~user:None
+         ~saved:(Some "wss://ai.example.com/ws")
+         "wss://ai.example.com/ws")
+    (Connected (hello {|{"client_id":"c2","namespace":"alice","user":"alice"}|}));
+  H.reply ~quiet:true h Initial_state (state_json ~cwd:"/srv" ());
+  H.reply ~quiet:true h Initial_messages "[]";
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+
+
+
+
+
+
+
+
+
+
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ───────────────────────────────────────────────────── connected to wss://ai.example.com as alice ───
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:wss://ai.example.com  user:alice
+    |}];
+  H.keys h "/connect ";
+  H.show h;
+  [%expect
+    {|
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ▸ wss://ai.example.com/ws  the current server
+      local                    a backend started here, like prigh-tui -local
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /connect ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
+    |}];
+  H.key h (Key.plain Escape);
+  H.key h (Key.ctrl 'u');
+  List.iter
+    [ "/connect ftp://ai.example.com/"
+    ; "/connect wss:///ws"
+    ; "/connect wss://ai.example.com:99999/ws"
+    ]
+    ~f:(fun command ->
+      H.keys h command;
+      H.enter h;
+      H.show h);
+  [%expect
+    {|
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ "ftp://ai.example.com/": the scheme must be ws, wss, http or https; expected HOST:PORT (prigh    │
+    │ serve -listen, e.g. 127.0.0.1:7777) or a prigh-web URL (e.g. wss://server/ws or                  │
+    │ https://server/prigh/); or /connect local                                                        │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:wss://ai.example.com  user:alice
+
+
+
+
+
+
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ "wss:///ws" has no host; expected HOST:PORT (prigh serve -listen, e.g. 127.0.0.1:7777) or a      │
+    │ prigh-web URL (e.g. wss://server/ws or https://server/prigh/); or /connect local                 │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:wss://ai.example.com  user:alice
+
+
+
+
+
+      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ "wss://ai.example.com:99999/ws": bad port; expected HOST:PORT (prigh serve -listen, e.g.         │
+    │ 127.0.0.1:7777) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/); or /connect  │
+    │ local                                                                                            │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:wss://ai.example.com  user:alice
+    |}]
+;;
+
+let%expect_test "status line: a URL under a path, and plain ws://" =
+  let h = on (remote "wss://ai.example.com/prigh/ws") in
+  H.show h;
+  H.step h (Server_link (remote "ws://10.0.0.5:7790/ws"));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:wss://ai.example.com/prigh
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:ws://10.0.0.5:7790  user:lloyd
     |}]
 ;;

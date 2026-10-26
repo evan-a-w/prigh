@@ -1959,7 +1959,8 @@ let relink ?doing m change =
 ;;
 
 let connect_hint =
-  "/connect HOST:PORT (of prigh serve -listen), or /connect local"
+  "/connect HOST:PORT (of prigh serve -listen), /connect wss://HOST/ws (a \
+   prigh-web URL, e.g. behind an HTTPS proxy), or /connect local"
 ;;
 
 let connect m arg =
@@ -1973,7 +1974,8 @@ let connect m arg =
              Text_prompt
                { question =
                    sprintf
-                     "Connect to HOST:PORT or local (now: %s)"
+                     "Connect to HOST:PORT, a prigh-web URL (wss://…) or local \
+                      (now: %s)"
                      (Server_link.describe server)
                ; action = Connect
                }
@@ -1988,13 +1990,13 @@ let connect m arg =
        , [] )
      | "local" -> relink m (Connect None) ~doing:"starting a local backend…"
      | address ->
-       (match Server_link.parse_address address with
-        | Error e -> error m (sprintf "%s; %s" e connect_hint), []
-        | Ok _ ->
+       (match Server_address.parse address with
+        | Error e -> error m (sprintf "%s; or /connect local" e), []
+        | Ok parsed ->
           relink
             m
-            (Connect (Some address))
-            ~doing:(sprintf "connecting to %s…" address)))
+            (Connect (Some (Server_address.normalize address)))
+            ~doing:(sprintf "connecting to %s…" (Server_address.display parsed))))
 ;;
 
 let nothing_to_sign_in m what =
@@ -2023,7 +2025,11 @@ let sign_out m =
     warn m "still connecting; wait for it, or Ctrl+C quits", []
   | Some { address = Some address; _ }, _ ->
     let m = signed_out { m with mode = Editing } ~reason:"signed out" in
-    ( notice m (sprintf "signed out of %s; the saved token is forgotten" address)
+    ( notice
+        m
+        (sprintf
+           "signed out of %s; the saved token is forgotten"
+           (Server_address.display_string address))
     , [ Command.Sign_out ] )
 ;;
 
@@ -2031,6 +2037,7 @@ let connected_notice m (link : Server_link.t) =
   match link.address with
   | None -> "connected to a local backend"
   | Some address ->
+    let address = Server_address.display_string address in
     (match m.user, m.namespace with
      | Some user, _ | None, Some user ->
        sprintf "connected to %s as %s" address user

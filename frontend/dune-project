@@ -29,4 +29,13 @@
   expect_test_helpers_core
   expect_test_helpers_async
   re
-  uucp))
+  uucp
+  tls
+  x509
+  ca-certs
+  mirage-crypto-rng
+  digestif
+  base64
+  domain-name
+  ipaddr
+  ptime))
