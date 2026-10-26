@@ -236,7 +236,9 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-thread.hot { border-color: var(--sodium-line); border-left-color: var(--sodium); }
 
 .review-note { display: flex; align-items: center; gap: 8px; color: var(--faint); font: 12px var(--sans); margin-bottom: 8px; }
-.review-since-note { color: var(--muted); }
+.review-since-note { display: block; color: var(--muted); line-height: 1.5; }
+.review-since-hint { margin-left: 10px; color: var(--faint); }
+.files-preview .review-since-note { padding: 6px 12px 2px; }
 .review-since-counts { font: 12px var(--mono); color: var(--sodium); font-variant-numeric: tabular-nums; }
 .review-since-same { color: var(--muted); }
 .review-since-menu { max-width: min(30ch, 100%); }
@@ -368,7 +370,7 @@ mark.review-mark[data-comment] { cursor: default; }
   line-height: 15px;
 }
 .files-row.changed .files-name { color: var(--chalk); font-weight: 500; }
-.files-review-bar { display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 8px 12px; font: 12px var(--sans); border-bottom: 1px solid var(--rule); }
+.files-review-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; white-space: nowrap; padding: 8px 12px; font: 12px var(--sans); border-bottom: 1px solid var(--rule); }
 .files-review-counts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .files-review-bar .review-open { margin-left: auto; }
 .files-review-bar .files-note { margin: 0; }

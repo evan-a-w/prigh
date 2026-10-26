@@ -96,6 +96,11 @@ let note (m : App.Model.t) path =
          ~cls:"review-note review-since-note"
          [ Node.text (sprintf "Since %s: " label)
          ; span ~cls:"review-since-counts" (sprintf "+%d −%d" added removed)
-         ; Node.text " (removed lines are the file as it was then)"
+         ; (if removed > 0
+            then
+              span
+                ~cls:"review-since-hint"
+                "(removed lines are the file as it was then)"
+            else Node.none)
          ])
 ;;

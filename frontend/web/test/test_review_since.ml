@@ -300,7 +300,7 @@ let%expect_test "an older action from the menu" =
     (Comment) (Edit)
     (Changes) (Whole file) (Since you commented · 09:00)
     bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
-    Since you commented · 09:00: +1 −0 (removed lines are the file as it was then)
+    Since you commented · 09:00: +1 −0
     @@ -1,0 +1,1 @@
     1 + let z = 4
     |}];
