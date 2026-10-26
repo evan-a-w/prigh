@@ -448,7 +448,7 @@ let%expect_test "a delivered steer: in the subagent's transcript, and said" =
     <div data-entry="2" class="msg noted">
       <details data-kind="steer" class="note">
         <summary>
-          <span aria-hidden="true" class="glyph"> • </span>
+          <span aria-hidden="true" class="glyph"> → </span>
           <span class="title"> You (steer) </span>
         </summary>
         <pre class="note-text">
@@ -462,7 +462,7 @@ let%expect_test "a delivered steer: in the subagent's transcript, and said" =
     <div data-entry="3" class="msg noted">
       <details data-kind="steer" class="note">
         <summary>
-          <span aria-hidden="true" class="glyph"> • </span>
+          <span aria-hidden="true" class="glyph"> → </span>
           <span class="title"> Main agent (steer) </span>
         </summary>
         <pre class="note-text"> [Your caller sends you this while you work.] </pre>
