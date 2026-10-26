@@ -1193,6 +1193,8 @@ try {
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();
   await page.waitForTimeout(200); // the drawer's slide
+  // The Review button comes with the diff's reply, after the listing.
+  await page.locator(".files-head .review-open").waitFor();
   section("files: the session's directory");
   console.log(clean(await page.locator(".files-head").innerText()));
   console.log(clean(await page.locator(".files-crumb.current").innerText()));
@@ -1309,7 +1311,8 @@ try {
     section("files: what the model saw");
     console.log(clean(user.text).split("\n").filter(l => l.startsWith("<file") || l.startsWith("[binary") || l === "read these" || l === "hello again" || l === "dropped text").join("\n"));
   }
-  // At phone size the browser is a sheet; a preview takes it over.
+  // At phone size the browser is a sheet; a preview takes it over, with a
+  // way back to the list.
   await page.waitForFunction(() => !document.querySelector(".toast"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
@@ -1321,6 +1324,11 @@ try {
   await page.locator(".files-preview .review-code").waitFor();
   await page.waitForTimeout(200);
   await screenshot("files: a preview on a phone");
+  section("files: a preview on a phone");
+  console.log(`the list: ${await page.locator(".files-list").isVisible() ? "shown" : "hidden"}; ${clean(await page.locator(".files-preview-head").innerText())}`);
+  await page.locator(".files-back").click();
+  await row("todo.md").waitFor();
+  console.log(`back: the list ${await page.locator(".files-list").isVisible() ? "shown" : "hidden"}, the preview ${await page.locator(".files-preview").count() ? "open" : "closed"}`);
   await page.locator(".files-close").click();
   await page.waitForSelector(".files-panel", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -1370,10 +1378,18 @@ try {
   await page.waitForTimeout(200);
   section("resize: a highlighted preview");
   console.log(await tokens(".files-preview .review-code"));
+  {
+    const at = s => page.evaluate(s => Math.round(document.querySelector(s).getBoundingClientRect().left), s);
+    console.log(`left to right: chat to ${await at(".files-panel")}, the preview from ${await at(".files-preview")}, the list from ${await at(".files-side")}`);
+  }
   await screenshot("resize: a highlighted preview");
+  // The list's edge with the preview closed: at 1280px the two of them
+  // share what the sidebar and the chat leave.
+  await page.locator(".files-close-preview").click();
+  await page.locator(".files-preview").waitFor({ state: "detached" });
   section("resize: the file browser's edge");
   console.log(`handles: ${await page.evaluate(() => [...document.querySelectorAll(".resizer")].map(h => `${h.dataset.resize} ${h.getAttribute("aria-valuenow")}`).join(", "))}`);
-  const filesBefore = await width(".files-panel");
+  const filesBefore = await width(".files-side");
   const bodyWhileDragging = await drag("files", -160, 0);
   console.log(`while dragging: ${bodyWhileDragging}; no text selected: ${await page.evaluate(() => getSelection().toString() === "")}`);
   // Kept with the user's preferences on the backend.
@@ -1388,24 +1404,39 @@ try {
     for (let i = 0; i < 50 && read() !== expected; i++) await page.waitForTimeout(100);
     return read();
   };
-  console.log(`dragged 160px left: ${filesBefore} -> ${await width(".files-panel")} (aria ${await valueNow("files")}), kept ${await keptWidth(560)}`);
+  console.log(`dragged 160px left: ${filesBefore} -> ${await width(".files-side")} (aria ${await valueNow("files")}), kept ${await keptWidth(560)}`);
   await page.waitForFunction(() => !document.body.className.includes("resizing"));
   await screenshot("resize: the file browser wider");
   await drag("files", -600, 0);
-  console.log(`as wide as it goes: ${await width(".files-panel")}, the chat keeps ${await width(".main")}`);
+  console.log(`as wide as it goes: ${await width(".files-side")}, the chat keeps ${await width(".main")}`);
   await handle("files").dblclick();
   await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "400");
-  console.log(`double-clicked: ${await width(".files-panel")}, kept ${await keptWidth(null)}`);
+  console.log(`double-clicked: ${await width(".files-side")}, kept ${await keptWidth(null)}`);
   await handle("files").focus();
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Shift+ArrowLeft");
   await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "480");
-  console.log(`arrow keys: ${await width(".files-panel")}`);
+  console.log(`arrow keys: ${await width(".files-side")}`);
   await screenshot("resize: a focused handle");
-  section("resize: the list over the preview");
-  const listBefore = await height(".files-browse");
-  await drag("files-split", 0, 120);
-  console.log(`dragged down: the list ${listBefore < (await height(".files-browse")) ? "taller" : "not taller"}, over 45%: ${(await valueNow("files-split")) > 45}`);
+  section("resize: the preview's edge");
+  await page.setViewportSize({ width: 1800, height: 800 });
+  await row("sample.py").click();
+  await page.locator(".files-preview .review-code").waitFor();
+  const previewBefore = await width(".files-preview");
+  await drag("files-preview", -100, 0);
+  console.log(`dragged 100px left: the preview ${previewBefore} -> ${await width(".files-preview")} (aria ${await valueNow("files-preview")}), the list ${await width(".files-side")}, the chat ${await width(".main")}`);
+  await page.waitForFunction(() => !document.body.className.includes("resizing"));
+  await screenshot("resize: a wider preview");
+  // Too narrow for both beside the chat: the preview in the list's place.
+  await page.setViewportSize({ width: 1150, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".files-panel.alone"));
+  console.log(`at 1150px: the list ${await page.locator(".files-list").isVisible() ? "shown" : "hidden"}, the preview ${await width(".files-preview")} with ${await page.locator(".files-panel .resizer").evaluateAll(hs => hs.map(h => h.dataset.resize).join(", "))}`);
+  await screenshot("resize: the preview alone");
+  await handle("files-preview").count().then(n => n === 0 || console.log("a preview handle while alone"));
+  await page.locator(".files-back").click();
+  await page.locator(".files-preview").waitFor({ state: "detached" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "480");
   section("resize: the sidebar's edge");
   const sidebarBefore = await width(".sidebar");
   await drag("sidebar", 80, 0);
@@ -1417,15 +1448,15 @@ try {
   await page.keyboard.press("Control+Shift+F");
   await row("sample.py").waitFor();
   await page.waitForFunction(() => !document.querySelector(".files-panel .loading, .files-wait"));
-  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}`);
+  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-side")}`);
   section("resize: a narrower window");
   await page.setViewportSize({ width: 1120, height: 800 });
   await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") !== "480");
-  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}, chat ${await width(".main")}`);
+  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-side")}, chat ${await width(".main")}`);
   await screenshot("resize: a narrower window");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "480");
-  console.log(`wide again: sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}`);
+  console.log(`wide again: sidebar ${await width(".sidebar")}, files ${await width(".files-side")}`);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow"));
   await page.waitForTimeout(400);

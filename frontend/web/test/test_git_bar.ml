@@ -587,3 +587,23 @@ let%expect_test "Generate for a new worktree's branch and the session's name" =
     (Cancel) (Rename)
     |}]
 ;;
+
+let%expect_test
+    "the git actions are at the page's foot, away from Send comments"
+  =
+  let h = opened () in
+  H.reply h "git_status" (status_json [ file "src/main.ml" ~worktree:"M" ]);
+  H.elements h ~selector:".review-page > *";
+  H.names h ~selector:".review-head .btn";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    <header class="review-head">
+    <div class="review-target">
+    <div class="review-body">
+    <div class="git-bar">
+    button "Refresh" -- Read the changes again (they also update as prigh edits)
+    button "Send comments" -- Send the new comments and replies to prigh (s)
+    button "Close the review" -- Close the review (Esc, Alt+R)
+    |}]
+;;

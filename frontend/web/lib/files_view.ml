@@ -486,22 +486,14 @@ let code_review_bar (m : App.Model.t) path ~inject =
            ; layout Full "Whole file" "The whole file with its changes inline"
            ]
            @ Option.to_list
-               (Option.map
-                  (Review_since_view.segment m path ~inject)
-                  ~f:segment))
-      ; Review_since_view.menu m path ~inject
+               (Review_since_view.segment m path ~place:`Files ~inject))
       ; Review_page_view.open_button ~path m ~inject
       ]
 ;;
 
-let preview (m : App.Model.t) (t : Files.t) ~inject =
-  let close =
-    button
-      ~cls:"icon ghost files-close-preview"
-      ~title:"Close the preview (Esc)"
-      ~on_click:(inject (files Close_preview))
-      [ icon Close ]
-  in
+(* Left of the list, or in its place ([alone]) with a way back to it. *)
+let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
+  let close_preview = inject (files Close_preview) in
   let frame ?(meta = []) ~name body =
     Node.create
       "section"
@@ -509,9 +501,31 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
         [ Attr.class_ "files-preview"
         ; Attr.create "aria-label" ("Preview of " ^ name)
         ]
-      [ div
+      [ Resize_view.handle m ~inject (if alone then Files else Files_preview)
+      ; div
           ~cls:"files-preview-head"
-          ([ span ~cls:"files-preview-name" name ] @ meta @ [ close ])
+          ((if alone
+            then
+              [ button
+                  ~cls:"icon ghost files-back"
+                  ~title:"Back to the list (Esc)"
+                  ~label:"Back to the list"
+                  ~on_click:close_preview
+                  [ icon Back ]
+              ]
+            else [])
+           @ [ span ~cls:"files-preview-name" name ]
+           @ meta
+           @
+           if alone
+           then []
+           else
+             [ button
+                 ~cls:"icon ghost files-close-preview"
+                 ~title:"Close the preview (Esc)"
+                 ~on_click:close_preview
+                 [ icon Close ]
+             ])
       ; div ~cls:"files-preview-body" body
       ]
   in
@@ -555,7 +569,7 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
               for its selection and comment box. *)
            (if m.review.open_
             then div ~cls:"files-note" [ Node.text "Shown in the review." ]
-            else Review_code_view.view m ~path ~inject)
+            else Review_code_view.view ~place:`Files m ~path ~inject)
          ]
        | Text { text; truncated; md5 = _ } -> text_preview p ~text ~truncated
        | Image { url = Some url; mime } ->
@@ -697,19 +711,7 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
           ]
       ]
   in
-  let previewing =
-    match t.preview with
-    | Some _ -> true
-    | None -> false
-  in
-  div
-    ~cls:(if previewing then "files-body previewing" else "files-body")
-    [ div ~cls:"files-browse" (listing_body @ [ actions t ~inject ])
-    ; (if previewing
-       then Resize_view.handle m ~inject Files_split
-       else Node.none)
-    ; preview m t ~inject
-    ]
+  div ~cls:"files-body" (listing_body @ [ actions t ~inject ])
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -722,10 +724,14 @@ let view (m : App.Model.t) ~inject =
       | Some w -> w.host_name
       | None -> "…"
     in
+    let alone = Resize.preview_alone m.layout (App.Model.shown m) in
+    let previewing = Option.is_some t.preview in
     Node.create
       "aside"
       ~attrs:
-        [ Attr.class_ "files-panel"
+        [ classes
+            [ "files-panel" ]
+            [ "previewing", previewing; "alone", previewing && alone ]
         ; Attr.id "files-panel"
         ; Attr.create "aria-label" "Files"
         ; Attr.create
@@ -735,53 +741,63 @@ let view (m : App.Model.t) ~inject =
                (Option.value_map t.listing ~default:"here" ~f:(fun l ->
                   Files.display_path t l.path)))
         ]
-      [ Resize_view.handle m ~inject Files
+      [ preview m t ~alone ~inject
       ; div
-          ~cls:"files-head"
-          [ glyph ~cls:"files-head-icon" Folder
-          ; span
-              ~cls:"files-machine"
-              ~attrs:[ Attr.title "The tools' host" ]
-              host
+          ~cls:"files-side"
+          [ (if previewing && alone
+             then Node.none
+             else Resize_view.handle m ~inject Files)
           ; div
-              ~cls:"files-tools"
-              [ tool
-                  ~inject
-                  ~title:"Up (Backspace)"
-                  ~label:"Up"
-                  ~disabled:
-                    (Option.value_map t.listing ~default:true ~f:(fun l ->
-                       Option.is_none l.parent))
-                  Up
-                  (glyph Up)
-              ; tool ~inject ~title:"Refresh" Refresh (glyph Refresh)
-              ; tool
-                  ~inject
-                  ~cls:(if t.hidden then "on" else "")
-                  ~title:
-                    (if t.hidden then "Hide dot files" else "Show dot files")
-                  Toggle_hidden
-                  (glyph Eye)
-              ; tool ~inject ~title:"New folder" New_folder (glyph Folder_plus)
-              ; tool
-                  ~inject
-                  ~title:"Upload files here"
-                  (Pick Here)
-                  (glyph Upload)
-              ; (if List.is_empty m.review.files
-                 then Node.none
-                 else Review_page_view.open_button m ~inject)
-              ; button
-                  ~cls:"icon ghost files-close"
-                  ~title:"Close (Ctrl+Shift+F)"
-                  ~label:"Close files"
-                  ~on_click:(inject (files Close))
-                  [ icon Close ]
+              ~cls:"files-head"
+              [ glyph ~cls:"files-head-icon" Folder
+              ; span
+                  ~cls:"files-machine"
+                  ~attrs:[ Attr.title "The tools' host" ]
+                  host
+              ; div
+                  ~cls:"files-tools"
+                  [ tool
+                      ~inject
+                      ~title:"Up (Backspace)"
+                      ~label:"Up"
+                      ~disabled:
+                        (Option.value_map t.listing ~default:true ~f:(fun l ->
+                           Option.is_none l.parent))
+                      Up
+                      (glyph Up)
+                  ; tool ~inject ~title:"Refresh" Refresh (glyph Refresh)
+                  ; tool
+                      ~inject
+                      ~cls:(if t.hidden then "on" else "")
+                      ~title:
+                        (if t.hidden then "Hide dot files" else "Show dot files")
+                      Toggle_hidden
+                      (glyph Eye)
+                  ; tool
+                      ~inject
+                      ~title:"New folder"
+                      New_folder
+                      (glyph Folder_plus)
+                  ; tool
+                      ~inject
+                      ~title:"Upload files here"
+                      (Pick Here)
+                      (glyph Upload)
+                  ; (if List.is_empty m.review.files
+                     then Node.none
+                     else Review_page_view.open_button m ~inject)
+                  ; button
+                      ~cls:"icon ghost files-close"
+                      ~title:"Close (Ctrl+Shift+F)"
+                      ~label:"Close files"
+                      ~on_click:(inject (files Close))
+                      [ icon Close ]
+                  ]
               ]
+          ; path_bar t ~inject
+          ; body m t ~inject
+          ; uploads t
           ]
-      ; path_bar t ~inject
-      ; body m t ~inject
-      ; uploads t
       ])
 ;;
 

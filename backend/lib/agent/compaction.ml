@@ -1,42 +1,6 @@
 open! Core
 open! Import
 
-(* Anthropic charges about (width * height) / 750 tokens for an image, at
-   most about 1600 after its own downscaling. *)
-let tokens_per_image = 1600
-
-let estimate_tokens messages =
-  let images =
-    List.sum
-      (module Int)
-      messages
-      ~f:(function
-        | Message.User u -> List.length u.images
-        | Tool_result r -> List.length r.images
-        | Assistant _ -> 0)
-  in
-  let chars =
-    List.sum
-      (module Int)
-      messages
-      ~f:(function
-        | Message.User u -> String.length u.text
-        | Tool_result r -> String.length r.text
-        | Assistant a ->
-          List.sum
-            (module Int)
-            a.content
-            ~f:(function
-              | Text s -> String.length s
-              | Thinking th -> String.length th.text
-              | Tool_call c -> String.length c.arguments + String.length c.name
-              | Server_tool s ->
-                String.length s.input
-                + Option.value_map s.output ~default:0 ~f:String.length))
-  in
-  (chars / 4) + (images * tokens_per_image)
-;;
-
 let image_lines (images : Image.t list) =
   List.map images ~f:(fun i -> sprintf "\n[image: %s]" i.mime_type)
   |> String.concat
@@ -152,7 +116,7 @@ let plan ~keep_recent_tokens messages =
     if i < 1
     then best
     else (
-      let tokens = tokens + estimate_tokens [ messages.(i) ] in
+      let tokens = tokens + Message.estimate_tokens [ messages.(i) ] in
       if tokens > keep_recent_tokens
       then best
       else walk (i - 1) tokens (if candidate i then Some i else best))
@@ -170,7 +134,9 @@ let plan ~keep_recent_tokens messages =
     let rec fit budget = function
       | [] -> []
       | i :: older ->
-        let tokens = estimate_tokens [ Pinned_messages.shorten messages.(i) ] in
+        let tokens =
+          Message.estimate_tokens [ Pinned_messages.shorten messages.(i) ]
+        in
         if tokens > budget then [] else i :: fit (budget - tokens) older
     in
     let earlier =
@@ -295,7 +261,7 @@ let fits (request : Provider.Request.t) =
     / 4
   in
   prompt_tokens
-  + estimate_tokens request.messages
+  + Message.estimate_tokens request.messages
   + Option.value request.max_tokens ~default:0
   <= request.model.context_window
 ;;

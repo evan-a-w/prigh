@@ -157,6 +157,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
+    Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
@@ -169,7 +170,7 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
@@ -177,6 +178,7 @@ let%expect_test "help lists every key and command" =
     ] / [ (reviewing; also n p, j k) the next / previous changed file
     a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
+    l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
@@ -222,6 +224,7 @@ let%expect_test "help lists every key and command" =
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
+    /trim [undo] drop everything before one of your messages from the model's context (the transcript keeps it folded); undo brings back the last trim
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
@@ -567,7 +570,9 @@ let%expect_test
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

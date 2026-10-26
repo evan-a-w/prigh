@@ -5,8 +5,6 @@ open! Import
     the context stays within the model's window: a session's (recorded as a
     compaction entry) or a subagent's in-memory one. *)
 
-val estimate_tokens : Message.t list -> int
-
 (** True when the last request's input tokens exceed the model's window
     threshold. *)
 val should_compact : Model.t -> input_tokens:int -> bool

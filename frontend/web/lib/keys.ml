@@ -61,6 +61,9 @@ let help =
   ; ( "Ctrl+J"
     , "jump to one of your messages: a list to filter (or the marks at the \
        transcript's right edge)" )
+  ; ( "Delete (in the jump list)"
+    , "trim the model's context before the highlighted message (confirmed \
+       first; /trim undo brings it back)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
   ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
@@ -86,8 +89,7 @@ let help =
   ; "Alt+0", "close the agents panel"
   ; ( "Enter / Alt+Enter (steering a subagent)"
     , "send it a message: at its next step / when it ends its turn (its Steer \
-       button, or a running subagent shown in the panel; /agents steer N TEXT)"
-    )
+       button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
   ; ( "Ctrl+Shift+F"
@@ -105,6 +107,9 @@ let help =
     , "choose what to review (a worktree, or a branch read-only); what to \
        compare it with (a branch, tag, commit or any revision typed); since \
        the merge base or directly" )
+  ; ( "l / Shift+L (reviewing)"
+    , "what changed since your latest action on the file (or the hunks again); \
+       choose the action it compares with: Latest follows your newest" )
   ; "Esc (reviewing)", "drop the comment or selection, then close the review"
   ; ( "Enter / Ctrl+S (reviewing)"
     , "add the comment or reply (Shift+Enter: a new line); save the file being \
@@ -173,11 +178,15 @@ let on_control t =
 (* Ctrl+` by the key's position, whatever the layout types there. *)
 let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 
-(* The review page's keys; [r], [b] and [d] choose what it compares. *)
+(* The review page's keys; [r], [b] and [d] choose what it compares, [L]
+   what its file's since-view does. *)
 let review_key (m : App.Model.t) t : App.Action.t option =
   match t.key with
   | "r" when plain t -> Some (Review_pick Target)
   | "b" when plain t -> Some (Review_pick Base)
+  | "L" when t.shift && not (t.alt || t.ctrl || t.meta) ->
+    Option.map m.review.current ~f:(fun path ->
+      App.Action.Review_pick (Since path))
   | "d" when plain t ->
     Option.map m.review.diff ~f:(fun d ->
       App.Action.Review_direct (not d.direct))
@@ -220,6 +229,12 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Reminders; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Remove_reminder item.id)
+  | "Delete", Picker { kind = Jump; picker } when plain t ->
+    Option.bind (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      match Jump.Target.of_string item.id with
+      | Some ((Entry _ | Message _) as target) ->
+        Some (App.Action.Ask_trim target)
+      | Some Trimmed | None -> None)
   | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       App.Action.Ask_remove_worktree item.id)

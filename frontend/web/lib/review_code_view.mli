@@ -13,7 +13,8 @@ open! Import
     agent's proposed changes to accept or reject, resolving. The review
     page and the file browser's preview of a changed file show it. *)
 val view
-  :  App.Model.t
+  :  ?place:[ `Page | `Files ] (** the review page's (the default) *)
+  -> App.Model.t
   -> path:string
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t

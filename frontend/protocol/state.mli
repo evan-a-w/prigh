@@ -54,6 +54,7 @@ type t =
   ; plan : Plan.t option (** the model's [update_plan] *)
   ; session_rules : string list
     (** rules the user allowed for the session ("don't ask again") *)
+  ; trim : Trim.t option (** what is trimmed from the model's context *)
   }
 [@@deriving sexp_of, equal]
 

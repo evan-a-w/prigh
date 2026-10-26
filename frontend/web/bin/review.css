@@ -7,7 +7,7 @@
 .app.reviewing .main {
   flex: 0 0 var(--review-chat-width, 400px);
   border-left: 1px solid var(--rule);
-  min-width: 320px;
+  min-width: 0;
 }
 .app.reviewing .files-panel { display: none; }
 
@@ -53,7 +53,7 @@
 
 .review-body { flex: 1; min-height: 0; display: flex; }
 .review-files {
-  width: 260px;
+  width: var(--review-files-width, 260px);
   flex-shrink: 0;
   border-right: 1px solid var(--rule);
   background: var(--slate);
@@ -241,12 +241,129 @@ mark.review-mark[data-comment] { cursor: default; }
 .files-preview .review-since-note { padding: 6px 12px 2px; }
 .review-since-counts { font: 12px var(--mono); color: var(--sodium); font-variant-numeric: tabular-nums; }
 .review-since-same { color: var(--muted); }
-.review-since-menu { max-width: min(30ch, 100%); }
+
+/* The since segment: what it compares with in the code face, and its menu's
+   chevron, one control with the switch's other segments. */
+.review-since { display: inline-flex; position: relative; border-radius: 4px; }
+.review-since.on { background: var(--slate-2); box-shadow: inset 0 0 0 1px var(--rule-2); }
+.review-since .segment { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.review-since.on .segment.on { background: none; box-shadow: none; }
+.review-since-segment { padding-right: 6px; max-width: 34ch; overflow: hidden; }
+.review-since-what {
+  font: 11.5px var(--mono);
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.review-since.on .review-since-what { color: var(--sodium); }
+.review-since-what.picked { color: var(--chalk); }
+.review-since .review-since-more {
+  padding: 3px 6px;
+  align-items: center;
+  border-left: 1px solid var(--rule) !important;
+  border-radius: 0 4px 4px 0;
+}
+.review-since-more .chevron { width: 12px; height: 12px; }
+.review-since-more.open .chevron { transform: rotate(180deg); color: var(--chalk); }
+.review-since .review-popover { left: auto; right: -2px; width: 380px; }
+.review-head:has(.review-since-more.open), .files-review-bar:has(.review-since-more.open) { position: relative; z-index: var(--z-menu-anchor); }
 .review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted); font: 13px var(--sans); padding: 18px 4px; }
 .review-empty.big { flex-direction: column; align-items: flex-start; padding: 48px 28px; max-width: 62ch; }
 .review-empty.big p { margin: 0; font-size: 14px; color: var(--chalk); }
 .review-empty.big .review-advice { color: var(--muted); font-size: 13px; }
-.review-elsewhere { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+
+/* Comments not on a line shown (their code changed beyond finding, or it is
+   outside the hunks): one quiet line each, unfolded on demand. */
+.review-asides { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.review-aside-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font: 12px var(--sans);
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-chip);
+  padding: 2px 9px 2px 6px;
+  cursor: pointer;
+}
+.review-aside-toggle:hover { color: var(--chalk); border-color: var(--muted); }
+.review-aside-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.review-aside-toggle .chevron { width: 12px; height: 12px; transform: rotate(-90deg); transition: transform 0.12s ease-out; }
+.review-aside-toggle.open .chevron { transform: none; }
+.review-aside-list { display: flex; flex-direction: column; gap: 6px; }
+.review-aside-threads { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- the margin: threads beside their lines (app/review_margin.ml puts
+   each at its line's height, below the one above when they would meet) */
+
+.review-code-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--review-margin-width, 340px);
+  column-gap: 14px;
+}
+.review-code-main { min-width: 0; overflow-x: auto; }
+.review-code-main table.review-diff { min-width: 100%; }
+.review-margin { position: relative; min-width: 0; }
+.review-margin > .resizer-review-margin { left: -12px; }
+.review-margin-item { position: absolute; left: 0; right: 0; top: 0; transition: top 0.14s ease-out; }
+.review-margin-item .review-thread { max-width: none; box-shadow: 0 1px 0 var(--rule); }
+.review-margin-item.thread .review-thread.hot { box-shadow: 0 0 0 1px var(--sodium-line), 0 6px 18px color-mix(in srgb, var(--edge-shadow) 35%, transparent); }
+.review-margin-item:hover, .review-margin-item:focus-within { z-index: var(--z-inset); }
+/* A tick from the thread back towards the code. */
+.review-margin-item.thread::before, .review-margin-item.draft::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 12px;
+  width: 14px;
+  height: 1px;
+  background: var(--rule-2);
+}
+.review-margin-item.draft::before, .review-margin-item:has(.review-thread.hot)::before { background: var(--sodium); }
+
+/* A resolved thread, folded to its line. */
+.review-folded-thread {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font: 12px var(--sans);
+  color: var(--muted);
+  background: var(--graphite);
+  border: 1px solid var(--sage-line);
+  border-radius: 999px;
+  padding: 1px 4px 1px 7px;
+  cursor: pointer;
+  text-align: left;
+}
+.review-folded-thread .icon { width: 12px; height: 12px; color: var(--sage); flex-shrink: 0; }
+.review-folded-thread .review-id { font-size: 11px; color: var(--faint); }
+.review-folded-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.review-folded-count {
+  font: 600 10px var(--sans);
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--slate-2);
+  color: var(--muted);
+}
+.review-folded-thread:hover, .review-folded-thread.hot { color: var(--chalk); border-color: var(--sage); }
+.review-folded-thread:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+table.review-diff tr.review-insert:has(> td > .review-folded-thread) > td { padding-top: 2px; padding-bottom: 4px; }
+.review-fold .chevron.up { transform: rotate(180deg); }
+mark.review-mark.quiet { background: none; box-shadow: inset 0 -1px 0 var(--sage-line); }
+mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .review-margin-item, .review-aside-toggle .chevron { transition: none; }
+}
 
 /* ---- threads */
 
@@ -381,11 +498,6 @@ mark.review-mark[data-comment] { cursor: default; }
 /* The chat: a reply to a comment */
 .comment-reply { font: 13px/1.5 var(--sans); }
 
-/* Narrower windows: the file list gives way first. */
-@media (max-width: 1180px) {
-  .review-files { width: 200px; }
-  .app.reviewing .main { flex-basis: 340px; min-width: 300px; }
-}
 /* Phones: a full-screen sheet; Esc or the close button goes back to the
    chat. */
 .app.narrow .review-page { position: fixed; inset: 0; z-index: var(--z-sheet); }
@@ -470,15 +582,17 @@ mark.review-mark[data-comment] { cursor: default; }
 @media (pointer: coarse) { .review-popover > .menu-keys, .review-popover .popover-shortcut { display: none; } }
 .review-merge-base { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }
 
-/* ---- the reviewed worktree's git: its branch, what is staged, push, PR */
+/* ---- the reviewed worktree's git, at the page's foot (away from Send
+   comments, at the top): its branch, what is staged, push, PR */
 
 .git-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 12px;
-  padding: 6px 14px 6px 18px;
-  border-bottom: 1px solid var(--rule);
+  padding: 7px 14px 7px 18px;
+  border-top: 1px solid var(--rule);
+  background: var(--slate);
   font: 12px var(--sans);
   color: var(--muted);
 }

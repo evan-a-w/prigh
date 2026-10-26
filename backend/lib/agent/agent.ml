@@ -103,6 +103,7 @@ module State = struct
     ; plan : Plan.t option
     ; session_rules : string list
     ; home : Session.Home.t option
+    ; trim : Session.Trim.t option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -431,17 +432,9 @@ let budget_exhausted t =
 
 let state t =
   let messages = messages t in
-  let assistant_messages =
-    List.filter_map messages ~f:(function
-      | Message.Assistant a -> Some a
-      | User _ | Tool_result _ -> None)
-  in
   let assistant_usage, assistant_cost = session_spend t in
   let usage = assistant_usage in
-  let context_tokens =
-    Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
-      a.usage.input)
-  in
+  let context_tokens = Session.context_tokens t.session in
   { State.session_id = Session.id t.session
   ; session_path = Session.path t.session
   ; session_name = Session.name t.session
@@ -470,6 +463,7 @@ let state t =
   ; plan = t.plan
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
   ; home = Session.home t.session
+  ; trim = Session.trim t.session
   }
 ;;
 
@@ -3457,6 +3451,30 @@ let fork t ?at () =
   Or_error.map
     (Session.fork ?at t.session ~dir:t.sessions_dir)
     ~f:(fun session -> replace_session t session ~keep_host:true)
+;;
+
+let trim_refused = "wait for the run to end or abort it (Esc)"
+
+let trim t ~before =
+  if is_running t
+  then
+    Or_error.error_string
+      ("cannot trim while a run is in progress: " ^ trim_refused)
+  else
+    Or_error.map (Session.append_trim t.session ~before) ~f:(fun trim ->
+      state_changed t;
+      trim)
+;;
+
+let untrim t =
+  if is_running t
+  then
+    Or_error.error_string
+      ("cannot undo a trim while a run is in progress: " ^ trim_refused)
+  else
+    Or_error.map (Session.append_untrim t.session) ~f:(fun trim ->
+      state_changed t;
+      trim)
 ;;
 
 let rewind t ~to_ =

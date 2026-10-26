@@ -64,6 +64,10 @@ module Reply_tag = struct
     | Models_catalog
     | Models_for_scoped
     | Compact_done
+    | Trim_points_picker
+    | Trimmed of [ `Trim | `Untrim ]
+    | Trim_reload (** the context's messages, after the trim changed *)
+    | Trimmed_shown
     | Git_diff
     | Review_comments of
         { target : P.Git_diff.Target.t
@@ -1836,9 +1840,19 @@ let set_state m (state : P.State.t) =
       then agent
       else { agent with status = Done { turns = 0; cost_usd = 0. } })
   in
+  (* A trim or an undo, here or in another frontend: the transcript is the
+     context, so it starts again. *)
+  let trim_changed =
+    match m.state with
+    | Some old ->
+      String.equal old.session_id state.session_id
+      && not (Option.equal P.Trim.equal old.trim state.trim)
+    | None -> false
+  in
   ( { m with state = Some state; agents = m.agents @ adopted }
   , List.map missed ~f:(fun a ->
-      rpc "get_subagent" ~params:[ "id", str a.id ] ~tag:Subagent_loaded) )
+      rpc "get_subagent" ~params:[ "id", str a.id ] ~tag:Subagent_loaded)
+    @ if trim_changed then [ rpc "get_messages" ~tag:Trim_reload ] else [] )
 ;;
 
 let subagent_loaded m (d : P.Subagent_detail.t) =
@@ -3158,6 +3172,92 @@ let help_heading text : Content.Line.t =
   [ { text; style = Style.bold (Style.fg Gray) } ]
 ;;
 
+let trim_refused =
+  "cannot trim while a run is in progress: wait for the run to end or abort it \
+   (Esc)"
+;;
+
+let trim_command m rest =
+  match String.strip rest with
+  | "" when running m -> error m trim_refused, []
+  | "" ->
+    ( notice m "finding where to trim…"
+    , [ call Get_trim_points ~tag:Trim_points_picker ] )
+  | "undo" when running m ->
+    ( error
+        m
+        "cannot undo a trim while a run is in progress: wait for the run to \
+         end or abort it (Esc)"
+    , [] )
+  | "undo" -> notice m "restoring…", [ call Untrim ~tag:(Trimmed `Untrim) ]
+  | "show" ->
+    (match Option.bind m.state ~f:(fun s -> s.trim) with
+     | None -> notice m "nothing is trimmed: /trim picks a point", []
+     | Some _ -> m, [ call Get_trimmed ~tag:Trimmed_shown ])
+  | "hide" ->
+    let transcript, _ = Transcript.show_trimmed m.transcript None in
+    { m with transcript }, []
+  | other ->
+    ( error
+        m
+        (sprintf
+           "unknown /trim argument %S: /trim picks a message, /trim undo, \
+            /trim show or /trim hide"
+           other)
+    , [] )
+;;
+
+let trim_time m at =
+  let date, ofday =
+    Time_ns.to_date_ofday
+      (Time_ns.add at m.utc_offset)
+      ~zone:Time_float.Zone.utc
+  in
+  let parts = Time_ns.Ofday.to_parts ofday in
+  sprintf "%s %02d:%02d" (Date.to_string date) parts.hr parts.min
+;;
+
+let trim_picker m (points : P.Trim.Point.t list) =
+  match List.rev points with
+  | [] ->
+    notice
+      m
+      "nothing to trim: the context starts at your only message (/compact \
+       summarises instead)"
+  | newest_first ->
+    let items =
+      List.map newest_first ~f:(fun (p : P.Trim.Point.t) ->
+        Picker.Item.create
+          ~id:p.before
+          ~search:p.text
+          ~detail:
+            (String.concat
+               ~sep:"  "
+               (Option.to_list (Option.map p.at ~f:(trim_time m))
+                @ [ P.Trim.label ~messages:p.messages ~tokens:p.tokens ]))
+          (first_line p.text))
+    in
+    open_picker
+      m
+      (Trim points)
+      (Picker.create ~title:"Trim everything before" items)
+;;
+
+(* The context's messages, after a trim or an undo (here or elsewhere):
+   the transcript starts again, at the divider. *)
+let add_context_messages m messages =
+  let m =
+    match Option.bind m.state ~f:(fun s -> s.trim) with
+    | None -> m
+    | Some { messages; tokens; _ } ->
+      with_transcript m ~f:(fun t ->
+        Transcript.add t (Trimmed { messages; tokens; shown = None }))
+  in
+  { m with
+    transcript = List.fold messages ~init:m.transcript ~f:Transcript.add_message
+  }
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
@@ -3363,6 +3463,7 @@ let run_command m (cmd : Commands.Parsed.t) =
              else [ "instructions", str cmd.rest ])
           ~tag:Compact_done
       ] )
+  | "trim", _ -> trim_command m cmd.rest
   | "pr", _ -> pr_command m cmd.rest
   | "commit", _ -> commit_command m cmd.rest
   | "push", _ -> push_command m cmd.rest
@@ -4276,6 +4377,28 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
        ( { m with editor = Editor.set_text m.editor (Injected_note.typed user) }
        , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
      | _ -> m, [])
+  | Trim points ->
+    (match
+       List.find points ~f:(fun (p : P.Trim.Point.t) ->
+         String.equal p.before item.id)
+     with
+     | Some p ->
+       ( { m with
+           mode =
+             Confirm
+               { question =
+                   sprintf
+                     "Trim %d message%s (%s) before %S? They leave the model's \
+                      context; /trim undo brings them back (y/n)"
+                     p.messages
+                     (if p.messages = 1 then "" else "s")
+                     (P.Trim.tokens_label p.tokens)
+                     (first_line p.text)
+               ; action = Trim p.before
+               }
+         }
+       , [] )
+     | None -> m, [])
   | Rewind entries ->
     (match
        List.find entries ~f:(fun (entry : P.Entry.t) ->
@@ -4858,6 +4981,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
     | Rewind id ->
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
+    | Trim before ->
+      notice m "trimming…", [ call (Trim { before }) ~tag:(Trimmed `Trim) ]
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
@@ -4884,6 +5009,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Logout _
     | Forge_logout _
     | Rewind _
+    | Trim _
     | Delete_sessions _
     | Remove_worktree _
     | Nix_gc _ -> notice m "cancelled", []
@@ -5714,10 +5840,42 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          log_block m [ banner m state ], commands)
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
-         let transcript =
-           List.fold messages ~init:m.transcript ~f:Transcript.add_message
+         follow (add_context_messages m messages), [])
+     | Trim_reload ->
+       decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
+         let m = { m with transcript = Transcript.clear m.transcript } in
+         let m =
+           match m.state with
+           | Some state -> log_block m [ banner m state ]
+           | None -> m
          in
-         follow { m with transcript }, [])
+         follow (add_context_messages m messages), [])
+     | Trim_points_picker ->
+       decode json ~f:P.Trim.Point.list_of_json (fun points ->
+         trim_picker { m with notice = None } points, [])
+     | Trimmed how ->
+       decode json ~f:P.Trim.Freed.of_json (fun { messages; tokens } ->
+         let what =
+           sprintf
+             "%d message%s (%s)"
+             messages
+             (if messages = 1 then "" else "s")
+             (P.Trim.tokens_label tokens)
+         in
+         ( notice
+             m
+             (match how with
+              | `Trim -> sprintf "trimmed %s: /trim undo brings them back" what
+              | `Untrim -> sprintf "%s back in the model's context" what)
+         , [] ))
+     | Trimmed_shown ->
+       decode json ~f:P.Trim.trimmed_of_json (fun messages ->
+         let transcript, found =
+           Transcript.show_trimmed m.transcript (Some messages)
+         in
+         if found
+         then { m with transcript }, []
+         else notice m "nothing is trimmed: /trim picks a point", [])
      | Reload_messages | Reload_messages_notice _ ->
        let m, commands = reset_session m in
        let m =

@@ -22,6 +22,7 @@ module Argument = struct
     | Budget
     | Goal
     | Resume
+    | Trim
     | Snippet
     | Remind
     | Worktree
@@ -151,6 +152,13 @@ let every =
       "compact"
       "[instructions]"
       "summarise older messages to free context"
+  ; c
+      ~argument:Argument.Trim
+      "trim"
+      "[undo|show|hide]"
+      "drop everything before one of your messages from the model's context: \
+       pick the message (newest first, with what it frees), confirm; undo \
+       brings the latest trim back, show/hide unfolds the trimmed messages"
   ; c
       ~argument:Argument.Path
       "diff"
