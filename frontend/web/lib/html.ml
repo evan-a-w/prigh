@@ -70,7 +70,6 @@ module Icon = struct
     | Brain
     | Folder
     | Branch
-    | Cpu
     | Logout
     | Undo
     | External
@@ -126,8 +125,6 @@ module Icon = struct
       {|<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>|}
     | Branch ->
       {|<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>|}
-    | Cpu ->
-      {|<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>|}
     | Logout ->
       {|<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>|}
     | Undo -> {|<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>|}
@@ -243,4 +240,15 @@ let caret (ev : Dom_html.event Js.t) =
               (Js.to_string i##.value)
               ~utf16:i##.selectionStart)
        | _ -> None)
+;;
+
+let rec inert (node : Node.t) : Node.t =
+  match node with
+  | Element e ->
+    Element
+      (Node.Element.map_attrs e ~f:(fun a ->
+         Attr.many [ a; Attr.create "inert" "" ]))
+  | Lazy { key; t } -> Lazy { key; t = lazy (inert (Lazy.force t)) }
+  | Fragment nodes -> Fragment (List.map nodes ~f:inert)
+  | (None | Text _ | Widget _) as node -> node
 ;;

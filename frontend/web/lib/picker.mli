@@ -42,6 +42,8 @@ val visible : t -> Item.t list
 
 val selected : t -> int
 val selected_item : t -> Item.t option
+
+(** Emptied, the highlight goes back to the marked item. *)
 val set_query : t -> string -> t
 
 (** Moves the highlight by [delta], clamped. *)

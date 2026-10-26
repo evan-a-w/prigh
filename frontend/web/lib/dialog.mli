@@ -42,6 +42,10 @@ type t =
       { kind : Picker_kind.t
       ; picker : Picker.t
       }
+  | Popover of
+      { chip : Chip.t
+      ; picker : Picker.t
+      } (** a composer chip's menu, over the chip *)
   | Help
   | Rename of string
   | Delete of Delete_target.t

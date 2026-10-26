@@ -1,7 +1,7 @@
 open! Core
 module H = Harness
 
-(* The settings page: opened from the top bar's gear, /settings or Ctrl+,;
+(* The settings page: opened from the sidebar's gear, /settings or Ctrl+,;
    Esc or Done closes it. Its controls run the commands that change them and
    leave it open. *)
 
@@ -9,7 +9,7 @@ let settings h = H.text h ~selector:".settings-dialog"
 
 let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   let h = H.create () in
-  H.click h ~selector:".topbar .settings-toggle";
+  H.click h ~selector:".sidebar-footer .settings-toggle";
   settings h;
   [%expect
     {|
@@ -77,11 +77,11 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     |}];
   (* It owns the keyboard: the page under it is inert. *)
   H.quiet h (fun () -> H.act h Open_settings);
-  H.elements h ~selector:".topbar[inert]";
+  H.elements h ~selector:".sidebar[inert]";
   H.elements h ~selector:".composer[inert]";
   [%expect
     {|
-    <header class="topbar">
+    <aside class="sidebar">
     <footer class="composer">
     |}]
 ;;

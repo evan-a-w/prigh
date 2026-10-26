@@ -139,13 +139,13 @@ let picker ~kind (p : Picker.t) ~inject =
                          ~f:Theme_view.sample)
                   | _ -> [])
                  @ [ span ~cls:"picker-label" item.label
-                 ; (if String.is_empty item.detail
-                    then Node.none
-                    else span ~cls:"picker-detail" item.detail)
-                 ; (if item.marked
-                    then Html.mark ~cls:"picker-check" Check
-                    else Node.none)
-                 ]
+                   ; (if String.is_empty item.detail
+                      then Node.none
+                      else span ~cls:"picker-detail" item.detail)
+                   ; (if item.marked
+                      then Html.mark ~cls:"picker-check" Check
+                      else Node.none)
+                   ]
                  @
                  match kind with
                  | Reminders ->
@@ -515,6 +515,7 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Picker { kind = Accounts; picker = p }) ->
     Account_view.menu m p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
+  | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some Help -> help ~inject
   | Some Settings -> Settings_view.view m ~inject
   | Some (Rename name) -> rename name ~inject
