@@ -5,8 +5,9 @@
 # e2e runs alongside.
 #
 #   ./test           the quick run, before pushing: the browser e2e in Chromium
-#   ./test --full    everything, before merging: the browser e2e in Chromium
-#                    and Firefox (what the flake's checks run)
+#   ./test --full    everything, before merging: every dune test run again,
+#                    even those dune has a result for, and the browser e2e in
+#                    Chromium and Firefox (what the flake's checks run)
 #
 # Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
 # comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
@@ -18,9 +19,13 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 engines=chromium
+force=()
 case "${1:-}" in
 "") ;;
---full) engines="chromium firefox" ;;
+--full)
+	engines="chromium firefox"
+	force=(--force)
+	;;
 *)
 	echo "usage: ./test [--full]" >&2
 	exit 2
@@ -74,8 +79,8 @@ web=$!
 # they run again every time.
 rm -rf "$root"/frontend/_build/default/tui/e2e/e2e.actual \
 	"$root"/frontend/_build/default/tui/tmux-test/.cram.*
-step "backend tests" dune build --root "$root/backend" @runtest
-step "frontend tests" dune build --root "$root/frontend" @runtest
+step "backend tests" dune build --root "$root/backend" @runtest "${force[@]}"
+step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
 
 if wait "$web"; then
 	echo "ok    web e2e: $engines ($(elapsed "$web_start"))"

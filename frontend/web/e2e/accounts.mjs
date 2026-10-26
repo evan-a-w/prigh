@@ -9,6 +9,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -164,10 +165,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  server.kill();
+  await end(() => server.kill(), () => browser.close());
 }

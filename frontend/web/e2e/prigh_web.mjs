@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -1463,10 +1464,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  await stopServer();
+  await end(() => stopServer(), () => browser.close());
 }

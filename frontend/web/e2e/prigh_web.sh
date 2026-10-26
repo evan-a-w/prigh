@@ -53,6 +53,10 @@ run_one() {
 	TEST_DIR="$tmp/$engine/$script" timeout -k 10 "${SCRIPT_TIMEOUT:-300}" \
 		node "$here/$file.mjs" "$engine" $part \
 		>"$tmp/$engine-$script.out" 2>"$tmp/$engine-$script.err" || status=$?
+	# The terminal panel's tmux server outlives a backend that was killed.
+	find "$tmp/$engine/$script" -type s -path '*/tmux-*/*' 2>/dev/null | while read -r socket; do
+		"${PRIGH_TMUX:-tmux}" -S "$socket" kill-server 2>/dev/null || true
+	done
 	if [ -n "${TIMES:-}" ]; then
 		printf '%-9s %-11s %6.1fs\n' "$engine" "$script" "$(awk "BEGIN { print $EPOCHREALTIME - $start }")" >&2
 	fi
@@ -77,6 +81,8 @@ for engine in $engines; do
 			echo "--- $engine $script failed (status $(cat "$tmp/$engine-$script.status")); its output and stderr:" >&2
 			tail -20 "$tmp/$engine-$script.out" >&2
 			cat "$tmp/$engine-$script.err" >&2
+		else
+			sed -n "s|^e2e: |$engine $script: |p" "$tmp/$engine-$script.err" >&2
 		fi
 	done
 	if [ "${UPDATE:-}" = 1 ] && [ -n "$ok" ]; then
