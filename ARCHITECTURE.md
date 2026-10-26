@@ -1501,6 +1501,21 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   absolute). Without the backend host,
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
+- `Nix_store_rpc` (`nix/`) — `nix_store_status` and `nix_store_gc`, for
+  superusers only (the signed-in user, not whom they act as). To
+  everyone else, and on a backend without users, they do not exist:
+  `dispatch` passes, so they get the same "unknown method" as any other
+  name, and progress goes only to the superuser who asked. `Nix_store` runs one collection at a time for the whole backend
+  (in a fiber of its own, so a dropped connection does not stop it) and
+  reports progress to the caller as `nix_gc_progress` events, at most every
+  250 ms while only paths are being deleted (`Nix_gc_output` classifies
+  Nix's lines and tallies them). It reaches the store through
+  `Nix_store_ops.t`, a record of functions faked in tests: `local` runs
+  `nix store gc` or `nix-collect-garbage` as the backend's user; `helper`
+  writes `gc ID GENERATIONS BY` to the container's root helper's FIFO
+  (`-nix-gc-helper`, DOCKER.md "Garbage collection") and follows its log
+  and result files, also reading the helper's `last-gc`, `running` (a
+  scheduled collection) and `schedule`.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
@@ -2282,8 +2297,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
       gear beside the account, the account menu, `/settings` or Ctrl+,:
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
-      providers, the account; its controls are `Action.Run` commands, which
-      leave it open),
+      providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
+      fetched as it opens, our collection's progress, also a chip in the
+      status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
+      words it for both frontends, and `Slash`/`Commands.all ~superuser`
+      leave it out for everyone else: no completion, `/help` or "did you
+      mean"), the account; its controls are
+      `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column; a repeat is counted rather than stacked, a notice's lifetime
       grows with its length, errors stay until dismissed, long paths are
@@ -2799,7 +2819,10 @@ closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
 with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
-back, and signs bob out, leaving alice on the sign-in page. Then
+back, and signs bob out, leaving alice on the sign-in page. Alice's
+Settings show the Nix store (stand-in `nix` and `df`) and collect it;
+bob sees no Nix store section, no `/nix-gc` completion, and `/nix-gc` is
+an unknown command. Then
 `reconnect.mjs`, at phone size: a long session scrolled halfway up with a
 draft and a pasted image; `context.setOffline` and back, then the backend
 killed and restarted: each time the same session, the same scroll

@@ -30,9 +30,11 @@ let rank ~prefix items =
     i.search)
 ;;
 
-let command_items ~prefix =
-  Prigh_ui.Fuzzy.rank ~query:prefix Slash.all ~key:(fun (s : Slash.Spec.t) ->
-    s.name)
+let command_items ~superuser ~prefix =
+  Prigh_ui.Fuzzy.rank
+    ~query:prefix
+    (Slash.all ~superuser)
+    ~key:(fun (s : Slash.Spec.t) -> s.name)
   |> List.map ~f:(fun (s : Slash.Spec.t) ->
     Picker.Item.create
       ~id:s.name
@@ -264,6 +266,7 @@ let compute
       ?(forges = [])
       ?(worktrees = [])
       ?(branches = [])
+      ~superuser
       ~text
       ~cursor
       ~models
@@ -294,11 +297,11 @@ let compute
     | Some body when in_first_line && not (String.mem body '\n') ->
       (match String.lsplit2 body ~on:' ' with
        | None when cursor >= 1 ->
-         (match command_items ~prefix:body with
+         (match command_items ~superuser ~prefix:body with
           | [] -> None
           | items -> Some (make Command ~prefix:body ~start:1 items))
        | Some (name, rest) when cursor > String.length name ->
-         (match Slash.find name with
+         (match Slash.find ~superuser name with
           | Some { argument = Some kind; _ } ->
             let prefix = String.strip rest in
             let start =

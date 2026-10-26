@@ -35,6 +35,7 @@ val compute
        (** the repository's, for [/worktree] and [/review] *)
   -> ?branches:string list
        (** the reviewed repository's, for [/review --base] *)
+  -> superuser:bool (** offers the commands only superusers have *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list
