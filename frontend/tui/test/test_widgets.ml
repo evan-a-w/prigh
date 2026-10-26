@@ -594,6 +594,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     PageDown         Page_down
     Ctrl+Up          Prev_user_message
     Ctrl+Down        Next_user_message
+    Ctrl+End         Jump_to_bottom
     Backspace        Backspace
     Ctrl+H           Backspace
     Delete           Delete
@@ -650,12 +651,13 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+B / Ctrl+Left       move the cursor back one word
     Alt+F / Ctrl+Right      move the cursor forward one word
     Alt+D                   delete the next word
-    Home / Ctrl+A           start of line
-    End / Ctrl+E            end of line
+    Home / Ctrl+A           start of line (on an empty prompt: the transcript's top)
+    End / Ctrl+E            end of line (on an empty prompt: back to the bottom)
     PageUp                  scroll the transcript / list up a page
     PageDown                scroll the transcript / list down a page
     Ctrl+Up                 jump to the previous user message
     Ctrl+Down               jump to the next user message
+    Ctrl+End                back to the bottom of the transcript, following new output
     Backspace / Ctrl+H      delete the character before the cursor
     Delete                  delete the character under the cursor
     Ctrl+K                  delete to the end of the line

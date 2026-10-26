@@ -1008,11 +1008,6 @@ let status (m : App.Model.t) : Content.Line.t =
          else [])
       @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
       @ Option.to_list (Option.map (jobs_part m) ~f:(fun p -> 3, p))
-      @ (match m.viewport with
-         | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
-           [ 1, [ span ~style:attention (sprintf "↓ %d new" new_lines) ] ]
-         | Viewport.Anchored _ -> [ 1, [ span ~style:attention "↑ scrolled" ] ]
-         | Viewport.Follow -> [])
       @ Option.to_list (Option.map (mode_hint m) ~f:(fun p -> 0, p))
     in
     let hint_index =
@@ -1683,7 +1678,29 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false
 ;;
 
-let screen (m : App.Model.t) : Screen.t =
+(* While scrolled back (not by a search, which shows where it is): what
+   arrived below, and the key that goes there. *)
+let jump_indicator (m : App.Model.t) =
+  match m.mode, m.viewport with
+  | Search _, _ | _, Viewport.Follow -> None
+  | _, Viewport.Anchored { new_lines; new_items; _ } ->
+    let what, style =
+      if new_items > 0
+      then sprintf "↓ %d new" new_items, attention
+      else if new_lines > 0
+      then "↓ new output", attention
+      else "↓ bottom", gray
+    in
+    let key =
+      match m.mode with
+      | Editing when Editor.is_empty m.editor -> "End"
+      | _ -> "Ctrl+End"
+    in
+    Some [ span " "; span ~style what; span ~style:gray (" · " ^ key) ]
+;;
+
+(* The screen, and where the jump indicator is: its row and columns. *)
+let frame (m : App.Model.t) =
   let editor_all, (cursor_row, cursor_col) = composer m in
   let layout =
     Layout.compute
@@ -1761,6 +1778,23 @@ let screen (m : App.Model.t) : Screen.t =
   in
   let transcript = Option.to_list agent_header @ padding @ transcript in
   let transcript = exactly rows transcript in
+  (* On the transcript's last row above the overlays, at its right edge. *)
+  let jump =
+    Option.bind (jump_indicator m) ~f:(fun badge ->
+      let row = overlay_top - 1 in
+      let badge_width = Content.Line.width badge in
+      let first = if Option.is_some agent_header then 1 else 0 in
+      Option.some_if
+        (row >= first && row < rows && badge_width <= area)
+        (row, badge, area - badge_width))
+  in
+  let transcript =
+    match jump with
+    | None -> transcript
+    | Some (row, badge, col) ->
+      List.mapi transcript ~f:(fun i line ->
+        if i = row then pad line ~width:col @ badge else line)
+  in
   let main =
     List.take transcript overlay_top
     @ List.map overlay_lines ~f:(Content.Line.truncate ~width:area)
@@ -1800,9 +1834,20 @@ let screen (m : App.Model.t) : Screen.t =
     | None -> layout.rule_row + 1 + (cursor_row - editor_start), cursor_col
   in
   let row, col = cursor in
-  { lines
-  ; cursor = Some (Int.min row (layout.height - 1), Int.min col (width - 1))
-  ; width
-  ; height = layout.height
-  }
+  ( { Screen.lines
+    ; cursor = Some (Int.min row (layout.height - 1), Int.min col (width - 1))
+    ; width
+    ; height = layout.height
+    }
+  , Option.map jump ~f:(fun (row, _, col) ->
+      row, layout.sidebar + col, layout.sidebar + area) )
+;;
+
+let screen m = fst (frame m)
+
+let click m ~row ~col : Intent.t option =
+  match snd (frame m) with
+  | Some (r, first, last) when row = r && col >= first && col < last ->
+    Some Jump_to_bottom
+  | _ -> None
 ;;

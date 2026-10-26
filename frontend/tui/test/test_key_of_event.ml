@@ -188,6 +188,7 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     PageDown         (Key_press (key (Page Down)))    ok
     Ctrl+Up          (Key_press (key (Arrow Up)) (mods (Ctrl))) ok
     Ctrl+Down        (Key_press (key (Arrow Down)) (mods (Ctrl))) ok
+    Ctrl+End         (Key_press (key End) (mods (Ctrl))) ok
     Backspace        (Key_press (key Backspace))      ok
     Ctrl+H           (Key_press (key (ASCII h)) (mods (Ctrl))) ok
     Delete           (Key_press (key Delete))         ok
