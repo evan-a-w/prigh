@@ -286,6 +286,9 @@ let view (m : Model.t) ~inject ~terminal =
          -> layered Fn.id
        | _ -> under_drawer)
         (Review_page_view.view m ~inject)
+    ; (if m.review.open_
+       then Resize_view.handle m ~inject Review_chat
+       else Node.none)
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         (List.map

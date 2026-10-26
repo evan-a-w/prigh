@@ -155,7 +155,14 @@ type t =
   ; picked : (int * Review_since.File.t option) String.Map.t
     (** an older action chosen to compare with, by file: its index in
         {!Review.history} and, once in, what changed since *)
-  ; views : Layout.t String.Map.t (** the layout chosen for a file *)
+  ; views : Layout.t String.Map.t
+    (** the layout chosen for a file; commenting on it, replying or deciding
+        a proposal chooses [Since] its latest action (dropping the one
+        [picked]) *)
+  ; unfolded : String.Set.t
+    (** what the code view shows unfolded: resolved threads (by id), a
+        file's outdated comments (["outdated:PATH"]) and those on lines not
+        shown (["hidden:PATH"]) *)
   }
 [@@deriving sexp_of]
 
@@ -168,6 +175,7 @@ module Reply : sig
     | Review
     | Comment_added
     | Changed of string option (** a comment's id *)
+    | Replied of string (** to the comment *)
     | Decided of string (** a proposal of the comment's: the file changed *)
     | Content of string (** a path *)
     | Shown of string (** a path, as a branch not checked out has it *)
@@ -219,6 +227,10 @@ module Action : sig
         { path : string
         ; index : int (** in {!Review.history} *)
         } (** the since-view, against that action *)
+    | Follow_latest of string
+    (** the since-view of that file, against its latest action, whichever
+        it is as the user acts *)
+    | Unfold of string (** or fold again: see [unfolded] *)
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -311,6 +323,11 @@ val history : t -> string -> Review.Snapshot.t list
 (** What changed in [path] since the action the since-view compares with
     (the last, or the one picked), once read. *)
 val since : t -> string -> Review_since.File.t option
+
+(** The diff the since-view of [path] shows: [None] unless it shows [Since]
+    and something changed (until then it shows the changes, as the page's
+    layout does). *)
+val since_diff : t -> string -> string option
 
 (** Whether [path] changed after the last action on it. *)
 val changed_since : t -> string -> bool

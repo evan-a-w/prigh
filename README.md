@@ -529,9 +529,13 @@ Docker container, or a laptop connected as a tool host), in the session's
 directory. The breadcrumbs (or the pencil, to type a path: absolute, `~/…`
 or relative to the directory shown), the up arrow and Backspace move
 around; the eye shows dot files; the columns sort by name, size or age
-(directories first). A file clicked (or reached with ↑↓) is previewed:
-text with line numbers (the first 256 KB), images (up to 20 MB), binaries
-only named. The selected entry's actions: Attach (to your next message),
+(directories first). A file clicked (or reached with ↑↓) is previewed
+in a pane of its own left of the list, between it and the chat: text
+with line numbers (the first 256 KB), images (up to 20 MB), binaries
+only named. Its close button (or Esc) leaves the list alone again. On a
+phone, with the drawer floating over a narrow window, or without room for
+both beside the chat, the preview takes the list's place, with a back
+arrow to it. The selected entry's actions: Attach (to your next message),
 Download (a directory as a `.tar.gz` archive: `tar -czf` of it, paths
 starting with its name), Mention (`@path` into the composer), Copy path,
 Rename (F2) and Delete (Delete; it asks first, and refuses `/` and the
@@ -591,16 +595,18 @@ worked. Errors are the backend's, saying what to do (`/login github`, `git
 remote add`…).
 
 Every panel resizes from a handle on its inner edge: the sessions
-sidebar's right edge, the file browser's and the agents panel's left
-edge, the terminal's top edge, and the line between the file list and
-its preview. The handle shows as a faint line under the pointer and turns
+sidebar's right edge; the left edges of the file browser's list, of its
+preview and of the agents panel; the terminal's top edge; on the review
+page, the edge between it and the chat beside it and the right edge of
+its list of changed files. The handle shows as a faint line under the pointer and turns
 sodium while it is dragged or focused; double-click it (or press Enter on
 it) for the default size. It is a focusable separator: Tab to it, then
 the arrow keys move it (Shift: four times as far), Home and End make the
-panel as small or as large as it goes. The chat always keeps 400px: when
-the window narrows, the side panels beside it shrink in proportion (down
-to their minimums) and grow back to the sizes you chose when it widens
-again. The sizes are kept with your preferences on the backend (below), so
+panel as small or as large as it goes. The chat always keeps 400px (while
+reviewing, the review page keeps 480px beside the chat, and its code
+320px beside its file list): when the window narrows, the side panels
+beside it shrink in proportion (down to their minimums) and grow back to
+the sizes you chose when it widens again. The sizes are kept with your preferences on the backend (below), so
 every browser you sign in on has them. On a phone the panels are sheets,
 without handles.
 
@@ -773,7 +779,8 @@ across the reconnect: their results wait for the backend to be back.
 
 `/review` (or Alt+R, or the Review button of the file browser and of
 `/diff`) opens the review page in the chat's place; the chat narrows to a
-column beside it and keeps working. Down its left are the changed files,
+column beside it and keeps working (drag the edge between them to share
+the width differently). Down its left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
 its hunks or, with Whole file (v), all of it with the changes inline, one
@@ -787,9 +794,13 @@ Select the code you want changed, as you would to copy it (drag across
 it, within a line or over several; on a phone, press and hold), here or in
 the file browser's preview of a changed file: a Comment button floats by
 the selection. Press it (or `c`), write what should change and Enter adds
-it (Shift+Enter for a new line, Esc drops it), under the code with the
-selected text quoted; that text stays marked while the comment is there,
-and pointing at either the comment or its code lights the other. Removed
+it (Shift+Enter for a new line, Esc drops it), with the selected text
+quoted. On a window wide enough, comments sit in a margin beside the code,
+each level with its first line (or just below the one above it), so the
+code never moves for them; drag the margin's edge to widen it. Narrower,
+and on a phone, they show under their lines. The selected text stays
+marked while the comment is there, and pointing at either the comment or
+its code lights the other. Removed
 lines can be commented on too: the comment says it is on the old text.
 (A line's number selects the whole line, Shift+click to another.)
 Comments collect until you send them (Send, or `s`): the agent then gets
@@ -800,10 +811,13 @@ Its replies show threaded under the comment; a reply may propose a change
 (exact replacements, like `edit`'s), which Accept applies to the file
 where the tools run and Reject declines, and the agent hears of either
 with the next comments you send. Reply in a thread to go on with it,
-Resolve it when it is done, or delete it. A comment keeps its code's
+Resolve it when it is done, which folds it to a small mark on its line
+(click it to unfold the thread), or delete it. A comment keeps its code's
 text, so when the file changes around it it moves with it (and, when
-only the rest of its lines changed, with the selected text); one whose
-code is gone shows above the file, marked so.
+only the rest of its lines changed, with the selected text); those whose
+code is gone are counted in one folded line above the file ("2 outdated
+comments", click to list them), as are those on lines the view does not
+show.
 
 Edit (e) switches to the file's text: edit it in place (highlighted) and
 Save (Ctrl+S) writes it on the tool host; a file that changed since you
@@ -817,14 +831,20 @@ and the comments with their threads.
 Each thing you do to a file in the review (approve or unapprove it,
 comment, reply, accept or reject a proposal, save it in Edit) records the
 file as it was then, so you can see just what changed in it afterwards:
-next to Changes and Whole file, "Since you approved · 14:32" (`l`) shows
-the file then against the file now, in the same view (select its current
-lines to comment on them). A file that changed after your last action
-opens in that view, and the file list says by how much (`+3 −1 since
-approved`); with several actions on a file, a menu next to it compares
-with an earlier one, and a file that has not changed says "Nothing
-changed since …". The file browser's preview of a changed file has the
-same view, and the TUI's `/review` says `changed since approved (+3 −1)`.
+next to Changes and Whole file, "Since latest (comment · 14:32)" (`l`)
+shows the file then against the file now, in the same view (select its
+current lines to comment on them). A file that changed after your last
+action opens in that view, and so does one you have just commented on,
+replied about or decided a proposal of: until something changes it shows
+the changes under "Nothing changed since your comment on line 6 · 14:32",
+then what changed since. The file list says by how much (`+3 −1 since
+approved`). Latest follows your newest action on the file as you act; the
+chevron beside it (or Shift+L) opens a menu (filtered as you type) of the
+earlier ones, named by what you did where ("Comment on line 6 · 20:59",
+"Approved · 20:41", "Edited · 20:30"), to compare with one of them
+instead, and Latest to follow again. The file browser's preview of a
+changed file has the same view, and the TUI's `/review` says `changed
+since approved (+3 −1)`.
 The texts are kept with the session's review, each distinct content once,
 read where the tools run (so remote tool hosts too); files over 1 MiB,
 binary files, and new contents once a session keeps 32 MiB of them record
@@ -877,7 +897,8 @@ directly").
 
 #### Committing, pushing and pull requests from the review
 
-Under the page's head, the git bar shows the reviewed worktree's branch, how
+At the page's foot, away from Send comments, the git bar shows the reviewed
+worktree's branch, how
 it stands with its upstream (`↑2 ↓0 origin/feat-x`, or "not pushed yet")
 and how many files are staged, unstaged and untracked. Each file with
 uncommitted changes has a box in the file list: approved files come ticked
@@ -896,6 +917,7 @@ changes again. Push pushes the branch to its upstream, setting one (on
 `origin`, else the only remote) when it has none, with the tool host's own
 git credentials: prigh never asks for a password. Create PR opens the
 pull-request dialog for that worktree's branch (see [Git hosting](#git-hosting)).
+Stage approved, Push and Create PR are at the bar's end.
 A branch reviewed without checking it out has no git bar, boxes or commit
 box: check it out into a worktree to commit there.
 Refusals say what to do: nothing ticked, an empty message, a detached HEAD

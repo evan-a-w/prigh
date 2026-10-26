@@ -712,17 +712,24 @@ notes.txt
 17 B
 todo.md
 18 B
+=== firefox: files: a preview on a phone ===
+the list: hidden; todo.md
+18 B
+<TIME>
+back: the list shown, the preview closed
 === firefox: resize: a highlighted preview ===
 hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+left to right: chat to 619, the preview from 619, the list from 974
 === firefox: resize: the file browser's edge ===
-handles: sidebar 280, files 400, files-split 45
+handles: sidebar 280, files 400
 while dragging: resizing-x; no text selected: true
 dragged 160px left: 400 -> 560 (aria 560), kept 560
 as wide as it goes: 600, the chat keeps 400
 double-clicked: 400, kept null
 arrow keys: 480
-=== firefox: resize: the list over the preview ===
-dragged down: the list taller, over 45%: true
+=== firefox: resize: the preview's edge ===
+dragged 100px left: the preview 480 -> 580 (aria 580), the list 480, the chat 460
+at 1150px: the list hidden, the preview 472 with files
 === firefox: resize: the sidebar's edge ===
 dragged 80px right: 280 -> 360
 === firefox: resize: kept after a reload ===
@@ -1301,7 +1308,8 @@ Comment
 Edit
 Changes
 Whole file
-Since you commented · <TIME>
+Since latest
+(comment · <TIME>)
 Send 1 comment
 === firefox: review: page: the files ===
 src/
@@ -1318,10 +1326,15 @@ Generate
 Amend
 Commit
 chat still shown: true
+=== firefox: review: page: resized ===
+the chat 400 -> 520 (aria 520), the files 260 -> 320 (aria 320), the page keeps 640
+the chat as wide as it goes: the page keeps 480
+double-clicked: the chat 400, the files 260
 file browser hidden: true
 === firefox: review: page: a second comment, not sent yet ===
 src/util.mlnew
 Approve
+Nothing changed since your comment on line 3 · <TIME>· the changes as they are, below
 @@ -0,0 +1,3 @@
 1	+	let id x = x
 2	+
@@ -1348,6 +1361,7 @@ threads: 2
 === firefox: review: page: comments on selections ===
 src/main.ml
 Approve
+Nothing changed since your comment on old line 12 · <TIME>· the changes as they are, below
 @@ -9,7 +9,8 @@ let v8 = 8
 9		let v9 = 9
 10		let v10 = 10
@@ -1396,7 +1410,8 @@ Comment
 Edit
 Changes
 Whole file
-Since you approved · <TIME>
+Since latest
+(approval · <TIME>)
 Send 4 comments
 === firefox: review: page: the files after the agent's edit ===
 README.md
@@ -1418,6 +1433,7 @@ Commit 1 file
 === firefox: review: page: the agent's reply ===
 src/main.ml
 Approved
+Nothing changed since your approval · <TIME>· the changes as they are, below
 @@ -9,7 +9,8 @@ let v8 = 8
 9		let v9 = 9
 10		let v10 = 10
@@ -1472,6 +1488,7 @@ Replied to both comments and updated the README.
 === firefox: review: page: a proposed change ===
 src/util.mlnew
 Approve
+Nothing changed since your comment on line 3 · <TIME>· the changes as they are, below
 @@ -0,0 +1,3 @@
 1	+	let id x = x
 2	+
@@ -1493,6 +1510,7 @@ Reject
 === firefox: review: page: accepted, the file changed ===
 src/util.mlnew
 Approve
+Nothing changed since you accepted the change on line 3 · <TIME>· the changes as they are, below
 @@ -0,0 +1,3 @@
 1	+	let id x = x
 2	+
@@ -1585,12 +1603,13 @@ Amend
 Commit
 === firefox: review: since: the view shown ===
 Comment
-Since you approved · <TIME>
+Since latest
+(approval · <TIME>)
 === firefox: review: since: what changed since approved ===
 src/util.mlnew
 Changed since you approved it
 Approve again
-Since you approved · <TIME>: +1 −0
+Since your approval · <TIME>: +1 −0
 @@ -1,3 +1,4 @@
 1		let id x = x
 2	+	let const x _ = x
@@ -1614,14 +1633,18 @@ You
 not sent yet
 Accepted your proposed change: it is applied.
 === firefox: review: since: the earlier actions ===
-you approved · <TIME>
-you accepted · <TIME>
-you commented · <TIME>
+Latest
+follows your newest action: Approved · <TIME>
+Accepted change on line 3 · <TIME>
+Comment on line 3 · <TIME>
+=== firefox: review: since: the switch, an earlier action picked ===
+Since
+comment on line 3 · <TIME>
 === firefox: review: since: since the comment ===
 src/util.mlnew
 Changed since you approved it
 Approve again
-Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+Since your comment on line 3 · <TIME>: +2 −1(removed lines are the file as it was then)
 @@ -1,3 +1,4 @@
 1		let id x = x
 2	+	let const x _ = x
@@ -1645,13 +1668,16 @@ You
 <TIME>
 not sent yet
 Accepted your proposed change: it is applied.
+=== firefox: review: since: Latest follows the new comment ===
+Since latest
+(comment · <TIME>)
 === firefox: review: since: a comment in the since-view ===
 src/util.mlnew
 Changed since you approved it
 Approve again
-Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
-@@ -1,3 +1,4 @@
-1		let id x = x
+Nothing changed since your comment on line 2 · <TIME>· the changes as they are, below
+@@ -0,0 +1,4 @@
+1	+	let id x = x
 2	+	let const x _ = x
 c5
 line 2
@@ -1661,9 +1687,37 @@ You
 <TIME>
 not sent yet
 Is const used?
-3
-3	-	let twice f x = f (f x)
+3	+
 4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+=== firefox: review: since: what changed since the comment ===
+src/util.mlnew
+Changed since you approved it
+Approve again
+Since your comment on line 2 · <TIME>: +1 −1(removed lines are the file as it was then)
+1 outdated comment
+@@ -1,4 +1,4 @@
+1		let id x = x
+2	-	let const x _ = x
+2	+	let always x _ = x
+3
+4		let apply_twice f x = f (f x)
 c2
 line 4
 Resolve
@@ -1688,7 +1742,21 @@ Changes
 src/main.ml
 Changed since you approved it
 Approve again
-Nothing changed since you edited · <TIME>.
+Nothing changed since your edit · <TIME>· the changes as they are, below
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
 c1
 line 12
 Resolve
@@ -1699,6 +1767,7 @@ Why double it here?
 prigh
 <TIME>
 Doubling is intended: v12 feeds the scale.
+13	+	let doubled = true
 c3
 lines 12–13
 Resolve
@@ -1707,20 +1776,52 @@ let doubled
 You
 <TIME>
 One line for both?
-c4
-old line 12
-old text
-its code changed
-Resolve
-v12
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+@@ -28,3 +29,5 @@ let v27 = 27
+29		let v28 = 28
+30		let v29 = 29
+31		let v30 = 30
+32	+	let late = 0
+33	+	let edited = 1
+=== firefox: review: margin: threads beside their lines ===
+c4 open old 12: at its line
+c1 open new 12: below its line
+c3 open new 12: below its line
+lines 12 and 13 adjacent: true
+=== firefox: review: margin: c1 resolved, folded to its line ===
+c4 open old 12: at its line
+c1 folded new 12: below its line
+c3 open new 12: below its line
+c1
+Why double it here?
+2
+=== firefox: review: margin: c1 unfolded ===
+c1
+line 12
+resolved
+Reopen
+12 * 2
 You
 <TIME>
-Was v12 used elsewhere?
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+=== firefox: review: margin: dragged wider ===
+wider by: 60
+=== firefox: review: git: the actions at the page's foot ===
+git bar under the code: true
+git bar at the foot: true
+Send comments in the head: true
+git buttons in the head: 0
 === firefox: review: since: the file browser ===
 Changes
 Whole file
-Since you commented · <TIME>
-Since you commented · <TIME>: +2 −1(removed lines are the file as it was then)
+Since latest
+(comment · <TIME>)
+Since your comment on line 2 · <TIME>: +1 −1(removed lines are the file as it was then)
 === firefox: review: compare: the base picker, filtered ===
 b
 origin/main

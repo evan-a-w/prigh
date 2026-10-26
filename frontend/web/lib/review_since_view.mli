@@ -2,30 +2,22 @@ open! Core
 open! Import
 
 (** The review's since-view controls, shared by the review page and the file
-    browser's preview: the "Since you approved · 14:32" segment next to
-    Changes / Whole file, the menu of a file's older actions, and the note
-    over the since-view (nothing changed, not comparable, still reading). *)
+    browser's preview: the since segment ending the Changes / Whole file
+    switch ("Since latest (comment · 20:59)", or the earlier action picked)
+    with the menu of the file's actions under its chevron (Latest, which
+    follows the newest action, then the earlier ones: {!Review_action}),
+    and the note over the since-view (nothing changed, not comparable,
+    still reading). *)
 
-(** ["you approved · 14:32"]: who acted (you, or another user), the action,
-    when (in the browser's time zone). *)
-val action_label : App.Model.t -> Review.Snapshot.t -> string
-
-(** The segment showing [path] as what changed since its last action (or
-    the one picked): [(text, title, on, action)] as the segmented controls
-    take them; [None] for a file with no actions. *)
+(** For a file with actions: the since segment and its menu's button, to
+    end a [.segmented] group; [place] tells the page's (with the menu,
+    [Review_pick (Since path)], open under it) from the file browser's. *)
 val segment
   :  App.Model.t
   -> string
+  -> place:[ `Page | `Files ]
   -> inject:(App.Action.t -> unit Effect.t)
-  -> (string * string * bool * unit Effect.t) option
-
-(** While [path] shows its since-view and has older actions: a menu to
-    compare with one of them. *)
-val menu
-  :  App.Model.t
-  -> string
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t
+  -> Node.t option
 
 (** Over the since-view of [path]: what it compares with and what came of
     it. *)
