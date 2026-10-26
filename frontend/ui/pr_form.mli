@@ -58,3 +58,36 @@ val submit : t -> [ `Wait of t | `Create of t * P.Request.Method.t ]
 
 (** The backend refused: shown, the form editable again. *)
 val failed : t -> error:string -> t
+
+(** Ctrl+G: has the model draft the title ([title], default true) and the
+    body from the branch's changes against the base: the [generate_text]
+    request, streamed into the fields, which wait (as does Enter) until it
+    ends; [None] while creating or already drafting. *)
+val generate
+  :  ?title:bool
+  -> t
+  -> gen_id:string
+  -> (t * P.Request.Method.t) option
+
+(** The draft under way's [gen_id]. *)
+val generating : t -> string option
+
+(** A [generate_delta] of the draft under way: the fields show the text so
+    far, its first line the title. *)
+val generated_delta : t -> gen_id:string -> string -> t
+
+(** The whole draft replaces the streamed one. *)
+val generated : t -> P.Generated.t -> t
+
+(** The fields go back to what they were, with the error. *)
+val generation_failed : t -> gen_id:string -> error:string -> t
+
+(** Esc while drafting: what came so far stays. *)
+val stop : t -> t
+
+(** Whether {!undo} has a title and body to bring back. *)
+val can_undo : t -> bool
+
+(** Ctrl+_: the title and body from before the last draft (again: the
+    draft). *)
+val undo : t -> t
