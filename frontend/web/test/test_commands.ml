@@ -102,6 +102,7 @@ let%expect_test "every command does something (none is unknown)" =
     /clone                     rpc clone
     /fork                      loading Fork from: rpc push_pref, rpc get_entries
     /rewind                    loading Rewind to: rpc push_pref, rpc get_entries
+    /trim                      loading Trim the context: rpc push_pref, rpc get_trim_points
     /tree                      loading Session tree: rpc push_pref, rpc get_entries
     /cd                        path prompt
     /mkdir                     path prompt
@@ -187,6 +188,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
+    Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it

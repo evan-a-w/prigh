@@ -42,6 +42,7 @@ let act t action =
      | Files _
      | Keep_scroll_position
      | Scroll_to_entry _
+     | Scroll_to_trimmed
      | Probe_connection
      | Drop_connection
      | Reload_page _

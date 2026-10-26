@@ -1193,6 +1193,8 @@ try {
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();
   await page.waitForTimeout(200); // the drawer's slide
+  // The Review button comes with the diff's reply, after the listing.
+  await page.locator(".files-head .review-open").waitFor();
   section("files: the session's directory");
   console.log(clean(await page.locator(".files-head").innerText()));
   console.log(clean(await page.locator(".files-crumb.current").innerText()));

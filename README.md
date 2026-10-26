@@ -365,6 +365,17 @@ is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 
+To shrink the context without summarising it, rest the pointer on one of
+your messages and choose ✂ Trim everything before this (or press Delete on
+it in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
+messages and tokens it frees (Enter trims, Esc cancels). The transcript then
+starts at one divider, `✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
+Show unfolds the trimmed messages above it, dimmed and read-only (they are
+not in the model's context), and Undo (or `/trim undo`) brings them back.
+The rail draws what is trimmed as one dashed cut at its top, and the jump
+list ends with a "Trimmed: 142 messages" row; both go to the divider. See
+[Trimming the context](#trimming-the-context).
+
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
 top of the chat, and once back the session's new messages are merged into
@@ -759,7 +770,7 @@ radio buttons or checkboxes with an "Other" field (keys as in the TUI, or
 clicks). Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
-lists them; `/help` and
+lists them (Delete there trims the context before one); `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
@@ -1170,7 +1181,7 @@ that no longer exists.
 | Ctrl+End / click on `↓ … · End` | back to the bottom of the transcript, following new output again |
 | PageUp / PageDown | scroll the transcript / list a page |
 | mouse wheel | scroll the transcript (selecting text needs Shift) |
-| Ctrl+Up / Ctrl+Down | jump to the previous/next user message |
+| Ctrl+Up / Ctrl+Down | jump to the previous/next user message (or the trimmed divider) |
 | Backspace / Ctrl+H | delete the character before the cursor |
 | Delete | delete the character under the cursor |
 | Ctrl+K / Ctrl+U | delete to the end / start of the line |
@@ -1548,6 +1559,25 @@ turn boundary, so tool calls keep their results, and when it falls in the
 middle of the work on your latest message, that message is kept verbatim
 ahead of the summary. Subagents compact their own context the same way.
 
+#### Trimming the context
+
+`/trim` drops everything before one of your messages from the model's
+context, without a summary: pick the message (newest first, each with its
+time and the messages and tokens trimming there frees), confirm, and the
+next request starts at it. The session file keeps everything: the
+transcript folds the trimmed part into one divider (`──── 142 messages
+trimmed · ~38k tokens ────`; `/trim show` unfolds it read-only in the TUI,
+Show in prigh-web), and `/trim undo` brings back what the latest trim took
+out (trims stack: each undo cancels one). The context use in the status line
+goes down by the estimate at once. The cut is always at one of your
+messages, so a tool call never loses its result, and it is refused while a
+run is in progress (wait for it to end or abort it with Esc). It works with
+compaction both ways: a `/compact` after a trim summarises only what is
+after it, and a trim after a compaction can cut into what the compaction
+kept, dropping the summary too. A fork or clone keeps the trim, and so does
+`/rewind` while the trimmed-to message stays on the path (rewinding to
+before it drops the trim).
+
 `/budget DOLLARS` sets a cost budget for the session (`/budget off` removes
 it, `/budget` shows it): once the session has cost that much — subagents and
 compactions included, counted as they happen — no further turn starts, the
@@ -1638,6 +1668,7 @@ it.
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
+| `/trim [undo\|show\|hide]` | drop everything before one of your messages from the model's context (a picker, then a confirmation); `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |

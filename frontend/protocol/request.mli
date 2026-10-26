@@ -33,6 +33,12 @@ module Method : sig
         } (** see {!Message_page} *)
     | Get_outline of { session : string (** a path or id *) }
     (** see {!Outline} *)
+    | Get_trim_points (** the client's session's: {!Trim.Point.list_of_json} *)
+    | Get_trimmed
+    (** what is trimmed from the client's session: {!Trim.trimmed_of_json} *)
+    | Trim of { before : string (** {!Trim.Point.before} *) }
+    (** drops what comes before it from the model's context: {!Trim.Freed} *)
+    | Untrim (** cancels the latest trim: {!Trim.Freed} *)
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option (** in this subagent's transcript *)

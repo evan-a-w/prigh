@@ -8,6 +8,7 @@ let what (p : Jump.Point.t) ~n =
   | User -> sprintf "Your message %d" n
   | Compaction -> "Context compacted"
   | Error -> "The model returned an error"
+  | Trimmed -> "Not in the model's context"
 ;;
 
 let tick ~inject times ~n (p : Jump.Point.t) =
@@ -15,7 +16,7 @@ let tick ~inject times ~n (p : Jump.Point.t) =
   let text =
     match p.kind, p.text with
     | User, "" -> "(an image)"
-    | (User | Error | Compaction), text -> text
+    | (User | Error | Compaction | Trimmed), text -> text
   in
   let label =
     String.concat
@@ -31,26 +32,27 @@ let tick ~inject times ~n (p : Jump.Point.t) =
           ; (match p.kind with
              | User -> "user"
              | Compaction -> "compaction"
-             | Error -> "error")
+             | Error -> "error"
+             | Trimmed -> "trimmed")
           ]
           [ ( "unloaded"
             , match p.target with
               | Message _ -> true
-              | Entry _ -> false )
+              | Entry _ | Trimmed -> false )
           ]
       ; Attr.type_ "button"
       ; Attr.tabindex (-1)
       ; Attr.create "aria-label" label
       ; (match p.target with
          | Entry e -> Attr.create "data-jump-entry" (Int.to_string e)
-         | Message _ -> Attr.empty)
+         | Message _ | Trimmed -> Attr.empty)
       ; Attr.on_click (fun _ -> inject (Action.Jump_to p.target))
       ]
     [ Node.span
         ~attrs:[ Attr.class_ "tip"; Attr.create "aria-hidden" "true" ]
         [ (match p.kind with
            | User -> Node.none
-           | Compaction | Error -> span ~cls:"tip-what" (what p ~n))
+           | Compaction | Error | Trimmed -> span ~cls:"tip-what" (what p ~n))
         ; (if String.is_empty text then Node.none else span ~cls:"tip-text" text)
         ; Option.value_map time ~default:Node.none ~f:(span ~cls:"tip-time")
         ]
@@ -88,7 +90,7 @@ let render ~inject ~narrow times points =
       let users =
         match p.kind with
         | User -> users + 1
-        | Compaction | Error -> users
+        | Compaction | Error | Trimmed -> users
       in
       users, (p, users))
   in
@@ -126,11 +128,11 @@ let view (m : App.Model.t) ~inject =
       m.jump
       ~path:(Option.map m.state ~f:(fun s -> s.session_path))
       ~paging:m.paging
+      ~trim:(Option.bind m.state ~f:(fun s -> s.trim))
       m.chat
   in
   let users =
-    List.count points ~f:(fun (p : Jump.Point.t) ->
-      Outline.Kind.equal p.kind User)
+    List.count points ~f:(fun (p : Jump.Point.t) -> Jump.Kind.equal p.kind User)
   in
   if users < 2
   then Node.none

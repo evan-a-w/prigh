@@ -14,6 +14,7 @@ module Picker_kind : sig
     | Sessions of Session_selection.t
     | Fork of Entry.t list
     | Rewind of Entry.t list
+    | Trim of Trim.Point.t list
     | Tree of Entry.t list
     | Agents
     | Jobs
@@ -65,6 +66,7 @@ module Confirm_action : sig
     | Logout of string
     | Forge_logout of string (** the host *)
     | Rewind of string
+    | Trim of string (** the message's entry id: [trim] before it *)
     | Delete_sessions of
         { paths : string list
         ; back : Open_picker.t option (** where Esc and Enter return *)

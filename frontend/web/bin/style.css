@@ -972,7 +972,9 @@ kbd {
 .picker-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-detail { margin-left: auto; }
 .picker-check { color: var(--sodium); align-self: center; }
-.picker-remove { flex-shrink: 0; align-self: center; }
+.picker-remove, .picker-trim { flex-shrink: 0; align-self: center; }
+.picker-item:not(.selected):not(:hover) > .picker-trim { visibility: hidden; }
+.rewind-quote .quote-time { display: block; margin-top: 4px; color: var(--faint); font: 11.5px var(--mono); }
 .picker-empty { color: var(--muted); padding: 14px 4px; font-size: 12.5px; }
 .modal .picker-item { border-radius: var(--r-control); }
 .modal .picker-item:hover { background: var(--slate-2); }
