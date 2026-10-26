@@ -172,6 +172,23 @@ let background (m : App.Model.t) ~inject =
       [ (if running then Html.lamp () else icon Bot); text_ text ]
 ;;
 
+let nix_gc (m : App.Model.t) ~inject =
+  match m.nix_gc.collecting with
+  | Some p when App.superuser m ->
+    let text =
+      "Collecting Nix garbage: " ^ Prigh_ui.Nix_gc_command.deleted_so_far p
+    in
+    Node.button
+      ~attrs:
+        [ Attr.class_ "status-item link nix-gc active"
+        ; Attr.type_ "button"
+        ; Attr.title (String.capitalize text ^ " (Settings shows the store)")
+        ; Attr.on_click (fun _ -> inject Action.Open_settings)
+        ]
+      [ Html.lamp (); text_ "Nix GC" ]
+  | Some _ | None -> Node.none
+;;
+
 let transfers (m : App.Model.t) =
   match Files.transfers m.files with
   | None -> Node.none
@@ -340,6 +357,7 @@ let extras (m : App.Model.t) ~host:with_host ~inject =
              [ icon Undo; text_ (sprintf "%d queued%s" queued whose) ]
          else Node.none)
       ; background m ~inject
+      ; nix_gc m ~inject
       ; transfers m
       ; (if with_host then host m ~always:false ~inject else Node.none)
       ; Node.fragment (modes m ~inject)

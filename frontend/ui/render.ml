@@ -139,7 +139,7 @@ let disconnected_hint (m : App.Model.t) =
     sprintf
       "not signed in%s · /signin signs in · /connect switches server"
       (match Option.bind m.server ~f:(fun s -> s.address) with
-       | Some address -> " to " ^ address
+       | Some address -> " to " ^ Server_address.display_string address
        | None -> "")
 ;;
 
@@ -571,7 +571,9 @@ let sign_in_dialog ~width form =
     1 + row, 2 + Int.min (Content.Line.width line) (inner - 1)
   in
   ( Boxed.render
-      ~title:("Sign in to " ^ Sign_in_form.address form)
+      ~title:
+        ("Sign in to "
+         ^ Server_address.display_string (Sign_in_form.address form))
       ~width
       (rows @ note @ Content.wrap hint ~width:inner)
   , cursor )
@@ -889,7 +891,11 @@ let context_text (s : P.State.t) =
 
 let server_part (m : App.Model.t) =
   match Option.bind m.server ~f:(fun s -> s.address) with
-  | Some address -> [ 6, [ span ~style:gray ("server:" ^ address) ] ]
+  | Some address ->
+    [ ( 6
+      , [ span ~style:gray ("server:" ^ Server_address.display_string address) ]
+      )
+    ]
   | None -> []
 ;;
 
@@ -946,6 +952,8 @@ let status (m : App.Model.t) : Content.Line.t =
             ] )
         ])
       @ server_part m
+      @ Option.value_map m.nix_gc ~default:[] ~f:(fun progress ->
+        [ 2, [ span ~style:attention (Nix_gc_command.progress progress) ] ])
       @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
         let text =
           match App.Model.acting_as m, m.user with
@@ -1283,10 +1291,11 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
   in
   let lines =
     match Autocomplete.source ac with
+    (* Only the user's commands are offered. *)
     | Autocomplete.Source.Command ->
       let usage (item : Picker.Item.t) =
         Option.value_map
-          (Commands.find item.id)
+          (Commands.find ~superuser:true item.id)
           ~default:("/" ^ item.label)
           ~f:Commands.usage
       in
@@ -1299,8 +1308,10 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
         let help =
-          Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-            s.help)
+          Option.value_map
+            (Commands.find ~superuser:true item.id)
+            ~default:""
+            ~f:(fun s -> s.help)
         in
         let name = "/" ^ item.label in
         let args =

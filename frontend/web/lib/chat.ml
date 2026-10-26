@@ -330,6 +330,7 @@ let rec apply t (event : Event.t) =
   | Review _
   | Sessions_changed
   | Agent_queues _
+  | Nix_gc_progress _
   | Prefs_changed _ -> t
 ;;
 

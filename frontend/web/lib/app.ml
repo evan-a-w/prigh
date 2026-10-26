@@ -193,6 +193,8 @@ module Reply_tag = struct
         } (** reconnected, but the backend no longer has [session] *)
     | Forge of Forge_reply.t
     | Prefs
+    | Nix_status of { open_settings : bool }
+    | Nix_collected
   [@@deriving sexp_of, equal]
 end
 
@@ -510,6 +512,7 @@ module Model = struct
       (** reconnected to a backend that no longer has this session: its
           transcript stays on show, read-only *)
     ; forges : Forges.t
+    ; nix_gc : Nix_gc.t
     ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
@@ -666,6 +669,7 @@ let init =
   ; outputs_loading = String.Set.empty
   ; session_gone = None
   ; forges = Forges.empty
+  ; nix_gc = Nix_gc.empty
   ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
@@ -758,7 +762,7 @@ let field json name =
 
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
-  | true, Some (Login _ | Forge_host _) ->
+  | true, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -1196,6 +1200,57 @@ let loading (m : Model.t) title cmds =
   m, focus @ cmds
 ;;
 
+let superuser (m : Model.t) = Option.exists m.hello ~f:(fun h -> h.superuser)
+
+let fetch_nix_status (m : Model.t) ~open_settings =
+  ( { m with nix_gc = Nix_gc.loading m.nix_gc }
+  , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
+;;
+
+(* Superusers see the Nix store there, as it is now. *)
+let open_settings ?(fetch = true) (m : Model.t) =
+  let m, cmds = open_dialog m Settings in
+  if fetch && superuser m
+  then (
+    let m, fetch = fetch_nix_status m ~open_settings:false in
+    m, cmds @ fetch)
+  else m, cmds
+;;
+
+let nix_gc_still_running m =
+  error
+    m
+    "The Nix garbage collection you started is still running: Settings shows \
+     how far it got."
+;;
+
+let start_nix_gc (m : Model.t) generations =
+  if Option.is_some m.nix_gc.collecting
+  then nix_gc_still_running m
+  else (
+    let m, cmds =
+      toast
+        { m with nix_gc = Nix_gc.start m.nix_gc }
+        (String.capitalize (Prigh_ui.Nix_gc_command.starting generations))
+    in
+    ( m
+    , cmds
+      @ [ call
+            (Nix_store_gc { delete_generations = generations })
+            ~tag:Nix_collected
+        ] ))
+;;
+
+(* [/nix-gc]: Settings, with the store. *)
+let nix_gc_command (m : Model.t) rest =
+  match Prigh_ui.Nix_gc_command.parse rest with
+  | Status -> fetch_nix_status m ~open_settings:true
+  | Error e -> error m (String.capitalize e)
+  | Collect _ when Option.is_some m.nix_gc.collecting -> nix_gc_still_running m
+  | Collect None -> start_nix_gc m None
+  | Collect (Some generations) -> open_dialog m (Nix_gc_confirm generations)
+;;
+
 let start_login (m : Model.t) ~provider ~method_ =
   let m, cmds = open_dialog m (Login (Login_flow.start provider)) in
   ( m
@@ -1381,6 +1436,7 @@ let complete_draft (m : Model.t) ~skills =
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
+      ~superuser:(superuser m)
       ~text:m.draft
       ~cursor:m.cursor
       ~models:m.models
@@ -2851,12 +2907,12 @@ let prompt_succeeded (m : Model.t) =
 
 let help_command (m : Model.t) name =
   let name = String.chop_prefix_if_exists name ~prefix:"/" in
-  match Slash.find name with
+  match Slash.find ~superuser:(superuser m) name with
   | Some spec -> toast m (sprintf "%s: %s" (Slash.Spec.usage spec) spec.help)
   | None ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec -> sprintf "No command /%s. Did you mean /%s?" name spec.name
        | None -> sprintf "No command /%s: /help lists them." name)
 ;;
@@ -3036,6 +3092,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; folds = String.Set.empty
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
+    ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     }
   in
   let m, cmds =
@@ -3062,7 +3119,7 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
-  | _, "settings" -> open_dialog m Settings
+  | _, "settings" -> open_settings m
   | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
     let m, close = close_dialog m in
@@ -3807,7 +3864,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
-  | "settings", _ -> open_dialog m Settings
+  | "settings", _ -> open_settings m
+  | "nix-gc", rest when superuser m -> nix_gc_command m rest
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
@@ -4152,7 +4210,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | name, _ ->
     error
       m
-      (match Slash.closest name with
+      (match Slash.closest ~superuser:(superuser m) name with
        | Some spec ->
          sprintf
            "Unknown command /%s. Did you mean /%s? (/help lists them)"
@@ -5172,6 +5230,34 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        then { m with jump = { m.jump with fetching = None } }
        else m)
     , [] )
+  | Nix_status _, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Nix_store_status.of_json json) ~f:Error.to_string_hum)
+    in
+    let m = { m with nix_gc = Nix_gc.status m.nix_gc result } in
+    (match tag, result with
+     | Nix_status { open_settings = true }, Ok _ -> open_settings ~fetch:false m
+     | Nix_status { open_settings = true }, Error e ->
+       error m (String.capitalize e)
+     | _ -> m, [])
+  | Nix_collected, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Nix_gc_report.of_json json) ~f:Error.to_string_hum)
+    in
+    let m = { m with nix_gc = Nix_gc.finished m.nix_gc result } in
+    let m, cmds =
+      match result with
+      | Ok report ->
+        toast
+          m
+          ("Nix garbage collected: " ^ Prigh_ui.Nix_gc_command.report report)
+      | Error e -> error m ("Nix garbage collection failed: " ^ e)
+    in
+    ( m
+    , cmds
+      @ [ call Nix_store_status ~tag:(Nix_status { open_settings = false }) ] )
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -5758,6 +5844,7 @@ let main_event (m : Model.t) (event : Event.t) =
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
   | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -6015,7 +6102,7 @@ let accept_completion (m : Model.t) ~run =
       | Command, Some item ->
         (* Optional free text (e.g. /compact's instructions) can be left out;
            an argument with completions is offered next. *)
-        (match Slash.find item.id with
+        (match Slash.find ~superuser:(superuser m) item.id with
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
          (* [/review] alone is the common case: it runs at once. *)
@@ -6300,6 +6387,10 @@ let dialog_accept (m : Model.t) =
     , [ change_dir ~if_missing:Create ~target path ] )
   | Some (New_worktree d) -> create_worktree m d
   | Some (Remove_worktree _) -> remove_worktree m ~force:false
+  | Some (Nix_gc_confirm generations) ->
+    let m, cmds = close_dialog m in
+    let m, start = start_nix_gc m (Some generations) in
+    m, cmds @ start
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -6365,14 +6456,14 @@ let sent_to_bottom ((m : Model.t), cmds) =
 let update_connected (m : Model.t) (action : Action.t) =
   match action with
   | Start -> m, start_commands m
-  | Hello hello -> { m with hello = Some hello }, []
+  | Hello hello -> { m with hello = Some hello; nix_gc = Nix_gc.empty }, []
   | Saved_login -> { m with saved_login = true }, []
   (* What another session does is not this one's. *)
   | Event e
     when Option.is_some m.session_gone
          &&
          match e with
-         | Sessions_changed -> false
+         | Sessions_changed | Nix_gc_progress _ -> false
          | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in
@@ -6539,7 +6630,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Chip_step delta -> step_chip m delta
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
-  | Open_settings -> open_dialog m Settings
+  | Open_settings -> open_settings m
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -6776,7 +6867,7 @@ let update_connected (m : Model.t) (action : Action.t) =
        (* A setting changed from the settings page leaves it open. *)
        (match m.dialog, m'.dialog with
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
-        | Some Settings, Some (Login _ | Forge_host _) ->
+        | Some Settings, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
           { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])

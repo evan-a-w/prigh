@@ -138,6 +138,7 @@ type t =
       } (** streamed answer to our own [btw] request *)
   | Sessions_changed
   | Prefs_changed of Prefs.Change.t list
+  | Nix_gc_progress of Nix_gc_progress.t
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -201,6 +202,8 @@ let rec of_json j =
   | "review" ->
     Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
   | "sessions_changed" -> Ok Sessions_changed
+  | "nix_gc_progress" ->
+    Nix_gc_progress.of_json j >>| fun p -> Nix_gc_progress p
   | "prefs_changed" ->
     Json.object_field j "prefs"
     >>= Prefs.changes_of_json

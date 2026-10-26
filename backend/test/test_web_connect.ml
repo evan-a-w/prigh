@@ -72,6 +72,27 @@ let%expect_test "backend addresses: HOST:PORT and prigh-web URLs" =
     |}]
 ;;
 
+let%expect_test "backend addresses: saved normalised, as prigh-tui saves them" =
+  List.iter
+    [ "https://example.com/"
+    ; " wss://example.com/ws "
+    ; "http://example.com/prigh"
+    ; "ws://[::1]:7790/ws"
+    ; " server:7790 "
+    ; "not an address"
+    ]
+    ~f:(fun spec -> printf "%S -> %S\n" spec (Backend_address.normalize spec));
+  [%expect
+    {|
+    "https://example.com/" -> "wss://example.com/ws"
+    " wss://example.com/ws " -> "wss://example.com/ws"
+    "http://example.com/prigh" -> "ws://example.com/prigh/ws"
+    "ws://[::1]:7790/ws" -> "ws://[::1]:7790/ws"
+    " server:7790 " -> "server:7790"
+    "not an address" -> "not an address"
+    |}]
+;;
+
 let%expect_test "the saved connection: flags are saved, the environment is not" =
   let show
         ?saved

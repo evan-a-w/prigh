@@ -92,6 +92,8 @@ module Reply_tag : sig
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Nix_store_shown (** [/nix-gc] *)
+    | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
     | Jobs_picker
     | Job_output
@@ -269,6 +271,9 @@ module Model : sig
     ; client_id : string option
     ; namespace : string option (** the user whose sessions we see *)
     ; user : string option (** the user we signed in as *)
+    ; superuser : bool
+      (** [user] is a superuser (even when acting as another): has the
+          commands only superusers have ([/nix-gc]) *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -284,6 +289,8 @@ module Model : sig
     ; server : Server_link.t option (** [None] until the platform reports it *)
     ; notice : Notice.t option
       (** the latest acknowledgement, until it expires (Esc dismisses it) *)
+    ; nix_gc : P.Nix_gc_progress.t option
+      (** while our [nix_store_gc] runs: how far it got *)
     ; sidebar : bool
       (** whether the agents sidebar shows on wide terminals (Alt+L) *)
     }
