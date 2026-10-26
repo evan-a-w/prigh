@@ -245,7 +245,9 @@ store: `/nix-gc` shows its size and the free space and `/nix-gc run [DAYS|all]`
 collects garbage, first deleting every user's profile generations older
 than DAYS days (prigh-web: Settings, Nix store); in Docker through the
 container's root helper (DOCKER.md, "Garbage collection"), elsewhere as
-the backend's user. `-host-tokens NAME=TOKEN,...`
+the backend's user. To everyone else (and on a backend without users)
+none of this exists: no `/nix-gc`, no Settings section, and the backend
+answers its methods as unknown and sends them nothing about the store. `-host-tokens NAME=TOKEN,...`
 (`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
 superuser, for tool hosts that should not hold the user's own token (the
 Docker image starts one per user with one).

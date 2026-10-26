@@ -50,7 +50,7 @@ end
 
 let c ?argument ?(args = "") name help = { Spec.name; args; help; argument }
 
-let all =
+let every =
   [ c ~args:"[command]" "help" "show commands and keys, or a command's usage"
   ; c "hotkeys" "show the keyboard shortcuts"
   ; c
@@ -294,7 +294,7 @@ let all =
       "nix-gc"
       "the Nix store's size and free space, in Settings; run collects garbage, \
        first deleting every user's profile generations older than DAYS days \
-       (all: all but the current ones) (superusers)"
+       (all: all but the current ones)"
   ; c "signout" "sign out of this account"
   ; c "retry-backend-connection" "reconnect to the backend now"
   ; c "state" "show the session state as the backend reports it"
@@ -303,13 +303,25 @@ let all =
   ]
 ;;
 
-let find name = List.find all ~f:(fun s -> String.equal s.name name)
+let superuser_only = [ "nix-gc" ]
 
-let closest name =
+let all ~superuser =
+  if superuser
+  then every
+  else
+    List.filter every ~f:(fun s ->
+      not (List.mem superuser_only s.name ~equal:String.equal))
+;;
+
+let find ~superuser name =
+  List.find (all ~superuser) ~f:(fun s -> String.equal s.name name)
+;;
+
+let closest ~superuser name =
   if String.is_empty name
   then None
   else
-    List.filter_map all ~f:(fun s ->
+    List.filter_map (all ~superuser) ~f:(fun s ->
       let d = Prigh_ui.Edit_distance.distance s.name name in
       Option.some_if (d <= 2 || String.is_prefix s.name ~prefix:name) (d, s))
     |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)

@@ -263,6 +263,9 @@ module Model : sig
     ; client_id : string option
     ; namespace : string option (** the user whose sessions we see *)
     ; user : string option (** the user we signed in as *)
+    ; superuser : bool
+      (** [user] is a superuser (even when acting as another): has the
+          commands only superusers have ([/nix-gc]) *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list

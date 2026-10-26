@@ -258,8 +258,9 @@ nix need. Three things clean it:
   store: its size, the free space on the volume, the last and the next
   collection; Collect, or Also delete generations over N days…) or `/nix-gc`
   in either frontend (`/nix-gc run`, `/nix-gc run DAYS`, `/nix-gc run all`),
-  with progress while it runs and what it freed at the end. Others are
-  refused and told whom to ask. From the host:
+  with progress while it runs and what it freed at the end. Other users
+  see none of it: no `/nix-gc`, no Settings section, nothing about the
+  store from the backend. From the host:
   `docker compose exec prigh prigh-docker nix-gc [keep|all|Nd]` (default:
   `PRIGH_NIX_GC_KEEP_DAYS`).
 

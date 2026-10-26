@@ -145,23 +145,11 @@ let%expect_test "deleting generations asks first, then returns to Settings" =
     |}]
 ;;
 
-let%expect_test
-    "/nix-gc opens Settings once the store is read; refusals say what to do"
-  =
+let%expect_test "/nix-gc opens Settings once the store is read" =
   let h = superuser () in
   H.type_ h "/nix-gc";
   H.act h Send;
   H.reply h "nix_store_status" status_json;
-  H.elements h ~selector:".settings-dialog";
-  let h = H.create () in
-  H.quiet h (fun () ->
-    H.type_ h "/nix-gc";
-    H.act h Send);
-  H.fail
-    h
-    "nix_store_status"
-    "cleaning the Nix store is for superusers: ask alice to run /nix-gc";
-  H.text h ~selector:".toasts";
   H.elements h ~selector:".settings-dialog";
   [%expect
     {|
@@ -171,7 +159,73 @@ let%expect_test
      (tag (Nix_status (open_settings true))))
     (Focus dialog)
     <div class="modal settings-dialog">
-    Cleaning the Nix store is for superusers: ask alice to run /nix-gc (Dismiss)
+    |}]
+;;
+
+let%expect_test "to everyone else /nix-gc does not exist" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    H.act
+      h
+      (Hello
+         { client_id = "c1"
+         ; namespace = Some "bob"
+         ; user = Some "bob"
+         ; superuser = false
+         }));
+  let completions () =
+    print_s
+      [%sexp
+        (Option.value_map (H.model h).completion ~default:[] ~f:(fun c ->
+           List.map (Prigh_web.Completion.items c) ~f:(fun i -> i.id))
+         : string list)]
+  in
+  H.quiet h (fun () -> H.type_ h "/nix");
+  completions ();
+  H.quiet h (fun () -> H.type_ h "/nix-gc");
+  H.act h Send;
+  H.text h ~selector:".toasts";
+  H.quiet h (fun () ->
+    H.type_ h "/help nix-gc";
+    H.act h Send);
+  H.text h ~selector:".toasts";
+  [%expect
+    {|
+    ()
+    (Rpc (method_ push_pref) (params ((key history) (value /nix-gc) (max 500)))
+     (tag Ignore))
+    Unknown command /nix-gc: /help lists the commands. (Dismiss)
+    No command /nix-gc: /help lists them. (Dismiss)
+    |}];
+  H.quiet h (fun () -> H.act h Open_help);
+  H.text h ~selector:".help-dialog";
+  let help = [%expect.output] in
+  print_s
+    [%message
+      "help"
+        ~commands:(String.is_substring help ~substring:"/setusr" : bool)
+        ~mentions_nix:(String.is_substring help ~substring:"nix" : bool)];
+  [%expect {| (help (commands true) (mentions_nix false)) |}]
+;;
+
+let%expect_test "a superuser acting as another user keeps /nix-gc" =
+  let h = superuser () in
+  H.quiet h (fun () ->
+    H.act
+      h
+      (Hello
+         { client_id = "c1"
+         ; namespace = Some "bob"
+         ; user = Some "alice"
+         ; superuser = true
+         });
+    H.type_ h "/nix-gc");
+  H.act h Send;
+  [%expect
+    {|
+    (Cache_prefs (((key history) (value ((/nix-gc))))))
+    (Rpc (method_ nix_store_status) (params ())
+     (tag (Nix_status (open_settings true))))
     |}]
 ;;
 

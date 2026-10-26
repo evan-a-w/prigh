@@ -2,7 +2,7 @@
 // -superusers alice`: signing in, adding a second account, switching between
 // them (each sees its own sessions), acting as bob from alice and back,
 // the Nix store in alice's Settings (with a stand-in nix and df: no real
-// store is touched) and refused for bob, and signing one out. Run by
+// store is touched) and nowhere for bob, and signing one out. Run by
 // prigh_web.sh after prigh_web.mjs; prints normalised snapshots (the
 // expected output is in ENGINE.expected).
 //
@@ -145,16 +145,31 @@ try {
   await send("I am bob");
   await bodyHas("noted");
   await sessions();
-  // Bob is no superuser: no Nix store in Settings, and /nix-gc says whom to ask.
+  // Bob is no superuser: no Nix store in Settings, and no /nix-gc.
   await page.locator(".settings-toggle").first().click();
   await page.locator(".settings-dialog").waitFor();
   section("bob's settings");
   console.log((await page.locator(".settings-section h3").allInnerTexts()).join("\n"));
   await page.keyboard.press("Escape");
   await page.waitForSelector(".settings-dialog", { state: "detached" });
+  // What the composer offers for [typed]: waits until its list offers [name]
+  // or, when [gone] may be the answer, is gone (the earlier list may still be
+  // on show).
+  const offered = async (typed, name, { gone }) => {
+    await page.locator(".composer textarea").fill(typed);
+    await page.waitForFunction(([name, gone]) => {
+      const list = document.getElementById("completion-list");
+      return list === null ? gone : list.innerText.includes(name);
+    }, [name, gone]);
+    const labels = await page.locator("#completion-list .popup-label").allInnerTexts();
+    console.log(`${typed} offers: ${labels.join(", ") || "nothing"}`);
+  };
+  section("bob's commands");
+  await offered("/setus", "/setusr", { gone: false });
+  await offered("/nix-g", "/nix-gc", { gone: true });
   await page.locator(".composer textarea").fill("/nix-gc");
   await page.locator(".composer textarea").press("Control+Enter");
-  await bodyHas("ask alice");
+  await bodyHas("Unknown command /nix-gc");
   await show("bob's /nix-gc", ".toast.error");
   await page.locator(".toast.error button").first().click();
 

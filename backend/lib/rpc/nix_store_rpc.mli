@@ -12,8 +12,9 @@ open! Import
 
 val methods : string list
 
-(** [None] for other methods. [signed_in] is who the connection signed in
-    as (not whom a superuser acts as). *)
+(** [None] for other methods, and for everyone but superusers, so that to
+    them these methods do not exist. [signed_in] is who the connection signed
+    in as (not whom a superuser acts as). *)
 val dispatch
   :  Nix_store.t option
   -> signed_in:User_access.Signed_in.t option

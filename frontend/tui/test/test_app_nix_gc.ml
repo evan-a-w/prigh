@@ -7,8 +7,12 @@ module P = Prigh_protocol
 
 (* /nix-gc: the Nix store for superusers. *)
 
-let connected () =
+let connected ?(superuser = true) () =
   let h = Test_app.connected ~width:80 ~height:16 () in
+  H.step
+    ~quiet:true
+    h
+    (Hello { client_id = "c1"; namespace = None; user = None; superuser });
   H.event h (State (state ()));
   h
 ;;
@@ -188,20 +192,11 @@ let%expect_test "one collection at a time; progress for others' is ignored" =
     |}]
 ;;
 
-let%expect_test "refused or failing: the backend says what to do" =
+let%expect_test "failing: the backend says why" =
   let h = connected () in
   run h "/nix-gc run";
-  H.reply_error
-    h
-    Nix_gc_done
-    "cleaning the Nix store is for superusers: ask alice to run /nix-gc";
+  H.reply_error h Nix_gc_done "nix store gc failed: disk on fire";
   print_s [%sexp (h.model.nix_gc : P.Nix_gc_progress.t option)];
-  H.show h;
-  run h "/nix-gc";
-  H.reply_error
-    h
-    Nix_store_shown
-    "cleaning the Nix store is for superusers: ask alice to run /nix-gc";
   H.show h;
   [%expect
     {|
@@ -220,10 +215,39 @@ let%expect_test "refused or failing: the backend says what to do" =
 
     ▌ earlier question
       earlier answer
-    ───────── cleaning the Nix store is for superusers: ask alice to run /nix-gc ───
+    ────────────────────────────────────────── nix store gc failed: disk on fire ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
-    (Rpc (method_ nix_store_status) (params ()) (tag Nix_store_shown))
+    |}]
+;;
+
+let%expect_test "to everyone else /nix-gc does not exist" =
+  let h = connected ~superuser:false () in
+  H.keys h "/nix";
+  print_s
+    [%message
+      "completing /nix"
+        ~offered:
+          (Option.map h.model.autocomplete ~f:(fun ac ->
+             List.map (Autocomplete.items ac) ~f:(fun i -> i.id))
+           : string list option)];
+  let h = connected ~superuser:false () in
+  run h "/nix-gc";
+  H.show h;
+  let h = connected ~superuser:false () in
+  run h "/help nix-gc";
+  H.show h;
+  print_s
+    [%message
+      "/help"
+        ~mentions_nix:
+          (String.is_substring
+             (Content.to_plain (Commands.help ~superuser:false))
+             ~substring:"nix"
+           : bool)];
+  [%expect
+    {|
+    ("completing /nix" (offered ()))
 
 
 
@@ -237,10 +261,43 @@ let%expect_test "refused or failing: the backend says what to do" =
 
     ▌ earlier question
       earlier answer
-    ───────── cleaning the Nix store is for superusers: ask alice to run /nix-gc ───
-    > ▏
+    ────── unknown command /nix-gc (back in the editor); Tab or / lists commands ───
+    > /nix-gc▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────── unknown command /nix-gc (back in the editor); Tab or / lists commands ───
+    > /help nix-gc▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    (/help (mentions_nix false))
     |}]
+;;
+
+let%expect_test "a superuser acting as another user keeps /nix-gc" =
+  let h = connected () in
+  H.step
+    ~quiet:true
+    h
+    (Hello
+       { client_id = "c1"
+       ; namespace = Some "bob"
+       ; user = Some "alice"
+       ; superuser = true
+       });
+  run h "/nix-gc";
+  [%expect
+    {| (Rpc (method_ nix_store_status) (params ()) (tag Nix_store_shown)) |}]
 ;;
 
 let%expect_test "mistakes show the usage, the command kept to fix" =

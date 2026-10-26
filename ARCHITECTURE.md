@@ -1502,9 +1502,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
 - `Nix_store_rpc` (`nix/`) — `nix_store_status` and `nix_store_gc`, for
-  superusers only (the signed-in user, not whom they act as; others are
-  told whom to ask, a backend without users to run `nix store gc` in a
-  shell). `Nix_store` runs one collection at a time for the whole backend
+  superusers only (the signed-in user, not whom they act as). To
+  everyone else, and on a backend without users, they do not exist:
+  `dispatch` passes, so they get the same "unknown method" as any other
+  name, and progress goes only to the superuser who asked. `Nix_store` runs one collection at a time for the whole backend
   (in a fiber of its own, so a dropped connection does not stop it) and
   reports progress to the caller as `nix_gc_progress` events, at most every
   250 ms while only paths are being deleted (`Nix_gc_output` classifies
@@ -2299,7 +2300,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
       fetched as it opens, our collection's progress, also a chip in the
       status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
-      words it for both frontends), the account; its controls are
+      words it for both frontends, and `Slash`/`Commands.all ~superuser`
+      leave it out for everyone else: no completion, `/help` or "did you
+      mean"), the account; its controls are
       `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column; a repeat is counted rather than stacked, a notice's lifetime
@@ -2816,7 +2819,10 @@ closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
 with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
-back, and signs bob out, leaving alice on the sign-in page. Then
+back, and signs bob out, leaving alice on the sign-in page. Alice's
+Settings show the Nix store (stand-in `nix` and `df`) and collect it;
+bob sees no Nix store section, no `/nix-gc` completion, and `/nix-gc` is
+an unknown command. Then
 `reconnect.mjs`, at phone size: a long session scrolled halfway up with a
 draft and a pasted image; `context.setOffline` and back, then the backend
 killed and restarted: each time the same session, the same scroll

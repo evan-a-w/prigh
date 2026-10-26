@@ -68,11 +68,6 @@ module Signed_in = struct
     then Ok (List.map t.access.namespaces ~f:(fun (n : Namespace.t) -> n.name))
     else Or_error.errorf "unauthorised: %s is not a superuser" t.user
   ;;
-
-  let superusers t =
-    List.filter_map t.access.namespaces ~f:(fun (n : Namespace.t) ->
-      Option.some_if (Set.mem t.access.superusers n.name) n.name)
-  ;;
 end
 
 let authenticate t ?user ?as_user token =

@@ -19,14 +19,6 @@ type t =
 
 let empty = { status = Unknown; collecting = None; outcome = None }
 
-let shown t ~superuser =
-  superuser
-  ||
-  match t.status with
-  | Loaded _ -> true
-  | Unknown | Loading | Failed _ -> false
-;;
-
 let loading t =
   match t.status with
   | Loaded _ -> t (* refreshed in place *)

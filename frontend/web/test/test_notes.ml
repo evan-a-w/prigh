@@ -401,7 +401,6 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
-    /nix-gc [run [DAYS|all]] the Nix store's size and free space, in Settings; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones) (superusers)
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /session show the session's details and statistics
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
