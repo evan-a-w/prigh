@@ -578,7 +578,7 @@ let%expect_test
         \nlet f = 6\
         \nlet g = 7\
         \n")
-       (expected m1)))
+       (expected m1) (review_root /home/me/proj)))
      (tag (Review (Saved src/main.ml))))
     |}];
   H.fail
@@ -609,7 +609,8 @@ let%expect_test
         \nlet e = 5\
         \nlet f = 6\
         \nlet g = 7\
-        \n")))
+        \n")
+       (review_root /home/me/proj)))
      (tag (Review (Saved src/main.ml))))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))

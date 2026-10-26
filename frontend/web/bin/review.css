@@ -86,6 +86,18 @@
 .review-file-path .name { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .review-file.approved .review-file-path .name { color: var(--muted); }
 .review-file-counts { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* What changed after the last action on the file, under its name. */
+.review-file-since {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  margin-top: -3px;
+  font: 11px var(--mono);
+  color: var(--sodium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
 .review-file-comments, .review-count {
   font: 600 10.5px var(--sans);
   min-width: 17px;
@@ -224,6 +236,12 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-thread.hot { border-color: var(--sodium-line); border-left-color: var(--sodium); }
 
 .review-note { display: flex; align-items: center; gap: 8px; color: var(--faint); font: 12px var(--sans); margin-bottom: 8px; }
+.review-since-note { display: block; color: var(--muted); line-height: 1.5; }
+.review-since-hint { margin-left: 10px; color: var(--faint); }
+.files-preview .review-since-note { padding: 6px 12px 2px; }
+.review-since-counts { font: 12px var(--mono); color: var(--sodium); font-variant-numeric: tabular-nums; }
+.review-since-same { color: var(--muted); }
+.review-since-menu { max-width: min(30ch, 100%); }
 .review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted); font: 13px var(--sans); padding: 18px 4px; }
 .review-empty.big { flex-direction: column; align-items: flex-start; padding: 48px 28px; max-width: 62ch; }
 .review-empty.big p { margin: 0; font-size: 14px; color: var(--chalk); }
@@ -352,7 +370,7 @@ mark.review-mark[data-comment] { cursor: default; }
   line-height: 15px;
 }
 .files-row.changed .files-name { color: var(--chalk); font-weight: 500; }
-.files-review-bar { display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 8px 12px; font: 12px var(--sans); border-bottom: 1px solid var(--rule); }
+.files-review-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; white-space: nowrap; padding: 8px 12px; font: 12px var(--sans); border-bottom: 1px solid var(--rule); }
 .files-review-counts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .files-review-bar .review-open { margin-left: auto; }
 .files-review-bar .files-note { margin: 0; }

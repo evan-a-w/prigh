@@ -144,6 +144,9 @@ val file : t -> string
 (** The branch of a comment on a branch that is not checked out. *)
 val branch : t -> string option
 
+(** The branch of a [root] that names one ([branch:NAME]). *)
+val root_branch : string -> string option
+
 (** The comment as the agent reads it: id, file, lines (and where the
     selection is in them, as 1-based character columns), the commented code
     with line numbers (a selection marked [⟦like this⟧], and quoted whole),

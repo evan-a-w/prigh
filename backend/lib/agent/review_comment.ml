@@ -192,7 +192,8 @@ type t =
   }
 [@@deriving sexp, jsonaf, equal]
 
-let branch t = String.chop_prefix t.root ~prefix:"branch:"
+let root_branch root = String.chop_prefix root ~prefix:"branch:"
+let branch t = root_branch t.root
 
 let file t =
   match branch t with

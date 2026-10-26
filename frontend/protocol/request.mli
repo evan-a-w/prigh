@@ -122,6 +122,13 @@ module Method : sig
         { root : string option
         ; path : string
         }
+    | Review_since of
+        { root : string
+        ; path : string option (** default: every file with actions *)
+        ; index : int option
+          (** of [path]'s action to compare with, in {!Review.history}
+              (default: the last) *)
+        } (** {!Review_since} *)
     | Fs_preview of { path : string } (** {!File_preview} *)
     | Git_show of
         { dir : string option
@@ -132,6 +139,9 @@ module Method : sig
         { path : string
         ; text : string
         ; expected : string option (** the [md5] it was read with *)
+        ; review_root : string option
+          (** saved in the review's editor, of that worktree: an action on
+              the file *)
         } (** [{path, md5}] *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)
     | Nix_store_gc of { delete_generations : Nix_generations.t option }

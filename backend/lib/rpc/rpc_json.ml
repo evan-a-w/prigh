@@ -212,6 +212,25 @@ let review_comment (c : Review_comment.t) =
        ])
 ;;
 
+let snapshot_content (c : Review_snapshot.Content.t) =
+  `Object
+    (match c with
+     | Text { md5 } -> [ "kind", str "text"; "md5", str md5 ]
+     | Absent -> [ "kind", str "absent" ]
+     | Binary { md5 } -> [ "kind", str "binary"; "md5", str md5 ]
+     | Too_large { bytes } -> [ "kind", str "too_large"; "bytes", int bytes ])
+;;
+
+let review_snapshot (s : Review_snapshot.t) =
+  `Object
+    ([ "root", str s.root
+     ; "path", str s.path
+     ; "action", str (Review_snapshot.Action.to_string s.action)
+     ]
+     @ Option.value_map s.by ~default:[] ~f:(fun by -> [ "by", str by ])
+     @ [ "at_ms", ms s.at; "content", snapshot_content s.content ])
+;;
+
 let review (r : Review_state.t) =
   `Object
     [ "comments", `Array (List.map r.comments ~f:review_comment)
@@ -224,7 +243,26 @@ let review (r : Review_state.t) =
                  (Option.value_map root ~default:[] ~f:(fun r ->
                     [ "root", str r ])
                   @ [ "path", str path; "hash", str hash ]))) )
+    ; ( "snapshots"
+      , `Array
+          (Map.data r.snapshots
+           |> List.concat_map ~f:List.rev
+           |> List.map ~f:review_snapshot) )
     ]
+;;
+
+let review_since (s : Review_state.Since.t) =
+  `Object
+    ([ "path", str s.path
+     ; "index", int s.index
+     ; "snapshot", review_snapshot s.snapshot
+     ; "current", snapshot_content s.current
+     ; "changed", bool s.changed
+     ; "added", int s.diff.added
+     ; "removed", int s.diff.removed
+     ; "diff", str s.diff.diff
+     ]
+     @ Option.value_map s.note ~default:[] ~f:(fun n -> [ "note", str n ]))
 ;;
 
 let config (c : Config.t) = Config.to_json c

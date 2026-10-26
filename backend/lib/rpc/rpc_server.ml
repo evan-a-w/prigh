@@ -2513,10 +2513,14 @@ let handle t client (request : Json.t) : Json.t =
            | Some result -> result
            | None ->
              let agent = agent_of_client t client in
+             let by =
+               Option.map client.signed_in ~f:(fun s ->
+                 s.User_access.Signed_in.user)
+             in
              (match
                 Option.first_some
-                  (Files_rpc.dispatch agent ~meth ~params)
-                  (Review_rpc.dispatch agent ~meth ~params)
+                  (Files_rpc.dispatch ?by agent ~meth ~params)
+                  (Review_rpc.dispatch ?by agent ~meth ~params)
               with
               | Some result -> result
               | None -> dispatch agent t.login ~meth ~params))

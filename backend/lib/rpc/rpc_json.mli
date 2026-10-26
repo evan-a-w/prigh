@@ -25,9 +25,16 @@ val config : Config.t -> Json.t
     error?}}]}]. *)
 val review_comment : Review_comment.t -> Json.t
 
-(** [{comments, approvals: [{root?, path, hash}]}] ([root] missing: approved
-    before worktrees were told apart, in the session's repository). *)
+(** [{comments, approvals: [{root?, path, hash}], snapshots: [{root, path,
+    action, by?, at_ms, content: {kind: text|absent|binary|too_large, md5?,
+    bytes?}}]}] ([root] missing: approved before worktrees were told apart,
+    in the session's repository; [snapshots] by file, each file's oldest
+    first, without their texts). *)
 val review : Review_state.t -> Json.t
+
+(** [{path, index, snapshot, current, changed, added, removed, diff, note?}]:
+    a snapshot and contents as in [review]'s [snapshots]. *)
+val review_since : Review_state.Since.t -> Json.t
 
 val model : Model.t -> Json.t
 
