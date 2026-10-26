@@ -85,14 +85,13 @@ let file_row (t : Code_review.t) (f : Diff_files.File.t) ~inject =
            then span ~cls:"review-file-comments" (Int.to_string comments)
            else Node.none)
         ; (match
-             Option.bind
-               (Map.find t.since f.path)
-               ~f:File_approval.since_label
+             Option.bind (Map.find t.since f.path) ~f:File_approval.since_label
            with
            | Some label ->
              span
                ~cls:"review-file-since"
-               ~attrs:[ Attr.title ("Changed after your last action: " ^ label) ]
+               ~attrs:
+                 [ Attr.title ("Changed after your last action: " ^ label) ]
                label
            | None -> Node.none)
         ; span

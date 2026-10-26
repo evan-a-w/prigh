@@ -41,8 +41,11 @@ type t =
   ; next_id : int
   ; snapshots : Review_snapshot.t list File_key.Map.t
   ; blobs : string String.Map.t
+  ; kept : int
   }
 [@@deriving sexp_of, equal]
+
+let max_kept_bytes = 32 * 1024 * 1024
 
 let empty =
   { comments = []
@@ -50,6 +53,7 @@ let empty =
   ; next_id = 1
   ; snapshots = File_key.Map.empty
   ; blobs = String.Map.empty
+  ; kept = 0
   }
 ;;
 
@@ -87,10 +91,11 @@ let apply t (change : Change.t) =
   | Unapprove { root; path } ->
     { t with approvals = Map.remove t.approvals { root; path } }
   | Snapshot { snapshot; text } ->
-    let blobs =
+    let blobs, kept =
       match snapshot.content, text with
-      | Text { md5 }, Some text -> Map.set t.blobs ~key:md5 ~data:text
-      | (Text _ | Absent | Binary _ | Too_large _), _ -> t.blobs
+      | Text { md5 }, Some text when not (Map.mem t.blobs md5) ->
+        Map.set t.blobs ~key:md5 ~data:text, t.kept + String.length text
+      | (Text _ | Absent | Binary _ | Too_large _), _ -> t.blobs, t.kept
     in
     { t with
       snapshots =
@@ -99,6 +104,7 @@ let apply t (change : Change.t) =
           ~key:{ root = Some snapshot.root; path = snapshot.path }
           ~data:snapshot
     ; blobs
+    ; kept
     }
 ;;
 
@@ -284,7 +290,9 @@ let unapprove ?root t ~path =
 let snapshot t (snapshot : Review_snapshot.t) ~text =
   let text =
     match snapshot.content with
-    | Text { md5 } when not (Map.mem t.blobs md5) -> text
+    | Text { md5 } when not (Map.mem t.blobs md5) ->
+      Option.filter text ~f:(fun text ->
+        t.kept + String.length text <= max_kept_bytes)
     | Text _ | Absent | Binary _ | Too_large _ -> None
   in
   [ Change.Snapshot { snapshot; text } ]
@@ -357,8 +365,7 @@ let since t ~root ~path ?index ~current () =
       | _, None -> Some "it cannot be read now", nothing
       | Some `Too_large, _ | _, Some `Too_large ->
         Some "it is larger than 1 MiB", nothing
-      | Some `Binary, _ | _, Some `Binary ->
-        Some "it is a binary file", nothing
+      | Some `Binary, _ | _, Some `Binary -> Some "it is a binary file", nothing
     in
     Ok
       { Since.path

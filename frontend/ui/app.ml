@@ -5155,7 +5155,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.against diff))
            , [] )
          else if List.is_empty review.snapshots
-         then (output m ~title:"Review" (File_approval.render diff review), [])
+         then output m ~title:"Review" (File_approval.render diff review), []
          else
            ( m
            , [ rpc

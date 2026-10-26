@@ -256,8 +256,9 @@ val reply : t -> Reply.t -> (Json.t, string) Result.t -> t * Out.t list
     ([watching]). *)
 val set_session : t -> string option -> watching:bool -> t * Out.t list
 
-(** The review changed (the [review] event). *)
-val set_review : t -> Review.t -> t
+(** The session's review, from its [review] event; new actions on the
+    reviewed worktree's files read what changed since them again. *)
+val set_review : t -> Review.t -> t * Out.t list
 
 (** The files may have changed (the agent edited, a run ended): the diff is
     read again while something shows it ([watching]). *)

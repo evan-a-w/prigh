@@ -53,7 +53,7 @@ let diff_json =
 
 let snapshot ?(by = "") ~path ~action ~at md5 =
   sprintf
-    {|{"root":"/work","path":"%s","action":"%s"%s,"at_ms":%d,"content":{"kind":"text","md5":"%s"}}|}
+    {|{"root":"/work","path":"%s","action":"%s"%s,"at_ms":%s,"content":{"kind":"text","md5":"%s"}}|}
     path
     action
     (if String.is_empty by then "" else sprintf {|,"by":"%s"|} by)
@@ -66,9 +66,35 @@ let snapshot ?(by = "") ~path ~action ~at md5 =
 let review_json =
   sprintf
     {|{"comments":[],"approvals":[{"root":"/work","path":"b.ml","hash":"x"}],"snapshots":[%s,%s,%s]}|}
-    (snapshot ~path:"a.ml" ~action:"commented" ~at:1791190800000 "m0")
-    (snapshot ~path:"a.ml" ~action:"approved" ~by:"bob" ~at:1791194400000 "m1")
-    (snapshot ~path:"b.ml" ~action:"approved" ~at:1791194400000 "m2")
+    (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791190800000" "m0")
+    (snapshot
+       ~path:"a.ml"
+       ~action:"approved"
+       ~by:"bob"
+       ~at:"1791194400000"
+       "m1")
+    (snapshot ~path:"b.ml" ~action:"approved" ~at:"1791194400000" "m2")
+;;
+
+(* The review after one more action on a.ml, at 10:00 by you. *)
+let review_after action =
+  sprintf
+    {|{"comments":[],"approvals":[{"root":"/work","path":"b.ml","hash":"x"}],"snapshots":[%s,%s,%s,%s]}|}
+    (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791190800000" "m0")
+    (snapshot
+       ~path:"a.ml"
+       ~action:"approved"
+       ~by:"bob"
+       ~at:"1791194400000"
+       "m1")
+    (snapshot ~path:"a.ml" ~action ~at:"1791194400000" "now")
+    (snapshot ~path:"b.ml" ~action:"approved" ~at:"1791194400000" "m2")
+;;
+
+let review_event action =
+  sprintf
+    {|{"type":"event","event":"review","review":%s}|}
+    (review_after action)
 ;;
 
 let since_diff =
@@ -82,8 +108,15 @@ let since_diff =
    +let z = 4\n"
 ;;
 
-let file ?(changed = true) ?(index = 1) ?(added = 2) ?(removed = 1) ?note path
-  snapshot diff
+let file
+      ?(changed = true)
+      ?(index = 1)
+      ?(added = 2)
+      ?(removed = 1)
+      ?note
+      path
+      snapshot
+      diff
   =
   sprintf
     {|{"path":"%s","index":%d,"snapshot":%s,"current":{"kind":"text","md5":"now"},"changed":%b,"added":%d,"removed":%d,"diff":%s%s}|}
@@ -104,7 +137,12 @@ let since_json =
     {|{"files":[%s,%s]}|}
     (file
        "a.ml"
-       (snapshot ~path:"a.ml" ~action:"approved" ~by:"bob" ~at:1791194400000 "m1")
+       (snapshot
+          ~path:"a.ml"
+          ~action:"approved"
+          ~by:"bob"
+          ~at:"1791194400000"
+          "m1")
        since_diff)
     (file
        ~changed:false
@@ -112,7 +150,7 @@ let since_json =
        ~added:0
        ~removed:0
        "b.ml"
-       (snapshot ~path:"b.ml" ~action:"approved" ~at:1791194400000 "m2")
+       (snapshot ~path:"b.ml" ~action:"approved" ~at:"1791194400000" "m2")
        "")
 ;;
 
@@ -125,7 +163,9 @@ let opened () =
     H.type_ h "/review";
     H.act h Send;
     H.reply h "git_diff" diff_json;
-    H.reply h "fs_preview"
+    H.reply
+      h
+      "fs_preview"
       {|{"path":"/work/a.ml","name":"a.ml","size":30,"kind":"text","text":"let x = 2\nlet y = 30\nlet z = 4\n","truncated":false,"md5":"now"}|});
   h
 ;;
@@ -164,10 +204,9 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Read the changes again (they also update as prigh edits))
     (Comment) (Edit)
     (Changes) (Whole file) (Since bob approved · 10:00)
-    you commented · 09:00 bob approved · 10:00
-    (Send comments) (Close the review (Esc, Alt+R))
-    Reviewing main (/work) against HEAD (the uncommitted changes) main
-    (○ a.ml +2 −1 +2 −1 since approved)
+    bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
+    Reviewing main (/work) against HEAD (the uncommitted changes)
+    (○ a.ml +2 −1 since approved +2 −1)
     (⚠ b.ml +1 −1)
     2 files changed, +3 −2
     (Previous file ([, p, k)) (Next file (], n, j))
@@ -175,19 +214,19 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Approve)
     Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then)
     @@ -1,1 +1,2 @@
-    1   let x = 2
+    1 let x = 2
     2 - let y = 3
     2 + let y = 30
     3 + let z = 4
     |}];
-  H.elements h ~selector:".segment.on";
-  H.elements h ~selector:".review-since-menu option";
+  H.names h ~selector:".segment.on";
+  H.names h ~selector:".review-since-menu option";
   [%expect
     {|
-    Comment
-    Since bob approved · 10:00
-    bob approved · 10:00
-    you commented · 09:00
+    button "Comment" -- Select code and comment on it (e)
+    button "Since bob approved \194\183 10:00" -- What changed in the file since then: its text then to now (l)
+    option "bob approved \194\183 10:00"
+    option "you commented \194\183 09:00"
     |}];
   (* b.ml has not changed since it was approved: it shows its changes, and
      its since-view says nothing changed. *)
@@ -202,16 +241,14 @@ let%expect_test "a file changed since its last action shows what changed since" 
      (tag (Review (Content b.ml))))
     (Previous file ([, p, k)) (Next file (], n, j))
     b.ml
-    Changed since you approved it
-    (Approve again)
+    Changed since you approved it (Approve again)
     @@ -1 +1 @@
     1 - let b = 1
     1 + let b = 2
     (Review (Set_layout Since))
     (Previous file ([, p, k)) (Next file (], n, j))
     b.ml
-    Changed since you approved it
-    (Approve again)
+    Changed since you approved it (Approve again)
     Nothing changed since you approved · 10:00.
     |}];
   (* Changes takes a.ml back to its hunks; it stays so. *)
@@ -221,11 +258,10 @@ let%expect_test "a file changed since its last action shows what changed since" 
   [%expect
     {|
     (Review (Step -1))
-    (Review (Set_layout Unified))
     @@ -1,2 +1,3 @@
     1 - let x = 1
     1 + let x = 2
-    2   let y = 3
+    2 let y = 3
     3 + let z = 4
     |}]
 ;;
@@ -236,7 +272,6 @@ let%expect_test "an older action from the menu" =
   H.act h (Review (Pick_since { path = "a.ml"; index = 0 }));
   [%expect
     {|
-    (Review (Pick_since (path a.ml) (index 0)))
     (Rpc (method_ review_since) (params ((root /work) (path a.ml) (index 0)))
      (tag (Review (Since_picked (root /work) (path a.ml) (index 0)))))
     |}];
@@ -252,16 +287,19 @@ let%expect_test "an older action from the menu" =
           ~added:1
           ~removed:0
           "a.ml"
-          (snapshot ~path:"a.ml" ~action:"commented" ~at:1791190800000 "m0")
-          "diff --git a/a.ml b/a.ml\n--- a/a.ml\n+++ b/a.ml\n@@ -1,0 +1,1 @@\n+let z = 4\n"));
+          (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791190800000" "m0")
+          "diff --git a/a.ml b/a.ml\n\
+           --- a/a.ml\n\
+           +++ b/a.ml\n\
+           @@ -1,0 +1,1 @@\n\
+           +let z = 4\n"));
   H.text h ~selector:".review-controls";
   H.text h ~selector:".review-scroll";
   [%expect
     {|
     (Comment) (Edit)
     (Changes) (Whole file) (Since you commented · 09:00)
-    you commented · 09:00 bob approved · 10:00
-    (Send comments) (Close the review (Esc, Alt+R))
+    bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
     Since you commented · 09:00: +1 −0 (removed lines are the file as it was then)
     @@ -1,0 +1,1 @@
     1 + let z = 4
@@ -270,52 +308,98 @@ let%expect_test "an older action from the menu" =
   H.act h (Review (Pick_since { path = "a.ml"; index = 1 }));
   H.text h ~selector:".review-since-note";
   [%expect
-    {|
-    (Review (Pick_since (path a.ml) (index 1)))
-    Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then)
-    |}]
+    {| Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then) |}]
 ;;
 
 let%expect_test "comments in the since-view are on the file as it is now" =
   let h = opened () in
   H.reply h "review_since" since_json;
   (* A removed line here is the old snapshot's: refused. *)
-  H.act h (Review (Select_line { path = "a.ml"; side = Old; line = 2; extend = false }));
-  [%expect
-    {|
+  H.act
+    h
     (Review
-     (Select_line (path a.ml) (side Old) (line 2) (extend false)))
-    (Toast
-     "The removed lines here are the file as it was at that action: comment on the current lines, or on removed ones in Changes.")
-    |}];
-  H.act h (Review (Select_line { path = "a.ml"; side = New; line = 2; extend = false }));
+       (Select_line { path = "a.ml"; side = Old; line = 2; extend = false }));
+  [%expect {| (Expire_toast (id 0) (after_ms 6000)) |}];
+  H.act
+    h
+    (Review
+       (Select_line { path = "a.ml"; side = New; line = 2; extend = false }));
   H.key h "c" ~target:Review;
   H.act h (Review (Draft_input "Why 30?"));
   H.act h (Review Draft_send);
-  [%expect {| |}];
+  [%expect
+    {|
+    Clear_text_selection
+    (Review Start_comment)
+    (Focus review-draft)
+    (Rpc (method_ review_comment)
+     (params
+      ((root /work) (path a.ml) (first 2) (last 2) (side new)
+       (anchor "let y = 30") (text "Why 30?")))
+     (tag (Review Comment_added)))
+    |}];
   H.reply
     h
     "review_comment"
     {|{"id":"c1","root":"/work","path":"a.ml","first":2,"last":2,"anchor":"let y = 30","status":"open","thread":[{"author":"user","text":"Why 30?","at_ms":1791194400000,"delivered":false}]}|};
+  [%expect {| |}];
+  (* Before the review event brings the comment's snapshot, the since-view
+     still compares with the approval, the comment on its current line. *)
+  H.text h ~selector:".review-scroll";
+  [%expect
+    {|
+    Since bob approved · 10:00: +2 −1 (removed lines are the file as it was then)
+    @@ -1,1 +1,2 @@
+    1 let x = 2
+    2 - let y = 3
+    2 + let y = 30
+    c1 line 2
+    (Resolve) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Why 30?
+    []
+    3 + let z = 4
+    |}];
+  H.event h (review_event "commented");
   [%expect
     {|
     (Rpc (method_ review_since) (params ((root /work)))
      (tag (Review (Since /work))))
     |}];
+  H.reply
+    h
+    "review_since"
+    (sprintf
+       {|{"files":[%s]}|}
+       (file
+          ~changed:false
+          ~index:2
+          ~added:0
+          ~removed:0
+          "a.ml"
+          (snapshot ~path:"a.ml" ~action:"commented" ~at:"1791194400000" "now")
+          ""));
   H.text h ~selector:".review-scroll";
-  [%expect {| |}]
+  [%expect
+    {|
+    @@ -1,2 +1,3 @@
+    1 - let x = 1
+    1 + let x = 2
+    2 let y = 3
+    3 + let z = 4
+    |}]
 ;;
 
 let%expect_test "actions read what changed again; the editor's save is one" =
   let h = opened () in
   H.reply h "review_since" since_json;
   H.key h "a" ~target:Review;
-  H.reply h "review_approve" review_json;
+  H.reply h "review_approve" (review_after "approved");
   [%expect
     {|
     (Review (Toggle_approval a.ml))
     (Rpc (method_ review_approve)
-     (params ((root /work) (path a.ml) (hash 4c1fa6e2eb1b01a2ff0b0aad0b7ea8a3)))
+     (params ((root /work) (path a.ml) (hash 185f77487f5bea33a200aac854de7910)))
      (tag (Review (Changed ()))))
     (Rpc (method_ review_since) (params ((root /work)))
      (tag (Review (Since /work))))
@@ -324,6 +408,27 @@ let%expect_test "actions read what changed again; the editor's save is one" =
   H.key h "e" ~target:Review;
   H.act h (Review (Edit_input "let x = 2\n"));
   H.act h (Review Save);
+  [%expect
+    {|
+    (Review (Set_mode Edit))
+    (Focus review-editor)
+    (Rpc (method_ fs_write)
+     (params
+      ((path /work/a.ml) (text "let x = 2\n") (expected now) (review_root /work)))
+     (tag (Review (Saved a.ml))))
+    |}];
+  (* The save's snapshot comes with the review event; the diff is read
+     again too, and with it what changed since. *)
+  H.event h (review_event "edited");
+  H.reply h "fs_write" {|{"path":"/work/a.ml","md5":"edited"}|};
+  [%expect
+    {|
+    (Rpc (method_ review_since) (params ((root /work)))
+     (tag (Review (Since /work))))
+    (Expire_toast (id 0) (after_ms 2500))
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    |}];
+  H.reply h "git_diff" diff_json;
   [%expect {| |}]
 ;;
 
@@ -331,5 +436,10 @@ let%expect_test "an older backend: no since-view" =
   let h = opened () in
   H.fail h "review_since" "unknown method \"review_since\"";
   H.text h ~selector:".review-files";
-  [%expect {| |}]
+  [%expect
+    {|
+    (○ a.ml +2 −1)
+    (⚠ b.ml +1 −1)
+    2 files changed, +3 −2
+    |}]
 ;;

@@ -872,10 +872,7 @@ let fork ?at t ~dir =
               in
               if Option.is_some text then Hash_set.add texts md5;
               Some (Review (Snapshot { snapshot = s; text }))
-            | Archived _
-            | Spend _
-            | Resume_at _
-            | Agent_worktree _ -> None
+            | Archived _ | Spend _ | Resume_at _ | Agent_worktree _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->

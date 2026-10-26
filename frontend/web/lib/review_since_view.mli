@@ -21,7 +21,11 @@ val segment
 
 (** While [path] shows its since-view and has older actions: a menu to
     compare with one of them. *)
-val menu : App.Model.t -> string -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+val menu
+  :  App.Model.t
+  -> string
+  -> inject:(App.Action.t -> unit Effect.t)
+  -> Node.t
 
 (** Over the since-view of [path]: what it compares with and what came of
     it. *)

@@ -52,7 +52,9 @@ module Snapshot = struct
     let%bind action = Json.string_field j "action" in
     let%bind by = Json.string_opt_field j "by" in
     let%bind at = Json.time_ms_opt_field j "at_ms" in
-    let%map content = Or_error.bind (Json.object_field j "content") ~f:Content.of_json in
+    let%map content =
+      Or_error.bind (Json.object_field j "content") ~f:Content.of_json
+    in
     { root; path; action; by; at; content }
   ;;
 end

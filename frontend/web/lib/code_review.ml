@@ -311,6 +311,8 @@ let layout_of t path : Layout.t =
 let get_since t =
   match root t with
   | None -> t, []
+  | Some _ when List.is_empty t.review.snapshots ->
+    { t with since = String.Map.empty }, []
   | Some _ when t.since_loading -> { t with since_again = true }, []
   | Some root ->
     ( { t with since_loading = true }
@@ -327,6 +329,16 @@ let get_picked t ~path ~index =
           (Since_picked { root; path; index })
       ] )
 ;;
+
+(* New review actions on the reviewed worktree: what changed since them. *)
+let with_all_since t all =
+  let before = t.review.snapshots in
+  let t = with_all t all in
+  if List.equal Review.Snapshot.equal before t.review.snapshots
+  then t, []
+  else get_since t
+;;
+
 let approved t = File_approval.approved t.review t.files
 let unsent t = Review.unsent t.review
 
@@ -554,7 +566,8 @@ let rows t ~path =
   let full = Layout.equal layout Full in
   let since =
     match layout with
-    | Since -> Some (Option.value_map (since t path) ~default:"" ~f:(fun s -> s.diff))
+    | Since ->
+      Some (Option.value_map (since t path) ~default:"" ~f:(fun s -> s.diff))
     | Unified | Full -> None
   in
   Rows.find
@@ -695,7 +708,13 @@ let rec update t (action : Action.t) =
     (match layout with
      | Full -> fetch_content t path
      | Since when List.is_empty (history t path) ->
-       t, [ toast (sprintf "No review actions on %s yet: approve it or comment on it first." path) ]
+       ( t
+       , [ toast
+             (sprintf
+                "No review actions on %s yet: approve it or comment on it \
+                 first."
+                path)
+         ] )
      | Unified | Since -> t, [])
   | Pick_since { path; index } ->
     let t =
@@ -853,7 +872,7 @@ let rec update t (action : Action.t) =
   | Refresh -> get_diff t
 ;;
 
-let set_review t review = with_all t review
+let set_review t review = with_all_since t review
 
 let set_session t session ~watching =
   if Option.equal String.equal t.session session
@@ -897,7 +916,6 @@ let refresh_contents t ~before =
 ;;
 
 let error_text e = String.capitalize e
-
 let root_of = root
 
 let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
@@ -937,22 +955,21 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   | Review, Error e -> t, [ toast ~error:true (error_text e) ]
   | Review, Ok json ->
     (match Review.of_json json with
-     | Ok review -> with_all t review, []
+     | Ok review -> with_all_since t review
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Comment_added, Error e ->
     ( { t with draft = Option.map t.draft ~f:(fun d -> { d with busy = false }) }
     , [ toast ~error:true (error_text e) ] )
   | Comment_added, Ok json ->
     let t = { t with draft = None; selection = None } in
-    let t, since = get_since t in
     (match Review_comment.of_json json with
      | Ok c ->
        ( map_comments t ~f:(fun comments ->
            if List.exists comments ~f:(fun o -> String.equal o.id c.id)
            then comments
            else comments @ [ c ])
-       , since )
-     | Error _ -> t, since)
+       , [] )
+     | Error _ -> t, [])
   | Decided id, result ->
     (* An accepted change edited the file. *)
     let t, outs = reply t (Changed (Some id)) result in
@@ -972,14 +989,10 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
          | Some id -> { t with replies = Map.remove t.replies id }
          | None -> t
        in
-       (* An approval or a reply is an action on the file. *)
-       let t, since = get_since t in
-       let with_since (t, outs) = t, outs @ since in
-       with_since @@
        (* An approval answers with the review; a comment with itself (the
-          [review] event brings the rest). *)
+          [review] event brings the rest, its snapshot too). *)
        (match Review.of_json json with
-        | Ok review when Option.is_none id -> with_all t review, []
+        | Ok review when Option.is_none id -> with_all_since t review
         | _ ->
           (match Review_comment.of_json json with
            | Ok c ->
@@ -1059,13 +1072,17 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     in
     let t, diff = get_diff t in
     t, toast (sprintf "Saved %s" path) :: diff
-  | Since root, _ when not (Option.equal String.equal (Some root) (root_of t)) ->
+  | Since root, _ when not (Option.equal String.equal (Some root) (root_of t))
+    ->
     (* Of the worktree reviewed before. *)
     get_since { t with since_loading = false; since_again = false }
   | Since _, result ->
     let t = { t with since_loading = false } in
     let t =
-      match Result.bind result ~f:(fun j -> Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum) with
+      match
+        Result.bind result ~f:(fun j ->
+          Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum)
+      with
       | Ok files ->
         { t with
           since =
@@ -1078,9 +1095,12 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
         t
     in
     let t, picked =
-      List.fold (Map.to_alist t.picked) ~init:(t, []) ~f:(fun (t, outs) (path, (index, _)) ->
-        let t, more = get_picked t ~path ~index in
-        t, outs @ more)
+      List.fold
+        (Map.to_alist t.picked)
+        ~init:(t, [])
+        ~f:(fun (t, outs) (path, (index, _)) ->
+          let t, more = get_picked t ~path ~index in
+          t, outs @ more)
     in
     if t.since_again
     then (
@@ -1089,12 +1109,19 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     else t, picked
   | Since_picked { root; path; index }, result ->
     (match Map.find t.picked path with
-     | Some (i, _) when i = index && Option.equal String.equal (Some root) (root_of t) ->
-       (match Result.bind result ~f:(fun j -> Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum) with
-        | Ok [ f ] -> { t with picked = Map.set t.picked ~key:path ~data:(index, Some f) }, []
+     | Some (i, _)
+       when i = index && Option.equal String.equal (Some root) (root_of t) ->
+       (match
+          Result.bind result ~f:(fun j ->
+            Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum)
+        with
+        | Ok [ f ] ->
+          ( { t with picked = Map.set t.picked ~key:path ~data:(index, Some f) }
+          , [] )
         | Ok _ -> { t with picked = Map.remove t.picked path }, []
         | Error e ->
-          { t with picked = Map.remove t.picked path }, [ toast ~error:true (error_text e) ])
+          ( { t with picked = Map.remove t.picked path }
+          , [ toast ~error:true (error_text e) ] ))
      | Some _ | None -> t, [])
   | Submitted, Error e ->
     { t with submitting = false }, [ toast ~error:true (error_text e) ]
