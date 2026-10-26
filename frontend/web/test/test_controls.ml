@@ -840,15 +840,19 @@ let%expect_test
     Model
     |}];
   (* Only the open chip says so; the other chips stay live, the rest of the
-     composer is inert, under the menu. *)
+     composer is inert, under the menu. The chips are lifted over the
+     menu's backdrop (menu-open) only while it is open: the rest of the
+     time, what covers the page covers them too. *)
   H.names h ~selector:".chip-button[aria-expanded=true]";
   H.elements h ~selector:".composer [inert]";
+  H.elements h ~selector:".composer-controls";
   H.elements h ~selector:".chip-anchor";
   [%expect
     {|
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     <textarea class="editor">
     <div class="composer-buttons">
+    <div class="composer-controls menu-open">
     <div class="chip-anchor model open">
     <div class="chip-anchor thinking">
     <div class="chip-anchor mode">
@@ -860,6 +864,7 @@ let%expect_test
   H.click h ~selector:".thinking-chip";
   H.click h ~selector:".popover-backdrop";
   shown ();
+  H.elements h ~selector:".composer-controls";
   [%expect
     {|
     (Open_chip Mode)
@@ -875,6 +880,7 @@ let%expect_test
     Close_dialog
     (Focus editor)
     closed
+    <div class="composer-controls">
     |}];
   (* A model without thinking levels: ← → pass over its chip. *)
   H.event

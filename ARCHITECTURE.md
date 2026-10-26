@@ -2812,7 +2812,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     `style.css`, `chat.css`, `agents.css`, `terminal.css`, `files.css`,
     `review.css`, `highlight.css` (which tokens take which colours), `resize.css`
     (the handles) and `forge.css` (git hosting and the pull request
-    dialogs) (other design tokens in `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    dialogs) (other design tokens in `style.css`'s `:root`, among them
+    the one z-index scale, `--z-*`, that every stylesheet stacks by: what
+    covers the page, a dialog, the image viewer or a phone's drawer, is
+    over the composer's chips, which rise over a menu's backdrop only
+    while their menu is open), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix

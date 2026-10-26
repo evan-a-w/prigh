@@ -824,7 +824,7 @@ details.image[open] .lightbox {
   place-items: center;
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: var(--z-viewer);
   padding: 24px;
   background: var(--lightbox);
   cursor: zoom-out;
