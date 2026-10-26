@@ -60,17 +60,20 @@ module Reply_tag : sig
     | Compact_done
     | Git_diff
     | Review_comments of
-        { dir : string option
+        { target : P.Git_diff.Target.t
         ; base : string option
-        } (** [/review [WORKTREE] [--base REV]]: then the diff *)
+        ; direct : bool
+        } (** [/review [WORKTREE|BRANCH] [--base REV]]: then the diff *)
     | Review_status of
         { review : P.Review.t
-        ; dir : string option (** [None]: the session's own worktree *)
+        ; target : P.Git_diff.Target.t
+          (** [Dir None]: the session's own worktree *)
         }
     | Review_named of
         { command : string
         ; name : string
         ; base : string option
+        ; direct : bool
         ; model : string option
         } (** [/review NAME]: [list_worktrees], to find it *)
     | Review_started
@@ -108,6 +111,7 @@ module Reply_tag : sig
     (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Worktrees_picker (** [list_worktrees] for [/worktree] *)
     | Worktrees_for_autocomplete of string (** the [Location_cache] key *)
+    | Refs_for_autocomplete of string (** [git_refs], for [/review] *)
     | Worktree_target of
         { command : string (** back in the editor when there is none *)
         ; action : Worktree_command.Action.t (** [Open] or [Remove] *)
@@ -246,6 +250,8 @@ module Model : sig
     ; sessions : P.Session_summary.t list option
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
+    ; refs : P.Git_diff.Refs.t Location_cache.t
+      (** the repository's branches and tags, for [/review]'s completion *)
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
     ; login_lines : string list

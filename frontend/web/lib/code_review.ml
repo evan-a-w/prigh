@@ -73,17 +73,20 @@ end
 
 module Target = struct
   type t =
-    { dir : string option
+    { reviewed : Git_diff.Target.t
     ; base : string option
+    ; direct : bool
     }
   [@@deriving sexp_of, equal]
 
-  let default = { dir = None; base = None }
+  let default = { reviewed = Dir None; base = None; direct = false }
+  let own t = Git_diff.Target.equal t.reviewed (Dir None)
 end
 
 type t =
   { session : string option
   ; target : Target.t
+  ; fallback : Target.t option
   ; requested : Target.t
   ; own_root : string option
   ; all : Review.t
@@ -111,6 +114,7 @@ type t =
 let empty =
   { session = None
   ; target = Target.default
+  ; fallback = None
   ; requested = Target.default
   ; own_root = None
   ; all = Review.empty
@@ -143,6 +147,7 @@ module Reply = struct
     | Changed of string option
     | Decided of string
     | Content of string
+    | Shown of string
     | Saved of string
     | Submitted
   [@@deriving sexp_of, equal]
@@ -220,19 +225,36 @@ let rpc method_ reply = Out.Rpc { method_; reply }
 let toast ?(error = false) text = Out.Toast { text; error }
 let root t = Option.map t.diff ~f:(fun d -> d.root)
 
+let read_only t =
+  match t.target.reviewed with
+  | Rev rev -> Some rev
+  | Dir _ -> None
+;;
+
+let not_checked_out rev =
+  sprintf
+    "%s is not checked out, so it is read-only here: Check out into a \
+     worktree to change it."
+    rev
+;;
+
+(* What the session's review keys this worktree's comments and approvals
+   by. *)
+let review_root t = Option.map t.diff ~f:Git_diff.review_root
+
 (* The reviewed worktree's part of [all]; before its diff is in, all of the
    session's own (as before worktrees were told apart), none of another. *)
 let scoped t =
   let review =
-    match root t with
+    match review_root t with
     | Some root ->
       Review.scope
         t.all
         ~root
         ~own:
-          (Option.is_none t.target.dir
+          (Target.own t.target
            || Option.equal String.equal t.own_root (Some root))
-    | None -> if Option.is_none t.target.dir then t.all else Review.empty
+    | None -> if Target.own t.target then t.all else Review.empty
   in
   { t with review }
 ;;
@@ -243,7 +265,10 @@ let with_all t all = scoped { t with all }
 let map_comments t ~f = with_all t { t.all with comments = f t.all.comments }
 
 let relative t ~abs =
-  Option.bind (root t) ~f:(fun root ->
+  Option.bind
+    (Option.bind (root t) ~f:(fun root ->
+       Option.some_if (Option.is_none (read_only t)) root))
+    ~f:(fun root ->
     String.chop_prefix
       abs
       ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
@@ -295,7 +320,10 @@ let fetch_content t path =
   | Some (Loading | Loaded _) -> t, []
   | Some (Failed _) | None ->
     ( { t with contents = Map.set t.contents ~key:path ~data:Content.Loading }
-    , [ rpc (Fs_preview { path = absolute t path }) (Content path) ] )
+    , [ (match read_only t with
+         | Some rev -> rpc (Git_show { dir = None; rev; path }) (Shown path)
+         | None -> rpc (Fs_preview { path = absolute t path }) (Content path))
+      ] )
 ;;
 
 let refetch_content t path =
@@ -537,6 +565,10 @@ let rec update t (action : Action.t) =
     let t =
       { t with
         target
+      ; fallback =
+          (match t.diff, t.diff_error with
+           | Some _, None -> Some t.target
+           | _ -> t.fallback)
       ; diff = None
       ; files = []
       ; diff_error = None
@@ -570,9 +602,10 @@ let rec update t (action : Action.t) =
   | Step by -> step t by
   | Set_mode Comment -> { t with mode = Comment }, []
   | Set_mode Edit ->
-    (match t.current with
-     | None -> t, [ toast "No file to edit: the working tree has no changes." ]
-     | Some path ->
+    (match t.current, read_only t with
+     | _, Some rev -> t, [ toast (not_checked_out rev) ]
+     | None, None -> t, [ toast "No file to edit: the working tree has no changes." ]
+     | Some path, None ->
        let t = { t with mode = Edit; selection = None } in
        let t, outs = fetch_content t path in
        let t =
@@ -641,7 +674,7 @@ let rec update t (action : Action.t) =
     { t with draft = Option.map t.draft ~f:(fun d -> { d with text }) }, []
   | Draft_cancel -> { t with draft = None }, []
   | Draft_send ->
-    (match t.draft, root t with
+    (match t.draft, review_root t with
      | Some d, _ when String.is_empty (String.strip d.text) ->
        t, [ toast "Write the comment first." ]
      | Some ({ busy = false; _ } as d), Some root ->
@@ -672,6 +705,8 @@ let rec update t (action : Action.t) =
     , [ rpc (Review_set_status { id; status }) (Changed (Some id)) ] )
   | Delete id ->
     comment_busy t id, [ rpc (Review_delete { id }) (Changed (Some id)) ]
+  | Decide { accept = true; _ } when Option.is_some (read_only t) ->
+    t, [ toast (not_checked_out (Option.value (read_only t) ~default:"")) ]
   | Decide { id; post; accept } ->
     comment_busy t id, [ rpc (Review_decide { id; post; accept }) (Decided id) ]
   | Toggle_approval path ->
@@ -684,7 +719,7 @@ let rec update t (action : Action.t) =
         | _ ->
           ( t
           , [ rpc
-                (Review_approve { root = root t; path; hash = f.hash })
+                (Review_approve { root = review_root t; path; hash = f.hash })
                 (Changed None)
             ] )))
   | Submit ->
@@ -695,7 +730,7 @@ let rec update t (action : Action.t) =
     then t, []
     else
       ( { t with submitting = true }
-      , [ rpc (Review_submit { root = root t }) Submitted ] )
+      , [ rpc (Review_submit { root = review_root t }) Submitted ] )
   | Edit_input text ->
     ( { t with
         editor =
@@ -777,6 +812,16 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   | Diff, _ when not (Target.equal t.requested t.target) ->
     (* For the worktree or base reviewed before. *)
     get_diff { t with loading = false; again = false }
+  | Diff, Error e
+    when String.is_prefix e ~prefix:"unknown revision"
+         && Option.is_some t.fallback ->
+    (* A base or branch typed wrong: back to what was reviewed, saying which
+       names are close. *)
+    let back = Option.value_exn t.fallback in
+    let t, outs =
+      update { t with loading = false; again = false; fallback = None } (Show back)
+    in
+    t, toast ~error:true (error_text e) :: outs
   | Diff, Error e ->
     let t = { t with loading = false; diff_error = Some (error_text e) } in
     if t.again then get_diff { t with again = false } else t, []
@@ -790,13 +835,12 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
          scoped
            { t with
              loading = false
+           ; fallback = None
            ; diff = Some diff
            ; files = Diff_files.parse diff.diff
            ; diff_error = None
            ; own_root =
-               (if Option.is_none t.target.dir
-                then Some diff.root
-                else t.own_root)
+               (if Target.own t.target then Some diff.root else t.own_root)
            }
        in
        let t, contents = refresh_contents t ~before in
@@ -864,6 +908,18 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
         contents = Map.set t.contents ~key:path ~data:(Failed (error_text e))
       }
     , [] )
+  | Shown path, Error e ->
+    ( { t with
+        contents = Map.set t.contents ~key:path ~data:(Failed (error_text e))
+      }
+    , [] )
+  | Shown path, Ok json ->
+    let content : Content.t =
+      match Git_diff.shown_of_json json with
+      | Ok (text, _) -> Loaded { text; md5 = None }
+      | Error e -> Failed (Error.to_string_hum e)
+    in
+    { t with contents = Map.set t.contents ~key:path ~data:content }, []
   | Content path, Ok json ->
     let content : Content.t =
       match File_preview.of_json json with

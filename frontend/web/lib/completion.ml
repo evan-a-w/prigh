@@ -263,7 +263,7 @@ let compute
       ?(reminders = [])
       ?(forges = [])
       ?(worktrees = [])
-      ?(branches = [])
+      ?(refs = Git_diff.Refs.empty)
       ~text
       ~cursor
       ~models
@@ -346,7 +346,7 @@ let compute
                     |> Option.map ~f:(fun (offset, candidates) ->
                       offset, List.map candidates ~f:without_label)
                   | Review ->
-                    Prigh_ui.Review_command.complete ~worktrees ~branches rest
+                    Prigh_ui.Review_command.complete ~worktrees ~refs rest
                     |> Option.map ~f:(fun (offset, candidates) ->
                       offset, List.map candidates ~f:without_label)
                   | _ -> Prigh_ui.Remind_command.complete ~reminders rest)
