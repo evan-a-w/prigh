@@ -217,10 +217,7 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
-    | Forge_status
-    | Get_review
-    | Nix_store_status -> []
+    | Delete_archived | Forge_status | Get_review | Nix_store_status -> []
     | Nix_store_gc { delete_generations = None } -> []
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]

@@ -5932,7 +5932,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     │ the current turn (a focused subagent's: before it        │
     │ reports)                                                 │
     │ Alt+S                   send exactly what is typed,      │
-    └─────────── 1–7 of 98 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └────────── 1–7 of 100 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes

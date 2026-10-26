@@ -143,7 +143,8 @@ let%expect_test "the pickers: grouped, filtered, keyboard and Esc" =
   (* A worktree made since: the menu follows the listing read again. *)
   H.reply h "list_worktrees" listing_with_old;
   popover h;
-  [%expect {|
+  [%expect
+    {|
     [] r
     Worktrees
     ✓ main /work · this session's
@@ -239,6 +240,7 @@ let%expect_test "against origin/main, since the merge base or directly" =
     (Dialog_input origin/ma)
     Dialog_accept
     (Rpc (method_ git_diff) (params ((base origin/main))) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}];
   H.reply h "git_diff" (diff_json ~base:"origin/main" ~against:(sha 'c') a_diff);
@@ -273,6 +275,7 @@ let%expect_test "against origin/main, since the merge base or directly" =
     (Review_direct true)
     (Rpc (method_ git_diff) (params ((base origin/main) (direct true)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}];
   H.reply
@@ -308,6 +311,7 @@ let%expect_test "against origin/main, since the merge base or directly" =
     {|
     (Review_direct false)
     (Rpc (method_ git_diff) (params ((base origin/main))) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}]
 ;;
@@ -334,6 +338,7 @@ let%expect_test "a typed revision: checked, the closest names when unknown" =
     {|
     (Picker_choose base:mian)
     (Rpc (method_ git_diff) (params ((base mian))) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}];
   H.fail
@@ -348,6 +353,7 @@ let%expect_test "a typed revision: checked, the closest names when unknown" =
   [%expect
     {|
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     Unknown revision "mian": name a branch, tag or commit (closest: main, origin/main, v1.1) (Dismiss)
     (Rpc (method_ fs_preview) (params ((path /work/a.ml)))
@@ -439,11 +445,103 @@ let%expect_test
     (Rpc (method_ git_diff)
      (params ((base main) (dir /home/u/.prigh/worktrees/work/feat-old)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/work/feat-old))) (tag (Git Status)))
     (Focus review-page)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
+    |}]
+;;
+
+(* The git bar (#56) acts on a worktree: a branch that is not checked out
+   has no bar, no stage boxes and no commit box, and gets no [git_status]. *)
+let%expect_test "a branch that is not checked out has no git bar" =
+  let h = started () in
+  let git_ui () =
+    List.iter [ ".git-bar"; ".git-tick"; ".git-commit" ] ~f:(fun selector ->
+      H.elements h ~selector)
+  in
+  H.reply
+    h
+    "git_status"
+    {|{"root":"/work","branch":"main","head":"abcdef0123","ahead":0,"behind":0,"files":[{"path":"a.ml","worktree":"M"}]}|};
+  git_ui ();
+  [%expect
+    {|
+    <div class="git-bar">
+    <button class="git-tick">
+    <div class="git-commit">
+    |}];
+  H.quiet h (fun () ->
+    H.key h "r" ~target:Review;
+    H.input h ~selector:"#review-pick-filter" "old");
+  H.key h "Enter";
+  H.reply
+    h
+    "git_diff"
+    (diff_json
+       ~branch:None
+       ~rev:"feat/old"
+       ~base:"main"
+       ~against:(sha 'e')
+       a_diff);
+  [%expect
+    {|
+    (Review_pick Target)
+    (Dialog_input old)
+    Dialog_accept
+    (Rpc (method_ git_diff) (params ((rev feat/old))) (tag (Review Diff)))
+    (Focus review-page)
+    (Rpc (method_ git_show) (params ((rev feat/old) (path a.ml)))
+     (tag (Review (Shown a.ml))))
+    (Cache_prefs
+     (((key web.review) (value (((compare ()) (last ((/work rev:feat/old)))))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs ((web.review ((compare ()) (last ((/work rev:feat/old)))))))))
+     (tag Show_error))
+    |}];
+  git_ui ();
+  [%expect {| |}];
+  (* Its git actions do nothing either (Alt+G in a commit box it no longer
+     shows, say). *)
+  H.act h (Git Commit);
+  H.act h (Git Stage_approved);
+  [%expect {| |}];
+  (* Back on the worktree: the bar is read again. *)
+  H.key h "r" ~target:Review;
+  H.click h ~selector:"[data-id='own']";
+  [%expect
+    {|
+    (Review_pick Target)
+    (Focus review-pick-filter)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose Review_pick))))
+    (Picker_choose own)
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
+    (Focus review-page)
+    |}];
+  H.reply h "git_diff" (diff_json a_diff);
+  H.reply
+    h
+    "git_status"
+    {|{"root":"/work","branch":"main","head":"abcdef0123","ahead":0,"behind":0,"files":[{"path":"a.ml","worktree":"M"}]}|};
+  git_ui ();
+  [%expect
+    {|
+    (Rpc (method_ fs_preview) (params ((path /work/a.ml)))
+     (tag (Review (Content a.ml))))
+    (Cache_prefs (((key web.review) (value (((compare ()) (last ())))))))
+    (Rpc (method_ set_prefs)
+     (params ((prefs ((web.review ((compare ()) (last ()))))))) (tag Show_error))
+    <div class="git-bar">
+    <button class="git-tick">
+    <div class="git-commit">
     |}]
 ;;
 
@@ -539,6 +637,7 @@ let%expect_test "remembered: the next visit opens where the last one was" =
                             \n/work") (purpose Review_pick))))
     (Picker_choose own)
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     (Review_pick Target)
     (Focus review-pick-filter)
