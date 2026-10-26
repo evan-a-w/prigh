@@ -35,7 +35,9 @@ let view (m : App.Model.t) ~inject =
         Node.section
           ~attrs:
             [ Attr.class_ "trimmed-messages"
-            ; Attr.create "aria-label" "Trimmed messages, not in the model's context"
+            ; Attr.create
+                "aria-label"
+                "Trimmed messages, not in the model's context"
             ]
           [ div
               ~cls:"trimmed-head"
@@ -85,14 +87,16 @@ let view (m : App.Model.t) ~inject =
             ; Attr.create "aria-label" label
             ]
           [ Node.span
-              ~attrs:[ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
+              ~attrs:
+                [ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
               [ Node.text "✂" ]
           ; span ~cls:"trim-label" label
           ; Node.span
               ~attrs:[ Attr.class_ "trim-actions" ]
               [ toggle
               ; Node.span
-                  ~attrs:[ Attr.class_ "trim-sep"; Attr.create "aria-hidden" "true" ]
+                  ~attrs:
+                    [ Attr.class_ "trim-sep"; Attr.create "aria-hidden" "true" ]
                   [ Node.text "·" ]
               ; undo
               ]
