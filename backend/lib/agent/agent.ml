@@ -131,6 +131,7 @@ module Event = struct
     | Queue_update of
         { steer : string list
         ; follow_up : string list
+        ; agents : Subagent_inbox.Listing.t list
         }
     | Tool_exec of
         { host : string
@@ -195,8 +196,7 @@ type t =
   ; mutable run : Run.t option
   ; mutable describing : unit Promise.t option
   ; auto_describe : bool
-  ; steer_queue : Queued.t Queue.t
-  ; follow_up_queue : Queued.t Queue.t
+  ; queue : Queued.t Steer_queue.t
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
@@ -430,15 +430,18 @@ let state t =
 let state_changed t = broadcast t (State_changed (state t))
 
 let queued_texts t =
-  let texts queue =
-    List.map (Queue.to_list queue) ~f:(fun (q : Queued.t) -> q.text)
+  let texts kind =
+    List.map (Steer_queue.items t.queue kind) ~f:(fun (q : Queued.t) -> q.text)
   in
-  texts t.steer_queue, texts t.follow_up_queue
+  texts Steer, texts Follow_up
 ;;
 
 let queue_update t =
   let steer, follow_up = queued_texts t in
-  broadcast t (Queue_update { steer; follow_up })
+  broadcast
+    t
+    (Queue_update
+       { steer; follow_up; agents = Background_tasks.queues t.background })
 ;;
 
 (* ---- approvals, plan mode and questions --------------------------------- *)
@@ -1858,11 +1861,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
              ~execute:(executor t)
              ~background:t.background
              ~steer:(fun () ->
-               let l = Queue.to_list t.steer_queue in
-               if not (List.is_empty l)
-               then (
-                 Queue.clear t.steer_queue;
-                 queue_update t);
+               let l = Steer_queue.take_steers t.queue in
+               if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
                (* A plan mode switched during the run is told between turns. *)
                let note =
@@ -1967,11 +1967,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        in
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
-       if not (Queue.is_empty t.steer_queue)
-       then (
-         Queue.blit_transfer ~src:t.follow_up_queue ~dst:t.steer_queue ();
-         Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
-         queue_update t);
+       if Steer_queue.steers_first t.queue then queue_update t;
        auto_compact t;
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
@@ -2018,7 +2014,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
          match handover with
          | Some prompts -> Some (`Handover prompts)
          | None ->
-           (match Queue.dequeue t.follow_up_queue with
+           (match Steer_queue.take_follow_up t.queue with
             | Some queued ->
               queue_update t;
               Some (`Prompts [ user_message t queued ])
@@ -2210,6 +2206,26 @@ and auto_compact t =
 
 (* A background task finished (or was delivered): an idle agent starts a
    turn to receive it; a running one picks it up at its next turn boundary. *)
+(* Messages a subagent stopped before taking are not lost silently. *)
+let subagent_queue_changed t =
+  queue_update t;
+  List.iter (Background_tasks.tasks t.background ~kind:Subagent) ~f:(fun task ->
+    Option.iter (Background_tasks.Task.inbox task) ~f:(fun inbox ->
+      let dropped = Subagent_inbox.take_dropped inbox in
+      (* A discarded one belongs to a session no longer shown. *)
+      if not (Background_tasks.Task.delivered task)
+      then
+      List.iter dropped ~f:(fun text ->
+        broadcast
+          t
+          (Notice
+             (sprintf
+                "%s stopped before it got your message, which was not \
+                 delivered: %s"
+                (Background_tasks.Task.id task)
+                (Background_tasks.short_task text))))))
+;;
+
 let background_changed t =
   sweep_orphans t ~main_running:(is_running t);
   if (not (is_running t)) && Background_tasks.has_undelivered t.background
@@ -2343,8 +2359,7 @@ let create
     ; run = None
     ; describing = None
     ; auto_describe
-    ; steer_queue = Queue.create ()
-    ; follow_up_queue = Queue.create ()
+    ; queue = Steer_queue.create ()
     ; subscribers = []
     ; config
     ; pending_confirms = String.Table.create ()
@@ -2395,7 +2410,8 @@ let create
     ~emit:(fun event ->
       account t event;
       broadcast t (Loop event))
-    ~on_change:(fun () -> background_changed t);
+    ~on_change:(fun () -> background_changed t)
+    ~on_queue_change:(fun () -> subagent_queue_changed t);
   t
 ;;
 
@@ -2420,41 +2436,39 @@ let prompt ?(attachments = []) ?(images = []) t text =
              ])))
 ;;
 
-let enqueue_queued t queue queued =
+let enqueue_queued t kind queued =
   if is_running t
   then (
-    Queue.enqueue queue queued;
+    Steer_queue.push t.queue kind queued;
     queue_update t)
   else start_run t [] ~then_:(fun () -> [ user_message t queued ])
 ;;
 
-let enqueue t queue ?(attachments = []) ?(images = []) text =
+let enqueue t kind ?(attachments = []) ?(images = []) text =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map (expand_skill t text) ~f:(fun skill ->
       enqueue_queued
         t
-        queue
+        kind
         { Queued.text; expanded = skill; source = None; attachments; images })
 ;;
 
 let steer ?attachments ?images t text =
-  enqueue t t.steer_queue ?attachments ?images text
+  enqueue t Steer ?attachments ?images text
 ;;
 
 let follow_up ?attachments ?images t text =
-  enqueue t t.follow_up_queue ?attachments ?images text
+  enqueue t Follow_up ?attachments ?images text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
    message is actually sent. *)
 let abort t =
-  let texts q = List.map (Queue.to_list q) ~f:(fun (q : Queued.t) -> q.text) in
-  let restored = texts t.steer_queue in
-  let follow_ups = texts t.follow_up_queue in
-  Queue.clear t.steer_queue;
-  Queue.clear t.follow_up_queue;
+  let restored =
+    List.map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) -> q.text)
+  in
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
   if Option.is_some t.resume
@@ -2462,7 +2476,7 @@ let abort t =
     cancel_resume_timer t;
     broadcast t (Notice "the automatic resume is cancelled");
     state_changed t);
-  restored @ follow_ups
+  restored
 ;;
 
 let rec wait_idle t =
@@ -2486,6 +2500,23 @@ let has_running_subagents t =
 
 let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
+
+let steer_subagent t ~agent_id ~kind text =
+  Background_tasks.send t.background ~id:agent_id kind ~from:User text
+;;
+
+let dequeue_subagent t ~agent_id =
+  Or_error.map
+    (Background_tasks.inbox_of t.background agent_id)
+    ~f:Subagent_inbox.pop_last
+;;
+
+let remove_subagent_queued t ~agent_id ~queue ~index ~text =
+  Or_error.bind (Background_tasks.inbox_of t.background agent_id) ~f:(fun inbox ->
+    Subagent_inbox.remove inbox queue ~index ~text)
+;;
+
+let subagent_queues t = Background_tasks.queues t.background
 
 let cancel_subagent t ~agent_id =
   Background_tasks.cancel t.background ~kind:Subagent agent_id
@@ -2538,43 +2569,18 @@ let pending_confirms t =
     String.compare a.call_id b.call_id)
 ;;
 
-(* Pops the most recently queued message: follow-ups take priority over steer
-   messages, and within each queue the back (last enqueued) is removed. *)
 let dequeue t =
-  let pop_last queue =
-    match List.rev (Queue.to_list queue) with
-    | [] -> None
-    | last :: rest ->
-      Queue.clear queue;
-      List.iter (List.rev rest) ~f:(fun item -> Queue.enqueue queue item);
-      Some last
-  in
-  let popped =
-    match pop_last t.follow_up_queue with
-    | Some _ as queued -> queued
-    | None -> pop_last t.steer_queue
-  in
+  let popped = Steer_queue.pop_last t.queue in
   Option.iter popped ~f:(fun _ -> queue_update t);
   popped
 ;;
 
 let remove_queued t ~queue ~index ~text =
-  let q =
-    match queue with
-    | `Steer -> t.steer_queue
-    | `Follow_up -> t.follow_up_queue
-  in
-  let items = Queue.to_list q in
-  match List.nth items index with
-  | Some (item : Queued.t) when Option.for_all text ~f:(String.equal item.text)
-    ->
-    Queue.clear q;
-    List.iteri items ~f:(fun i item -> if i <> index then Queue.enqueue q item);
+  Steer_queue.remove t.queue queue ~index ~matches:(fun (item : Queued.t) ->
+    Option.for_all text ~f:(String.equal item.text))
+  |> Or_error.map ~f:(fun item ->
     queue_update t;
-    Ok item
-  | _ ->
-    Or_error.error_string
-      "that message is no longer queued: it was delivered or removed already"
+    item)
 ;;
 
 let shell t ~command ~add_to_context =
@@ -2737,7 +2743,7 @@ let command_prompt t ~text ~expanded ~source =
   | None ->
     enqueue_queued
       t
-      t.follow_up_queue
+      Follow_up
       { Queued.text
       ; expanded = Some expanded
       ; source = Some source
@@ -2800,7 +2806,7 @@ let submit_review ?root t =
       ~f:(fun (text, count) ->
         enqueue_queued
           t
-          t.steer_queue
+          Steer
           { Queued.text =
               (if count = 1
                then "Review comment"

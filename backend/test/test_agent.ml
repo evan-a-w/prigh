@@ -336,12 +336,12 @@ let%expect_test "remove_queued takes out one message, if it is still there" =
          |> Or_error.map ~f:(fun (q : Agent.Queued.t) -> q.text)
          : string Or_error.t)]
   in
-  remove `Steer ~index:0 ~text:(Some "first");
+  remove Steer ~index:0 ~text:(Some "first");
   (* Stale: "first" is gone, "second" is now at 0. *)
-  remove `Steer ~index:0 ~text:(Some "first");
-  remove `Steer ~index:3 ~text:None;
+  remove Steer ~index:0 ~text:(Some "first");
+  remove Steer ~index:3 ~text:None;
   print_s [%sexp (Agent.queued_texts agent : string list * string list)];
-  remove `Follow_up ~index:0 ~text:None;
+  remove Follow_up ~index:0 ~text:None;
   Agent.wait_idle agent;
   dump ();
   [%expect
