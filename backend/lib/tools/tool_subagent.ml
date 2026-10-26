@@ -34,7 +34,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description = background_description
   ; parameters =
       Tool_args.schema
@@ -550,7 +550,7 @@ let control_spec ~name ~description parameters =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description
   ; parameters
   }

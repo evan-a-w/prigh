@@ -475,8 +475,15 @@ let route t agent (event : Agent.Event.t) =
    | Tool_exec_input { host; _ } ->
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+  (* A subagent's messages too: its tools may have made worktrees. *)
+  let rec message_end : Agent_event.t -> bool = function
+    | Message_end _ -> true
+    | Subagent { event; _ } -> message_end event
+    | _ -> false
+  in
   (match event with
-   | State_changed _ | Loop (Message_end _) -> note_listed t agent
+   | State_changed _ -> note_listed t agent
+   | Loop e when message_end e -> note_listed t agent
    | _ -> ());
   match event with
   | State_changed { running; _ } ->

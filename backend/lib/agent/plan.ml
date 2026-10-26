@@ -113,7 +113,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "Updates the task plan, which the user sees. Use it for work with \
        several steps: give every step (short, a few words to a sentence) with \

@@ -50,6 +50,13 @@ let tool_summary ~name (args : Json.t) =
   | `Object fields ->
     let find name = List.Assoc.find fields ~equal:String.equal name in
     (match find "command", find "path", find "input" with
+     | _ when String.equal name "worktree" ->
+       let text key =
+         match find key with
+         | Some (`String s) -> [ s ]
+         | _ -> []
+       in
+       String.concat ~sep:" " (text "action" @ text "branch" @ text "path")
      | Some (`String s), _, _ -> s
      | _, Some (`String s), _ -> s
      | _, _, Some (`String patch) when String.equal name "apply_patch" ->

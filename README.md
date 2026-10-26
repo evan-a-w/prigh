@@ -1171,6 +1171,21 @@ until it is removed: prigh-web shows it under the session, tagged
 `subagent`, and `/worktree` lists it like any other (open it, or start a
 session there, to look at the work).
 
+The model makes worktrees itself with the `worktree` tool (main agent and
+subagents alike): `create` checks a branch out at the standard place, like
+`/worktree new` (an existing branch as it is, else a new one from `base`),
+and the session records it (a subagent's as that subagent's, tagged
+`subagent`); the model works there by its path (`cd` in bash, a
+subagent's `cwd`). `list` shows the worktrees with their branch and
+changes, and `remove` takes one away with `/worktree rm`'s rules: never
+the main checkout or the worktree the agent or the session works in, and
+one with uncommitted changes only with `force`. The system prompt tells
+the model to use it rather than `git worktree add`. Should it run `git
+worktree add` (or `remove`, `move`, `prune`) in bash anyway, prigh
+compares the repository's worktrees before and after the command: new
+ones are recorded on the session (one outside `worktrees_dir` gets a note
+telling the model to use the tool next time) and removed ones forgotten.
+
 Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
 …, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
 the highlighted one); `/agents cancel <n|id>` cancels by number or id; Esc
@@ -1653,7 +1668,9 @@ there), keeps the branch, and is refused for the main checkout, for the
 worktree the session itself is in (open another first) and, without
 `-f`, for one with uncommitted changes or locked; a worktree whose
 directory was deleted is pruned. prigh-web's sidebar shows, under each
-session, the worktrees it made, moved into or gave its subagents (above).
+session, the worktrees it made, moved into or gave its subagents (above),
+including those its agents made with the `worktree` tool or `git worktree
+add`.
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:
@@ -1744,9 +1761,10 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  and MCP tools that are not read-only) wait for your answer.
-- `auto-edit`: file edits run without asking; `bash`, `job_input` and MCP
-  tools still ask.
+  `worktree`'s `create` and `remove` (not `list`), and MCP tools that are
+  not read-only) wait for your answer.
+- `auto-edit`: file edits run without asking; `bash`, `job_input`,
+  `worktree create`/`remove` and MCP tools still ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its

@@ -201,13 +201,15 @@ let common_params =
       let current f default () =
         Option.value_map !agent_ref ~default ~f:(fun a -> f (Agent.state a))
       in
+      let worktrees_dir () =
+        match !agent_ref with
+        | Some agent -> (Agent.config agent).worktrees_dir
+        | None -> Config.default.worktrees_dir
+      in
       let subagent =
         Tool_subagent.create
           ~models
-          ~worktrees_dir:(fun () ->
-            match !agent_ref with
-            | Some agent -> (Agent.config agent).worktrees_dir
-            | None -> Config.default.worktrees_dir)
+          ~worktrees_dir
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -225,6 +227,11 @@ let common_params =
              else
                Tools.all
                @ (subagent :: Tool_subagent.control_tools)
+               @ [ Tool_worktree.create
+                     ~worktrees_dir
+                     ~session:(fun () -> Option.map !agent_ref ~f:Agent.session)
+                     ()
+                 ]
                @ Tool_jobs.tools
                @ Tools.interaction)
           ~sessions_dir
