@@ -3,6 +3,7 @@ open! Import
 open Chat_html
 
 let image_src = Image_view.src
+let trim_attribute = "data-trim-entry"
 
 let tokens n =
   if n < 1000
@@ -71,7 +72,24 @@ let margin_note ?at times (n : Origin.Note.t) =
   note ?at times ~kind:n.kind ~title:n.title n.text
 ;;
 
-let user ?skill times (u : Message.User.t) =
+(* Revealed with the message on hover or focus; the page's click listener
+   turns it into [Ask_trim]. *)
+let trim_button n =
+  Node.button
+    ~attrs:
+      [ Attr.class_ "trim-before"
+      ; Attr.type_ "button"
+      ; Attr.title "Trim everything before this from the model's context"
+      ; Attr.create trim_attribute (Int.to_string n)
+      ]
+    [ Node.span
+        ~attrs:[ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
+        [ Node.text "✂" ]
+    ; Node.text "Trim everything before this"
+    ]
+;;
+
+let user ?skill ?trim times (u : Message.User.t) =
   let notes, attachments =
     match u.origin with
     | None -> [], []
@@ -104,6 +122,7 @@ let user ?skill times (u : Message.User.t) =
                   ~attrs:[ Attr.class_ "attachment"; Attr.title "Attached file" ]
                   [ Node.text ("@" ^ path) ])))
       ; Option.value_map u.at ~default:Node.none ~f:(time times)
+      ; Option.value_map trim ~default:Node.none ~f:trim_button
       ]
   in
   match notes with
@@ -206,10 +225,12 @@ module Deps = struct
     ; times : Message_time.t
     ; expanded : bool list (** the entry's folds *)
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
+    ; trim : bool (** it has "Trim everything before this" *)
     }
 
   let equal a b =
     a.n = b.n
+    && Bool.equal a.trim b.trim
     && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
     && Message_time.equal a.times b.times
@@ -219,10 +240,12 @@ module Deps = struct
 end
 
 module Chat_deps = struct
-  type t = Message_time.t * Fold.t
+  type t = Message_time.t * Fold.t * int option
 
-  let equal (times, fold) (times', fold') =
-    Message_time.equal times times' && Fold.equal fold fold'
+  let equal (times, fold, trim_after) (times', fold', trim_after') =
+    Message_time.equal times times'
+    && Fold.equal fold fold'
+    && Option.equal Int.equal trim_after trim_after'
   ;;
 end
 
@@ -294,7 +317,7 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
       ((pending :: blocks)
        @ [ stopped; (if streaming then Node.none else footer times message) ])
 
-and render_entry ~fold times chat (entry : Chat.Entry.t) =
+and render_entry ?trim ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     let notes =
@@ -320,7 +343,8 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
             (String.chop_prefix u.text ~prefix:summary_prefix)
             ~default:u.text)
      | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
-     | None -> user ?skill:(Skill_message.parse (Message.User.body u)) times u)
+     | None ->
+       user ?skill:(Skill_message.parse (Message.User.body u)) ?trim times u)
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
@@ -341,7 +365,14 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ~fold times chat ~n (entry : Chat.Entry.t) =
+and entry ?trim_after ~fold times chat ~n (entry : Chat.Entry.t) =
+  let trim =
+    match trim_after, entry with
+    | Some after, User u
+      when n > after && Option.is_none (Message.User.source u) ->
+      Jump.landmark entry
+    | _ -> false
+  in
   let ids =
     match entry with
     | Assistant { message; _ } ->
@@ -380,10 +411,13 @@ and entry ~fold times chat ~n (entry : Chat.Entry.t) =
             (List.exists tools ~f:(fun tool ->
                Option.exists tool ~f:(fun t -> Option.is_some t.subagent)))
             fold
+      ; trim
       }
     ~equal:Deps.equal
     ~f:(fun () ->
-      let node = render_entry ~fold times chat entry in
+      let node =
+        render_entry ?trim:(Option.some_if trim n) ~fold times chat entry
+      in
       match node with
       | Element e when Jump.landmark entry ->
         Element
@@ -401,15 +435,15 @@ and keyed key (node : Node.t) : Node.t =
 
 (* Days are marked where they change, not above the first message: its time
    already says which day it is. *)
-and view ?(fold = Fold.default) times chat =
+and view ?(fold = Fold.default) ?trim_after times chat =
   View_cache.find
     chats
     chat
-    ~deps:(times, fold)
+    ~deps:(times, fold, trim_after)
     ~equal:Chat_deps.equal
-    ~f:(fun () -> entries_view ~fold times chat)
+    ~f:(fun () -> entries_view ?trim_after ~fold times chat)
 
-and entries_view ~fold times chat =
+and entries_view ?trim_after ~fold times chat =
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
     | Assistant { message; _ } -> message.at
@@ -429,7 +463,8 @@ and entries_view ~fold times chat =
         in
         ( Option.first_some day last_day
         , i + 1
-        , keyed (Int.to_string i) (entry ~fold times chat ~n:i e) :: rev_nodes ))
+        , keyed (Int.to_string i) (entry ?trim_after ~fold times chat ~n:i e)
+          :: rev_nodes ))
   in
   div "entries" (List.rev rev_nodes)
 ;;

@@ -36,6 +36,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
       | Argument Accent -> "Accent colours"
+      | Argument Trim -> "Trim"
     in
     div
       ~cls:"popup"

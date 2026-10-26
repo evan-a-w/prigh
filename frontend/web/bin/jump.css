@@ -3,7 +3,8 @@
    rather than by height, so every one is as easy to hit. The user's turns
    are short sodium strokes (sodium is their colour in the transcript), the
    one in view drawn out in full sodium; a reply that failed a brick dot; a
-   compaction a longer faint rule; turns not loaded yet are faint. Above
+   compaction a longer faint rule; what is trimmed from the context a dashed
+   cut line at the top; turns not loaded yet are faint. Above
    them, the jump list's button. On a phone only the button, floating. */
 
 .chat-frame {
@@ -63,6 +64,9 @@
 }
 .tick.unloaded::before { background: var(--faint-line); opacity: 0.55; }
 .tick.compaction::before { width: 20px; height: 1px; background: var(--faint-line); }
+/* What is trimmed from the context: a cut line, at the top. */
+.tick.trimmed::before { width: 20px; height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--muted); opacity: 0.8; }
+.tick.trimmed:hover::before { border-top-color: var(--chalk); opacity: 1; }
 .tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--brick); margin-right: 2px; }
 .tick.user[aria-current]::before { width: 16px; background: var(--sodium); opacity: 1; }
 .tick.user:hover::before,

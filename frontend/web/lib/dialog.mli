@@ -24,6 +24,9 @@ module Picker_kind : sig
     | Reminders (** the session's ([/remind]); item ids are their names *)
     | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
     | Jump (** item ids are [Jump.Target.to_string]s *)
+    | Trim of Trim.Point.t list
+    (** [/trim]: where to trim the context before; item ids are
+        [Trim.Point.before]s *)
     | Worktrees of Worktree.Listing.t (** item ids are their paths *)
     | Themes (** item ids are [Theme.Name.to_string]s *)
     | Accents (** item ids are [Theme.Accent.to_string]s *)
@@ -70,6 +73,11 @@ type t =
       { id : string
       ; text : string
       }
+  | Trim_confirm of
+      { point : Trim.Point.t
+      ; busy : bool (** trimming: waiting for the backend *)
+      ; error : string option
+      } (** trim the context before [point]? *)
   | Create_dir of
       { target : Dir_change.Target.t
       ; path : string (** absolute, on the target's host *)
