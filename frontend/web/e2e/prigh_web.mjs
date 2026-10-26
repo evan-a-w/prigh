@@ -145,16 +145,26 @@ const browser = await engine.launch({
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
 // [window.__delay] holds back what the backend says by that many ms, so that
-// what the page shows while it waits can be seen.
+// what the page shows while it waits can be seen. Messages keep their order:
+// those that come after the delay is lifted wait for the held ones.
 await page.addInitScript(() => {
   const Real = window.WebSocket;
   window.__delay = 0;
   window.WebSocket = class extends Real {
     set onmessage(f) {
+      const held = [];
+      let timer = null;
+      const pump = () => {
+        timer = null;
+        while (held.length && held[0].at <= Date.now()) f(held.shift().e);
+        if (held.length) timer = setTimeout(pump, held[0].at - Date.now());
+      };
       super.onmessage = e => {
         const delay = window.__delay;
-        if (delay) setTimeout(() => f(e), delay);
-        else f(e);
+        if (!delay && !held.length) return f(e);
+        const last = held.length ? held[held.length - 1].at : 0;
+        held.push({ e, at: Math.max(Date.now() + delay, last) });
+        if (!timer) pump();
       };
     }
     get onmessage() { return super.onmessage; }
