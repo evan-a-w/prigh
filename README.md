@@ -1554,8 +1554,9 @@ placeholder (`[bash output omitted to save context: 412 lines, 18 KB; run the
 tool again if you need it]`), and so are large arguments of old tool calls
 (a `write`'s content, an `apply_patch` body); the model's reasoning, its
 calls and your messages stay, and so do errors and outputs under 2 KB. It
-masks in batches, only when that frees at least a tenth of the window, so
-the provider's prompt cache is not invalidated every turn, and the session
+masks in batches, only when that frees at least a tenth of the window (also
+past the point where it would summarise), so the provider's prompt cache is
+not invalidated every turn, and the session
 records it, so a resumed session sends the same context. The transcript
 keeps showing the full outputs, with a note saying what was masked;
 `mask_observations: false` in `config.json` turns it off.

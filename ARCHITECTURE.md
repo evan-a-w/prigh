@@ -1271,10 +1271,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   all) with one, keeping the JSON valid; errors and small results stay.
   `plan` masks everything before the last 10 assistant messages
   (`keep_turns`), saying where it ends (`through`) and the tokens it saves;
-  `worth_masking` takes it when urgent (the context would otherwise be
-  summarised, or overflowed) or when the context is over half the window
-  and it saves a tenth of the window: masking rewrites the prompt's prefix,
-  and so the provider's cache, so it is done in batches, not every turn.
+  `worth_masking` takes it after an overflow (anything that helps) or when
+  the context is over half the window and it saves a tenth of the window,
+  over the summarisation threshold too: masking rewrites the prompt's
+  prefix, and so the provider's cache, so it is done in batches, not every
+  turn (a smaller floor past the threshold re-masked each turn's output as
+  it aged whenever no summary followed: nothing to summarise, or it
+  failed).
   `mask_observations` in `config.json` (default true) turns it off, also
   for subagents (`Tool_subagent.create ~mask_observations`).
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:

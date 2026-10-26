@@ -176,27 +176,31 @@ let%expect_test "when masking is worth it" =
     [ 40_000, false, 50_000
     ; 60_000, false, 5_000
     ; 60_000, false, 10_000
+    ; 90_000, false, 9_999
+    ; 90_000, false, 10_000
     ; 60_000, true, 5
     ; 0, true, 1
     ]
-    ~f:(fun (input_tokens, urgent, saved) ->
+    ~f:(fun (input_tokens, overflowed, saved) ->
       printf
-        "%6d tokens, urgent %-5b, saves %5d: %b\n"
+        "%6d tokens, overflowed %-5b, saves %5d: %b\n"
         input_tokens
-        urgent
+        overflowed
         saved
         (Observation_mask.worth_masking
            model
            ~input_tokens
-           ~urgent
+           ~overflowed
            (plan saved)));
   [%expect
     {|
-     40000 tokens, urgent false, saves 50000: false
-     60000 tokens, urgent false, saves  5000: false
-     60000 tokens, urgent false, saves 10000: true
-     60000 tokens, urgent true , saves     5: true
-         0 tokens, urgent true , saves     1: true
+    40000 tokens, overflowed false, saves 50000: false
+    60000 tokens, overflowed false, saves  5000: false
+    60000 tokens, overflowed false, saves 10000: true
+    90000 tokens, overflowed false, saves  9999: false
+    90000 tokens, overflowed false, saves 10000: true
+    60000 tokens, overflowed true , saves     5: true
+        0 tokens, overflowed true , saves     1: true
     |}]
 ;;
 
@@ -248,11 +252,11 @@ let print_request (r : Provider.Request.t) =
       masked
 ;;
 
-let filler_call i =
+let filler_call ?(size = 8000) i =
   Reply.tool_call
     ~id:(sprintf "c%d" i)
     ~name:"filler"
-    ~arguments:{|{"size":8000}|}
+    ~arguments:(sprintf {|{"size":%d}|} size)
     ()
 ;;
 
@@ -347,6 +351,49 @@ let%expect_test "with masking off, the same run summarises" =
     compacted: SUMMARY
     request: 8 messages, ~6027 tokens, masked []
     added: 34 messages
+    |}]
+;;
+
+(* Over the threshold with nothing it can summarise (the user's message is
+   kept):
+   masking waits until a batch frees as much as it would under the
+   threshold, rather than masking each turn's output as it ages, which
+   would invalidate the provider's cache on every request. *)
+let%expect_test "over the threshold, masking still waits for a large batch" =
+  run_loop
+    ~context:[ Message.user ("old " ^ String.make 112_000 'u') ]
+    (List.map (List.range 1 25) ~f:(filler_call ~size:3000)
+     @ [ Reply.text "done" ]);
+  [%expect
+    {|
+    request: 2 messages, ~28003 tokens, masked []
+    request: 4 messages, ~28757 tokens, masked []
+    request: 6 messages, ~29512 tokens, masked []
+    request: 8 messages, ~30267 tokens, masked []
+    request: 10 messages, ~31022 tokens, masked []
+    request: 12 messages, ~31776 tokens, masked []
+    request: 14 messages, ~32531 tokens, masked []
+    request: 16 messages, ~33286 tokens, masked []
+    request: 18 messages, ~34041 tokens, masked []
+    request: 20 messages, ~34795 tokens, masked []
+    request: 22 messages, ~35550 tokens, masked []
+    request: 24 messages, ~36305 tokens, masked []
+    request: 26 messages, ~37060 tokens, masked []
+    request: 28 messages, ~37814 tokens, masked []
+    request: 30 messages, ~38569 tokens, masked []
+    request: 32 messages, ~39324 tokens, masked []
+    masked 6 messages, saving ~4368 tokens
+    request: 34 messages, ~35712 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 36 messages, ~36467 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 38 messages, ~37222 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 40 messages, ~37976 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 42 messages, ~38731 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 44 messages, ~39486 tokens, masked [c1 c2 c3 c4 c5 c6]
+    masked 6 messages, saving ~4368 tokens
+    request: 46 messages, ~35874 tokens, masked [c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12]
+    request: 48 messages, ~36629 tokens, masked [c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12]
+    request: 50 messages, ~37384 tokens, masked [c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12]
+    added: 50 messages
     |}]
 ;;
 

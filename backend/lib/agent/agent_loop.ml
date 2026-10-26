@@ -234,7 +234,7 @@ let run
   in
   (* Masks old tool outputs when [Observation_mask.worth_masking] says so,
      returning the tokens it saved. *)
-  let mask_context ~input_tokens ~urgent =
+  let mask_context ~input_tokens ~overflowed =
     if not config.mask_observations
     then None
     else (
@@ -243,7 +243,7 @@ let run
         when Observation_mask.worth_masking
                config.model
                ~input_tokens
-               ~urgent
+               ~overflowed
                plan ->
         (match mask ~through:plan.through !messages with
          | Error _ -> None
@@ -265,12 +265,7 @@ let run
         tokens + Message.estimate_tokens (List.drop !messages since)
       in
       let tokens =
-        match
-          mask_context
-            ~input_tokens:tokens
-            ~urgent:
-              (Compaction.should_compact config.model ~input_tokens:tokens)
-        with
+        match mask_context ~input_tokens:tokens ~overflowed:false with
         | Some saved -> tokens - saved
         | None -> tokens
       in
@@ -324,7 +319,7 @@ let run
         | Error message
           when Context_overflow.matches message
                && not (Cancellation.is_cancelled cancel) ->
-          if Option.is_some (mask_context ~input_tokens:0 ~urgent:true)
+          if Option.is_some (mask_context ~input_tokens:0 ~overflowed:true)
           then attempt n ~overflows
           else if overflows >= overflow_attempts
           then

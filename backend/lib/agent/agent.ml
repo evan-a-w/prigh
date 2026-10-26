@@ -2449,7 +2449,7 @@ and auto_compact t =
           && Observation_mask.worth_masking
                t.model
                ~input_tokens:tokens
-               ~urgent:(Compaction.should_compact t.model ~input_tokens:tokens)
+               ~overflowed:false
                plan)
     with
     | None -> tokens
