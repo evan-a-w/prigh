@@ -1804,7 +1804,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     output. `Event` has `Tool_exec.stdin` and `Tool_exec_input`; the
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
-    `Backend_link.connection_hello` with local tools announces `"features":
+    `Backend_link.connection_hello` with local tools gives its `home` and announces `"features":
     ["exec_input", "terminal_kill", "git_location"]` (`Terminal_kill` goes to the worker,
     which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
