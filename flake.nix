@@ -142,7 +142,8 @@
 
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
         # with prigh-web, the browser frontend, instead (`prigh serve -web
-        # 127.0.0.1:7790 -open ...`).
+        # 127.0.0.1:7790 -open ...`); with -connect or -remote, prigh-web for
+        # a backend elsewhere (`prigh web -open ...`).
         prighWebRoot = "${prighFrontend}/share/prigh_frontend/web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
@@ -152,6 +153,9 @@
             export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             if [ "''${1:-}" = "-web" ]; then
               shift
+              for arg in "$@"; do
+                case "$arg" in -connect | -remote) exec "$PRIGH_BACKEND" web -open "$@" ;; esac
+              done
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
             exec ${prighFrontend}/bin/prigh-tui "$@"
@@ -206,6 +210,26 @@
             PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_ROOT=/custom \
             ${prigh}/bin/prigh -web
           test "$(cat override-root)" = /custom
+          ARGS_OUT="$PWD/connect-args" ROOT_OUT="$PWD/connect-root" \
+            PRIGH_BACKEND="$PWD/fake-backend" \
+            ${prigh}/bin/prigh -web -connect server:7790 -token sekrit
+          diff -u ${pkgs.writeText "expected-connect-args" ''
+            web
+            -open
+            -connect
+            server:7790
+            -token
+            sekrit
+          ''} connect-args
+          test "$(cat connect-root)" = "${prighWebRoot}"
+          ARGS_OUT="$PWD/remote-args" ROOT_OUT="$PWD/remote-root" \
+            PRIGH_BACKEND="$PWD/fake-backend" \
+            ${prigh}/bin/prigh -web -remote
+          diff -u ${pkgs.writeText "expected-remote-args" ''
+            web
+            -open
+            -remote
+          ''} remote-args
           test -f ${prighWebRoot}/index.html
           test -f ${prighWebRoot}/main.bc.js
           test -f ${prighWebRoot}/style.css

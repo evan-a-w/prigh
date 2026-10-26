@@ -89,6 +89,10 @@ From another machine, connect to the web or server port:
 `prigh-tui -connect <docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj`.
 By default the tools then run on *that* machine. Add `-tools remote` to run
 them on the user's tool host in the container instead.
+The browser UI can be served from that machine the same way, with its
+tools there and the page signed in for you: `prigh -web -connect
+<docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj` (`prigh web`; see
+the README's "prigh-web for a backend elsewhere").
 
 ## Users
 

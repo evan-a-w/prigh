@@ -89,8 +89,9 @@ module Host = struct
         ~log
         ~initial_backoff:(Time_ns.Span.of_sec 0.05)
         ~max_backoff:(Time_ns.Span.of_sec 0.2)
-        ~host:"127.0.0.1"
-        ~port
+        ~backend:
+          (Or_error.ok_exn
+             (Backend_address.parse (sprintf "127.0.0.1:%d" port)))
         ~token
         ?user
         ?host_id

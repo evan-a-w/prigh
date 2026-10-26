@@ -35,7 +35,8 @@ val run
   -> unit
   -> unit
 
-(** Connects to a backend's JSON-lines port as an RPC client, says [hello]
+(** Connects to a backend ({!Backend_socket}: its JSON-lines port, or its
+    WebSocket for a URL) as an RPC client, says [hello]
     as a tool host (with the feature [exec_input]) and serves its
     [tool_exec], [tool_exec_cancel], [tool_exec_input] and [terminal_*]
     events, reconnecting with exponential backoff (from
@@ -52,8 +53,8 @@ val connect
   -> ?log:(string -> unit)
   -> ?initial_backoff:Time_ns.Span.t
   -> ?max_backoff:Time_ns.Span.t
-  -> host:string
-  -> port:int
+  -> ?on_connect:(unit -> unit) (** after each accepted [hello] *)
+  -> backend:Backend_address.t
   -> token:string option
   -> ?user:string (** the namespace's name, sent in [hello] *)
   -> ?host_id:string

@@ -3,6 +3,7 @@
 # or the current environment under `nix develop`), then runs the TUI.
 # Usage: ./prigh [frontend options] [-- backend options]   (see prigh-tui -help)
 #        ./prigh -web [serve options]                      (prigh-web, the browser frontend; see prigh serve -help)
+#        ./prigh -web -connect HOST:PORT|-remote [options] (prigh-web for a backend elsewhere; see prigh web -help)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
@@ -14,11 +15,15 @@ fi
 
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
 
-# ./prigh -web [serve options]: prigh-web (frontend/web/) instead of the TUI.
+# ./prigh -web [serve options]: prigh-web (frontend/web/) instead of the TUI;
+# with -connect or -remote, for a backend elsewhere (`prigh web`).
 if [ "${1:-}" = "-web" ]; then
 	shift
 	(cd "$root/frontend" && dune build ./web/bin/site 2>&1 | { grep -v missing-effects-backend || true; })
 	export PRIGH_WEB_ROOT="${PRIGH_WEB_ROOT:-$root/frontend/_build/default/web/bin/site}"
+	for arg in "$@"; do
+		case "$arg" in -connect | -remote) exec "$PRIGH_BACKEND" web -open "$@" ;; esac
+	done
 	exec "$PRIGH_BACKEND" serve -web "${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
 fi
 

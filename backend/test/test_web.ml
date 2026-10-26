@@ -262,6 +262,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       ~root:(Some root)
       ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
       ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
+      ()
   in
   let http = Loopback.http ~env:t.env ~sw ~port in
   http "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
@@ -438,6 +439,7 @@ let%expect_test
       ~root:None
       ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
       ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
+      ()
   in
   let terminal_flow = Loopback.connect ~env:t.env ~sw ~port in
   let terminal =
