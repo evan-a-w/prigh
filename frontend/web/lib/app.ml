@@ -2122,27 +2122,9 @@ let unqueue (m : Model.t) (recipient : Recipient.t) q ~tag =
 ;;
 
 (* A finished subagent takes no messages: the composer goes back to the main
-   agent. On a desktop the subagent shown in the panel is the one steered
-   (until Esc), none once the panel closes. *)
-let follow_recipient (before : Model.t) ((m : Model.t), cmds) =
-  let m =
-    if
-      m.narrow
-      || (Option.equal
-            Agents.Item.equal
-            before.agents.selected
-            m.agents.selected
-          && Bool.equal before.agents.open_ m.agents.open_)
-    then m
-    else
-      { m with
-        recipient =
-          (match m.agents.open_, m.agents.selected with
-           | true, Some (Agent id)
-             when Option.is_none (Recipient.refusal m.agents id) -> Agent id
-           | _ -> Main)
-      }
-  in
+   agent. Showing a subagent in the panel does not steer it: only its Steer
+   button does. *)
+let follow_recipient ((m : Model.t), cmds) =
   match m.recipient with
   | Main -> m, cmds
   | Agent id ->
@@ -7520,7 +7502,7 @@ let settle (m : Model.t) cmds =
 let update (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
   let m', cmds = follow_worktrees m (m', cmds) in
-  let m', cmds = follow_recipient m (m', cmds) in
+  let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
   if
