@@ -316,7 +316,13 @@ let view (m : App.Model.t) ~inject =
 let extras (m : App.Model.t) ~host:with_host ~inject =
   match m.state, m.connection with
   | Some state, Connected ->
-    let queued = Queued.count m.queue in
+    let queued, whose =
+      match m.recipient with
+      | Main -> Queued.count m.queue, ""
+      | Agent id ->
+        let q = Agent_queue.find m.agent_queues id in
+        List.length q.steer + List.length q.follow_up, " for " ^ id
+    in
     div
       ~cls:"status-extras"
       [ goal state ~inject
@@ -331,7 +337,7 @@ let extras (m : App.Model.t) ~host:with_host ~inject =
                ; Attr.title "Take the last queued message back into the editor"
                ; Attr.on_click (fun _ -> inject Action.Dequeue)
                ]
-             [ icon Undo; text_ (sprintf "%d queued" queued) ]
+             [ icon Undo; text_ (sprintf "%d queued%s" queued whose) ]
          else Node.none)
       ; background m ~inject
       ; transfers m

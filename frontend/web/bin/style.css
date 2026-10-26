@@ -1448,6 +1448,31 @@ kbd {
 .queued.steer { border-left-color: var(--sodium); }
 .queued-tag { font-size: 12px; line-height: 26px; color: var(--muted); white-space: nowrap; }
 .queued.steer .queued-tag { color: var(--sodium); }
+
+/* Steering a subagent: whom the composer writes to, over the editor. */
+.steer-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  align-self: flex-start;
+  padding: 2px 2px 2px 8px;
+  color: var(--sodium);
+  background: var(--sodium-wash);
+  border: 1px solid var(--sodium-line);
+  border-radius: var(--r-chip);
+  font-size: 12.5px;
+  animation: rise 0.12s ease-out;
+}
+.steer-chip-icon { width: 13px; height: 13px; flex-shrink: 0; }
+.steer-chip-label { white-space: nowrap; font-weight: 500; }
+.steer-chip-id { font: 500 12px var(--mono); }
+.steer-chip-task { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steer-chip-task::before { content: "· "; color: var(--faint); }
+.steer-chip-close.btn.icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--muted); }
+.steer-chip-close .icon { width: 11px; height: 11px; }
+.steer-chip-close:hover { color: var(--fg); }
 .queued-text {
   padding: 3px 0;
   font-size: 14px;

@@ -5,63 +5,7 @@ module H = Harness
 (* The agents panel: subagents (live from their events and [list_subagents],
    nested ones under their parent) and background jobs ([list_jobs]). *)
 
-let call ~id ~name args =
-  sprintf
-    {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","id":"%s","name":"%s","arguments":%s}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}}|}
-    id
-    name
-    (Jsonaf.to_string (`String args))
-;;
-
-let text_reply text =
-  sprintf
-    {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":%s}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}}|}
-    (Jsonaf.to_string (`String text))
-;;
-
-let tool_start ~id ~name args =
-  sprintf
-    {|{"event":"tool_start","call":{"id":"%s","name":"%s","arguments":%s}}|}
-    id
-    name
-    (Jsonaf.to_string (`String args))
-;;
-
-let tool_end ~id ~name text =
-  sprintf
-    {|{"event":"tool_end","call":{"id":"%s","name":"%s","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"%s","tool_name":"%s","text":%s,"is_error":false}}|}
-    id
-    name
-    id
-    name
-    (Jsonaf.to_string (`String text))
-;;
-
-let inner ~call ~agent json =
-  sprintf
-    {|{"event":"subagent","call_id":"%s","agent_id":"%s","inner":%s}|}
-    call
-    agent
-    json
-;;
-
-let start ~call ~agent task =
-  sprintf
-    {|{"event":"subagent_start","call_id":"%s","agent_id":"%s","task":"%s","model":"deepseek-flash","tools":["bash"]}|}
-    call
-    agent
-    task
-;;
-
-let end_ ?(error = false) ~call ~agent ~turns text =
-  sprintf
-    {|{"event":"subagent_end","call_id":"%s","agent_id":"%s","usage":{"input":0,"output":0,"cache_read":0},"turns":%d,"cost_usd":0.012,"result":{"text":%s,"is_error":%b}}|}
-    call
-    agent
-    turns
-    (Jsonaf.to_string (`String text))
-    error
-;;
+open Agent_events
 
 let in_a1 = inner ~call:"s1" ~agent:"a1"
 let in_n1 json = in_a1 (inner ~call:"n1" ~agent:"a1/n1" json)
@@ -305,6 +249,14 @@ let%expect_test "what is shown in full stays pinned under what scrolls" =
         </h2>
         <div class="detail-meta">
           <button type="button"
+                  title="a1/n1 runs inside a1 (a subagent's own subagent) and takes no messages: steer a1 instead."
+                  disabled=""
+                  class="agents-steer btn ghost small"
+                  @on_click>
+            <icon class="target"> </icon>
+            Steer
+          </button>
+          <button type="button"
                   title="Cancel this subagent (/agents lists the others)"
                   class="btn small stop"
                   @on_click>
@@ -348,7 +300,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     bash ls lib | wc -l
     (Survey the repository) ›
     Count the modules
-    (Cancel) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
+    (Steer) (Cancel) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
     |}];
   H.key h ~alt:true "3";
   H.key h ~alt:true ~ctrl:true "1";
@@ -362,7 +314,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   [%expect
     {|
     (Rpc (method_ cancel_subagent) (params ((agent_id a1/n1))) (tag Show_error))
-    (Stopping…) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
+    (Steer) (Stopping…) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
     |}];
   H.act h (Show_in_chat "a1/n1");
   [%expect {| (Reveal (s1 n1)) |}];
