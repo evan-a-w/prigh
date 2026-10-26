@@ -932,6 +932,7 @@ let install_listeners ~schedule ~current =
   Jump_listeners.install ();
   Selection_listeners.install ~schedule;
   Menu_listeners.install ();
+  Review_margin.install ();
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
   let reported = ref true in

@@ -5,6 +5,7 @@ module Which = struct
   type t =
     | Target
     | Base
+    | Since of string
   [@@deriving sexp_of, equal]
 end
 
@@ -12,6 +13,10 @@ module Choice = struct
   type t =
     | Review of Git_diff.Target.t
     | Base of string
+    | Since of
+        { path : string
+        ; index : int option
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -31,6 +36,8 @@ module Item = struct
     | Review (Dir (Some dir)) -> "dir:" ^ dir
     | Review (Rev rev) -> "rev:" ^ rev
     | Base rev -> "base:" ^ rev
+    | Since { index = None; _ } -> "since:latest"
+    | Since { index = Some i; _ } -> sprintf "since:%d" i
   ;;
 
   let search t = t.label ^ " " ^ t.detail
@@ -62,7 +69,7 @@ let typed t =
       ; marked = false
       }
     ]
-  | Base | Target -> []
+  | Base | Target | Since _ -> []
 ;;
 
 let visible t =
@@ -217,3 +224,5 @@ let refresh t ~fresh =
   let t = { fresh with query = t.query; selected = t.selected } in
   move t 0
 ;;
+
+let since ~path items = create (Since path) items

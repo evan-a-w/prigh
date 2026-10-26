@@ -1,19 +1,22 @@
 open! Core
 open! Import
 
-(** The review page's two pickers, anchored menus over its "Reviewing …
+(** The review page's pickers, anchored menus over its "Reviewing …
     against …" line: what to review (the repository's worktrees, then its
     branches, local and remote, that are not checked out: those are
     reviewed read-only), and what to compare it with ([HEAD]: the
     uncommitted changes only; the branches, remote branches, tags and the
     last commits on what is reviewed; or any revision typed, which the
     backend checks). Grouped while nothing is typed, best match first
-    otherwise. *)
+    otherwise. A third, under a file's since-view switch,
+    picks the action it compares with: the latest, whichever it is, or an
+    earlier one. *)
 
 module Which : sig
   type t =
     | Target (** what is reviewed *)
     | Base (** what it is compared with *)
+    | Since of string (** what the file's since-view compares with *)
   [@@deriving sexp_of, equal]
 end
 
@@ -21,6 +24,11 @@ module Choice : sig
   type t =
     | Review of Git_diff.Target.t
     | Base of string
+    | Since of
+        { path : string
+        ; index : int option
+          (** in {!Review.history}; [None]: the latest, as it changes *)
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -56,6 +64,10 @@ val targets
 
 (** What to compare [diff]'s worktree or branch with; its base is marked. *)
 val bases : Git_diff.t -> t
+
+(** The actions on [path] to compare its since-view with ([Since]
+    choices), as {!Review_since_view} names them. *)
+val since : path:string -> Item.t list -> t
 
 (** The items matching the query, best first (grouped, in order, when it is
     empty), and for [Base] a last one comparing with the query as typed

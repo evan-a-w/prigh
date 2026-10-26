@@ -4,94 +4,135 @@ open Html
 
 let review action = App.Action.Review action
 
-let who (m : App.Model.t) (s : Review.Snapshot.t) =
-  match s.by, Option.bind m.hello ~f:(fun h -> h.user) with
-  | None, _ -> "you"
-  | Some by, Some me when String.equal by me -> "you"
-  | Some by, _ -> by
-;;
-
-let action_label (m : App.Model.t) (s : Review.Snapshot.t) =
-  sprintf
-    "%s %s%s"
-    (who m s)
-    s.action
-    (Option.value_map s.at ~default:"" ~f:(fun at ->
-       " · " ^ Message_time.short (App.Model.message_time m) at))
-;;
-
-(* The action compared with: the one picked, else the last. *)
+(* The action compared with: the one picked, else the latest. *)
 let compared (t : Code_review.t) path =
   let history = Code_review.history t path in
-  let index =
-    match Map.find t.picked path with
-    | Some (i, _) -> i
-    | None -> List.length history - 1
-  in
-  Option.map (List.nth history index) ~f:(fun s -> index, s)
+  match Map.find t.picked path with
+  | Some (i, _) -> Option.map (List.nth history i) ~f:(fun s -> `Picked s)
+  | None -> Option.map (List.last history) ~f:(fun s -> `Latest s)
 ;;
 
-let segment (m : App.Model.t) path ~inject =
-  let t = m.review in
-  Option.map (compared t path) ~f:(fun (_, s) ->
-    ( "Since " ^ action_label m s
-    , "What changed in the file since then: its text then to now (l)"
-    , Code_review.Layout.equal (Code_review.layout_of t path) Since
-    , inject (review (Set_view { path; layout = Since })) ))
+let label (m : App.Model.t) path s =
+  Review_action.label
+    (Review.on m.review.review path)
+    ~me:(Option.bind m.hello ~f:(fun h -> h.user))
+    ~time:(App.Model.message_time m)
+    s
 ;;
 
-let menu (m : App.Model.t) path ~inject =
+let open_menu (m : App.Model.t) path =
+  match m.dialog with
+  | Some (Review_pick p) ->
+    (match Review_picker.which p with
+     | Since p' when String.equal p' path -> Some p
+     | Since _ | Target | Base -> None)
+  | _ -> None
+;;
+
+let segment (m : App.Model.t) path ~place ~inject =
   let t = m.review in
-  let history = Code_review.history t path in
-  match compared t path with
-  | Some (current, _)
-    when List.length history > 1
-         && Code_review.Layout.equal (Code_review.layout_of t path) Since ->
-    Node.select
-      ~attrs:
-        [ Attr.class_ "review-select review-since-menu"
-        ; Attr.create "aria-label" "Compare with an earlier action"
-        ; Attr.title "Compare with an earlier action on this file"
-        ; Attr.on_change (fun _ value ->
-            match Int.of_string_opt value with
-            | Some index -> inject (review (Pick_since { path; index }))
-            | None -> Effect.Ignore)
+  Option.map (compared t path) ~f:(fun compared ->
+    let on = Code_review.Layout.equal (Code_review.layout_of t path) Since in
+    let time = App.Model.message_time m in
+    let text =
+      match compared with
+      | `Latest s ->
+        [ Node.text "Since latest"
+        ; span ~cls:"review-since-what" ("(" ^ Review_action.brief ~time s ^ ")")
         ]
-      (List.rev
-         (List.mapi history ~f:(fun i s ->
-            Node.option
-              ~attrs:
-                [ Attr.value (Int.to_string i)
-                ; Attr.bool_property "selected" (i = current)
-                ]
-              [ Node.text (action_label m s) ])))
-  | Some _ | None -> Node.none
+      | `Picked s ->
+        [ Node.text "Since "
+        ; span
+            ~cls:"review-since-what picked"
+            (String.uncapitalize (label m path s))
+        ]
+    in
+    let title =
+      match compared with
+      | `Latest s ->
+        sprintf
+          "What changed since your latest action on the file, whichever it is \
+           as you act: now %s (l)"
+          (label m path s)
+      | `Picked s -> sprintf "What changed since %s (l)" (label m path s)
+    in
+    let menu = open_menu m path in
+    let page =
+      match place with
+      | `Page -> true
+      | `Files -> false
+    in
+    let id = if page then "review-since-button" else "files-since-button" in
+    Node.div
+      ~attrs:[ classes [ "review-since" ] [ "on", on ] ]
+      [ Node.button
+          ~attrs:
+            [ classes [ "segment"; "review-since-segment" ] [ "on", on ]
+            ; Attr.type_ "button"
+            ; Attr.create "aria-pressed" (Bool.to_string on)
+            ; Attr.title title
+            ; Attr.on_click (fun _ ->
+                inject
+                  (match compared with
+                   | `Latest _ -> review (Follow_latest path)
+                   | `Picked _ -> review (Set_view { path; layout = Since })))
+            ]
+          text
+      ; Node.button
+          ~attrs:
+            [ classes
+                [ "segment"; "review-since-more" ]
+                [ "open", Option.is_some menu ]
+            ; Attr.id id
+            ; Attr.type_ "button"
+            ; Attr.create "aria-haspopup" "dialog"
+            ; Attr.create "aria-expanded" (Bool.to_string (Option.is_some menu))
+            ; Attr.create "aria-label" "Compare with another action"
+            ; Attr.title
+                "Compare with another action on this file: Latest follows your \
+                 newest (Shift+L)"
+            ; Attr.on_click (fun _ ->
+                inject (App.Action.Review_pick (Since path)))
+            ]
+          [ icon ~cls:"chevron" Chevron ]
+      ; (match menu with
+         | Some p when Bool.equal page t.open_ ->
+           Review_picker_view.view p ~inject
+         | Some _ | None -> Node.none)
+      ])
 ;;
 
 let note (m : App.Model.t) path =
   let t = m.review in
   match compared t path, Code_review.since t path with
   | None, _ -> Node.none
-  | Some (_, s), None ->
-    div
-      ~cls:"review-note review-since-note"
-      [ lamp ()
-      ; Node.text (sprintf "Reading what changed since %s…" (action_label m s))
-      ]
-  | Some (_, s), Some since ->
-    let label = action_label m s in
+  | Some (`Latest s | `Picked s), since ->
+    let label =
+      Review_action.phrase
+        (Review.on m.review.review path)
+        ~me:(Option.bind m.hello ~f:(fun h -> h.user))
+        ~time:(App.Model.message_time m)
+        s
+    in
     (match since with
-     | { changed = false; _ } ->
+     | None ->
        div
-         ~cls:"review-empty review-since-same"
-         [ Node.text (sprintf "Nothing changed since %s." label) ]
-     | { note = Some note; _ } ->
+         ~cls:"review-note review-since-note"
+         [ lamp (); Node.text (sprintf "Reading what changed since %s…" label) ]
+     | Some { changed = false; _ } ->
        div
-         ~cls:"review-empty review-since-same"
-         [ Node.text
-             (sprintf "Changed since %s, but %s: no diff to show." label note)
+         ~cls:"review-note review-since-note review-since-same"
+         [ Node.text (sprintf "Nothing changed since %s" label)
+         ; span ~cls:"review-since-hint" "· the changes as they are, below"
          ]
-     | { added; removed; _ } ->
+     | Some { note = Some note; _ } ->
+       div
+         ~cls:"review-note review-since-note review-since-same"
+         [ Node.text
+             (sprintf "Changed since %s, but %s: no diff to show" label note)
+         ; span ~cls:"review-since-hint" "· the changes, below"
+         ]
+     | Some { added; removed; _ } ->
        div
          ~cls:"review-note review-since-note"
          [ Node.text (sprintf "Since %s: " label)

@@ -72,8 +72,12 @@ let%expect_test "the cache first, then the backend's, which win" =
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
-      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
+      ((key web.files-width) (value ()))
+      ((key web.files-preview-width) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.review-chat-width) (value ()))
+      ((key web.review-files-width) (value ()))
+      ((key web.review-margin-width) (value ()))))
     ((theme ((name Light) (accent (Custom #3366ff))))
      (look ((name Light) (accent (Custom #3366ff)))) (notify true)
      (verbosity Quiet) (history ("from the tui")) (sidebar ())
@@ -103,8 +107,12 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
-      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
+      ((key web.files-width) (value ()))
+      ((key web.files-preview-width) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.review-chat-width) (value ()))
+      ((key web.review-files-width) (value ()))
+      ((key web.review-margin-width) (value ()))))
     (Rpc (method_ set_prefs)
      (params ((prefs ((web.notify false) (web.migrated true)))))
      (tag Show_error))
@@ -129,8 +137,12 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value ()))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
-      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
+      ((key web.files-width) (value ()))
+      ((key web.files-preview-width) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.review-chat-width) (value ()))
+      ((key web.review-files-width) (value ()))
+      ((key web.review-margin-width) (value ()))))
     true
     |}]
 ;;
@@ -257,7 +269,9 @@ let%expect_test
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-split web.agents-width web.terminal-height))))
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];
