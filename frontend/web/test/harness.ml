@@ -18,6 +18,8 @@ let act t action =
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
      | Reconnect _
      | Place_popover
+     | Place_menu _
+     | Open_tab _
      | Set_url_session _
      | Clear_text_selection
      | Expire_toast _
@@ -190,7 +192,7 @@ let session_json
       ?(archived = false)
       ?(bytes = 0)
       ?repo
-      ?(agent_worktrees = [])
+      ?(worktrees = [])
       id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
@@ -205,20 +207,26 @@ let session_json
         (opt branch)
         (String.equal root worktree)
   in
-  let agent_worktrees =
+  let worktrees =
     String.concat
       ~sep:","
-      (List.map agent_worktrees ~f:(fun (agent, task, path, branch, root) ->
+      (List.map worktrees ~f:(fun (path, branch, root, source) ->
+         let source =
+           match String.split source ~on:':' with
+           | [ "pr"; n ] -> sprintf {|"source":"pull_request","pr":%s|} n
+           | [ "agent"; agent; task ] ->
+             sprintf {|"source":"agent","agent":%S,"task":%S|} agent task
+           | _ -> sprintf {|"source":%S|} source
+         in
          sprintf
-           {|{"agent":%S,"task":%S,"path":%S,"branch":%S,"root":%S}|}
-           agent
-           task
+           {|{"path":%S,"branch":%s,"root":%S,%s}|}
            path
-           branch
-           root))
+           (opt branch)
+           root
+           source))
   in
   sprintf
-    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s"agent_worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
+    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s"worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"archived":%b,"bytes":%d}|}
     id
     id
     (opt name)
@@ -228,7 +236,7 @@ let session_json
     (opt first_prompt)
     messages
     repo
-    agent_worktrees
+    worktrees
     live
     running
     background
@@ -537,6 +545,21 @@ let interact ?(nth = 0) t ~selector ~f =
 
 let click ?nth t ~selector =
   interact ?nth t ~selector ~f:Node_helpers.User_actions.click_on
+;;
+
+let right_click ?nth ?(at = 0, 0) t ~selector =
+  let x, y = at in
+  let number n = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.number_of_float (Float.of_int n)) in
+  interact ?nth t ~selector ~f:(fun node ->
+    Node_helpers.trigger
+      node
+      ~event_name:"oncontextmenu"
+      ~extra_fields:
+        [ "clientX", number x
+        ; "clientY", number y
+        ; "preventDefault", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.wrap_callback (fun () -> ()))
+        ; "stopPropagation", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.wrap_callback (fun () -> ()))
+        ])
 ;;
 
 let input ?nth t ~selector text =

@@ -293,13 +293,9 @@ let new_worktree (d : New_worktree.t) ~inject =
       ]
   in
   let head = Option.value d.head ~default:"HEAD" in
-  let fresh = Option.is_some d.repo in
   Modal.view
     ~cls:"prompt-dialog worktree-dialog"
-    ~title:
-      (match d.repo with
-       | Some repo -> "New worktree of " ^ Filename.basename repo
-       | None -> "New worktree")
+    ~title:"New worktree"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
       [ keys_hint "Enter creates, Esc cancels"
@@ -309,10 +305,7 @@ let new_worktree (d : New_worktree.t) ~inject =
           ~disabled:d.busy
           ~on_click:(inject Action.Dialog_accept)
           [ Node.text
-              (match d.busy, fresh with
-               | true, _ -> "Creating…"
-               | false, true -> "Create and start a session"
-               | false, false -> "Create and switch")
+              (if d.busy then "Creating…" else "Create and switch")
           ]
       ]
     [ field
@@ -327,26 +320,18 @@ let new_worktree (d : New_worktree.t) ~inject =
         ~value:d.base
         ~placeholder:head
         ~note:
-          (if fresh
-           then sprintf "Where a new branch starts (empty: %s)" head
-           else
-             sprintf
-               "Where a new branch starts (empty: %s, where this session is)"
-               head)
+          (sprintf
+             "Where a new branch starts (empty: %s, where this session is)"
+             head)
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.text
-            (match d.project_dir, fresh with
-             | Some dir, false ->
+            (match d.project_dir with
+             | Some dir ->
                sprintf
                  "Created in %s, then this session works there."
                  (Sidebar_view.home_relative dir)
-             | None, false -> "This session works there once it is created."
-             | Some dir, true ->
-               sprintf
-                 "Created in %s, then a new session starts there."
-                 (Sidebar_view.home_relative dir)
-             | None, true -> "A new session starts there once it is created.")
+             | None -> "This session works there once it is created.")
         ]
     ; dialog_error d.error
     ]

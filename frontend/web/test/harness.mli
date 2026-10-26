@@ -56,6 +56,10 @@ val fail : t -> string -> string -> unit
     actions its handler produced, and applies them. *)
 val click : ?nth:int -> t -> selector:string -> unit
 
+(** Right-clicks it ([contextmenu]), at [at] in the window (default 0,0:
+    as from the keyboard). *)
+val right_click : ?nth:int -> ?at:int * int -> t -> selector:string -> unit
+
 (** Types [text] into the [nth] field [selector] matches, as its new value. *)
 val input : ?nth:int -> t -> selector:string -> string -> unit
 
@@ -102,8 +106,9 @@ val session_json
   -> ?repo:string * string * string option
        (** where its cwd is in git: the repository's root, the worktree and
            its branch *)
-  -> ?agent_worktrees:(string * string * string * string * string) list
-       (** its subagents' worktrees: agent, task, path, branch, root *)
+  -> ?worktrees:(string * string option * string * string) list
+       (** its worktrees: path, branch, root and source ([created],
+           [entered], [pr:N] or [agent:ID:TASK]) *)
   -> string
   -> string
 

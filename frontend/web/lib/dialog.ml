@@ -117,7 +117,7 @@ let per_session = function
       { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
       ; _
       }
-  | Picker { kind = Snippets | Reminders | Worktrees _; _ } -> true
+  | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true
   | Picker
       { kind =
           ( Models
