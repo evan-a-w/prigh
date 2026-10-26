@@ -640,6 +640,9 @@ let rec event ?now (e : Agent.Event.t) =
       ; "cost_usd", float cost_usd
       ; "result", tool_result_value result
       ]
+    | Loop (Worktrees_changed _) ->
+      (* [Agent] records it rather than broadcasting it. *)
+      [ "event", str "worktrees_changed" ]
     | Loop (Compacted { summary; usage = u; cost_usd }) ->
       [ "event", str "compacted"
       ; "summary", str summary

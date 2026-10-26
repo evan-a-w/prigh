@@ -318,17 +318,57 @@ let rec started_worktree (e : Agent_event.t) =
   | _ -> None
 ;;
 
+(* [Worktrees_changed] at any depth, with the id of the subagent whose it
+   is. *)
+let rec worktrees_changed ?agent (e : Agent_event.t) =
+  match e with
+  | Worktrees_changed { added; removed } -> Some (agent, added, removed)
+  | Subagent { agent_id; event; _ } -> worktrees_changed ~agent:agent_id event
+  | _ -> None
+;;
+
+let record_worktrees t ~agent ~added ~removed =
+  let recorded path =
+    List.exists (Session.worktrees t.session) ~f:(fun w ->
+      String.equal w.path path)
+  in
+  List.iter added ~f:(fun (w : Session_worktree.t) ->
+    if not (recorded w.path)
+    then (
+      let w =
+        match agent, w.source with
+        | Some agent, Created ->
+          let task =
+            Option.value_map
+              (Subagent_log.find t.subagent_log agent)
+              ~default:""
+              ~f:(fun ((s : Subagent_log.Summary.t), _) -> s.task)
+          in
+          { w with source = Agent { agent; task } }
+        | _ -> w
+      in
+      ignore (Session.add_worktree t.session w : Session.Entry.t)));
+  List.iter removed ~f:(fun path ->
+    if recorded path
+    then ignore (Session.worktree_removed t.session ~path : Session.Entry.t))
+;;
+
 let broadcast t (event : Event.t) =
-  (match event with
-   | Loop e ->
-     Subagent_log.record
-       t.subagent_log
-       ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
-       e;
-     Option.iter (started_worktree e) ~f:(fun w ->
-       ignore (Session.add_agent_worktree t.session w : Session.Entry.t))
-   | _ -> ());
-  List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+  match event with
+  | Loop e when Option.is_some (worktrees_changed e) ->
+    Option.iter (worktrees_changed e) ~f:(fun (agent, added, removed) ->
+      record_worktrees t ~agent ~added ~removed)
+  | _ ->
+    (match event with
+     | Loop e ->
+       Subagent_log.record
+         t.subagent_log
+         ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+         e;
+       Option.iter (started_worktree e) ~f:(fun w ->
+         ignore (Session.add_agent_worktree t.session w : Session.Entry.t))
+     | _ -> ());
+    List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 ;;
 
 let session t = t.session
@@ -1278,23 +1318,31 @@ let executor t : Tool.executor =
     then Seen_files.with_scope arguments ~scope:(Session.id t.session)
     else arguments
   in
-  if
-    (not tool.spec.on_host)
-    || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
-    || (String.equal (Tool.name tool) (Tool.name Tool_bash.tool)
-        && Tool_bash.runs_in_backend context arguments)
+  let bash = String.equal (Tool.name tool) (Tool.name Tool_bash.tool) in
+  if bash && Tool_bash.runs_in_backend context arguments
   then Tool.execute tool context arguments
-  else
-    active_host_exec
-      t
-      ?stdin:context.stdin
-      ~cancel:context.cancel
-      ~on_output:context.on_output
-      ~call_id:context.call_id
-      ~cwd:context.cwd
-      ~name:(Tool.name tool)
-      ~arguments
-      ()
+  else (
+    let run () =
+      if
+        (not tool.spec.on_host)
+        || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
+      then Tool.execute tool context arguments
+      else
+        active_host_exec
+          t
+          ?stdin:context.stdin
+          ~cancel:context.cancel
+          ~on_output:context.on_output
+          ~call_id:context.call_id
+          ~cwd:context.cwd
+          ~name:(Tool.name tool)
+          ~arguments
+          ()
+    in
+    if bash
+    then
+      Worktree_watch.around context ~dir:t.config.worktrees_dir ~arguments run
+    else run ())
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
@@ -2725,7 +2773,8 @@ let remove_worktree ?cwd t ~path ~force =
     ?cwd
     t
     ~name:Worktree.remove_op
-    ~arguments:(Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force)
+    ~arguments:
+      (Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force ())
   |> Worktree.removed_of_result
 ;;
 
