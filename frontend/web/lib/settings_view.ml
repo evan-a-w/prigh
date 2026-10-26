@@ -294,14 +294,14 @@ let nix_store (m : App.Model.t) ~inject =
     | Unknown | Loading ->
       row
         ~cls:"nix-store"
-        ~name:"Nix store"
+        ~name:"Disk usage"
         ~about
         ~note:("muted", "Reading the store…")
         []
     | Failed e ->
       row
         ~cls:"nix-store"
-        ~name:"Nix store"
+        ~name:"Disk usage"
         ~about
         ~note:("warm", String.capitalize e)
         [ refresh "Retry" ]
@@ -310,7 +310,7 @@ let nix_store (m : App.Model.t) ~inject =
         ~cls:"setting nix-store"
         [ div
             ~cls:"setting-text"
-            ([ span ~cls:"setting-name" "Nix store"
+            ([ span ~cls:"setting-name" "Disk usage"
              ; span
                  ~cls:"setting-about"
                  (String.capitalize

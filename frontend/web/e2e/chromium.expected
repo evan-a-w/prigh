@@ -840,6 +840,14 @@ Sign in
 Back to alice
 === chromium: accounts: sessions ===
 I am bob
+=== chromium: accounts: bob's settings ===
+Appearance
+Preferences
+On the backend
+Git hosting
+Account
+=== chromium: accounts: bob's /nix-gc ===
+Cleaning the Nix store is for superusers: ask alice to run /nix-gc
 === chromium: accounts: bob's menu ===
 B
 bob
@@ -862,6 +870,27 @@ forget this account in this browser
 ↑↓ to move, Enter to choose, Esc to close
 === chromium: accounts: sessions ===
 I am alice
+=== chromium: accounts: alice's nix store ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: none recorded
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Also delete generations over 14 days…
+Collect
+=== chromium: accounts: collected ===
+Nix store
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Freed 3.0 GiB: 1 path deleted in <N> s
+Also delete generations over 14 days…
+Collect
 === chromium: accounts: act as ===
 alice
 you
