@@ -82,4 +82,11 @@ type t =
       ; cost_usd : float
       ; result : Tool_result.t
       }
+  | Worktrees_changed of
+      { added : Session_worktree.t list
+      ; removed : string list (** their paths *)
+      }
+  (** A tool made or removed git worktrees ([worktree], or [bash] running
+      [git worktree]): {!Agent} records them on the session, a subagent's as
+      that subagent's; frontends do not see this event. *)
 [@@deriving sexp_of]

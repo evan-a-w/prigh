@@ -153,3 +153,44 @@ let%expect_test
     ⎇ detached
     |}]
 ;;
+
+let%expect_test "where a worktree switch took it from: in /sessions' details" =
+  let with_home home =
+    P.Json.parse
+      (sprintf
+         {|{"id":"s4","path":"/s/s4.jsonl","name":"s4","cwd":"/wt/p/feat-x","created_at":"x","message_count":1,"home":%s}|}
+         home)
+    |> Or_error.ok_exn
+    |> P.Session_summary.of_json
+    |> Or_error.ok_exn
+  in
+  let sessions =
+    [ with_home
+        {|{"cwd":"/src/p","host":{"id":"backend","name":"srv"},"repo":{"root":"/src/p","worktree":"/src/p","branch":"main","main":true}}|}
+    ; with_home {|{"cwd":"/home/u/notes","host":null,"repo":null}|}
+    ; with_home "null"
+    ]
+  in
+  List.iter sessions ~f:(fun s ->
+    print_endline
+      (Option.value
+         (Session_worktrees.home
+            ~tilde:(String.substr_replace_first ~pattern:"/home/u" ~with_:"~")
+            s.home)
+         ~default:"(none)"));
+  List.iter
+    (Picker.visible
+       (Session_selection.picker
+          (Session_selection.create sessions)
+          ~current:None))
+    ~f:(fun item -> print_endline item.detail);
+  [%expect
+    {|
+    from main
+    from ~/notes
+    (none)
+    /wt/p/feat-x · from main
+    /wt/p/feat-x · from /home/u/notes
+    /wt/p/feat-x
+    |}]
+;;

@@ -121,7 +121,9 @@ end
 
 type t =
   { id : string (** [c1], [c2], ...: never reused in a session *)
-  ; root : string (** the repository's top directory, as [git_diff] says *)
+  ; root : string
+    (** the repository's top directory, as [git_diff] says; [branch:NAME]
+        for a branch reviewed without a checkout *)
   ; path : string (** relative to [root], as [git diff] names it *)
   ; range : Range.t
   ; anchor : string
@@ -135,11 +137,16 @@ type t =
 (** Whether a post of the user's has not been sent to the agent yet. *)
 val unsent : t -> bool
 
-(** [root/path]. *)
+(** [root/path]; for a branch's comment, [NAME:path] (as [git show] names
+    it). *)
 val file : t -> string
+
+(** The branch of a comment on a branch that is not checked out. *)
+val branch : t -> string option
 
 (** The comment as the agent reads it: id, file, lines (and where the
     selection is in them, as 1-based character columns), the commented code
     with line numbers (a selection marked [⟦like this⟧], and quoted whole),
-    and the thread, the posts it has not seen marked [new]. *)
+    and the thread, the posts it has not seen marked [new]. A branch's
+    comment names the branch instead of a worktree. *)
 val to_prompt : t -> string

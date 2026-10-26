@@ -122,7 +122,7 @@ let%expect_test "parse" =
       "usage: /worktree rm [-f] TARGET (TARGET: a branch or path, as /worktree lists them)"))
     (prune (
       Error
-      "unknown subcommand \"prune\": /worktree [list|new BRANCH [BASE]|open [-n] TARGET|rm [-f] TARGET]"))
+      "unknown subcommand \"prune\": /worktree [list|new BRANCH [BASE]|open [-n] TARGET|back [main]|rm [-f] TARGET]"))
     |}]
 ;;
 
@@ -209,11 +209,13 @@ let%expect_test "complete" =
       list  pick a worktree of this repository to work in
       new  new BRANCH [BASE]: create a worktree and work in it
       open  open [-n] TARGET: work in a worktree (-n: in a new session)
+      back  back [main]: back where the session switched into worktrees from
       rm  rm [-f] TARGET: remove a worktree (-f: with uncommitted changes)
     "op" at 0:
       list  pick a worktree of this repository to work in
       new  new BRANCH [BASE]: create a worktree and work in it
       open  open [-n] TARGET: work in a worktree (-n: in a new session)
+      back  back [main]: back where the session switched into worktrees from
       rm  rm [-f] TARGET: remove a worktree (-f: with uncommitted changes)
     "open " at 5:
       -n  in a new session

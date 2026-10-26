@@ -11,17 +11,25 @@ end
 let b keys intent help = { Binding.keys; intent; help }
 
 let bindings =
-  [ b [ Key.plain Enter ] Submit "send the prompt / accept the highlighted item"
+  [ b
+      [ Key.plain Enter ]
+      Submit
+      "send the prompt (steer a focused subagent) / accept the highlighted item"
   ; b
       [ Key.alt Enter ]
       Queue_follow_up
-      "queue a follow-up to run after the current turn"
+      "queue a follow-up to run after the current turn (a focused subagent's: \
+       before it reports)"
   ; b
       [ Key.alt (Char "s") ]
       Submit_as_typed
       "send exactly what is typed, ignoring the completion popup"
   ; b [ Key.ctrl 'j'; Key.alt (Char "j") ] Newline "insert a newline"
-  ; b [ Key.plain Escape ] Cancel "close the dialog, or abort the running turn"
+  ; b
+      [ Key.plain Escape ]
+      Cancel
+      "close the dialog, back to the main agent from a subagent, or abort the \
+       running turn"
   ; b
       [ Key.plain Tab ]
       Complete
@@ -32,7 +40,8 @@ let bindings =
   ; b
       [ Key.alt Up ]
       Dequeue
-      "pop the last queued steer/follow-up back into the editor"
+      "pop the last queued steer/follow-up (the focused agent's) back into the \
+       editor"
   ; b [ Key.plain Left ] Left "move the cursor left"
   ; b [ Key.plain Right ] Right "move the cursor right"
   ; b

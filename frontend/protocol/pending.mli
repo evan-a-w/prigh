@@ -32,6 +32,7 @@ end
 type t =
   { steer_texts : string list
   ; follow_up_texts : string list
+  ; agents : Agent_queue.t list (** the subagents' queues, those not empty *)
   ; confirms : Confirm.t list
   ; questions : Ask.t list
   }

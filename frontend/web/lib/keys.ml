@@ -84,6 +84,12 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
+  ; ( "Enter / Alt+Enter (steering a subagent)"
+    , "send it a message: at its next step / when it ends its turn (its Steer \
+       button, or a running subagent shown in the panel; /agents steer N TEXT)"
+    )
+  ; "Alt+↑ (steering a subagent)", "take its last queued message back"
+  ; "Esc (steering a subagent)", "write to the main agent again"
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
@@ -95,6 +101,10 @@ let help =
     , "approve the file; comment on the code selected (drag across it, in the \
        review or a changed file's preview); edit or comment; the whole file or \
        the changes; send the new comments to prigh" )
+  ; ( "r / b / d (reviewing)"
+    , "choose what to review (a worktree, or a branch read-only); what to \
+       compare it with (a branch, tag, commit or any revision typed); since \
+       the merge base or directly" )
   ; "Esc (reviewing)", "drop the comment or selection, then close the review"
   ; ( "Enter / Ctrl+S (reviewing)"
     , "add the comment or reply (Shift+Enter: a new line); save the file being \
@@ -157,18 +167,42 @@ let on_control t =
 (* Ctrl+` by the key's position, whatever the layout types there. *)
 let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 
+(* The review page's keys; [r], [b] and [d] choose what it compares. *)
+let review_key (m : App.Model.t) t : App.Action.t option =
+  match t.key with
+  | "r" when plain t -> Some (Review_pick Target)
+  | "b" when plain t -> Some (Review_pick Base)
+  | "d" when plain t ->
+    Option.map m.review.diff ~f:(fun d ->
+      App.Action.Review_direct (not d.direct))
+  | _ ->
+    Code_review.key m.review ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
+    |> Option.map ~f:(fun a -> App.Action.Review a)
+;;
+
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
   | ( "ArrowUp"
-    , (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
-    -> Some (Dialog_move (-1))
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Login _
+      | Scoped_models _
+      | Prompt _
+      | Pulls _ ) ) -> Some (Dialog_move (-1))
   | ( "ArrowDown"
-    , (Picker _ | Popover _ | Login _ | Scoped_models _ | Prompt _ | Pulls _) )
-    -> Some (Dialog_move 1)
-  | "PageUp", (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
-    Some (Dialog_move (-8))
-  | "PageDown", (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Login _
+      | Scoped_models _
+      | Prompt _
+      | Pulls _ ) ) -> Some (Dialog_move 1)
+  | "PageUp", (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _)
+    -> Some (Dialog_move (-8))
+  | ( "PageDown"
+    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _) ) ->
     Some (Dialog_move 8)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
@@ -218,6 +252,8 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
+  | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
+    Some (Set_recipient Main)
   | "Escape", _ when App.Model.running m -> Some Abort
   | "ArrowUp", None
     when plain t
@@ -498,22 +534,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Files ->
           Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
           |> Option.map ~f:(fun a -> App.Action.Files a)
-        | None, Page when m.review.open_ ->
-          Code_review.key
-            m.review
-            ~key:t.key
-            ~shift:t.shift
-            ~ctrl:t.ctrl
-            ~alt:t.alt
-          |> Option.map ~f:(fun a -> App.Action.Review a)
-        | None, Review ->
-          Code_review.key
-            m.review
-            ~key:t.key
-            ~shift:t.shift
-            ~ctrl:t.ctrl
-            ~alt:t.alt
-          |> Option.map ~f:(fun a -> App.Action.Review a)
+        | None, Page when m.review.open_ -> review_key m t
+        | None, Review -> review_key m t
         | None, Resize h ->
           resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
         | None, (Field | Multiline | Control | Terminal | Page) -> None))

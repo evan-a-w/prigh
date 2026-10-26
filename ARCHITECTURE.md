@@ -25,8 +25,10 @@ tools of MCP servers.
 
 The frontend either spawns `prigh serve` and talks to it over stdin/stdout,
 or connects over TCP to a backend started with `prigh serve -listen
-HOST:PORT` (possibly on another machine). Either way it exchanges one JSON
-object per line. Requests carry `{id, method, params}`; the backend answers
+HOST:PORT` (possibly on another machine), or opens a WebSocket on the `/ws`
+of its `-web` port, directly (`ws://`) or through a TLS-terminating reverse
+proxy (`wss://`), as prigh-web does. Either way it exchanges one JSON
+object per line (one per text message on a WebSocket). Requests carry `{id, method, params}`; the backend answers
 with `{type:"response", id, ok, result|error}` and pushes `{type:"event",
 event, ...}` for everything that happens asynchronously (streaming deltas,
 tool output, state changes, login prompts). The same binary also has headless
@@ -472,7 +474,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   bounds output by lines and bytes. `Tool_spec` carries the flags the
   harness reasons about: `parallel_safe` (safe to run concurrently with
   other tools), `destructive` (what the approval modes hold for
-  confirmation, see `Approval`), `on_host` (runs on the active tool host rather than always in
+  confirmation, see `Approval`: `Always`, `Never`, or `Depends` on the
+  call's arguments, as `worktree`'s `list` does not ask but `create` and
+  `remove` do), `on_host` (runs on the active tool host rather than always in
   the backend) and `freeform` (a Lark grammar: the Responses API sends the
   tool as an OpenAI custom tool, whose free-text input streams and is
   replayed as the `input` string argument; other providers send the JSON
@@ -621,8 +625,16 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the context carries the agent's `Background_tasks` and the call only spawns
   the loop there, with its own cancellation, and returns `started agent
   a<n> (...)`; deeper calls (no jobs) block and return the report.
-  `subagent_status`/`subagent_cancel` act on the jobs and are dropped below
-  depth 0. Nothing blocks on background work: its reports wake the agent.
+  `subagent_status`/`subagent_cancel`/`subagent_message` act on the jobs
+  and are dropped below depth 0. A background subagent gets a
+  `Subagent_inbox`: its loop's `steer` takes the inbox's steers (with
+  finished jobs' reports) at each step boundary, and its `wake` takes
+  everything queued when it ends its turn, so a follow-up makes it carry on
+  rather than report; while its jobs run, `wake` waits for a job or a
+  message (`take_next ~interrupt`). The inbox is closed, with nothing in
+  between that could take a message, when the loop stops; messages queued
+  then are dropped with a `Notice`. A delivered message is a user message
+  with an `Injected.Note.Steer {from_user; follow_up}` note. Nothing blocks on background work: its reports wake the agent.
   With `worktree` (a branch name, or `auto`/`true` for `agent/<the task's
   first words>`, made `fresh`: `-2`, ... when the branch exists) the call
   first makes a worktree through `Worktree.create_tool` (an `on_host`
@@ -634,6 +646,28 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   which `Agent.broadcast` records in the session (`add_agent_worktree`),
   and the report ends with `Agent_worktree.report_line` (where the branch
   is, how to review, merge or remove it).
+- `Tool_worktree` — the model's `worktree` tool (`action` create, list or
+  remove; `branch`, `base`, `path`, `force`, `cwd`), made in `bin/main.ml`
+  with closures for the agent's `worktrees_dir` and session. It runs
+  `Worktree`'s pseudo-tools (`list_tool`, `create_tool`, `remove_tool`)
+  with `Tool.execute_via`, so on the session's tool host; `remove` refuses
+  the worktree the calling agent's cwd or the session's cwd is in (and
+  `Worktree.remove` the main checkout, and changes without `force`). What
+  it makes or removes goes out as `Agent_event.Worktrees_changed {added;
+  removed}` through the context's `emit`, so a subagent's arrives wrapped in
+  its `Subagent` events. `Agent.broadcast` takes that event (at any depth)
+  out of the stream, never sending it to frontends, and records it on the
+  session: an added `Created` worktree from a subagent becomes `Agent
+  {agent; task}` (the task from `Subagent_log`), removed paths append
+  `Worktree_removed`. `Rpc_server` re-lists a session on every
+  `Message_end`, a subagent's too, so the sidebar follows.
+- `Worktree_watch` — the safety net for `git worktree add`/`remove`/`move`/
+  `prune` run in `bash`: `Agent.executor` wraps the call that actually runs
+  a matching command (not the backend-side wrapper of a job) in
+  `$worktree_list` listings before and after, in the call's cwd, and emits
+  the difference as `Worktrees_changed`; a new worktree outside the
+  project directory (`managed = false`) gets a note in the result telling
+  the model to use the `worktree` tool.
 - `Background_tasks` — one agent's background work, of two kinds:
   subagents (ids `a<n>`, seeded past the subagent calls already in the
   session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
@@ -647,7 +681,15 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (the agent turns a batch, subagents and jobs together, into one user
   message; `take_next` first blocks until a running task finishes) or by
   `cancel_and_wait` (`job_kill`/`subagent_cancel` results). Events and changes
-  go to the hooks `Agent` installs with `connect`.
+  go to the hooks `Agent` installs with `connect` (`on_queue_change` for the
+  subagents' inboxes). `send`/`inbox_of` reach a running subagent's inbox,
+  refusing a finished one (its report is on its way or delivered: tell the
+  main agent instead), a nested one (`a1/a1`: send it to `a1`) or an
+  unknown id.
+- `Steer_queue` — a steer queue and a follow-up queue (push, take the
+  steers, take one follow-up, `steers_first`, take back the last, remove by
+  index if it still matches): the main agent's queue of `Queued.t` and each
+  `Subagent_inbox`'s.
 - Background jobs — `bash` with `background: true` at depth 0 spawns a job
   whose fiber runs the same call in the foreground (`background` dropped,
   no timeout unless one was given) through the context's executor, so it
@@ -760,7 +802,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (nested ones keep `subagent`) leaves that out and says instead to use
   foreground commands rather than sleep, that job reports wake it after its
   turn, and that it finishes only once its jobs have exited (so kill
-  servers first).
+  servers first). Either role, given the `worktree` tool, is told to make
+  worktrees with it (or `subagent`'s `worktree` option) rather than `git
+  worktree add`, and to work there by the worktree's path.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -833,7 +877,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
-  Queue_update`). Background subagents and jobs (`Background_tasks`) run in
+  Queue_update | Subagent_queues`, the latter, `agent_queues` on the wire,
+  listing the subagents with queued messages after every change; `get_pending`
+  has them as `agents`). Background subagents and jobs (`Background_tasks`) run in
   the agent's switch, not the run's: `abort` leaves them running,
   `cancel_subagent`/`kill_job` stop one, `start_job` starts a job for a
   user's `!&cmd`. When one finishes, an idle agent starts a run whose prompts
@@ -1053,6 +1099,22 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   follows), less those removed since (`remove_worktree` appends
   `Worktree_removed` to every session, saved or live, that has it; entering
   it again records it again); `fork` copies all but `Agent_worktree`;
+  `Home {home}` (a `Session.Home.t`: the cwd, host and git location a
+  worktree switch took the session from, `None` once cleared; like `Cwd`
+  the last one on any branch counts: `home`, also in `Summary`, the
+  agent's state and `list_sessions`/`get_state`'s `home`). `set_cwd`'s
+  `worktree: true` (the frontends' `/worktree open`/`new`, `/pr checkout`,
+  the sidebar's Switch session here) is a worktree switch: it records the
+  home unless the session has one (A → B keeps the first), and switching
+  into the home's checkout clears it; any other move (`set_cwd`,
+  `set_active_host`) clears it when it lands on the home, on another host
+  or outside the home's repository, and keeps it within the repository's
+  worktrees (`Worktree_home`, which compares git locations asked of the
+  host at once, or paths for a host that cannot tell). `worktree_back
+  {main}` (`Agent.switch_back`) moves the session to the home on its host
+  (an error names a disconnected host, or a gone directory with `/worktree
+  back main`, the home's repository's main checkout, as the way out) and
+  clears it; `fork` copies it.
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -1107,8 +1169,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   branch it was made from (`Worktree.base_key`), else its remote's
   `HEAD`, else `main`/`master`; the result names the worktree's `branch`,
   the `base`, whether it is the `main` checkout and the repository's
-  `branches` (to pick another base). Errors say what to do
-  (not a repository, no git, unknown base). `Review` writes `/review`'s
+  `branches`, `remote_branches`, `tags` and last `commits` (sha and
+  subject; for the pickers). With `rev` it reviews a branch (any commit)
+  without a checkout: `git diff BASE...REV` (no untracked files; `HEAD` is
+  no base for it), its base found as a linked worktree's; with `direct`
+  the diff is against the base itself (two-dot) rather than the merge
+  base. Errors say what to do (not a repository, no git, an unknown base
+  or `rev`, with the closest refs by `Edit_distance`). `$git_show` reads a
+  file as a commit has it (the review of a branch not checked out) and
+  `$git_refs` lists the branches and tags (the TUI's `/review`
+  completion). A comment on such a branch is rooted at `branch:NAME`
+  (`Review_comment.branch`): sent to the agent naming the branch and
+  `NAME:path`. `Review` writes `/review`'s
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
@@ -1311,7 +1383,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
   `follow_up`, `abort`, `dequeue`, `remove_queued` (`{queue: "steer" |
   "follow_up", index, text?}`, returning `{text, attachments}` like
-  `dequeue`), `cancel_subagent`, `list_subagents`,
+  `dequeue`), `steer_agent` (`{agent_id, text, mode?: "steer" |
+  "follow_up"}`: a message for a running background subagent),
+  `dequeue_agent` (`{agent_id}`: `{text}` or null), `remove_agent_queued`
+  (`{agent_id, queue, index, text?}`: `{text}`), `cancel_subagent`, `list_subagents`,
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
@@ -1350,10 +1425,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
-  `resume_now`, `git_diff {path?, base?, dir?}`
-  (`{root, against, diff, truncated, branch?, base, main, branches}`: `dir`
-  any worktree on the host, a linked one compared with its default base
-  when no `base` is given), `review {args?}` (`[base]
+  `resume_now`, `git_diff {path?, base?, dir?, rev?, direct?}`
+  (`{root, against, diff, truncated, branch?, base, main, branches,
+  remote_branches, tags, commits, rev?, direct}`: `dir` any worktree on
+  the host, a linked one compared with its default base when no `base` is
+  given; `rev` a branch not checked out; `direct` two-dot), `git_show
+  {rev, path, dir?}` (`{text, truncated}`), `git_refs {dir?}`
+  (`{branches, remote_branches, tags}`), `review {args?}` (`[base]
   [instructions]`) and `init`, `list_worktrees {cwd?}` (`{root,
   project_dir, worktrees}`), `create_worktree {branch, base?, cwd?}`
   (`{worktree, new_branch, root, cwd}`: `cwd` is the directory it was
@@ -1470,7 +1548,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   proxy: the RPC goes over its `/ws`, `Websocket.connect` being the client
   side of the handshake, over `Http_client.tls_client` for `wss`).
   `Tool_host.connect` (so `prigh tool-host -connect`) and `prigh web` use
-  them.
+  them. The TUI, an Async program in another dune project, has the same
+  parsing in `ui/server_address.ml` and its own client side
+  (`client/unix/websocket_transport.ml`): keep the two in step.
 - `Web_connect` / `Web_proxy` / `Signin_handoff` — `prigh web`: prigh-web
   on this machine for a backend elsewhere, with nothing of a backend
   running locally. `Web_connect.Check` says `hello` once to tell an
@@ -1491,7 +1571,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
   (which has the same module in `client/unix/`): `prigh web` resolves and
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
-  passed, and only `HOST:PORT` addresses (the TUI connects to no URLs).
+  passed, URLs normalised (`Backend_address.normalize`: `https://host/`
+  is saved as `wss://host/ws`, as the TUI saves it).
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -1520,6 +1601,21 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   absolute). Without the backend host,
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
+- `Nix_store_rpc` (`nix/`) — `nix_store_status` and `nix_store_gc`, for
+  superusers only (the signed-in user, not whom they act as). To
+  everyone else, and on a backend without users, they do not exist:
+  `dispatch` passes, so they get the same "unknown method" as any other
+  name, and progress goes only to the superuser who asked. `Nix_store` runs one collection at a time for the whole backend
+  (in a fiber of its own, so a dropped connection does not stop it) and
+  reports progress to the caller as `nix_gc_progress` events, at most every
+  250 ms while only paths are being deleted (`Nix_gc_output` classifies
+  Nix's lines and tallies them). It reaches the store through
+  `Nix_store_ops.t`, a record of functions faked in tests: `local` runs
+  `nix store gc` or `nix-collect-garbage` as the backend's user; `helper`
+  writes `gc ID GENERATIONS BY` to the container's root helper's FIFO
+  (`-nix-gc-helper`, DOCKER.md "Garbage collection") and follows its log
+  and result files, also reading the helper's `last-gc`, `running` (a
+  scheduled collection) and `schedule`.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
@@ -1603,7 +1699,15 @@ terminal frontend and `web/` prigh-web, the browser one.
   with "not connected" in between; `received` and `waiting` count the lines
   received and the calls waiting, for prigh-web's probe). `client/unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
-  spawns the backend, `Tcp_transport` connects to `-listen` — and
+  spawns the backend, `Tcp_transport` connects to `-listen`,
+  `Websocket_transport` to a prigh-web URL's `/ws` (the RFC 6455 client
+  side: a masked text message per line, the server's pings answered, a
+  ping after 20s of quiet and a close after 60s, so the client reconnects;
+  an upgrade answered with a redirect, 401 or HTML page is explained as a
+  proxy's sign-in), over `Tls_channel` (the pure `tls` engine over Async,
+  certificates checked against the system's CAs via `ca-certs`) for
+  `wss`; both over `Channel` (a TCP byte stream with keepalive). The
+  tests' servers and throwaway CA are in `client/unix/testing/` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
   `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
   lines back as `tool_exec_*` requests, a result's `images` verbatim) and
@@ -1663,8 +1767,14 @@ terminal frontend and `web/` prigh-web, the browser one.
     `State.subagents` lists it as undelivered, then until the next prompt;
     a delivered report, a subagent's or a job's, renders as a compact
     `Transcript` `Delivery` item; `/jobs` lists `list_jobs` in a picker,
-    Enter adds `job_output` to the transcript as a block, Ctrl+D kills),
-    `Commands` (slash table, parse, complete,
+    Enter adds `job_output` to the transcript as a block, Ctrl+D kills;
+    `Agent_queues` keeps the subagents' queues from `agent_queues` and
+    `get_pending`, reset with the session: with a subagent focused, Enter /
+    Alt+Enter / Alt+Up become `steer_agent` / `steer_agent mode:follow_up` /
+    `dequeue_agent`, tagged `Agent_message` so a refusal takes it off the
+    shown queue and puts the text back, and `App.shown_queue` lists the
+    focused agent's queue; `Agents_command` parses and completes `/agents
+    steer|follow-up|cancel N`), `Commands` (slash table, parse, complete,
     closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
     `Btw_box` (the `/btw` panel above the composer: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
@@ -1781,7 +1891,13 @@ terminal frontend and `web/` prigh-web, the browser one.
     so a refusal goes back to the editor. `/review` alone reads
     `get_review`, then `git_diff`, and shows `File_approval.render`: each
     changed file with its approval and its comments' threads, then the
-    comments on files no longer changed. `File_approval` (an approval
+    comments on files no longer changed, under what was compared
+    (`Diff_files.where`/`against`: "feat/x (not checked out) against main
+    directly"); `Review_command` (shared with prigh-web) parses
+    `[WORKTREE|BRANCH] [--base REV] [--direct]` (a name that is no worktree
+    is a branch to review read-only) and completes worktrees, branches not
+    checked out, remote branches and tags, which the TUI caches from
+    `git_refs` (`refs`, a `Location_cache`). `File_approval` (an approval
     counts while its hash is the file's `Diff_files.File.hash`, the MD5
     of its section of the diff) and `Comment_anchor` (a comment's code
     now: where its anchor text is, nearest to where it was, else where
@@ -1927,8 +2043,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     prompt history. Text selection therefore needs Shift.
   - `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
     as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
-    path). `-connect HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend
-    instead of spawning one, with `-token` (`$PRIGH_TOKEN`), `-user`
+    path). `-connect HOST:PORT` or a prigh-web URL (`$PRIGH_CONNECT`;
+    `ui/server_address.ml`) joins a running backend instead of spawning
+    one (`-header`/`$PRIGH_CONNECT_HEADERS` add headers to a URL's
+    WebSocket upgrade), with `-token` (`$PRIGH_TOKEN`), `-user`
     (`$PRIGH_USER`) and `-name`; the flags are remembered in
     `~/.prigh/tui-connection.sexp` (`client/unix/saved_connection.ml`, which
     resolves flag > environment > saved; `-local` ignores it, `-forget`
@@ -2133,7 +2251,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       are missing after a reload — or a job's output, with what it is
       (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
       pinned under the scrolling body; the status line's
-      summary and the toggle in the chat's corner or the bar). Elapsed times tick with `Clock`,
+      summary and the toggle in the chat's corner or the bar). Steering:
+      `Model.recipient` (`Recipient`: `Main` or a subagent's id) is who the
+      composer sends to; `follow_recipient`, after every update, makes it the
+      running top-level subagent shown in the panel when the selection
+      changes on a desktop (`Main` once the panel closes) and `Main` when
+      that subagent finishes, with a toast. `send` then calls `steer_agent`
+      (`mode: follow_up` for Alt+Enter, `Steered` puts the text back if it
+      fails), `Dequeue` `dequeue_agent`; `Composer_view` shows the chip,
+      `Agents_view` the Steer button (disabled, saying why, for nested
+      ones). Elapsed times tick with `Clock`,
       which the page sends every second only while the panel is open with
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
@@ -2281,7 +2408,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
-      message reaches the transcript, until the run ends), `Completion`
+      message reaches the transcript, until the run ends; then the
+      subagents' queues, `Model.agent_queues` from `agent_queues` and
+      `get_pending`'s `agents`, removed with `remove_agent_queued`; the
+      actions carry the `Recipient`), `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
       `list_paths`, `#` snippets) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
@@ -2304,8 +2434,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
       gear beside the account, the account menu, `/settings` or Ctrl+,:
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
-      providers, the account; its controls are `Action.Run` commands, which
-      leave it open),
+      providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
+      fetched as it opens, our collection's progress, also a chip in the
+      status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
+      words it for both frontends, and `Slash`/`Commands.all ~superuser`
+      leave it out for everyone else: no completion, `/help` or "did you
+      mean"), the account; its controls are
+      `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column; a repeat is counted rather than stacked, a notice's lifetime
       grows with its length, errors stay until dismissed, long paths are
@@ -2440,7 +2575,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       transparent `textarea` over its own highlighted text, Ctrl+S saving
       with `fs_write`; after a conflict the next save overwrites). Keys
       (`Keys.Target.Review`, the page focused but not its fields): `]`
-      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere; c also wherever
+      `[` n p j k, a, c, e, v, s, Esc; r, b, d; Alt+R everywhere; c also wherever
       code is selected but in a field. In the comment and reply fields
       Enter sends and Shift+Enter is a new line. `Files_view`
       marks changed entries (a dot, a sage tick once approved, sodium once
@@ -2448,6 +2583,23 @@ terminal frontend and `web/` prigh-web, the browser one.
       repository with `Review_code_view`, under a bar with its approval,
       counts, the layout and Review. `Tool_view` draws `reply_to_comment`
       as its reply and proposed diff.
+      What the page reviews is a `Code_review.Target` (a worktree, or a
+      branch not checked out: `Git_diff.Target.Rev`, read-only, its files
+      read with `git_show`, Edit and Accept refused) with a base and
+      `direct`; a base git does not know goes back to the target before
+      (`fallback`) with the error's closest names in a toast. The head's
+      two pickers are `Review_picker`s (`Dialog.Review_pick`, drawn under
+      their buttons by `Review_picker_view` with the composer chips'
+      classes: worktrees then branches not checked out; HEAD, branches,
+      remote branches, tags, recent commits and what is typed), rebuilt
+      when the diff or the worktrees (listed again on opening) come in;
+      the page stays live under them, the rest of it inert. Since merge
+      base / Directly is a segmented control (`Review_direct`), "Check out
+      into a worktree" `create_worktree` (`Review_checked_out`).
+      `Review_memory` keeps the last comparison per worktree or branch and
+      each session worktree's last target in the `web.review` preference:
+      written once a chosen diff is in, used when the page opens on its
+      defaults and when a target comes without a base.
     - Worktrees: `Worktrees` keeps the listing of the session's place
       (session, tool host, directory; reset on a session or user switch,
       stale after a turn, a create or remove, or other sessions moving)
@@ -2828,7 +2980,10 @@ closing one and giving the editor the focus, Ctrl+L and a filter, Esc,
 with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
-back, and signs bob out, leaving alice on the sign-in page. Then
+back, and signs bob out, leaving alice on the sign-in page. Alice's
+Settings show the Nix store (stand-in `nix` and `df`) and collect it;
+bob sees no Nix store section, no `/nix-gc` completion, and `/nix-gc` is
+an unknown command. Then
 `reconnect.mjs`, at phone size: a long session scrolled halfway up with a
 draft and a pasted image; `context.setOffline` and back, then the backend
 killed and restarted: each time the same session, the same scroll

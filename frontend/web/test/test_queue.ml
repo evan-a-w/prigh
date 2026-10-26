@@ -90,7 +90,7 @@ let%expect_test
   queue h;
   [%expect
     {|
-    (Remove_queued
+    (Remove_queued Main
      ((kind Follow_up) (index 0) (text "then write the changelog")))
     (Rpc (method_ remove_queued)
      (params ((queue follow_up) (index 0) (text "then write the changelog")))
@@ -125,7 +125,7 @@ let%expect_test
   queue h;
   [%expect
     {|
-    (Edit_queued ((kind Steer) (index 0) (text "also check the docs")))
+    (Edit_queued Main ((kind Steer) (index 0) (text "also check the docs")))
     (Rpc (method_ remove_queued)
      (params ((queue steer) (index 0) (text "also check the docs")))
      (tag Dequeued))
@@ -150,7 +150,7 @@ let%expect_test
   queue h;
   [%expect
     {|
-    (Remove_queued ((kind Steer) (index 1) (text b)))
+    (Remove_queued Main ((kind Steer) (index 1) (text b)))
     (Rpc (method_ remove_queued) (params ((queue steer) (index 1) (text b)))
      (tag (Unqueued b)))
     Steers this turn a

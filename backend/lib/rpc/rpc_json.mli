@@ -69,11 +69,13 @@ val subagent_summary : Subagent_log.Summary.t -> Json.t
 (** [{"subagent": summary, "messages": transcript}]. *)
 val subagent : Subagent_log.Summary.t * Timed_message.t list -> Json.t
 
-(** [{"steer_texts", "follow_up_texts", "confirms": [{call_id, agent_id,
-    name, summary, rules}], "questions": [{call_id, questions}]}]. *)
+(** [{"steer_texts", "follow_up_texts", "agents": [{agent_id, steer_texts,
+    follow_up_texts}], "confirms": [{call_id, agent_id, name, summary,
+    rules}], "questions": [{call_id, questions}]}]. *)
 val pending
   :  steer:string list
   -> follow_up:string list
+  -> agents:Subagent_inbox.Listing.t list
   -> confirms:Agent.Pending_confirm.t list
   -> questions:Agent.Pending_question.t list
   -> Json.t

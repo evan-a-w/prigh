@@ -109,8 +109,14 @@ val session_json
   -> ?worktrees:(string * string option * string * string) list
        (** its worktrees: path, branch, root and source ([created],
            [entered], [pr:N] or [agent:ID:TASK]) *)
+  -> ?home:string * string option
+       (** where a worktree switch took it from: its directory and branch *)
   -> string
   -> string
+
+(** [home] as [list_sessions] and [get_state] give it: a directory on the
+    backend host and its branch (the main checkout of a repository there). *)
+val home_json : string * string option -> string
 
 (** A model as [list_models] and states give it, keyed [provider/id]. *)
 val model_json

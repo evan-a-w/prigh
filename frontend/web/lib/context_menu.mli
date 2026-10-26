@@ -41,6 +41,7 @@ module Item : sig
     | Rename
     | Fork
     | New_worktree
+    | Switch_back (** the session goes back to its home ([/worktree back]) *)
     | Switch_here (** the session moves into the worktree *)
     | New_session_here
     | Review
@@ -63,7 +64,8 @@ module Item : sig
 end
 
 (** As a [Picker]: ids from {!Item.id}, the label, the detail (the slash
-    command that does the same). *)
+    command that does the same). A session with a home ({!Session_summary.home}:
+    pass the current session's from its state) offers to switch back first. *)
 val picker : Target.t -> Session_summary.t -> current:bool -> Picker.t
 
 (** The worktree's path, for a worktree's menu. *)

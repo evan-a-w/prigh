@@ -49,7 +49,7 @@ let%expect_test
       ; parallel_safe = false
       ; on_host = true
       ; freeform = None
-      ; destructive = true
+      ; destructive = Always
       ; description = "Run a command"
       ; parameters =
           `Object
