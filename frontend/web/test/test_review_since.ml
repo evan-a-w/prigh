@@ -205,7 +205,10 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Comment) (Edit)
     (Changes) (Whole file) (Since bob approved · 10:00)
     bob approved · 10:00 you commented · 09:00 (Send comments) (Close the review (Esc, Alt+R))
-    Reviewing main (/work) against HEAD (the uncommitted changes)
+    Reviewing
+    (main /work)
+    against
+    (HEAD the uncommitted changes)
     (○ a.ml +2 −1 since approved +2 −1)
     (⚠ b.ml +1 −1)
     2 files changed, +3 −2
