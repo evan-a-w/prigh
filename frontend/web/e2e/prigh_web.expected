@@ -1115,9 +1115,7 @@ Delete…  Delete
 === chromium: worktrees: Esc changed nothing ===
 Tidy the docs in a worktree
 === chromium: worktrees: a terminal in the worktree ===
-desktop
 <DIR>/home/.prigh/worktrees/prigh/feat-login
-connecting…
 === chromium: worktrees: folded ===
 The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
@@ -2572,9 +2570,7 @@ Delete…  Delete
 === firefox: worktrees: Esc changed nothing ===
 Tidy the docs in a worktree
 === firefox: worktrees: a terminal in the worktree ===
-desktop
 <DIR>/home/.prigh/worktrees/prigh/feat-login
-connecting…
 === firefox: worktrees: folded ===
 The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
@@ -2630,7 +2626,7 @@ Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
 === firefox: worktrees: errors ===
-console: [JavaScript Error: "Firefox can’t establish a connection to the server at ws://127.0.0.1:39789/terminal?token=sekrit%26x%3Dy&session=a815d96298fecc83&cols=115&rows=15." {file: "http://127.0.0.1:39789/terminal.js" line: 56}]
+none
 === firefox: review: files: changes marked ===
 src (changed: 2)
 README.md
