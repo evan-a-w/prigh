@@ -828,7 +828,8 @@ same view, and the TUI's `/review` says `changed since approved (+3 −1)`.
 The texts are kept with the session's review, each distinct content once,
 read where the tools run (so remote tool hosts too); files over 1 MiB,
 binary files, and new contents once a session keeps 32 MiB of them record
-only a digest: the review then says that the file changed, not how.
+only a digest: the review then says that the file changed, not how. A
+branch reviewed without checking it out (below) has no such view.
 
 Any worktree of the repository can be reviewed, not only the session's,
 and compared with anything. The review page's head reads "Reviewing
