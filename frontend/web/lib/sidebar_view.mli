@@ -19,3 +19,6 @@ val settings : inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** [/home/USER/x] as [~/x]. *)
 val home_relative : string -> string
+
+(** Where a session works: its repository and branch, else its directory. *)
+val place : ?cls:string -> Session_summary.t -> cwd:string -> Node.t

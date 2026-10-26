@@ -34,10 +34,7 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
        div
          ~cls:"context-menu-head"
          [ span ~cls:"context-menu-title" (Session_list.title s)
-         ; (match Prigh_ui.Session_worktrees.place s with
-            | Some place -> span ~cls:"context-menu-sub" place
-            | None ->
-              span ~cls:"context-menu-sub" (Sidebar_view.home_relative s.cwd))
+         ; Sidebar_view.place ~cls:"context-menu-sub" s ~cwd:s.cwd
          ]
      | Worktree { path; _ } ->
        let label =
@@ -48,7 +45,9 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
        in
        div
          ~cls:"context-menu-head"
-         [ span ~cls:"context-menu-title" ("⎇ " ^ label)
+         [ Node.span
+             ~attrs:[ Attr.class_ "context-menu-title" ]
+             [ icon ~cls:"place-icon" Branch; Node.text label ]
          ; span ~cls:"context-menu-sub" ("in " ^ Session_list.title s)
          ])
 ;;
@@ -98,7 +97,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
   in
   Node.div
     ~attrs:
-      [ Attr.class_ "menu-backdrop"
+      [ Attr.class_ "menu-backdrop context-menu-backdrop"
       ; Attr.on_click (fun ev ->
           if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
           then close
