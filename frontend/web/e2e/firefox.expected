@@ -1518,14 +1518,14 @@ Looking around.
 bash
 until [ -f sub-go ]; do sleep 0.1; done; echo sub-go
 sub-go
-•
+→
 You (steer)
 [The user sends you this while you work: take it into account and carry on.]
 use the tests
 <TIME>
 Using the tests, as asked.
 <TIME>
-•
+→
 You (follow-up)
 [The user sends you this as you finish: deal with it before you report.]
 then summarise
