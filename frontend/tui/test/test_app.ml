@@ -776,7 +776,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -793,7 +793,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -810,7 +810,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -876,14 +876,13 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: wh…
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /import [path]                  import a session from a J…
+      /compaction [at|model|mask ...]  show when conversations …
       /permissions                    show the mode and the all…
     ────────────────────────────────────────────────────────────
     > /mo▏
@@ -2824,7 +2823,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 288 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 294 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5246,7 +5245,10 @@ let%expect_test
       (worktrees_dir    ())
       (archive_after_days 7)
       (notify             bell)
-      (snippets ())))
+      (snippets ())
+      (compact_at_tokens 200000)
+      (compaction_model ())
+      (mask_observations true)))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode Auto)
@@ -5261,7 +5263,10 @@ let%expect_test
       (worktrees_dir    ())
       (archive_after_days 7)
       (notify             bell)
-      (snippets ())))
+      (snippets ())
+      (compact_at_tokens 200000)
+      (compaction_model ())
+      (mask_observations true)))
     |}]
 ;;
 
@@ -6270,7 +6275,10 @@ let%expect_test "/change_default saves the model and thinking level" =
       (worktrees_dir   ())
       (archive_after_days 7)
       (notify             bell)
-      (snippets ())))
+      (snippets ())
+      (compact_at_tokens 200000)
+      (compaction_model ())
+      (mask_observations true)))
 
 
 
@@ -8297,7 +8305,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8314,7 +8322,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8597,7 +8605,7 @@ let%expect_test
                                 │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
                                 │   /default-dir [off|path]            show or set the directory new sessions start in
                                 │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 66
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 67
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

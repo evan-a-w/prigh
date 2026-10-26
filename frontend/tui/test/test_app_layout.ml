@@ -83,7 +83,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]           show or set the models that take…
       /default-dir [off|path]            show or set the directory new se…
       /login [provider] [api_key|oauth]  log in to a provider, or a git h…
-      ↕ 1–8 of 66
+      ↕ 1–8 of 67
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -461,7 +461,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /trim [undo|show|hide]           drop everything before one of your…
       /name [text]                     set the session name
       /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agent wh…
-      ↕ 1–8 of 14
+      ↕ 1–8 of 15
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -590,7 +590,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -605,6 +604,7 @@ let%expect_test "screen: 100x30 and 160x40" =
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
       /import [path]                   import a session from a JSONL file
+      /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; …
       /permissions                     show the mode and the allow/ask/deny rules (config and this sess…
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /mo▏
@@ -672,7 +672,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -687,6 +686,7 @@ let%expect_test "screen: 100x30 and 160x40" =
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
       /import [path]                   import a session from a JSONL file
+      /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not onl…
       /permissions                     show the mode and the allow/ask/deny rules (config and this session)
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /mo▏

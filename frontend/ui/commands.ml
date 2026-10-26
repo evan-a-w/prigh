@@ -31,6 +31,7 @@ module Argument = struct
     | Pr
     | Commit
     | Agents
+    | Compaction
   [@@deriving sexp_of, equal]
 end
 
@@ -152,6 +153,15 @@ let every =
       "compact"
       "[instructions]"
       "summarise older messages to free context"
+  ; c
+      ~argument:Argument.Compaction
+      "compaction"
+      "[at|model|mask ...]"
+      "show when conversations are compacted and what summarises them; at \
+       TOKENS|off: also once the context exceeds TOKENS, not only at 80% of \
+       the window; model MODEL|off: the model that writes the summaries (off: \
+       the session's); mask on|off: replace old tool outputs with placeholders \
+       first"
   ; c
       ~argument:Argument.Trim
       "trim"

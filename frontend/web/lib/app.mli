@@ -160,6 +160,7 @@ module Reply_tag : sig
     | Config_saved of string (** the new config; the notice is shown *)
     | Fallback_saved (** the new config; its chain is shown *)
     | Default_dir_saved
+    | Compaction_saved (** the new config; its settings are shown *)
     | Default_saved
     | Session_stats
     | Entries of Entries_purpose.t

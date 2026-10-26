@@ -1507,9 +1507,13 @@ editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
 command moves to the background and how long a wait lasts, above),
 `generate_model` (the model ✦ Generate drafts commit messages, pull
-requests, branch names and session names with; default: the session's) and
+requests, branch names and session names with; default: the session's),
 `mask_observations` (default `true`: replace old tool outputs with
-placeholders before summarising, see "Long runs" below).
+placeholders before summarising, see "Long runs" below),
+`compact_at_tokens` (default 200000, `0` = off: compact once the context
+exceeds this many tokens, if that comes before 80% of the window) and
+`compaction_model` (the model that writes compaction summaries; default:
+the conversation's), all three set with `/compaction` (below).
 Without a `default_thinking`, sessions start with thinking `on`; models that
 cannot think ignore it. A fallback model keeps the session's thinking level.
 
@@ -1548,18 +1552,20 @@ known one), and a `default_model` that names no known model.
 ### Long runs: compaction, budget, goals, usage limits
 
 Context never runs out mid-task. The first, cheap tier is observation
-masking: once the context passes half of the model's window, the outputs of
+masking: once the context passes 5/8 of the compaction threshold (half of
+the model's window, when it compacts at 80%; below), the outputs of
 tool calls older than the last 10 turns are replaced with a one-line
 placeholder (`[bash output omitted to save context: 412 lines, 18 KB; run the
 tool again if you need it]`), and so are large arguments of old tool calls
 (a `write`'s content, an `apply_patch` body); the model's reasoning, its
 calls and your messages stay, and so do errors and outputs under 2 KB. It
-masks in batches, only when that frees at least a tenth of the window (also
-past the point where it would summarise), so the provider's prompt cache is
-not invalidated every turn, and the session
+masks in batches, only when that frees at least 1/8 of the threshold (a
+tenth of the window; also past the point where it would summarise), so the
+provider's prompt cache is not invalidated every turn, and the session
 records it, so a resumed session sends the same context. The transcript
 keeps showing the full outputs, with a note saying what was masked;
-`mask_observations: false` in `config.json` turns it off.
+`/compaction mask off` (`mask_observations: false` in `config.json`) turns
+it off.
 
 When the context still crosses 80% of the model's window between the turns
 of a run (the last response's tokens plus the tool results since, less what
@@ -1586,6 +1592,20 @@ conversation as the agent sends it (masked), in a request that shares the
 session's prompt cache; a conversation too long for that is sent as a
 shortened transcript instead. Subagents mask and compact their own context
 the same way.
+
+On models with very long windows, 80% is far past where answers start to
+degrade, so compaction also happens once the context exceeds
+`compact_at_tokens` (default 200000; `/compaction at 150k`, or `off` for
+80% only); masking then starts relative to it too (a 1M-window model
+capped at 200k masks past 125k tokens). `compaction_model` (`/compaction
+model MODEL`, `off` for the conversation's model) has a cheaper model
+write the summaries, at its own price; it is used only when its window
+holds what is summarised. It is sent the same request as the
+conversation's model would be (its messages, system prompt and tools,
+thinking only if it supports it, else a transcript when that does not
+fit), but, being another model, it does not reuse the conversation's
+prompt cache. `/compaction` alone shows all three settings. The system prompt also suggests handing
+wide exploration to subagents, so the main context stays small.
 
 #### Trimming the context
 
@@ -1698,6 +1718,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/trim [undo\|show\|hide]` | drop everything before one of your messages from the model's context (a picker, then a confirmation); `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
+| `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`) |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |

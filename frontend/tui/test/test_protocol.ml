@@ -858,6 +858,18 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"snippets":[{"name":"review"}]}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"compact_at_tokens":0,"compaction_model":"claude-haiku-4-5"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"compact_at_tokens":"lots"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"mask_observations":false}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"mask_observations":"yes"}|};
   print_s
     [%sexp
       (Config.to_json
@@ -874,6 +886,9 @@ let%expect_test "config round trip and config_changed event" =
          ; notify = "desktop"
          ; snippets =
              [ { name = "review"; text = "Review the diff.\nBe brief." } ]
+         ; compact_at_tokens = 150_000
+         ; compaction_model = Some "anthropic/claude-haiku-4-5"
+         ; mask_observations = false
          }
        : Json.t)];
   decode
@@ -893,7 +908,10 @@ let%expect_test "config round trip and config_changed event" =
      (worktrees_dir    ())
      (archive_after_days 7)
      (notify             bell)
-     (snippets ()))
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -907,7 +925,10 @@ let%expect_test "config round trip and config_changed event" =
      (worktrees_dir    ())
      (archive_after_days 7)
      (notify             bell)
-     (snippets ()))
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -921,7 +942,10 @@ let%expect_test "config round trip and config_changed event" =
      (worktrees_dir   ())
      (archive_after_days 7)
      (notify             bell)
-     (snippets ()))
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -936,7 +960,10 @@ let%expect_test "config round trip and config_changed event" =
      (worktrees_dir ())
      (archive_after_days 7)
      (notify             bell)
-     (snippets ()))
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models ())
@@ -954,8 +981,47 @@ let%expect_test "config round trip and config_changed event" =
      (notify             bell)
      (snippets ((
        (name review)
-       (text "Review it.\nBriefly.")))))
+       (text "Review it.\nBriefly."))))
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true))
     (decode (e (in snippets[0] "missing field \"text\"")))
+    ((scoped_models ())
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ())
+     (worktrees_dir    ())
+     (archive_after_days 7)
+     (notify             bell)
+     (snippets ())
+     (compact_at_tokens 0)
+     (compaction_model (claude-haiku-4-5))
+     (mask_observations true))
+    (decode (e "compact_at_tokens must be a whole number"))
+    ((scoped_models ())
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ())
+     (worktrees_dir    ())
+     (archive_after_days 7)
+     (notify             bell)
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations false))
+    (decode (e "mask_observations must be a boolean"))
     ((scoped_models (a b))
      (approval_mode ask)
      (permissions (
@@ -971,7 +1037,10 @@ let%expect_test "config round trip and config_changed event" =
      (notify             desktop)
      (snippets ((
        (name review)
-       (text "Review the diff.\nBe brief.")))))
+       (text "Review the diff.\nBe brief."))))
+     (compact_at_tokens 150000)
+     (compaction_model  anthropic/claude-haiku-4-5)
+     (mask_observations false))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -987,7 +1056,10 @@ let%expect_test "config round trip and config_changed event" =
         (worktrees_dir    ())
         (archive_after_days 7)
         (notify             bell)
-        (snippets ()))))
+        (snippets ())
+        (compact_at_tokens 200000)
+        (compaction_model ())
+        (mask_observations true))))
     |}]
 ;;
 
