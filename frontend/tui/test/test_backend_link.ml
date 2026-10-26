@@ -566,12 +566,12 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     open (Websocket (url wss://srv.example/prigh/ws)
      (address
       ((tls true) (host srv.example) (port 443) (prefix /prigh) (lines false)))
      (headers ((X-Auth secret))))
-    wss://srv.example/prigh/ws hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    wss://srv.example/prigh/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (wss://srv.example/prigh/ws))
      (user ())
@@ -581,7 +581,7 @@ let%expect_test
     open (Websocket (url ws://[::1]:7790/ws)
      (address ((tls false) (host ::1) (port 7790) (prefix "") (lines false)))
      (headers ((X-Auth secret))))
-    ws://[::1]:7790/ws hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    ws://[::1]:7790/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (ws://[::1]:7790/ws)) (user ()) (saved (ws://[::1]:7790/ws)))
     |}];

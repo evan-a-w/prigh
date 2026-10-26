@@ -984,6 +984,65 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "a switched session's home is shown with its tool host's home directory"
+  =
+  let sessions =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         [ H.session_json
+             ~name:"Laptop"
+             ~cwd:"/Users/ann/wt"
+             ~host:"laptop"
+             ~home:("/Users/ann/notes", None)
+             "s1"
+         ; H.session_json
+             ~name:"Server"
+             ~cwd:"/home/prigh/wt"
+             ~host:"backend"
+             ~home:("/home/bob/notes", None)
+             "s2"
+         ])
+  in
+  let state =
+    H.state_json
+      ~fields:
+        [ "session_id", `String "s9"
+        ; "active_host", `String "laptop"
+        ; ( "hosts"
+          , Jsonaf.of_string
+              {|[{"id":"backend","name":"srv","cwd":"/home/prigh","home":"/home/prigh"},{"id":"laptop","name":"laptop","cwd":"/Users/ann","home":"/Users/ann"}]|}
+          )
+        ]
+      ()
+  in
+  let h = H.create ~sessions ~state () in
+  H.text h ~selector:".session-home";
+  H.right_click h ~selector:".session" ~nth:0;
+  H.text h ~selector:".context-menu [data-item=switch_back]";
+  H.key h "Escape" ~target:Page;
+  H.right_click h ~selector:".session" ~nth:1;
+  H.text h ~selector:".context-menu [data-item=switch_back]";
+  [%expect {|
+    from ~/notes
+    from /home/bob/notes
+    (Open_menu
+     ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
+    (Focus dialog)
+    (Place_menu (Element session-s1))
+    Switch back to ~/notes /worktree back
+    Close_dialog
+    (Focus editor)
+    (Open_menu
+     ((target (Session /sessions/s2.jsonl)) (anchor (Element session-s2))))
+    (Focus dialog)
+    (Place_menu (Element session-s2))
+    Switch back to /home/bob/notes /worktree back
+    |}]
+;;
+
 let%expect_test "Switch back runs /worktree back; the session's home goes" =
   let h =
     H.create
