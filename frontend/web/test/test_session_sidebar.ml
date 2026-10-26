@@ -527,6 +527,7 @@ let%expect_test "a session's items on the current session" =
     Rename session
     (Close (Esc))
     []
+    (✦ Generate)
     (Cancel) (Rename)
     |}];
   H.key h "Escape" ~target:Page;
@@ -547,6 +548,7 @@ let%expect_test "a session's items on the current session" =
     (Picker_choose review)
     (Focus editor)
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
@@ -659,6 +661,9 @@ let%expect_test "a worktree's menu and its items" =
     (Rpc (method_ git_diff)
      (params ((dir /home/u/.prigh/worktrees/prigh/feat-login)))
      (tag (Review Diff)))
+    (Rpc (method_ git_status)
+     (params ((dir /home/u/.prigh/worktrees/prigh/feat-login)))
+     (tag (Git Status)))
     (Focus review-page)
     (Open_menu
      ((target

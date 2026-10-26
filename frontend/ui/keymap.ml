@@ -81,11 +81,19 @@ let bindings =
       "delete the word before the cursor"
   ; b [ Key.ctrl 'y' ] Yank "paste the most recent kill"
   ; b [ Key.alt (Char "y") ] Yank_pop "replace the last yank with an older kill"
-  ; b [ Key.ctrl '_' ] Undo "undo the last edit"
+  ; b
+      [ Key.ctrl '_' ]
+      Undo
+      "undo the last edit (the /pr new form: back to the text before the \
+       model's draft)"
   ; b [ Key.ctrl 'o' ] Cycle_verbosity "cycle transcript verbosity"
   ; b [ Key.ctrl 'r' ] Path_complete "complete a file path at the cursor"
   ; b [ Key.ctrl 'f' ] Search "search the transcript"
-  ; b [ Key.ctrl 'g' ] Edit_externally "edit the prompt in $EDITOR"
+  ; b
+      [ Key.ctrl 'g' ]
+      Edit_externally
+      "edit the prompt in $EDITOR (the /pr new form: the model drafts the \
+       title and body)"
   ; b [ Key.ctrl 'l' ] Model_picker "pick a model"
   ; b
       [ Key.alt (Char "n") ]

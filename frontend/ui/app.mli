@@ -19,8 +19,19 @@ module Reply_tag : sig
     | Forge_refresh (** [forge_status]: the git hosts, and what lists them *)
     | Prs_picker of string option (** [/pr list]'s state *)
     | Pr_shown
-    | Pr_form_defaults of string option (** the title after [/pr new] *)
+    | Pr_form_defaults of
+        { title : string option (** the title after [/pr new] *)
+        ; generate : bool (** [--generate]: then draft it *)
+        }
     | Pr_created (** errors go to the form *)
+    | Pr_drafted of string (** the form's [generate_text]: its [gen_id] *)
+    | Commit_staged of
+        { command : string (** back in the editor if it fails *)
+        ; commit : Commit_command.t
+        } (** [/commit -a]: then commit *)
+    | Committed of { amend : bool }
+    | Commit_drafted of string (** [/commit --generate]: its [gen_id] *)
+    | Pushed
     | Pr_checked_out of int (** offers to [/cd] to the worktree *)
     | Models_for_picker of string (** initial filter *)
     | Models_for_switch of string (** the argument to resolve *)
@@ -293,6 +304,9 @@ module Model : sig
     ; reconnect_generation : int
     ; btw : Btw_box.t option
     ; btw_seq : int
+    ; commit_draft : Commit_draft.t option
+      (** [/commit --generate]'s, until it is in the editor *)
+    ; gen_seq : int (** numbers [generate_text]'s [gen_id]s *)
     ; width : int
     ; height : int
     ; quitting : bool

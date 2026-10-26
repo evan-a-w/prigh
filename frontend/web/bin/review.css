@@ -467,3 +467,69 @@ mark.review-mark[data-comment] { cursor: default; }
 }
 @media (pointer: coarse) { .review-popover > .menu-keys, .review-popover .popover-shortcut { display: none; } }
 .review-merge-base { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }
+
+/* ---- the reviewed worktree's git: its branch, what is staged, push, PR */
+
+.git-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 14px 6px 18px;
+  border-bottom: 1px solid var(--rule);
+  font: 12px var(--sans);
+  color: var(--muted);
+}
+.git-bar > .icon { width: 14px; height: 14px; color: var(--faint); }
+.git-branch { font: 500 12.5px var(--mono); color: var(--chalk); }
+.git-branch.detached { color: var(--brick); }
+.git-upstream { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+.git-upstream.none { font-family: var(--sans); color: var(--faint); font-style: italic; }
+.git-counts { display: flex; gap: 10px; }
+.git-count { white-space: nowrap; }
+.git-count .n { font: 500 12px var(--mono); color: var(--chalk); }
+.git-count.none { color: var(--faint); }
+.git-count.none .n { color: var(--faint); font-weight: 400; }
+.git-actions { display: flex; gap: 6px; margin-left: auto; }
+.git-up { transform: scaleY(-1); }
+.git-error { color: var(--faint); }
+
+/* A file's stage box, left of its row in the list. */
+.review-files li { display: flex; align-items: center; }
+.review-files li > .review-file { flex: 1; min-width: 0; }
+.git-tick {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.git-tick.clean { cursor: default; }
+.git-tick:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.git-tick:hover .check { border-color: var(--muted); }
+/* Approved, staged at the commit: drawn hollow until git has it. */
+.git-tick.pending .check.on { background: none; color: var(--sodium); border-style: dashed; }
+.git-tick.partly .check.on { background: color-mix(in srgb, var(--sodium) 45%, transparent); }
+
+/* The commit message, under the file list. */
+.git-commit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--rule);
+}
+.git-commit .field-label { white-space: nowrap; }
+.git-message { resize: vertical; min-height: 84px; font: 12.5px/1.45 var(--mono); }
+.git-commit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.git-failure, .git-notice { flex-basis: 100%; font: 12px/1.4 var(--sans); overflow-wrap: anywhere; }
+.git-failure { color: var(--brick); }
+.git-notice { color: var(--sage); }
+.app.narrow .git-actions { margin-left: 0; }

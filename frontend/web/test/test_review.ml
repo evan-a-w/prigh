@@ -132,6 +132,7 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     (Rpc (method_ push_pref) (params ((key history) (value /review) (max 500)))
      (tag Ignore))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}];
   H.text h ~selector:".review-page";
@@ -241,7 +242,10 @@ let%expect_test
   H.event
     h
     {|{"type":"event","event":"tool_end","call":{"id":"e1","name":"edit","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"e1","tool_name":"edit","text":"ok","is_error":false}}|};
-  [%expect {| (Rpc (method_ git_diff) (params ()) (tag (Review Diff))) |}];
+  [%expect {|
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
+    |}];
   H.reply h "git_diff" (diff_json (main_ml_diff ^ "+let g = 7\n" ^ util_diff));
   H.text h ~selector:".review-file-head";
   [%expect
@@ -267,6 +271,7 @@ let%expect_test
     {|
     (Review Toggle)
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}]
 ;;
@@ -439,7 +444,10 @@ let%expect_test
          [ {|{"author":"agent","text":"Or:","at_ms":1791194460000,"delivered":true,
               "proposal":{"edits":[{"old_text":"3 * 2","new_text":"3"}],"state":"accepted"}}|}
          ]);
-  [%expect {| (Rpc (method_ git_diff) (params ()) (tag (Review Diff))) |}];
+  [%expect {|
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
+    |}];
   H.text h ~selector:".review-proposal-state";
   [%expect {| Accepted: applied to the file |}];
   (* A reply, then resolving. *)
@@ -614,6 +622,7 @@ let%expect_test
      (tag (Review (Saved src/main.ml))))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     Saved on the tool host
     (Reload) (Save)
     |}]
@@ -677,6 +686,7 @@ let%expect_test
     {|
     (Review (Open (src/main.ml)))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}]
 ;;
@@ -882,5 +892,6 @@ let%expect_test "help lists the review's keys" =
     r / b / d (reviewing): choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     Esc (reviewing): drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
+    Ctrl+Enter (the review's commit message): commit the ticked files (approved files come ticked; untick to leave one out)
     |}]
 ;;

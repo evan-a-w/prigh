@@ -13,7 +13,12 @@ val page
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
 
-val create : Pr_create.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+(** With ✦ Generate for the title and description. *)
+val create
+  :  Generate.t
+  -> Pr_create.t
+  -> inject:(App.Action.t -> unit Effect.t)
+  -> Node.t
 
 val checked_out
   :  number:int

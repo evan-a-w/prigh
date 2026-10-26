@@ -276,7 +276,7 @@ let argument_items
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
-  | Remind | Worktree | Review | Agents -> None
+  | Remind | Worktree | Review | Commit | Agents -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -443,10 +443,11 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
-              | (Remind | Agents) as kind ->
+              | (Remind | Commit | Agents) as kind ->
                 let rest = String.drop_prefix line start in
                 Option.bind
                   (match kind with
+                   | Commit -> Commit_command.complete rest
                    | Agents -> Agents_command.complete ~agents rest
                    | _ -> Remind_command.complete ~reminders rest)
                   ~f:(fun (offset, candidates) ->

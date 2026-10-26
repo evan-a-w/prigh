@@ -200,6 +200,8 @@ module Reply_tag = struct
         } (** reconnected, but the backend no longer has [session] *)
     | Forge of Forge_reply.t
     | Prefs
+    | Generated of string
+    | Git of Git_bar.Reply.t
     | Nix_status of { open_settings : bool }
     | Nix_collected
   [@@deriving sexp_of, equal]
@@ -457,6 +459,10 @@ module Action = struct
     | New_pr
     | Pr_form of Pr_create.Action.t
     | Preview_accent of string
+    | Generate of Generate.Target.t
+    | Generate_stop
+    | Generate_undo of Generate.Target.t
+    | Git of Git_bar.Action.t
   [@@deriving sexp_of]
 end
 
@@ -528,6 +534,8 @@ module Model = struct
     ; theme : Theme.t
     ; theme_preview : Theme.t option
     ; prefs : Pref_sync.t
+    ; generate : Generate.t
+    ; git_bar : Git_bar.t
     }
   [@@deriving sexp_of]
 
@@ -686,6 +694,8 @@ let init =
   ; theme = Theme.default
   ; theme_preview = None
   ; prefs = Pref_sync.init
+  ; generate = Generate.empty
+  ; git_bar = Git_bar.empty
   }
 ;;
 
@@ -803,6 +813,12 @@ let cancel_btw (m : Model.t) =
   | _ -> []
 ;;
 
+let cancel_generate (m : Model.t) =
+  match m.generate.running with
+  | Some r -> [ call (Generate_cancel { gen_id = r.id }) ~tag:Ignore ]
+  | None -> []
+;;
+
 (* A new session (switched, new, forked) starts from its own messages. *)
 (* ---- the file browser and the attachments *)
 
@@ -833,13 +849,24 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     match out with
     | Rpc { method_; reply } -> m, cmds @ [ call method_ ~tag:(Review reply) ]
     | Get_diff { reviewed; base; direct } ->
-      ( m
-      , cmds
-        @ [ rpc
-              "git_diff"
-              (Git_diff.params ?base ~direct ~target:reviewed ())
-              ~tag:(Review Diff)
-          ] )
+      let diff =
+        rpc
+          "git_diff"
+          (Git_diff.params ?base ~direct ~target:reviewed ())
+          ~tag:(Review Diff)
+      in
+      (* The page's git bar follows the worktree it reviews; a branch that
+         is not checked out has none. *)
+      (match reviewed with
+       | Dir dir when m.review.open_ ->
+         let git_bar, outs = Git_bar.watch m.git_bar ~dir in
+         ( { m with git_bar }
+         , cmds
+           @ [ diff ]
+           @ List.filter_map outs ~f:(function
+             | Rpc { method_; reply } -> Some (call method_ ~tag:(Git reply))
+             | Draft_message | Changed | Create_pr _ -> None) )
+       | Dir _ | Rev _ -> m, cmds @ [ diff ])
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
@@ -1017,6 +1044,8 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
+      ; generate = Generate.empty
+      ; git_bar = Git_bar.empty
       ; completion = None
       ; scrolled_up = false
       ; skills = Skills.empty
@@ -1025,6 +1054,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; session_gone = None
       }
     , cancel_btw m
+      @ cancel_generate m
       @ [ Command.Set_url_session state.session_id ]
       @ fetch
       @ (if Option.is_some cached then [ Command.Scroll_to_bottom ] else [])
@@ -1354,9 +1384,13 @@ let open_pr ?back (m : Model.t) number =
       ] )
 ;;
 
-let new_pr ?back (m : Model.t) ~title =
-  let m, cmds = open_dialog m (Pr_create (Pr_create.create ?back ~title ())) in
-  m, cmds @ [ call Pr_defaults ~tag:(Forge (Defaults (session_id m))) ]
+let new_pr ?back ?dir (m : Model.t) ~title =
+  let m, cmds =
+    open_dialog m (Pr_create (Pr_create.create ?back ?dir ~title ()))
+  in
+  ( m
+  , cmds @ [ call (Pr_defaults { dir }) ~tag:(Forge (Defaults (session_id m))) ]
+  )
 ;;
 
 let checkout_pr (m : Model.t) number =
@@ -3085,7 +3119,7 @@ let act_as (m : Model.t) user =
 
 (* Everything but the connection belongs to the user we were. *)
 let user_switched (m : Model.t) (hello : Hello_reply.t) =
-  let cancel = cancel_btw m in
+  let cancel = cancel_btw m @ cancel_generate m in
   let m =
     { m with
       hello = Some hello
@@ -3106,6 +3140,8 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; dialog = None
     ; completion = None
     ; btw = None
+    ; generate = Generate.empty
+    ; git_bar = Git_bar.empty
     ; images = []
     ; skills = Skills.empty
     ; worktrees = Worktrees.reset m.worktrees
@@ -5111,10 +5147,157 @@ let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
      | _, None, None -> m, [ focus_editor ])
 ;;
 
+(* ---- drafting fields with the model (Generate) *)
+
+(* The target's field, while it is on show: its text (a pull request's
+   title and body). *)
+let field_texts (m : Model.t) (target : Generate.Target.t) =
+  match target, m.dialog with
+  | Pr, Some (Pr_create f) -> Some [ f.title; f.body ]
+  | Commit_message, _ -> Some [ m.git_bar.message ]
+  | Worktree_branch, Some (New_worktree d) -> Some [ d.branch ]
+  | Session_title, Some (Rename name) -> Some [ name ]
+  | (Pr | Worktree_branch | Session_title), _ -> None
+;;
+
+let set_field_texts (m : Model.t) (target : Generate.Target.t) texts =
+  match target, texts, m.dialog with
+  | Pr, [ title; body ], Some (Pr_create f) ->
+    { m with dialog = Some (Pr_create { f with title; body; error = None }) }
+  | Commit_message, [ message ], _ ->
+    { m with git_bar = { m.git_bar with message } }
+  | Worktree_branch, [ branch ], Some (New_worktree d) ->
+    { m with dialog = Some (New_worktree (New_worktree.set d Branch branch)) }
+  | Session_title, [ name ], Some (Rename _) ->
+    { m with dialog = Some (Rename name) }
+  | _ -> m
+;;
+
+let streamed_texts (target : Generate.Target.t) text =
+  match target with
+  | Pr ->
+    let title, body = Generated.split_pr text in
+    [ title; body ]
+  | Commit_message | Worktree_branch | Session_title -> [ text ]
+;;
+
+let generate_request (m : Model.t) (target : Generate.Target.t) ~gen_id
+  : (Request.Method.t, string) Result.t
+  =
+  let kind = Generate.Target.kind target in
+  let request ?dir ?base ?task () =
+    Ok (Request.Method.Generate_text { gen_id; kind; dir; base; task })
+  in
+  match target, m.dialog with
+  | Pr, Some (Pr_create { defaults = Some d; base; dir; _ }) ->
+    let base = String.strip base in
+    request ?dir ~base:(if String.is_empty base then d.base else base) ()
+  | Pr, _ -> Error "Wait for the branch's details to load."
+  | Commit_message, _ -> request ?dir:m.git_bar.dir ()
+  | Worktree_branch, Some (New_worktree d) ->
+    let task = String.strip d.branch in
+    if String.is_empty task then request () else request ~task ()
+  | Worktree_branch, _ | Session_title, _ -> request ()
+;;
+
+let start_generate (m : Model.t) (target : Generate.Target.t) =
+  match field_texts m target with
+  | None -> m, []
+  | Some before ->
+    let cancel = cancel_generate m in
+    let generate, _ = Generate.stop m.generate in
+    let generate, gen_id = Generate.start generate target ~before in
+    (match generate_request m target ~gen_id with
+     | Error e -> error m e
+     | Ok method_ ->
+       let m =
+         match target, m.dialog with
+         | Pr, Some (Pr_create f) ->
+           { m with
+             generate
+           ; dialog = Some (Pr_create { f with error = None })
+           }
+         | Commit_message, _ ->
+           { m with generate; git_bar = { m.git_bar with failure = None } }
+         | _ -> { m with generate }
+       in
+       m, cancel @ [ call method_ ~tag:(Generated gen_id) ])
+;;
+
+let stop_generate (m : Model.t) =
+  let cancel = cancel_generate m in
+  let generate, _ = Generate.stop m.generate in
+  { m with generate }, cancel
+;;
+
+let undo_generate (m : Model.t) target =
+  match Generate.undo_for m.generate target with
+  | None -> m, []
+  | Some before ->
+    let m = set_field_texts m target before in
+    { m with generate = Generate.forget m.generate target }, []
+;;
+
+let generated (m : Model.t) id result =
+  let generate, running = Generate.finish m.generate ~id in
+  let m = { m with generate } in
+  match running, result with
+  | None, _ -> m, []
+  | Some r, Error e ->
+    let m =
+      { (set_field_texts m r.target r.before) with
+        generate = Generate.forget generate r.target
+      }
+    in
+    if String.equal e "cancelled" then m, [] else error m e
+  | Some r, Ok json ->
+    (match Generated.of_json json with
+     | Error e -> error m (Error.to_string_hum e)
+     | Ok g ->
+       let texts =
+         match r.target, g.title, g.body with
+         | Pr, Some title, Some body -> [ title; body ]
+         | _ -> streamed_texts r.target g.text
+       in
+       set_field_texts m r.target texts, [])
+;;
+
+(* ---- the review page's git bar *)
+
+let review_files (m : Model.t) =
+  List.map m.review.files ~f:(fun f ->
+    ( f.path
+    , Prigh_ui.File_approval.Status.equal
+        (Code_review.approval m.review f)
+        Approved ))
+;;
+
+let git_out (m : Model.t) (outs : Git_bar.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Git_bar.Out.t) ->
+    let m, more =
+      match out with
+      | Rpc { method_; reply } -> m, [ call method_ ~tag:(Git reply) ]
+      | Draft_message -> start_generate m Commit_message
+      | Changed -> with_review m (Code_review.refresh m.review)
+      | Create_pr { dir } -> new_pr m ?dir ~title:""
+    in
+    m, cmds @ more)
+;;
+
+let with_git (m : Model.t) (git_bar, outs) = git_out { m with git_bar } outs
+
+let git_action (m : Model.t) action =
+  match Code_review.read_only m.review with
+  | Some _ -> m, []
+  | None -> with_git m (Git_bar.update m.git_bar ~files:(review_files m) action)
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
   | Forge tag, result -> forge_reply m tag result
+  | Generated id, result -> generated m id result
+  | Git reply, result -> with_git m (Git_bar.reply m.git_bar reply result)
   | Files (Previewed path as reply), (Ok json as result) ->
     let m =
       match File_preview.of_json json with
@@ -6139,6 +6322,12 @@ let main_event (m : Model.t) (event : Event.t) =
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
+  | Generate_delta { gen_id; delta } ->
+    (match Generate.delta m.generate ~id:gen_id delta with
+     | generate, Some (target, text) ->
+       ( set_field_texts { m with generate } target (streamed_texts target text)
+       , [] )
+     | generate, None -> { m with generate }, [])
   | _ -> m, []
 ;;
 
@@ -6991,14 +7180,22 @@ let update_connected (m : Model.t) (action : Action.t) =
      | _ -> m, [])
   | Dialog_accept -> dialog_accept m
   | Close_dialog ->
-    (match m.dialog with
-     | Some (Login { failed = None; provider; _ }) ->
-       let m, cmds = close_dialog { m with cancelled_login = Some provider } in
-       m, cmds @ [ rpc "auth_cancel" [] ]
-     | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
-       open_picker m (Pulls l)
-     | Some _ -> close_dialog m
-     | None -> m, [])
+    (match m.dialog, m.generate.running with
+     (* Esc stops a draft streaming into the dialog before closing it. *)
+     | Some (Pr_create _), Some { target = Pr; _ }
+     | Some (New_worktree _), Some { target = Worktree_branch; _ }
+     | Some (Rename _), Some { target = Session_title; _ } -> stop_generate m
+     | _ ->
+       (match m.dialog with
+        | Some (Login { failed = None; provider; _ }) ->
+          let m, cmds =
+            close_dialog { m with cancelled_login = Some provider }
+          in
+          m, cmds @ [ rpc "auth_cancel" [] ]
+        | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
+          open_picker m (Pulls l)
+        | Some _ -> close_dialog m
+        | None -> m, []))
   | Login_choose i ->
     (match m.dialog with
      | Some (Login flow) ->
@@ -7039,6 +7236,11 @@ let update_connected (m : Model.t) (action : Action.t) =
            Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
     )
   | New_session_in path -> new_session_in m path
+  | Generate Commit_message -> git_action m Draft
+  | Generate target -> start_generate m target
+  | Generate_stop -> stop_generate m
+  | Generate_undo target -> undo_generate m target
+  | Git action -> git_action m action
   | New_worktree -> new_worktree_dialog m
   | New_worktree_input { field; text } ->
     (match m.dialog with

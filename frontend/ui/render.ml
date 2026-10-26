@@ -130,7 +130,11 @@ let picker_keys (kind : Mode.Picker_kind.t) =
 
 let sign_in_keys = "Tab next field · Enter signs in · Esc closes"
 
-let pr_form_keys = "Enter creates · Esc cancels"
+let pr_form_keys form =
+  if Option.is_some (Pr_form.generating form)
+  then "drafting… · Esc stops"
+  else "Enter creates · Esc cancels"
+;;
 
 let disconnected_hint (m : App.Model.t) =
   match m.mode with
@@ -282,7 +286,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Question _ ->
           Some [ span ~style:attention "Enter accepts · Esc declines" ]
         | Sign_in _ -> Some [ span ~style:attention sign_in_keys ]
-        | Pr_form _ -> Some [ span ~style:attention pr_form_keys ]
+        | Pr_form form -> Some [ span ~style:attention (pr_form_keys form) ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
           then
@@ -309,6 +313,13 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
            | None ->
              if m.pending_quit
              then Some [ span ~style:attention "Ctrl+C again quits" ]
+             else if Option.is_some m.commit_draft
+             then
+               Some
+                 [ span
+                     ~style:attention
+                     "drafting the commit message · Esc stops"
+                 ]
              else if Option.is_some m.btw
              then
                Some
@@ -675,18 +686,27 @@ let pr_form_dialog ~width form =
     ]
   in
   let note =
-    match Pr_form.submitting form, Pr_form.error form with
-    | true, _ -> [ [ span ~style:gray "creating…" ] ]
-    | false, Some error ->
+    match
+      Pr_form.submitting form, Pr_form.generating form, Pr_form.error form
+    with
+    | true, _, _ -> [ [ span ~style:gray "creating…" ] ]
+    | false, Some _, _ ->
+      [ [ span ~style:attention "drafting with the model… (Esc stops)" ] ]
+    | false, None, Some error ->
       Content.wrap [ [ span ~style:(Style.fg Red) error ] ] ~width:inner
-    | false, None -> []
+    | false, None, None -> []
   in
   let keys =
     Content.wrap
       [ [ span
             ~style:gray
-            "Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · \
-             Enter creates · Esc cancels"
+            (sprintf
+               "Tab/↑↓ fields · Space toggles · Ctrl+J new line in the body · \
+                Ctrl+G drafts it with the model%s · Enter creates · Esc \
+                cancels"
+               (if Pr_form.can_undo form
+                then " · Ctrl+_ undoes the draft"
+                else ""))
         ]
       ]
       ~width:inner
@@ -1432,6 +1452,15 @@ let overlays (m : App.Model.t) ~width ~rows : Overlay.t list =
               ~max_rows:(Int.min rows (Btw_box.max_rows ~height:m.height)))
        ]
      | _ -> [])
+    @ (match m.mode, m.commit_draft with
+       | Editing, Some draft ->
+         [ Overlay.create
+             (Commit_draft.render
+                draft
+                ~width
+                ~max_rows:(Int.min rows (Btw_box.max_rows ~height:m.height)))
+         ]
+       | _ -> [])
     @ (match m.mode with
        | Editing -> Option.to_list (queued_block m ~width)
        | _ -> [])

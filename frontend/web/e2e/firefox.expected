@@ -1109,7 +1109,9 @@ Delete…  Delete
 === firefox: worktrees: the new worktree dialog ===
 New worktree
 Branch
-A new branch, or an existing one to check out
+✦
+Generate name
+A new branch, or an existing one to check out (✦ names one from the task typed here)
 Base
 Where a new branch starts (empty: main, where this session is)
 Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
@@ -1294,6 +1296,11 @@ src/
 util.ml
 +3 −0
 2 files changed, +5 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 chat still shown: true
 file browser hidden: true
 === firefox: review: page: a second comment, not sent yet ===
@@ -1387,6 +1394,11 @@ util.ml
 1
 +3 −0
 3 files changed, +6 −2
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === firefox: review: page: the agent's reply ===
 src/main.ml
 Approved
@@ -1504,10 +1516,20 @@ src/
 login.ml
 +1 −0
 2 files changed, +2 −1
+Commit message
+✦
+Generate
+Amend
+Commit
 === firefox: review: worktree: against HEAD ===
 README.md
 +1 −1
 1 file changed, +1 −1
+Commit message
+✦
+Generate
+Amend
+Commit 1 file
 === firefox: review: worktree: against HEAD, what is reviewed ===
 Reviewing feat/login (<WT>) against HEAD
 === firefox: review: worktree: back to the session's own ===
@@ -1522,6 +1544,11 @@ util.ml
 1
 +3 −0
 3 files changed, +8 −2
+Commit message
+✦
+Generate
+Amend
+Commit
 === firefox: review: since: the files ===
 README.md
 +1 −1
@@ -1535,6 +1562,11 @@ util.ml
 +1 −0 since approved
 +4 −0
 3 files changed, +9 −2
+Commit message
+✦
+Generate
+Amend
+Commit
 === firefox: review: since: the view shown ===
 Comment
 Since you approved · <TIME>
@@ -1722,6 +1754,65 @@ Reviewing feat/old (<HOME>/.prigh/worktrees/repo/feat-old) against main (merge b
 sheet: fixed
 Alt+R closed it
 === firefox: review: errors ===
+none
+=== firefox: review git: the bar ===
+main
+↑0 ↓0 origin/main
+0 staged
+1 unstaged
+1 untracked
+Stage approved
+Push
+Create PR
+=== firefox: review git: the boxes ===
+src/main.ml: false
+src/util.ml: false
+=== firefox: review git: ticked ===
+src/main.ml: true (staged at the commit)
+src/util.ml: true
+=== firefox: review git: one staged ===
+1 staged
+1 unstaged
+0 untracked
+=== firefox: review git: drafted ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+=== firefox: review git: the commit box ===
+Commit message
+✦
+Generate
+Undo
+Amend
+Commit 2 files
+=== firefox: review git: both staged ===
+2 staged
+0 unstaged
+0 untracked
+=== firefox: review git: committed ===
+Committed <SHA> main: double v12, add util on main
+=== firefox: review git: ahead of origin ===
+main
+↑1 ↓0 origin/main
+0 staged
+0 unstaged
+0 untracked
+Stage approved
+Push ↑1
+Create PR
+Committed <SHA> main: double v12, add util on main
+=== firefox: review git: pushed ===
+Pushed main to origin
+=== firefox: review git: level with origin ===
+↑0 ↓0 origin/main
+=== firefox: review git: origin has it ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+src/main.ml | 2 +-
+src/util.ml | 3 +++
+2 files changed, 4 insertions(+), 1 deletion(-)
+=== firefox: review git: errors ===
 none
 === firefox: remote: prigh web ===
 http://127.0.0.1:<PORT>/#signin=<code>
