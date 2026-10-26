@@ -9,7 +9,6 @@ module Drag = struct
     ; handle : Resize.Handle.t
     ; target : Dom_html.element Js.t
     ; var : string
-    ; unit : string
     ; grows : int
     ; vertical : bool
     ; pointer : int
@@ -17,7 +16,6 @@ module Drag = struct
     ; start : int
     ; min : int
     ; max : int
-    ; per_px : float (* units per pixel: 1 for pixels, 100/size for percent *)
     ; mutable value : int
     ; mutable frame : bool
     }
@@ -93,26 +91,15 @@ let start (handle_el : Dom_html.element Js.t) (ev : Dom_html.pointerEvent Js.t) 
       Js.Opt.to_option (Dom_html.document##querySelector (Js.string selector)))
   in
   let%bind var = attribute handle_el "data-resize-var" in
-  let%bind unit = attribute handle_el "data-resize-unit" in
   let%bind grows = int_attribute handle_el "data-resize-grows" in
   let%bind start = int_attribute handle_el "aria-valuenow" in
   let%bind min = int_attribute handle_el "aria-valuemin" in
   let%map max = int_attribute handle_el "aria-valuemax" in
   let vertical = Resize.Handle.vertical handle in
-  let per_px =
-    if String.equal unit "%"
-    then (
-      let size =
-        if vertical then target##.clientWidth else target##.clientHeight
-      in
-      100. /. Float.of_int (Int.max 1 size))
-    else 1.
-  in
   { Drag.handle_el
   ; handle
   ; target
   ; var
-  ; unit
   ; grows
   ; vertical
   ; pointer = pointer_id ev
@@ -120,7 +107,6 @@ let start (handle_el : Dom_html.element Js.t) (ev : Dom_html.pointerEvent Js.t) 
   ; start
   ; min
   ; max
-  ; per_px
   ; value = start
   ; frame = false
   }
@@ -174,9 +160,7 @@ let install_drag ~schedule =
          let value =
            Int.max
              d.min
-             (Int.min
-                d.max
-                (d.start + Float.iround_nearest_exn (moved *. d.per_px)))
+             (Int.min d.max (d.start + Float.iround_nearest_exn moved))
          in
          if value <> d.value
          then (
@@ -188,7 +172,7 @@ let install_drag ~schedule =
                (Dom_html.window##requestAnimationFrame
                   (Js.wrap_callback (fun (_ : Js.number_t) ->
                      d.frame <- false;
-                     set_var d.target d.var (sprintf "%d%s" d.value d.unit)))
+                     set_var d.target d.var (sprintf "%dpx" d.value)))
                 : Dom_html.animation_frame_request_id)))
        | _ -> ());
   let stop (ev : Dom_html.pointerEvent Js.t) =

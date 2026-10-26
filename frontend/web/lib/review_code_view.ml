@@ -39,6 +39,7 @@ module Mark = struct
     ; end_ : int
     ; id : string option (** the comment's; [None]: the draft's *)
     ; hot : bool (** its thread is pointed at *)
+    ; quiet : bool (** resolved *)
     }
   [@@deriving equal]
 end
@@ -109,6 +110,7 @@ let marked tokens (marks : Mark.t list) ~inject =
                    [ "hot", List.exists ms ~f:(fun m -> m.hot)
                    ; "draft", Option.is_none m.id
                    ; "many", List.length ms > 1
+                   ; "quiet", List.for_all ms ~f:(fun m -> m.quiet)
                    ]
                ]
                @
@@ -383,7 +385,16 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
         ; (if busy then lamp ~title:"Saving" () else Node.none)
         ; div
             ~cls:"review-thread-tools"
-            [ button
+            [ (if resolved && not outdated
+               then
+                 button
+                   ~cls:"icon ghost review-fold"
+                   ~title:"Fold it to its mark on the line"
+                   ~label:"Fold"
+                   ~on_click:(inject (review (Unfold c.id)))
+                   [ icon ~cls:"chevron up" Chevron ]
+               else Node.none)
+            ; button
                 ~cls:"small ghost"
                 ~disabled:busy
                 ~title:
@@ -406,12 +417,9 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
             ]
         ]
     ; quote ~range:c.range ~anchor:c.anchor
-    ; (if resolved && String.is_empty reply
-       then Node.none
-       else
-         Node.ul
-           ~attrs:[ Attr.class_ "review-posts" ]
-           (List.mapi c.thread ~f:(fun i p -> post_view m c i p ~inject)))
+    ; Node.ul
+        ~attrs:[ Attr.class_ "review-posts" ]
+        (List.mapi c.thread ~f:(fun i p -> post_view m c i p ~inject))
     ; (if resolved
        then Node.none
        else
@@ -560,7 +568,85 @@ let side_lines (t : Code_review.t) ~path rows (side : Review_comment.Side.t) =
   | New, None | Old, _ -> of_rows ()
 ;;
 
-let view (m : App.Model.t) ~path ~inject =
+(* A resolved thread folded to its line: a mark that unfolds it. *)
+let folded_mark (m : App.Model.t) (c : Review_comment.t) ~inject =
+  let first =
+    List.find_map c.thread ~f:(fun (p : Review_comment.Post.t) ->
+      match p.author with
+      | User -> Some p.text
+      | Agent -> None)
+    |> Option.value ~default:""
+    |> String.split_lines
+    |> List.hd
+    |> Option.value ~default:""
+  in
+  Node.button
+    ~attrs:
+      [ classes
+          [ "review-folded-thread" ]
+          [ "hot", Option.exists m.review.hover ~f:(String.equal c.id) ]
+      ; Attr.type_ "button"
+      ; Attr.id ("review-thread-" ^ c.id)
+      ; Attr.create "data-comment" c.id
+      ; Attr.create "aria-expanded" "false"
+      ; Attr.title
+          (sprintf
+             "Resolved: %s on %s. Click to show its thread."
+             c.id
+             (where c.range))
+      ; Attr.on_click (fun _ -> inject (review (Unfold c.id)))
+      ; Attr.on_mouseenter (fun _ -> inject (review (Hover (Some c.id))))
+      ; Attr.on_mouseleave (fun _ -> inject (review (Hover None)))
+      ]
+    [ icon Check
+    ; span ~cls:"review-id" c.id
+    ; span ~cls:"review-folded-text" first
+    ; span ~cls:"review-folded-count" (Int.to_string (List.length c.thread))
+    ]
+;;
+
+(* Threads not on a line shown, folded to one line each until opened. *)
+let folded_list (m : App.Model.t) ~key ~label ~title threads ~inject =
+  match threads with
+  | [] -> Node.none
+  | threads ->
+    let open_ = Set.mem m.review.unfolded key in
+    div
+      ~cls:"review-aside-list"
+      ([ Node.button
+           ~attrs:
+             [ classes [ "review-aside-toggle" ] [ "open", open_ ]
+             ; Attr.type_ "button"
+             ; Attr.create "aria-expanded" (Bool.to_string open_)
+             ; Attr.title title
+             ; Attr.on_click (fun _ -> inject (review (Unfold key)))
+             ]
+           [ icon ~cls:"chevron" Chevron
+           ; Node.text (label (List.length threads))
+           ]
+       ]
+       @
+       if open_
+       then [ div ~cls:"review-aside-threads" (List.map threads ~f:Fn.id) ]
+       else [])
+;;
+
+(* Where the review's comments show beside the code rather than between its
+   lines: wide enough for both, not on a phone. *)
+let beside (m : App.Model.t) ~place =
+  let shown = App.Model.shown m in
+  let margin = (Resize.bounds m.layout shown Review_margin).value in
+  let room =
+    match place with
+    | `Page -> Resize.review_room m.layout shown
+    | `Files -> Resize.preview_width m.layout shown
+  in
+  (not m.narrow) && room - 40 - margin >= 440
+;;
+
+let plural n one many = if n = 1 then one else sprintf many n
+
+let view ?(place = `Page) (m : App.Model.t) ~path ~inject =
   let t = m.review in
   let file = Code_review.file t path in
   let rows = Code_review.rows t ~path in
@@ -568,7 +654,11 @@ let view (m : App.Model.t) ~path ~inject =
   let comments = Review.on t.review path in
   let lines_new = lazy (side_lines t ~path rows New) in
   let lines_old = lazy (side_lines t ~path rows Old) in
-  let since = Code_review.Layout.equal (Code_review.layout_of t path) Since in
+  let since_view =
+    Code_review.Layout.equal (Code_review.layout_of t path) Since
+  in
+  let since = Option.is_some (Code_review.since_diff t path) in
+  let beside = beside m ~place in
   let located =
     List.map comments ~f:(fun (c : Review_comment.t) ->
       let line, count =
@@ -581,7 +671,7 @@ let view (m : App.Model.t) ~path ~inject =
   in
   let shown = List.filter_map rows ~f:Code_selection.key |> Set.Poly.of_list in
   (* The since-view's removed lines are the file at the action, not what
-     the change removed: comments on those show above the file. *)
+     the change removed: comments on those are listed apart. *)
   let shown_at (r : Review_comment.Range.t) =
     (not (since && Review_comment.Side.equal r.side Old))
     && Set.mem shown (r.side, r.last)
@@ -592,12 +682,22 @@ let view (m : App.Model.t) ~path ~inject =
       | At r when shown_at r -> Some (c, r)
       | At _ | Outdated -> None)
   in
-  let elsewhere =
+  let unfolded (c : Review_comment.t) =
+    (not (Review_comment.Status.equal c.status Resolved))
+    || Set.mem t.unfolded c.id
+  in
+  let outdated =
     List.filter_map located ~f:(fun (c, l) ->
       match l with
-      | At r when shown_at r -> None
-      | At _ -> Some (c, false)
-      | Outdated -> Some (c, true))
+      | Outdated -> Some (thread m c ~outdated:true ~inject)
+      | At _ -> None)
+  in
+  let hidden =
+    List.filter_map located ~f:(fun (c, l) ->
+      match l with
+      | At r when not (shown_at r) ->
+        Some (thread m c ~at:r ~outdated:false ~inject)
+      | At _ | Outdated -> None)
   in
   let selection =
     Option.filter t.selection ~f:(fun s -> String.equal s.path path)
@@ -612,6 +712,11 @@ let view (m : App.Model.t) ~path ~inject =
       (Code_selection.key row)
       (Some (r.side, r.last))
   in
+  let shown_thread (c, r) =
+    if unfolded c
+    then thread m c ~at:r ~outdated:false ~inject
+    else folded_mark m c ~inject
+  in
   let body =
     List.concat
       (List.map2_exn rows tokens ~f:(fun (row : Row.t) tok ->
@@ -622,13 +727,19 @@ let view (m : App.Model.t) ~path ~inject =
                ; end_
                ; id = Some c.id
                ; hot = Option.exists t.hover ~f:(String.equal c.id)
+               ; quiet = Review_comment.Status.equal c.status Resolved
                }))
            @ Option.to_list
                (Option.bind draft ~f:(fun d ->
                   Option.map
                     (Code_selection.covered d.range row)
                     ~f:(fun (start, end_) ->
-                      { Mark.start; end_; id = None; hot = false })))
+                      { Mark.start
+                      ; end_
+                      ; id = None
+                      ; hot = false
+                      ; quiet = false
+                      })))
          in
          let selected =
            Option.bind line_selection ~f:(fun r -> Code_selection.covered r row)
@@ -654,10 +765,11 @@ let view (m : App.Model.t) ~path ~inject =
              ~f:(fun () -> row_view ~path row tok deps ~inject)
          in
          let threads =
-           List.filter_map at_row ~f:(fun (c, r) ->
-             Option.some_if
-               (ends_at row r)
-               (insert (thread m c ~at:r ~outdated:false ~inject)))
+           if beside
+           then []
+           else
+             List.filter_map at_row ~f:(fun (c, r) ->
+               Option.some_if (ends_at row r) (insert (shown_thread (c, r))))
          in
          let bar =
            match selection, draft with
@@ -667,11 +779,59 @@ let view (m : App.Model.t) ~path ~inject =
          in
          let draft_row =
            match draft with
-           | Some d when ends_at row d.range ->
+           | Some d when (not beside) && ends_at row d.range ->
              [ insert (draft_view m d ~inject) ]
            | Some _ | None -> []
          in
          (node :: threads) @ bar @ draft_row))
+  in
+  (* Beside the code: each thread (and the draft) by the first of its lines
+     shown; the page's glue (app/review_margin.ml) moves them down to their
+     line, and further when the one above is in the way. *)
+  let margin () =
+    let index =
+      List.filter_map rows ~f:Code_selection.key
+      |> List.mapi ~f:(fun i key -> key, i)
+      |> Map.Poly.of_alist_reduce ~f:(fun a _ -> a)
+    in
+    let item ~key ~cls (r : Review_comment.Range.t) node =
+      let line =
+        List.range r.first (r.last + 1)
+        |> List.find ~f:(fun n -> Set.mem shown (r.side, n))
+        |> Option.value ~default:r.last
+      in
+      ( Option.value (Map.find index (r.side, line)) ~default:Int.max_value
+      , Node.div
+          ~key
+          ~attrs:
+            [ Attr.class_ ("review-margin-item " ^ cls)
+            ; Attr.create "data-side" (Review_comment.Side.to_string r.side)
+            ; Attr.create "data-line" (Int.to_string line)
+            ]
+          [ node ] )
+    in
+    let items =
+      List.map at_row ~f:(fun ((c : Review_comment.t), r) ->
+        item
+          ~key:c.id
+          ~cls:(if unfolded c then "thread" else "folded")
+          r
+          (shown_thread (c, r)))
+      @ Option.to_list
+          (Option.map draft ~f:(fun d ->
+             item ~key:"draft" ~cls:"draft" d.range (draft_view m d ~inject)))
+    in
+    Node.create
+      "aside"
+      ~attrs:
+        [ Attr.class_ "review-margin"; Attr.create "aria-label" "Comments" ]
+      ((match place with
+        | `Page -> Resize_view.handle m ~inject Review_margin
+        | `Files -> Node.none)
+       :: List.map
+            (List.stable_sort items ~compare:(fun (a, _) (b, _) ->
+               Int.compare a b))
+            ~f:snd)
   in
   let empty =
     match rows, file, Map.find t.contents path with
@@ -705,26 +865,59 @@ let view (m : App.Model.t) ~path ~inject =
       ]
     | _ -> []
   in
+  let aside =
+    match outdated, hidden with
+    | [], [] -> Node.none
+    | _ ->
+      div
+        ~cls:"review-asides"
+        [ folded_list
+            m
+            ~key:("outdated:" ^ path)
+            ~label:(fun n ->
+              plural n "1 outdated comment" "%d outdated comments")
+            ~title:"Comments whose code changed so much it is not found again"
+            outdated
+            ~inject
+        ; folded_list
+            m
+            ~key:("hidden:" ^ path)
+            ~label:(fun n ->
+              plural
+                n
+                "1 comment on lines not shown"
+                "%d comments on lines not shown")
+            ~title:
+              (if since
+               then
+                 "On lines this since-view does not show: Changes or Whole \
+                  file shows them by their lines"
+               else "On lines outside these hunks: Whole file shows them")
+            hidden
+            ~inject
+        ]
+  in
+  let table () =
+    Node.table ~attrs:[ Attr.class_ "diff review-diff" ] [ Node.tbody body ]
+  in
   div
     ~cls:"review-code"
-    ~attrs:[ Attr.create "data-path" path ]
-    ([ (if since then Review_since_view.note m path else Node.none)
-     ; (match elsewhere with
-        | [] -> Node.none
-        | elsewhere ->
-          div
-            ~cls:"review-elsewhere"
-            (List.map elsewhere ~f:(fun (c, outdated) ->
-               thread m c ~outdated ~inject)))
+    ~attrs:
+      [ Attr.create "data-path" path
+      ; (if beside then Attr.class_ "beside" else Attr.empty)
+      ]
+    ([ (if since_view then Review_since_view.note m path else Node.none)
+     ; aside
      ]
      @ full_hint
      @ empty
-     @ [ (if List.is_empty rows
-          then Node.none
-          else
-            Node.table
-              ~attrs:[ Attr.class_ "diff review-diff" ]
-              [ Node.tbody body ])
+     @ [ (match rows with
+          | [] -> Node.none
+          | _ when beside ->
+            div
+              ~cls:"review-code-grid"
+              [ div ~cls:"review-code-main" [ table () ]; margin () ]
+          | _ -> table ())
        ; (match selection, draft with
           | Some { pop = Some p; _ }, None -> pop p ~inject
           | _ -> Node.none)

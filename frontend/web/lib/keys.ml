@@ -105,6 +105,9 @@ let help =
     , "choose what to review (a worktree, or a branch read-only); what to \
        compare it with (a branch, tag, commit or any revision typed); since \
        the merge base or directly" )
+  ; ( "l / Shift+L (reviewing)"
+    , "what changed since your latest action on the file (or the hunks again); \
+       choose the action it compares with: Latest follows your newest" )
   ; "Esc (reviewing)", "drop the comment or selection, then close the review"
   ; ( "Enter / Ctrl+S (reviewing)"
     , "add the comment or reply (Shift+Enter: a new line); save the file being \
@@ -173,11 +176,15 @@ let on_control t =
 (* Ctrl+` by the key's position, whatever the layout types there. *)
 let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 
-(* The review page's keys; [r], [b] and [d] choose what it compares. *)
+(* The review page's keys; [r], [b] and [d] choose what it compares, [L]
+   what its file's since-view does. *)
 let review_key (m : App.Model.t) t : App.Action.t option =
   match t.key with
   | "r" when plain t -> Some (Review_pick Target)
   | "b" when plain t -> Some (Review_pick Base)
+  | "L" when t.shift && not (t.alt || t.ctrl || t.meta) ->
+    Option.map m.review.current ~f:(fun path ->
+      App.Action.Review_pick (Since path))
   | "d" when plain t ->
     Option.map m.review.diff ~f:(fun d ->
       App.Action.Review_direct (not d.direct))

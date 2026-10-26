@@ -26,10 +26,13 @@
 
 /* Where each one sits. The sidebar's is in the flow, between it and the
    chat; the others on their panel's edge. */
-.resizer-sidebar { position: relative; flex: none; margin: 0 -5px 0 -4px; }
-.resizer-files, .resizer-agents { left: -5px; }
+.resizer:is(.resizer-sidebar, .resizer-review-chat, .resizer-review-files) {
+  position: relative;
+  flex: none;
+  margin: 0 -5px 0 -4px;
+}
+.resizer:is(.resizer-files, .resizer-files-preview, .resizer-agents, .resizer-review-margin) { left: -5px; }
 .resizer-terminal { top: -5px; }
-.resizer-files-split { position: relative; flex: none; margin: -4px 0 -5px; }
 
 /* While dragging: the cursor everywhere, no text selection, and nothing
    underneath (the terminal, an image) takes the pointer. */
