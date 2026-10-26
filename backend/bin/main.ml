@@ -1552,11 +1552,20 @@ let compaction_eval_command =
          "-window"
          (optional int)
          ~doc:"TOKENS context window (default: the session's model's)"
+     and compact_at =
+       flag
+         "-compact-at"
+         (optional int)
+         ~doc:
+           "TOKENS compact once the context exceeds this, if under 80% of the \
+            window; 0: off (default: config.json's compact_at_tokens)"
      and threshold_tokens =
        flag
          "-threshold-tokens"
          (optional int)
-         ~doc:"TOKENS summarise above this (default: 80% of the window)"
+         ~doc:
+           "TOKENS summarise above this (default: 80% of the window, or \
+            -compact-at when less, as the agent)"
      and keep_recent_tokens =
        flag
          "-keep-recent-tokens"
@@ -1581,15 +1590,15 @@ let compaction_eval_command =
          "-mask-at"
          (optional_with_default Compaction_eval.Config.default.mask_at float)
          ~doc:
-           "FRACTION mask once the context is over this much of the window \
-            (0.5)"
+           "FRACTION mask once the context is over this much of the threshold \
+            (0.625)"
      and mask_min_saving =
        flag
          "-mask-min-saving"
          (optional_with_default
             Compaction_eval.Config.default.mask_min_saving
             float)
-         ~doc:"FRACTION of the window a mask batch must free (0.1)"
+         ~doc:"FRACTION of the threshold a mask batch must free (0.125)"
      and summary_tokens =
        flag
          "-summary-tokens"
@@ -1622,7 +1631,17 @@ let compaction_eval_command =
        flag
          "-model"
          (optional string)
-         ~doc:"ID with -live, the model (default: each session's)"
+         ~doc:
+           "ID with -live, the conversation's model: it answers the probes, \
+            and writes the summaries without a compaction model (default: each \
+            session's)"
+     and compaction_model =
+       flag
+         "-compaction-model"
+         (optional string)
+         ~doc:
+           "ID|off with -live, the model that writes the summaries (default: \
+            config.json's compaction_model)"
      and sexp = flag "-sexp" no_arg ~doc:" print the report as a sexp"
      and json = flag "-json" no_arg ~doc:" print the report as JSON"
      and auth_file = auth_file_path_flag in
@@ -1649,8 +1668,29 @@ let compaction_eval_command =
              | Ok s -> s
              | Error e -> fail "-strategies: %s" (Error.to_string_hum e))
        in
+       let settings =
+         match Config.load ~home:(home ()) with
+         | Ok settings -> settings
+         | Error e ->
+           eprintf
+             "%s; using the default compact_at_tokens and compaction_model\n"
+             (Error.to_string_hum e);
+           Config.default
+       in
+       let max_tokens =
+         match compact_at with
+         | Some tokens -> Option.some_if (tokens > 0) tokens
+         | None -> Config.compact_at settings
+       in
+       let compaction_model =
+         match compaction_model with
+         | Some "off" -> None
+         | Some id -> Some id
+         | None -> settings.compaction_model
+       in
        let config =
          { Compaction_eval.Config.window
+         ; compaction = { Compaction_settings.window_only with max_tokens }
          ; threshold_tokens
          ; keep_recent_tokens
          ; keep_turns
@@ -1733,6 +1773,23 @@ let compaction_eval_command =
                  (Error.to_string_hum e)
            in
            let model = Option.map model ~f:resolve in
+           let config =
+             { config with
+               compaction =
+                 { config.compaction with
+                   model =
+                     Option.map compaction_model ~f:(fun id ->
+                       match Model_registry.resolve models id with
+                       | Ok m -> m
+                       | Error e ->
+                         fail
+                           "compaction model: %s\n\
+                            prigh models lists them all; -compaction-model off \
+                            uses the conversation's"
+                           (Error.to_string_hum e))
+                 }
+             }
+           in
            let setup model =
              { Compaction_eval.Live.Setup.provider
              ; model

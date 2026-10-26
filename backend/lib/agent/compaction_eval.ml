@@ -47,6 +47,7 @@ end
 module Config = struct
   type t =
     { window : int option
+    ; compaction : Compaction_settings.t
     ; threshold_tokens : int option
     ; keep_recent_tokens : int
     ; keep_turns : int
@@ -61,12 +62,13 @@ module Config = struct
 
   let default =
     { window = None
+    ; compaction = Compaction_settings.window_only
     ; threshold_tokens = None
     ; keep_recent_tokens = Compaction.default_keep_recent_tokens
     ; keep_turns = Observation_mask.keep_turns
     ; mask_min_bytes = Observation_mask.min_bytes
-    ; mask_at = 0.5
-    ; mask_min_saving = 0.1
+    ; mask_at = 0.625
+    ; mask_min_saving = 0.125
     ; summary_tokens = 2000
     ; overhead_tokens = 0
     ; strategies = Strategy.all
@@ -90,6 +92,7 @@ end
 module Live = struct
   type t =
     { summaries : int
+    ; summary_model : string
     ; failures : int
     ; usage : Usage.t
     ; cost_usd : float
@@ -111,6 +114,7 @@ module Live = struct
 
   let add a b =
     { summaries = a.summaries + b.summaries
+    ; summary_model = a.summary_model
     ; failures = a.failures + b.failures
     ; usage = Usage.add a.usage b.usage
     ; cost_usd = a.cost_usd +. b.cost_usd
@@ -196,7 +200,7 @@ module Item = struct
     }
 
   let of_message m =
-    { sent = m; original = m; tokens = Compaction.estimate_tokens [ m ] }
+    { sent = m; original = m; tokens = Message.estimate_tokens [ m ] }
   ;;
 
   let tokens items = List.sum (module Int) items ~f:(fun t -> t.tokens)
@@ -294,11 +298,18 @@ let recalls ~answer probe =
 module Live_run = struct
   type t =
     { setup : Live.Setup.t
+    ; summariser : Model.t
     ; system : string option
     ; mutable summaries : int
     ; mutable failures : int
     ; mutable usage : Usage.t
+    ; mutable cost_usd : float
     }
+
+  let add_usage t ~(model : Model.t) usage =
+    t.usage <- Usage.add t.usage usage;
+    t.cost_usd <- t.cost_usd +. Model.cost_usd model usage
+  ;;
 
   let questions =
     "[prigh: compaction-eval] Answer from the conversation so far alone, \
@@ -322,7 +333,7 @@ module Live_run = struct
     in
     let fits =
       (Option.value_map t.system ~default:0 ~f:String.length / 4)
-      + Compaction.estimate_tokens request.messages
+      + Message.estimate_tokens request.messages
       + 4096
       <= t.setup.model.context_window
     in
@@ -335,7 +346,7 @@ module Live_run = struct
             ~cancel:t.setup.cancel
             ~on_event:ignore
         in
-        t.usage <- Usage.add t.usage reply.usage;
+        add_usage t ~model:t.setup.model reply.usage;
         match reply.stop_reason with
         | Error e -> Some ("error: " ^ e)
         | Aborted -> Some "aborted"
@@ -350,9 +361,10 @@ module Live_run = struct
       if grade then Fraction.count items ~f else Fraction.zero
     in
     { Live.summaries = t.summaries
+    ; summary_model = Model.key t.summariser
     ; failures = t.failures
     ; usage = t.usage
-    ; cost_usd = Model.cost_usd t.setup.model t.usage
+    ; cost_usd = t.cost_usd
     ; probed = grade
     ; files_modified =
         fraction truth.files.modified ~f:(fun path ->
@@ -424,7 +436,7 @@ module Sim = struct
 
   let sent t = List.map t.context ~f:(fun (i : Item.t) -> i.sent)
 
-  let mask t =
+  let mask t ~overflowed =
     let tokens = tokens t t.context in
     match
       Observation_mask.plan
@@ -433,12 +445,12 @@ module Sim = struct
         (sent t)
     with
     | Some plan
-      when Observation_mask.worth_masking
+      when Compaction_settings.worth_masking_at
              ~at:t.config.mask_at
              ~min_saving:t.config.mask_min_saving
-             t.model
+             ~threshold:t.threshold
              ~input_tokens:tokens
-             ~urgent:(tokens > t.threshold)
+             ~overflowed
              plan ->
       t.mask_batches <- t.mask_batches + 1;
       t.context
@@ -453,8 +465,7 @@ module Sim = struct
              in
              if phys_equal sent item.sent
              then item
-             else
-               { item with sent; tokens = Compaction.estimate_tokens [ sent ] }))
+             else { item with sent; tokens = Message.estimate_tokens [ sent ] }))
     | Some _ | None -> ()
   ;;
 
@@ -510,7 +521,7 @@ module Sim = struct
                   else
                     { item with
                       sent
-                    ; tokens = Compaction.estimate_tokens [ sent ]
+                    ; tokens = Message.estimate_tokens [ sent ]
                     })
                 else item)
             in
@@ -523,7 +534,7 @@ module Sim = struct
             (match
                Compaction.compact_messages
                  ~provider:live.setup.provider
-                 ~model:live.setup.model
+                 ~model:live.summariser
                  ~prompt:{ Compaction.Prompt.none with system = live.system }
                  ~keep_recent_tokens:t.config.keep_recent_tokens
                  ~cancel:live.setup.cancel
@@ -536,7 +547,7 @@ module Sim = struct
                None
              | Ok (messages, outcome) ->
                live.summaries <- live.summaries + 1;
-               live.usage <- Usage.add live.usage outcome.usage;
+               Live_run.add_usage live ~model:live.summariser outcome.usage;
                (* Pinned messages keep their place in the cache when unchanged. *)
                let items = Array.of_list t.context in
                let head =
@@ -559,8 +570,13 @@ module Sim = struct
   let before_request t =
     if Option.is_some t.last_request
     then (
-      if Strategy.masks t.strategy then mask t;
-      if Strategy.summarises t.strategy then summarise t)
+      if Strategy.masks t.strategy then mask t ~overflowed:false;
+      if Strategy.summarises t.strategy then summarise t;
+      (* The provider would reject the request: the agent masks whatever
+         it can and sends it again. *)
+      if
+        Strategy.masks t.strategy && tokens t t.context > t.model.context_window
+      then mask t ~overflowed:true)
   ;;
 
   let run t messages =
@@ -638,9 +654,14 @@ let session ?live ?model:given (config : Config.t) session =
   let window = Option.value config.window ~default:model.context_window in
   let model = { model with context_window = window } in
   let threshold =
-    Option.value
-      config.threshold_tokens
-      ~default:(Float.iround_down_exn (Float.of_int window *. 0.8))
+    Option.value_or_thunk config.threshold_tokens ~default:(fun () ->
+      Compaction_settings.threshold config.compaction model)
+  in
+  (* As [Compaction_settings.summary_model], against [threshold]. *)
+  let summariser (setup : Live.Setup.t) =
+    match config.compaction.model with
+    | Some summariser when summariser.context_window >= threshold -> summariser
+    | Some _ | None -> setup.model
   in
   let messages = recorded_messages session in
   let system = Session.system_prompt session in
@@ -660,10 +681,12 @@ let session ?live ?model:given (config : Config.t) session =
         ; live =
             Option.map live ~f:(fun setup ->
               { Live_run.setup
+              ; summariser = summariser setup
               ; system
               ; summaries = 0
               ; failures = 0
               ; usage = Usage.zero
+              ; cost_usd = 0.
               })
         ; context = []
         ; last_request = None
@@ -772,10 +795,11 @@ module Report = struct
     | Some l ->
       [ main
       ; sprintf
-          "  %-15s live: %d summaries (%d failed), $%.4f; %s written files, %s \
-           constraints, %s last error"
+          "  %-15s live: %d summaries by %s (%d failed), $%.4f; %s written \
+           files, %s constraints, %s last error"
           ""
           l.summaries
+          l.summary_model
           l.failures
           l.cost_usd
           (if l.probed then Fraction.to_string l.files_modified else "n/a")

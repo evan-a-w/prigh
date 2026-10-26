@@ -17,16 +17,22 @@ let threshold t (model : Model.t) =
 
 let should_compact t model ~input_tokens = input_tokens > threshold t model
 
-let worth_masking
-      t
-      model
+let worth_masking_at
+      ?(at = 0.625)
+      ?(min_saving = 0.125)
+      ~threshold
       ~input_tokens
       ~overflowed
       (plan : Observation_mask.Plan.t)
   =
-  let threshold = threshold t model in
+  let threshold = Float.of_int threshold in
   overflowed
-  || (input_tokens * 8 > threshold * 5 && plan.tokens_saved * 8 >= threshold)
+  || (Float.(of_int input_tokens > threshold * at)
+      && Float.(of_int plan.tokens_saved >= threshold * min_saving))
+;;
+
+let worth_masking t model =
+  worth_masking_at ?at:None ?min_saving:None ~threshold:(threshold t model)
 ;;
 
 let summary_model t (model : Model.t) =
