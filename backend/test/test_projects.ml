@@ -337,19 +337,22 @@ let%expect_test "a subagent in a worktree of its own" =
 ;;
 
 (* [list_sessions]' [repo] and [worktrees] fields, as a client sees
-   them. *)
+   them, by name: sessions made within the same second have no order. *)
 let print_sessions t json =
   match json with
   | `Object fields ->
     (match List.Assoc.find fields ~equal:String.equal "result" with
      | Some (`Array sessions) ->
-       List.iter sessions ~f:(fun s ->
-         let field name =
-           Option.value_map
-             (Jsonaf.member name s)
-             ~default:"absent"
-             ~f:(fun j -> show t (Jsonaf.to_string j))
-         in
+       let field s name =
+         Option.value_map
+           (Jsonaf.member name s)
+           ~default:"absent"
+           ~f:(fun j -> show t (Jsonaf.to_string j))
+       in
+       List.sort sessions ~compare:(fun a b ->
+         String.compare (field a "name") (field b "name"))
+       |> List.iter ~f:(fun s ->
+         let field = field s in
          printf
            "%s cwd=%s\n  repo=%s\n  worktrees=%s\n"
            (field "name")
@@ -466,6 +469,9 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   print_sessions t (call main "list_sessions");
   [%expect
     {|
+    "in worktree" cwd="$DIR/trees/repo/feat-w"
+      repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
     "main" cwd="$DIR/repo"
       repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
       worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"created"},{"path":"$DIR/trees/repo/agent-tidy-up","branch":"agent/tidy-up","root":"$DIR/repo","source":"agent","agent":"a1","task":"Tidy up"}]
@@ -478,9 +484,6 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     "plain" cwd="$DIR/plain"
       repo=null
       worktrees=[]
-    "in worktree" cwd="$DIR/trees/repo/feat-w"
-      repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
-      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
     |}];
   (* Removing it from any session (here one in another repository, naming
      the repository) forgets it. *)
@@ -493,12 +496,12 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   print_sessions t (call main "list_sessions");
   [%expect
     {|
+    "in worktree" cwd="$DIR/trees/repo/feat-w"
+      repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
+      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
     "main" cwd="$DIR/repo"
       repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
       worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"created"}]
-    "remover" cwd="$DIR/other"
-      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
-      worktrees=[]
     "old" cwd="$DIR/repo"
       repo={"root":"$DIR/repo","worktree":"$DIR/repo","branch":"main","main":true}
       worktrees=[]
@@ -508,9 +511,9 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
     "plain" cwd="$DIR/plain"
       repo=null
       worktrees=[]
-    "in worktree" cwd="$DIR/trees/repo/feat-w"
-      repo={"root":"$DIR/repo","worktree":"$DIR/trees/repo/feat-w","branch":"feat/w","main":false}
-      worktrees=[{"path":"$DIR/trees/repo/feat-w","branch":"feat/w","root":"$DIR/repo","source":"entered"}]
+    "remover" cwd="$DIR/other"
+      repo={"root":"$DIR/other","worktree":"$DIR/other","branch":"main","main":true}
+      worktrees=[]
     |}];
   (* One removed outside prigh: removing it only forgets it. *)
   let gone = Filename.concat trees "repo/gone" in
