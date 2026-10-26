@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Real-terminal harness behind the cram test in run.t: runs the built TUI
+# Real-terminal harness behind the cram tests (*.t): runs the built TUI
 # (`prigh-tui -faux`) inside a detached tmux session, sends keys, and prints
 # the captured panes (normalised) for the cram expectation. Usage:
 #   harness.sh NAME     run one scenario (see the bottom of this file)
@@ -11,7 +11,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -n "${DUNE_SOURCEROOT:-}" ]; then
 	frontend="$DUNE_SOURCEROOT"
 else
-	frontend="$(dirname "$(dirname "$(dirname "$here")")")"
+	frontend="$(dirname "$(dirname "$here")")"
 fi
 root="$(dirname "$frontend")"
 exe="${PRIGH_TUI:-$(command -v prigh-tui || echo "$frontend/_build/default/tui/bin/main.exe")}"

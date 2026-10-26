@@ -6,7 +6,7 @@
 // to the same session, scroll position and draft, also when the backend is
 // out of reach as it loads. Run by prigh_web.sh after
 // prigh_web.mjs; prints normalised results (the expected output is in
-// prigh_web.expected).
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
@@ -14,6 +14,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { png } from "./png.mjs";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -261,10 +262,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  await stopServer();
+  await end(() => stopServer(), () => browser.close());
 }
