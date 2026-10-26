@@ -474,7 +474,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   bounds output by lines and bytes. `Tool_spec` carries the flags the
   harness reasons about: `parallel_safe` (safe to run concurrently with
   other tools), `destructive` (what the approval modes hold for
-  confirmation, see `Approval`), `on_host` (runs on the active tool host rather than always in
+  confirmation, see `Approval`: `Always`, `Never`, or `Depends` on the
+  call's arguments, as `worktree`'s `list` does not ask but `create` and
+  `remove` do), `on_host` (runs on the active tool host rather than always in
   the backend) and `freeform` (a Lark grammar: the Responses API sends the
   tool as an OpenAI custom tool, whose free-text input streams and is
   replayed as the `input` string argument; other providers send the JSON

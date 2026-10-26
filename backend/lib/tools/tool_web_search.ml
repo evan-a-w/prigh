@@ -8,7 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
-  ; destructive = false
+  ; destructive = Never
   ; description =
       "Search the web for current information (documentation, error messages, \
        releases). Returns result titles, URLs and excerpts; use web_fetch to \

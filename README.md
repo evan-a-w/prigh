@@ -1761,9 +1761,10 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  and MCP tools that are not read-only) wait for your answer.
-- `auto-edit`: file edits run without asking; `bash`, `job_input` and MCP
-  tools still ask.
+  `worktree`'s `create` and `remove` (not `list`), and MCP tools that are
+  not read-only) wait for your answer.
+- `auto-edit`: file edits run without asking; `bash`, `job_input`,
+  `worktree create`/`remove` and MCP tools still ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its
