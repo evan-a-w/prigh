@@ -50,11 +50,14 @@ module Spec : sig
   val usage : t -> string
 end
 
-val all : Spec.t list
-val find : string -> Spec.t option
+(** The commands the user has: [superuser]'s include those only superusers
+    have ([/nix-gc]), which to everyone else do not exist. *)
+val all : superuser:bool -> Spec.t list
+
+val find : superuser:bool -> string -> Spec.t option
 
 (** The command with the nearest name (within two edits, or a prefix). *)
-val closest : string -> Spec.t option
+val closest : superuser:bool -> string -> Spec.t option
 
 module Parsed : sig
   type t =

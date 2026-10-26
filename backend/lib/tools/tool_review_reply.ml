@@ -30,7 +30,7 @@ let spec =
         ; "resolve", `Boolean, "Mark the comment resolved"
         ]
   ; parallel_safe = true
-  ; destructive = false
+  ; destructive = Never
   ; on_host = false
   ; freeform = None
   }

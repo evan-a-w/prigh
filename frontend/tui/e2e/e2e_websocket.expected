@@ -1,0 +1,27 @@
+== ws://
+<- ping ERROR: unauthorised: send hello with the token first
+<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- ping: ok
+<- prompt: ok
+  event text_delta "faux reply"
+<- hello ERROR: unauthorised: bad user name or password
+<- ping ERROR: unauthorised: send hello with the token first
+== http:// (its /ws)
+<- ping ERROR: unauthorised: send hello with the token first
+<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- ping: ok
+<- prompt: ok
+  event text_delta "faux reply"
+<- hello ERROR: unauthorised: bad user name or password
+<- ping ERROR: unauthorised: send hello with the token first
+== wss:// through a TLS proxy
+<- ping ERROR: unauthorised: send hello with the token first
+<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- ping: ok
+<- prompt: ok
+  event text_delta "faux reply"
+<- hello ERROR: unauthorised: bad user name or password
+<- ping ERROR: unauthorised: send hello with the token first
+== wss:// with a CA that did not issue the certificate
+cannot connect: the TLS certificate of localhost is not trusted: invalid certificate chain. prigh checks it against the system's CAs ($SSL_CERT_FILE overrides them): use a certificate they trust (e.g. Let's Encrypt), or an SSH tunnel to plain HOST:PORT
+backend stopped

@@ -24,6 +24,8 @@ let summary (call : Tool_call.t) =
   then
     List.hd (patch_files args)
     |> Option.value_map ~default:"" ~f:Prigh_ui.Patch.File.name
+  else if String.equal call.name "worktree"
+  then Option.value (Tool_summary.worktree args) ~default:""
   else
     List.find_map
       [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]

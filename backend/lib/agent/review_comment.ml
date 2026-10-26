@@ -192,7 +192,13 @@ type t =
   }
 [@@deriving sexp, jsonaf, equal]
 
-let file t = Filename.concat t.root t.path
+let branch t = String.chop_prefix t.root ~prefix:"branch:"
+
+let file t =
+  match branch t with
+  | Some branch -> branch ^ ":" ^ t.path
+  | None -> Filename.concat t.root t.path
+;;
 
 let unsent t =
   List.exists t.thread ~f:(fun (p : Post.t) ->
@@ -266,10 +272,11 @@ let to_prompt t =
   String.concat
     ~sep:"\n"
     ([ sprintf
-         "<comment id=\"%s\" worktree=\"%s\" file=\"%s\" lines=\"%s\"%s%s \
-          status=\"%s\">"
+         "<comment id=\"%s\" %s file=\"%s\" lines=\"%s\"%s%s status=\"%s\">"
          t.id
-         t.root
+         (match branch t with
+          | Some branch -> sprintf "branch=\"%s\" checked_out=\"no\"" branch
+          | None -> sprintf "worktree=\"%s\"" t.root)
          (file t)
          (Range.to_string { t.range with side = New })
          (match t.range.side with

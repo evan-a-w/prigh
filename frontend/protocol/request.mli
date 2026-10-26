@@ -42,6 +42,12 @@ module Method : sig
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
+    | Enter_worktree of string
+    (** [set_cwd] to this path as a worktree switch: the session's home
+        ({!Session_home}) is recorded; see {!Dir_change.Outcome} *)
+    | Worktree_back of { main : bool }
+    (** back to the session's home, or with [main] to its repository's main
+        checkout; see {!Dir_change.Outcome} *)
     | Forge_status (** see {!Forge_account.list_of_json} *)
     | Forge_login of
         { host : string
@@ -124,6 +130,11 @@ module Method : sig
               (default: the last) *)
         } (** {!Review_since} *)
     | Fs_preview of { path : string } (** {!File_preview} *)
+    | Git_show of
+        { dir : string option
+        ; rev : string
+        ; path : string
+        } (** a file of a commit: {!Git_diff.shown_of_json} *)
     | Fs_write of
         { path : string
         ; text : string
@@ -132,6 +143,10 @@ module Method : sig
           (** saved in the review's editor, of that worktree: an action on
               the file *)
         } (** [{path, md5}] *)
+    | Nix_store_status (** superusers: {!Nix_store_status} *)
+    | Nix_store_gc of { delete_generations : Nix_generations.t option }
+    (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can
+        take minutes *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

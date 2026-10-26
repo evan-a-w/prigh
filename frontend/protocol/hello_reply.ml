@@ -4,6 +4,7 @@ type t =
   { client_id : string
   ; namespace : string option
   ; user : string option
+  ; superuser : bool
   }
 [@@deriving sexp_of, equal]
 
@@ -13,8 +14,9 @@ let of_json j =
   let%bind host_id = Json.string_opt_field j "host_id" in
   let client_id = Option.value host_id ~default:client_id in
   let%bind namespace = Json.string_opt_field j "namespace" in
-  let%map user = Json.string_opt_field j "user" in
-  { client_id; namespace; user }
+  let%bind user = Json.string_opt_field j "user" in
+  let%map superuser = Json.bool_default_field j "superuser" ~default:false in
+  { client_id; namespace; user; superuser }
 ;;
 
 let acting_as t =

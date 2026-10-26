@@ -209,7 +209,7 @@ let tools (listing : Listing.t) ~call =
                  else tool.description)
             ; parameters = tool.input_schema
             ; parallel_safe = tool.read_only
-            ; destructive = not tool.read_only
+            ; destructive = Tool_spec.Destructive.of_bool (not tool.read_only)
             ; on_host = false
             ; freeform = None
             }

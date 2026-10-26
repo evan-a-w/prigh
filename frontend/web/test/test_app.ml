@@ -14,7 +14,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded history web.migrated web.sidebar-width
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
          web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Set_url_session s1)
@@ -36,10 +36,10 @@ let%expect_test "startup, a prompt and its streamed reply" =
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value ())) ((key web.verbosity) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
-      ((key history) (value ())) ((key web.migrated) (value (true)))
-      ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
-      ((key web.files-split) (value ())) ((key web.agents-width) (value ()))
-      ((key web.terminal-height) (value ()))))
+      ((key web.review) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ())) ((key web.files-split) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))))
     |}];
   Harness.act h (Set_draft "hello");
   Harness.act h Send;
