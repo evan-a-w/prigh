@@ -6,13 +6,14 @@
 // whole-file layout, edit mode saving a file), live updates as the agent
 // edits, another worktree (a branch with a commit) against its base, and a
 // phone. Run by prigh_web.sh; prints normalised snapshots (the
-// expected output is in prigh_web.expected).
+// expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -298,12 +299,18 @@ try {
 
   // 8. Edit mode: the file's text, saved where the tools run.
   await page.locator(".review-controls .segment", { hasText: "Edit" }).click();
-  await page.locator("#review-editor").waitFor();
+  // Until the file is read the editor is disabled, and what is typed would
+  // go before its text.
+  await page.waitForFunction(() => {
+    const editor = document.querySelector("#review-editor");
+    return editor && !editor.disabled && editor.value.endsWith("let late = 0\n");
+  });
   await page.locator("#review-editor").press("Control+End");
   await page.keyboard.type("let edited = 1\n");
   await screenshot("page: editing");
+  await page.locator(".review-editor-state.dirty").waitFor();
   await page.locator("#review-editor").press("Control+s");
-  await page.locator(".review-editor-state", { hasText: /^Saved/ }).waitFor();
+  await page.locator(".review-editor-state:not(.dirty)", { hasText: /^Saved/ }).waitFor();
   console.log(`main.ml ends: ${JSON.stringify(readFileSync(join(cwd, "src", "main.ml"), "utf8").split("\n").slice(-3).join("\n"))}`);
   await page.locator(".review-controls .segment", { hasText: "Comment" }).click();
   await page.locator(".review-controls .segment", { hasText: "Whole file" }).click();
@@ -373,10 +380,10 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  server.kill();
+  await end(() => server.kill(), () => browser.close());
 }
