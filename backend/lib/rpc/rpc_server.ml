@@ -205,7 +205,7 @@ module Listed = struct
     ; name : string option
     ; description : string option
     ; repo : Git_location.t option option
-    ; agent_worktrees : Agent_worktree.t list
+    ; worktrees : Session_worktree.t list
     }
   [@@deriving equal]
 
@@ -217,7 +217,7 @@ module Listed = struct
     ; name = Session.name session
     ; description = Session.description session
     ; repo = Session.repo session
-    ; agent_worktrees = Session.agent_worktrees session
+    ; worktrees = Session.worktrees session
     }
   ;;
 end
@@ -1626,12 +1626,26 @@ let list_worktrees t (client : Client.t) params =
         ])
 ;;
 
+(* The client's session records a worktree that matters to it. *)
+let record_worktree t (client : Client.t) (w : Session_worktree.t) =
+  ignore (Session.add_worktree (Agent.session client.agent) w : Session.Entry.t);
+  sessions_changed t
+;;
+
 let create_worktree t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind branch = string_param params "branch" in
   let%bind base = string_param_opt params "base" in
   let%bind cwd = string_param_opt params "cwd" in
   let%map created = Agent.create_worktree ?cwd client.agent ~branch ~base in
+  record_worktree
+    t
+    client
+    { path = created.worktree.path
+    ; branch = created.worktree.branch
+    ; root = created.root
+    ; source = Created
+    };
   `Object
     [ "worktree", worktree_json t client created.worktree
     ; ("new_branch", if created.new_branch then `True else `False)
@@ -1640,15 +1654,37 @@ let create_worktree t (client : Client.t) params =
     ]
 ;;
 
-(* The saved sessions whose subagents' worktrees include [path] forget it. *)
-let forget_agent_worktree t client ~path =
+(* [/pr checkout]'s worktree, in the repository the session works in. *)
+let record_checkout t (client : Client.t) ~params json =
+  let open Or_error.Let_syntax in
+  let%bind number = number_param params "number" in
+  let root =
+    match Session.repo (Agent.session client.agent) with
+    | Some (Some l) -> l.root
+    | Some None | None -> (Agent.state client.agent).cwd
+  in
+  let%map checkout =
+    Or_error.try_with (fun () -> [%of_jsonaf: Git_forge.Checkout.t] json)
+  in
+  record_worktree
+    t
+    client
+    { path = checkout.path
+    ; branch = Some checkout.branch
+    ; root
+    ; source = Pull_request { number }
+    }
+;;
+
+(* The sessions (saved or live) whose worktrees include [path] forget it. *)
+let forget_worktree t client ~path =
   List.filter (listings t client) ~f:(fun (l : Listing.t) ->
-    List.exists l.summary.agent_worktrees ~f:(fun w -> String.equal w.path path))
+    List.exists l.summary.worktrees ~f:(fun w -> String.equal w.path path))
   |> List.iter ~f:(fun (l : Listing.t) ->
     let session =
       match l.agent with
       | Some agent -> Ok (Agent.session agent)
-      | None -> Session.load l.summary.path
+      | None -> session_to_read t l.summary.path
     in
     Or_error.iter session ~f:(fun session ->
       ignore (Session.worktree_removed session ~path : Session.Entry.t)));
@@ -1673,21 +1709,20 @@ let remove_worktree t (client : Client.t) params =
   in
   let recorded =
     List.find_map (listings t client) ~f:(fun (l : Listing.t) ->
-      List.find l.summary.agent_worktrees ~f:(fun w ->
-        String.equal w.path target))
+      List.find l.summary.worktrees ~f:(fun w -> String.equal w.path target))
   in
   match
     Agent.remove_worktree ?cwd:repo_cwd client.agent ~path ~force, recorded
   with
   | Ok removed, _ ->
-    forget_agent_worktree t client ~path:removed.path;
+    forget_worktree t client ~path:removed.path;
     Ok (`Object [ "worktree", worktree_json t client removed ])
   | Error e, Some w
     when String.is_substring
            (Error.to_string_hum e)
            ~substring:"not a worktree of" ->
     (* Removed outside prigh: only the record of it is left. *)
-    forget_agent_worktree t client ~path:w.path;
+    forget_worktree t client ~path:w.path;
     Ok
       (`Object
           [ ( "worktree"
@@ -1695,7 +1730,7 @@ let remove_worktree t (client : Client.t) params =
                 t
                 client
                 { Worktree.path = w.path
-                ; branch = Some w.branch
+                ; branch = w.branch
                 ; head = None
                 ; main = false
                 ; managed = false
@@ -2005,7 +2040,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
         Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
           Login_manager.forge_logged_out t.login instance.host;
           `Object [])))
-  | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" | "pr_checkout" ->
+  | "pr_checkout" ->
+    Some
+      (Or_error.bind (pull_requests t client ~meth ~params) ~f:(fun json ->
+         Or_error.map (record_checkout t client ~params json) ~f:(fun () ->
+           json)))
+  | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
     let models = Login_manager.models t.login in

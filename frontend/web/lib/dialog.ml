@@ -24,6 +24,7 @@ module Picker_kind = struct
     | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
+    | Menu of Context_menu.t
   [@@deriving sexp_of, equal]
 end
 

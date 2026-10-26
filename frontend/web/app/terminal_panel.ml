@@ -3,7 +3,7 @@ open Js_of_ocaml
 
 let panel_class = "terminal-panel"
 
-let url ~backend ~user ~as_user ~token ~session =
+let url ~backend ~user ~as_user ~token ~session ~dir =
   let base =
     match String.lsplit2 backend ~on:'?' with
     | Some (base, _) -> base
@@ -21,6 +21,7 @@ let url ~backend ~user ~as_user ~token ~session =
       ; Option.map as_user ~f:(fun u -> "as_user", u)
       ; Option.map token ~f:(fun t -> "token", t)
       ; Option.map session ~f:(fun s -> "session", s)
+      ; Option.map dir ~f:(fun d -> "dir", d)
       ]
     |> List.map ~f:(fun (k, v) ->
       k ^ "=" ^ Js.to_string (Js.encodeURIComponent (Js.string v)))

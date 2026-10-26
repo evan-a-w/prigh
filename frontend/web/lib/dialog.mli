@@ -27,6 +27,9 @@ module Picker_kind : sig
     | Worktrees of Worktree.Listing.t (** item ids are their paths *)
     | Themes (** item ids are [Theme.Name.to_string]s *)
     | Accents (** item ids are [Theme.Accent.to_string]s *)
+    | Menu of Context_menu.t
+    (** a session's or worktree's context menu; item ids are
+        [Context_menu.Item.id]s *)
   [@@deriving sexp_of, equal]
 end
 
