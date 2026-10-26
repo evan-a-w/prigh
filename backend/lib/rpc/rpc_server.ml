@@ -39,6 +39,8 @@ let methods =
   ; "list_models"
   ; "compact"
   ; "git_diff"
+  ; "git_show"
+  ; "git_refs"
   ; "list_worktrees"
   ; "create_worktree"
   ; "remove_worktree"
@@ -2230,9 +2232,22 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     let%bind path = string_param_opt params "path" in
     let%bind base = string_param_opt params "base" in
     let%bind dir = string_param_opt params "dir" in
+    let%bind rev = string_param_opt params "rev" in
+    let%bind direct = bool_param params "direct" ~default:false in
     Or_error.map
-      (Agent.git_diff ?path ?base ?dir ~default_base:true agent)
+      (Agent.git_diff ?path ?base ?dir ?rev ~direct ~default_base:true agent)
       ~f:[%jsonaf_of: Git_diff.Result.t]
+  | "git_refs" ->
+    Or_error.bind (string_param_opt params "dir") ~f:(fun dir ->
+      Or_error.map (Agent.git_refs ?dir agent) ~f:[%jsonaf_of: Git_diff.Refs.t])
+  | "git_show" ->
+    let open Or_error.Let_syntax in
+    let%bind dir = string_param_opt params "dir" in
+    let%bind rev = string_param params "rev" in
+    let%bind path = string_param params "path" in
+    Or_error.map
+      (Agent.git_show ?dir agent ~rev ~path)
+      ~f:[%jsonaf_of: Git_diff.Shown.t]
   | "review" ->
     Or_error.bind (string_param_opt params "args") ~f:(fun args ->
       unit_result (Agent.review agent ~args:(Option.value args ~default:"")))

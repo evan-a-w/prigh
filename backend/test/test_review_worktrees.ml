@@ -71,7 +71,9 @@ let print_diff ?(full = false) t (r : Git_diff.Result.t Or_error.t) =
       removed;
     if full
     then (
-      printf "branches: %s\n" (String.concat ~sep:" " r.branches);
+      printf
+        "branches: %s\n"
+        (String.concat ~sep:" " (r.branches @ r.remote_branches));
       print_string (show t r.diff))
 ;;
 
@@ -189,7 +191,7 @@ let%expect_test
   [%expect
     {|
     root=$DIR/wts/repo/feat-y branch=feat/y main=false base=origin/trunk against=<sha> files=2 +2 -1
-    error: unknown revision "nope": name a branch, tag or commit (e.g. main)
+    error: unknown revision "nope": name a branch, tag or commit (closest: main, manual, feat/x)
     error: not a git repository: $DIR (name a worktree of the repository: /worktree lists them)
     |}]
 ;;

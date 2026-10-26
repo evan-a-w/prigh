@@ -276,7 +276,6 @@ let create ~dir ~cwd ?parent () =
   t
 ;;
 
-
 (* The first way it mattered stays; its branch follows. *)
 let track_worktree t (w : Session_worktree.t) =
   match
@@ -320,7 +319,9 @@ let add_entry t (entry : Entry.t) =
   | Review _ -> ()
   | Repo { cwd; repo } ->
     Hashtbl.set t.repos ~key:cwd ~data:repo;
-    Option.iter (Option.bind repo ~f:Session_worktree.of_location) ~f:(track_worktree t)
+    Option.iter
+      (Option.bind repo ~f:Session_worktree.of_location)
+      ~f:(track_worktree t)
   | Agent_worktree w -> track_worktree t (Session_worktree.of_agent w)
   | Worktree w -> track_worktree t w
   | Worktree_removed { path } ->
@@ -857,10 +858,7 @@ let fork ?at t ~dir =
                    ; kept_from = renamed kept_from
                    ; pinned = Option.map pinned ~f:renamed
                    })
-            | Archived _
-            | Spend _
-            | Resume_at _
-            | Agent_worktree _ -> None
+            | Archived _ | Spend _ | Resume_at _ | Agent_worktree _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
