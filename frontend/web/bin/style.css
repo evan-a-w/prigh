@@ -240,7 +240,7 @@ kbd {
   align-items: flex-start;
   border-radius: var(--r-control);
 }
-/* The row's button: all of it but archive and delete. */
+/* The row's button: all of it but its fold and ⋯. */
 .session-open {
   flex: 1;
   min-width: 0;
@@ -271,11 +271,17 @@ kbd {
 .session-age { flex-shrink: 0; white-space: nowrap; }
 .session-cwd { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-size { flex-shrink: 0; white-space: nowrap; }
-/* Archive and delete, over the row's right end while it is pointed at. */
+/* Its repository, then its branch: the branch gives way first. */
+.session-place { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+.session-repo { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.session-branch { min-width: 0; display: inline-flex; align-items: center; gap: 3px; overflow: hidden; text-overflow: ellipsis; }
+.place-icon { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.8; }
+/* Its ⋯ menu, over the right end of the title line while the row is
+   pointed at: the worktrees' fold is on the line below. */
 .session-actions {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
+  top: 1px;
+  height: 27px;
   right: 2px;
   display: flex;
   align-items: center;
@@ -288,7 +294,6 @@ kbd {
 .session-actions .btn .icon { width: 14px; height: 14px; }
 .session:hover .session-actions, .session:focus-within .session-actions { opacity: 1; }
 .session-actions .btn:hover { background: transparent; color: var(--chalk); }
-.session-actions .delete:hover { color: var(--brick); }
 @media (hover: none) {
   .session-actions { position: static; padding: 0; background: none; opacity: 0.7; align-self: center; }
   .session-actions .btn { width: 36px; height: 36px; }
@@ -370,120 +375,133 @@ kbd {
 .selection-bar .btn { height: 30px; }
 .selection-bar .btn.danger { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* The tree. A project is a quiet heading: its folder (a repository's has a
-   branch in it), its name and its main checkout's branch. Its sessions and
-   worktrees hang from a rail running down from the folder; each worktree
-   branches off the rail like a branch off a commit graph's line, its own
-   sessions on a rail of their own. The rail of the project (and worktree)
-   the open session is in takes the accent: where you are, even folded. */
-.project { display: flex; flex-direction: column; }
-.project + .project { margin-top: 8px; }
-.project-row, .worktree-row { position: relative; display: flex; align-items: center; min-height: 28px; border-radius: var(--r-control); }
-.project-row:hover, .worktree-row:hover { background: var(--slate-2); }
-.project-toggle, .worktree-toggle {
-  flex: 1;
-  min-width: 0;
+/* A session's worktrees hang under it from a rail dropping out of its
+   lamp's column, each branching off like a branch off a commit graph's
+   line. The one the session works in takes the accent. */
+.session-item { display: flex; flex-direction: column; }
+.session-item.has-worktrees > .session .session-meta { padding-right: 40px; }
+.session-fold {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 2px 0 5px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: none;
+  color: var(--faint);
+  font: 11px var(--mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.session-fold .fold-icon { width: 11px; height: 11px; }
+.session-fold .chev { width: 4px; height: 4px; margin: 0 3px 0 2px; }
+.session-fold:hover { color: var(--chalk); background: var(--rule); }
+.session-fold:focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
+.session-item.selected .session-fold { color: var(--muted); }
+.session-worktrees {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 4px 10px;
+  padding-left: 10px;
+}
+.worktree {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px 4px 2px;
-  margin: 0;
+  min-height: 24px;
+  padding: 2px 8px 2px 4px;
   border: 0;
-  border-radius: inherit;
+  border-radius: var(--r-control);
   background: none;
   color: var(--muted);
   font: inherit;
   text-align: start;
   cursor: pointer;
 }
-.project-toggle:focus-visible, .worktree-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.project-toggle .chev, .worktree-toggle .chev { margin: 0 1px 0 4px; color: var(--faint-line); }
-.project-row:hover .chev, .worktree-row:hover .chev { color: var(--muted); }
-.project-icon { width: 15px; height: 15px; flex-shrink: 0; color: var(--faint); }
-.project.here > .project-row .project-icon { color: var(--sodium); }
-.project-name { min-width: 0; color: var(--chalk); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.project-branch { min-width: 0; flex-shrink: 1000; font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* What a folded row holds: work in progress, then how many sessions. */
-.tree-count { margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding-left: 6px; font: 11.5px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
-.tree-count .lamp { width: 6px; height: 6px; }
-.project.here.folded > .project-row .tree-count, .worktree.here.folded > .worktree-row .tree-count { color: var(--sodium); }
-
-/* A new session or worktree, a removal: over the row's right end while it
-   is pointed at, as on the sessions. */
-.tree-actions {
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  right: 2px;
-  display: flex;
-  align-items: center;
-  padding-left: 18px;
-  border-radius: var(--r-control);
-  background: linear-gradient(to right, transparent, var(--slate-2) 16px);
-  opacity: 0;
-}
-.tree-actions .btn { width: 26px; height: 26px; }
-.tree-actions .btn .icon { width: 14px; height: 14px; }
-.project-row:hover .tree-actions, .project-row:has(:focus-visible) .tree-actions,
-.worktree-row:hover .tree-actions, .worktree-row:has(:focus-visible) .tree-actions { opacity: 1; }
-.tree-actions .btn:hover { background: transparent; color: var(--chalk); }
-.tree-actions .delete:hover { color: var(--brick); }
-@media (hover: none) {
-  .tree-actions { position: static; padding: 0; background: none; opacity: 0.7; }
-  .tree-actions .btn { width: 36px; height: 36px; }
-}
-
-/* The rails. */
-.project-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 2px 0 0 13px;
-  padding-left: 3px;
-  border-left: 1px solid var(--rule);
-}
-.project.here > .project-body { border-left-color: var(--sodium-line); }
-.worktree { position: relative; display: flex; flex-direction: column; }
-.worktree-row { margin-left: 6px; }
-/* The branch off the rail, curving into the worktree's icon. */
-.worktree-row::before {
+/* The rail down to the branch, curving into the worktree's icon; it goes
+   on past all but the last. */
+.worktree::before, .worktree:not(:last-child)::after {
   content: "";
   position: absolute;
   left: -10px;
-  top: 0;
-  width: 10px;
-  height: 50%;
   border: 0 solid var(--rule);
-  border-width: 0 0 1px 1px;
-  border-bottom-left-radius: 8px;
   pointer-events: none;
 }
-.project.here .worktree.here > .worktree-row::before { border-color: var(--sodium-line); }
-.worktree-toggle { padding-left: 3px; }
-.worktree-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--faint); }
-.worktree.here .worktree-icon { color: var(--sodium); }
-.worktree-branch { min-width: 0; font: 12.5px var(--mono); color: var(--chalk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.worktree.gone .worktree-branch { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--faint-line); }
-.worktree.opening > .worktree-row { background: var(--slate-2); }
-.worktree-sessions {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 2px 0 0 15px;
-  padding-left: 3px;
-  border-left: 1px solid var(--rule);
+.worktree::before {
+  top: 0;
+  width: 8px;
+  height: 50%;
+  border-width: 0 0 1px 1px;
+  border-bottom-left-radius: 7px;
 }
-.project.here .worktree.here > .worktree-sessions { border-left-color: var(--sodium-line); }
+.worktree:not(:last-child)::after { top: 0; bottom: 0; border-left-width: 1px; }
+.session-item.selected .worktree::before, .session-item.selected .worktree::after { border-color: var(--sodium-line); }
+.worktree:hover, .worktree.opening { background: var(--slate-2); }
+.worktree:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.worktree-icon { width: 12px; height: 12px; flex-shrink: 0; color: var(--faint); }
+.worktree.here .worktree-icon { color: var(--sodium); }
+.worktree-branch { min-width: 0; font: 12px var(--mono); color: var(--chalk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.worktree:not(.here) .worktree-branch { color: var(--muted); }
+.worktree:hover .worktree-branch { color: var(--chalk); }
+.worktree.gone .worktree-branch { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--faint-line); }
 .worktree-changes { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--sodium); font: 11px var(--mono); white-space: nowrap; }
-.worktree-changes::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .worktree-sync { flex-shrink: 0; color: var(--faint); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .worktree-tag { flex-shrink: 0; padding: 0 5px; border: 1px solid var(--rule-2); border-radius: var(--r-chip); color: var(--faint); font-size: 10.5px; line-height: 15px; }
-/* A subagent's: its tag in the accent's line, and where it came from. */
-.worktree.agent .worktree-tag:first-of-type { border-color: var(--sodium-line); color: var(--muted); }
-.worktree-origin { margin: 0 0 2px 27px; color: var(--faint); font-size: 11.5px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.worktree-owner { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; }
-.worktree-owner:hover { color: var(--chalk); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 2px; }
-.worktree-owner:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; border-radius: 2px; }
+.worktree-tag.agent { border-color: var(--sodium-line); color: var(--muted); }
+.worktree-tag.here { border-color: transparent; padding: 0; color: var(--sodium); }
+@media (hover: none) {
+  .worktree { min-height: 36px; }
+  /* Left of the ⋯, which has a column of its own. */
+  .session-fold { right: 40px; height: 24px; padding: 0 6px; }
+}
+
+/* A session's or worktree's context menu: at the pointer (or under its
+   row), the command doing the same at each item's right. Hidden until the
+   page has put it in the window. */
+/* Over the composer's controls (41) too. */
+.menu-backdrop.context-menu-backdrop { z-index: 50; }
+.context-menu {
+  position: fixed;
+  min-width: 248px;
+  max-width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  animation: appear 0.1s ease-out;
+}
+.context-menu:not(.placed) { visibility: hidden; }
+.context-menu-head { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px 7px; border-bottom: 1px solid var(--rule); }
+.context-menu-title { display: flex; align-items: center; gap: 6px; color: var(--chalk); font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.context-menu-title .place-icon { width: 13px; height: 13px; color: var(--sodium); }
+.context-menu-sub { color: var(--faint); font: 11.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.context-menu-head .session-place { flex: none; }
+.context-menu .menu-section { padding: 3px 0; }
+.context-menu .menu-item { gap: 9px; padding: 5px 8px; font-size: 13px; }
+.context-menu .menu-item > .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.context-menu .menu-label { flex-shrink: 0; }
+.menu-command {
+  margin-left: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font: 11px var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-item.selected .menu-command, .menu-item:hover .menu-command { color: var(--muted); }
+@media (max-width: 760px) {
+  .context-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; }
+  .context-menu .menu-item { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .context-menu { animation: none; } }
 .field-note { color: var(--faint); font-size: 11.5px; }
 .worktree-dialog .field + .field { margin-top: 12px; }
 .worktree-dialog .dialog-note { margin: 12px 0 0; }
