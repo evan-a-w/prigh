@@ -179,7 +179,10 @@ end
 module Request = struct
   type t =
     | Status
-    | Stage of string list
+    | Stage of
+        { paths : string list
+        ; tracked : bool
+        }
     | Unstage of string list
     | Commit of
         { message : string
@@ -197,7 +200,9 @@ module Request = struct
     let fields =
       match t with
       | Status -> [ "action", s "status" ]
-      | Stage ps -> [ "action", s "stage"; "paths", paths ps ]
+      | Stage { paths = ps; tracked } ->
+        [ "action", s "stage"; "paths", paths ps ]
+        @ if tracked then [ "tracked", `True ] else []
       | Unstage ps -> [ "action", s "unstage"; "paths", paths ps ]
       | Commit { message; amend; paths = ps } ->
         [ "action", s "commit"
@@ -306,9 +311,14 @@ let check_paths = function
   | paths -> List.map paths ~f:check_path
 ;;
 
-let stage repo paths =
-  let paths = check_paths paths in
-  ignore (Repo.git_exn repo ("add" :: "--all" :: "--" :: paths) : string)
+let stage ?(tracked = false) repo paths =
+  if tracked
+  then ignore (Repo.git_exn repo [ "add"; "--update" ] : string)
+  else ignore (check_paths paths : string list);
+  if not (List.is_empty paths)
+  then (
+    let paths = check_paths paths in
+    ignore (Repo.git_exn repo ("add" :: "--all" :: "--" :: paths) : string))
 ;;
 
 let unstage repo paths =
@@ -645,7 +655,13 @@ let run ~env ~cancel ~cwd ~arguments =
       match str "action" with
       | Some "status" -> [%jsonaf_of: Status.t] (Repo.status repo)
       | Some "stage" ->
-        stage repo (paths ());
+        stage
+          repo
+          (paths ())
+          ~tracked:
+            (match Json.member "tracked" arguments with
+             | Some `True -> true
+             | _ -> false);
         [%jsonaf_of: Status.t] (Repo.status repo)
       | Some "unstage" ->
         unstage repo (paths ());

@@ -88,7 +88,10 @@ end
 module Request : sig
   type t =
     | Status
-    | Stage of string list
+    | Stage of
+        { paths : string list
+        ; tracked : bool (** and every change to tracked files *)
+        }
     | Unstage of string list
     | Commit of
         { message : string

@@ -215,6 +215,16 @@ let%expect_test "status, stage, unstage, commit, amend and push in a worktree" =
     remote: origin
     branch: feat/x
     $DIR/repo branch=feat/x upstream=origin/feat/x ahead=0 behind=0 head=true
+    |}];
+  (* [tracked]: every change to tracked files, like [git commit -a]. *)
+  write t "repo/x.txt" "xx\n";
+  write t "repo/y.txt" "y\n";
+  call t agent "git_stage" [ dir; "tracked", `True ];
+  [%expect
+    {|
+    $DIR/repo branch=feat/x upstream=origin/feat/x ahead=0 behind=0 head=true
+      M. x.txt
+      .? y.txt
     |}]
 ;;
 

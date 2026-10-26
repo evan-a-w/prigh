@@ -110,6 +110,7 @@ module Method = struct
     | Git_stage of
         { dir : string option
         ; paths : string list
+        ; tracked : bool
         }
     | Git_unstage of
         { dir : string option
@@ -280,8 +281,11 @@ module Method = struct
       @ (if force then [ "force", Json.bool true ] else [])
       @ cwd_param cwd
     | Git_status { dir } | Git_push { dir } -> dir_param dir
-    | Git_stage { dir; paths } | Git_unstage { dir; paths } ->
-      dir_param dir @ paths_param paths
+    | Git_stage { dir; paths; tracked } ->
+      dir_param dir
+      @ paths_param paths
+      @ if tracked then [ "tracked", Json.bool true ] else []
+    | Git_unstage { dir; paths } -> dir_param dir @ paths_param paths
     | Git_commit { dir; message; amend; paths } ->
       dir_param dir
       @ [ "message", Json.str message ]

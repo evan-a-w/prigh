@@ -59,7 +59,10 @@ let dispatch agent ~meth ~params =
   match meth with
   | "git_status" -> run (fun () -> Ok Git_actions.Request.Status)
   | "git_stage" ->
-    run (fun () -> paths params >>| fun ps -> Git_actions.Request.Stage ps)
+    run (fun () ->
+      let%bind tracked = bool params "tracked" in
+      let%map paths = paths params in
+      Git_actions.Request.Stage { paths; tracked })
   | "git_unstage" ->
     run (fun () -> paths params >>| fun ps -> Git_actions.Request.Unstage ps)
   | "git_commit" ->
