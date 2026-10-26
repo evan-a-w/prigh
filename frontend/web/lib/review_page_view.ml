@@ -281,12 +281,98 @@ let empty_state (t : Code_review.t) =
           [ Node.text
               (sprintf
                  "No changes in %s against %s."
-                 d.root
+                 (Diff_files.where d)
                  (Diff_files.against d))
           ]
       ; Node.p
           ~attrs:[ Attr.class_ "review-advice" ]
           [ Node.text "What the agent changes shows here as it works." ]
+      ]
+;;
+
+let select ~id ~label ~on_change options =
+  Node.select
+    ~attrs:
+      [ Attr.id id
+      ; Attr.class_ "review-select"
+      ; Attr.create "aria-label" label
+      ; Attr.title label
+      ; Attr.on_change (fun _ value -> on_change value)
+      ]
+    (List.map options ~f:(fun (value, text, on) ->
+       Node.option
+         ~attrs:[ Attr.value value; Attr.bool_property "selected" on ]
+         [ Node.text text ]))
+;;
+
+(* What the page reviews, and pickers for another worktree or base:
+   "Reviewing feat/x (/path) against main". *)
+let target_bar (m : App.Model.t) ~inject =
+  let t = m.review in
+  match t.diff with
+  | None ->
+    (match t.target.dir with
+     | Some dir ->
+       div ~cls:"review-target" [ span ~cls:"review-target-text" ("Reviewing " ^ dir) ]
+     | None -> Node.none)
+  | Some d ->
+    let worktrees =
+      Option.value_map (Worktrees.listing m.worktrees) ~default:[] ~f:(fun l ->
+        List.filter l.worktrees ~f:(fun (w : Worktree.t) -> not w.prunable))
+    in
+    let worktree_options =
+      List.map worktrees ~f:(fun (w : Worktree.t) ->
+        ( w.path
+        , sprintf "%s (%s)" (Worktree.label w) w.path
+        , String.equal w.path d.root ))
+    in
+    let worktree_options =
+      if List.exists worktree_options ~f:(fun (_, _, on) -> on)
+      then worktree_options
+      else (d.root, Diff_files.where d, true) :: worktree_options
+    in
+    let bases =
+      List.dedup_and_sort
+        ~compare:String.compare
+        (d.base
+         :: List.filter d.branches ~f:(fun b ->
+           not (Option.exists d.branch ~f:(String.equal b))))
+      |> List.filter ~f:(fun b -> not (String.equal b "HEAD"))
+    in
+    let base_options =
+      ("HEAD", "HEAD (the uncommitted changes)", String.equal d.base "HEAD")
+      :: List.map bases ~f:(fun b -> b, b, String.equal b d.base)
+    in
+    let merge_base =
+      match Diff_files.against d with
+      | "HEAD" -> Node.none
+      | against when String.equal against d.base -> Node.none
+      | against ->
+        (match String.chop_prefix against ~prefix:(d.base ^ " ") with
+         | Some rest -> span ~cls:"review-merge-base" rest
+         | None -> span ~cls:"review-merge-base" against)
+    in
+    div
+      ~cls:"review-target"
+      ~attrs:
+        [ Attr.title
+            (sprintf "Reviewing %s against %s" (Diff_files.where d) (Diff_files.against d))
+        ]
+      [ span ~cls:"review-target-text" "Reviewing"
+      ; select
+          ~id:"review-worktree"
+          ~label:"The worktree to review"
+          ~on_change:(fun path ->
+            inject (App.Action.Review_worktree { path; base = None }))
+          worktree_options
+      ; span ~cls:"review-target-text" "against"
+      ; select
+          ~id:"review-base"
+          ~label:"What to compare it with"
+          ~on_change:(fun base ->
+            inject (review (Show { t.target with base = Some base })))
+          base_options
+      ; merge_base
       ]
 ;;
 
@@ -421,5 +507,5 @@ let view (m : App.Model.t) ~inject =
         ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Review of the changes"
         ]
-      [ head; body ])
+      [ head; target_bar m ~inject; body ])
 ;;

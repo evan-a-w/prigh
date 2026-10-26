@@ -323,6 +323,19 @@ let counterpart ~env ~cancel ~cwd path =
   | Error _ -> path
 ;;
 
+let base_key branch = sprintf "branch.%s.prighBase" branch
+
+(* The branch [rev] names (local or remote, short), if it is one. *)
+let branch_name ~env ~cancel ~dir rev =
+  match git ~env ~cancel ~dir [ "rev-parse"; "--symbolic-full-name"; rev ] with
+  | Ok full ->
+    let full = String.strip full in
+    Option.first_some
+      (String.chop_prefix full ~prefix:"refs/heads/")
+      (String.chop_prefix full ~prefix:"refs/remotes/")
+  | Error _ -> None
+;;
+
 let create ?(fresh = false) ~env ~cancel ~cwd ~dir ~branch ~base () =
   protect (fun () ->
     let branch = String.strip branch in
@@ -400,6 +413,13 @@ let create ?(fresh = false) ~env ~cancel ~cwd ~dir ~branch ~base () =
          ~what:"git worktree add"
          ("worktree" :: "add" :: "--quiet" :: add_args)
        : string);
+    (match add_args with
+     | [ "-b"; _; _; from ] ->
+       Option.iter (branch_name ~env ~cancel ~dir:cwd from) ~f:(fun from ->
+         ignore
+           (git ~env ~cancel ~dir:cwd [ "config"; base_key branch; from ]
+            : (string, string) Result.t))
+     | _ -> ());
     let listing, _ = list_exn ~env ~cancel ~cwd ~dir in
     let real = realpath path in
     match

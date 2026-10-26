@@ -559,6 +559,10 @@ let%expect_test
   [%expect
     {|
     (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (Worktrees_for_autocomplete "abc123 backend:/work")))
+    (Rpc
       (method_ review)
       (params ((args "main look at errors")))
       (tag (
@@ -625,12 +629,15 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
          "approvals":[{"path":"src/a.ml","hash":%S},{"path":"new file.txt","hash":"older"}]}|}
       (hash "src/a.ml")
   in
-  H.reply ~quiet:true h Review_comments review_json;
+  H.reply ~quiet:true h (Review_comments { dir = None; base = None }) review_json;
   H.reply
     h
     (Review_status
-       (P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
-        |> Or_error.ok_exn))
+       { review =
+           P.Review.of_json (P.Json.parse review_json |> Or_error.ok_exn)
+           |> Or_error.ok_exn
+       ; dir = None
+       })
     diff_json;
   H.show h;
   [%expect
@@ -640,7 +647,7 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
     ▌ earlier question
       earlier answer
     ┌─ Review ─────────────────────────────────────────────────────────────────────────┐
-    │ review /work  1 of 2 files approved                                              │
+    │ review /work against HEAD  1 of 2 files approved                                 │
     │   ✓ src/a.ml  +1 −1  approved                                                    │
     │     c1 line 2 “y”, open                                                          │
     │       you: Why 3?                                                                │
