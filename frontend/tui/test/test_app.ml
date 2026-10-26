@@ -1163,13 +1163,13 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
-      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
-      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
     >
@@ -1353,13 +1353,13 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions (named)  (1)  Alt+A (un)archives
     / ▏
-      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
     >
@@ -1407,7 +1407,6 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
       earlier answer
     Sessions  (1)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
-      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ──────────────────────────────── Deleted 1 session (0 B) ───
     >
@@ -1455,14 +1454,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
     ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1474,11 +1473,10 @@ let%expect_test
   picker_rows h;
   [%expect
     {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
       earlier [bold]answer[/]
-    [dim]  ── work ──[/]
     [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it[dim]  /work[/]
-    [dim]  ── tmp ──[/]
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
     [dim]  ── archived ──[/]
     [dim]   (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike[/][dim]  /old[/]
@@ -1516,14 +1514,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1541,14 +1539,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1568,14 +1566,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1604,14 +1602,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1632,14 +1630,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1655,16 +1653,16 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    ▌ earlier question
+      earlier answer
     ┌─ Warning ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Deleted 1 session (1.0 MB)                                                                       │
     │ Not deleted: session "deploy" is running: wait for it, or switch to it and /abort                │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1718,13 +1716,13 @@ let%expect_test
         Archive_done
         (name     "session 5")
         (archived true))))
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
       ── archived ──
@@ -1745,14 +1743,14 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -1780,16 +1778,16 @@ let%expect_test
         Archive_done
         (name     "session \"old spike\"")
         (archived false))))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-      ── old ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
-      ── tmp ──
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
@@ -2161,15 +2159,15 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
-      ── work ──
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-      ── tmp ──
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
@@ -2195,16 +2193,16 @@ let%expect_test
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
     Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
-      ── work ──
      ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
-    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-      ── tmp ──
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
       ── archived ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -6439,15 +6437,15 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
 
 
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
-      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
-      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     >
@@ -6464,9 +6462,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
       earlier answer
     Sessions  (2)  Alt+A (un)archives
     / ▏
-      ── work ──
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
-      ── other ──
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msg…
     ────────────────────────────────────────
     >

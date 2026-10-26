@@ -287,7 +287,10 @@ let session_search_key t : App.Action.t option =
   | _ -> None
 ;;
 
-let menu_key t = String.equal t.key "ContextMenu" || (String.equal t.key "F10" && t.shift && not (t.ctrl || t.alt || t.meta))
+let menu_key t =
+  String.equal t.key "ContextMenu"
+  || (String.equal t.key "F10" && t.shift && not (t.ctrl || t.alt || t.meta))
+;;
 
 let session_key (m : App.Model.t) t id : App.Action.t option =
   let session f =
@@ -327,8 +330,10 @@ let worktree_key (m : App.Model.t) t ~session ~path : App.Action.t option =
             { target = Worktree { session = s.path; path }
             ; anchor = Element (Context_menu.worktree_dom_id ~session path)
             })
-     | "ArrowDown" when plain t -> Some (Session_nav { from = Some session; by = 1 })
-     | "ArrowUp" when plain t -> Some (Session_nav { from = Some session; by = 0 })
+     | "ArrowDown" when plain t ->
+       Some (Session_nav { from = Some session; by = 1 })
+     | "ArrowUp" when plain t ->
+       Some (Session_nav { from = Some session; by = 0 })
      | ("Delete" | "Backspace") when plain t -> Some (Ask_remove_worktree path)
      | "Escape" -> Some Leave_sidebar
      | _ -> None)

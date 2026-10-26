@@ -24,13 +24,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 let create ~head ~project_dir () =
-  { branch = ""
-  ; base = ""
-  ; head
-  ; project_dir
-  ; busy = false
-  ; error = None
-  }
+  { branch = ""; base = ""; head; project_dir; busy = false; error = None }
 ;;
 
 let set t (field : Field.t) text =

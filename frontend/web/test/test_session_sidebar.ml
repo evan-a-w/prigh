@@ -86,7 +86,10 @@ let quiet () = H.create ~state ~sessions:(sessions ()) ~verbose:false ()
 let list h = H.text h ~selector:".sessions"
 let menu h = H.text h ~selector:".context-menu"
 let dialog h = H.text h ~selector:".modal"
-let worktree ~owner path = sprintf "[data-owner=%s][data-worktree='%s']" owner path
+
+let worktree ~owner path =
+  sprintf "[data-owner=%s][data-worktree='%s']" owner path
+;;
 
 let choose h id =
   H.click h ~selector:(sprintf ".context-menu [data-item=%s]" id)
@@ -116,7 +119,8 @@ let listing root worktrees =
 let%expect_test "a flat list of sessions, each with its worktrees under it" =
   let h = create () in
   list h;
-  [%expect {|
+  [%expect
+    {|
     (Main work 2m ago prigh ⎇ main) (3) (More (right-click, Shift+F10))
     (feat/login) (agent/fix-the-parser subagent) (pr-7 #7)
     (Login form 20m ago prigh ⎇ feat/login) (1) (More (right-click, Shift+F10))
@@ -129,7 +133,8 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
     |}];
   H.elements h ~selector:".session-item";
   H.elements h ~selector:".worktree";
-  [%expect {|
+  [%expect
+    {|
     <div class="has-worktrees selected session-item">
     <div class="has-worktrees session-item">
     <div class="session-item">
@@ -142,7 +147,8 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
     <button class="here worktree">
     |}];
   H.names h ~selector:".worktree";
-  [%expect {|
+  [%expect
+    {|
     button "feat/login" -- ~/.prigh/worktrees/prigh/feat-login
     button "agent/fix-the-parser subagent" -- ~/.prigh/worktrees/prigh/agent-fix-the-parser
     button "pr-7 #7" -- ~/.prigh/worktrees/prigh/pr-7
@@ -152,8 +158,7 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
 ;;
 
 let%expect_test
-    "the worktrees' repositories are listed: changes, ahead, removed ones \
-     gone"
+    "the worktrees' repositories are listed: changes, ahead, removed ones gone"
   =
   let h = create () in
   H.reply
@@ -166,7 +171,8 @@ let%expect_test
        ; worktree_json agent_wt "agent/fix-the-parser"
        ]);
   H.text h ~selector:".session-worktrees";
-  [%expect {|
+  [%expect
+    {|
     (feat/login ● 2 ↑1) (agent/fix-the-parser subagent)
     (feat/login here ● 2 ↑1)
     (redesign here)
@@ -177,7 +183,8 @@ let%expect_test
     (listing site [ worktree_json ~main:true site "trunk" ]);
   (* redesign is not listed any more: removed outside prigh. *)
   H.elements h ~selector:".worktree";
-  [%expect {|
+  [%expect
+    {|
     <button class="dirty worktree">
     <button class="agent worktree">
     <button class="dirty here worktree">
@@ -188,7 +195,8 @@ let%expect_test "folding a session's worktrees: a preference, by session" =
   let h = create () in
   H.click h ~selector:".session-fold" ~nth:0;
   list h;
-  [%expect {|
+  [%expect
+    {|
     (Toggle_folded s1)
     (Cache_prefs (((key web.sidebar-folded) (value ((s1))))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-folded (s1))))))
@@ -203,18 +211,18 @@ let%expect_test "folding a session's worktrees: a preference, by session" =
     (Archived 1)
     |}];
   H.click h ~selector:".session-fold" ~nth:0;
-  [%expect {|
+  [%expect
+    {|
     (Toggle_folded s1)
     (Cache_prefs (((key web.sidebar-folded) (value ()))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-folded null)))))
      (tag Show_error))
     |}];
   let h = quiet () in
-  H.event
-    h
-    {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":["s6"]}}|};
+  H.event h {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":["s6"]}}|};
   H.elements h ~selector:".session-fold.folded";
-  [%expect {|
+  [%expect
+    {|
     (Cache_prefs (((key web.sidebar-folded) (value ((s6))))))
     <button class="folded session-fold">
     |}]
@@ -226,20 +234,20 @@ let%expect_test "search: by repository, branch and worktree" =
   H.text h ~selector:".session-title";
   H.act h (Set_session_query "redesign");
   H.text h ~selector:".session-title";
-  [%expect {|
+  [%expect
+    {|
     Main work
     New hero
     |}]
 ;;
 
-let%expect_test
-    "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc"
-  =
+let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc" =
   let h = create () in
   H.right_click h ~selector:".session" ~nth:2 ~at:(40, 200);
   menu h;
   H.show h ~selector:".context-menu";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s3.jsonl)) (anchor (Point (x 40) (y 200)))))
     (Focus dialog)
@@ -343,7 +351,8 @@ let%expect_test
   (* Esc closes it, nothing else. *)
   H.key h "Escape" ~target:Page;
   H.elements h ~selector:".context-menu";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}];
@@ -355,7 +364,8 @@ let%expect_test
   H.key h "Escape" ~target:Page;
   H.click h ~selector:"#more-session-s6";
   H.names h ~selector:".context-menu [role=menuitem]";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
     (Focus dialog)
@@ -418,7 +428,8 @@ let%expect_test "the menu from the keyboard: ↑↓ move, Enter chooses" =
   H.key h "ArrowDown" ~target:Page;
   H.elements h ~selector:".context-menu .menu-item.selected";
   H.key h "Enter" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s3.jsonl)) (anchor (Element session-s3))))
     (Focus dialog)
@@ -442,7 +453,8 @@ let%expect_test "a session's items on another session: switch there first" =
   let h = create () in
   H.right_click h ~selector:".session" ~nth:2;
   choose h "fork";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s3.jsonl)) (anchor (Element session-s3))))
     (Focus dialog)
@@ -469,7 +481,8 @@ let%expect_test "a session's items on another session: switch there first" =
             ; "cwd", `String site
             ]
           ()));
-  [%expect {|
+  [%expect
+    {|
     (Set_url_session s3)
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
@@ -497,7 +510,8 @@ let%expect_test "a session's items on the current session" =
   in
   on_s1 "rename";
   dialog h;
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
     (Focus dialog)
@@ -516,7 +530,8 @@ let%expect_test "a session's items on the current session" =
   on_s1 "copy_path";
   on_s1 "copy_id";
   on_s1 "new_worktree";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Open_menu
@@ -572,7 +587,8 @@ let%expect_test "a session's items on the current session" =
   H.key h "Escape" ~target:Page;
   on_s1 "delete";
   dialog h;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Open_menu
@@ -597,7 +613,8 @@ let%expect_test "a worktree's menu and its items" =
   in
   H.click h ~selector:(worktree ~owner:"s1" login);
   menu h;
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target
        (Worktree (session /sessions/s1.jsonl)
@@ -620,7 +637,8 @@ let%expect_test "a worktree's menu and its items" =
   on_login "files";
   on_login "terminal";
   on_login "copy_path";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Open_menu
@@ -676,7 +694,8 @@ let%expect_test "a worktree's menu and its items" =
     (Expire_toast (id 1) (after_ms 3820))
     |}];
   on_login "switch_here";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target
        (Worktree (session /sessions/s1.jsonl)
@@ -695,7 +714,8 @@ let%expect_test "a worktree's menu and its items" =
          ("Working in the worktree feat/login (/home/u/.prigh/worktrees/prigh/feat-login)"))))))
     |}];
   on_login "new_session_here";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target
        (Worktree (session /sessions/s1.jsonl)
@@ -716,7 +736,8 @@ let%expect_test "a worktree's items on another session's worktree" =
   let h = create () in
   H.right_click h ~selector:(worktree ~owner:"s6" redesign);
   choose h "create_pr";
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target
        (Worktree (session /sessions/s6.jsonl)
@@ -743,7 +764,8 @@ let%expect_test "removing a worktree from its menu, or Delete on its row" =
   H.right_click h ~selector:(worktree ~owner:"s6" redesign);
   choose h "remove";
   dialog h;
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target
        (Worktree (session /sessions/s6.jsonl)
@@ -762,7 +784,8 @@ let%expect_test "removing a worktree from its menu, or Delete on its row" =
   H.key h "F10" ~shift:true ~target:(Worktree { session = "s1"; path = pr_wt });
   menu h;
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Open_menu
@@ -786,7 +809,8 @@ let%expect_test "removing a worktree from its menu, or Delete on its row" =
     |}];
   H.key h "Delete" ~target:(Worktree { session = "s1"; path = pr_wt });
   H.key h "Enter" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Ask_remove_worktree /home/u/.prigh/worktrees/prigh/pr-7)
     (Focus dialog)
     Dialog_accept
@@ -806,7 +830,8 @@ let%expect_test "selecting: no menus, ranges in list order" =
   H.elements h ~selector:".session.marked";
   H.elements h ~selector:".worktree";
   H.elements h ~selector:".more";
-  [%expect {|
+  [%expect
+    {|
     (Mark_session (path /sessions/s1.jsonl) (range false))
     (Mark_session (path /sessions/s3.jsonl) (range false))
     (Cancel) (Delete 2 sessions (0 B))

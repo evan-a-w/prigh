@@ -740,9 +740,15 @@ let field json name =
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | true, Some (Login _ | Forge_host _) ->
-    ( { m with dialog = Some Settings; return_to_settings = false; theme_preview = None }
+    ( { m with
+        dialog = Some Settings
+      ; return_to_settings = false
+      ; theme_preview = None
+      }
     , [ Command.Focus "dialog" ] )
-  | _ -> { m with dialog = None; return_to_settings = false; theme_preview = None }, [ focus_editor ]
+  | _ ->
+    ( { m with dialog = None; return_to_settings = false; theme_preview = None }
+    , [ focus_editor ] )
 ;;
 
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
@@ -3384,8 +3390,7 @@ let create_worktree (m : Model.t) (d : New_worktree.t) =
       , [ call
             (Create_worktree { branch; base; cwd = None })
             ~tag:
-              (Worktree_created
-                 { command = New_worktree.command ~branch ~base })
+              (Worktree_created { command = New_worktree.command ~branch ~base })
         ] ))
 ;;
 
@@ -5271,8 +5276,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Repo_worktrees root, Ok json ->
     decode m json Worktree.Listing.of_json ~f:(fun listing ->
       ( { m with
-          repo_worktrees =
-            Repo_listings.loaded m.repo_worktrees ~root listing
+          repo_worktrees = Repo_listings.loaded m.repo_worktrees ~root listing
         }
       , [] ))
   | Worktree_removed _, Ok json ->
@@ -5734,7 +5738,8 @@ let accept_completion (m : Model.t) ~run =
    switching to that session first when it is not the one on show. *)
 let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
   match
-    find_session_by_path m (Context_menu.session menu), Context_menu.Item.of_id id
+    ( find_session_by_path m (Context_menu.session menu)
+    , Context_menu.Item.of_id id )
   with
   | None, _ | _, None ->
     error m "That session is gone: the sidebar lists the others."
@@ -5762,7 +5767,9 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Switch_here ->
        let label =
          List.find s.worktrees ~f:(fun w -> String.equal w.path dir)
-         |> Option.value_map ~default:(Filename.basename dir) ~f:Session_worktree.label
+         |> Option.value_map
+              ~default:(Filename.basename dir)
+              ~f:Session_worktree.label
        in
        plan
          ~enter:dir

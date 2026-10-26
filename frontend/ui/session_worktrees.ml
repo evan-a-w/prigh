@@ -52,10 +52,7 @@ let of_session ?(listings = []) ?cwd (s : P.Session_summary.t) =
         | _ -> w
       in
       Some
-        { Node.worktree
-        ; listed
-        ; here = P.Session_worktree.contains w ~dir:cwd
-        })
+        { Node.worktree; listed; here = P.Session_worktree.contains w ~dir:cwd })
 ;;
 
 let roots sessions =

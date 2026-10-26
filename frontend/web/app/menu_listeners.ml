@@ -28,7 +28,9 @@ let place (anchor : Prigh_web.Context_menu.Anchor.t) =
       let height = Float.of_int menu##.offsetHeight in
       let window_width = Float.of_int Dom_html.window##.innerWidth in
       let window_height = Float.of_int Dom_html.window##.innerHeight in
-      let left = Float.max margin (Float.min x (window_width -. width -. margin)) in
+      let left =
+        Float.max margin (Float.min x (window_width -. width -. margin))
+      in
       (* No room below: above the anchor instead. *)
       let top =
         if Float.(y +. height +. margin > window_height)
@@ -41,9 +43,13 @@ let place (anchor : Prigh_web.Context_menu.Anchor.t) =
       menu##focus))
 ;;
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option =
+let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+  =
   Js.Opt.to_option
-    (Js.Unsafe.meth_call el "closest" [| Js.Unsafe.inject (Js.string selector) |])
+    (Js.Unsafe.meth_call
+       el
+       "closest"
+       [| Js.Unsafe.inject (Js.string selector) |])
 ;;
 
 let listen ?(capture = false) target event handler =
@@ -65,55 +71,67 @@ let install () =
     Option.iter !timer ~f:Dom_html.clearTimeout;
     timer := None
   in
-  listen doc Dom_html.Event.pointerdown (fun (ev : Dom_html.pointerEvent Js.t) ->
-    cancel ();
-    pressed := false;
-    let touch =
-      String.equal (Js.to_string (Js.Unsafe.coerce ev)##.pointerType) "touch"
-    in
-    (match
-       Option.bind (Js.Opt.to_option ev##.target) ~f:(fun el ->
-         closest el "[data-session], [data-worktree]")
-     with
-     | Some row when touch ->
-       let x = Js.to_float ev##.clientX
-       and y = Js.to_float ev##.clientY in
-       start := x, y;
-       timer
-       := Some
-            (Dom_html.setTimeout
-               (fun () ->
-                  timer := None;
-                  pressed := true;
-                  let event =
-                    Js.Unsafe.new_obj
-                      (Js.Unsafe.global##._MouseEvent)
-                      [| Js.Unsafe.inject (Js.string "contextmenu")
-                       ; Js.Unsafe.obj
-                           [| "bubbles", Js.Unsafe.inject Js._true
-                            ; "cancelable", Js.Unsafe.inject Js._true
-                            ; "clientX", Js.Unsafe.inject (Js.number_of_float x)
-                            ; "clientY", Js.Unsafe.inject (Js.number_of_float y)
-                           |]
-                      |]
-                  in
-                  ignore
-                    (Js.Unsafe.meth_call row "dispatchEvent" [| event |]
-                     : bool Js.t))
-               550.)
-     | Some _ | None -> ());
-    Js._true);
-  listen doc Dom_html.Event.pointermove (fun (ev : Dom_html.pointerEvent Js.t) ->
-    let x0, y0 = !start in
-    if Float.(
-         abs (Js.to_float ev##.clientX -. x0) > 10.
-         || abs (Js.to_float ev##.clientY -. y0) > 10.)
-    then cancel ();
-    Js._true);
-  List.iter [ Dom_html.Event.pointerup; Dom_html.Event.pointercancel ] ~f:(fun e ->
-    listen doc e (fun _ ->
-      cancel ();
-      Js._true));
+  listen
+    doc
+    Dom_html.Event.pointerdown
+    (fun (ev : Dom_html.pointerEvent Js.t) ->
+       cancel ();
+       pressed := false;
+       let touch =
+         String.equal (Js.to_string (Js.Unsafe.coerce ev)##.pointerType) "touch"
+       in
+       (match
+          Option.bind
+            (Js.Opt.to_option ev##.target)
+            ~f:(fun el -> closest el "[data-session], [data-worktree]")
+        with
+        | Some row when touch ->
+          let x = Js.to_float ev##.clientX
+          and y = Js.to_float ev##.clientY in
+          start := x, y;
+          timer
+          := Some
+               (Dom_html.setTimeout
+                  (fun () ->
+                     timer := None;
+                     pressed := true;
+                     let event =
+                       Js.Unsafe.new_obj
+                         Js.Unsafe.global##._MouseEvent
+                         [| Js.Unsafe.inject (Js.string "contextmenu")
+                          ; Js.Unsafe.obj
+                              [| "bubbles", Js.Unsafe.inject Js._true
+                               ; "cancelable", Js.Unsafe.inject Js._true
+                               ; ( "clientX"
+                                 , Js.Unsafe.inject (Js.number_of_float x) )
+                               ; ( "clientY"
+                                 , Js.Unsafe.inject (Js.number_of_float y) )
+                              |]
+                         |]
+                     in
+                     ignore
+                       (Js.Unsafe.meth_call row "dispatchEvent" [| event |]
+                        : bool Js.t))
+                  550.)
+        | Some _ | None -> ());
+       Js._true);
+  listen
+    doc
+    Dom_html.Event.pointermove
+    (fun (ev : Dom_html.pointerEvent Js.t) ->
+       let x0, y0 = !start in
+       if
+         Float.(
+           abs (Js.to_float ev##.clientX -. x0) > 10.
+           || abs (Js.to_float ev##.clientY -. y0) > 10.)
+       then cancel ();
+       Js._true);
+  List.iter
+    [ Dom_html.Event.pointerup; Dom_html.Event.pointercancel ]
+    ~f:(fun e ->
+      listen doc e (fun _ ->
+        cancel ();
+        Js._true));
   (* The press opened the menu: the click it ends with must not also open the
      session. *)
   listen ~capture:true doc Dom_html.Event.click (fun ev ->

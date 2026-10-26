@@ -238,7 +238,8 @@ let%expect_test "an exited shell, a failure and what to do next" =
   (* The host is back: a new attempt. *)
   state_event h ~active_host:"c7" ();
   H.text h ~selector:".terminal-body";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\

@@ -36,12 +36,15 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
          [ span ~cls:"context-menu-title" (Session_list.title s)
          ; (match Prigh_ui.Session_worktrees.place s with
             | Some place -> span ~cls:"context-menu-sub" place
-            | None -> span ~cls:"context-menu-sub" (Sidebar_view.home_relative s.cwd))
+            | None ->
+              span ~cls:"context-menu-sub" (Sidebar_view.home_relative s.cwd))
          ]
      | Worktree { path; _ } ->
        let label =
          List.find s.worktrees ~f:(fun w -> String.equal w.path path)
-         |> Option.value_map ~default:(Filename.basename path) ~f:Session_worktree.label
+         |> Option.value_map
+              ~default:(Filename.basename path)
+              ~f:Session_worktree.label
        in
        div
          ~cls:"context-menu-head"
@@ -65,11 +68,15 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
         ; Attr.create "data-item" item.id
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
         ]
-      [ Option.value_map kind ~default:Node.none ~f:(fun k -> icon (item_icon k))
+      [ Option.value_map kind ~default:Node.none ~f:(fun k ->
+          icon (item_icon k))
       ; span ~cls:"menu-label" item.label
       ; (if String.is_empty item.detail
          then Node.none
-         else Node.kbd ~attrs:[ Attr.class_ "menu-command" ] [ Node.text item.detail ])
+         else
+           Node.kbd
+             ~attrs:[ Attr.class_ "menu-command" ]
+             [ Node.text item.detail ])
       ]
   in
   (* Separated: going there, changing it, looking at it, copying, and the
@@ -119,6 +126,8 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
           ]
         (heading m menu
          :: List.map sections ~f:(fun section ->
-           div ~cls:"menu-section" (List.map section ~f:(fun (i, item) -> row i item))))
+           div
+             ~cls:"menu-section"
+             (List.map section ~f:(fun (i, item) -> row i item))))
     ]
 ;;

@@ -26,7 +26,6 @@ type t =
 [@@deriving sexp_of, equal]
 
 val create : head:string option -> project_dir:string option -> unit -> t
-
 val set : t -> Field.t -> string -> t
 
 (** The branch and base to create, or what to fix first. *)

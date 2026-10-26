@@ -304,9 +304,7 @@ let new_worktree (d : New_worktree.t) ~inject =
           ~cls:"primary"
           ~disabled:d.busy
           ~on_click:(inject Action.Dialog_accept)
-          [ Node.text
-              (if d.busy then "Creating…" else "Create and switch")
-          ]
+          [ Node.text (if d.busy then "Creating…" else "Create and switch") ]
       ]
     [ field
         Branch

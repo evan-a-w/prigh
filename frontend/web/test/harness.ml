@@ -549,7 +549,10 @@ let click ?nth t ~selector =
 
 let right_click ?nth ?(at = 0, 0) t ~selector =
   let x, y = at in
-  let number n = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.number_of_float (Float.of_int n)) in
+  let number n =
+    Js_of_ocaml.Js.Unsafe.inject
+      (Js_of_ocaml.Js.number_of_float (Float.of_int n))
+  in
   interact ?nth t ~selector ~f:(fun node ->
     Node_helpers.trigger
       node
@@ -557,8 +560,12 @@ let right_click ?nth ?(at = 0, 0) t ~selector =
       ~extra_fields:
         [ "clientX", number x
         ; "clientY", number y
-        ; "preventDefault", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.wrap_callback (fun () -> ()))
-        ; "stopPropagation", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.wrap_callback (fun () -> ()))
+        ; ( "preventDefault"
+          , Js_of_ocaml.Js.Unsafe.inject
+              (Js_of_ocaml.Js.wrap_callback (fun () -> ())) )
+        ; ( "stopPropagation"
+          , Js_of_ocaml.Js.Unsafe.inject
+              (Js_of_ocaml.Js.wrap_callback (fun () -> ())) )
         ])
 ;;
 
