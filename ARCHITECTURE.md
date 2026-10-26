@@ -1298,6 +1298,40 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `/compaction mask on|off`) turns it off, also for subagents
   (`Tool_subagent.create ~compaction`, the session's
   `Compaction_settings`).
+- `Compaction_eval` — a developer's tool for tuning the two tiers with
+  data (`prigh compaction-eval SESSION... | -all`, left out of the main
+  help: `main.ml` dispatches it before `Command_unix.run`). It replays a
+  saved session's recorded conversation (the messages of its active path,
+  not its compacted context) request by request, one request per
+  assistant message, under each strategy (`none`, `mask`, `summarise`,
+  `mask+summarise`), masking and summarising before each request as the
+  agent would, with the window, the summarising threshold and the masking
+  parameters as flags (`Observation_mask`'s `?min_bytes`,
+  `Compaction_settings.worth_masking_at`'s `?at`/`?min_saving`, fractions
+  of the threshold). The threshold defaults to the agent's
+  (`Compaction_settings.threshold`, with `config.json`'s
+  `compact_at_tokens` or `-compact-at`), a request over the window is
+  masked as after an overflow, and with `-live` the `compaction_model`
+  (or `-compaction-model`) writes the summaries when its window holds the
+  threshold. Offline (the default, no
+  network) a summary is a stub: the pinned messages, a placeholder of
+  `-summary-tokens` and the `Compaction_files` list. It reports per
+  strategy the peak request, requests over the window, the input sent
+  (the cost without a cache), what each request does not share with the
+  one before (the cost with one; `cached$` prices both as Anthropic's
+  cache does), the requests that invalidate the cache, mask batches and
+  compactions, and probes of the final context: the user's own messages
+  (verbatim, shortened, total), the files read and modified that it
+  mentions, and the error results whose first line it still has; then
+  the sum over the sessions; `-sexp`/`-json` for machines. `-live` has a
+  model (each session's, or `-model`; the compaction model, if any, for the
+  summaries) write the summaries
+  (`Compaction.compact_messages ~unmasked`) and answer questions about
+  each final context (the files modified, the user's constraints, the
+  last error), graded against the session, and reports what it cost;
+  tests run it only on `Faux_provider`. Tokens are estimated as
+  `Message.estimate_tokens` does; each request also counts the system
+  prompt and `-overhead-tokens` (default: the built-in tools' specs).
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
   `git diff` against `HEAD` (or a base's merge base) plus untracked files
   as new ones, optionally one path, cut at 1 MB, in the session cwd's

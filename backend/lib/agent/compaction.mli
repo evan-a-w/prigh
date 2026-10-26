@@ -7,6 +7,11 @@ open! Import
 
 val render_transcript : Message.t list -> string
 
+(** Whether a message is a user message the user wrote, rather than one the
+    harness wrote in their place (a summary, reminder, goal, report of
+    background work...). *)
+val is_users_own : Message.t -> bool
+
 (** How much of the conversation's end is kept verbatim by default. *)
 val default_keep_recent_tokens : int
 
@@ -74,7 +79,9 @@ val plan : keep_recent_tokens:int -> Message.t list -> Plan.t option
     transcript goes in a request of its own instead. The files the
     summarised tool calls read and modified (and the earlier summary's) are
     appended to the summary ({!Compaction_files}), relative ones resolved
-    against [cwd]. *)
+    against [cwd]; they come from [unmasked], when given: the messages as
+    they were before {!Observation_mask} (a masked [apply_patch] has lost its
+    paths). *)
 val compact_messages
   :  provider:Provider.t
   -> model:Model.t
@@ -84,6 +91,7 @@ val compact_messages
   -> ?cancel:Cancellation.t
   -> ?cwd:string
   -> ?instructions:string
+  -> ?unmasked:Message.t list
   -> Message.t list
   -> (Message.t list * Outcome.t) Or_error.t
 

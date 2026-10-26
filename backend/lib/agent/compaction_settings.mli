@@ -45,6 +45,18 @@ val worth_masking
   -> Observation_mask.Plan.t
   -> bool
 
+(** {!worth_masking} against [threshold], with [at] (default 5/8) and
+    [min_saving] (default 1/8) its fractions, to tune them
+    ({!Compaction_eval}). *)
+val worth_masking_at
+  :  ?at:float
+  -> ?min_saving:float
+  -> threshold:int
+  -> input_tokens:int
+  -> overflowed:bool
+  -> Observation_mask.Plan.t
+  -> bool
+
 (** The model that summarises a conversation held by [model]: [t.model] when
     its window holds what is summarised (up to [model]'s threshold), else
     [model]. *)
