@@ -589,7 +589,8 @@ let%expect_test "manual compaction" =
     {|
     (Error "nothing to compact: conversation is short")
     (Ok "SUMMARY OF OLD STUFF")
-    ( "user: Summary of the conversation so far:\
+    ("user: old question"
+      "user: Summary of the conversation so far:\
      \nSUMMARY O" "user: recent question" "assistant: recent reply")
     state: running=true messages=0
     user: old question
@@ -600,21 +601,28 @@ let%expect_test "manual compaction" =
     assistant: recent reply
     state: running=false messages=4
     compacted: SUMMARY OF OLD STUFF
-    state: running=false messages=3
-    state: running=true messages=3
+    state: running=false messages=4
+    state: running=true messages=4
     user: next
     assistant: after
-    state: running=false messages=5
+    state: running=false messages=6
     |}]
 ;;
 
 let%expect_test "compaction instructions reach the summariser" =
   let long = String.make 40_000 'x' in
   let on_request (r : Provider.Request.t) =
-    match r.system with
-    | Some system when String.is_prefix system ~prefix:"Summarise" ->
-      (* The default instructions, then the user's. *)
-      print_endline (List.last_exn (String.split_lines system))
+    match List.last r.messages with
+    | Some (User { text; _ })
+      when String.is_prefix text ~prefix:"[prigh: compaction]" ->
+      (* The session's own request, ending with the default instructions,
+         then the user's. *)
+      printf
+        "system prompt: %b, tools: %b, cache key is the session's: %b\n"
+        (Option.is_some r.system)
+        (not (List.is_empty r.tools))
+        (Option.is_some r.cache_key);
+      print_endline (List.last_exn (String.split_lines text))
     | _ -> ()
   in
   with_agent
@@ -631,6 +639,7 @@ let%expect_test "compaction instructions reach the summariser" =
        : string Or_error.t)];
   [%expect
     {|
+    system prompt: true, tools: true, cache key is the session's: true
     The user's instructions for this summary: keep the file names
     (Ok SUMMARY)
     |}]

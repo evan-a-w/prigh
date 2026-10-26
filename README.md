@@ -1518,9 +1518,18 @@ too long anyway (Anthropic's "prompt is too long", OpenAI's
 OpenAI-compatible servers), the conversation is compacted and the request
 sent again, keeping less the second time; only then does the run fail,
 saying what to do. A compaction keeps the end of the conversation from a
-turn boundary, so tool calls keep their results, and when it falls in the
-middle of the work on your latest message, that message is kept verbatim
-ahead of the summary. Subagents compact their own context the same way.
+turn boundary, so tool calls keep their results, and carries your
+instructions over: when it falls in the middle of the work on your latest
+message, that message is kept verbatim ahead of the summary, and your
+earlier messages are too, long ones cut to their first 2000 characters,
+the newest first up to about 6k tokens. The summary has fixed sections
+(goal and constraints, decisions, failed approaches with their exact
+errors, files, current state, next steps), updates the previous one rather
+than summarising it again, and ends with the files read and modified,
+recorded from the tool calls. It is written by the model from the
+conversation as it is, in a request that shares the session's prompt
+cache; a conversation too long for that is sent as a shortened transcript
+instead. Subagents compact their own context the same way.
 
 `/budget DOLLARS` sets a cost budget for the session (`/budget off` removes
 it, `/budget` shows it): once the session has cost that much — subagents and

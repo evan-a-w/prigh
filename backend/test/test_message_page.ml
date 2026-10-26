@@ -203,7 +203,11 @@ let%expect_test "a compaction's summary starts a page with its pinned message" =
   let (_ : string) = append t (assistant "old reply") in
   let kept = append t (user "kept") ~label:"kept" in
   let (_ : Session.Entry.t) =
-    Session.append_compaction t ~pinned ~summary:"it went well" ~kept_from:kept
+    Session.append_compaction
+      t
+      ~pinned:[ { id = pinned; shortened = false } ]
+      ~summary:"it went well"
+      ~kept_from:kept
   in
   let (_ : string) = append t (assistant "after") ~label:"after" in
   let before = page t ~limit:2 in

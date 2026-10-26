@@ -30,7 +30,11 @@ module Entry = struct
       | Compaction of
           { summary : string
           ; kept_from : string
-          ; pinned : string option [@jsonaf.option] [@sexp.option]
+          ; pinned : Pinned_messages.t
+                [@jsonaf.default []]
+                [@jsonaf_drop_default.equal]
+                [@sexp.default []]
+                [@sexp_drop_default.equal]
           }
       | Name of { name : string }
       | Description of { text : string }
@@ -588,7 +592,7 @@ let description t =
     | Review _ -> None)
 ;;
 
-let append_compaction ?pinned t ~summary ~kept_from =
+let append_compaction ?(pinned = []) t ~summary ~kept_from =
   append t (Compaction { summary; kept_from; pinned })
 ;;
 
@@ -636,13 +640,15 @@ let summary_message summary =
     (summary_prefix ^ summary)
 ;;
 
-let is_summary_message : Message.t -> bool = function
-  | User { text; _ } -> String.is_prefix text ~prefix:summary_prefix
-  | Assistant _ | Tool_result _ -> false
+let summary_of_message : Message.t -> string option = function
+  | User { text; _ } -> String.chop_prefix text ~prefix:summary_prefix
+  | Assistant _ | Tool_result _ -> None
 ;;
 
+let is_summary_message m = Option.is_some (summary_of_message m)
+
 (* The messages of the next request, each with the id of its entry (none for
-   a compaction's summary): after a compaction, its pinned message, the
+   a compaction's summary): after a compaction, its pinned messages, the
    summary, then the path from [kept_from]. *)
 let context t =
   let path = active_path t in
@@ -706,9 +712,16 @@ let context t =
       List.drop_while path ~f:(fun e -> not (String.equal e.id kept_from))
     in
     let pinned =
-      Option.bind pinned ~f:(Hashtbl.find t.by_id) |> Option.to_list
+      List.filter_map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
+        match Hashtbl.find t.by_id pin.id with
+        | Some ({ payload = Message message; _ } as e) ->
+          let message =
+            if pin.shortened then Pinned_messages.shorten message else message
+          in
+          Some (Some e.id, { Timed_message.message; at = e.at })
+        | Some _ | None -> None)
     in
-    messages pinned
+    pinned
     @ [ None, { Timed_message.message = summary_message summary; at = None } ]
     @ messages kept
 ;;
@@ -885,7 +898,9 @@ let fork ?at t ~dir =
                 (Compaction
                    { summary
                    ; kept_from = renamed kept_from
-                   ; pinned = Option.map pinned ~f:renamed
+                   ; pinned =
+                       List.map pinned ~f:(fun pin ->
+                         { pin with id = renamed pin.id })
                    })
             | Review
                 (Snapshot
