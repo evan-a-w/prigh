@@ -130,6 +130,46 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   max-width: 72ch;
 }
 .msg.user .time { grid-column: 2; }
+
+/* "Trim everything before this": a tab on the message's top edge, where the
+   cut would be, shown with the message on hover or focus. */
+.entries > .msg.user, .entries > .msg.noted > .msg.user { position: relative; }
+.trim-before {
+  position: absolute;
+  top: 0;
+  right: 14px;
+  transform: translateY(-55%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 10px 2px 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: var(--slate-2);
+  color: var(--muted);
+  font: 12px/1.5 var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease-out, visibility 0.12s;
+}
+.trim-before > .scissors { color: var(--sodium); font-size: 13px; line-height: 1; }
+.msg.user:hover > .trim-before,
+.msg.user:focus-within > .trim-before { opacity: 1; visibility: visible; }
+.trim-before:hover { color: var(--fg); border-color: var(--sodium-line); }
+.trim-before:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+/* Where it would cut. */
+.msg.user:has(> .trim-before:is(:hover, :focus-visible))::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: 0;
+  top: -1px;
+  border-top: 1px dashed var(--sodium);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) { .trim-before { transition: none; } }
 .msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 
 /* A subagent's task is a prompt too, but not the user's. */

@@ -9,7 +9,8 @@
 # /worktree in a git repository, then review.mjs, the review page and the
 # file browser's diffs and comments, then remote.mjs, the page `prigh web
 # -connect` serves for a backend elsewhere, then steer.mjs, steering a
-# background subagent from the composer) in each
+# background subagent from the composer, then trim.mjs, trimming the
+# context before a message and undoing it) in each
 # browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected). The scripts all run at once (JOBS at a time, default:
 # the number of CPUs), each with its own backend, browser and directory;
@@ -41,7 +42,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote steer"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote steer trim"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

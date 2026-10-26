@@ -1021,8 +1021,8 @@ steps 1 to 40 (40)
 not loaded: 0
 the one in view: Step 3
 === firefox: paging: jump: the list ===
-Step 40: look at module 40. | 40 of 40 <TIME>
-Step 17: look at module 17. | 17 of 40 <TIME>
+Step 40: look at module 40. | 40 of 40 <TIME> | Trim before
+Step 17: look at module 17. | 17 of 40 <TIME> | Trim before
 step 17 at the top
 === firefox: paging: jump: on a phone ===
 marks: 0
@@ -1898,4 +1898,34 @@ in the editor: /agents steer a1 one more thing
 === firefox: steer: the main agent got the report ===
 The survey is in.
 === firefox: steer: errors ===
+none
+=== firefox: trim: opened ===
+steps: 1 2 3 4 5
+actions: 4
+opacity before hover: 0
+on hover: ✂
+Trim everything before this
+=== firefox: trim: confirmation ===
+Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+after Esc, steps: 1 2 3 4 5; divider: 0
+=== firefox: trim: trimmed ===
+divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
+steps: 3 4 5
+actions: 2
+divider in view: true
+toast: Trimmed 4 messages (~196 tokens) from the context: Undo on the divider at the top (or /trim undo) brings them back
+=== firefox: trim: rail ===
+trimmed "Not in the model's context, 4 messages trimmed · ~196 tokens, <TIME>" | user "Your message 1, Step 3: look at module 3., <TIME>" | user "Your message 2, Step 4: look at module 4., <TIME>" | user "Your message 3, Step 5: look at module 5., <TIME>"
+tooltip: Not in the model's context | 4 messages trimmed · ~196 tokens | <TIME>
+=== firefox: trim: shown ===
+head: Not in the model's context | Kept in the transcript only; the model no longer sees them.
+trimmed: Step 1, Step 2
+actions on them: 0
+dimmed: true
+divider: ✂ | 4 messages trimmed · ~196 tokens | Hide | · | Undo
+hidden again
+=== firefox: trim: undone ===
+steps: 1 2 3 4 5
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>" | user "Your message 4, Step 4: look at module 4., <TIME>" | user "Your message 5, Step 5: look at module 5., <TIME>"
+=== firefox: trim: errors ===
 none

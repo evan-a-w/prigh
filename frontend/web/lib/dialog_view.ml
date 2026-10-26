@@ -24,6 +24,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Reminders -> "Reminders"
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
+  | Trim _ -> "Messages"
   | Worktrees _ -> "Worktrees"
   | Themes -> "Themes"
   | Accents -> "Colours"
@@ -40,7 +41,22 @@ let mcp_problems : Dialog.Picker_kind.t -> Node.t = function
   | _ -> Node.none
 ;;
 
-let picker ~kind (p : Picker.t) ~inject =
+(* The jump list's messages that the context can be trimmed before, by
+   item id. *)
+let trimmable (m : App.Model.t) =
+  let paging = m.paging in
+  Jump.points
+    m.jump
+    ~path:(Option.map m.state ~f:(fun s -> s.session_path))
+    ~paging
+    ~trim:(Option.bind m.state ~f:(fun s -> s.trim))
+    m.chat
+  |> List.filter ~f:(Jump.trimmable ~paging m.chat)
+  |> List.map ~f:(fun (p : Jump.Point.t) -> Jump.Target.to_string p.target)
+  |> String.Set.of_list
+;;
+
+let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
   let visible = Picker.visible p in
   Modal.view
     ~cls:
@@ -58,6 +74,9 @@ let picker ~kind (p : Picker.t) ~inject =
            | Worktrees _ ->
              "Enter works there, Alt+Enter in a new session, Alt+R reviews, \
               Delete removes, Esc closes"
+           | Jump ->
+             "↑↓ to move, Enter to jump, Delete to trim the context before, \
+              Esc to close"
            | _ -> "↑↓ to move, Enter to choose, Esc to close")
       ]
     [ div
@@ -161,6 +180,21 @@ let picker ~kind (p : Picker.t) ~inject =
                             ])
                        [ Node.text "Remove" ]
                    ]
+                 | Jump when Set.mem trimmable item.id ->
+                   (match Jump.Target.of_string item.id with
+                    | Some target ->
+                      [ button
+                          ~cls:"small picker-trim"
+                          ~title:"Trim everything before this (Delete)"
+                          ~label:("Trim the context before " ^ item.label)
+                          ~on_click:
+                            (Effect.Many
+                               [ Effect.Stop_propagation
+                               ; inject (Action.Ask_trim target)
+                               ])
+                          [ Node.text "Trim before" ]
+                      ]
+                    | None -> [])
                  | _ -> []))))
     ; mcp_problems kind
     ]
@@ -586,6 +620,8 @@ let dialog (m : App.Model.t) ~inject =
     Account_view.menu m p ~inject
   | Some (Picker { kind = Menu menu; picker = p }) ->
     Context_menu_view.view m menu p ~inject
+  | Some (Picker { kind = Jump; picker = p }) ->
+    picker ~trimmable:(trimmable m) ~kind:Jump p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some (Review_pick _) -> Chip_popover_view.backdrop ~inject
