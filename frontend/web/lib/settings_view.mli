@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** The settings page ([Dialog.Settings], the top bar's gear, [/settings]):
+(** The settings page ([Dialog.Settings], the sidebar's gear or the bar's, [/settings]):
     notifications and the transcript's detail in this browser, tool
     confirmation and the providers on the backend, the git hosts, and the
     account. Each

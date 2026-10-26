@@ -549,11 +549,11 @@ let%expect_test "outside a repository the create dialog says what to do" =
 ;;
 
 let%expect_test
-    "the top bar's branch opens the list; switching session closes it and \
+    "the session card's branch opens the list; switching session closes it and \
      ignores its answers"
   =
   let h = H.create () in
-  H.click h ~selector:".topbar .branch";
+  H.click h ~selector:".session-card .branch";
   [%expect
     {|
     (Run /pr)

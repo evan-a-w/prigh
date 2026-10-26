@@ -300,6 +300,7 @@ let checkout ~env ~cancel ~(runner : Runner.t) ~cwd ~remote ~number ~dir =
         ~dir
         ~branch
         ~base:(if existed then None else Some fetched)
+        ()
       |> or_fail
     in
     if existed then fast_forward created.worktree.path;

@@ -166,7 +166,9 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model
+    Ctrl+L switch model: the model chip's menu
+    ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models
+    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
@@ -1646,7 +1648,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (tag (Worktrees (place  "b1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    (A alice acting as bob) (Commands and keys (/help))
+    (A alice acting as bob) (Settings (Ctrl+, or /settings))
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};
@@ -1665,9 +1667,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1718,9 +1720,9 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open history
-         web.migrated web.sidebar-width web.files-width web.files-split
-         web.agents-width web.terminal-height))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded history web.migrated web.sidebar-width
+         web.files-width web.files-split web.agents-width web.terminal-height))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

@@ -70,7 +70,6 @@ module Icon = struct
     | Brain
     | Folder
     | Branch
-    | Cpu
     | Logout
     | Undo
     | External
@@ -102,6 +101,8 @@ module Icon = struct
     | Next
     | Ring
     | Toc
+    | Repo
+    | Branch_plus
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -126,8 +127,6 @@ module Icon = struct
       {|<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>|}
     | Branch ->
       {|<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>|}
-    | Cpu ->
-      {|<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>|}
     | Logout ->
       {|<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>|}
     | Undo -> {|<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>|}
@@ -179,6 +178,10 @@ module Icon = struct
     | Next -> {|<path d="m10 7 5 5-5 5"/>|}
     | Ring -> {|<circle cx="12" cy="12" r="4.5"/>|}
     | Toc -> {|<path d="M10 6h10M10 12h10M10 18h10M4 6h2M4 12h2M4 18h2"/>|}
+    | Repo ->
+      {|<path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"/><circle cx="13" cy="12" r="2"/><path d="M18 19c-2.8 0-5-2.2-5-5v8"/><circle cx="20" cy="19" r="2"/>|}
+    | Branch_plus ->
+      {|<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M15 6a9 9 0 0 0-9 9M18 15v6M21 18h-6"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -243,4 +246,15 @@ let caret (ev : Dom_html.event Js.t) =
               (Js.to_string i##.value)
               ~utf16:i##.selectionStart)
        | _ -> None)
+;;
+
+let rec inert (node : Node.t) : Node.t =
+  match node with
+  | Element e ->
+    Element
+      (Node.Element.map_attrs e ~f:(fun a ->
+         Attr.many [ a; Attr.create "inert" "" ]))
+  | Lazy { key; t } -> Lazy { key; t = lazy (inert (Lazy.force t)) }
+  | Fragment nodes -> Fragment (List.map nodes ~f:inert)
+  | (None | Text _ | Widget _) as node -> node
 ;;

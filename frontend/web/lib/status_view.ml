@@ -13,7 +13,7 @@ let tokens n =
   else Int.to_string n
 ;;
 
-(* What a narrow top bar leaves to the icon beside it. *)
+(* What a narrow bar leaves to the icon beside it. *)
 let text_ text = span ~cls:"status-text" text
 
 let item ?(cls = "") ?title ?(attrs = []) children =
@@ -179,15 +179,37 @@ let transfers (m : App.Model.t) =
     item ~cls:"transfers" ~title:text [ Html.lamp (); Node.text text ]
 ;;
 
-let host (state : State.t) =
-  if String.equal state.active_host Host.backend_id
-  then Node.none
-  else (
-    let name =
-      List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
-      |> Option.value_map ~default:state.active_host ~f:(fun h -> h.name)
-    in
-    item ~cls:"host" ~title:"Tools run here" [ icon Server; text_ name ])
+let host (m : App.Model.t) ~always ~inject =
+  match m.state with
+  | None -> Node.none
+  | Some state
+    when (not always) && String.equal state.active_host Host.backend_id ->
+    Node.none
+  | Some state ->
+    (match
+       List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
+     with
+     | Some h ->
+       chip
+         ~cls:"host"
+         ~title:(sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd)
+         ~command:"/host"
+         ~inject
+         [ icon Server; text_ h.name ]
+     | None when String.equal state.active_host Host.backend_id ->
+       chip
+         ~cls:"host"
+         ~title:"Tools run on the backend (/host switches)"
+         ~command:"/host"
+         ~inject
+         [ icon Server; text_ "backend" ]
+     | None ->
+       chip
+         ~cls:"host warm"
+         ~title:"No host runs the tools: /host picks one"
+         ~command:"/host"
+         ~inject
+         [ icon Server; text_ "No host" ])
 ;;
 
 (* Settings that change what you see, and the model's plan; the approval
@@ -291,7 +313,7 @@ let view (m : App.Model.t) ~inject =
       ]
 ;;
 
-let extras (m : App.Model.t) ~inject =
+let extras (m : App.Model.t) ~host:with_host ~inject =
   match m.state, m.connection with
   | Some state, Connected ->
     let queued = Queued.count m.queue in
@@ -313,7 +335,7 @@ let extras (m : App.Model.t) ~inject =
          else Node.none)
       ; background m ~inject
       ; transfers m
-      ; host state
+      ; (if with_host then host m ~always:false ~inject else Node.none)
       ; Node.fragment (modes m ~inject)
       ]
   | _ -> div ~cls:"status-extras" []

@@ -204,6 +204,10 @@ let common_params =
       let subagent =
         Tool_subagent.create
           ~models
+          ~worktrees_dir:(fun () ->
+            match !agent_ref with
+            | Some agent -> (Agent.config agent).worktrees_dir
+            | None -> Config.default.worktrees_dir)
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)

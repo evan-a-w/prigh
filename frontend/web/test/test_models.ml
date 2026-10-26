@@ -6,12 +6,16 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".composer-controls";
-  [%expect {| (Claude Opus 5.5) (Thinking on) (Auto: never asks) |}];
-  H.key h "l" ~ctrl:true;
+  [%expect
+    {|
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
+    |}];
+  H.act h (Run "/model");
   H.text h ~selector:".modal";
   [%expect
     {|
-    Open_model_picker
     (Focus picker-input)
     Switch model
     (Close (Esc))
@@ -52,7 +56,7 @@ let%expect_test
   H.text h ~selector:".modal";
   [%expect {| |}];
   (* Esc closes without switching. *)
-  H.act h Open_model_picker;
+  H.act h (Run "/model");
   H.key h "Escape" ~target:Field;
   [%expect
     {|
@@ -61,7 +65,7 @@ let%expect_test
     (Focus editor)
     |}];
   (* Clicking an item chooses it. *)
-  H.act h Open_model_picker;
+  H.act h (Run "/model");
   H.act h (Picker_choose "deepseek/deepseek-chat");
   [%expect
     {|
@@ -71,7 +75,7 @@ let%expect_test
      (tag Model_set))
     (Expire_toast (id 1) (after_ms 4620))
     |}];
-  H.act h Open_model_picker;
+  H.act h (Run "/model");
   H.act h (Picker_query "zz");
   H.text h ~selector:".picker-empty";
   [%expect
@@ -118,7 +122,7 @@ let%expect_test "/model with a name switches, or says what matches" =
 
 let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   let h = H.create () in
-  H.act h Open_thinking_picker;
+  H.act h (Run "/thinking");
   H.text h ~selector:".picker-items";
   [%expect
     {|
@@ -164,7 +168,12 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
           ~fields:[ "model", deepseek; "thinking", `String "off" ]
           ()));
   H.text h ~selector:".composer-controls";
-  [%expect {| (DeepSeek Chat) (No thinking) (Auto: never asks) |}];
+  [%expect
+    {|
+    (DeepSeek Chat)
+    (No thinking)
+    (Auto: never asks)
+    |}];
   H.type_ h "/thinking high";
   H.act h Send;
   H.text h ~selector:".toast.error";
@@ -218,6 +227,7 @@ let%expect_test
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
   H.text h ~selector:".status";
   H.text h ~selector:".status-extras";
+  H.text h ~selector:".card-where";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -227,7 +237,8 @@ let%expect_test
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
     (75%) ↑123k ↓7.9k $1.2345 Working
-    (3 queued) laptop
+    (3 queued)
+    (laptop) (main)
     |}];
   H.show h ~selector:".context";
   [%expect

@@ -174,7 +174,8 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
     then (
       t.runs <- t.runs + 1;
       write t (Run { run = t.runs }))
-  | Subagent_start { call_id; agent_id; task; model; tools = _ } ->
+  | Subagent_start { call_id; agent_id; task; model; tools = _; worktree = _ }
+    ->
     start t ~id:agent_id ~call_id ~parent ~task ~model ~at:now;
     write
       t

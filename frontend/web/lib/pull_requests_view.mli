@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** The pull request dialogs: the list ([/pr], the top bar's branch), one
+(** The pull request dialogs: the list ([/pr], the session card's branch), one
     pull request with its checks and diff, the create form ([/pr new]) and
     the offer to work in a checked-out pull request. *)
 

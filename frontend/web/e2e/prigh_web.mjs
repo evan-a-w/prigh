@@ -145,16 +145,26 @@ const browser = await engine.launch({
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
 // [window.__delay] holds back what the backend says by that many ms, so that
-// what the page shows while it waits can be seen.
+// what the page shows while it waits can be seen. Messages keep their order:
+// those that come after the delay is lifted wait for the held ones.
 await page.addInitScript(() => {
   const Real = window.WebSocket;
   window.__delay = 0;
   window.WebSocket = class extends Real {
     set onmessage(f) {
+      const held = [];
+      let timer = null;
+      const pump = () => {
+        timer = null;
+        while (held.length && held[0].at <= Date.now()) f(held.shift().e);
+        if (held.length) timer = setTimeout(pump, held[0].at - Date.now());
+      };
       super.onmessage = e => {
         const delay = window.__delay;
-        if (delay) setTimeout(() => f(e), delay);
-        else f(e);
+        if (!delay && !held.length) return f(e);
+        const last = held.length ? held[held.length - 1].at : 0;
+        held.push({ e, at: Math.max(Date.now() + delay, last) });
+        if (!timer) pump();
       };
     }
     get onmessage() { return super.onmessage; }
@@ -171,7 +181,11 @@ page.on("console", message => {
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
+// The session's card shows the cwd's last directory apart (a line of its
+// own in innerText).
+const cwdApart = `${cwd.slice(0, cwd.lastIndexOf("/"))}\n${cwd.slice(cwd.lastIndexOf("/"))}`;
 const clean = text => text
+  .replaceAll(cwdApart, "<CWD>")
   .replaceAll(cwd, "<CWD>")
   .replace(/[0-9a-f]{16}/g, "<ID>")
   .replace(/ws:\/\/127\.0\.0\.1:\d+/g, "ws://127.0.0.1:<PORT>")
@@ -210,15 +224,15 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".topbar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+    [...document.querySelectorAll(":is(.session-card, .session-bar) :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
-// The top bar's text, with each select showing its chosen option.
-const showHeader = async label => {
+// The session's card (or bar), with each select showing its chosen option.
+const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll("header *")]
+    [...document.querySelectorAll(":is(.session-card, .session-bar) *")]
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
         || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
@@ -274,13 +288,23 @@ const layoutProblems = selector => page.evaluate(selector => {
   const name = e => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
   const problems = [];
   const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open"));
+  // A box without one of its own (display: contents) lays its children out
+  // in its parent's.
+  const contents = e => getComputedStyle(e).display === "contents";
+  const boxParent = e => {
+    let p = e.parentElement;
+    while (p !== root && contents(p)) p = p.parentElement;
+    return p;
+  };
+  const boxKids = e => [...e.children].flatMap(k => (contents(k) ? boxKids(k) : [k]));
   for (const e of all) {
     const r = e.getBoundingClientRect();
     if (e !== root) {
-      const p = e.parentElement.getBoundingClientRect();
-      if (r.left < p.left - 0.5 || r.right > p.right + 0.5) problems.push(`${name(e)} sticks out of ${name(e.parentElement)}`);
+      const parent = boxParent(e);
+      const p = parent.getBoundingClientRect();
+      if (r.left < p.left - 0.5 || r.right > p.right + 0.5) problems.push(`${name(e)} sticks out of ${name(parent)}`);
     }
-    const kids = [...e.children].filter(k => all.includes(k));
+    const kids = boxKids(e).filter(k => all.includes(k));
     for (let i = 0; i < kids.length; i++)
       for (let j = i + 1; j < kids.length; j++) {
         const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
@@ -299,12 +323,27 @@ const layoutProblems = selector => page.evaluate(selector => {
 // The composer's chips as shown: each chip's text, or "icon" for an icon
 // alone.
 const controlsShown = () => page.evaluate(() => {
-  return [...document.querySelectorAll(".composer-controls > .chip-button")].map(chip => {
+  return [...document.querySelectorAll(".composer-controls .chip-button")].map(chip => {
     const after = getComputedStyle(chip, "::after");
     const extra = after.display !== "none" && after.content.startsWith('"') ? after.content.slice(1, -1) : "";
     const text = (chip.innerText.trim().replace(/\s+/g, " ") + " " + extra).trim();
     return text || "icon";
   }).join(", ");
+});
+
+// Where a chip's menu stands: above the composer's box or below its chip,
+// at the chip's left edge (or as wide as the box), inside the window.
+const popoverPlace = () => page.evaluate(() => {
+  const menu = document.querySelector("#chip-popover");
+  const r = menu.getBoundingClientRect();
+  const chip = menu.parentNode.querySelector(".chip-button").getBoundingClientRect();
+  const box = document.querySelector(".composer-box").getBoundingClientRect();
+  const near = (a, b) => Math.abs(a - b) <= 4;
+  const where = r.bottom <= box.top ? "above the composer" : r.top >= chip.bottom ? "below the chip" : "over the composer";
+  const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? "shifted inside the composer" : "out of line";
+  const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+  return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
 
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
@@ -394,7 +433,7 @@ try {
   await page.locator(".chat .empty").waitFor();
   await show("signed in: sidebar", ".sidebar");
   await show("signed in: chat", ".chat");
-  await showHeader("signed in: top bar");
+  await showSession("signed in: the session's card");
 
   // A dialog owns the keyboard: Tab and Shift+Tab go round it, and Esc gives
   // the focus back to the editor. A refused command stays in the editor.
@@ -559,7 +598,7 @@ try {
   await idle();
   await page.locator(".tool").first().waitFor();
   await showTurn("bash run");
-  await showHeader("top bar after a run");
+  await showSession("the session's card after a run");
 
   // A budget shows in the status line as spend against it.
   await send("/budget 5");
@@ -872,17 +911,56 @@ try {
   await bodyLacks("Connection lost");
   // The thinking level and the mode sit beside the model, each a picker.
   await show("the model, thinking and mode controls", ".composer-controls");
-  await page.locator(".thinking-chip").click();
-  await page.locator(".modal .picker-item", { hasText: "high" }).waitFor();
-  await page.waitForTimeout(300); // its fade in
-  await show("the thinking picker", ".modal");
-  await page.locator(".modal .picker-item", { hasText: "high" }).click();
-  await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
-  await page.locator(".mode-chip").click();
+  // Where tools run, in the session's card, opens the host picker.
+  await page.locator(".session-card .host").click();
   await page.locator(".modal .picker-item").first().waitFor();
   await page.waitForTimeout(300); // its fade in
-  await show("the mode picker", ".modal");
-  await page.locator(".modal .picker-item", { hasText: "Asks: edits & commands" }).click();
+  await show("the host picker, from the session's card", ".modal");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".modal", { state: "detached" });
+  // Quiet until pointed at: then lit, with a chevron.
+  await page.locator(".thinking-chip").hover();
+  await page.waitForTimeout(300);
+  await screenshot("a chip pointed at");
+  // A chip opens a menu standing on it, not a dialog: above the composer's
+  // box, from the chip's left edge, inside the window, the keyboard in it.
+  await page.locator(".thinking-chip").click();
+  await page.locator("#chip-popover .popover-item", { hasText: "high" }).waitFor();
+  await page.waitForTimeout(300); // its rise
+  await show("the thinking chip's menu", "#chip-popover");
+  console.log(await popoverPlace());
+  await page.locator("#chip-popover .popover-item", { hasText: "high" }).click();
+  await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
+  console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
+  // The model's: a filter, the models under their providers.
+  await page.keyboard.press("Control+l");
+  await page.locator("#chip-popover[data-chip=model]").waitFor();
+  await page.waitForTimeout(300);
+  console.log(await popoverPlace());
+  await screenshot("the model chip's menu");
+  await page.keyboard.type("v4.1 flash");
+  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .popover-item").length === 1);
+  await show("the model chip's menu, filtered", "#chip-popover .popover-items");
+  // Esc closes it unchanged; ← → go along the chips.
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
+  await page.locator(".model-chip").click();
+  await page.locator("#chip-popover[data-chip=model]").waitFor();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("ArrowRight");
+  await page.locator("#chip-popover[data-chip=thinking]").waitFor();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("ArrowRight");
+  await page.locator("#chip-popover[data-chip=mode]").waitFor();
+  await page.waitForTimeout(300); // its rise
+  await show("the mode chip's menu, from the model's with → →", "#chip-popover");
+  console.log(await popoverPlace());
+  // A click beside it closes it.
+  await page.mouse.click(700, 200);
+  await page.waitForSelector("#chip-popover", { state: "detached" });
+  await page.locator(".mode-chip").click();
+  await page.locator("#chip-popover .popover-item").first().waitFor();
+  await page.locator("#chip-popover .popover-item", { hasText: "Asks: edits & commands" }).click();
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
   await page.locator(".mode-chip:not(.awaiting)", { hasText: "Asks: edits & commands" }).waitFor();
   await show("mode ask", ".composer-controls");
@@ -959,6 +1037,15 @@ try {
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
+  // A chip's menu is as wide as the composer's box there.
+  await page.locator(".thinking-chip").click();
+  await page.locator("#chip-popover").waitFor();
+  await page.waitForTimeout(300);
+  section("phone: a chip's menu");
+  console.log(await popoverPlace());
+  await screenshot("phone: a chip's menu");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
@@ -1039,7 +1126,11 @@ try {
   await page.waitForTimeout(300); // its fade in
   await show("/cd: the directory popup", ".popup");
   await composer().press("Control+Enter");
-  await page.waitForFunction(c => document.querySelector(".topbar .where")?.title === c, cwd);
+  // Its row names the directory unless it is its project's own (no subdirectory).
+  await page.waitForFunction(c => {
+    const where = document.querySelector(".session.selected .session-cwd");
+    return where ? where.title === c : document.querySelector(".session.selected") !== null;
+  }, cwd);
   await page.keyboard.press("Control+Shift+F");
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();
@@ -1286,10 +1377,11 @@ try {
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
 
-  // 15. The top bar and the composer fit the chat column, however wide the
-  //     panels around it make it: the composer's chips take shorter labels,
-  //     the status in the top bar drops its counters, then its words; the
-  //     title keeps some room. Nothing overlaps or is cut off.
+  // 15. The session's card (or, without the sidebar, its bar) and the
+  //     composer fit, however wide the panels around the chat make it: the
+  //     composer's chips take shorter labels, the bar's status drops its
+  //     counters, then its words; the title keeps some room. Nothing
+  //     overlaps or is cut off.
   const chatWidth = () => width(".main");
   // Drags the file browser's edge until the chat column is [target] wide.
   const chatAt = async target => {
@@ -1299,24 +1391,39 @@ try {
   const showTopBar = async label => {
     section(label);
     const where = await page.evaluate(() => {
+      const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(".topbar :is(.status, .status-extras) > .status-item")]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-where) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
-      return { title: Math.round(r(".topbar .title").width), status: status.join(", "), height: Math.round(r(".topbar").height) };
+      const title = document.querySelector(`${at} .session-name > span`);
+      const titleFits = !title ? "none" : title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
+      return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; status: ${clean(where.status)}; title at least 100px: ${where.title >= 100}; top bar ${where.height}px high`);
-    for (const s of [".topbar", ".composer"]) {
+    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
+    for (const s of [".session-card, .session-bar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
+    // With the card, the panels' toggles float in the chat's top right
+    // corner, clear of the jump list's button.
+    const tools = await page.evaluate(() => {
+      const t = document.querySelector(".chat-tools");
+      if (!t) return null;
+      const r = t.getBoundingClientRect(), main = document.querySelector(".main").getBoundingClientRect();
+      const list = document.querySelector(".jump-list")?.getBoundingClientRect();
+      const clear = !list || list.top >= r.bottom || list.right <= r.left;
+      const open = [...t.querySelectorAll(".btn.open")].map(b => b.getAttribute("aria-label"));
+      return `${t.querySelectorAll(".btn").length} buttons ${Math.round(r.top - main.top)}px from the top, ${Math.round(main.right - r.right)}px from the right, clear of the jump list: ${clear}, open: ${open.join(", ") || "none"}`;
+    });
+    if (tools) console.log(`the panels' toggles: ${tools}`);
     await screenshot(label);
   };
   await page.keyboard.press("Control+Shift+F");
   await page.locator(".files-panel").waitFor();
   for (const target of [700, 520, 400]) {
     await chatAt(target);
-    await showTopBar(`top bar: a ${target}px chat column`);
+    await showTopBar(`the session: a ${target}px chat column`);
   }
   // The settings page, from the gear: Esc closes it, a choice keeps it.
   await page.locator(".settings-toggle").click();
@@ -1331,11 +1438,13 @@ try {
   await page.waitForSelector(".settings-dialog", { state: "detached" });
   await page.waitForFunction(() => document.activeElement?.id === "editor", null, { timeout: 2000 }).catch(() => {});
   console.log(`Esc closes it, the editor has the focus: ${await page.evaluate(() => document.activeElement?.id === "editor")}`);
-  // Without the sidebar, its button joins the top bar.
+  // Without the sidebar, the session's bar over the chat, with its button.
   await page.keyboard.press("Control+b");
   await page.waitForFunction(() => !document.querySelector(".app.sidebar-open"));
-  await chatAt(400);
-  await showTopBar("top bar: a 400px chat column without the sidebar");
+  for (const target of [900, 600, 400]) {
+    await chatAt(target);
+    await showTopBar(`the session's bar: a ${target}px chat column without the sidebar`);
+  }
   await page.keyboard.press("Control+b");
   await page.waitForFunction(() => document.querySelector(".app.sidebar-open"));
   await handle("files").dblclick();

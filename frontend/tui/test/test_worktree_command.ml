@@ -152,7 +152,11 @@ let%expect_test "find, describe, confirm" =
     print_endline ("  " ^ W.confirm_remove w ~force:true));
   print_endline
     (W.created
-       { worktree = List.nth_exn listing.worktrees 1; new_branch = true });
+       { worktree = List.nth_exn listing.worktrees 1
+       ; new_branch = true
+       ; root = None
+       ; cwd = None
+       });
   print_endline (W.removed (List.nth_exn listing.worktrees 2));
   [%expect
     {|

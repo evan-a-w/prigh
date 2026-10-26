@@ -10,13 +10,14 @@ type t =
 let create ?(named_only = false) sessions = { named_only; sessions }
 let title t = if t.named_only then "Sessions (named)" else "Sessions"
 
-(* Active first: [Picker] orders sections as they first appear. *)
+(* The active ones by project, then the archived ones: [Picker] orders
+   sections as they first appear. *)
 let active_first sessions =
   let active, archived =
     List.partition_tf sessions ~f:(fun (s : P.Session_summary.t) ->
       not s.archived)
   in
-  active @ archived
+  Project_tree.sessions (Project_tree.build active) @ archived
 ;;
 
 let shown t =
@@ -26,7 +27,7 @@ let shown t =
      else t.sessions)
 ;;
 
-let item ~current (s : P.Session_summary.t) =
+let item ~tree ~current (s : P.Session_summary.t) =
   let name = Option.value s.name ~default:"(unnamed)" in
   let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
   let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
@@ -36,10 +37,14 @@ let item ~current (s : P.Session_summary.t) =
   Picker.Item.create
     ~id:s.path
     ~detail:s.cwd
-    ~search:(name ^ " " ^ first ^ " " ^ s.cwd ^ " " ^ date)
+    ~search:
+      (String.concat
+         ~sep:" "
+         [ name; first; s.cwd; date; Project_tree.place_label tree s ])
     ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
     ~dimmed:s.archived
-    ~section:(if s.archived then "archived" else "")
+    ~section:
+      (if s.archived then "archived" else Project_tree.place_label tree s)
     (sprintf
        "%s%s ∣ %s ∣ %d msgs%s ∣ %s"
        (if s.running then "▶ " else if s.live then "● " else "")
@@ -71,7 +76,11 @@ let nearest_shown t id =
 ;;
 
 let picker ?previous ?select t ~current =
-  let items = List.map (shown t) ~f:(item ~current) in
+  let shown = shown t in
+  let tree =
+    Project_tree.build (List.filter shown ~f:(fun s -> not s.archived))
+  in
+  let items = List.map shown ~f:(item ~tree ~current) in
   match previous with
   | None -> Picker.create ~title:(title t) items
   | Some previous ->

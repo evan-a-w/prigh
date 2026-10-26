@@ -64,16 +64,23 @@ module Method : sig
         ; push : bool (** push the branch to the remote first *)
         } (** answers {!Pr_detail} without checks or diff *)
     | Pr_checkout of int (** see {!Pr_checkout} *)
-    | List_worktrees (** see {!Worktree.Listing} *)
+    | List_worktrees of
+        { cwd : string option
+          (** in its repository (default: the session cwd's) *)
+        } (** see {!Worktree.Listing} *)
     | Create_worktree of
         { branch : string
         ; base : string option
           (** a new branch from it; [None]: an existing branch, the one
               remote branch of that name, or a new one from [HEAD] *)
+        ; cwd : string option
+          (** in its repository (default: the session cwd's) *)
         } (** see {!Worktree.Created} *)
     | Remove_worktree of
         { path : string
         ; force : bool (** also with uncommitted changes, or locked *)
+        ; cwd : string option
+          (** in its repository (default: the session cwd's) *)
         } (** see {!Worktree.removed_of_json} *)
     | Get_review (** {!Review} *)
     | Review_comment of

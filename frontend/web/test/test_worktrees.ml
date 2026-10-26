@@ -11,7 +11,7 @@ let run h command =
 
 let toasts h = H.text h ~selector:".toast"
 let dialog h = H.text h ~selector:".modal"
-let section h = H.text h ~selector:".worktrees"
+let section h = H.text h ~selector:".worktree"
 
 let worktree
       ?(branch = Some "main")
@@ -74,10 +74,16 @@ let sessions =
     "[%s]"
     (String.concat
        ~sep:","
-       [ H.session_json ~name:"Main work" ~cwd:"/work" ~live:true "s1"
+       [ H.session_json
+           ~name:"Main work"
+           ~cwd:"/work"
+           ~repo:("/work", "/work", Some "main")
+           ~live:true
+           "s1"
        ; H.session_json
            ~name:"Login fix"
            ~cwd:login_path
+           ~repo:("/work", login_path, Some "feat/login")
            ~live:true
            ~running:true
            "s2"
@@ -106,99 +112,7 @@ let state_event h ?session ?cwd ?branch () =
     (sprintf {|{"event":"state","state":%s}|} (state ?session ?cwd ?branch ()))
 ;;
 
-let%expect_test
-    "the sidebar lists the worktrees: changes, sync, sessions, the current one"
-  =
-  let h = H.create ~sessions () in
-  (* Asked for with the session; nothing shows until it answers. *)
-  section h;
-  [%expect {| |}];
-  H.reply h "list_worktrees" (listing ());
-  section h;
-  H.names h ~selector:".worktrees button";
-  [%expect
-    {|
-    (Worktrees 4) (List the worktrees again) (New worktree (/worktree new BRANCH [BASE]))
-    (main /work) (New session in this worktree (/worktree open -n))
-    (Main work)
-    (feat/login 3 changed ↑2 ↓1 ~/.prigh/worktrees/work/feat-login) (New session in this worktree (/worktree open -n)) (Remove this worktree (/worktree rm))
-    (Login fix)
-    (docs ~/.prigh/worktrees/work/docs) (New session in this worktree (/worktree open -n)) (Remove this worktree (/worktree rm))
-    (old gone ~/.prigh/worktrees/work/old) (Remove this worktree (/worktree rm))
-    button "Worktrees 4" -- Git worktrees of /work (hide them)
-    button "Refresh worktrees" -- List the worktrees again
-    button "New worktree" -- New worktree (/worktree new BRANCH [BASE])
-    button "main /work" -- /work · the repository's main worktree · this session works here
-    button "New session in main" -- New session in this worktree (/worktree open -n)
-    button "Main work" -- This session
-    button "feat/login 3 changed \226\134\1452 \226\134\1471 ~/.prigh/worktrees/work/feat-login" -- /home/u/.prigh/worktrees/work/feat-login · work here (/worktree open)
-    button "New session in feat/login" -- New session in this worktree (/worktree open -n)
-    button "Remove feat/login" -- Remove this worktree (/worktree rm)
-    button "Login fix" -- Switch to this session
-    button "docs ~/.prigh/worktrees/work/docs" -- /home/u/.prigh/worktrees/work/docs · work here (/worktree open)
-    button "New session in docs" -- New session in this worktree (/worktree open -n)
-    button "Remove docs" -- Remove this worktree (/worktree rm)
-    button "old gone ~/.prigh/worktrees/work/old" -- /home/u/.prigh/worktrees/work/old · work here (/worktree open)
-    button "Remove old" -- Remove this worktree (/worktree rm)
-    |}];
-  H.elements h ~selector:".worktree";
-  H.show h ~selector:".worktree.dirty";
-  [%expect
-    {|
-    <div class="current worktree">
-    <div class="dirty worktree">
-    <div class="worktree">
-    <div class="gone worktree">
-    <div class="dirty worktree">
-      <button type="button"
-              data-worktree="/home/u/.prigh/worktrees/work/feat-login"
-              title="/home/u/.prigh/worktrees/work/feat-login · work here (/worktree open)"
-              class="worktree-open"
-              @on_click>
-        <div class="worktree-mark">
-          <icon class="branch"> </icon>
-        </div>
-        <div class="worktree-main">
-          <div class="worktree-line">
-            <span class="worktree-branch"> feat/login </span>
-            <span title="3 files with uncommitted changes" class="worktree-changes"> 3 changed </span>
-            <span title="2 ahead of and 1 behind origin/feat/login" class="worktree-sync"> ↑2 ↓1 </span>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-          <span class="worktree-path"> ~/.prigh/worktrees/work/feat-login </span>
-        </div>
-      </button>
-      <span class="worktree-actions">
-        <button type="button"
-                title="New session in this worktree (/worktree open -n)"
-                aria-label="New session in feat/login"
-                class="btn ghost icon new-here"
-                @on_click>
-          <icon class="plus"> </icon>
-        </button>
-        <button type="button"
-                title="Remove this worktree (/worktree rm)"
-                aria-label="Remove feat/login"
-                class="btn delete ghost icon"
-                @on_click>
-          <icon class="trash"> </icon>
-        </button>
-      </span>
-      <div class="worktree-sessions">
-        <button type="button"
-                title="Switch to this session"
-                class="running worktree-session"
-                @on_click>
-          <span title="Running" role="img" aria-label="Running" class="lamp"> </span>
-          <span dir="auto" class="worktree-session-name"> Login fix </span>
-        </button>
-      </div>
-    </div>
-    |}]
-;;
-
-let%expect_test "not a repository: no section, no error" =
+let%expect_test "not a repository: no listing, no error" =
   let h = H.create ~sessions () in
   H.fail
     h
@@ -208,7 +122,11 @@ let%expect_test "not a repository: no section, no error" =
   toasts h;
   (* The same place is not asked again at every event. *)
   state_event h ();
-  [%expect {| |}]
+  [%expect
+    {|
+    (feat/login) (New session in this worktree) (Remove this worktree (/worktree rm))
+    (Login fix 2m ago) (Archive (A)) (Delete session (Delete))
+    |}]
 ;;
 
 let%expect_test "the listing follows the directory and resets with the session" =
@@ -216,11 +134,9 @@ let%expect_test "the listing follows the directory and resets with the session" 
   (* Another directory of this session: listed again, the old one showing
      meanwhile with the lamp. *)
   state_event h ~cwd:login_path ~branch:"feat/login" ();
-  H.elements h ~selector:".worktrees-head .lamp";
-  H.elements h ~selector:".worktree.current";
+  H.elements h ~selector:".worktree.here";
   H.reply h "list_worktrees" (listing ~current:login_path ());
-  H.elements h ~selector:".worktrees-head .lamp";
-  H.text h ~selector:".worktree.current";
+  H.text h ~selector:".worktree.here";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -230,16 +146,13 @@ let%expect_test "the listing follows the directory and resets with the session" 
               \nbackend\
               \n/home/u/.prigh/worktrees/work/feat-login")
        (purpose (Sidebar 2)))))
-    <span class="lamp">
-    <div class="current worktree">
-    (feat/login 3 changed ↑2 ↓1 ~/.prigh/worktrees/work/feat-login) (New session in this worktree (/worktree open -n))
-    (Login fix)
+    (feat/login 3 changed ↑2 ↓1) (New session in this worktree)
+    (Login fix 2m ago) (Archive (A)) (Delete session (Delete))
     |}];
-  (* Another session: nothing from the old one shows. Asked again before the
-     answer, only the newest request's reply counts. *)
+  (* Another session: the old one's listing (its changes, sync) goes; the
+     tree keeps the sessions' worktrees. *)
   state_event h ~session:"s2" ~cwd:"/elsewhere" ();
   section h;
-  H.act h Refresh_worktrees;
   [%expect
     {|
     (Set_url_session s2)
@@ -255,20 +168,22 @@ let%expect_test "the listing follows the directory and resets with the session" 
      (tag (Worktrees (place  "s2\
                             \nbackend\
                             \n/elsewhere") (purpose (Sidebar 3)))))
-    (Rpc (method_ list_worktrees) (params ())
-     (tag (Worktrees (place  "s2\
-                            \nbackend\
-                            \n/elsewhere") (purpose (Sidebar 4)))))
+    (feat/login) (New session in this worktree)
+    (Login fix 2m ago /elsewhere) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     |}];
   H.reply h "list_worktrees" (listing ());
   section h;
-  [%expect {| |}];
-  H.reply h "list_worktrees" (listing ~current:"" ());
+  [%expect
+    {|
+    (feat/login 3 changed ↑2 ↓1) (New session in this worktree) (Remove this worktree (/worktree rm))
+    (Login fix 2m ago /elsewhere) (Rename (/name)) (Archive (A)) (Delete session (Delete))
+    (docs) (New session in this worktree) (Remove this worktree (/worktree rm))
+    (old gone) (Remove this worktree (/worktree rm))
+    |}];
   H.elements h ~selector:".worktree";
   [%expect
     {|
-    <div class="worktree">
-    <div class="dirty worktree">
+    <div class="dirty here worktree">
     <div class="worktree">
     <div class="gone worktree">
     |}]
@@ -301,7 +216,7 @@ let%expect_test "sessions moving in or out list the worktrees again" =
 
 let%expect_test "acting as another user forgets the worktrees" =
   let h = listed () in
-  H.quiet h (fun () -> H.act h Refresh_worktrees);
+  H.quiet h (fun () -> state_event h ~cwd:login_path ());
   H.act
     h
     (Reply
@@ -342,129 +257,9 @@ let%expect_test "acting as another user forgets the worktrees" =
     |}]
 ;;
 
-let%expect_test "the section folds, and refreshes on asking" =
-  let h = listed () in
-  H.click h ~selector:".worktrees-toggle";
-  section h;
-  H.click h ~selector:".worktrees-toggle";
-  H.click h ~selector:".worktrees-head .btn";
-  H.elements h ~selector:".worktrees-head .lamp";
-  [%expect
-    {|
-    Toggle_worktrees
-    (Worktrees 4) (List the worktrees again) (New worktree (/worktree new BRANCH [BASE]))
-    Toggle_worktrees
-    Refresh_worktrees
-    (Rpc (method_ list_worktrees) (params ())
-     (tag (Worktrees (place  "s1\
-                            \nbackend\
-                            \n/work") (purpose (Sidebar 2)))))
-    <span class="lamp">
-    |}]
-;;
-
-let%expect_test "a row opens its worktree here, or in a new session" =
-  let h = listed () in
-  H.click h ~selector:".worktree-open" ~nth:1;
-  H.elements h ~selector:".worktree.opening";
-  H.names h ~selector:".worktree.opening .worktree-open";
-  [%expect
-    {|
-    (Open_worktree (path /home/u/.prigh/worktrees/work/feat-login)
-     (new_session false))
-    (Focus editor)
-    (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/work/feat-login)))
-     (tag
-      (Worktree_entered
-       "Working in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)")))
-    <div class="dirty opening worktree">
-    button "feat/login 3 changed \226\134\1452 \226\134\1471 ~/.prigh/worktrees/work/feat-login" -- /home/u/.prigh/worktrees/work/feat-login · work here (/worktree open)
-    |}];
-  H.reply h "set_cwd" (sprintf {|{"cwd":"%s"}|} login_path);
-  H.elements h ~selector:".worktree.opening";
-  toasts h;
-  [%expect
-    {|
-    (Expire_toast (id 0) (after_ms 4580))
-    Working in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)
-    |}];
-  (* In a new session: started, then moved there. *)
-  H.click h ~selector:".worktree .new-here" ~nth:1;
-  H.text h ~selector:".new-session";
-  [%expect
-    {|
-    (Open_worktree (path /home/u/.prigh/worktrees/work/feat-login)
-     (new_session true))
-    (Focus editor)
-    (Rpc (method_ new_session) (params ())
-     (tag
-      (Worktree_session (path /home/u/.prigh/worktrees/work/feat-login)
-       (notice
-        "New session in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)"))))
-    (Starting…)
-    |}];
-  H.reply h "new_session" (sprintf {|{"state":%s}|} (state ~session:"s3" ()));
-  [%expect
-    {|
-    (Set_url_session s3)
-    (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s3.jsonl) (limit 60)))
-     (tag (Page (path /sessions/s3.jsonl) (before ()))))
-    (Rpc (method_ get_pending) (params ()) (tag Pending))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
-    (Rpc (method_ set_cwd)
-     (params ((path /home/u/.prigh/worktrees/work/feat-login)))
-     (tag
-      (Worktree_entered
-       "New session in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)")))
-    (Rpc (method_ list_worktrees) (params ())
-     (tag (Worktrees (place  "s3\
-                            \nbackend\
-                            \n/work") (purpose (Sidebar 2)))))
-    |}];
-  H.reply h "set_cwd" (sprintf {|{"cwd":"%s"}|} docs_path);
-  toasts h;
-  [%expect
-    {|
-    (Expire_toast (id 1) (after_ms 4740))
-    Working in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)
-    New session in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)
-    |}];
-  (* A worktree whose directory went says so. *)
-  H.reply h "list_worktrees" (listing ());
-  H.click h ~selector:".worktree-open" ~nth:3;
-  toasts h;
-  [%expect
-    {|
-    (Open_worktree (path /home/u/.prigh/worktrees/work/old) (new_session false))
-    (Focus editor)
-    New session in the worktree feat/login (/home/u/.prigh/worktrees/work/feat-login)
-    The worktree old is gone (/home/u/.prigh/worktrees/work/old was deleted): /worktree rm old forgets it. (Dismiss)
-    |}]
-;;
-
-let%expect_test "a row's sessions switch to them" =
-  let h = listed () in
-  H.click h ~selector:".worktree-session" ~nth:1;
-  [%expect
-    {|
-    (Switch_session /sessions/s2.jsonl)
-    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
-     (tag Reload_state))
-    (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s2.jsonl) (limit 60)))
-     (tag (Page (path /sessions/s2.jsonl) (before ()))))
-    (Focus editor)
-    |}]
-;;
-
 let%expect_test "removing asks first; Esc sends nothing; changes need force" =
   let h = listed () in
-  H.click h ~selector:".worktree .delete" ~nth:0;
+  H.click h ~selector:".worktree-row .delete" ~nth:0;
   dialog h;
   [%expect
     {|
@@ -483,7 +278,7 @@ let%expect_test "removing asks first; Esc sends nothing; changes need force" =
     |}];
   (* Removing without force is refused by the backend: the dialog says how to
      force it. *)
-  H.click h ~selector:".worktree .delete" ~nth:0;
+  H.click h ~selector:".worktree-row .delete" ~nth:0;
   H.key h "Enter" ~target:Page;
   H.text h ~selector:".modal-buttons";
   H.fail
@@ -536,7 +331,7 @@ let%expect_test "removing asks first; Esc sends nothing; changes need force" =
 
 let%expect_test "a clean worktree is removed with Enter" =
   let h = listed () in
-  H.click h ~selector:".worktree .delete" ~nth:1;
+  H.click h ~selector:".worktree-row .delete" ~nth:1;
   dialog h;
   H.key h "Enter" ~target:Page;
   [%expect
@@ -576,12 +371,11 @@ let%expect_test
     "the new worktree dialog: Enter creates and moves there, Esc sends nothing"
   =
   let h = listed () in
-  H.click h ~selector:".worktrees-head .btn" ~nth:1;
+  H.act h (New_worktree { repo = None });
   dialog h;
   H.show h ~selector:"#worktree-base";
   [%expect
     {|
-    New_worktree
     (Focus worktree-branch)
     New worktree
     (Close (Esc))
@@ -605,12 +399,11 @@ let%expect_test
     Close_dialog
     (Focus editor)
     |}];
-  H.click h ~selector:".worktrees-head .btn" ~nth:1;
+  H.act h (New_worktree { repo = None });
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".dialog-error";
   [%expect
     {|
-    New_worktree
     (Focus worktree-branch)
     Dialog_accept
     Type a branch name (Esc cancels).
@@ -623,7 +416,9 @@ let%expect_test
     (New_worktree_input (field Branch) (text feat/search))
     Dialog_accept
     (Rpc (method_ create_worktree) (params ((branch feat/search)))
-     (tag (Worktree_created "/worktree new feat/search")))
+     (tag
+      (Worktree_created (command "/worktree new feat/search")
+       (new_session false))))
     Enter creates, Esc cancels (Cancel) (Creating…)
     |}];
   H.reply
@@ -658,7 +453,7 @@ let%expect_test
     Working in the worktree feat/search (/home/u/.prigh/worktrees/work/feat-search)
     |}];
   (* With a base; a refusal stays in the dialog, to fix. *)
-  H.click h ~selector:".worktrees-head .btn" ~nth:1;
+  H.act h (New_worktree { repo = None });
   H.input h ~selector:"#worktree-branch" "fix/crash";
   H.input h ~selector:"#worktree-base" "release-1";
   H.key h "Enter" ~target:Field;
@@ -669,13 +464,14 @@ let%expect_test
   dialog h;
   [%expect
     {|
-    New_worktree
     (Focus worktree-branch)
     (New_worktree_input (field Branch) (text fix/crash))
     (New_worktree_input (field Base) (text release-1))
     Dialog_accept
     (Rpc (method_ create_worktree) (params ((branch fix/crash) (base release-1)))
-     (tag (Worktree_created "/worktree new fix/crash release-1")))
+     (tag
+      (Worktree_created (command "/worktree new fix/crash release-1")
+       (new_session false))))
     New worktree
     (Close (Esc))
     Branch [fix/crash] A new branch, or an existing one to check out
@@ -995,7 +791,9 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
      (tag Ignore))
     (Expire_toast (id 0) (after_ms 2740))
     (Rpc (method_ create_worktree) (params ((branch feat/x) (base main)))
-     (tag (Worktree_created "/worktree new feat/x main")))
+     (tag
+      (Worktree_created (command "/worktree new feat/x main")
+       (new_session false))))
     Creating the worktree feat/x…
     |}];
   H.fail
@@ -1092,7 +890,6 @@ let%expect_test "a turn's end checks them again, in the background" =
   in
   running true;
   running false;
-  H.elements h ~selector:".worktrees-head .lamp";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -1101,6 +898,6 @@ let%expect_test "a turn's end checks them again, in the background" =
                             \n/work") (purpose (Sidebar 2)))))
     |}];
   H.reply h "list_worktrees" (listing ~current:"" ());
-  H.elements h ~selector:".worktree.current";
+  H.elements h ~selector:".worktree.here";
   [%expect {| |}]
 ;;
