@@ -34,6 +34,7 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
+    button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     button "Files" -- Files (Ctrl+Shift+F)
@@ -64,6 +65,7 @@ let%expect_test "the names of the controls" =
     button "Delete sessions" -- Delete the selected sessions (Delete)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
+    button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"

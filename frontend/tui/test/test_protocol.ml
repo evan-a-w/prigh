@@ -1395,3 +1395,187 @@ let%expect_test "worktree requests and replies" =
     (error (e "missing field \"path\""))
     |}]
 ;;
+
+let%expect_test "git hosting: requests" =
+  List.iter
+    [ Request.Method.Forge_status
+    ; Forge_login { host = "github.com"; kind = None; method_ = None }
+    ; Forge_login
+        { host = "codeberg.org"; kind = Some "forgejo"; method_ = Some "token" }
+    ; Forge_logout "codeberg.org"
+    ; Pr_list { state = None }
+    ; Pr_list { state = Some "all" }
+    ; Pr_view 12
+    ; Pr_defaults
+    ; Pr_create
+        { title = "Add x"
+        ; body = "Because"
+        ; base = None
+        ; head = None
+        ; draft = false
+        ; push = true
+        }
+    ; Pr_create
+        { title = "WIP"
+        ; body = ""
+        ; base = Some "dev"
+        ; head = Some "feat/y"
+        ; draft = true
+        ; push = false
+        }
+    ; Pr_checkout 7
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    {"id":1,"method":"forge_status","params":{}}
+    {"id":1,"method":"forge_login","params":{"host":"github.com"}}
+    {"id":1,"method":"forge_login","params":{"host":"codeberg.org","kind":"forgejo","method":"token"}}
+    {"id":1,"method":"forge_logout","params":{"host":"codeberg.org"}}
+    {"id":1,"method":"pr_list","params":{}}
+    {"id":1,"method":"pr_list","params":{"state":"all"}}
+    {"id":1,"method":"pr_view","params":{"number":12}}
+    {"id":1,"method":"pr_defaults","params":{}}
+    {"id":1,"method":"pr_create","params":{"title":"Add x","body":"Because","draft":false,"push":true}}
+    {"id":1,"method":"pr_create","params":{"title":"WIP","body":"","base":"dev","head":"feat/y","draft":true,"push":false}}
+    {"id":1,"method":"pr_checkout","params":{"number":7}}
+    |}]
+;;
+
+let%expect_test "git hosting: replies and auth events" =
+  let show of_json sexp_of json =
+    match Or_error.bind (Json.parse json) ~f:of_json with
+    | Ok v -> print_s (sexp_of v)
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  show
+    Forge_account.list_of_json
+    [%sexp_of: Forge_account.t list]
+    {|{"accounts":[{"host":"github.com","kind":"github","label":"GitHub","user":"octo","method":"oauth","expires_ms":null,"oauth":true,"oauth_note":null},{"host":"codeberg.org","kind":"forgejo","label":"Forgejo","user":null,"method":null,"expires_ms":null,"oauth":true,"oauth_note":"the consent page names git-credential-oauth"}]}|};
+  let repo =
+    {|{"host":"github.com","kind":"github","owner":"evan-a-w","name":"prigh","remote":"origin","url":"https://github.com/evan-a-w/prigh"}|}
+  in
+  let pr =
+    {|{"number":24,"title":"Git hosting","state":"open","draft":true,"author":"lloyd","head":"feat/git-hosting","base":"main","url":"https://github.com/evan-a-w/prigh/pull/24","body":"Closes #1","created_at":"2026-10-25T10:00:00Z","updated_at":"2026-10-25T11:00:00Z"}|}
+  in
+  show
+    Pr_list.of_json
+    Pr_list.sexp_of_t
+    (sprintf {|{"repo":%s,"prs":[%s]}|} repo pr);
+  show
+    Pr_detail.of_json
+    Pr_detail.sexp_of_t
+    (sprintf
+       {|{"repo":%s,"pr":%s,"checks":{"state":"failure","items":[{"name":"build","state":"success","url":"https://ci/1"},{"name":"lint","state":"failure","url":null}]},"diff":"diff --git a/x b/x\n","truncated":false}|}
+       repo
+       pr);
+  (* pr_create's reply *)
+  show
+    (fun j -> Or_error.map (Pr_detail.of_json j) ~f:Pr_detail.git_diff)
+    Git_diff.sexp_of_t
+    (sprintf {|{"repo":%s,"pr":%s}|} repo pr);
+  show
+    Pr_defaults.of_json
+    Pr_defaults.sexp_of_t
+    (sprintf
+       {|{"repo":%s,"head":"feat/x","base":"main","title":"Add x","body":"- Add x\n- Test x","commits":["Add x","Test x"],"pushed":false}|}
+       repo);
+  show
+    Pr_checkout.of_json
+    Pr_checkout.sexp_of_t
+    {|{"path":"/src/prigh-wt/pr-24","branch":"pr-24","created":true}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"forge_done","host":"github.com","user":"octo","method":"oauth"}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"forge_logged_out","host":"codeberg.org"}|};
+  [%expect
+    {|
+    (((host  github.com)
+      (kind  github)
+      (label GitHub)
+      (user    (octo))
+      (method_ (oauth))
+      (expires_ms ())
+      (oauth true)
+      (oauth_note ()))
+     ((host  codeberg.org)
+      (kind  forgejo)
+      (label Forgejo)
+      (user       ())
+      (method_    ())
+      (expires_ms ())
+      (oauth true)
+      (oauth_note ("the consent page names git-credential-oauth"))))
+    ((repo (
+       (host   github.com)
+       (kind   github)
+       (owner  evan-a-w)
+       (name   prigh)
+       (remote origin)
+       (url    https://github.com/evan-a-w/prigh)))
+     (prs ((
+       (number 24)
+       (title  "Git hosting")
+       (state  Open)
+       (draft  true)
+       (author lloyd)
+       (head   feat/git-hosting)
+       (base   main)
+       (url    https://github.com/evan-a-w/prigh/pull/24)
+       (body   "Closes #1")
+       (created_at 2026-10-25T10:00:00Z)
+       (updated_at 2026-10-25T11:00:00Z)))))
+    ((repo (
+       (host   github.com)
+       (kind   github)
+       (owner  evan-a-w)
+       (name   prigh)
+       (remote origin)
+       (url    https://github.com/evan-a-w/prigh)))
+     (pr (
+       (number 24)
+       (title  "Git hosting")
+       (state  Open)
+       (draft  true)
+       (author lloyd)
+       (head   feat/git-hosting)
+       (base   main)
+       (url    https://github.com/evan-a-w/prigh/pull/24)
+       (body   "Closes #1")
+       (created_at 2026-10-25T10:00:00Z)
+       (updated_at 2026-10-25T11:00:00Z)))
+     (checks ((
+       (state failure)
+       (items (
+         ((name  build)
+          (state success)
+          (url (https://ci/1)))
+         ((name  lint)
+          (state failure)
+          (url ())))))))
+     (diff      "diff --git a/x b/x\n")
+     (truncated false))
+    ((root      evan-a-w/prigh)
+     (against   main)
+     (diff      "")
+     (truncated false))
+    ((repo (
+       (host   github.com)
+       (kind   github)
+       (owner  evan-a-w)
+       (name   prigh)
+       (remote origin)
+       (url    https://github.com/evan-a-w/prigh)))
+     (head  feat/x)
+     (base  main)
+     (title "Add x")
+     (body  "- Add x\n- Test x")
+     (commits ("Add x" "Test x"))
+     (pushed false))
+    ((path    /src/prigh-wt/pr-24)
+     (branch  pr-24)
+     (created true))
+    (Event (Auth (Forge_done (host github.com) (user (octo)) (method_ oauth))))
+    (Event (Auth (Forge_logged_out codeberg.org)))
+    |}]
+;;

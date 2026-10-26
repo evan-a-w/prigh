@@ -83,6 +83,14 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "forge_status"
+  ; "forge_login"
+  ; "forge_logout"
+  ; "pr_list"
+  ; "pr_view"
+  ; "pr_defaults"
+  ; "pr_create"
+  ; "pr_checkout"
   ; "get_prefs"
   ; "set_prefs"
   ; "push_pref"
@@ -267,6 +275,7 @@ end
 
 type t =
   { login : Login_manager.t
+  ; forges : Forges.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
   ; backend_host : bool
@@ -469,6 +478,7 @@ let create
       ?namespace
       ?(backend_host = true)
       ?home
+      ?forges
       ~login
       ~sessions_dir
       ~cwd
@@ -476,8 +486,21 @@ let create
       ?default_agent
       ()
   =
+  let forges =
+    match forges with
+    | Some forges -> forges
+    | None ->
+      Forges.create
+        ~http:(Forge_http.real ~env)
+        ~sleep:(Eio.Time.sleep (Eio.Stdenv.clock env))
+        ~listen:(Forge_login.Listen.real ~env)
+        ?home
+        ~store:(Login_manager.store login)
+        ()
+  in
   let t =
     { login
+    ; forges
     ; token
     ; namespace
     ; backend_host
@@ -519,7 +542,7 @@ let create
       Option.iter
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
-    | Done _ | Failed _ | Logged_out _ ->
+    | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
       Hashtbl.iter t.clients ~f:(fun c -> c.send json));
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
     Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
@@ -1445,6 +1468,61 @@ let switch_user (client : Client.t) params =
       User_access.Signed_in.switch signed_in user)
 ;;
 
+let number_param params name =
+  match param params name with
+  | Some (`Number n) ->
+    (match Int.of_string_opt n with
+     | Some n -> Ok n
+     | None -> Or_error.errorf "param %S must be a whole number" name)
+  | Some _ -> Or_error.errorf "param %S must be a number" name
+  | None -> Or_error.errorf "missing param %S" name
+;;
+
+(* The repository is the client's session's, on its active tool host. *)
+let pull_requests t (client : Client.t) ~meth ~params =
+  let git request =
+    Agent.host_call
+      client.agent
+      ~name:Git_forge.op
+      (Git_forge.Request.to_json request)
+  in
+  let open Or_error.Let_syntax in
+  match meth with
+  | "pr_list" ->
+    let%bind state = string_param_opt params "state" in
+    Forges.list_pulls t.forges ~git ~state:(Option.value state ~default:"open")
+  | "pr_view" ->
+    let%bind number = number_param params "number" in
+    Forges.view_pull t.forges ~git number
+  | "pr_defaults" -> Forges.pull_defaults t.forges ~git
+  | "pr_checkout" ->
+    let%bind number = number_param params "number" in
+    Forges.checkout_pull
+      t.forges
+      ~git
+      ~worktrees_dir:(Agent.config client.agent).worktrees_dir
+      number
+  | _ ->
+    let%bind title = string_param params "title" in
+    let%bind body = string_param_opt params "body" in
+    let%bind base = string_param_opt params "base" in
+    let%bind head = string_param_opt params "head" in
+    let%bind draft = bool_param params "draft" ~default:false in
+    let%bind push = bool_param params "push" ~default:false in
+    let blank =
+      Option.filter ~f:(fun s -> not (String.is_empty (String.strip s)))
+    in
+    Forges.create_pull
+      t.forges
+      ~git
+      ~title
+      ~body:(Option.value body ~default:"")
+      ~base:(blank base)
+      ~head:(blank head)
+      ~draft
+      ~push
+;;
+
 let request_params request =
   Option.value (param request "params") ~default:(`Object [])
 ;;
@@ -1846,6 +1924,49 @@ let dispatch_server t (client : Client.t) ~meth ~params
       if Result.is_error result || not (Login_manager.in_progress t.login)
       then t.login_owner <- previous;
       unit_result result)
+  | "forge_status" ->
+    Some
+      (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->
+         `Object
+           [ "accounts", `Array (List.map accounts ~f:Forges.Account.to_json) ]))
+  | "forge_login" ->
+    Option.some
+    @@
+    let open Or_error.Let_syntax in
+    let%bind host =
+      string_param_opt params "host" >>| Option.value ~default:"github.com"
+    in
+    let%bind kind =
+      match%bind string_param_opt params "kind" with
+      | None -> Ok None
+      | Some k -> Forge_kind.of_string k >>| Option.some
+    in
+    let%bind method_ =
+      match%bind string_param_opt params "method" with
+      | None -> Ok None
+      | Some m -> Forge_credential.Method.of_string m >>| Option.some
+    in
+    let%bind instance = Forges.instance t.forges ?kind host in
+    let previous = t.login_owner in
+    t.login_owner <- Some client.id;
+    let started =
+      Login_manager.start_forge
+        t.login
+        ~host:instance.host
+        ~run:(fun interaction ->
+          Forges.login t.forges instance ~method_ interaction)
+    in
+    if Result.is_error started then t.login_owner <- previous;
+    unit_result started
+  | "forge_logout" ->
+    Option.some
+    @@ Or_error.bind (string_param params "host") ~f:(fun host ->
+      Or_error.bind (Forges.instance t.forges host) ~f:(fun instance ->
+        Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
+          Login_manager.forge_logged_out t.login instance.host;
+          `Object [])))
+  | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" | "pr_checkout" ->
+    Some (pull_requests t client ~meth ~params)
   | "list_models" ->
     let models = Login_manager.models t.login in
     Model_registry.reload models;

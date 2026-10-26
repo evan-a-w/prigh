@@ -23,6 +23,7 @@ module Picker_kind = struct
     | Reminders
     | Worktrees of Worktree.Listing.t
     | Mcp of Mcp_list.t
+    | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string
   [@@deriving sexp_of, equal]
 end
@@ -40,6 +41,10 @@ module Text_prompt_action = struct
         } (** the reason for denying a tool call, which the model sees *)
     | Host_cwd of string (** host id; the text is the directory there *)
     | Connect (** [/connect]'s address: [HOST:PORT] or [local] *)
+    | Forge_host of
+        { kind : string
+        ; method_ : string option
+        } (** the git host to sign in to *)
   [@@deriving sexp_of, equal]
 end
 
@@ -54,6 +59,7 @@ end
 module Confirm_action = struct
   type t =
     | Logout of string
+    | Forge_logout of string (** the host *)
     | Rewind of string
     | Delete_sessions of
         { paths : string list
@@ -64,6 +70,8 @@ module Confirm_action = struct
         { target : Dir_change.Target.t
         ; path : string (** absolute, on the target's host *)
         } (** a missing directory given to [/cd] or [/host] *)
+    | Cd_to_checkout of string
+    (** the worktree [/pr checkout] made: change the session's directory *)
     | Remove_worktree of
         { worktree : Worktree.t
         ; force : bool
@@ -95,6 +103,7 @@ type t =
       ; form : Question_form.t
       } (** the model's [ask_user] *)
   | Sign_in of Sign_in_form.t (** [/signin], or a server refusing us *)
+  | Pr_form of Pr_form.t (** [/pr new] *)
   | Search of
       { query : string
       ; matches : int list
@@ -110,7 +119,8 @@ let is_dialog = function
   | Text_prompt _
   | Confirm _
   | Question _
-  | Sign_in _ -> true
+  | Sign_in _
+  | Pr_form _ -> true
 ;;
 
 let name = function
@@ -121,6 +131,7 @@ let name = function
   | Confirm _ -> "confirm"
   | Question _ -> "question"
   | Sign_in _ -> "sign_in"
+  | Pr_form _ -> "pr_form"
   | Search _ -> "search"
   | Output _ -> "output"
 ;;

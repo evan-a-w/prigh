@@ -1,4 +1,5 @@
 open! Core
+open! Import
 
 (** Credential file ([~/.config/prigh/auth.json] by default), one entry per
     provider. Every read goes to disk so changes made by other processes are
@@ -29,6 +30,20 @@ val modify
   -> Provider_id.t
   -> f:(Credential.t option -> Credential.t option Or_error.t)
   -> Credential.t option Or_error.t
+
+(** Entries by their raw key, for credentials that are not a provider's
+    (e.g. a git forge's, ["forge:github.com"]): the same lock and atomic
+    0600 writes as [modify]. *)
+val modify_entry
+  :  t
+  -> string
+  -> f:(Json.t option -> Json.t option Or_error.t)
+  -> Json.t option Or_error.t
+
+val read_entry : t -> string -> Json.t option Or_error.t
+
+(** The entries whose keys start with [prefix], in file order. *)
+val entries : t -> prefix:string -> (string * Json.t) list Or_error.t
 
 val set : t -> Provider_id.t -> Credential.t -> unit Or_error.t
 val remove : t -> Provider_id.t -> unit Or_error.t

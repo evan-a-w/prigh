@@ -44,6 +44,12 @@ type t =
       ; error : string
       }
   | Logged_out of string
+  | Forge_done of
+      { host : string
+      ; user : string option
+      ; method_ : string (** [oauth] or [token] *)
+      } (** signed in to a git host; [Failed] names the host otherwise *)
+  | Forge_logged_out of string (** the host *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

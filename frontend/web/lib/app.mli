@@ -49,6 +49,29 @@ module Mcp_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Forge_reply : sig
+  (** Git hosting's replies. [session]s are ids: replies for another
+      session are ignored. *)
+  type t =
+    | Status (** [forge_status] *)
+    | Logout of string (** the host *)
+    | List of
+        { session : string
+        ; filter : Pull_requests.Filter.t
+        } (** [pr_list], for the [/pr] dialog *)
+    | View of
+        { session : string
+        ; number : int
+        }
+    | Defaults of string (** [pr_defaults], for the create dialog *)
+    | Created (** [pr_create]: said whatever is on show by then *)
+    | Checkout of
+        { session : string
+        ; number : int
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Worktrees_purpose : sig
   (** Why we asked for [list_worktrees]. *)
   type t =
@@ -180,6 +203,7 @@ module Reply_tag : sig
         }
     (** like [Reconnect generation], but the backend no longer has [session]
         (it restarted before saving it): we are on another one *)
+    | Forge of Forge_reply.t
     | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
   [@@deriving sexp_of, equal]
 end
@@ -464,6 +488,11 @@ module Action : sig
     | Load_output of string (** a [Fold] key: the whole of an elided output *)
     | Network of bool
     (** the browser's [online] (reconnect now) and [offline] events *)
+    | Pr_filter of Pull_requests.Filter.t (** the [/pr] list's state *)
+    | Pr_open of int (** a pull request, from the list *)
+    | Pr_checkout of int
+    | New_pr (** the create dialog, from the list (Esc goes back to it) *)
+    | Pr_form of Pr_create.Action.t (** typed or toggled in it *)
     | Preview_accent of string
     (** a colour, while the settings' colour input is being dragged: shown,
         not saved ([Run "/accent #hex"] saves it) *)
@@ -535,6 +564,10 @@ module Model : sig
     ; session_gone : string option
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
+    ; forges : Forges.t (** the user's git hosts *)
+    ; return_to_settings : bool
+    (** the login dialog showing was opened from the settings page: closing
+        it goes back there *)
     ; theme : Theme.t (** the user's ([/theme], [/accent]) *)
     ; theme_preview : Theme.t option
       (** an accent being picked in the settings, shown but not saved *)

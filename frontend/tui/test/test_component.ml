@@ -117,6 +117,7 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     [ "get_state", Ok (state_json false)
     ; "get_messages", Ok "[]"
     ; "auth_status", Ok "[]"
+    ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
     ]
@@ -140,6 +141,7 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     rpc get_state ()
     rpc get_messages ()
     rpc auth_status ()
+    rpc forge_status ()
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()
@@ -155,6 +157,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     [ "get_state", Ok (state_json false)
     ; "get_messages", Ok "[]"
     ; "auth_status", Ok "[]"
+    ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
     ; "set_thinking", Error "thinking must be one of: off, on, low, high, max"
@@ -174,6 +177,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_state ()
     rpc get_messages ()
     rpc auth_status ()
+    rpc forge_status ()
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()
@@ -247,6 +251,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_messages ()
     rpc get_pending ()
     rpc auth_status ()
+    rpc forge_status ()
     rpc get_config ()
     rpc list_models ()
     spinner=2 running=false
@@ -268,6 +273,7 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     [ "get_state", Ok (state_json false)
     ; "get_messages", Ok "[]"
     ; "auth_status", Ok "[]"
+    ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
     ]
@@ -292,6 +298,7 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     rpc get_state ()
     rpc get_messages ()
     rpc auth_status ()
+    rpc forge_status ()
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()

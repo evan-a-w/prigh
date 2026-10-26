@@ -77,6 +77,7 @@ let argument_items
       ~users
       ~(skills : Skill.t list)
       ~(snippets : Snippet.t list)
+      ~(forges : Forge_account.t list)
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
@@ -102,6 +103,18 @@ let argument_items
           ~detail:"add an OpenAI-compatible endpoint"
           "custom"
       ]
+    @ List.map forges ~f:(fun a ->
+      let arg = Forge_account.login_arg a in
+      Picker.Item.create
+        ~id:arg
+        ~detail:(Forges.name a ^ ", " ^ Forges.describe a)
+        ~search:(String.concat ~sep:" " [ arg; a.label; a.host ])
+        arg)
+    @ [ Picker.Item.create
+          ~id:"forgejo"
+          ~detail:"another Forgejo or Gitea host: /login forgejo HOST"
+          "forgejo"
+      ]
   | Logout ->
     List.filter_map auth ~f:(fun s ->
       Option.map s.configured ~f:(fun c ->
@@ -113,6 +126,14 @@ let argument_items
              | None -> sprintf "%s via %s" c.method_ c.source)
           ~search:(s.name ^ " " ^ s.provider)
           s.name))
+    @ List.filter_map forges ~f:(fun a ->
+      Option.some_if
+        (Forge_account.signed_in a)
+        (Picker.Item.create
+           ~id:a.host
+           ~detail:(Forges.name a ^ ", " ^ Forges.describe a)
+           ~search:(a.label ^ " " ^ a.host)
+           a.host))
   | Theme ->
     simple
       (List.map Theme.Name.all ~f:(fun n ->
@@ -185,6 +206,15 @@ let argument_items
       [ "now", "retry the run at once"
       ; "cancel", "stay stopped until you send a message"
       ]
+  | Pr ->
+    simple
+      [ "list", "the open pull requests"
+      ; "list closed", "the closed and merged ones"
+      ; "list all", "all of them"
+      ; "view", "view N: one, with its checks and diff"
+      ; "new", "new [title]: create one from this branch"
+      ; "checkout", "checkout N: its branch in a worktree"
+      ]
   | Models | Directory | Backend_directory | Path | Remind | Worktree -> []
 ;;
 
@@ -230,6 +260,7 @@ let compute
       ?(skills = [])
       ?(snippets = [])
       ?(reminders = [])
+      ?(forges = [])
       ?(worktrees = [])
       ~text
       ~cursor
@@ -344,7 +375,8 @@ let compute
                        ~hosts
                        ~users
                        ~skills
-                       ~snippets)
+                       ~snippets
+                       ~forges)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
                 with
@@ -363,7 +395,8 @@ let compute
                        ~hosts
                        ~users
                        ~skills
-                       ~snippets)
+                       ~snippets
+                       ~forges)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))

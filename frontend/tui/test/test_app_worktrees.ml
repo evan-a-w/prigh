@@ -241,14 +241,14 @@ let%expect_test "Ctrl+D in the picker asks first; Esc goes back to it" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
-    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; it has 3 unc… │
+    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; it has 3      │
+    │ uncommitted changes; sessions working there: fixing a, s2? (the branch       │
+    │ stays) (y/n)                                                                 │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
@@ -322,14 +322,14 @@ let%expect_test "Ctrl+D in the picker asks first; Esc goes back to it" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
-    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; its 3 uncomm… │
+    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; its 3         │
+    │ uncommitted changes are lost; sessions working there: fixing a, s2? (the     │
+    │ branch stays) (y/n)                                                          │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
@@ -468,14 +468,14 @@ let%expect_test "/worktree rm asks first: Esc cancels, Enter removes" =
 
 
 
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
-    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; it has 3 unc… │
+    │ Remove the worktree feat/a at /h/.prigh/worktrees/repo/feat-a; it has 3      │
+    │ uncommitted changes; sessions working there: fixing a, s2? (the branch       │
+    │ stays) (y/n)                                                                 │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏

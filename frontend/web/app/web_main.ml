@@ -708,7 +708,8 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
          }
      | Input i when String.equal (Js.to_string i##.id) "session-search" ->
        Session_search
-     | Textarea _ | Input _ | Select _ -> Field
+     | Textarea _ -> Multiline
+     | Input _ | Select _ -> Field
      | Button _ | A _ -> Control
      | _ ->
        if String.equal (String.lowercase (Js.to_string el##.tagName)) "summary"
