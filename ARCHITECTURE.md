@@ -2360,13 +2360,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
       its dialog open, Enter and Esc.
     - Panel sizes: `Resize` (pure: per `Handle` — the sidebar, the file
-      browser, its list/preview split in percent, the agents panel, the
-      terminal — the user's preference (`web.<var>`, see below), and the window's
+      browser's list and its preview (left of it, or in its place when
+      `preview_alone`), the agents panel, the terminal, the chat beside
+      the review page, the review's file list and its comments' column —
+      the user's preference (`web.<var>`, see below), and the window's
       `Viewport`; `bounds` gives a handle's size, minimum and maximum in
       that window given what is open (`App.Model.shown`): the side panels
       docked beside the chat (the file browser floats over it below
       1100px, the agents panel below 1180px, as in the CSS) share its
-      width less `chat_min` (400px), shrinking in proportion to what they
+      width less `chat_min` (400px; while reviewing, the chat is one of
+      them and the review page keeps `review_min`), shrinking in proportion to what they
       have above their minimums when they would not fit, while the
       preferences stay; `update` returns the `Save`s, preferences to keep)
       and `Resize_view` (the handles: `role=separator`, focusable, with

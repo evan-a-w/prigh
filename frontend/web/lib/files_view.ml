@@ -494,14 +494,9 @@ let code_review_bar (m : App.Model.t) path ~inject =
       ]
 ;;
 
-let preview (m : App.Model.t) (t : Files.t) ~inject =
-  let close =
-    button
-      ~cls:"icon ghost files-close-preview"
-      ~title:"Close the preview (Esc)"
-      ~on_click:(inject (files Close_preview))
-      [ icon Close ]
-  in
+(* Left of the list, or in its place ([alone]) with a way back to it. *)
+let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
+  let close_preview = inject (files Close_preview) in
   let frame ?(meta = []) ~name body =
     Node.create
       "section"
@@ -509,9 +504,31 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
         [ Attr.class_ "files-preview"
         ; Attr.create "aria-label" ("Preview of " ^ name)
         ]
-      [ div
+      [ Resize_view.handle m ~inject (if alone then Files else Files_preview)
+      ; div
           ~cls:"files-preview-head"
-          ([ span ~cls:"files-preview-name" name ] @ meta @ [ close ])
+          ((if alone
+            then
+              [ button
+                  ~cls:"icon ghost files-back"
+                  ~title:"Back to the list (Esc)"
+                  ~label:"Back to the list"
+                  ~on_click:close_preview
+                  [ icon Back ]
+              ]
+            else [])
+           @ [ span ~cls:"files-preview-name" name ]
+           @ meta
+           @
+           if alone
+           then []
+           else
+             [ button
+                 ~cls:"icon ghost files-close-preview"
+                 ~title:"Close the preview (Esc)"
+                 ~on_click:close_preview
+                 [ icon Close ]
+             ])
       ; div ~cls:"files-preview-body" body
       ]
   in
@@ -697,19 +714,7 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
           ]
       ]
   in
-  let previewing =
-    match t.preview with
-    | Some _ -> true
-    | None -> false
-  in
-  div
-    ~cls:(if previewing then "files-body previewing" else "files-body")
-    [ div ~cls:"files-browse" (listing_body @ [ actions t ~inject ])
-    ; (if previewing
-       then Resize_view.handle m ~inject Files_split
-       else Node.none)
-    ; preview m t ~inject
-    ]
+  div ~cls:"files-body" (listing_body @ [ actions t ~inject ])
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -722,10 +727,14 @@ let view (m : App.Model.t) ~inject =
       | Some w -> w.host_name
       | None -> "…"
     in
+    let alone = Resize.preview_alone m.layout (App.Model.shown m) in
+    let previewing = Option.is_some t.preview in
     Node.create
       "aside"
       ~attrs:
-        [ Attr.class_ "files-panel"
+        [ classes
+            [ "files-panel" ]
+            [ "previewing", previewing; "alone", previewing && alone ]
         ; Attr.id "files-panel"
         ; Attr.create "aria-label" "Files"
         ; Attr.create
@@ -735,8 +744,13 @@ let view (m : App.Model.t) ~inject =
                (Option.value_map t.listing ~default:"here" ~f:(fun l ->
                   Files.display_path t l.path)))
         ]
-      [ Resize_view.handle m ~inject Files
+      [ preview m t ~alone ~inject
       ; div
+          ~cls:"files-side"
+          [ (if previewing && alone
+             then Node.none
+             else Resize_view.handle m ~inject Files)
+          ; div
           ~cls:"files-head"
           [ glyph ~cls:"files-head-icon" Folder
           ; span
@@ -782,6 +796,7 @@ let view (m : App.Model.t) ~inject =
       ; path_bar t ~inject
       ; body m t ~inject
       ; uploads t
+          ]
       ])
 ;;
 

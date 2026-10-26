@@ -529,9 +529,13 @@ Docker container, or a laptop connected as a tool host), in the session's
 directory. The breadcrumbs (or the pencil, to type a path: absolute, `~/…`
 or relative to the directory shown), the up arrow and Backspace move
 around; the eye shows dot files; the columns sort by name, size or age
-(directories first). A file clicked (or reached with ↑↓) is previewed:
-text with line numbers (the first 256 KB), images (up to 20 MB), binaries
-only named. The selected entry's actions: Attach (to your next message),
+(directories first). A file clicked (or reached with ↑↓) is previewed
+in a pane of its own left of the list, between it and the chat: text
+with line numbers (the first 256 KB), images (up to 20 MB), binaries
+only named. Its close button (or Esc) leaves the list alone again. On a
+phone, with the drawer floating over a narrow window, or without room for
+both beside the chat, the preview takes the list's place, with a back
+arrow to it. The selected entry's actions: Attach (to your next message),
 Download (a directory as a `.tar.gz` archive: `tar -czf` of it, paths
 starting with its name), Mention (`@path` into the composer), Copy path,
 Rename (F2) and Delete (Delete; it asks first, and refuses `/` and the
@@ -591,16 +595,18 @@ worked. Errors are the backend's, saying what to do (`/login github`, `git
 remote add`…).
 
 Every panel resizes from a handle on its inner edge: the sessions
-sidebar's right edge, the file browser's and the agents panel's left
-edge, the terminal's top edge, and the line between the file list and
-its preview. The handle shows as a faint line under the pointer and turns
+sidebar's right edge; the left edges of the file browser's list, of its
+preview and of the agents panel; the terminal's top edge; on the review
+page, the edge between it and the chat beside it and the right edge of
+its list of changed files. The handle shows as a faint line under the pointer and turns
 sodium while it is dragged or focused; double-click it (or press Enter on
 it) for the default size. It is a focusable separator: Tab to it, then
 the arrow keys move it (Shift: four times as far), Home and End make the
-panel as small or as large as it goes. The chat always keeps 400px: when
-the window narrows, the side panels beside it shrink in proportion (down
-to their minimums) and grow back to the sizes you chose when it widens
-again. The sizes are kept with your preferences on the backend (below), so
+panel as small or as large as it goes. The chat always keeps 400px (while
+reviewing, the review page keeps 480px beside the chat, and its code
+320px beside its file list): when the window narrows, the side panels
+beside it shrink in proportion (down to their minimums) and grow back to
+the sizes you chose when it widens again. The sizes are kept with your preferences on the backend (below), so
 every browser you sign in on has them. On a phone the panels are sheets,
 without handles.
 
@@ -773,7 +779,8 @@ across the reconnect: their results wait for the backend to be back.
 
 `/review` (or Alt+R, or the Review button of the file browser and of
 `/diff`) opens the review page in the chat's place; the chat narrows to a
-column beside it and keeps working. Down its left are the changed files,
+column beside it and keeps working (drag the edge between them to share
+the width differently). Down its left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
 its hunks or, with Whole file (v), all of it with the changes inline, one

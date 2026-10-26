@@ -611,6 +611,7 @@ let view (m : App.Model.t) ~inject =
                   [ Node.text (Diff_files.summary files) ]
               ; Git_bar_view.commit_box m ~inject
               ]
+          ; Resize_view.handle m ~inject Review_files
           ; current_file m path ~inject
           ]
     in

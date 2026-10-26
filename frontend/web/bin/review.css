@@ -7,7 +7,7 @@
 .app.reviewing .main {
   flex: 0 0 var(--review-chat-width, 400px);
   border-left: 1px solid var(--rule);
-  min-width: 320px;
+  min-width: 0;
 }
 .app.reviewing .files-panel { display: none; }
 
@@ -53,7 +53,7 @@
 
 .review-body { flex: 1; min-height: 0; display: flex; }
 .review-files {
-  width: 260px;
+  width: var(--review-files-width, 260px);
   flex-shrink: 0;
   border-right: 1px solid var(--rule);
   background: var(--slate);
@@ -381,11 +381,6 @@ mark.review-mark[data-comment] { cursor: default; }
 /* The chat: a reply to a comment */
 .comment-reply { font: 13px/1.5 var(--sans); }
 
-/* Narrower windows: the file list gives way first. */
-@media (max-width: 1180px) {
-  .review-files { width: 200px; }
-  .app.reviewing .main { flex-basis: 340px; min-width: 300px; }
-}
 /* Phones: a full-screen sheet; Esc or the close button goes back to the
    chat. */
 .app.narrow .review-page { position: fixed; inset: 0; z-index: 40; }
