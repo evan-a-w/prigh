@@ -95,7 +95,11 @@ let start ~sw ~(env : Eio_unix.Stdenv.base) ~handler =
     | `Unix _ -> assert false
   in
   let t = { port; requests = Queue.create () } in
+  (* Connections live in the daemon's switch: a reply still sleeping before
+     its next chunk is cancelled when the test is done, not waited for. *)
   Fiber.fork_daemon ~sw (fun () ->
+    Switch.run
+    @@ fun sw ->
     while true do
       Eio.Net.accept_fork
         ~sw
