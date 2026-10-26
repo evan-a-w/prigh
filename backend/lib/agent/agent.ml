@@ -131,8 +131,8 @@ module Event = struct
     | Queue_update of
         { steer : string list
         ; follow_up : string list
-        ; agents : Subagent_inbox.Listing.t list
         }
+    | Subagent_queues of Subagent_inbox.Listing.t list
     | Tool_exec of
         { host : string
         ; exec_id : string
@@ -438,10 +438,7 @@ let queued_texts t =
 
 let queue_update t =
   let steer, follow_up = queued_texts t in
-  broadcast
-    t
-    (Queue_update
-       { steer; follow_up; agents = Background_tasks.queues t.background })
+  broadcast t (Queue_update { steer; follow_up })
 ;;
 
 (* ---- approvals, plan mode and questions --------------------------------- *)
@@ -2204,28 +2201,28 @@ and auto_compact t =
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
 
-(* A background task finished (or was delivered): an idle agent starts a
-   turn to receive it; a running one picks it up at its next turn boundary. *)
 (* Messages a subagent stopped before taking are not lost silently. *)
 let subagent_queue_changed t =
-  queue_update t;
+  broadcast t (Subagent_queues (Background_tasks.queues t.background));
   List.iter (Background_tasks.tasks t.background ~kind:Subagent) ~f:(fun task ->
     Option.iter (Background_tasks.Task.inbox task) ~f:(fun inbox ->
       let dropped = Subagent_inbox.take_dropped inbox in
       (* A discarded one belongs to a session no longer shown. *)
       if not (Background_tasks.Task.delivered task)
       then
-      List.iter dropped ~f:(fun text ->
-        broadcast
-          t
-          (Notice
-             (sprintf
-                "%s stopped before it got your message, which was not \
-                 delivered: %s"
-                (Background_tasks.Task.id task)
-                (Background_tasks.short_task text))))))
+        List.iter dropped ~f:(fun text ->
+          broadcast
+            t
+            (Notice
+               (sprintf
+                  "%s stopped before it got your message %S, which was not \
+                   delivered: tell the main agent instead"
+                  (Background_tasks.Task.id task)
+                  (Background_tasks.short_task text))))))
 ;;
 
+(* A background task finished (or was delivered): an idle agent starts a
+   turn to receive it; a running one picks it up at its next turn boundary. *)
 let background_changed t =
   sweep_orphans t ~main_running:(is_running t);
   if (not (is_running t)) && Background_tasks.has_undelivered t.background
@@ -2512,8 +2509,9 @@ let dequeue_subagent t ~agent_id =
 ;;
 
 let remove_subagent_queued t ~agent_id ~queue ~index ~text =
-  Or_error.bind (Background_tasks.inbox_of t.background agent_id) ~f:(fun inbox ->
-    Subagent_inbox.remove inbox queue ~index ~text)
+  Or_error.bind
+    (Background_tasks.inbox_of t.background agent_id)
+    ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)
 ;;
 
 let subagent_queues t = Background_tasks.queues t.background

@@ -46,4 +46,9 @@ val pop_last : 'a t -> 'a option
 
 (** Takes the [index]th (from 0) message of a queue if it is still there and
     [matches] (the caller's view may be stale). *)
-val remove : 'a t -> Kind.t -> index:int -> matches:('a -> bool) -> 'a Or_error.t
+val remove
+  :  'a t
+  -> Kind.t
+  -> index:int
+  -> matches:('a -> bool)
+  -> 'a Or_error.t
