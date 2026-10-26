@@ -327,6 +327,7 @@ let rec apply t (event : Event.t) =
   | Terminal_close _
   | Terminal_kill _
   | Btw_delta _
+  | Generate_delta _
   | Review _
   | Sessions_changed
   | Prefs_changed _ -> t

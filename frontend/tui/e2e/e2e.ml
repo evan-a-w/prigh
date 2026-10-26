@@ -147,6 +147,8 @@ let rec summarise (e : Event.t) : string option =
   (* A hint to refresh session lists: how many arrive depends on timing. *)
   | Sessions_changed -> None
   | Prefs_changed _ -> None
+  | Generate_delta { gen_id; delta } ->
+    Some (sprintf "generate_delta %s %S" gen_id delta)
   | Review r ->
     Some (sprintf "review %d comments" (List.length r.comments))
 ;;

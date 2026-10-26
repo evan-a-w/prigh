@@ -133,6 +133,10 @@ type t =
       { btw_id : string
       ; delta : string
       } (** streamed answer to our own [btw] request *)
+  | Generate_delta of
+      { gen_id : string
+      ; delta : string
+      } (** streamed text of our own [generate_text] request *)
   | Sessions_changed
   | Prefs_changed of Prefs.Change.t list
 [@@deriving sexp_of, equal]
@@ -269,5 +273,9 @@ let rec of_json j =
     let%bind btw_id = Json.string_field j "btw_id" in
     let%map delta = Json.string_field j "delta" in
     Btw_delta { btw_id; delta }
+  | "generate_delta" ->
+    let%bind gen_id = Json.string_field j "gen_id" in
+    let%map delta = Json.string_field j "delta" in
+    Generate_delta { gen_id; delta }
   | other -> Or_error.errorf "unknown event %S" other
 ;;

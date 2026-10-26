@@ -1406,9 +1406,10 @@ let%expect_test "git hosting: requests" =
     ; Pr_list { state = None }
     ; Pr_list { state = Some "all" }
     ; Pr_view 12
-    ; Pr_defaults
+    ; Pr_defaults { dir = None }
     ; Pr_create
-        { title = "Add x"
+        { dir = None
+        ; title = "Add x"
         ; body = "Because"
         ; base = None
         ; head = None
@@ -1416,7 +1417,8 @@ let%expect_test "git hosting: requests" =
         ; push = true
         }
     ; Pr_create
-        { title = "WIP"
+        { dir = None
+        ; title = "WIP"
         ; body = ""
         ; base = Some "dev"
         ; head = Some "feat/y"

@@ -1268,7 +1268,7 @@ let open_pr ?back (m : Model.t) number =
 
 let new_pr ?back (m : Model.t) ~title =
   let m, cmds = open_dialog m (Pr_create (Pr_create.create ?back ~title ())) in
-  m, cmds @ [ call Pr_defaults ~tag:(Forge (Defaults (session_id m))) ]
+  m, cmds @ [ call (Pr_defaults { dir = None }) ~tag:(Forge (Defaults (session_id m))) ]
 ;;
 
 let checkout_pr (m : Model.t) number =

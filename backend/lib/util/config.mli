@@ -53,6 +53,9 @@ type t =
   ; auto_background_seconds : float
     (** a foreground [bash] call of the main agent still running after this
         long is moved to the background as a job (default 30; 0: never) *)
+  ; generate_model : string option
+    (** the model that drafts commit messages, pull requests, branch names
+        and session titles ([generate_text]); [None]: the session's *)
   }
 [@@deriving sexp_of]
 

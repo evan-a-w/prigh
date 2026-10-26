@@ -938,7 +938,7 @@ let pr_command m rest =
     , [ call (Pr_view number) ~tag:Pr_shown ] )
   | Ok (New { title }) ->
     ( notice m "reading the branch…"
-    , [ call Pr_defaults ~tag:(Pr_form_defaults title) ] )
+    , [ call (Pr_defaults { dir = None }) ~tag:(Pr_form_defaults title) ] )
   | Ok (Checkout number) ->
     ( notice m (sprintf "checking out pull request #%d…" number)
     , [ call (Pr_checkout number) ~tag:(Pr_checked_out number) ] )
@@ -4843,6 +4843,7 @@ let event m (e : P.Event.t) =
      with
      | Some entries -> set_backend_history m entries, []
      | None -> m, [])
+  | Generate_delta _ -> m, []
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]

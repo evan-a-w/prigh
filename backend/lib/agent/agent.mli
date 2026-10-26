@@ -577,6 +577,24 @@ val btw
   -> on_delta:(string -> unit)
   -> (Message.Assistant.t * float) Or_error.t
 
+(** The model [generate_text] drafts with: the config's [generate_model],
+    else the session's. *)
+val generate_model : t -> Model.t Or_error.t
+
+(** One tool-less request without thinking, outside the conversation:
+    [system] and the one user message [user]; [on_delta] receives the
+    streamed text. The cost counts towards the session's. Returns the
+    reply's text and its cost. *)
+val complete
+  :  t
+  -> model:Model.t
+  -> system:string
+  -> user:string
+  -> max_tokens:int
+  -> cancel:Cancellation.t
+  -> on_delta:(string -> unit)
+  -> (string * float) Or_error.t
+
 (** In-place session replacement for a single-agent embedding (the CLI and
     tests); background subagents are cancelled and their reports dropped.
     [Rpc_server] instead keeps one agent per session and moves clients
