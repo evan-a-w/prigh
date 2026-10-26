@@ -1946,7 +1946,8 @@ let relink ?doing m change =
 ;;
 
 let connect_hint =
-  "/connect HOST:PORT (of prigh serve -listen), or /connect local"
+  "/connect HOST:PORT (of prigh serve -listen), /connect wss://HOST/ws (a \
+   prigh-web URL, e.g. behind an HTTPS proxy), or /connect local"
 ;;
 
 let connect m arg =
@@ -1960,7 +1961,8 @@ let connect m arg =
              Text_prompt
                { question =
                    sprintf
-                     "Connect to HOST:PORT or local (now: %s)"
+                     "Connect to HOST:PORT, a prigh-web URL (wss://…) or \
+                      local (now: %s)"
                      (Server_link.describe server)
                ; action = Connect
                }
@@ -1975,13 +1977,14 @@ let connect m arg =
        , [] )
      | "local" -> relink m (Connect None) ~doing:"starting a local backend…"
      | address ->
-       (match Server_link.parse_address address with
+       (match Server_address.parse address with
         | Error e -> error m (sprintf "%s; %s" e connect_hint), []
-        | Ok _ ->
+        | Ok parsed ->
           relink
             m
-            (Connect (Some address))
-            ~doing:(sprintf "connecting to %s…" address)))
+            (Connect (Some (Server_address.normalize address)))
+            ~doing:
+              (sprintf "connecting to %s…" (Server_address.display parsed))))
 ;;
 
 let nothing_to_sign_in m what =

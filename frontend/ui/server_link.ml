@@ -10,19 +10,6 @@ type t =
 
 let describe t = Option.value t.address ~default:"a local backend"
 
-let parse_address text =
-  let bad () =
-    Error (sprintf "%S is not HOST:PORT (e.g. 127.0.0.1:7777)" text)
-  in
-  match String.rsplit2 text ~on:':' with
-  | Some (host, port) when not (String.exists host ~f:Char.is_whitespace) ->
-    (match Int.of_string_opt port with
-     | Some port when port > 0 && port < 65536 ->
-       Ok ((if String.is_empty host then "127.0.0.1" else host), port)
-     | _ -> bad ())
-  | _ -> bad ()
-;;
-
 (* The backend's [User_access.unauthorised]; other "unauthorised:" errors are
    about acting as another user. *)
 let is_rejection error =
