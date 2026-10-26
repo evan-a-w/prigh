@@ -178,6 +178,15 @@ let auth_json =
      {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"API key"}],"configured":null}]|}
 ;;
 
+let home_json (cwd, branch) =
+  sprintf
+    {|{"cwd":%S,"host":{"id":"backend","name":"srv"},"repo":{"root":%S,"worktree":%S,"branch":%s,"main":true}}|}
+    cwd
+    cwd
+    cwd
+    (Option.value_map branch ~default:"null" ~f:(sprintf "%S"))
+;;
+
 let session_json
       ?name
       ?description
@@ -193,6 +202,7 @@ let session_json
       ?(bytes = 0)
       ?repo
       ?(worktrees = [])
+      ?home
       id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
@@ -206,6 +216,11 @@ let session_json
         worktree
         (opt branch)
         (String.equal root worktree)
+  in
+  let repo =
+    match home with
+    | None -> repo
+    | Some home -> sprintf {|"home":%s,%s|} (home_json home) repo
   in
   let worktrees =
     String.concat

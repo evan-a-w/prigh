@@ -114,6 +114,8 @@ module Reply_tag : sig
         } (** [list_worktrees] to find the worktree [action] names *)
     | Worktree_created (** then [set_cwd] there *)
     | Worktree_entered of string (** [set_cwd] into one; the notice *)
+    | Worktree_went_back of P.Session_home.t option
+    (** [worktree_back], from that home *)
     | Worktree_session_started of
         { path : string
         ; notice : string

@@ -37,6 +37,8 @@ module Method = struct
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         }
+    | Enter_worktree of string
+    | Worktree_back of { main : bool }
     | Forge_status
     | Forge_login of
         { host : string
@@ -119,6 +121,8 @@ module Method = struct
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
+    | Enter_worktree _ -> "set_cwd"
+    | Worktree_back _ -> "worktree_back"
     | Forge_status -> "forge_status"
     | Forge_login _ -> "forge_login"
     | Forge_logout _ -> "forge_logout"
@@ -217,6 +221,9 @@ module Method = struct
        | Cwd -> [ "path", Json.str path ]
        | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
       @ if_missing
+    | Enter_worktree path ->
+      [ "path", Json.str path; "worktree", Json.bool true ]
+    | Worktree_back { main } -> if main then [ "main", Json.bool true ] else []
     | Forge_login { host; kind; method_ } ->
       [ "host", Json.str host ]
       @ Option.value_map kind ~default:[] ~f:(fun k -> [ "kind", Json.str k ])

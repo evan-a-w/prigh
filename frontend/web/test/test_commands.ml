@@ -1744,7 +1744,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     Session state
     (Close (Esc))
     ((session_id s1) (session_path /sessions/s1.jsonl) (session_name ())
-     (session_description ()) (cwd /work) (git_branch (main))
+     (session_description ()) (cwd /work) (home ()) (git_branch (main))
      (model
       ((id claude-opus-5-5) (provider anthropic) (key anthropic/claude-opus-5-5)
        (name "Claude Opus 5.5") (context_window 200000) (max_output 64000)
