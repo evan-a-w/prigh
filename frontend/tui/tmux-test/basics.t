@@ -47,6 +47,44 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh scroll
+  === scrolled back
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ prompt 1
+    faux reply
+  
+  ▌ prompt 2
+    faux reply
+  
+  ▌ prompt 3                                                                            ↓ bottom · End
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  === Ctrl+End: at the bottom
+  ▌ prompt 2
+    faux reply
+  
+  ▌ prompt 3
+    faux reply
+  
+  ▌ prompt 4
+    faux reply
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  > draft
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  === clicked: at the bottom
+  ▌ prompt 2
+    faux reply
+  
+  ▌ prompt 3
+    faux reply
+  
+  ▌ prompt 4
+    faux reply
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  > draft
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh quit
   === after first C-c
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits

@@ -401,7 +401,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ Esc                     close the dialog, back to the main agent   │
     │ from a subagent, or abort the running turn                         │
     │ Tab                     complete a slash command, @path or         │
-    └──────────────────── 1–11 of 85 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └──────────────────── 1–11 of 89 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor
@@ -423,7 +423,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
     │ Left                    move the cursor left                       │
     │ Right                   move the cursor right                      │
     │ Alt+B / Ctrl+Left       move the cursor back one word              │
-    └─────────────────── 12–22 of 85 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └─────────────────── 12–22 of 89 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ↑↓ scroll · Esc closes · typing goes to the editor

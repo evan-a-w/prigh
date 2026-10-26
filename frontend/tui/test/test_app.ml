@@ -37,6 +37,13 @@ module H = struct
   let focus_agent t n = key t (Key.alt (Key.Code.Char (Int.to_string n)))
   let event t e = step t (Event e)
 
+  (* A left click on the cell at [row], [col] of the screen. *)
+  let click t ~row ~col =
+    match Render.click t.model ~row ~col with
+    | Some intent -> step t (Intent intent)
+    | None -> print_endline "(nothing to click there)"
+  ;;
+
   let reply ?quiet t tag json =
     step ?quiet t (Reply (tag, Ok (Or_error.ok_exn (P.Json.parse json))))
   ;;
@@ -2817,7 +2824,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 279 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 283 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -3566,10 +3573,10 @@ let%expect_test "scroll stays anchored while streaming" =
       line 3
       line 4
       line 5
-      line 6
+      line 6                                                                              ↓ bottom · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   stream 12 10;
   H.show h;
@@ -3581,10 +3588,10 @@ let%expect_test "scroll stays anchored while streaming" =
       line 3
       line 4
       line 5
-      line 6
+      line 6                                                                          ↓ new output · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.show h;
   [%expect
@@ -3595,10 +3602,10 @@ let%expect_test "scroll stays anchored while streaming" =
       line 3
       line 4
       line 5
-      line 6
+      line 6                                                                          ↓ new output · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain End);
   H.show h;
@@ -3637,10 +3644,10 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 11
       line 12
       line 13
-      line 14
+      line 14                                                                             ↓ bottom · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -3652,10 +3659,10 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 6
       line 7
       line 8
-      line 9
+      line 9                                                                              ↓ bottom · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -3667,10 +3674,10 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 11
       line 12
       line 13
-      line 14
+      line 14                                                                             ↓ bottom · End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -3713,10 +3720,10 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
       line 11
       line 12
       line 13
-      line 14
+      line 14                                                                        ↓ bottom · Ctrl+End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > draft▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Home);
   H.show h;
@@ -3728,10 +3735,10 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
       line 11
       line 12
       line 13
-      line 14
+      line 14                                                                        ↓ bottom · Ctrl+End
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏raft
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5763,10 +5770,10 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
-      earlier answer
+      earlier answer                              ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5801,10 +5808,10 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       earlier answer
 
     ▌ second question
-      second answer
+      second answer                               ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h ctrl_up;
   H.show h;
@@ -5814,10 +5821,10 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       earlier answer
 
     ▌ second question
-      second answer
+      second answer                               ↓ bottom · End
     ───────────────────────────────────── no earlier message ───
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h ctrl_down;
   H.show h;
@@ -5827,10 +5834,10 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       second answer
 
     ▌ third question
-      third answer
+      third answer                                ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h ctrl_down;
   H.show h;
@@ -5840,10 +5847,10 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       second answer
 
     ▌ third question
-      third answer
+      third answer                                ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h ctrl_down;
   H.show h;
@@ -5932,7 +5939,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     │ the current turn (a focused subagent's: before it        │
     │ reports)                                                 │
     │ Alt+S                   send exactly what is typed,      │
-    └────────── 1–7 of 100 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └────────── 1–7 of 104 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -7226,6 +7233,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     PageDown         Page_down                covered
     Ctrl+Up          Prev_user_message        covered
     Ctrl+Down        Next_user_message        covered
+    Ctrl+End         Jump_to_bottom           MISSING
     Backspace/Ctrl+H Backspace                covered
     Delete           Delete                   covered
     Ctrl+K           Kill_to_end              covered
@@ -7565,10 +7573,10 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     ▌ message 4
 
     ▌ message 5
-
+                                                  ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.step h (Intent Scroll_up);
   print_s [%sexp (h.model.viewport : Viewport.t)];
@@ -7579,7 +7587,8 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     {|
     (Anchored
       (top       7)
-      (new_lines 0))
+      (new_lines 0)
+      (new_items 0))
     Follow
     |}];
   H.key h (Key.plain Up);
@@ -8358,7 +8367,7 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
   [%expect {| Quit |}]
 ;;
 
-let%expect_test "scrolled up: the status says so, and Esc returns to the \
+let%expect_test "scrolled up: the indicator says so, and Esc returns to the \
                  bottom when idle (aborts when running)"
   =
   let h = connected ~height:8 () in
@@ -8372,10 +8381,10 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
 
     ▌ line 2
 
-    ▌ line 3
+    ▌ line 3                                      ↓ bottom · End
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.esc h;
   H.show h;
@@ -8398,7 +8407,192 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
   [%expect {|
     (Anchored
       (top       7)
-      (new_lines 0))
+      (new_lines 0)
+      (new_items 0))
+    |}]
+;;
+
+let%expect_test
+    "scrolled up: the jump indicator counts what arrives below; End, Ctrl+End \
+     or a click on it goes back and follows again"
+  =
+  let h = connected ~height:9 () in
+  List.iter (List.range 0 6) ~f:(fun i ->
+    H.event h (Message_start (user (sprintf "line %d" i))));
+  H.key h (Key.plain Page_up);
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                      ↓ bottom · End
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* A message arriving below is counted; text still streaming is "new
+     output" until its message is complete. *)
+  H.event h (Message_start (user "a new question"));
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                       ↓ 1 new · End
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.event h (Message_start (Assistant partial));
+  H.event h (Message_update { partial; delta = Text_delta "streaming" });
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                       ↓ 1 new · End
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.event h (Message_end (assistant "streaming"));
+  H.event h (Tool_start (tool_call ~name:"bash" "c1"));
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                       ↓ 2 new · End
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.event
+    h
+    (Tool_end
+       { call = tool_call ~name:"bash" "c1"
+       ; result = tool_result ~name:"bash" ~id:"c1" "ok"
+       });
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                       ↓ 3 new · End
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* With text in the editor End moves its cursor: the hint says Ctrl+End. *)
+  H.keys h "draft";
+  H.show h;
+  [%expect
+    {|
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3                                  ↓ 3 new · Ctrl+End
+    ────────────────────────────────────────────────────────────
+    > draft▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.click h ~row:0 ~col:0;
+  H.click h ~row:5 ~col:59;
+  H.show h;
+  [%expect
+    {|
+    (nothing to click there)
+    ▌ line 5
+
+    ▌ a new question
+      streaming
+    ✓ bash
+        ok
+    ────────────────────────────────────────────────────────────
+    > draft▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* Following again: what arrives next shows at the bottom. *)
+  H.event h (Message_start (user "after the click"));
+  H.show h;
+  [%expect
+    {|
+    ▌ a new question
+      streaming
+    ✓ bash
+        ok
+
+    ▌ after the click
+    ────────────────────────────────────────────────────────────
+    > draft▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Key.plain Page_up);
+  H.key h { (Key.plain End) with ctrl = true };
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  [%expect {| Follow |}];
+  (* On an empty prompt End does it too. *)
+  H.key h (Key.ctrl 'u');
+  H.key h (Key.plain Page_up);
+  H.key h (Key.plain End);
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  [%expect {| Follow |}]
+;;
+
+let%expect_test
+    "the jump indicator sits above an open picker and beside the sidebar, and \
+     a click there still jumps"
+  =
+  let h = connected ~width:130 ~height:20 () in
+  List.iter (List.range 0 8) ~f:(fun i ->
+    H.event h (Message_start (user (sprintf "line %d" i))));
+  H.key h (Key.alt (Char "l"));
+  H.key h (Key.plain Page_up);
+  H.keys h "/";
+  H.show h;
+  [%expect
+    {|
+     Agents                     │   prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ▌○ main                 idle│
+       deepseek-flash           │ ▌ earlier question
+                                │   earlier answer
+                                │
+                                │ ▌ line 0
+                                │
+                                │ ▌ line 1                                                                         ↓ bottom · Ctrl+End
+                                │ ▸ /help                              show commands and keys
+                                │   /hotkeys                           show keyboard shortcuts
+                                │   /model [name|id|provider/id]       pick or switch the model
+                                │   /scoped-models                     pick the models Ctrl+P cycles through
+                                │   /change_default                    save the current model and thinking level as the default for n…
+                                │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
+                                │   /default-dir [off|path]            show or set the directory new sessions start in
+                                │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 65
+    ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.click h ~row:7 ~col:109;
+  H.click h ~row:8 ~col:129;
+  H.click h ~row:7 ~col:110;
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  [%expect
+    {|
+    (nothing to click there)
+    (nothing to click there)
+    Follow
     |}]
 ;;
 
