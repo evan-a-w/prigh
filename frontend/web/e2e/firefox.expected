@@ -1485,3 +1485,57 @@ prefer_host: host-laptop
 Sign in
 === firefox: remote: errors ===
 none
+=== firefox: steer: the subagent shown is written to ===
+Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+Survey the project
+Steering
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== firefox: steer: Esc ===
+(no chip); Steer the agent…
+still running: true
+Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+=== firefox: steer: queued for it ===
+To a1, next step
+use the tests
+Edit
+To a1, after its turn
+then summarise
+Edit
+=== firefox: steer: its row says so ===
+2 queued  deepseek-flash  1 turn  1 tool call
+=== firefox: steer: edited ===
+in the editor: then summarise
+=== firefox: steer: delivered, it finished ===
+a1 has finished: you are writing to the main agent again
+=== firefox: steer: the composer is the main agent's again ===
+(no chip); Steer the agent…
+=== firefox: steer: its transcript ===
+Looking around.
+bash
+until [ -f sub-go ]; do sleep 0.1; done; echo sub-go
+sub-go
+•
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+use the tests
+<TIME>
+Using the tests, as asked.
+<TIME>
+•
+You (follow-up)
+[The user sends you this as you finish: deal with it before you report.]
+then summarise
+<TIME>
+Summary: 3 files, all tested.
+<TIME>
+=== firefox: steer: too late ===
+Couldn't send it to a1: a1 has finished and its report is on its way to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor.
+in the editor: /agents steer a1 one more thing
+=== firefox: steer: the main agent got the report ===
+The survey is in.
+=== firefox: steer: errors ===
+none
