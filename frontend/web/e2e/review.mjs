@@ -5,7 +5,7 @@
 // accepted), the review page beside the chat (approvals, the keys, the
 // whole-file layout, edit mode saving a file), live updates as the agent
 // edits, and a phone. Run by prigh_web.sh; prints normalised snapshots (the
-// expected output is in prigh_web.expected).
+// expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.

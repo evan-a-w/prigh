@@ -1,7 +1,7 @@
 // Drives a real browser against `prigh serve -web ... -faux-script`
 // (see prigh_web.sh) and prints normalised snapshots of what the page shows.
 // It owns the backend so that it can restart it. The expected output lives
-// in prigh_web.expected.
+// in ENGINE.expected.
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE (the built site),
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
@@ -349,6 +349,11 @@ const popoverPlace = () => page.evaluate(() => {
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
 const bodyLacks = text => page.waitForFunction(t => !document.body.innerText.includes(t), text);
 const composer = () => page.locator(".composer textarea");
+// Clicks the toasts away, one at a time: each click removes the one under it.
+const dismissToasts = async () => {
+  const toasts = page.locator(".toast");
+  for (let i = 0; i < 20 && await toasts.count(); i++) await toasts.first().click({ timeout: 2000 }).catch(() => {});
+};
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 
 const send = async text => {
@@ -555,7 +560,7 @@ try {
   await page.waitForTimeout(100);
   console.log(`#fi: ${await popupShown()}`);
   await composer().fill("");
-  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
+  await dismissToasts();
 
   // Reminders (/remind): added, counted on the status line, listed in a
   // picker where Delete removes one, and removed by name; none is left to
@@ -590,7 +595,7 @@ try {
   await page.waitForSelector(".status-extras .reminders", { state: "detached" });
   console.log("status: no reminders");
   await composer().fill("");
-  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
+  await dismissToasts();
 
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");

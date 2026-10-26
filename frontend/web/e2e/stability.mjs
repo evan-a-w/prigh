@@ -5,7 +5,7 @@
 // was drawn with, and the editor grows with its text in the frame that shows
 // the text, and the session's status keeps its place in every frame as turns
 // start and end, in the sidebar on a desktop and in the bar on a phone. Run by prigh_web.sh; prints normalised results (the expected
-// output is in prigh_web.expected).
+// output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
