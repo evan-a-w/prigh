@@ -173,6 +173,7 @@ user, `default`.
 | `PRIGH_CWD` | `/home/prigh` | working directory for `PRIGH_MODE=tui` only |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
+| `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
 | `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://prigh.cachix.org` and its key | (build) the Nix binary cache. Set the substituter to an empty value to compile everything |

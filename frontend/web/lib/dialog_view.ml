@@ -18,6 +18,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Hosts -> "Hosts"
   | Users -> "Users"
   | Accounts -> "Accounts"
+  | Menu _ -> "Menu"
   | Skills -> "Skills"
   | Snippets -> "Snippets"
   | Reminders -> "Reminders"
@@ -55,8 +56,8 @@ let picker ~kind (p : Picker.t) ~inject =
            | Reminders ->
              "↑↓ to move, Enter to show, Delete to remove, Esc to close"
            | Worktrees _ ->
-             "Enter works there, Alt+Enter in a new session, Delete removes, \
-              Esc closes"
+             "Enter works there, Alt+Enter in a new session, Alt+R reviews, \
+              Delete removes, Esc closes"
            | _ -> "↑↓ to move, Enter to choose, Esc to close")
       ]
     [ div
@@ -578,6 +579,8 @@ let dialog (m : App.Model.t) ~inject =
   | None -> Node.none
   | Some (Picker { kind = Accounts; picker = p }) ->
     Account_view.menu m p ~inject
+  | Some (Picker { kind = Menu menu; picker = p }) ->
+    Context_menu_view.view m menu p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
   | Some Help -> help ~inject

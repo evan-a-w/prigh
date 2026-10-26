@@ -1,6 +1,5 @@
 open! Core
 open! Import
-module Project_tree = Prigh_ui.Project_tree
 
 let title (s : Session_summary.t) =
   match s.name with
@@ -13,10 +12,8 @@ let filter sessions ~query =
     String.concat
       ~sep:" "
       ([ title s; Option.value s.first_prompt ~default:""; s.cwd ]
-       @
-       match s.repo with
-       | None -> []
-       | Some r -> Filename.basename r.root :: Option.to_list r.branch))
+       @ Option.to_list (Prigh_ui.Session_worktrees.place s)
+       @ List.map s.worktrees ~f:Session_worktree.label))
 ;;
 
 let dom_id id = "session-" ^ id
@@ -26,19 +23,11 @@ let sections sessions ~query =
     not s.archived)
 ;;
 
-let searching ~query = not (String.is_empty (String.strip query))
-let archived_shown ~query ~archived_open = archived_open || searching ~query
-
-let tree sessions ~query ~listing =
-  let active, archived = sections sessions ~query in
-  if searching ~query
-  then Project_tree.build active
-  else Project_tree.build ?listing ~owners:archived active
+let archived_shown ~query ~archived_open =
+  archived_open || not (String.is_empty (String.strip query))
 ;;
 
-let shown sessions ~query ~archived_open ~folded ~listing =
-  let _, archived = sections sessions ~query in
-  let folded = if searching ~query then String.Set.empty else folded in
-  Project_tree.sessions ~collapsed:folded (tree sessions ~query ~listing)
-  @ if archived_shown ~query ~archived_open then archived else []
+let shown sessions ~query ~archived_open =
+  let active, archived = sections sessions ~query in
+  if archived_shown ~query ~archived_open then active @ archived else active
 ;;

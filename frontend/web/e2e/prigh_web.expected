@@ -166,11 +166,11 @@ same session after reload: true
 prigh
 web
 New session
-Projects
+Sessions
 Select
-cwd
 count some lines
 <AGE>
+<CWD>
 0%
 ↑0 ↓0
 $<COST>
@@ -195,13 +195,14 @@ new session in the url: true
 prigh
 web
 New session
-Projects
+Sessions
 Select
-cwd
 hello again
 <AGE>
+<CWD>
 count some lines
 <AGE>
+<CWD>
 0%
 ↑0 ↓0
 $<COST>
@@ -213,6 +214,7 @@ token
 Loading the session…
 marked in the sidebar: count some lines
 <AGE>
+<CWD>
 switched back: true
 === chromium: switched back ===
 count some lines
@@ -531,25 +533,25 @@ Done waiting.
 === chromium: phone: a chip's menu ===
 thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 count some lines
 <AGE>
-sub/
+cwd
+main
 Archived
 1
 === chromium: archived ===
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 count some lines
 <AGE>
-sub/
+cwd
+main
 Archived
 1
 hello again
@@ -572,11 +574,10 @@ Delete 2
 session files before: 3
 === chromium: deleted ===
 Deleted 2 sessions (<SIZE>)
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 session files after: 1
 === chromium: /cd: the directory popup ===
 Directories
@@ -1055,41 +1056,74 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
 none
+=== chromium: worktrees: a session's menu ===
+Tidy the docs in a worktree — prigh — main
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
 === chromium: worktrees: the new worktree dialog ===
-New worktree of prigh
+New worktree
 Branch
 A new branch, or an existing one to check out
 Base
-Where a new branch starts (empty: main)
-A new session starts there once it is created.
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
 Enter creates, Esc cancels
 Cancel
-Create and start a session
-=== chromium: worktrees: the project tree ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
-│ feat/login
-│ │ The login form | <age>
+Create and switch
+=== chromium: worktrees: a worktree's menu ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== chromium: worktrees: sessions and their worktrees ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [selected]
 │ agent/tidy-the-docs | subagent [agent]
-│ │ from Tidy the docs in a worktree
-│ docs | 2 changed [dirty]
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
-=== chromium: worktrees: a folded project ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
 │ feat/login
-│ │ The login form | <age>
-│ agent/tidy-the-docs | subagent [agent]
-│ │ from Tidy the docs in a worktree
-│ docs | 2 changed [dirty]
-notes
-│ Shopping list | <age>
-site | trunk | 1 [folded]
+│ docs | here | ● 2 [dirty here]
+=== chromium: worktrees: from the keyboard ===
+A landing page — site — trunk
+Open  Enter
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== chromium: worktrees: Esc changed nothing ===
+Tidy the docs in a worktree
+=== chromium: worktrees: a terminal in the worktree ===
+<DIR>/home/.prigh/worktrees/prigh/feat-login
+=== chromium: worktrees: folded ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [folded selected]
 === chromium: worktrees: searching ===
-prigh › feat/login › The login form
+Tidy the docs in a worktree
 === chromium: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
@@ -1106,30 +1140,36 @@ Cancel
 Discard changes and remove
 Remove
 === chromium: worktrees: removed ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
 │ feat/login
-│ │ The login form | <age>
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === chromium: worktrees: the /worktree picker ===
 Worktrees of <DIR>/prigh
 main
 <DIR>/prigh · main worktree · here · 1 session
 feat/login
 <DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
-Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
 === chromium: worktrees: on a phone ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
 │ feat/login
-│ │ The login form | <age>
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== chromium: worktrees: a long press on a phone ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
 === chromium: worktrees: errors ===
 none
 === chromium: review: files: changes marked ===
@@ -1392,6 +1432,34 @@ Approve again
 main.ml ends: "let late = 0\nlet edited = 1\n"
 Esc closed it: true
 /review opened it: true
+=== chromium: review: worktree: what is reviewed ===
+Reviewing feat/login (<WT>) against main (merge base <SHA>)
+base: main
+=== chromium: review: worktree: the files ===
+README.md
++1 −1
+src/
+login.ml
++1 −0
+2 files changed, +2 −1
+=== chromium: review: worktree: against HEAD ===
+README.md
++1 −1
+1 file changed, +1 −1
+=== chromium: review: worktree: against HEAD, what is reviewed ===
+Reviewing feat/login (<WT>) against HEAD
+=== chromium: review: worktree: back to the session's own ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +8 −2
 === chromium: review: phone ===
 sheet: fixed
 Alt+R closed it
@@ -1580,11 +1648,11 @@ same session after reload: true
 prigh
 web
 New session
-Projects
+Sessions
 Select
-cwd
 count some lines
 <AGE>
+<CWD>
 0%
 ↑0 ↓0
 $<COST>
@@ -1609,13 +1677,14 @@ new session in the url: true
 prigh
 web
 New session
-Projects
+Sessions
 Select
-cwd
 hello again
 <AGE>
+<CWD>
 count some lines
 <AGE>
+<CWD>
 0%
 ↑0 ↓0
 $<COST>
@@ -1627,6 +1696,7 @@ token
 Loading the session…
 marked in the sidebar: count some lines
 <AGE>
+<CWD>
 switched back: true
 === firefox: switched back ===
 count some lines
@@ -1945,25 +2015,25 @@ Done waiting.
 === firefox: phone: a chip's menu ===
 thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === firefox: archived, folded ===
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 count some lines
 <AGE>
-sub/
+cwd
+main
 Archived
 1
 === firefox: archived ===
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 count some lines
 <AGE>
-sub/
+cwd
+main
 Archived
 1
 hello again
@@ -1986,11 +2056,10 @@ Delete 2
 session files before: 3
 === firefox: deleted ===
 Deleted 2 sessions (<SIZE>)
-cwd
-main
 one more
 <AGE>
-sub/
+cwd
+main
 session files after: 1
 === firefox: /cd: the directory popup ===
 Directories
@@ -2470,41 +2539,74 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === firefox: themes: errors ===
 none
+=== firefox: worktrees: a session's menu ===
+Tidy the docs in a worktree — prigh — main
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
 === firefox: worktrees: the new worktree dialog ===
-New worktree of prigh
+New worktree
 Branch
 A new branch, or an existing one to check out
 Base
-Where a new branch starts (empty: main)
-A new session starts there once it is created.
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
 Enter creates, Esc cancels
 Cancel
-Create and start a session
-=== firefox: worktrees: the project tree ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
-│ feat/login
-│ │ The login form | <age>
+Create and switch
+=== firefox: worktrees: a worktree's menu ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== firefox: worktrees: sessions and their worktrees ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [selected]
 │ agent/tidy-the-docs | subagent [agent]
-│ │ from Tidy the docs in a worktree
-│ docs | 2 changed [dirty]
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
-=== firefox: worktrees: a folded project ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
 │ feat/login
-│ │ The login form | <age>
-│ agent/tidy-the-docs | subagent [agent]
-│ │ from Tidy the docs in a worktree
-│ docs | 2 changed [dirty]
-notes
-│ Shopping list | <age>
-site | trunk | 1 [folded]
+│ docs | here | ● 2 [dirty here]
+=== firefox: worktrees: from the keyboard ===
+A landing page — site — trunk
+Open  Enter
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== firefox: worktrees: Esc changed nothing ===
+Tidy the docs in a worktree
+=== firefox: worktrees: a terminal in the worktree ===
+<DIR>/home/.prigh/worktrees/prigh/feat-login
+=== firefox: worktrees: folded ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [folded selected]
 === firefox: worktrees: searching ===
-prigh › feat/login › The login form
+Tidy the docs in a worktree
 === firefox: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
@@ -2521,30 +2623,36 @@ Cancel
 Discard changes and remove
 Remove
 === firefox: worktrees: removed ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
 │ feat/login
-│ │ The login form | <age>
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === firefox: worktrees: the /worktree picker ===
 Worktrees of <DIR>/prigh
 main
 <DIR>/prigh · main worktree · here · 1 session
 feat/login
 <DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
-Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
+Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
 === firefox: worktrees: on a phone ===
-prigh | main [here]
-│ Tidy the docs in a worktree | <age> [selected]
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
 │ feat/login
-│ │ The login form | <age>
-notes
-│ Shopping list | <age>
-site | trunk
-│ A landing page | <age>
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== firefox: worktrees: a long press on a phone ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
 === firefox: worktrees: errors ===
 none
 === firefox: review: files: changes marked ===
@@ -2807,6 +2915,34 @@ Approve again
 main.ml ends: "let late = 0\nlet edited = 1\n"
 Esc closed it: true
 /review opened it: true
+=== firefox: review: worktree: what is reviewed ===
+Reviewing feat/login (<WT>) against main (merge base <SHA>)
+base: main
+=== firefox: review: worktree: the files ===
+README.md
++1 −1
+src/
+login.ml
++1 −0
+2 files changed, +2 −1
+=== firefox: review: worktree: against HEAD ===
+README.md
++1 −1
+1 file changed, +1 −1
+=== firefox: review: worktree: against HEAD, what is reviewed ===
+Reviewing feat/login (<WT>) against HEAD
+=== firefox: review: worktree: back to the session's own ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +8 −2
 === firefox: review: phone ===
 sheet: fixed
 Alt+R closed it

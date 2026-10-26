@@ -55,5 +55,6 @@ type t =
   | Prev_user_message (** Ctrl+Up: jump to the previous user message *)
   | Next_user_message (** Ctrl+Down: jump to the next user message *)
   | Toggle_archived (** Alt+A in the sessions picker *)
+  | Review_highlighted (** Alt+R in the worktrees picker: review it *)
   | Toggle_sidebar (** Alt+L: the agents sidebar on wide terminals *)
 [@@deriving sexp_of, equal, compare]
