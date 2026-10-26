@@ -63,6 +63,8 @@ module Entry = struct
       | Worktree of Session_worktree.t
       | Worktree_removed of { path : string }
       | Home of { home : Home.t option }
+      | Trim of { before : string }
+      | Untrim
     [@@deriving sexp, jsonaf]
   end
 
@@ -182,7 +184,9 @@ let worth_saving (line : Line.t) =
           | Agent_worktree _
           | Worktree _
           | Worktree_removed _
-          | Home _ )
+          | Home _
+          | Trim _
+          | Untrim )
       ; _
       }
   | Header _ | Head _ -> false
@@ -329,7 +333,9 @@ let add_entry t (entry : Entry.t) =
   | Spend _
   | Resume_at _
   | Told_environment _
-  | Review _ -> ()
+  | Review _
+  | Trim _
+  | Untrim -> ()
   | Repo { cwd; repo } ->
     Hashtbl.set t.repos ~key:cwd ~data:repo;
     Option.iter
@@ -558,6 +564,8 @@ let name t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> None)
 ;;
 
@@ -585,6 +593,8 @@ let description t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> None)
 ;;
 
@@ -641,17 +651,74 @@ let is_summary_message : Message.t -> bool = function
   | Assistant _ | Tool_result _ -> false
 ;;
 
+module Trim = struct
+  type t =
+    { before : string
+    ; messages : int
+    ; tokens : int
+    ; at : float option
+    }
+  [@@deriving sexp_of]
+end
+
+module Folded = struct
+  type item = string option * Timed_message.t
+
+  type t =
+    { context : item list
+    ; trims : (Entry.t * item list) list
+      (** the trims in effect, newest first, with what each took out *)
+    }
+end
+
 (* The messages of the next request, each with the id of its entry (none for
-   a compaction's summary): after a compaction, its pinned message, the
-   summary, then the path from [kept_from]. *)
-let context t =
-  let path = active_path t in
-  let compaction =
-    List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
+   a compaction's summary), folding the path: a compaction replaces what
+   comes before [kept_from] with its pinned message and the summary, a trim
+   drops what comes before its message, and an untrim puts back what the
+   latest trim in effect dropped. *)
+let fold t path =
+  let position = String.Table.create () in
+  List.iteri path ~f:(fun i (e : Entry.t) ->
+    Hashtbl.set position ~key:e.id ~data:i);
+  let message (e : Entry.t) =
+    match e.payload with
+    | Message message -> Some (Some e.id, { Timed_message.message; at = e.at })
+    | _ -> None
+  in
+  let rev_context, trims =
+    List.fold path ~init:([], []) ~f:(fun (rev_context, trims) (e : Entry.t) ->
       match e.payload with
+      | Message _ -> Option.to_list (message e) @ rev_context, trims
       | Compaction { summary; kept_from; pinned } ->
-        Some (summary, kept_from, pinned)
-      | Message _
+        let from = Hashtbl.find position kept_from in
+        let kept =
+          List.filter (List.rev rev_context) ~f:(fun (id, _) ->
+            match Option.bind id ~f:(Hashtbl.find position), from with
+            | Some p, Some from -> p >= from
+            | _ -> false)
+        in
+        let pinned =
+          Option.bind pinned ~f:(Hashtbl.find t.by_id)
+          |> Option.bind ~f:message
+          |> Option.to_list
+        in
+        let summary =
+          None, { Timed_message.message = summary_message summary; at = None }
+        in
+        List.rev (pinned @ (summary :: kept)), trims
+      | Trim { before } ->
+        let context = List.rev rev_context in
+        (match
+           List.findi context ~f:(fun _ (id, _) ->
+             Option.equal String.equal id (Some before))
+         with
+         | Some (i, _) ->
+           List.rev (List.drop context i), (e, List.take context i) :: trims
+         | None -> rev_context, (e, []) :: trims)
+      | Untrim ->
+        (match trims with
+         | [] -> rev_context, []
+         | (_, dropped) :: trims -> rev_context @ List.rev dropped, trims)
       | Model _
       | Name _
       | Description _
@@ -671,46 +738,149 @@ let context t =
       | Worktree _
       | Worktree_removed _
       | Home _
-      | Review _ -> acc)
+      | Review _ -> rev_context, trims)
   in
-  let messages entries =
-    List.filter_map entries ~f:(fun (e : Entry.t) ->
+  { Folded.context = List.rev rev_context; trims }
+;;
+
+let context t = (fold t (active_path t)).context
+
+(* Message by message, as [Trim_point] sums them. *)
+let estimate items =
+  List.sum
+    (module Int)
+    items
+    ~f:(fun (_, (m : Timed_message.t)) -> Message.estimate_tokens [ m.message ])
+;;
+
+let trim_of_folded ({ trims; _ } : Folded.t) =
+  match trims with
+  | [] -> None
+  | ((latest : Entry.t), _) :: _ ->
+    let dropped = List.concat_map trims ~f:snd in
+    let before =
+      match latest.payload with
+      | Trim { before } -> before
+      | _ -> latest.id
+    in
+    Some
+      { Trim.before
+      ; messages = List.length dropped
+      ; tokens = estimate dropped
+      ; at = latest.at
+      }
+;;
+
+let trim t = trim_of_folded (fold t (active_path t))
+
+let trimmed_messages t =
+  List.concat_map (List.rev (fold t (active_path t)).trims) ~f:snd
+;;
+
+let is_trim_point (m : Message.t) =
+  match m with
+  | User _ -> not (is_summary_message m)
+  | Assistant _ | Tool_result _ -> false
+;;
+
+let tool_call_ids items =
+  List.concat_map items ~f:(fun (_, (m : Timed_message.t)) ->
+    match m.message with
+    | Assistant a ->
+      List.map (Message.Assistant.tool_calls a) ~f:(fun c -> c.id)
+    | User _ | Tool_result _ -> [])
+;;
+
+let splits_a_call ~dropped ~kept =
+  let calls = String.Hash_set.of_list (tool_call_ids dropped) in
+  List.exists kept ~f:(fun (_, (m : Timed_message.t)) ->
+    match m.message with
+    | Tool_result r -> Hash_set.mem calls r.tool_call_id
+    | User _ | Assistant _ -> false)
+;;
+
+let append_trim t ~before =
+  let context = context t in
+  match
+    List.findi context ~f:(fun _ (id, _) ->
+      Option.equal String.equal id (Some before))
+  with
+  | None ->
+    Or_error.errorf
+      "message %s is not in the model's context: trim before one of your \
+       messages that /trim lists"
+      before
+  | Some (0, _) ->
+    Or_error.error_string
+      "nothing to trim: that message is the first one in the model's context"
+  | Some (i, (_, m)) ->
+    let dropped = List.take context i in
+    let kept = List.drop context i in
+    if not (is_trim_point m.message)
+    then
+      Or_error.error_string
+        "the context can only be trimmed before one of your messages, so that \
+         every tool call keeps its result: pick one that /trim lists"
+    else if splits_a_call ~dropped ~kept
+    then
+      Or_error.error_string
+        "trimming there would part a tool call from its result: pick an \
+         earlier or later message"
+    else (
+      let entry = append t (Trim { before }) in
+      Ok
+        { Trim.before
+        ; messages = List.length dropped
+        ; tokens = estimate dropped
+        ; at = entry.at
+        })
+;;
+
+let append_untrim t =
+  match (fold t (active_path t)).trims with
+  | [] -> Or_error.error_string "nothing is trimmed: /trim picks a point"
+  | (latest, dropped) :: _ ->
+    ignore (append t Untrim : Entry.t);
+    Ok
+      { Trim.before =
+          (match latest.payload with
+           | Trim { before } -> before
+           | _ -> latest.id)
+      ; messages = List.length dropped
+      ; tokens = estimate dropped
+      ; at = latest.at
+      }
+;;
+
+let context_tokens t =
+  let path = active_path t in
+  let last_reply =
+    List.findi (List.rev path) ~f:(fun _ (e : Entry.t) ->
       match e.payload with
-      | Message message -> Some (Some e.id, { Timed_message.message; at = e.at })
-      | Model _
-      | Compaction _
-      | Name _
-      | Description _
-      | Cwd _
-      | System_prompt _
-      | Goal _
-      | Reminders _
-      | Budget _
-      | Approval _
-      | Allow_rule _
-      | Archived _
-      | Spend _
-      | Resume_at _
-      | Told_environment _
-      | Repo _
-      | Agent_worktree _
-      | Worktree _
-      | Worktree_removed _
-      | Home _
-      | Review _ -> None)
+      | Message (Assistant _) -> true
+      | _ -> false)
   in
-  match compaction with
-  | None -> messages path
-  | Some (summary, kept_from, pinned) ->
-    let kept =
-      List.drop_while path ~f:(fun e -> not (String.equal e.id kept_from))
+  match last_reply with
+  | None -> 0
+  | Some (from_end, reply) ->
+    let input =
+      match reply.payload with
+      | Message (Assistant a) -> a.usage.input
+      | _ -> 0
     in
-    let pinned =
-      Option.bind pinned ~f:(Hashtbl.find t.by_id) |> Option.to_list
-    in
-    messages pinned
-    @ [ None, { Timed_message.message = summary_message summary; at = None } ]
-    @ messages kept
+    let since = List.drop path (List.length path - from_end) in
+    if
+      not
+        (List.exists since ~f:(fun (e : Entry.t) ->
+           match e.payload with
+           | Trim _ | Untrim -> true
+           | _ -> false))
+    then input
+    else (
+      let seen =
+        (fold t (List.take path (List.length path - from_end))).context
+      in
+      Int.max 0 (input + estimate (context t) - estimate seen))
 ;;
 
 let timed_messages t = List.map (context t) ~f:snd
@@ -745,6 +915,8 @@ let system_prompt t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> acc)
 ;;
 
@@ -772,6 +944,8 @@ let goal t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> acc)
 ;;
 
@@ -814,6 +988,8 @@ let budget t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> acc)
 ;;
 
@@ -841,14 +1017,44 @@ let model t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> acc)
+;;
+
+(* A trim stays while its message does, and an untrimmed context stays
+   untrimmed: when the trim in effect on the path now differs from [trim]
+   (the one before a rewind, or the copy's source's), it is recorded again
+   if its message is in the context, or the trims are cancelled. *)
+let keep_trim t (trim : Trim.t option) =
+  let current () =
+    Option.map (trim_of_folded (fold t (active_path t))) ~f:(fun t -> t.before)
+  in
+  match trim with
+  | None ->
+    let rec untrim limit =
+      if limit > 0 && Option.is_some (current ())
+      then (
+        ignore (append t Untrim : Entry.t);
+        untrim (limit - 1))
+    in
+    untrim 100
+  | Some { before; _ } ->
+    if
+      (not (Option.equal String.equal (current ()) (Some before)))
+      && List.exists
+           (List.drop (context t) 1)
+           ~f:(fun (id, _) -> Option.equal String.equal id (Some before))
+    then ignore (append t (Trim { before }) : Entry.t)
 ;;
 
 let rewind t ~to_ =
   if Hashtbl.mem t.by_id to_
   then (
+    let trim = trim t in
     t.head <- Some to_;
     write_line t (Head to_);
+    keep_trim t trim;
     Ok ())
   else Or_error.error_s [%message "no such entry" (to_ : string)]
 ;;
@@ -887,6 +1093,7 @@ let fork ?at t ~dir =
                    ; kept_from = renamed kept_from
                    ; pinned = Option.map pinned ~f:renamed
                    })
+            | Trim { before } -> Some (Trim { before = renamed before })
             | Review
                 (Snapshot
                    { snapshot = { content = Text { md5 }; _ } as s; text }) ->
@@ -907,6 +1114,10 @@ let fork ?at t ~dir =
           if not (String.equal e.id at) then copy rest
       in
       copy path;
+      keep_trim
+        forked
+        (Option.map (trim t) ~f:(fun (trim : Trim.t) ->
+           { trim with before = renamed trim.before }));
       (* The home follows the file, not the path: it may have been set on
          another branch. *)
       if not (Option.equal Home.equal forked.home t.home)
@@ -1016,6 +1227,8 @@ let archived_and_activity t ~mtime =
         | Worktree _
         | Worktree_removed _
         | Home _
+        | Trim _
+        | Untrim
         | Review _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
@@ -1301,6 +1514,8 @@ let to_markdown t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Trim _
+    | Untrim
     | Review _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in

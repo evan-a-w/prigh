@@ -35,6 +35,8 @@ let methods =
   ; "get_messages"
   ; "get_messages_page"
   ; "get_outline"
+  ; "get_trim_points"
+  ; "get_trimmed"
   ; "get_tool_output"
   ; "get_entries"
   ; "set_model"
@@ -71,6 +73,8 @@ let methods =
   ; "fork"
   ; "clone"
   ; "rewind"
+  ; "trim"
+  ; "untrim"
   ; "session_stats"
   ; "set_cwd"
   ; "worktree_back"
@@ -966,14 +970,30 @@ let messages_page t (client : Client.t) params =
   Message_page.to_json page
 ;;
 
-let outline t (client : Client.t) params =
-  let open Or_error.Let_syntax in
-  let%map session =
-    match%bind string_param_opt params "session" with
-    | None -> Ok (Agent.session client.agent)
-    | Some key -> session_to_read t key
-  in
-  Outline.to_json (Outline.create (Session.identified_messages session))
+let read_session t (client : Client.t) params =
+  match%bind.Or_error string_param_opt params "session" with
+  | None -> Ok (Agent.session client.agent)
+  | Some key -> session_to_read t key
+;;
+
+let outline t client params =
+  Or_error.map (read_session t client params) ~f:(fun session ->
+    Outline.to_json (Outline.create (Session.identified_messages session)))
+;;
+
+let trim_points t client params =
+  Or_error.map (read_session t client params) ~f:(fun session ->
+    Trim_point.to_json (Trim_point.create (Session.identified_messages session)))
+;;
+
+let trimmed t client params =
+  Or_error.map (read_session t client params) ~f:(fun session ->
+    `Object
+      [ ( "messages"
+        , `Array
+            (List.map (Session.trimmed_messages session) ~f:(fun (_, m) ->
+               Message_page.message m)) )
+      ])
 ;;
 
 (* Searches the whole session file, so that outputs from before a
@@ -2017,6 +2037,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "remove_worktree" -> Some (remove_worktree t client params)
   | "get_messages_page" -> Some (messages_page t client params)
   | "get_outline" -> Some (outline t client params)
+  | "get_trim_points" -> Some (trim_points t client params)
+  | "get_trimmed" -> Some (trimmed t client params)
   | "get_tool_output" -> Some (tool_output t client params)
   | "delete_session" ->
     Some
@@ -2437,6 +2459,10 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "rewind" ->
     Or_error.bind (string_param params "to") ~f:(fun to_ ->
       unit_result (Agent.rewind agent ~to_))
+  | "trim" ->
+    Or_error.bind (string_param params "before") ~f:(fun before ->
+      Or_error.map (Agent.trim agent ~before) ~f:Rpc_json.trim_result)
+  | "untrim" -> Or_error.map (Agent.untrim agent) ~f:Rpc_json.trim_result
   | "session_stats" -> ok (Rpc_json.session_stats (Agent.session_stats agent))
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->

@@ -28,6 +28,10 @@ module Method = struct
         ; limit : int
         }
     | Get_outline of { session : string }
+    | Get_trim_points
+    | Get_trimmed
+    | Trim of { before : string }
+    | Untrim
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option
@@ -157,6 +161,10 @@ module Method = struct
     | Delete_archived -> "delete_archived"
     | Get_messages_page _ -> "get_messages_page"
     | Get_outline _ -> "get_outline"
+    | Get_trim_points -> "get_trim_points"
+    | Get_trimmed -> "get_trimmed"
+    | Trim _ -> "trim"
+    | Untrim -> "untrim"
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
@@ -217,7 +225,13 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived | Forge_status | Get_review | Nix_store_status -> []
+    | Delete_archived
+    | Forge_status
+    | Get_review
+    | Nix_store_status
+    | Get_trim_points
+    | Get_trimmed
+    | Untrim -> []
     | Nix_store_gc { delete_generations = None } -> []
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
@@ -272,6 +286,7 @@ module Method = struct
       @ Option.value_map from ~default:[] ~f:(fun f -> [ "from", Json.str f ])
       @ [ "limit", Json.int limit ]
     | Get_outline { session } -> [ "session", Json.str session ]
+    | Trim { before } -> [ "before", Json.str before ]
     | Get_tool_output { call_id; agent_id } ->
       [ "call_id", Json.str call_id ]
       @ Option.value_map agent_id ~default:[] ~f:(fun a ->

@@ -100,6 +100,11 @@ module Entry : sig
       (** where a worktree switch took it from; [None]: cleared (it went
           back, or elsewhere). Like [Cwd], the last one on any branch
           counts. *)
+      | Trim of { before : string }
+      (** from here on the model's context starts at the message [before]
+          (one of the user's): what comes before it is dropped (see
+          {!messages}) *)
+      | Untrim (** cancels the latest [Trim] in effect *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -167,10 +172,47 @@ val description : t -> string option
 (** Entries on the active path, root first. *)
 val active_path : t -> Entry.t list
 
-(** Messages for the next model request: those on the active path, with a
-    compaction summary (if any) replacing everything before [kept_from],
-    preceded by the compaction's pinned message. *)
+(** Messages for the next model request: those on the active path, folded
+    in order: a compaction's summary replaces everything before its
+    [kept_from] in the context so far, preceded by the compaction's pinned
+    message; a trim drops everything before its message (the summary and
+    the pinned message too, when it cuts into a compaction's kept part); an
+    untrim puts back what the latest trim in effect dropped, in front of the
+    context as it is now (a compaction after a trim summarised only what
+    came after it). *)
 val messages : t -> Message.t list
+
+module Trim : sig
+  type t =
+    { before : string
+      (** the entry id of the message the context starts at, the latest
+          trim's *)
+    ; messages : int
+    ; tokens : int (** estimated ({!Message.estimate_tokens}) *)
+    ; at : float option (** when the latest trim was made *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** The trims in effect on the active path: the latest one's point, and
+    every one's messages and tokens. *)
+val trim : t -> Trim.t option
+
+(** What the trims in effect dropped from the context, oldest first. *)
+val trimmed_messages : t -> (string option * Timed_message.t) list
+
+(** Drops everything before the message [before] from the context: it must
+    be a user message in {!messages} other than the first (a cut there never
+    parts a tool call from its result). Answers what it dropped. *)
+val append_trim : t -> before:string -> Trim.t Or_error.t
+
+(** Cancels the latest trim in effect, answering what it brought back. *)
+val append_untrim : t -> Trim.t Or_error.t
+
+(** The input tokens of the latest reply on the active path's request,
+    adjusted by the estimated tokens the trims and untrims since took out
+    or brought back; 0 before any reply. *)
+val context_tokens : t -> int
 
 (** The entry id of each of [messages] ([None] for a compaction summary). *)
 val context_ids : t -> string option list
@@ -286,6 +328,9 @@ val append_compaction
   -> kept_from:string
   -> Entry.t
 
+(** Moves [head] to [to_]. The trim in effect stays: it is recorded again
+    when its message is still in the context (rewinding to before it drops
+    it), and cancelled when there was none. *)
 val rewind : t -> to_:string -> unit Or_error.t
 
 (** Copy [src_path] into [dir] under a fresh stamp. The session id is kept
@@ -293,7 +338,8 @@ val rewind : t -> to_:string -> unit Or_error.t
 val import : dir:string -> string -> t Or_error.t
 
 (** A new session in [dir] containing a copy of the active path up to and
-    including [at] (default: head). *)
+    including [at] (default: head), with the trim in effect, as
+    {!rewind} keeps it. *)
 val fork : ?at:string -> t -> dir:string -> t Or_error.t
 
 module Export_format : sig

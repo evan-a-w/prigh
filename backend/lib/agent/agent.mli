@@ -76,6 +76,8 @@ module State : sig
       (** rules the user allowed for this session ("don't ask again") *)
     ; home : Session.Home.t option
       (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
+    ; trim : Session.Trim.t option
+      (** what is trimmed from the model's context ({!Session.trim}) *)
     }
   [@@deriving sexp_of]
 end
@@ -695,6 +697,13 @@ val new_session : t -> unit
 
 val switch_session : t -> path:string -> unit Or_error.t
 val fork : t -> ?at:string -> unit -> unit Or_error.t
+
+(** {!Session.append_trim}, refused while a run is in progress. *)
+val trim : t -> before:string -> Session.Trim.t Or_error.t
+
+(** {!Session.append_untrim}, refused while a run is in progress. *)
+val untrim : t -> Session.Trim.t Or_error.t
+
 val rewind : t -> to_:string -> unit Or_error.t
 val set_session_name : t -> string -> unit
 
