@@ -2111,7 +2111,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       are missing after a reload — or a job's output, with what it is
       (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
       pinned under the scrolling body; the status line's
-      summary and the toggle in the chat's corner or the bar). Elapsed times tick with `Clock`,
+      summary and the toggle in the chat's corner or the bar). Steering:
+      `Model.recipient` (`Recipient`: `Main` or a subagent's id) is who the
+      composer sends to; `follow_recipient`, after every update, makes it the
+      running top-level subagent shown in the panel when the selection
+      changes on a desktop (`Main` once the panel closes) and `Main` when
+      that subagent finishes, with a toast. `send` then calls `steer_agent`
+      (`mode: follow_up` for Alt+Enter, `Steered` puts the text back if it
+      fails), `Dequeue` `dequeue_agent`; `Composer_view` shows the chip,
+      `Agents_view` the Steer button (disabled, saying why, for nested
+      ones). Elapsed times tick with `Clock`,
       which the page sends every second only while the panel is open with
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
@@ -2259,7 +2268,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
-      message reaches the transcript, until the run ends), `Completion`
+      message reaches the transcript, until the run ends; then the
+      subagents' queues, `Model.agent_queues` from `agent_queues` and
+      `get_pending`'s `agents`, removed with `remove_agent_queued`; the
+      actions carry the `Recipient`), `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
       `list_paths`, `#` snippets) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
