@@ -2,7 +2,7 @@ open! Core
 
 let optional j name ~f =
   match Json.field j name with
-  | None -> Ok None
+  | None | Some `Null -> Ok None
   | Some v -> Or_error.map (f v) ~f:Option.some
 ;;
 
@@ -40,8 +40,8 @@ module Schedule = struct
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind interval_seconds = Json.int_field j "interval_seconds" in
-    let%bind keep_days = optional j "keep_days" ~f:(fun _ ->
-      Json.int_field j "keep_days")
+    let%bind keep_days =
+      optional j "keep_days" ~f:(fun _ -> Json.int_field j "keep_days")
     in
     let%map next_at = Json.time_ms_opt_field j "next_at_ms" in
     { interval = Time_ns.Span.of_int_sec interval_seconds; keep_days; next_at }
