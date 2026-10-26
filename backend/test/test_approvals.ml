@@ -947,7 +947,8 @@ let%expect_test
       "notify": "bell",
       "snippets": [],
       "auto_background_seconds": 30,
-      "generate_model": null
+      "generate_model": null,
+      "mask_observations": true
     }
     |}]
 ;;

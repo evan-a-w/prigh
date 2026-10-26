@@ -206,10 +206,16 @@ let common_params =
         | Some agent -> (Agent.config agent).worktrees_dir
         | None -> Config.default.worktrees_dir
       in
+      let mask_observations () =
+        match !agent_ref with
+        | Some agent -> (Agent.config agent).mask_observations
+        | None -> Config.default.mask_observations
+      in
       let subagent =
         Tool_subagent.create
           ~models
           ~worktrees_dir
+          ~mask_observations
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -337,6 +343,11 @@ let run_command =
          | Loop Agent_start -> if not in_subagent then failed := None
          | Loop (Compacted _) | Compacted _ ->
            note "[compacted the conversation to fit the context window]"
+         | Loop (Masked { masked; tokens_saved }) ->
+           note
+             "[masked %d old tool outputs to save context (about %d tokens)]"
+             masked
+             tokens_saved
          | Notice n -> eprintf "%s\n%!" (cli_hints n)
          (* Nobody is there to answer: refuse rather than wait forever. *)
          | Loop (Tool_confirm { call_id; agent_id; name; summary; _ }) ->

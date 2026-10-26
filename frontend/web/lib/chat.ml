@@ -407,6 +407,7 @@ let rec apply t (event : Event.t) =
   | Sessions_changed
   | Agent_queues _
   | Nix_gc_progress _
+  | Masked _
   | Prefs_changed _ -> t
 ;;
 

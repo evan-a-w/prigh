@@ -56,6 +56,9 @@ type t =
   ; generate_model : string option
     (** the model that drafts commit messages, pull requests, branch names
         and session titles ([generate_text]); [None]: the session's *)
+  ; mask_observations : bool
+    (** replace old tool outputs with placeholders before summarising the
+        conversation ({!Observation_mask}; default true) *)
   }
 [@@deriving sexp_of]
 

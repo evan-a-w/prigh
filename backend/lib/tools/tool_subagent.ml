@@ -269,6 +269,7 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
 
 let execute
       ?inbox
+      ~mask_observations
       ~provider
       ~home
       (context : Tool.Context.t)
@@ -324,6 +325,7 @@ let execute
           (match context.cache_key with
            | Some parent -> parent ^ "/" ^ agent_id
            | None -> agent_id)
+    ; mask_observations
     }
   in
   context.emit
@@ -474,6 +476,7 @@ let execute
 let create
       ?(models = Model_registry.builtin ())
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
+      ?(mask_observations = fun () -> true)
       ~provider
       ~current_model
       ~current_thinking
@@ -504,6 +507,7 @@ let create
                let result =
                  execute
                    ~inbox
+                   ~mask_observations:(mask_observations ())
                    ~provider
                    ~home
                    { context with cancel; emit; on_output = ignore }
@@ -528,7 +532,13 @@ let create
            | None -> context.call_id
            | Some parent -> parent ^ "/" ^ context.call_id
          in
-         execute ~provider ~home context prepared ~agent_id)
+         execute
+           ~mask_observations:(mask_observations ())
+           ~provider
+           ~home
+           context
+           prepared
+           ~agent_id)
   in
   { Tool.spec; run }
 ;;

@@ -12,6 +12,7 @@ let config ?(tools = Tools.all) ?max_turns () =
   ; max_tokens = None
   ; retries = 2
   ; cache_key = None
+  ; mask_observations = true
   }
 ;;
 
@@ -64,6 +65,8 @@ let rec show_event (e : Agent_event.t) =
       summary
       usage.input
       usage.output
+  | Masked { masked; tokens_saved } ->
+    sprintf "masked %d messages (saved %d tokens)" masked tokens_saved
   | Subagent { call_id; agent_id; event } ->
     sprintf "subagent %s/%s: %s" call_id agent_id (show_event event)
   | Subagent_end { call_id; agent_id; usage; turns; cost_usd; _ } ->

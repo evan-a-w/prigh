@@ -36,6 +36,7 @@ let%expect_test "state event and messages" =
   decode
     {|{"type":"event","event":"agent_end","messages":[{"role":"user","text":"x"}]}|};
   decode {|{"type":"event","event":"compacted","summary":"s"}|};
+  decode {|{"type":"event","event":"masked","masked":3,"tokens_saved":5934}|};
   decode {|{"type":"event","event":"notice","text":"n"}|};
   decode
     {|{"type":"event","event":"queue_update","steer":2,"follow_up":1,"steer_texts":["a","b"],"follow_up_texts":["c"]}|};
@@ -132,6 +133,10 @@ let%expect_test "state event and messages" =
       (chunk   "line\n")))
     (Event (Agent_end ((User ((text x))))))
     (Event (Compacted s))
+    (Event (
+      Masked
+      (masked       3)
+      (tokens_saved 5934)))
     (Event (Notice n))
     (Event (Queue_update (steer (a b)) (follow_up (c))))
     |}]
@@ -780,6 +785,7 @@ let%expect_test "entries and session stats" =
      (context_percent  1.5)
      (model_changes    1)
      (compactions      0)
+     (masks            0)
      (duration_seconds 12.5))
     |}]
 ;;

@@ -6548,6 +6548,8 @@ let main_event (m : Model.t) (event : Event.t) =
   | State state when superseded m state -> m, []
   | State state -> set_state m state
   | Notice text -> toast m text
+  | Masked { masked; tokens_saved } ->
+    toast m (Event.masked_notice ~masked ~tokens_saved)
   | Queue_update { steer; follow_up } ->
     { m with queue = Queued.update m.queue ~steer ~follow_up }, []
   | Agent_queues agent_queues -> { m with agent_queues }, []

@@ -9,6 +9,7 @@ type t =
   ; context_percent : float
   ; model_changes : int
   ; compactions : int
+  ; masks : int
   ; duration_seconds : float
   }
 [@@deriving sexp_of, equal]
@@ -38,6 +39,11 @@ let of_json j =
   let%bind context_percent = Json.float_field j "context_percent" in
   let%bind model_changes = Json.int_field j "model_changes" in
   let%bind compactions = Json.int_field j "compactions" in
+  let%bind masks =
+    match Json.field j "masks" with
+    | None -> Ok 0
+    | Some _ -> Json.int_field j "masks"
+  in
   let%map duration_seconds = Json.float_field j "duration_seconds" in
   { message_count
   ; turns
@@ -47,6 +53,7 @@ let of_json j =
   ; context_percent
   ; model_changes
   ; compactions
+  ; masks
   ; duration_seconds
   }
 ;;
