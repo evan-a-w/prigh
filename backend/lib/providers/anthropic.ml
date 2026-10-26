@@ -274,15 +274,8 @@ let wire_tool ~oauth (t : Tool_spec.t) =
 ;;
 
 let thinking_budget ~max_tokens (thinking : Thinking.t) =
-  let budget =
-    match thinking with
-    | Off -> None
-    | On None -> Some 8_192
-    | On (Some Low) -> Some 2_048
-    | On (Some High) -> Some 16_384
-    | On (Some Max) -> Some 32_000
-  in
-  Option.map budget ~f:(fun b -> Int.max 1_024 (Int.min b (max_tokens - 1_024)))
+  Option.map (Thinking.budget_tokens thinking) ~f:(fun b ->
+    Int.max 1_024 (Int.min b (max_tokens - 1_024)))
 ;;
 
 let effort_of_thinking : Thinking.t -> string option = function

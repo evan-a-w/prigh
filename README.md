@@ -1555,9 +1555,19 @@ too long anyway (Anthropic's "prompt is too long", OpenAI's
 OpenAI-compatible servers), the conversation is compacted and the request
 sent again, keeping less the second time; only then does the run fail,
 saying what to do. A compaction keeps the end of the conversation from a
-turn boundary, so tool calls keep their results, and when it falls in the
-middle of the work on your latest message, that message is kept verbatim
-ahead of the summary. Subagents compact their own context the same way.
+turn boundary, so tool calls keep their results, and carries your
+instructions over: when it falls in the middle of the work on your latest
+message, that message is kept verbatim ahead of the summary, and your
+earlier messages are too, long ones cut to their first 2000 characters,
+the newest first up to about 6k tokens. The summary has fixed sections
+(goal and constraints, decisions, failed approaches with their exact
+errors, files, current state, next steps), updates the previous one rather
+than summarising it again, and ends with the files read and modified,
+recorded from the tool calls that succeeded (absolute paths, the 100 most
+recent of each). It is written by the model from the
+conversation as it is, in a request that shares the session's prompt
+cache; a conversation too long for that is sent as a shortened transcript
+instead. Subagents compact their own context the same way.
 
 #### Trimming the context
 
@@ -1572,9 +1582,10 @@ out (trims stack: each undo cancels one). The context use in the status line
 goes down by the estimate at once. The cut is always at one of your
 messages, so a tool call never loses its result, and it is refused while a
 run is in progress (wait for it to end or abort it with Esc). It works with
-compaction both ways: a `/compact` after a trim summarises only what is
-after it, and a trim after a compaction can cut into what the compaction
-kept, dropping the summary too. A fork or clone keeps the trim, and so does
+compaction both ways: a `/compact` after a trim summarises, and carries
+over, only your messages after it, and a trim after a compaction can start
+at one of the messages it carried over, or cut into what it kept, dropping
+those messages and the summary too. A fork or clone keeps the trim, and so does
 `/rewind` while the trimmed-to message stays on the path (rewinding to
 before it drops the trim).
 

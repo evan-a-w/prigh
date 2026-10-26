@@ -19,6 +19,16 @@ type t =
 
 let default = On None
 
+(* The token budget for budget-style thinking (Anthropic's older models),
+   before it is capped to fit the request's [max_tokens]. *)
+let budget_tokens = function
+  | Off -> None
+  | On None -> Some 8_192
+  | On (Some Low) -> Some 2_048
+  | On (Some High) -> Some 16_384
+  | On (Some Max) -> Some 32_000
+;;
+
 let to_string = function
   | Off -> "off"
   | On None -> "on"

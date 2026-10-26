@@ -14,6 +14,14 @@ module Config = struct
     }
 
   let default_retries = 5
+
+  let compaction_prompt t =
+    { Compaction.Prompt.system = t.system
+    ; tools = Tools.specs t.tools
+    ; thinking = t.thinking
+    ; cache_key = t.cache_key
+    }
+  ;;
 end
 
 let is_retryable_error message =
@@ -189,20 +197,23 @@ let run
     match compact with
     | Some f -> f
     | None ->
-      fun ~keep_recent_tokens ~cancel messages ->
+      fun ~keep_recent_tokens ~overflowed ~cancel messages ->
         Compaction.compact_messages
           ~provider
           ~model:config.model
+          ~prompt:(Config.compaction_prompt config)
+          ~overflowed
           ~keep_recent_tokens
           ~cancel
+          ~cwd
           messages
   in
   (* Tokens of the latest response's request and reply, while they still
      describe the context (until it is compacted). *)
   let last_tokens = ref None in
-  let compact_context ~keep_recent_tokens =
+  let compact_context ~keep_recent_tokens ~overflowed =
     Or_error.map
-      (compact ~keep_recent_tokens ~cancel !messages)
+      (compact ~keep_recent_tokens ~overflowed ~cancel !messages)
       ~f:(fun (context, (outcome : Compaction.Outcome.t)) ->
         messages := context;
         last_tokens := None;
@@ -225,6 +236,7 @@ let run
         match
           compact_context
             ~keep_recent_tokens:Compaction.default_keep_recent_tokens
+            ~overflowed:false
         with
         | Ok () -> ()
         | Error _ -> compaction_failed := true)
@@ -281,6 +293,7 @@ let run
             match
               compact_context
                 ~keep_recent_tokens:(overflow_keep ~attempt:(overflows + 1))
+                ~overflowed:true
             with
             | Ok () -> attempt n ~overflows:(overflows + 1)
             | Error e ->
