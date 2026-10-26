@@ -8,11 +8,13 @@ open! Import
     what each costs and what it keeps. A developer's tool ([prigh
     compaction-eval]) for tuning {!Observation_mask} and {!Compaction}.
 
-    Tokens are estimated as {!Compaction.estimate_tokens} counts them. Each
+    Tokens are estimated as {!Message.estimate_tokens} counts them. Each
     assistant message is one request, whose input is the context before it
     plus the system prompt and [overhead_tokens]. Before each request (but
     the first), masking and then summarising run when the agent would run
-    them. Offline, a summary is a stub: a placeholder of [summary_tokens]
+    them ({!Compaction_settings.worth_masking_at} against the threshold), and
+    a request still larger than the window is masked as the agent masks
+    after an overflow. Offline, a summary is a stub: a placeholder of [summary_tokens]
     and the files list ({!Compaction_files}); the pinned user messages are
     carried as the agent carries them. With [live], a model writes the
     summaries and answers questions about the final context. *)
@@ -34,14 +36,21 @@ end
 module Config : sig
   type t =
     { window : int option (** default: the model's context window *)
+    ; compaction : Compaction_settings.t
+      (** as the agent's: its [max_tokens] cap sets the default threshold,
+          and with [live] its [model] writes the summaries when its window
+          holds the threshold (else the live model does);
+          [mask_observations] is not used (the strategies say) *)
     ; threshold_tokens : int option
-      (** summarise above this (and mask urgently); default: 80% of the
-          window, as {!Compaction.should_compact} *)
+      (** summarise above this; default: [compaction]'s
+          ({!Compaction_settings.threshold}, of the evaluated window) *)
     ; keep_recent_tokens : int (** {!Compaction.default_keep_recent_tokens} *)
     ; keep_turns : int (** {!Observation_mask.keep_turns} *)
     ; mask_min_bytes : int (** {!Observation_mask.min_bytes} *)
-    ; mask_at : float (** {!Observation_mask.worth_masking}'s [at] *)
-    ; mask_min_saving : float (** and its [min_saving] *)
+    ; mask_at : float
+      (** {!Compaction_settings.worth_masking_at}'s [at], a fraction of the
+          threshold (5/8) *)
+    ; mask_min_saving : float (** and its [min_saving] (1/8) *)
     ; summary_tokens : int (** the offline stub summary's size *)
     ; overhead_tokens : int
       (** what each request sends besides the messages and the system prompt
@@ -66,6 +75,7 @@ end
 module Live : sig
   type t =
     { summaries : int
+    ; summary_model : string (** the model that wrote them *)
     ; failures : int (** summaries that failed (the context was kept) *)
     ; usage : Usage.t (** of the summaries and the questions *)
     ; cost_usd : float
@@ -83,7 +93,9 @@ module Live : sig
   module Setup : sig
     type t =
       { provider : Provider.t
-      ; model : Model.t (** writes the summaries and answers *)
+      ; model : Model.t
+        (** answers, and writes the summaries unless the config's
+            [compaction] has a model for them *)
       ; cancel : Cancellation.t
       }
   end

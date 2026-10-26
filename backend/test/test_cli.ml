@@ -455,7 +455,26 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
   printf
     "file unchanged: %b\n"
     (String.equal before (In_channel.read_all (Session.path s)));
-  [%expect {|
+  (* The threshold honours compact_at_tokens, and -compact-at over it. *)
+  Out_channel.write_all
+    (Filename.concat t.dir ".prigh/config.json")
+    ~data:{|{"compact_at_tokens": 10000}|};
+  List.iter
+    [ []; [ "-compact-at"; "12000" ]; [ "-compact-at"; "0" ] ]
+    ~f:(fun flags ->
+      prigh
+        ~hide:[ prefix, "<prefix>" ]
+        t
+        ([ "compaction-eval"
+         ; prefix
+         ; "-window"
+         ; "20000"
+         ; "-strategies"
+         ; "none"
+         ]
+         @ flags));
+  [%expect
+    {|
     in the help: false
     $ prigh compaction-eval
     name sessions (ids, as prigh sessions list shows, or files), or pass -all
@@ -483,5 +502,32 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
       summarise          11.3k    0    33.9k    11.3k    16.4k     0     0     0  13.5k       1/0/1     6/6       -       -
       mask+summarise      9027    0    27.2k    13.6k    18.4k     1     1     0   6850       1/0/1     6/6       -       -
     file unchanged: true
+    $ prigh compaction-eval <prefix> -window 20000 -strategies none
+    session <id> "Fix it. Don't touch the lexer."
+      deepseek/deepseek-flash (default), window 20.0k, summarise over 10.0k: 13 messages, recorded input 0
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+
+    aggregate over 1 sessions
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+    $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 12000
+    session <id> "Fix it. Don't touch the lexer."
+      deepseek/deepseek-flash (default), window 20.0k, summarise over 12.0k: 13 messages, recorded input 0
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+
+    aggregate over 1 sessions
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+    $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 0
+    session <id> "Fix it. Don't touch the lexer."
+      deepseek/deepseek-flash (default), window 20.0k, summarise over 16.0k: 13 messages, recorded input 0
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+
+    aggregate over 1 sessions
+      strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
+      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
     |}]
 ;;

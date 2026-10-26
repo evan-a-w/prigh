@@ -112,16 +112,16 @@ let%expect_test "offline: each strategy on a session" =
       anthropic/claude-opus-4-5, window 20.0k, summarise over 14.0k: 114 messages, recorded input 57.0k
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-      mask                9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
+      mask                8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
       summarise          14.0k    0   448.8k    33.7k    83.7k     4     0     2   6904       2/0/2     1/1   18/18     2/6
-      mask+summarise      9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
+      mask+summarise      8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-      mask                9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
+      mask                8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
       summarise          14.0k    0   448.8k    33.7k    83.7k     4     0     2   6904       2/0/2     1/1   18/18     2/6
-      mask+summarise      9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
+      mask+summarise      8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
     |}]
 ;;
 
@@ -299,24 +299,24 @@ let%expect_test "live: a model writes the summaries and answers the probes" =
       anthropic/claude-opus-4-5, window 20.0k, summarise over 14.0k: 114 messages, recorded input 57.0k
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
-      mask                9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+      mask                8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
       summarise          14.0k    0   448.8k    33.7k    83.7k     4     0     2   6904       2/0/2     1/1   18/18     2/6
-                      live: 2 summaries (0 failed), $0.0016; 2/18 written files, 1/2 constraints, 1/1 last error
-      mask+summarise      9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+                      live: 2 summaries by deepseek/deepseek-flash (0 failed), $0.0016; 2/18 written files, 1/2 constraints, 1/1 last error
+      mask+summarise      8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
-      mask                9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+      mask                8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
       summarise          14.0k    0   448.8k    33.7k    83.7k     4     0     2   6904       2/0/2     1/1   18/18     2/6
-                      live: 2 summaries (0 failed), $0.0016; 2/18 written files, 1/2 constraints, 1/1 last error
-      mask+summarise      9879    0   353.2k    39.2k    80.4k     4     4     0   7485       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
+                      live: 2 summaries by deepseek/deepseek-flash (0 failed), $0.0016; 2/18 written files, 1/2 constraints, 1/1 last error
+      mask+summarise      8413    0   324.7k    44.5k    83.6k     6     6     0   7485       2/0/2     1/1   18/18     6/6
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0005; 2/18 written files, 1/2 constraints, 1/1 last error
     (none 0 ((0 ((input 1000) (output 200) (cache_read 0)))))
     (mask 0 ((0 ((input 1000) (output 200) (cache_read 0)))))
     (summarise 2 ((2 ((input 3000) (output 600) (cache_read 0)))))
@@ -348,15 +348,124 @@ let%expect_test "live: a final context too large for the model is not probed" =
       anthropic/claude-opus-4-5, window 20.0k, summarise over 14.0k: 114 messages, recorded input 57.0k
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0000; n/a written files, n/a constraints, n/a last error
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0000; n/a written files, n/a constraints, n/a last error
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               32.4k   21   940.5k    32.4k   131.3k     0     0     0  32.4k       2/0/2     1/1   18/18     6/6
-                      live: 0 summaries (0 failed), $0.0000; n/a written files, n/a constraints, n/a last error
+                      live: 0 summaries by deepseek/deepseek-flash (0 failed), $0.0000; n/a written files, n/a constraints, n/a last error
     |}]
 ;;
 
+let%expect_test "live: the compaction model writes the summaries" =
+  with_sandbox
+  @@ fun t ->
+  let session = make_session t ~turns:18 in
+  let config = { config with strategies = [ Summarise ] } in
+  let cheap window =
+    { Model.default with
+      id = "cheap"
+    ; context_window = window
+    ; cost = { input = 0.1; output = 0.1; cache_read = 0. }
+    }
+  in
+  let usage = { Usage.input = 1000; output = 200; cache_read = 0 } in
+  let run summariser =
+    let provider =
+      Faux_provider.create
+        ~on_request:(fun r ->
+          printf
+            "%s: %s\n"
+            (Model.key r.model)
+            (match List.last r.messages with
+             | Some (User u)
+               when String.is_substring u.text ~substring:"compaction-eval" ->
+               "probe"
+             | Some _ | None -> "summary"))
+        (List.init 3 ~f:(fun i ->
+           { (Reply.text (if i < 2 then summary_text else "answer")) with
+             usage
+           }))
+    in
+    let live =
+      { Compaction_eval.Live.Setup.provider
+      ; model = Model.default
+      ; cancel = Cancellation.never
+      }
+    in
+    let report =
+      Compaction_eval.session
+        ~live
+        { config with
+          compaction =
+            { Compaction_settings.window_only with model = Some summariser }
+        }
+        session
+    in
+    List.iter report.results ~f:(fun r ->
+      Option.iter r.live ~f:(fun l ->
+        printf
+          "%d summaries by %s, $%.6f\n"
+          l.summaries
+          l.summary_model
+          l.cost_usd))
+  in
+  (* Its window holds the 14k threshold: it summarises, at its price. *)
+  run (cheap 14_000);
+  (* It does not: the conversation's model does. *)
+  run (cheap 13_999);
+  [%expect
+    {|
+    deepseek/cheap: summary
+    deepseek/cheap: summary
+    deepseek/deepseek-flash: probe
+    2 summaries by deepseek/cheap, $0.000780
+    deepseek/deepseek-flash: summary
+    deepseek/deepseek-flash: summary
+    deepseek/deepseek-flash: probe
+    2 summaries by deepseek/deepseek-flash, $0.001620
+    |}]
+;;
+
+let%expect_test "the threshold: the compaction settings' cap, or the flag" =
+  with_sandbox
+  @@ fun t ->
+  let session = make_session t ~turns:4 in
+  List.iter
+    [ None, None
+    ; Some 12_000, None
+    ; Some 50_000, None
+    ; Some 12_000, Some 9_000
+    ]
+    ~f:(fun (cap, threshold_tokens) ->
+      let report =
+        Compaction_eval.session
+          { config with
+            threshold_tokens
+          ; strategies = [ None_ ]
+          ; compaction =
+              { Compaction_settings.window_only with max_tokens = cap }
+          }
+          session
+      in
+      printf
+        "window 20000, cap %s, -threshold-tokens %s: summarise over %d\n"
+        (Option.value_map cap ~default:"none" ~f:Int.to_string)
+        (Option.value_map threshold_tokens ~default:"none" ~f:Int.to_string)
+        report.threshold_tokens);
+  [%expect
+    {|
+    window 20000, cap none, -threshold-tokens none: summarise over 16000
+    window 20000, cap 12000, -threshold-tokens none: summarise over 12000
+    window 20000, cap 50000, -threshold-tokens none: summarise over 16000
+    window 20000, cap 12000, -threshold-tokens 9000: summarise over 9000
+    |}]
+;;
+
+(* Masking alone cannot keep 30 turns in a 20k window: under and past the
+   threshold it masks only batches that free 1/8 of it (each read result
+   alone frees less), and the rest are the masks after an overflow, which
+   take whatever helps. *)
 let%expect_test "mask+summarise: summarising when masking frees too little" =
   with_sandbox
   @@ fun t ->
@@ -375,12 +484,12 @@ let%expect_test "mask+summarise: summarising when masking frees too little" =
     session <id> "Fix the parser. Don't touch the lexer, and make sure the tes"
       anthropic/claude-opus-4-5, window 20.0k, summarise over 14.0k: 186 messages, recorded input 93.0k
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      mask               20.3k   14    1.46M   378.5k   580.8k    20    20     0  20.3k       2/0/2     1/1   30/30   10/10
+      mask               20.3k   14    1.49M   332.3k   530.7k    17    17     0  20.3k       2/0/2     1/1   30/30   10/10
       mask+summarise     14.0k    0   751.2k    56.6k   140.2k     8     0     4   6952       2/0/2     1/1   30/30    2/10
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      mask               20.3k   14    1.46M   378.5k   580.8k    20    20     0  20.3k       2/0/2     1/1   30/30   10/10
+      mask               20.3k   14    1.49M   332.3k   530.7k    17    17     0  20.3k       2/0/2     1/1   30/30   10/10
       mask+summarise     14.0k    0   751.2k    56.6k   140.2k     8     0     4   6952       2/0/2     1/1   30/30    2/10
     |}]
 ;;
