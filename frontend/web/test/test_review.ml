@@ -458,7 +458,7 @@ let%expect_test
     (Review (Reply_input (id c1) (text Thanks)))
     (Review (Reply_send c1))
     (Rpc (method_ review_reply) (params ((id c1) (text Thanks)))
-     (tag (Review (Changed (c1)))))
+     (tag (Review (Replied c1))))
     |}];
   H.click h ~selector:".review-thread-tools .btn";
   [%expect
@@ -470,8 +470,8 @@ let%expect_test
 ;;
 
 let%expect_test
-    "a comment whose lines moved follows them; one whose lines are gone shows \
-     above"
+    "a comment whose lines moved follows them; one whose lines are gone is \
+     listed, folded, above"
   =
   let h = opened () in
   H.event
@@ -484,11 +484,7 @@ let%expect_test
   [%expect
     {|
     (Complete_accept (run true))
-    c2 line 2 its code changed
-    (Resolve) (Delete the comment and its thread)
-    You 10:00 not sent yet
-    Gone?
-    []
+    (1 outdated comment)
     @@ -2,3 +2,4 @@
     2 let b = 2
     3 - let c = 3
@@ -890,8 +886,221 @@ let%expect_test "help lists the review's keys" =
     ] / [ (reviewing; also n p, j k): the next / previous changed file
     a / c / e / v / s (reviewing): approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing): choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
+    l / Shift+L (reviewing): what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing): drop the comment or selection, then close the review
     Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+Enter (the review's commit message): commit the ticked files (approved files come ticked; untick to leave one out)
     |}]
+;;
+
+(* ---- where threads show *)
+
+let three_threads () =
+  let h = opened () in
+  H.quiet h (fun () ->
+    H.event
+      h
+      (review_event
+         [ comment_json "c1" ~first:3 ~last:4 "Why double?"
+         ; comment_json
+             "c2"
+             ~first:4
+             ~last:4
+             ~anchor:"let d = 4"
+             ~status:"resolved"
+             ~thread:
+               [ {|{"author":"agent","text":"Fixed.","at_ms":1791194400000,"delivered":true}|}
+               ]
+             "Is d needed?"
+         ; comment_json "c3" ~first:9 ~last:9 ~anchor:"let gone = 0" "Gone?"
+         ]));
+  h
+;;
+
+let%expect_test "on a wide window threads sit in a margin beside their lines" =
+  let h = three_threads () in
+  H.quiet h (fun () ->
+    H.act h (Resize (Viewport { width = 1920; height = 1000 })));
+  H.elements h ~selector:".review-code > *";
+  H.elements h ~selector:".review-code-grid > *";
+  H.show h ~selector:".review-margin";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    <Vdom.Node.none-widget class="">
+    <div class="review-asides">
+    <div class="review-code-grid">
+    <Vdom.Node.none-widget class="">
+    <div class="review-code-main">
+    <aside class="review-margin">
+    <aside aria-label="Comments" class="review-margin">
+      <div role="separator"
+           tabindex="0"
+           aria-label="Resize the review's comments"
+           aria-orientation="vertical"
+           aria-valuenow="340"
+           aria-valuemin="240"
+           aria-valuemax="640"
+           title="Drag to resize, double-click for the default size"
+           data-resize="review-margin"
+           data-resize-var="--review-margin-width"
+           data-resize-grows="-1"
+           data-resize-target="#review-page"
+           class="resizer resizer-review-margin"
+           @on_dblclick> </div>
+      <div @key=c1 data-side="new" data-line="3" class="review-margin-item thread">
+        <article id="review-thread-c1"
+                 data-comment="c1"
+                 aria-label="Comment c1 on lines 3–4"
+                 class="review-thread"
+                 @on_mouseenter
+                 @on_mouseleave>
+          <div class="review-thread-head">
+            <span class="review-id"> c1 </span>
+            <span class="review-where"> lines 3–4 </span>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <div class="review-thread-tools">
+              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+              <button type="button" title="Mark it done" class="btn ghost small" @on_click> Resolve </button>
+              <button type="button"
+                      title="Delete the comment and its thread"
+                      aria-label="Delete"
+                      class="btn ghost icon"
+                      @on_click>
+                <icon class="trash"> </icon>
+              </button>
+            </div>
+          </div>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <ul class="review-posts">
+            <li class="review-post user">
+              <div class="review-post-head">
+                <span class="review-who"> You </span>
+                <span class="review-time"> 10:00 </span>
+                <span class="review-unsent"> not sent yet </span>
+              </div>
+              <div class="review-post-text">
+                <div class="markdown">
+                  <div class="md-part">
+                    <p dir="auto"> Why double? </p>
+                  </div>
+                </div>
+              </div>
+              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            </li>
+          </ul>
+          <div class="review-reply">
+            <textarea id="review-reply-c1"
+                      placeholder="Reply…"
+                      rows="1"
+                      aria-label="Reply to c1"
+                      class="review-field"
+                      #value=""
+                      @on_input
+                      @on_keydown> </textarea>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+        </article>
+      </div>
+      <div @key=c2 data-side="new" data-line="4" class="folded review-margin-item">
+        <button type="button"
+                id="review-thread-c2"
+                data-comment="c2"
+                aria-expanded="false"
+                title="Resolved: c2 on line 4. Click to show its thread."
+                class="review-folded-thread"
+                @on_click
+                @on_mouseenter
+                @on_mouseleave>
+          <icon class="check"> </icon>
+          <span class="review-id"> c2 </span>
+          <span class="review-folded-text"> Is d needed? </span>
+          <span class="review-folded-count"> 2 </span>
+        </button>
+      </div>
+    </aside>
+    |}];
+  (* The code has no threads between its lines: they are in the margin, at
+     their first line; the resolved one folded to a mark. *)
+  H.text h ~selector:".review-diff";
+  H.elements h ~selector:".review-margin-item";
+  H.text h ~selector:".review-margin";
+  [%expect
+    {|
+    @@ -2,3 +2,4 @@
+    2 let b = 2
+    3 - let c = 3
+    3 + let c = 3 * 2
+    4 + let d = 4
+    5 let e = 5
+    <div class="review-margin-item thread">
+    <div class="folded review-margin-item">
+    c1 lines 3–4
+    (Resolve) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Why double?
+    []
+    (c2 Is d needed? 2)
+    |}];
+  (* The mark unfolds it; its fold button folds it again. *)
+  H.click h ~selector:".review-folded-thread";
+  H.text h ~selector:".review-margin-item.thread:last-child";
+  H.click h ~selector:".review-fold";
+  H.elements h ~selector:".review-margin-item";
+  [%expect
+    {|
+    (Review (Unfold c2))
+    c2 line 4 resolved
+    (Fold it to its mark on the line) (Reopen) (Delete the comment and its thread)
+    (Review (Unfold c2))
+    <div class="review-margin-item thread">
+    <div class="folded review-margin-item">
+    |}];
+  (* The comment whose code is gone: one folded line above the code. *)
+  H.text h ~selector:".review-asides";
+  H.click h ~selector:".review-aside-toggle";
+  H.text h ~selector:".review-asides";
+  [%expect
+    {|
+    (1 outdated comment)
+    (Review (Unfold outdated:src/main.ml))
+    (1 outdated comment)
+    c3 line 9 its code changed
+    (Resolve) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Gone?
+    []
+    |}]
+;;
+
+let%expect_test "narrower, and on a phone, threads show under their lines" =
+  let h = three_threads () in
+  H.quiet h (fun () ->
+    H.act h (Resize (Viewport { width = 1440; height = 900 })));
+  H.text h ~selector:".review-code";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    (1 outdated comment)
+    @@ -2,3 +2,4 @@
+    2 let b = 2
+    3 - let c = 3
+    3 + let c = 3 * 2
+    4 + let d = 4
+    c1 lines 3–4
+    (Resolve) (Delete the comment and its thread)
+    You 10:00 not sent yet
+    Why double?
+    []
+    (c2 Is d needed? 2)
+    5 let e = 5
+    |}];
+  H.quiet h (fun () ->
+    H.act h (Resize (Viewport { width = 1920; height = 1000 }));
+    H.act h (Set_narrow true));
+  H.elements h ~selector:".review-margin";
+  [%expect {| |}]
 ;;

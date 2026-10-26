@@ -249,6 +249,18 @@ let rec bounds t (shown : Shown.t) (h : Handle.t) : Bounds.t =
        { min; max; value = clamp (preferred t h) ~min ~max })
 ;;
 
+let review_room t shown =
+  let shown = { shown with Shown.reviewing = true } in
+  t.viewport.width
+  - List.sum (module Int) (docked_widths t shown) ~f:(fun (_, w) -> w)
+  - (bounds t shown Review_files).value
+;;
+
+let preview_width t shown =
+  (bounds t shown (if preview_alone t shown then Files else Files_preview))
+    .value
+;;
+
 let vars t shown =
   List.map Handle.all ~f:(fun h ->
     Handle.var h, sprintf "%dpx" (bounds t shown h).value)

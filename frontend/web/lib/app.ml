@@ -798,7 +798,9 @@ let close_dialog (m : Model.t) =
     , [ Command.Focus
           (match Review_picker.which p with
            | Target -> "review-target-button"
-           | Base -> "review-base-button")
+           | Base -> "review-base-button"
+           | Since _ when m.review.open_ -> "review-since-button"
+           | Since _ -> "files-since-button")
       ] )
   | _ ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
@@ -3836,68 +3838,72 @@ let review_target (m : Model.t) ~command ~name ~base ~direct ~model listing =
 
 (* ---- the review page's pickers *)
 
-let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) d =
-  match which with
-  | Target ->
-    Review_picker.targets
-      ~worktrees:
-        (match worktrees with
-         | Some worktrees -> worktrees
-         | None ->
-           Option.value_map
-             (Worktrees.listing m.worktrees)
-             ~default:[]
-             ~f:(fun l -> l.worktrees))
-      ~reviewed:m.review.target.reviewed
-      d
-  | Base -> Review_picker.bases d
+let review_picker (m : Model.t) ?worktrees (which : Review_picker.Which.t) =
+  match which, m.review.diff with
+  | Target, Some d ->
+    Some
+      (Review_picker.targets
+         ~worktrees:
+           (match worktrees with
+            | Some worktrees -> worktrees
+            | None ->
+              Option.value_map
+                (Worktrees.listing m.worktrees)
+                ~default:[]
+                ~f:(fun l -> l.worktrees))
+         ~reviewed:m.review.target.reviewed
+         d)
+  | Base, Some d -> Some (Review_picker.bases d)
+  | (Target | Base), None -> None
+  | Since path, _ ->
+    Some
+      (Review_action.picker
+         m.review
+         ~path
+         ~me:(own_user m)
+         ~time:(Model.message_time m))
 ;;
 
 let open_review_pick (m : Model.t) (which : Review_picker.Which.t) =
-  match m.dialog, m.review.diff with
+  match m.dialog, review_picker m which with
   | Some (Review_pick p), _
     when Review_picker.Which.equal (Review_picker.which p) which ->
     close_dialog m
   | _, None -> toast m "The changes are still being read: try again."
-  | _, Some d ->
-    let m, cmds =
-      open_dialog
-        m
-        ~focus:"review-pick-filter"
-        (Review_pick (review_picker m which d))
-    in
+  | _, Some p when List.is_empty (Review_picker.visible p) ->
+    toast
+      m
+      "No review actions on this file yet: approve it or comment on it first."
+  | _, Some p ->
+    let m, cmds = open_dialog m ~focus:"review-pick-filter" (Review_pick p) in
     (* The worktrees as they are now: one may have been made since. *)
     ( m
     , cmds
       @
-      match which, Worktrees.place m.state with
-      | Target, Some place ->
-        [ call
-            (List_worktrees { cwd = None })
-            ~tag:(Worktrees { place; purpose = Review_pick })
-        ]
-      | Target, None | Base, _ -> [] )
+        (match which, Worktrees.place m.state with
+        | Target, Some place ->
+          [ call
+              (List_worktrees { cwd = None })
+              ~tag:(Worktrees { place; purpose = Review_pick })
+          ]
+        | Target, None | (Base | Since _), _ -> []) )
 ;;
 
-(* The diff or the worktrees were read again under an open picker: its
+(* The diff, the review or the worktrees changed under an open picker: its
    choices follow. *)
 let refresh_review_pick ?worktrees (m : Model.t) =
-  match m.dialog, m.review.diff with
-  | Some (Review_pick p), Some d ->
+  match m.dialog with
+  | Some (Review_pick p) ->
     let worktrees =
       match worktrees, Review_picker.worktrees p with
       | Some w, _ -> Some w
       | None, [] -> None
       | None, w -> Some w
     in
-    { m with
-      dialog =
-        Some
-          (Review_pick
-             (Review_picker.refresh
-                p
-                ~fresh:(review_picker m ?worktrees (Review_picker.which p) d)))
-    }
+    (match review_picker m ?worktrees (Review_picker.which p) with
+     | Some fresh ->
+       { m with dialog = Some (Review_pick (Review_picker.refresh p ~fresh)) }
+     | None -> m)
   | _ -> m
 ;;
 
@@ -3916,6 +3922,9 @@ let review_picked (m : Model.t) (item : Review_picker.Item.t) =
           base = Some base
         ; direct = target.direct && not (String.equal base "HEAD")
         }
+    | Since { path; index = None } -> review_update m (Follow_latest path)
+    | Since { path; index = Some index } ->
+      review_update m (Pick_since { path; index })
   in
   m, cmds
 ;;

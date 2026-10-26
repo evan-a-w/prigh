@@ -486,10 +486,7 @@ let code_review_bar (m : App.Model.t) path ~inject =
            ; layout Full "Whole file" "The whole file with its changes inline"
            ]
            @ Option.to_list
-               (Option.map
-                  (Review_since_view.segment m path ~inject)
-                  ~f:segment))
-      ; Review_since_view.menu m path ~inject
+               (Review_since_view.segment m path ~place:`Files ~inject))
       ; Review_page_view.open_button ~path m ~inject
       ]
 ;;
@@ -572,7 +569,7 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
               for its selection and comment box. *)
            (if m.review.open_
             then div ~cls:"files-note" [ Node.text "Shown in the review." ]
-            else Review_code_view.view m ~path ~inject)
+            else Review_code_view.view ~place:`Files m ~path ~inject)
          ]
        | Text { text; truncated; md5 = _ } -> text_preview p ~text ~truncated
        | Image { url = Some url; mime } ->

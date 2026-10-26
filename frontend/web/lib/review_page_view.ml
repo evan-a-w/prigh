@@ -13,7 +13,7 @@ let approval_mark (status : File_approval.Status.t) =
   | Unapproved -> mark ~cls:"todo" ~label:"Not approved yet" Ring
 ;;
 
-let segmented ~label items =
+let segmented ?more ~label items =
   Node.div
     ~attrs:
       [ Attr.class_ "segmented"
@@ -29,7 +29,8 @@ let segmented ~label items =
            ; Attr.title title
            ; Attr.on_click (fun _ -> action)
            ]
-         [ Node.text text ]))
+         [ Node.text text ])
+     @ Option.to_list more)
 ;;
 
 let open_button ?path (m : App.Model.t) ~inject =
@@ -559,20 +560,18 @@ let view (m : App.Model.t) ~inject =
                in
                segmented
                  ~label:"Show"
-                 ([ ( "Changes"
-                    , "Only the changed hunks (v)"
-                    , Code_review.Layout.equal layout Unified
-                    , inject (review (Set_layout Unified)) )
-                  ; ( "Whole file"
-                    , "The whole file with its changes inline (v)"
-                    , Code_review.Layout.equal layout Full
-                    , inject (review (Set_layout Full)) )
-                  ]
-                  @ Option.to_list
-                      (Option.bind t.current ~f:(fun path ->
-                         Review_since_view.segment m path ~inject))))
-            ; Option.value_map t.current ~default:Node.none ~f:(fun path ->
-                Review_since_view.menu m path ~inject)
+                 ?more:
+                   (Option.bind t.current ~f:(fun path ->
+                      Review_since_view.segment m path ~place:`Page ~inject))
+                 [ ( "Changes"
+                   , "Only the changed hunks (v)"
+                   , Code_review.Layout.equal layout Unified
+                   , inject (review (Set_layout Unified)) )
+                 ; ( "Whole file"
+                   , "The whole file with its changes inline (v)"
+                   , Code_review.Layout.equal layout Full
+                   , inject (review (Set_layout Full)) )
+                 ])
             ; button
                 ~cls:(if unsent > 0 then "small primary" else "small")
                 ~disabled:(unsent = 0 || t.submitting)
@@ -623,13 +622,14 @@ let view (m : App.Model.t) ~inject =
         ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Review of the changes"
         ]
-      (* While a picker is open the rest of the page is out of reach. *)
-      (match m.dialog with
-       | Some (Review_pick _) ->
-         [ inert head
-         ; target_bar m ~inject
-         ; inert (Git_bar_view.strip m ~inject)
-         ; inert body
-         ]
-       | _ -> [ head; target_bar m ~inject; Git_bar_view.strip m ~inject; body ]))
+      (* While a picker is open the rest of the page is out of reach. The
+         git actions are at the foot, away from Send comments. *)
+      (let target = target_bar m ~inject in
+       let foot = Git_bar_view.strip m ~inject in
+       match m.dialog with
+       | Some (Review_pick p) ->
+         (match Review_picker.which p with
+          | Since _ -> [ head; inert target; inert body; inert foot ]
+          | Target | Base -> [ inert head; target; inert body; inert foot ])
+       | _ -> [ head; target; body; foot ]))
 ;;
