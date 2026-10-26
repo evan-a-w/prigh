@@ -4,7 +4,7 @@ open! Import
 (** A git worktree made for a subagent (the [subagent] tool's [worktree]
     option): it works there on a branch of its own, which the user reviews,
     merges or removes once it reports. The session that ran the subagent
-    records it ({!Session.agent_worktrees}) until it is removed. *)
+    records it ({!Session.worktrees}) until it is removed. *)
 
 type t =
   { agent : string (** the subagent's id in its session *)

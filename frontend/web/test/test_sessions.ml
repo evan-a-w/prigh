@@ -37,17 +37,14 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (work) (New session in /work)
-    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
-    (docs) (New session in ~/docs)
-    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
-    (compiler) (New session in ~/src/compiler)
-    (Refactor the lexer 15d ago) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug just now /work) (More (right-click, Shift+F10))
+    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10))
+    (Refactor the lexer 15d ago ~/src/compiler) (More (right-click, Shift+F10))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
     {|
-    <div class="selected session" @on_pointerenter>
+    <div class="selected session" @on_contextmenu @on_pointerenter>
       <button type="button"
               id="session-s1"
               data-session="s1"
@@ -65,32 +62,21 @@ let%expect_test
           <span dir="auto" class="session-title"> fix the parser bug </span>
           <div class="session-meta">
             <span class="session-age"> just now </span>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <span title="/work" class="session-cwd"> /work </span>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           </div>
         </div>
       </button>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <span class="session-actions">
         <button type="button"
-                title="Rename (/name)"
-                aria-label="Rename fix the parser bug"
-                class="btn ghost icon rename"
+                id="more-session-s1"
+                title="More (right-click, Shift+F10)"
+                aria-label="More for fix the parser bug"
+                aria-haspopup="menu"
+                class="btn ghost icon more"
                 @on_click>
-          <icon class="pencil"> </icon>
-        </button>
-        <button type="button"
-                title="Archive (A)"
-                aria-label="Archive fix the parser bug"
-                class="archive btn ghost icon"
-                @on_click>
-          <icon class="archive"> </icon>
-        </button>
-        <button type="button"
-                title="Delete session (Delete)"
-                aria-label="Delete fix the parser bug"
-                class="btn delete ghost icon"
-                @on_click>
-          <icon class="trash"> </icon>
+          <icon class="more"> </icon>
         </button>
       </span>
     </div>
@@ -114,12 +100,14 @@ let%expect_test
                         \n/home/ann/src/parser")
        (purpose (Sidebar 2)))))
     span "~/src/parser" -- /home/ann/src/parser
+    span "~/docs" -- /home/ann/docs
+    span "~/src/compiler" -- /home/ann/src/compiler
     |}];
   H.text h ~selector:".session.selected .session-meta";
   [%expect {| just now ~/src/parser |}];
-  (* Only the current one has a rename button: it opens what /name opens. *)
-  H.elements h ~selector:".session .rename";
-  H.click h ~selector:".session.selected .rename";
+  (* Its menu's Rename opens what /name opens. *)
+  H.right_click h ~selector:".session.selected";
+  H.click h ~selector:".context-menu [data-item=rename]";
   let clicked = (H.model h).dialog in
   H.quiet h (fun () -> H.act h Close_dialog);
   H.quiet h (fun () -> H.act h (Run "/name"));
@@ -129,8 +117,11 @@ let%expect_test
   H.quiet h (fun () -> H.act h Close_dialog);
   [%expect
     {|
-    <button class="btn ghost icon rename">
-    Open_rename
+    (Open_menu
+     ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
+    (Focus dialog)
+    (Place_menu (Element session-s1))
+    (Picker_choose rename)
     (Focus dialog-input)
     true
     |}];
@@ -436,10 +427,8 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (work) (New session in /work)
-    (fix the parser bug just now) (Rename (/name)) (Archive (A)) (Delete session (Delete))
-    (docs) (New session in ~/docs)
-    (Release notes 3h ago) (Archive (A)) (Delete session (Delete))
+    (fix the parser bug just now /work) (More (right-click, Shift+F10))
+    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10))
     |}]
 ;;
 

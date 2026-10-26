@@ -1,15 +1,17 @@
 open! Core
 open! Import
 
-(** The sidebar's view of [list_sessions]: the active sessions as a tree of
-    projects ({!Prigh_ui.Project_tree}), then the archived ones. *)
+(** The sidebar's view of [list_sessions]: the active sessions, most recent
+    first, then the archived ones. Each says where it works (its repository
+    and branch) and has its worktrees under it
+    ({!Prigh_ui.Session_worktrees}). *)
 
 (** The name, else the description or first prompt. *)
 val title : Session_summary.t -> string
 
-(** The sessions matching [query] (title, first prompt, cwd, project and
-    branch), best first; all of them, in the backend's order, when it is
-    empty. *)
+(** The sessions matching [query] (title, first prompt, cwd, repository,
+    branch and its worktrees' branches), best first; all of them, in the
+    backend's order, when it is empty. *)
 val filter : Session_summary.t list -> query:string -> Session_summary.t list
 
 (** The DOM id of a session's row in the sidebar (focused from the keyboard). *)
@@ -25,24 +27,10 @@ val sections
     searching. *)
 val archived_shown : query:string -> archived_open:bool -> bool
 
-(** Whether [query] searches. *)
-val searching : query:string -> bool
-
-(** The active sessions' tree. While searching, only the matches, without
-    [listing]'s worktrees or the archived sessions' subagents' worktrees. *)
-val tree
-  :  Session_summary.t list
-  -> query:string
-  -> listing:Worktree.Listing.t option
-  -> Prigh_ui.Project_tree.t
-
-(** The session rows the sidebar shows, in its order: the tree's, but those
-    [folded] away (not while searching), then the archived ones when
-    [archived_shown]. *)
+(** The rows the sidebar shows, in its order: the active sessions, then the
+    archived ones when [archived_shown]. *)
 val shown
   :  Session_summary.t list
   -> query:string
   -> archived_open:bool
-  -> folded:String.Set.t
-  -> listing:Worktree.Listing.t option
   -> Session_summary.t list

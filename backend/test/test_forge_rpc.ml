@@ -329,6 +329,13 @@ let%expect_test
     {"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","created":false}
     error: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? /pr lists them): fatal: couldn't find remote ref refs/pull/3/head
     |}];
+  (* The session records the checkout among its worktrees, once. *)
+  call "set_session_name" ~params:{|{"name": "reviewing"}|};
+  call "list_sessions";
+  [%expect {|
+    {}
+    [{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":"reviewing","description":null,"cwd":"$DIR/r","created_at":"<time>","updated_at":"<time>","first_prompt":null,"message_count":0,"parent":null,"host":null,"repo":{"root":"$DIR/r","worktree":"$DIR/r","branch":"feat/add-things","main":true},"worktrees":[{"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","root":"$DIR/r","source":"pull_request","pr":7}],"bytes":<n>,"live":true,"clients":1,"running":false,"background":0,"archived":false}]
+    |}];
   sh repo "git checkout -q --detach";
   call "pr_defaults";
   sh repo "git remote remove origin && git remote add upstream /srv/x.git";

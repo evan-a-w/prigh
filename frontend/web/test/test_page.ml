@@ -38,14 +38,16 @@ let%expect_test
 let%expect_test
     "web connection: the terminal URL and the session in the page URL"
   =
-  let terminal backend ?user ?as_user ?token ?session () =
-    Terminal_panel.url ~backend ~user ~as_user ~token ~session |> print_endline
+  let terminal backend ?user ?as_user ?token ?session ?dir () =
+    Terminal_panel.url ~backend ~user ~as_user ~token ~session ~dir
+    |> print_endline
   in
   terminal "ws://127.0.0.1:7777/ws" ();
   terminal "wss://host.example/ws?x=1" ~token:"sekrit&x=y" ~session:"abc" ();
   terminal "ws://host:9000/" ~session:"s" ();
   terminal "ws://host:9000/ws" ~user:"lloyd o'k" ~token:"pw" ~session:"s" ();
   terminal "ws://host:9000/ws" ~user:"s" ~as_user:"lloyd" ~token:"pw" ();
+  terminal "ws://host:9000/ws" ~session:"s" ~dir:"/wt/a b" ();
   let with_session search =
     Browser.with_query_param ~search "session" "a b&c" |> print_endline
   in
@@ -64,6 +66,7 @@ let%expect_test
     ws://host:9000/terminal?session=s
     ws://host:9000/terminal?user=lloyd%20o'k&token=pw&session=s
     ws://host:9000/terminal?user=s&as_user=lloyd&token=pw
+    ws://host:9000/terminal?session=s&dir=%2Fwt%2Fa%20b
     ?session=a%20b%26c
     ?backend=ws%3A%2F%2Fx&name=laptop&session=a%20b%26c
     ""

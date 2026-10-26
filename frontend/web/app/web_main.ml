@@ -486,6 +486,24 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Focus id -> Effect.of_sync_fun focus id
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Place_popover -> Effect.of_sync_fun place_popover ()
+    | Place_menu anchor -> Effect.of_sync_fun Menu_listeners.place anchor
+    | Open_tab session ->
+      Effect.of_sync_fun
+        (fun () ->
+           let location = Dom_html.window##.location in
+           let search =
+             Browser.with_query_param
+               ~search:(Js.to_string location##.search)
+               "session"
+               session
+           in
+           ignore
+             (Dom_html.window##open_
+                (Js.string (Js.to_string location##.pathname ^ search))
+                (Js.string "_blank")
+                Js.null
+              : Dom_html.window Js.t Js.opt))
+        ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
@@ -572,7 +590,8 @@ let terminal
          ~user:settings.login.user
          ~as_user:target.as_user
          ~token:settings.login.password
-         ~session:(Some target.session))
+         ~session:(Some target.session)
+         ~dir:target.dir)
     ~key
     ~on_status:(fun status ->
       inject (App.Action.Terminal_status { key; status }))
@@ -697,6 +716,13 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
          match Dom_html.tagged el with
          | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
          | _ -> true -> Review
+  | Some el
+    when Js.Opt.test (el##getAttribute (Js.string "data-worktree")) ->
+    let attr name =
+      Js.to_string
+        (Js.Opt.get (el##getAttribute (Js.string name)) (fun () -> Js.string ""))
+    in
+    Worktree { session = attr "data-owner"; path = attr "data-worktree" }
   | Some el
     when Js.Opt.test (el##getAttribute (Js.string "data-session")) ->
     Session
@@ -895,6 +921,7 @@ let install_listeners ~schedule ~current =
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();
   Selection_listeners.install ~schedule;
+  Menu_listeners.install ();
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
   let reported = ref true in

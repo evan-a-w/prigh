@@ -148,10 +148,7 @@ module Reply_tag = struct
         { place : string
         ; purpose : Worktrees_purpose.t
         }
-    | Worktree_created of
-        { command : string
-        ; new_session : bool
-        }
+    | Worktree_created of { command : string }
     | Worktree_entered of string
     | Worktree_session of
         { path : string
@@ -161,6 +158,9 @@ module Reply_tag = struct
         { target : string
         ; force : bool
         }
+    | Repo_worktrees of string
+    | Plan_switched of Context_menu.Plan.t
+    | Plan_entered of Context_menu.Plan.t
     | Mode_set of string
     | Model_set
     | Thinking_set
@@ -212,6 +212,8 @@ module Command = struct
     | Focus of string
     | Clear_text_selection
     | Place_popover
+    | Place_menu of Context_menu.Anchor.t
+    | Open_tab of string
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -358,7 +360,7 @@ module Action = struct
     | Remove_reminder of string
     | Toggle_folded of string
     | New_session_in of string
-    | New_worktree of { repo : string option }
+    | New_worktree
     | New_worktree_input of
         { field : New_worktree.Field.t
         ; text : string
@@ -369,6 +371,7 @@ module Action = struct
         }
     | Ask_remove_worktree of string
     | Remove_worktree of { force : bool }
+    | Open_menu of Context_menu.t
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -484,6 +487,7 @@ module Model = struct
     ; terminal : Terminal.t
     ; skills : Skills.t
     ; worktrees : Worktrees.t
+    ; repo_worktrees : Repo_listings.t
     ; folded : String.Set.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
@@ -639,6 +643,7 @@ let init =
   ; terminal = Terminal.closed
   ; skills = Skills.empty
   ; worktrees = Worktrees.empty
+  ; repo_worktrees = Repo_listings.empty
   ; folded = String.Set.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
@@ -745,9 +750,15 @@ let field json name =
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | true, Some (Login _ | Forge_host _) ->
-    ( { m with dialog = Some Settings; return_to_settings = false; theme_preview = None }
+    ( { m with
+        dialog = Some Settings
+      ; return_to_settings = false
+      ; theme_preview = None
+      }
     , [ Command.Focus "dialog" ] )
-  | _ -> { m with dialog = None; return_to_settings = false; theme_preview = None }, [ focus_editor ]
+  | _ ->
+    ( { m with dialog = None; return_to_settings = false; theme_preview = None }
+    , [ focus_editor ] )
 ;;
 
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
@@ -830,7 +841,7 @@ let with_files (m : Model.t) (files, outs) =
 
 let files_where (m : Model.t) =
   Option.map m.state ~f:(fun (state : State.t) ->
-    let name, _ = Terminal.where state in
+    let name, _ = Terminal.where m.terminal state in
     { Files.Where.session = state.session_id
     ; host = state.active_host
     ; host_name = name
@@ -1425,22 +1436,19 @@ let switch_session (m : Model.t) path =
       @ [ focus_editor ] ))
 ;;
 
-(* The sidebar's sessions in the order it shows them: the tree's, then the
-   archived ones. *)
+(* The sidebar's sessions in the order it shows them. *)
 let shown_sessions (m : Model.t) =
   Session_list.shown
     m.sessions
     ~query:m.session_query
     ~archived_open:m.archived_open
-    ~folded:m.folded
-    ~listing:(Worktrees.listing m.worktrees)
 ;;
 
-let project_tree (m : Model.t) =
-  Session_list.tree
-    m.sessions
-    ~query:""
-    ~listing:(Worktrees.listing m.worktrees)
+(* What is known of the repositories' worktrees: the session's own
+   repository's, then the others'. *)
+let worktree_listings (m : Model.t) =
+  Option.to_list (Worktrees.listing m.worktrees)
+  @ Repo_listings.listings m.repo_worktrees
 ;;
 
 let session_order (m : Model.t) =
@@ -1800,6 +1808,14 @@ let with_terminal (m : Model.t) ~f = { m with terminal = f m.terminal }
 
 (* The shell takes the keyboard (Ctrl+` gives it back); on a phone the panel
    covers the page, the sidebar's drawer included. *)
+(* [/terminal DIR]: a shell of its own there, for this session; [None]:
+   the session's own again. *)
+let with_terminal_dir (m : Model.t) dir =
+  match m.state with
+  | None -> m
+  | Some state -> with_terminal m ~f:(fun t -> Terminal.set_dir t state dir)
+;;
+
 let open_terminal (m : Model.t) =
   ( { m with
       terminal = { m.terminal with open_ = true }
@@ -3228,37 +3244,42 @@ let shown_worktree (m : Model.t) path =
   | _ -> Worktrees.find m.worktrees path
 ;;
 
-(* A worktree of the tree that the session's listing does not have (another
-   repository's, a subagent's): what is known of it, and its repository. *)
-let tree_worktree (m : Model.t) path =
-  Option.map
-    (Prigh_ui.Project_tree.find_worktree (project_tree m) path)
-    ~f:(fun ((p : Prigh_ui.Project_tree.Project.t), w) ->
-      let worktree : Worktree.t =
-        match w.listed with
-        | Some listed -> listed
-        | None ->
-          { path = w.path
-          ; branch = w.branch
-          ; head = None
-          ; main = false
-          ; managed = true
-          ; locked = false
-          ; prunable = false
-          ; changes = None
-          ; upstream = None
-          ; ahead = 0
-          ; behind = 0
-          ; current = false
-          ; sessions = []
-          }
-      in
-      worktree, p.root)
+(* A worktree under a session in the sidebar that the session's listing
+   does not have (another repository's, a subagent's): what is known of it,
+   and its repository. *)
+let session_worktree (m : Model.t) path =
+  List.find_map m.sessions ~f:(fun s ->
+    List.find s.worktrees ~f:(fun w -> String.equal w.path path))
+  |> Option.map ~f:(fun (w : Session_worktree.t) ->
+    let listed =
+      List.find_map (worktree_listings m) ~f:(fun l ->
+        List.find l.worktrees ~f:(fun lw -> String.equal lw.path path))
+    in
+    let worktree : Worktree.t =
+      match listed with
+      | Some listed -> listed
+      | None ->
+        { path = w.path
+        ; branch = w.branch
+        ; head = None
+        ; main = false
+        ; managed = true
+        ; locked = false
+        ; prunable = false
+        ; changes = None
+        ; upstream = None
+        ; ahead = 0
+        ; behind = 0
+        ; current = false
+        ; sessions = []
+        }
+    in
+    worktree, w.root)
 ;;
 
-(* From the tree: a worktree of any project. *)
-let ask_remove_tree_worktree (m : Model.t) path =
-  match shown_worktree m path, tree_worktree m path with
+(* From the sidebar: a worktree of any repository. *)
+let ask_remove_session_worktree (m : Model.t) path =
+  match shown_worktree m path, session_worktree m path with
   | Some w, _ -> ask_remove_worktree m w ~force:false
   | None, Some (w, repo) ->
     let here =
@@ -3288,7 +3309,7 @@ let ask_remove_tree_worktree (m : Model.t) path =
     error m (sprintf "No worktree at %s any more: /worktree lists them." path)
 ;;
 
-(* A new session working in [path]: a project's directory or a worktree. *)
+(* A new session working in [path]: a worktree. *)
 let new_session_in (m : Model.t) path =
   ( { (starting (with_entering m (Some path))) with
       sidebar_open = m.sidebar_open && not m.narrow
@@ -3357,30 +3378,17 @@ let worktree_remove_failed (m : Model.t) ~target ~force e =
 
 let creating = "Creating the worktree "
 
-let new_worktree_dialog (m : Model.t) ~repo =
+let new_worktree_dialog (m : Model.t) =
   current_state m ~f:(fun state ->
-    let listing =
-      match repo, Worktrees.listing m.worktrees with
-      | None, listing -> listing
-      | Some repo, Some l when String.equal repo l.root -> Some l
-      | Some _, _ -> None
-    in
-    let head =
-      match repo with
-      | None -> state.git_branch
-      | Some repo ->
-        Option.bind
-          (Prigh_ui.Project_tree.find_project (project_tree m) repo)
-          ~f:(fun p -> p.branch)
-    in
     open_dialog
       m
       ~focus:(New_worktree.Field.id Branch)
       (New_worktree
          (New_worktree.create
-            ?repo
-            ~head
-            ~project_dir:(Option.map listing ~f:(fun l -> l.project_dir))
+            ~head:state.git_branch
+            ~project_dir:
+              (Option.map (Worktrees.listing m.worktrees) ~f:(fun l ->
+                 l.project_dir))
             ())))
 ;;
 
@@ -3396,56 +3404,40 @@ let create_worktree (m : Model.t) (d : New_worktree.t) =
           dialog = Some (New_worktree { d with busy = true; error = None })
         }
       , [ call
-            (Create_worktree { branch; base; cwd = d.repo })
+            (Create_worktree { branch; base; cwd = None })
             ~tag:
-              (Worktree_created
-                 { command = New_worktree.command ~branch ~base
-                 ; new_session = Option.is_some d.repo
-                 })
+              (Worktree_created { command = New_worktree.command ~branch ~base })
         ] ))
 ;;
 
-let worktree_created (m : Model.t) (c : Worktree.Created.t) ~new_session =
+let worktree_created (m : Model.t) (c : Worktree.Created.t) =
   let m, close =
     match m.dialog with
     | Some (New_worktree { busy = true; _ }) -> close_dialog m
     | _ -> m, []
   in
-  if new_session
-  then (
-    let m, cmds =
-      toast
-        { m with worktrees = Worktrees.stale m.worktrees }
-        ~replaces:creating
-        (String.capitalize (Worktree_command.created c))
-    in
-    let m, start =
-      new_session_in m (Option.value c.cwd ~default:c.worktree.path)
-    in
-    m, close @ cmds @ start)
-  else (
-    let m =
-      with_entering
-        { m with worktrees = Worktrees.stale m.worktrees }
-        (Some c.worktree.path)
-    in
-    let m, cmds =
-      toast
-        m
-        ~replaces:creating
-        (String.capitalize (Worktree_command.created c))
-    in
-    ( m
-    , close
-      @ cmds
-      @ [ enter_worktree
-            ~notice:
-              (sprintf
-                 "Working in the worktree %s (%s)"
-                 (Worktree.label c.worktree)
-                 c.worktree.path)
-            c.worktree.path
-        ] ))
+  let m =
+    with_entering
+      { m with
+        worktrees = Worktrees.stale m.worktrees
+      ; repo_worktrees = Repo_listings.stale m.repo_worktrees
+      }
+      (Some c.worktree.path)
+  in
+  let m, cmds =
+    toast m ~replaces:creating (String.capitalize (Worktree_command.created c))
+  in
+  ( m
+  , close
+    @ cmds
+    @ [ enter_worktree
+          ~notice:
+            (sprintf
+               "Working in the worktree %s (%s)"
+               (Worktree.label c.worktree)
+               c.worktree.path)
+          c.worktree.path
+      ] )
 ;;
 
 let worktree_create_failed (m : Model.t) ~command e =
@@ -3554,7 +3546,7 @@ let worktree_command (m : Model.t) rest =
     , cmds
       @ [ call
             (Create_worktree { branch; base; cwd = None })
-            ~tag:(Worktree_created { command; new_session = false })
+            ~tag:(Worktree_created { command })
         ] )
   | (Open _ | Remove _) as action ->
     list_worktrees m (Target { command; action })
@@ -3584,20 +3576,61 @@ let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
          (Option.map before.state ~f:(fun s -> s.session_id))
          (Option.map m.state ~f:(fun s -> s.session_id))
   in
+  (* The sessions' worktrees changed: their repositories are listed again,
+     so that a new one is not taken for removed. *)
+  let worktrees_changed =
+    (not (phys_equal before.sessions m.sessions))
+    && not
+         ([%equal: (string * string list) list]
+            (List.map before.sessions ~f:(fun s ->
+               s.id, List.map s.worktrees ~f:(fun w -> w.path)))
+            (List.map m.sessions ~f:(fun s ->
+               s.id, List.map s.worktrees ~f:(fun w -> w.path))))
+  in
   let m =
     if turn_ended
     then { m with worktrees = Worktrees.stale ~quiet:true m.worktrees }
     else m
   in
-  match m.connection, m.state, Worktrees.wanted m.worktrees m.state with
-  | Connected, Some state, Some place when Option.is_none m.session_gone ->
-    let worktrees, seq = Worktrees.requested m.worktrees state in
-    ( { m with worktrees }
+  let m =
+    if turn_ended || worktrees_changed
+    then { m with repo_worktrees = Repo_listings.stale m.repo_worktrees }
+    else m
+  in
+  match m.connection, m.state with
+  | Connected, Some state when Option.is_none m.session_gone ->
+    let m, own =
+      match Worktrees.wanted m.worktrees m.state with
+      | Some place ->
+        let worktrees, seq = Worktrees.requested m.worktrees state in
+        ( { m with worktrees }
+        , [ call
+              (List_worktrees { cwd = None })
+              ~tag:(Worktrees { place; purpose = Sidebar seq })
+          ] )
+      | None -> m, []
+    in
+    (* Only the repositories on the session's tool host can be listed; its
+       own repository's listing is the one above. *)
+    let own_root =
+      List.find_map m.sessions ~f:(fun s ->
+        if String.equal s.id state.session_id
+        then Option.map s.repo ~f:(fun r -> r.root)
+        else None)
+    in
+    let roots =
+      Prigh_ui.Session_worktrees.roots
+        (List.filter m.sessions ~f:(fun s ->
+           Option.for_all s.host ~f:(String.equal state.active_host)))
+      |> List.filter ~f:(fun root ->
+        not (Option.exists own_root ~f:(String.equal root)))
+      |> Repo_listings.wanted m.repo_worktrees
+    in
+    ( { m with repo_worktrees = Repo_listings.requested m.repo_worktrees roots }
     , cmds
-      @ [ call
-            (List_worktrees { cwd = None })
-            ~tag:(Worktrees { place; purpose = Sidebar seq })
-        ] )
+      @ own
+      @ List.map roots ~f:(fun root ->
+        call (List_worktrees { cwd = Some root }) ~tag:(Repo_worktrees root)) )
   | _ -> m, cmds
 ;;
 
@@ -3842,6 +3875,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
               if String.is_suffix s.cwd ~suffix:"/" then s.cwd else s.cwd ^ "/"))
          Mkdir)
   | "mkdir", path -> m, [ change_dir ~if_missing:Create ~target:Cwd path ]
+  | "worktree", "new" -> new_worktree_dialog m
   | "worktree", rest -> worktree_command m rest
   | "default-dir", "" ->
     with_config m ~f:(fun c -> toast m (default_dir_summary c))
@@ -3890,9 +3924,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
   | "files", "" -> with_files m (Files.update m.files (Open None))
   | "files", path -> with_files m (Files.update m.files (Open (Some path)))
-  | "terminal", "" -> open_terminal m
-  | "terminal", _ ->
-    error m "Usage: /terminal (Ctrl+` opens and closes it; × in its header too)"
+  | "terminal", "" -> open_terminal (with_terminal_dir m None)
+  | "terminal", dir -> open_terminal (with_terminal_dir m (Some dir))
   | "agents", "" -> open_agents m None
   | "agents", _ ->
     (match words with
@@ -4560,6 +4593,42 @@ let forge_reply (m : Model.t) (tag : Forge_reply.t) result =
   | (Created | Checkout _), Error e, _ -> error m (said e)
 ;;
 
+let is_current_path (m : Model.t) path =
+  Option.exists m.state ~f:(fun s -> String.equal s.session_path path)
+;;
+
+(* A context menu's item, from the step the backend has reached: switch to
+   the session, move it into the directory, then run the command. *)
+let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
+  match plan.switch with
+  | Some path when not (is_current_path m path) ->
+    let m, fetch = fetch_newest m path in
+    ( { m with
+        pending = { m.pending with session = Some (Switching path) }
+      ; sidebar_open = m.sidebar_open && not m.narrow
+      }
+    , rpc "switch_session" [ "path", str path ] ~tag:(Plan_switched plan)
+      :: fetch )
+  | _ ->
+    let here dir =
+      Option.exists m.state ~f:(fun s ->
+        String.equal s.cwd dir || String.is_prefix s.cwd ~prefix:(dir ^ "/"))
+    in
+    (match plan.enter, plan.run, plan.notice with
+     | Some dir, _, _ when not (here dir) ->
+       ( with_entering m (Some dir)
+       , [ call
+             (Change_dir { target = Cwd; path = dir; if_missing = Fail })
+             ~tag:(Plan_entered { plan with enter = None })
+         ] )
+     | _, Some command, _ ->
+       (match Slash.parse command with
+        | Some parsed -> run_command { m with dialog = None } parsed
+        | None -> m, [])
+     | _, None, Some notice -> toast m notice
+     | _, None, None -> m, [ focus_editor ])
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -4718,6 +4787,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error (with_entering m None) (sprintf "Couldn't open the worktree: %s." e)
   | Worktree_session _, Error e ->
     reply_to (with_entering m None) Reload_state (Error e)
+  | Plan_switched _, Error e -> reply_to m Reload_state (Error e)
+  | Plan_entered _, Error e ->
+    error (with_entering m None) (sprintf "Couldn't move there: %s." e)
+  | Repo_worktrees root, Error _ ->
+    { m with repo_worktrees = Repo_listings.failed m.repo_worktrees ~root }, []
   | Worktree_removed { target; force }, Error e ->
     worktree_remove_failed m ~target ~force e
   (* A backend that keeps none: this browser keeps them. *)
@@ -5246,8 +5320,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Target { command; action } -> worktree_target m ~command action listing
       | Review_target { command; name; base; model } ->
         review_target m ~command ~name ~base ~model listing)
-  | Worktree_created { new_session; _ }, Ok json ->
-    decode m json Worktree.Created.of_json ~f:(worktree_created m ~new_session)
+  | Worktree_created _, Ok json ->
+    decode m json Worktree.Created.of_json ~f:(worktree_created m)
   | Worktree_entered notice, Ok json ->
     let m = with_entering m None in
     decode m json Dir_change.Outcome.of_json ~f:(function
@@ -5257,6 +5331,26 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Worktree_session { path; notice }, Ok json ->
     let m, cmds = reply_to m Reload_state (Ok json) in
     with_entering m (Some path), cmds @ [ enter_worktree ~notice path ]
+  | Plan_switched plan, Ok json ->
+    let m, cmds = reply_to m Reload_state (Ok json) in
+    (* Not if the user went on to another session meanwhile. *)
+    (match plan.switch with
+     | Some path when is_current_path m path ->
+       let m, more = run_plan m plan in
+       m, cmds @ more
+     | Some _ | None -> m, cmds)
+  | Plan_entered plan, Ok json ->
+    let m = with_entering m None in
+    decode m json Dir_change.Outcome.of_json ~f:(function
+      | Changed _ -> run_plan m plan
+      | Missing path ->
+        error m (sprintf "%s is gone: /worktree lists the others." path))
+  | Repo_worktrees root, Ok json ->
+    decode m json Worktree.Listing.of_json ~f:(fun listing ->
+      ( { m with
+          repo_worktrees = Repo_listings.loaded m.repo_worktrees ~root listing
+        }
+      , [] ))
   | Worktree_removed _, Ok json ->
     decode m json Worktree.removed_of_json ~f:(fun w ->
       let m, close =
@@ -5266,7 +5360,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       in
       let m, cmds =
         toast
-          { m with worktrees = Worktrees.stale m.worktrees }
+          { m with
+            worktrees = Worktrees.stale m.worktrees
+          ; repo_worktrees = Repo_listings.stale m.repo_worktrees
+          }
           (String.capitalize (Worktree_command.removed w))
       in
       m, close @ cmds)
@@ -5711,6 +5808,65 @@ let accept_completion (m : Model.t) ~run =
     else edit_at_caret m ~cursor draft
 ;;
 
+(* A context menu's item: on the session or worktree it was opened on,
+   switching to that session first when it is not the one on show. *)
+let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
+  match
+    ( find_session_by_path m (Context_menu.session menu)
+    , Context_menu.Item.of_id id )
+  with
+  | None, _ | _, None ->
+    error m "That session is gone: the sidebar lists the others."
+  | Some s, Some item ->
+    let worktree = Context_menu.worktree menu in
+    let cwd =
+      match m.state with
+      | Some state when String.equal state.session_path s.path -> state.cwd
+      | _ -> s.cwd
+    in
+    let dir = Option.value worktree ~default:cwd in
+    let plan ?enter ?run ?notice () =
+      run_plan m { switch = Some s.path; enter; run; notice }
+    in
+    let copy what text =
+      let m, cmds = toast m (sprintf "Copied %s: %s" what text) in
+      m, Command.Copy text :: cmds
+    in
+    (match item with
+     | Open -> switch_session m s.path
+     | Open_tab -> m, [ Command.Open_tab s.id ]
+     | Rename -> plan ~run:"/name" ()
+     | Fork -> plan ~run:"/fork" ()
+     | New_worktree -> plan ~run:"/worktree new" ()
+     | Switch_here ->
+       let label =
+         List.find s.worktrees ~f:(fun w -> String.equal w.path dir)
+         |> Option.value_map
+              ~default:(Filename.basename dir)
+              ~f:Session_worktree.label
+       in
+       plan
+         ~enter:dir
+         ~notice:(sprintf "Working in the worktree %s (%s)" label dir)
+         ()
+     | New_session_here -> new_session_in m dir
+     | Review -> plan ~run:(Prigh_ui.Review_command.command ?dir:worktree ()) ()
+     | Files -> plan ~run:("/files " ^ dir) ()
+     | Terminal ->
+       plan
+         ~run:
+           (Option.value_map worktree ~default:"/terminal" ~f:(fun w ->
+              "/terminal " ^ w))
+         ()
+     | Create_pr -> plan ?enter:worktree ~run:"/pr new" ()
+     | Copy_path -> copy "the path" dir
+     | Copy_id -> copy "the session id" s.id
+     | Archive -> set_archived m s ~archived:true
+     | Unarchive -> set_archived m s ~archived:false
+     | Delete -> ask_delete m [ s.path ]
+     | Remove -> ask_remove_session_worktree m dir)
+;;
+
 let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
   let m = { m with dialog = None } in
   let m, cmds =
@@ -5806,6 +5962,7 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
+    | Menu menu -> menu_chosen m menu item.id
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
 ;;
@@ -6262,7 +6419,7 @@ let update_connected (m : Model.t) (action : Action.t) =
            Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
     )
   | New_session_in path -> new_session_in m path
-  | New_worktree { repo } -> new_worktree_dialog m ~repo
+  | New_worktree -> new_worktree_dialog m
   | New_worktree_input { field; text } ->
     (match m.dialog with
      | Some (New_worktree d) ->
@@ -6274,8 +6431,25 @@ let update_connected (m : Model.t) (action : Action.t) =
       let m = { m with dialog = None } in
       let m, cmds = open_worktree m w ~new_session in
       m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds)
-  | Ask_remove_worktree path -> ask_remove_tree_worktree m path
+  | Ask_remove_worktree path -> ask_remove_session_worktree m path
   | Remove_worktree { force } -> remove_worktree m ~force
+  | Open_menu menu ->
+    (match find_session_by_path m (Context_menu.session menu) with
+     | None -> m, []
+     | Some s ->
+       let m, cmds =
+         open_dialog
+           m
+           (Picker
+              { kind = Menu menu
+              ; picker =
+                  Context_menu.picker
+                    menu.target
+                    s
+                    ~current:(is_current_path m s.path)
+              })
+       in
+       m, cmds @ [ Command.Place_menu menu.anchor ])
   | Remove_queued q ->
     ( { m with queue = Queued.remove m.queue q }
     , [ rpc

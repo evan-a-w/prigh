@@ -1049,7 +1049,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
-  // 12. Sessions: archiving one moves it under a divider that folds the
+  // 12. Sessions: archiving one (from its ⋯ menu) moves it under a divider that folds the
   //     archived away (a click unfolds them, muted); selecting several (a
   //     shift-click takes the range, across the divider) and deleting them
   //     asks first with their count and size, then removes their files.
@@ -1064,7 +1064,8 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".sidebar .session").length === 3);
   const hello = page.locator(".sidebar .session", { hasText: "hello again" });
   await hello.hover();
-  await hello.locator(".archive").click();
+  await hello.locator(".more").click();
+  await page.locator(".context-menu.placed [data-item=archive]").click();
   await page.locator(".sessions-divider").waitFor();
   section("archived, folded");
   console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
