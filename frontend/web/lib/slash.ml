@@ -258,9 +258,11 @@ let every =
       "browse, preview, upload and download files where the tools run \
        (Ctrl+Shift+F)"
   ; c
-      ~args:"[n|id|cancel <n|id>]"
+      ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"
-      "follow subagents and background jobs in the agents panel, or cancel one"
+      "follow subagents and background jobs in the agents panel, cancel one, \
+       or send a running subagent a message (steer: at its next step; \
+       follow-up: when it ends its turn)"
   ; c
       ~args:"[id|kill <id>]"
       "jobs"

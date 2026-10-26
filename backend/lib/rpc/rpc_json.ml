@@ -353,7 +353,8 @@ let session_worktree (w : Session_worktree.t) =
      match w.source with
      | Created -> [ "source", str "created" ]
      | Entered -> [ "source", str "entered" ]
-     | Pull_request { number } -> [ "source", str "pull_request"; "pr", int number ]
+     | Pull_request { number } ->
+       [ "source", str "pull_request"; "pr", int number ]
      | Agent { agent; task } ->
        [ "source", str "agent"; "agent", str agent; "task", str task ])
 ;;
@@ -549,6 +550,16 @@ let login_event (e : Login_manager.Event.t) =
   `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
+let agent_queues agents =
+  `Array
+    (List.map agents ~f:(fun (q : Subagent_inbox.Listing.t) ->
+       `Object
+         [ "agent_id", str q.agent_id
+         ; "steer_texts", `Array (List.map q.steer ~f:str)
+         ; "follow_up_texts", `Array (List.map q.follow_up ~f:str)
+         ]))
+;;
+
 let rec event ?now (e : Agent.Event.t) =
   let fields =
     match e with
@@ -652,6 +663,8 @@ let rec event ?now (e : Agent.Event.t) =
     | Config_changed c -> [ "event", str "config_changed"; "config", config c ]
     | Review_changed r -> [ "event", str "review"; "review", review r ]
     | Notice text -> [ "event", str "notice"; "text", str text ]
+    | Subagent_queues agents ->
+      [ "event", str "agent_queues"; "agents", agent_queues agents ]
     | Queue_update { steer; follow_up } ->
       [ "event", str "queue_update"
       ; "steer", int (List.length steer)
@@ -715,10 +728,11 @@ let subagent ((s : Subagent_log.Summary.t), messages) =
     ]
 ;;
 
-let pending ~steer ~follow_up ~confirms ~questions =
+let pending ~steer ~follow_up ~agents ~confirms ~questions =
   `Object
     [ "steer_texts", `Array (List.map steer ~f:str)
     ; "follow_up_texts", `Array (List.map follow_up ~f:str)
+    ; "agents", agent_queues agents
     ; ( "confirms"
       , `Array
           (List.map confirms ~f:(fun (c : Agent.Pending_confirm.t) ->

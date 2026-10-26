@@ -64,7 +64,9 @@ let for_model model tools =
 let specs tools = List.map tools ~f:(fun (t : Tool.t) -> t.spec)
 
 (* A subagent's own subagents are synchronous. *)
-let subagent_control = [ "subagent_status"; "subagent_cancel" ]
+let subagent_control =
+  [ "subagent_status"; "subagent_cancel"; "subagent_message" ]
+;;
 
 (* The session's plan, goal, plan mode and the user belong to the main
    agent. *)

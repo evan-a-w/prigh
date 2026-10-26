@@ -22,6 +22,10 @@ module Note = struct
           ; after : string
           }
       | Plan_mode of { on : bool }
+      | Steer of
+          { from_user : bool
+          ; follow_up : bool
+          }
     [@@deriving sexp, jsonaf, equal]
 
     let wire = function
@@ -29,6 +33,7 @@ module Note = struct
       | Cwd _ -> "cwd"
       | Tools _ | Editor _ -> "tools"
       | Plan_mode _ -> "plan_mode"
+      | Steer _ -> "steer"
     ;;
   end
 
@@ -57,6 +62,25 @@ module Note = struct
       "Plan mode on: the model was told to plan, not change files"
     | Plan_mode { on = false } ->
       "Plan mode off: the model was told it can change files"
+    | Steer { from_user; follow_up } ->
+      sprintf
+        "%s (%s)"
+        (if from_user then "You" else "Main agent")
+        (if follow_up then "follow-up" else "steer")
+  ;;
+
+  let steer ~from_user ~follow_up =
+    { kind = Steer { from_user; follow_up }
+    ; text =
+        (match from_user, follow_up with
+         | true, false ->
+           "[The user sends you this while you work: take it into account and \
+            carry on.]"
+         | true, true ->
+           "[The user sends you this as you finish: deal with it before you \
+            report.]"
+         | false, _ -> "[Your caller sends you this while you work.]")
+    }
   ;;
 
   let between s ~prefix ~suffix =

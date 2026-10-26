@@ -26,6 +26,12 @@ module Note : sig
       | Plan_mode of { on : bool }
       (** plan mode turned on or off ([System_prompt.plan_mode_note]), also
           as a message of its own between turns *)
+      | Steer of
+          { from_user : bool (** else the main agent ([subagent_message]) *)
+          ; follow_up : bool
+          }
+      (** a message sent to a background subagent while it works
+          ({!Subagent_inbox}) *)
     [@@deriving sexp, jsonaf, equal]
   end
 
@@ -35,8 +41,11 @@ module Note : sig
     }
   [@@deriving sexp, jsonaf, equal]
 
-  (** One line for the user, e.g. [Tools now run on laptop]. *)
+  (** One line for the user, e.g. [Tools now run on laptop], [You (steer)]. *)
   val title : t -> string
+
+  (** The note in front of a message sent to a subagent while it works. *)
+  val steer : from_user:bool -> follow_up:bool -> t
 end
 
 module Attachment : sig
