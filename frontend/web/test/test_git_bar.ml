@@ -443,6 +443,20 @@ let%expect_test
     (Rpc (method_ fs_preview)
      (params ((path /home/me/.prigh/worktrees/proj/feat-y/src/util.ml)))
      (tag (Review (Content src/util.ml))))
+    (Cache_prefs
+     (((key web.review)
+       (value
+        (((compare
+           ((/home/me/.prigh/worktrees/proj/feat-y ((base main) (direct false)))))
+          (last ())))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.review
+          ((compare
+            ((/home/me/.prigh/worktrees/proj/feat-y ((base main) (direct false)))))
+           (last ())))))))
+     (tag Show_error))
     (Git Create_pr)
     (Focus dialog)
     (Rpc (method_ pr_defaults)

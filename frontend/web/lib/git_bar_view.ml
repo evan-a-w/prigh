@@ -15,7 +15,9 @@ let files (m : App.Model.t) =
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
 
 (* A branch reviewed without a checkout has nothing to stage or commit. *)
-let read_only (m : App.Model.t) = Option.is_some (Code_review.read_only m.review)
+let read_only (m : App.Model.t) =
+  Option.is_some (Code_review.read_only m.review)
+;;
 
 let strip (m : App.Model.t) ~inject =
   let t = m.git_bar in

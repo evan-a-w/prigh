@@ -181,6 +181,7 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Rpc (method_ push_pref) (params ((key history) (value /review) (max 500)))
      (tag Ignore))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     (Rpc (method_ fs_preview) (params ((path /work/a.ml)))
      (tag (Review (Content a.ml))))
@@ -430,6 +431,7 @@ let%expect_test "actions read what changed again; the editor's save is one" =
      (tag (Review (Since /work))))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     |}];
   H.reply h "git_diff" diff_json;
   [%expect {| |}]
