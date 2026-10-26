@@ -28,6 +28,7 @@ module Argument = struct
     | Review
     | Server
     | Pr
+    | Agents
   [@@deriving sexp_of, equal]
 end
 
@@ -46,7 +47,7 @@ let c ?argument name args help = { Spec.name; args; help; argument }
 (* In cycling order: "on" is the provider's default budget. *)
 let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
 
-let all =
+let every =
   [ c "help" "" "show commands and keys"
   ; c "hotkeys" "" "show keyboard shortcuts"
   ; c
@@ -198,9 +199,12 @@ let all =
       "delete sessions, after a confirmation (none: pick them in /sessions)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
+      ~argument:Argument.Agents
       "agents"
-      "[cancel <n>]"
-      "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
+      "[steer|cancel ...]"
+      "focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N \
+       (its number or id) at its next step, follow-up N TEXT: before it \
+       reports; cancel N"
   ; c
       "jobs"
       "[id|kill <id>]"
@@ -281,9 +285,10 @@ let all =
   ; c
       ~argument:Argument.Server
       "connect"
-      "[HOST:PORT|local]"
-      "switch to the backend at HOST:PORT (saved for next time) or to a local \
-       one; none: asks, with the current address"
+      "[HOST:PORT|URL|local]"
+      "switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, \
+       through an HTTPS proxy; saved for next time) or to a local one; none: \
+       asks, with the current address"
   ; c "signin" "[user]" "sign in to the server, as another user or again"
   ; c
       "signout"
@@ -293,11 +298,29 @@ let all =
       "setusr"
       "[user]"
       "act as another user (superusers only); without a user, list them"
+  ; c
+      "nix-gc"
+      "[run [DAYS|all]]"
+      "show the Nix store's size and free space; run collects garbage, first \
+       deleting every user's profile generations older than DAYS days (all: \
+       all but the current ones)"
   ; c "quit" "" "exit"
   ]
 ;;
 
-let find name = List.find all ~f:(fun s -> String.equal s.name name)
+let superuser_only = [ "nix-gc" ]
+
+let all ~superuser =
+  if superuser
+  then every
+  else
+    List.filter every ~f:(fun s ->
+      not (List.mem superuser_only s.name ~equal:String.equal))
+;;
+
+let find ~superuser name =
+  List.find (all ~superuser) ~f:(fun s -> String.equal s.name name)
+;;
 
 let usage (s : Spec.t) =
   let sep = if String.is_suffix s.name ~suffix:":" then "" else " " in
@@ -327,15 +350,17 @@ let parse input =
        Some { name; args; rest })
 ;;
 
-let closest name =
-  List.filter_map all ~f:(fun s ->
+let closest ~superuser name =
+  List.filter_map (all ~superuser) ~f:(fun s ->
     let d = Edit_distance.distance s.name name in
     Option.some_if (d <= 2 || String.is_prefix s.name ~prefix:name) (d, s))
   |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
   |> Option.map ~f:snd
 ;;
 
-let help = Help_table.render (List.map all ~f:(fun s -> usage s, s.help))
+let help ~superuser =
+  Help_table.render (List.map (all ~superuser) ~f:(fun s -> usage s, s.help))
+;;
 
 let input_help =
   Help_table.render

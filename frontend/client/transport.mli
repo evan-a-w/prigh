@@ -1,8 +1,8 @@
 open! Core
 open! Async_kernel
 
-(** A bidirectional line channel to the backend. Stdio to a spawned process
-    today; a websocket later. *)
+(** A bidirectional line channel to the backend: stdio to a spawned
+    process, TCP, or a WebSocket's text messages. *)
 type t =
   { send_line : string -> unit
   ; lines : string Pipe.Reader.t

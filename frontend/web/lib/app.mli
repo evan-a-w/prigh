@@ -109,6 +109,10 @@ module Reply_tag : sig
         { text : string
         ; images : Image.t list
         } (** a prompt, steer or follow-up: back to the editor if it fails *)
+    | Steered of
+        { agent : string
+        ; draft : string (** what was sent, as typed *)
+        } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
@@ -215,6 +219,9 @@ module Reply_tag : sig
         (it restarted before saving it): we are on another one *)
     | Forge of Forge_reply.t
     | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
+    | Nix_status of { open_settings : bool }
+    (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
+    | Nix_collected (** [nix_store_gc] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -410,9 +417,13 @@ module Action : sig
     | Logout of string (** provider *)
     | Cancel_subagent of string (** agent id *)
     | Kill_job of string (** job id *)
-    | Dequeue (** the last queued message back into the editor *)
-    | Edit_queued of Queued.Message.t (** back into the editor *)
-    | Remove_queued of Queued.Message.t
+    | Dequeue
+    (** the last message queued for the composer's recipient back into the
+        editor *)
+    | Edit_queued of Recipient.t * Queued.Message.t (** back into the editor *)
+    | Remove_queued of Recipient.t * Queued.Message.t
+    | Set_recipient of Recipient.t
+    (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
     | Toggle_folded of string
     (** fold or unfold the worktrees under a session of the sidebar (by its
@@ -544,6 +555,10 @@ module Model : sig
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
     ; queue : Queued.t
+    ; agent_queues : Agent_queue.t list
+      (** the background subagents' queues, those not empty *)
+    ; recipient : Recipient.t
+      (** who the composer sends to: a subagent while steering it *)
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)
@@ -591,6 +606,7 @@ module Model : sig
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
     ; forges : Forges.t (** the user's git hosts *)
+    ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; return_to_settings : bool
     (** the login dialog showing was opened from the settings page: closing
         it goes back there *)
@@ -642,6 +658,9 @@ val thinking_levels : string list
 
 (** A token count in a few characters: [200k], [1.2M]. *)
 val compact_tokens : int -> string
+
+(** Whether the user signed in as a superuser. *)
+val superuser : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list

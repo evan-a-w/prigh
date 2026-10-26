@@ -10,6 +10,7 @@ type t =
         (the one we sent, if accepted), else its [client_id] *)
   ; namespace : string option
   ; user : string option
+  ; superuser : bool (** [user] is one: may act as anyone, clean the Nix store *)
   }
 [@@deriving sexp_of, equal]
 
