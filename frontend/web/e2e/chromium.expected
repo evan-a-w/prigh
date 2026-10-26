@@ -1079,7 +1079,7 @@ Branch
 A new branch, or an existing one to check out
 Base
 Where a new branch starts (empty: main, where this session is)
-Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
+Created in ~/.prigh/worktrees/prigh, then this session works there.
 Enter creates, Esc cancels
 Cancel
 Create and switch
@@ -1119,7 +1119,7 @@ Delete…  Delete
 === chromium: worktrees: Esc changed nothing ===
 Tidy the docs in a worktree
 === chromium: worktrees: a terminal in the worktree ===
-<DIR>/home/.prigh/worktrees/prigh/feat-login
+~/.prigh/worktrees/prigh/feat-login
 === chromium: worktrees: folded ===
 The login form | <age> | prigh | feat/login | 1
 │ feat/login | here [here]
