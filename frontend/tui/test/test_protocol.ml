@@ -1558,7 +1558,11 @@ let%expect_test "git hosting: replies and auth events" =
     ((root      evan-a-w/prigh)
      (against   main)
      (diff      "")
-     (truncated false))
+     (truncated false)
+     (branch (feat/git-hosting))
+     (base main)
+     (main true)
+     (branches ()))
     ((repo (
        (host   github.com)
        (kind   github)

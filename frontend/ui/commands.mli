@@ -30,6 +30,7 @@ module Argument : sig
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
     | Worktree
     (** a [/worktree] subcommand, then a worktree, flag or base branch *)
+    | Review (** [/review]: a worktree or [--base], then a base branch *)
     | Server (** [/connect]: [local], the current or the saved address *)
     | Pr (** [/pr]'s subcommands *)
   [@@deriving sexp_of, equal]

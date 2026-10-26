@@ -215,7 +215,8 @@ let argument_items
       ; "new", "new [title]: create one from this branch"
       ; "checkout", "checkout N: its branch in a worktree"
       ]
-  | Models | Directory | Backend_directory | Path | Remind | Worktree -> []
+  | Models | Directory | Backend_directory | Path | Remind | Worktree | Review
+    -> []
 ;;
 
 let word_at text ~cursor =
@@ -262,6 +263,7 @@ let compute
       ?(reminders = [])
       ?(forges = [])
       ?(worktrees = [])
+      ?(branches = [])
       ~text
       ~cursor
       ~models
@@ -335,12 +337,16 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | (Remind | Worktree) as kind ->
+             | (Remind | Worktree | Review) as kind ->
                let rest = String.lstrip rest in
                Option.bind
                  (match kind with
                   | Worktree ->
                     Prigh_ui.Worktree_command.complete ~worktrees rest
+                    |> Option.map ~f:(fun (offset, candidates) ->
+                      offset, List.map candidates ~f:without_label)
+                  | Review ->
+                    Prigh_ui.Review_command.complete ~worktrees ~branches rest
                     |> Option.map ~f:(fun (offset, candidates) ->
                       offset, List.map candidates ~f:without_label)
                   | _ -> Prigh_ui.Remind_command.complete ~reminders rest)
@@ -480,6 +486,7 @@ let takes_more t =
   | Argument Worktree, Some { id; _ } ->
     List.mem [ "new"; "open"; "rm"; "remove" ] id ~equal:String.equal
     || String.is_prefix id ~prefix:"-"
+  | Argument Review, Some { id; _ } -> String.equal id "--base"
   | _ -> false
 ;;
 
@@ -497,7 +504,7 @@ let accept t ~text =
       | Path when not (String.is_suffix item.id ~suffix:"/") -> item.id ^ " "
       | Argument (Skill | Models) when not (String.is_prefix after ~prefix:" ")
         -> item.id ^ " "
-      | Argument Worktree
+      | Argument (Worktree | Review)
         when takes_more t && not (String.is_prefix after ~prefix:" ") ->
         item.id ^ " "
       | Path | Argument _ | Snippet -> item.id

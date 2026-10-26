@@ -217,8 +217,13 @@ let review (r : Review_state.t) =
     [ "comments", `Array (List.map r.comments ~f:review_comment)
     ; ( "approvals"
       , `Array
-          (List.map (Map.to_alist r.approvals) ~f:(fun (path, hash) ->
-             `Object [ "path", str path; "hash", str hash ])) )
+          (List.map
+             (Map.to_alist r.approvals)
+             ~f:(fun ({ Review_state.File_key.root; path }, hash) ->
+               `Object
+                 (Option.value_map root ~default:[] ~f:(fun r ->
+                    [ "root", str r ])
+                  @ [ "path", str path; "hash", str hash ]))) )
     ]
 ;;
 

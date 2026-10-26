@@ -8,23 +8,43 @@ open! Import
 
     A file is approved at a hash of its change (as frontends compute it from
     the diff): once the file changes again its hash differs and the approval
-    no longer counts. *)
+    no longer counts.
+
+    Comments name their worktree's [root]; approvals too, apart from those
+    recorded before worktrees were told apart (no [root]: the session's own
+    repository's). A frontend reviewing a worktree shows its own only. *)
+
+module File_key : sig
+  (** An approved file: its worktree's top directory ([None]: unknown, the
+      session's repository) and its path in it. *)
+  type t =
+    { root : string option
+    ; path : string
+    }
+  [@@deriving sexp, compare, equal]
+
+  include Comparable.S with type t := t
+end
 
 module Change : sig
   type t =
     | Comment of Review_comment.t (** a comment added or changed, whole *)
     | Delete of { id : string }
     | Approve of
-        { path : string
+        { root : string option
+        ; path : string
         ; hash : string
         }
-    | Unapprove of { path : string }
+    | Unapprove of
+        { root : string option
+        ; path : string
+        }
   [@@deriving sexp, jsonaf, equal]
 end
 
 type t =
   { comments : Review_comment.t list (** oldest first *)
-  ; approvals : string String.Map.t (** hashes by path *)
+  ; approvals : string File_key.Map.t (** hashes by file *)
   ; next_id : int (** of the next comment, [c<next_id>] *)
   }
 [@@deriving sexp_of, equal]
@@ -89,8 +109,15 @@ val decide
 (** The user's posts the agent has not seen, as one message (their comments
     in full, in {!Review_comment.to_prompt}'s form, after instructions on
     replying), with how many comments it covers; their posts become
-    delivered. Fails when there is nothing to send. *)
-val submit : t -> (string * int * Change.t list) Or_error.t
+    delivered. With [root], only the comments on that worktree. Fails when
+    there is nothing to send. *)
+val submit : ?root:string -> t -> (string * int * Change.t list) Or_error.t
 
-val approve : path:string -> hash:string -> Change.t list
-val unapprove : t -> path:string -> Change.t list
+val approve
+  :  ?root:string
+  -> path:string
+  -> hash:string
+  -> unit
+  -> Change.t list
+
+val unapprove : ?root:string -> t -> path:string -> Change.t list

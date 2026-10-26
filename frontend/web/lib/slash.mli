@@ -32,6 +32,7 @@ module Argument : sig
     | Pr (** [/pr]'s subcommands *)
     | Worktree
     (** a [/worktree] subcommand, then a worktree, flag or base branch *)
+    | Review (** [/review]: a worktree or [--base], then a base branch *)
   [@@deriving sexp_of, equal]
 end
 
