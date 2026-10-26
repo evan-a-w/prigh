@@ -83,12 +83,13 @@ let help =
        beside the chat" )
   ; "] / [ (reviewing; also n p, j k)", "the next / previous changed file"
   ; ( "a / c / e / v / s (reviewing)"
-    , "approve the file; comment on the selected lines (click a line number, \
-       Shift+click for a range); edit or comment; the whole file or the \
-       changes; send the new comments to prigh" )
+    , "approve the file; comment on the code selected (drag across it, in the \
+       review or a changed file's preview); edit or comment; the whole file or \
+       the changes; send the new comments to prigh" )
   ; "Esc (reviewing)", "drop the comment or selection, then close the review"
-  ; ( "Ctrl+Enter / Ctrl+S (reviewing)"
-    , "add the comment or reply; save the file being edited" )
+  ; ( "Enter / Ctrl+S (reviewing)"
+    , "add the comment or reply (Shift+Enter: a new line); save the file being \
+       edited" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
@@ -360,6 +361,23 @@ let question_key t : Question_dialog.Action.t option =
   | _ -> None
 ;;
 
+(* Code is selected and no field has the keys. *)
+let commenting (m : App.Model.t) t =
+  Option.is_some m.review.selection
+  && Option.is_none m.review.draft
+  &&
+  match t.target with
+  | Page | Files | Review -> true
+  | Editor _
+  | Field
+  | Multiline
+  | Control
+  | Session_search
+  | Session _
+  | Terminal
+  | Resize _ -> false
+;;
+
 let handle (m : App.Model.t) t : App.Action.t option =
   match t.target, m.confirms, m.questions, m.dialog with
   (* Inside the terminal every key but Ctrl+` is the shell's, Esc and Enter
@@ -422,6 +440,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)
+     (* Code selected in the review or a preview: comment on it. *)
+     | "c" when plain t && commenting m t -> Some (Review Start_comment)
      | _ ->
        (match agents_key m t, t.target with
         | Some action, _ -> Some action

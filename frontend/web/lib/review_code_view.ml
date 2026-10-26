@@ -1,7 +1,6 @@
 open! Core
 open! Import
 open Html
-module Diff_files = Prigh_ui.Diff_files
 module Comment_anchor = Prigh_ui.Comment_anchor
 module Row = Diff_view.Row
 
@@ -9,206 +8,193 @@ let review action = App.Action.Review action
 
 (* ---- rows *)
 
-(* The whole file with the hunks' changes inline: the lines between hunks
-   are the file's own. *)
-let full_rows (hunk_rows : Row.t list) (lines : string array) =
-  let out = ref [] in
-  let old_n = ref 1 in
-  let new_n = ref 1 in
-  let fill_to last =
-    while !new_n <= last && !new_n <= Array.length lines do
-      out
-      := Row.Line
-           { kind = `Same
-           ; old_line = Some !old_n
-           ; new_line = Some !new_n
-           ; text = lines.(!new_n - 1)
-           }
-         :: !out;
-      incr old_n;
-      incr new_n
-    done
-  in
-  List.iter hunk_rows ~f:(fun (row : Row.t) ->
-    match row with
-    | Hunk header ->
-      (match Diff_view.hunk_starts header with
-       | Some (o, n) ->
-         fill_to (n - 1);
-         old_n := Int.max o 1;
-         new_n := Int.max n 1
-       | None -> ())
-    | Line { kind; _ } ->
-      out := row :: !out;
-      (match kind with
-       | `Same ->
-         incr old_n;
-         incr new_n
-       | `Added -> incr new_n
-       | `Removed -> incr old_n));
-  fill_to (Array.length lines);
-  List.rev !out
-;;
-
-let plain_rows lines =
-  Array.to_list
-    (Array.mapi lines ~f:(fun i text ->
-       Row.Line
-         { kind = `Same
-         ; old_line = Some (i + 1)
-         ; new_line = Some (i + 1)
-         ; text
-         }))
-;;
-
-module Rows = struct
-  (* Rows and their tokens are made once per file version and layout, so
-     that a key press or a streamed delta does not highlight a file again,
-     and so that the rows (the cache's keys) stay the same values. *)
-  type key =
-    { path : string
-    ; hash : string option
-    ; text : string option
-    ; full : bool
-    }
-
-  type t =
-    { rows : Row.t list
-    ; tokens : Highlight.Token.t list option list
-    }
-
-  let memo : (string, key * t) Hashtbl.t = Hashtbl.create (module String)
-
-  let same a b =
-    String.equal a.path b.path
-    && Option.equal String.equal a.hash b.hash
-    && Option.equal phys_equal a.text b.text
-    && Bool.equal a.full b.full
+module Tokens = struct
+  (* Highlighted once per rows value (see [Code_review.rows]). *)
+  let memo : (string, Row.t list * Highlight.Token.t list option list) Hashtbl.t
+    =
+    Hashtbl.create (module String)
   ;;
 
-  let find key ~make =
-    match Hashtbl.find memo key.path with
-    | Some (k, t) when same k key -> t
+  let find ~path rows =
+    match Hashtbl.find memo path with
+    | Some (r, tokens) when phys_equal r rows -> tokens
     | Some _ | None ->
-      let t = make () in
-      Hashtbl.set memo ~key:key.path ~data:(key, t);
-      t
-  ;;
-end
-
-let text_of (t : Code_review.t) path =
-  match Map.find t.contents path with
-  | Some (Loaded { text; _ }) -> Some text
-  | Some (Loading | Failed _) | None -> None
-;;
-
-let rows (t : Code_review.t) ~path ~(file : Diff_files.File.t option) =
-  let text = text_of t path in
-  let full = Code_review.Layout.equal t.layout Full in
-  Rows.find
-    { path
-    ; hash = Option.map file ~f:(fun f -> f.hash)
-    ; text = (if full || Option.is_none file then text else None)
-    ; full
-    }
-    ~make:(fun () ->
-      let lines () =
-        Array.of_list (String.split_lines (Option.value text ~default:""))
-      in
-      let rows =
-        match file, text with
-        | None, _ -> plain_rows (lines ())
-        | Some f, _ ->
-          let hunk_rows =
-            Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
-          in
-          if full && Option.is_some text
-          then full_rows hunk_rows (lines ())
-          else hunk_rows
-      in
       let tokens =
         match Highlight.Lang.of_path path with
         | Some lang when List.length rows <= 20_000 ->
           Diff_view.highlighted lang rows
         | Some _ | None -> List.map rows ~f:(fun _ -> None)
       in
-      { Rows.rows; tokens })
-;;
+      Hashtbl.set memo ~key:path ~data:(rows, tokens);
+      tokens
+  ;;
+end
 
 (* ---- a row *)
 
+module Mark = struct
+  (* Text of a row a comment (or the draft) is on: bytes [start, end_). *)
+  type t =
+    { start : int
+    ; end_ : int
+    ; id : string option (** the comment's; [None]: the draft's *)
+    ; hot : bool (** its thread is pointed at *)
+    }
+  [@@deriving equal]
+end
+
 module Deps = struct
   type t =
-    { selected : bool
+    { selected : bool (** by its line number *)
     ; first : bool (** of the selection *)
     ; commented : bool
+    ; marks : Mark.t list
     }
   [@@deriving equal]
 end
 
 let row_cache : (Row.t, Deps.t) View_cache.t = View_cache.create ()
 
+(* The tokens' text, split where marks start and end, the marked parts in
+   [<mark>]s. *)
+let marked tokens (marks : Mark.t list) ~inject =
+  match marks with
+  | [] -> Highlight_view.spans tokens
+  | marks ->
+    let cuts =
+      List.concat_map marks ~f:(fun m -> [ m.start; m.end_ ])
+      |> List.dedup_and_sort ~compare:Int.compare
+    in
+    let pieces =
+      List.fold
+        tokens
+        ~init:(0, [])
+        ~f:(fun (pos, acc) ({ kind; text } : Highlight.Token.t) ->
+          let len = String.length text in
+          let inside =
+            List.filter cuts ~f:(fun c -> c > pos && c < pos + len)
+          in
+          let bounds = (pos :: inside) @ [ pos + len ] in
+          let rec split acc = function
+            | a :: (b :: _ as rest) ->
+              split
+                (( a
+                 , { Highlight.Token.kind
+                   ; text = String.sub text ~pos:(a - pos) ~len:(b - a)
+                   } )
+                 :: acc)
+                rest
+            | [ _ ] | [] -> acc
+          in
+          pos + len, split acc bounds)
+      |> snd
+      |> List.rev
+    in
+    let covering at =
+      List.filter marks ~f:(fun m -> m.start <= at && at < m.end_)
+    in
+    List.group pieces ~break:(fun (a, _) (b, _) ->
+      not (List.equal Mark.equal (covering a) (covering b)))
+    |> List.map ~f:(fun group ->
+      let at = fst (List.hd_exn group) in
+      let spans = Highlight_view.spans (List.map group ~f:snd) in
+      match covering at with
+      | [] -> spans
+      | m :: _ as ms ->
+        [ Node.create
+            "mark"
+            ~attrs:
+              ([ classes
+                   [ "review-mark" ]
+                   [ "hot", List.exists ms ~f:(fun m -> m.hot)
+                   ; "draft", Option.is_none m.id
+                   ; "many", List.length ms > 1
+                   ]
+               ]
+               @
+               match m.id with
+               | None -> []
+               | Some id ->
+                 [ Attr.create "data-comment" id
+                 ; Attr.on_mouseenter (fun _ ->
+                     inject (review (Hover (Some id))))
+                 ; Attr.on_mouseleave (fun _ -> inject (review (Hover None)))
+                 ])
+            spans
+        ])
+    |> List.concat
+;;
+
 let row_view ~path (row : Row.t) tokens (deps : Deps.t) ~inject =
-  let num = Option.value_map ~default:"" ~f:Int.to_string in
   match row with
   | Hunk text ->
     Node.tr
       ~attrs:[ Attr.class_ "hunk" ]
-      [ Node.td ~attrs:[ Attr.create "colspan" "4" ] [ Node.text text ] ]
-  | Line { kind; old_line; new_line; text } ->
+      [ Node.td
+          ~attrs:[ Attr.create "colspan" "3" ]
+          (Diff_view.hunk_header text)
+      ]
+  | Line { kind; text; _ } ->
     let cls, sign =
       match kind with
       | `Same -> "same", " "
       | `Added -> "add", "+"
       | `Removed -> "del", "-"
     in
+    let key = Code_selection.key row in
     let line_cell =
-      match new_line with
+      match key with
       | None -> Node.td ~attrs:[ Attr.class_ "ln" ] []
-      | Some line ->
+      | Some (side, line) ->
         Node.td
           ~attrs:
-            [ Attr.class_ "ln pick"
-            ; Attr.title
-                (sprintf
-                   "Select line %d to comment on (Shift+click: a range)"
-                   line)
+            [ classes
+                [ "ln"; "pick" ]
+                [ "old", Review_comment.Side.equal side Old ]
             ; Attr.on_click (fun ev ->
                 inject
                   (review
                      (Select_line
                         { path
+                        ; side
                         ; line
                         ; extend = Js_of_ocaml.Js.to_bool ev##.shiftKey
                         })))
             ]
           [ Node.text (Int.to_string line) ]
     in
+    let tokens =
+      Option.value tokens ~default:[ { Highlight.Token.kind = Plain; text } ]
+    in
     Node.tr
       ~attrs:
-        [ classes
-            [ cls ]
-            [ "selected", deps.selected
-            ; "sel-first", deps.first
-            ; "commented", deps.commented
-            ]
-        ; (match new_line with
-           | Some n -> Attr.create "data-line" (Int.to_string n)
-           | None -> Attr.empty)
-        ]
-      [ Node.td ~attrs:[ Attr.class_ "ln" ] [ Node.text (num old_line) ]
-      ; line_cell
-      ; Node.td ~attrs:[ Attr.class_ "sign" ] [ Node.text sign ]
-      ; (match tokens with
-         | Some tokens ->
-           Node.td ~attrs:[ Attr.class_ "text" ] (Highlight_view.spans tokens)
-         | None -> Node.td ~attrs:[ Attr.class_ "text" ] [ Node.text text ])
+        ([ classes
+             [ cls ]
+             [ "selected", deps.selected
+             ; "sel-first", deps.first
+             ; "commented", deps.commented
+             ]
+         ]
+         @
+         match key with
+         | Some (side, n) ->
+           [ Attr.create "data-side" (Review_comment.Side.to_string side)
+           ; Attr.create "data-line" (Int.to_string n)
+           ]
+         | None -> [])
+      [ line_cell
+      ; Node.td
+          ~attrs:[ Attr.class_ "sign"; Attr.create "aria-hidden" "true" ]
+          [ Node.text sign ]
+      ; Node.td ~attrs:[ Attr.class_ "text" ] (marked tokens deps.marks ~inject)
       ]
 ;;
 
 (* ---- threads *)
 
-let ctrl_enter ~inject action =
+(* Enter sends, Shift+Enter is a new line, Esc cancels (and goes no
+   further: it would close the review). *)
+let field_keys (m : App.Model.t) ~field ~inject =
   Attr.on_keydown (fun ev ->
     let key =
       Js_of_ocaml.Js.Optdef.case
@@ -216,20 +202,62 @@ let ctrl_enter ~inject action =
         (fun () -> "")
         Js_of_ocaml.Js.to_string
     in
-    let command =
-      Js_of_ocaml.Js.to_bool ev##.ctrlKey || Js_of_ocaml.Js.to_bool ev##.metaKey
+    let composing =
+      Js_of_ocaml.Js.to_bool (Js_of_ocaml.Js.Unsafe.coerce ev)##.isComposing
     in
-    match key with
-    | "Enter" when command ->
+    match
+      if composing
+      then None
+      else
+        Code_review.field_key
+          m.review
+          ~field
+          ~key
+          ~shift:(Js_of_ocaml.Js.to_bool ev##.shiftKey)
+          ~ctrl:(Js_of_ocaml.Js.to_bool ev##.ctrlKey)
+          ~meta:(Js_of_ocaml.Js.to_bool ev##.metaKey)
+    with
+    | Some action ->
       ev##preventDefault;
-      inject action
-    | _ -> Effect.Ignore)
+      Effect.Many [ Effect.Stop_propagation; inject (review action) ]
+    | None -> Effect.Ignore)
 ;;
 
-let lines_label first last =
-  if first = last
-  then sprintf "line %d" first
-  else sprintf "lines %d–%d" first last
+(* The selected text, as the comment box and the thread quote it: a few
+   lines at most. *)
+let quote ~(range : Review_comment.Range.t) ~anchor =
+  match range.columns with
+  | None -> Node.none
+  | Some _ ->
+    let lines =
+      String.split_lines (Review_comment.Range.selected range ~anchor)
+    in
+    let shown = List.take lines 4 in
+    Node.create
+      "blockquote"
+      ~attrs:
+        [ classes
+            [ "review-quote" ]
+            [ "old", Review_comment.Side.equal range.side Old ]
+        ]
+      [ Node.pre
+          [ Node.text
+              (String.concat ~sep:"\n" shown
+               ^ if List.length lines > List.length shown then "\n…" else "")
+          ]
+      ]
+;;
+
+let where = Review_comment.Range.label
+
+let old_flag (range : Review_comment.Range.t) =
+  match range.side with
+  | Old ->
+    span
+      ~cls:"review-flag old"
+      ~attrs:[ Attr.title "On lines the change removed" ]
+      "old text"
+  | New -> Node.none
 ;;
 
 let post_view
@@ -313,7 +341,7 @@ let post_view
 ;;
 
 let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
-  let first, last = Option.value at ~default:(c.first, c.last) in
+  let range = Option.value at ~default:c.range in
   let busy = Set.mem m.review.busy c.id in
   let reply = Option.value (Map.find m.review.replies c.id) ~default:"" in
   let resolved = Review_comment.Status.equal c.status Resolved in
@@ -323,18 +351,23 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
     ~attrs:
       [ classes
           [ "review-thread" ]
-          [ "resolved", resolved; "outdated", outdated ]
+          [ "resolved", resolved
+          ; "outdated", outdated
+          ; "hot", Option.exists m.review.hover ~f:(String.equal c.id)
+          ]
       ; Attr.id ("review-thread-" ^ c.id)
-      ; Attr.create
-          "aria-label"
-          (sprintf "Comment %s on %s" c.id (lines_label first last))
+      ; Attr.create "data-comment" c.id
+      ; Attr.create "aria-label" (sprintf "Comment %s on %s" c.id (where range))
+      ; Attr.on_mouseenter (fun _ -> inject (review (Hover (Some c.id))))
+      ; Attr.on_mouseleave (fun _ -> inject (review (Hover None)))
       ]
     [ div
         ~cls:"review-thread-head"
         [ span ~cls:"review-id" c.id
-        ; span ~cls:"review-where" (lines_label first last)
+        ; span ~cls:"review-where" (where range)
+        ; old_flag range
         ; (if outdated
-           then span ~cls:"review-flag" "its lines changed"
+           then span ~cls:"review-flag" "its code changed"
            else Node.none)
         ; (if resolved
            then span ~cls:"review-flag done" "resolved"
@@ -364,6 +397,7 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
                 [ icon Trash ]
             ]
         ]
+    ; quote ~range:c.range ~anchor:c.anchor
     ; (if resolved && String.is_empty reply
        then Node.none
        else
@@ -385,7 +419,7 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
                  ; Attr.string_property "value" reply
                  ; Attr.on_input (fun _ text ->
                      inject (review (Reply_input { id = c.id; text })))
-                 ; ctrl_enter ~inject (review (Reply_send c.id))
+                 ; field_keys m ~field:(`Reply c.id) ~inject
                  ]
                []
            ; (if String.is_empty (String.strip reply)
@@ -394,38 +428,36 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
                 button
                   ~cls:"small"
                   ~disabled:busy
-                  ~title:"Ctrl+Enter"
+                  ~title:"Enter (Shift+Enter: a new line)"
                   ~on_click:(inject (review (Reply_send c.id)))
                   [ Node.text "Reply" ])
            ])
     ]
 ;;
 
-let draft_view (d : Code_review.Draft.t) ~inject =
+let draft_view (m : App.Model.t) (d : Code_review.Draft.t) ~inject =
   div
     ~cls:"review-thread draft"
     [ div
         ~cls:"review-thread-head"
-        [ span ~cls:"review-where" ("Comment on " ^ lines_label d.first d.last)
+        [ span ~cls:"review-where" ("Comment on " ^ where d.range)
+        ; old_flag d.range
         ]
+    ; quote ~range:d.range ~anchor:d.anchor
     ; Node.textarea
         ~attrs:
           [ Attr.id "review-draft"
           ; Attr.class_ "review-field"
           ; Attr.placeholder
-              "What should change here? prigh reads it with the code."
+              (match d.range.columns with
+               | Some _ ->
+                 "What should change here? prigh reads it with the code."
+               | None -> "What should change in these lines?")
           ; Attr.create "rows" "3"
           ; Attr.create "aria-label" "Comment"
           ; Attr.string_property "value" d.text
           ; Attr.on_input (fun _ text -> inject (review (Draft_input text)))
-          ; ctrl_enter ~inject (review Draft_send)
-          ; Attr.on_keydown (fun ev ->
-              match Js_of_ocaml.Js.Optdef.to_option ev##.key with
-              | Some k when String.equal (Js_of_ocaml.Js.to_string k) "Escape"
-                ->
-                Effect.Many
-                  [ Effect.Stop_propagation; inject (review Draft_cancel) ]
-              | _ -> Effect.Ignore)
+          ; field_keys m ~field:`Draft ~inject
           ]
         []
     ; div
@@ -434,7 +466,7 @@ let draft_view (d : Code_review.Draft.t) ~inject =
             ~cls:"keys-hint"
             ~attrs:
               [ Attr.title "Send then gives prigh every new comment at once" ]
-            "Ctrl+Enter adds it"
+            "Enter adds it · Shift+Enter a new line · Esc cancels"
         ; button
             ~cls:"small ghost"
             ~on_click:(inject (review Draft_cancel))
@@ -452,10 +484,11 @@ let draft_view (d : Code_review.Draft.t) ~inject =
 let insert node =
   Node.tr
     ~attrs:[ Attr.class_ "review-insert" ]
-    [ Node.td ~attrs:[ Attr.create "colspan" "4" ] [ node ] ]
+    [ Node.td ~attrs:[ Attr.create "colspan" "3" ] [ node ] ]
 ;;
 
-let comment_button (s : Code_review.Selection.t) ~inject =
+(* Lines picked by their numbers: the bar under them. *)
+let comment_bar (s : Code_review.Selection.t) ~inject =
   insert
     (div
        ~cls:"review-select-bar"
@@ -463,9 +496,7 @@ let comment_button (s : Code_review.Selection.t) ~inject =
            ~cls:"small primary"
            ~title:"c"
            ~on_click:(inject (review Start_comment))
-           [ icon Pencil
-           ; Node.text ("Comment on " ^ lines_label s.first s.last)
-           ]
+           [ icon Pencil; Node.text ("Comment on " ^ where s.range) ]
        ; button
            ~cls:"small ghost"
            ~title:"Esc"
@@ -474,70 +505,129 @@ let comment_button (s : Code_review.Selection.t) ~inject =
        ])
 ;;
 
+(* Text selected: the button floating by its end. Pressing it keeps the
+   page's selection. *)
+let pop (p : Code_review.Pop.t) ~inject =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "review-pop"
+      ; Attr.style Css_gen.(left (`Px p.left) @> top (`Px p.top))
+      ]
+    [ Node.button
+        ~attrs:
+          [ Attr.class_ "btn small primary"
+          ; Attr.type_ "button"
+          ; Attr.title "Comment on the selected code (c)"
+          ; Attr.on_mousedown (fun ev ->
+              Js_of_ocaml.Dom.preventDefault ev;
+              Effect.Ignore)
+          ; Attr.on_click (fun _ -> inject (review Start_comment))
+          ]
+        [ icon Pencil
+        ; Node.text "Comment"
+        ; Node.kbd ~attrs:[ Attr.class_ "review-pop-key" ] [ Node.text "c" ]
+        ]
+    ]
+;;
+
+(* The lines of a side as they are now, to find comments again in: the
+   file's text (or the rows shown, while it is read), or the removed rows. *)
+let side_lines (t : Code_review.t) ~path rows (side : Review_comment.Side.t) =
+  let of_rows () =
+    let map =
+      List.filter_map rows ~f:(fun row ->
+        match Code_selection.key row, row with
+        | Some (s, n), Row.Line { text; _ }
+          when Review_comment.Side.equal s side -> Some (n, text)
+        | _ -> None)
+      |> Int.Map.of_alist_reduce ~f:(fun a _ -> a)
+    in
+    Map.find map, Option.value_map (Map.max_elt map) ~default:0 ~f:fst
+  in
+  match side, Code_review.lines t path with
+  | New, Some lines ->
+    ( (fun n ->
+        if n >= 1 && n <= Array.length lines then Some lines.(n - 1) else None)
+    , Array.length lines )
+  | New, None | Old, _ -> of_rows ()
+;;
+
 let view (m : App.Model.t) ~path ~inject =
   let t = m.review in
   let file = Code_review.file t path in
-  let { Rows.rows; tokens } = rows t ~path ~file in
+  let rows = Code_review.rows t ~path in
+  let tokens = Tokens.find ~path rows in
   let comments = Review.on t.review path in
-  let lines =
-    Option.map (text_of t path) ~f:(fun text ->
-      Array.of_list (String.split_lines text))
-  in
+  let lines_new = lazy (side_lines t ~path rows New) in
+  let lines_old = lazy (side_lines t ~path rows Old) in
   let located =
-    List.map comments ~f:(fun c ->
-      match lines with
-      | Some lines -> c, Comment_anchor.locate c ~lines
-      | None -> c, Comment_anchor.Located.At { first = c.first; last = c.last })
+    List.map comments ~f:(fun (c : Review_comment.t) ->
+      let line, count =
+        force
+          (match c.range.side with
+           | New -> lines_new
+           | Old -> lines_old)
+      in
+      c, Comment_anchor.locate c ~line ~count)
   in
-  let shown_lines =
-    List.filter_map rows ~f:(fun (r : Row.t) ->
-      match r with
-      | Line { new_line = Some n; _ } -> Some n
-      | Line _ | Hunk _ -> None)
-    |> Int.Set.of_list
-  in
-  let at_line =
+  let shown = List.filter_map rows ~f:Code_selection.key |> Set.Poly.of_list in
+  let shown_at (r : Review_comment.Range.t) = Set.mem shown (r.side, r.last) in
+  let at_row =
     List.filter_map located ~f:(fun (c, l) ->
       match l with
-      | At { first; last } when Set.mem shown_lines last ->
-        Some (last, (c, first))
+      | At r when shown_at r -> Some (c, r)
       | At _ | Outdated -> None)
   in
   let elsewhere =
     List.filter_map located ~f:(fun (c, l) ->
       match l with
-      | At { last; _ } when Set.mem shown_lines last -> None
+      | At r when shown_at r -> None
       | At _ -> Some (c, false)
       | Outdated -> Some (c, true))
-  in
-  let commented =
-    List.concat_map located ~f:(fun (_, l) ->
-      match l with
-      | At { first; last } -> List.range first (last + 1)
-      | Outdated -> [])
-    |> Int.Set.of_list
   in
   let selection =
     Option.filter t.selection ~f:(fun s -> String.equal s.path path)
   in
   let draft = Option.filter t.draft ~f:(fun d -> String.equal d.path path) in
+  let line_selection =
+    Option.bind selection ~f:(fun s -> Option.map s.from ~f:(fun _ -> s.range))
+  in
+  let ends_at row (r : Review_comment.Range.t) =
+    Option.equal
+      [%equal: Review_comment.Side.t * int]
+      (Code_selection.key row)
+      (Some (r.side, r.last))
+  in
   let body =
     List.concat
       (List.map2_exn rows tokens ~f:(fun (row : Row.t) tok ->
-         let line =
-           match row with
-           | Line { new_line; _ } -> new_line
-           | Hunk _ -> None
+         let marks =
+           List.filter_map at_row ~f:(fun (c, r) ->
+             Option.map (Code_selection.covered r row) ~f:(fun (start, end_) ->
+               { Mark.start
+               ; end_
+               ; id = Some c.id
+               ; hot = Option.exists t.hover ~f:(String.equal c.id)
+               }))
+           @ Option.to_list
+               (Option.bind draft ~f:(fun d ->
+                  Option.map
+                    (Code_selection.covered d.range row)
+                    ~f:(fun (start, end_) ->
+                      { Mark.start; end_; id = None; hot = false })))
+         in
+         let selected =
+           Option.bind line_selection ~f:(fun r -> Code_selection.covered r row)
          in
          let deps =
-           { Deps.selected =
-               Option.exists line ~f:(fun n ->
-                 Option.exists selection ~f:(fun s ->
-                   n >= s.first && n <= s.last))
+           { Deps.selected = Option.is_some selected
            ; first =
-               Option.exists line ~f:(fun n ->
-                 Option.exists selection ~f:(fun s -> n = s.first))
-           ; commented = Option.exists line ~f:(Set.mem commented)
+               Option.is_some selected
+               && Option.exists line_selection ~f:(fun r ->
+                 Option.exists (Code_selection.key row) ~f:(fun (_, n) ->
+                   n = r.first))
+           ; commented = not (List.is_empty marks)
+           ; marks = List.filter marks ~f:(fun m -> m.end_ > m.start)
            }
          in
          let node =
@@ -549,26 +639,25 @@ let view (m : App.Model.t) ~path ~inject =
              ~equal:Deps.equal
              ~f:(fun () -> row_view ~path row tok deps ~inject)
          in
-         match line, row with
-         | Some n, Line { kind = `Added | `Same; _ } ->
-           let threads =
-             List.filter_map at_line ~f:(fun (l, (c, first)) ->
-               Option.some_if
-                 (l = n)
-                 (insert (thread m c ~at:(first, l) ~outdated:false ~inject)))
-           in
-           let after_selection =
-             match selection, draft with
-             | Some s, None when s.last = n -> [ comment_button s ~inject ]
-             | _ -> []
-           in
-           let after_draft =
-             match draft with
-             | Some d when d.last = n -> [ insert (draft_view d ~inject) ]
-             | Some _ | None -> []
-           in
-           (node :: threads) @ after_selection @ after_draft
-         | _ -> [ node ]))
+         let threads =
+           List.filter_map at_row ~f:(fun (c, r) ->
+             Option.some_if
+               (ends_at row r)
+               (insert (thread m c ~at:r ~outdated:false ~inject)))
+         in
+         let bar =
+           match selection, draft with
+           | Some ({ from = Some _; _ } as s), None when ends_at row s.range ->
+             [ comment_bar s ~inject ]
+           | _ -> []
+         in
+         let draft_row =
+           match draft with
+           | Some d when ends_at row d.range ->
+             [ insert (draft_view m d ~inject) ]
+           | Some _ | None -> []
+         in
+         (node :: threads) @ bar @ draft_row))
   in
   let empty =
     match rows, file, Map.find t.contents path with
@@ -603,6 +692,7 @@ let view (m : App.Model.t) ~path ~inject =
   in
   div
     ~cls:"review-code"
+    ~attrs:[ Attr.create "data-path" path ]
     ([ (match elsewhere with
         | [] -> Node.none
         | elsewhere ->
@@ -619,5 +709,8 @@ let view (m : App.Model.t) ~path ~inject =
             Node.table
               ~attrs:[ Attr.class_ "diff review-diff" ]
               [ Node.tbody body ])
+       ; (match selection, draft with
+          | Some { pop = Some p; _ }, None -> pop p ~inject
+          | _ -> Node.none)
        ])
 ;;

@@ -616,11 +616,11 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
   let review_json =
     sprintf
       {|{"comments":[
-          {"id":"c1","root":"/work","path":"src/a.ml","first":2,"last":2,"anchor":"let y = 3","status":"open",
+          {"id":"c1","root":"/work","path":"src/a.ml","first":2,"last":2,"side":"new","start_col":4,"end_col":5,"anchor":"let y = 3","status":"open",
            "thread":[{"author":"user","text":"Why 3?","at_ms":1,"delivered":true},
                      {"author":"agent","text":"It was off by one.","at_ms":2,"delivered":true,
                       "proposal":{"edits":[{"old_text":"3","new_text":"4"}],"state":"pending"}}]},
-          {"id":"c2","root":"/work","path":"gone.ml","first":1,"last":3,"anchor":"x","status":"resolved",
+          {"id":"c2","root":"/work","path":"gone.ml","first":1,"last":3,"side":"old","anchor":"x","status":"resolved",
            "thread":[{"author":"user","text":"Drop it","at_ms":3,"delivered":false}]}],
          "approvals":[{"path":"src/a.ml","hash":%S},{"path":"new file.txt","hash":"older"}]}|}
       (hash "src/a.ml")
@@ -642,16 +642,16 @@ let%expect_test "/review alone: the files' approvals and the review comments" =
     ┌─ Review ─────────────────────────────────────────────────────────────────────────┐
     │ review /work  1 of 2 files approved                                              │
     │   ✓ src/a.ml  +1 −1  approved                                                    │
-    │     c1 line 2, open                                                              │
+    │     c1 line 2 “y”, open                                                          │
     │       you: Why 3?                                                                │
     │       prigh: It was off by one. [proposes a change]                              │
     │   ● new file.txt  +1 −0  changed since approved                                  │
     │   on files no longer changed:                                                    │
     │   gone.ml                                                                        │
-    │     c2 lines 1–3, resolved                                                       │
+    │     c2 old lines 1–3, resolved                                                   │
     │       you: Drop it                                                               │
-    │ approve files and comment on lines in prigh-web's review page; /review HEAD has  │
-    │ prigh review the changes itself                                                  │
+    │ approve files and comment on code you select in prigh-web's review page; /review │
+    │ HEAD has prigh review the changes itself                                         │
     └───────────────────────────────────────────────────────────────────── Esc closes ─┘
     ────────────────────────────────────────────────────────────────────────────────────
     > ▏

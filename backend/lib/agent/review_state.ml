@@ -88,16 +88,7 @@ let changed c = Ok (c, [ Change.Comment c ])
 let add t ~root ~path ~(range : C.Range.t) ~anchor ~text ~at =
   let open Or_error.Let_syntax in
   let%bind text = non_empty ~what:"comment" text in
-  let%bind () =
-    if range.first < 1 || range.last < range.first
-    then
-      Or_error.errorf
-        "lines %d-%d are not a range of lines: the first is 1 or more and the \
-         last no smaller"
-        range.first
-        range.last
-    else Ok ()
-  in
+  let%bind () = C.Range.validate range ~anchor in
   let%bind () =
     if String.is_empty (String.strip path)
     then Or_error.error_string "a comment needs the file's path"
@@ -205,15 +196,17 @@ let instructions =
    Make the changes they ask for; where the user should decide, propose the \
    change with the reply's edits instead of making it (it is applied when they \
    accept it). Resolve a comment (resolve: true) when it needs nothing more. \
-   Posts marked new are what you have not seen yet."
+   Posts marked new are what you have not seen yet. A comment on text the user \
+   selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one \
+   with side=\"old\" is on lines the change removed, numbered as in the file \
+   before it."
 ;;
 
 let submit t =
   match List.filter t.comments ~f:C.unsent with
   | [] ->
     Or_error.error_string
-      "no new comments to send: select lines of a changed file to comment on \
-       them"
+      "no new comments to send: select text in a changed file to comment on it"
   | comments ->
     let text =
       String.concat

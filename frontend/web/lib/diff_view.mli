@@ -29,8 +29,13 @@ val highlighted
   -> Row.t list
   -> Highlight.Token.t list option list
 
-(** A unified diff (what [edit] returns), with old and new line numbers,
-    folded to [max_rows] (default 8). *)
+(** A hunk header's nodes: its line ranges, then the code it is in
+    ([@@ -12,7 +12,8 @@ let f x =]). *)
+val hunk_header : string -> Node.t list
+
+(** A unified diff (what [edit] returns), one line number per row (the new
+    one, or the old one of a removed line), folded to [max_rows] (default
+    8). *)
 val unified
   :  ?max_rows:int
   -> ?lang:Highlight.Lang.t

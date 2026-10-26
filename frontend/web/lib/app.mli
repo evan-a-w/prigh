@@ -231,6 +231,7 @@ module Command : sig
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
     | Focus of string (** the element with this id, once rendered *)
+    | Clear_text_selection (** the page's selected text, unselected *)
     | Place_popover
     (** a chip's menu, once rendered: above the composer, or below its chip
         when only there is room; inside the composer sideways *)

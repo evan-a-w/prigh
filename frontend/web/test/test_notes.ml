@@ -229,12 +229,13 @@ let%expect_test
             <table class="diff">
               <tbody>
                 <tr class="hunk">
-                  <td colspan="4"> @@ -1,2 +1,2 @@ </td>
+                  <td colspan="3">
+                    <span class="hunk-range"> @@ -1,2 +1,2 @@ </span>
+                  </td>
                 </tr>
                 <tr class="same">
                   <td class="ln"> 1 </td>
-                  <td class="ln"> 1 </td>
-                  <td class="sign">   </td>
+                  <td aria-hidden="true" class="sign">   </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      x =
@@ -242,9 +243,8 @@ let%expect_test
                   </td>
                 </tr>
                 <tr class="del">
-                  <td class="ln"> 2 </td>
-                  <td class="ln">  </td>
-                  <td class="sign"> - </td>
+                  <td class="ln old"> 2 </td>
+                  <td aria-hidden="true" class="sign"> - </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
@@ -252,9 +252,8 @@ let%expect_test
                   </td>
                 </tr>
                 <tr class="add">
-                  <td class="ln">  </td>
                   <td class="ln"> 2 </td>
-                  <td class="sign"> + </td>
+                  <td aria-hidden="true" class="sign"> + </td>
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
@@ -276,12 +275,13 @@ let%expect_test
             <table class="diff">
               <tbody>
                 <tr class="hunk">
-                  <td colspan="4"> @@ -0,0 +1 @@ </td>
+                  <td colspan="3">
+                    <span class="hunk-range"> @@ -0,0 +1 @@ </span>
+                  </td>
                 </tr>
                 <tr class="add">
-                  <td class="ln">  </td>
                   <td class="ln"> 1 </td>
-                  <td class="sign"> + </td>
+                  <td aria-hidden="true" class="sign"> + </td>
                   <td class="text"> hello </td>
                 </tr>
               </tbody>

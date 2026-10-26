@@ -171,9 +171,9 @@ let%expect_test "help lists every key and command" =
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     ] / [ (reviewing; also n p, j k) the next / previous changed file
-    a / c / e / v / s (reviewing) approve the file; comment on the selected lines (click a line number, Shift+click for a range); edit or comment; the whole file or the changes; send the new comments to prigh
+    a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     Esc (reviewing) drop the comment or selection, then close the review
-    Ctrl+Enter / Ctrl+S (reviewing) add the comment or reply; save the file being edited
+    Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)

@@ -71,8 +71,7 @@ module Method = struct
     | Review_comment of
         { root : string
         ; path : string
-        ; first : int
-        ; last : int
+        ; range : Review_comment.Range.t
         ; anchor : string
         ; text : string
         }
@@ -153,14 +152,14 @@ module Method = struct
     | Pr_defaults
     | Get_review
     | Review_submit -> []
-    | Review_comment { root; path; first; last; anchor; text } ->
+    | Review_comment { root; path; range; anchor; text } ->
       [ "root", Json.str root
       ; "path", Json.str path
-      ; "first", Json.int first
-      ; "last", Json.int last
-      ; "anchor", Json.str anchor
-      ; "text", Json.str text
+      ; "first", Json.int range.first
+      ; "last", Json.int range.last
       ]
+      @ Review_comment.Range.params range
+      @ [ "anchor", Json.str anchor; "text", Json.str text ]
     | Review_reply { id; text } -> [ "id", Json.str id; "text", Json.str text ]
     | Review_set_status { id; status } ->
       [ "id", Json.str id

@@ -69,7 +69,7 @@ let comment t agent ~path ~first ~last ~anchor text =
       r
       ~root:t.dir
       ~path
-      ~range:{ first; last }
+      ~range:(Review_comment.Range.lines ~first ~last)
       ~anchor
       ~text
       ~at:0.)
@@ -121,7 +121,7 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   Agent.wait_idle agent;
   print_result t (Agent.submit_review agent);
   [%expect
-    {| error: no new comments to send: select lines of a changed file to comment on them |}];
+    {| error: no new comments to send: select text in a changed file to comment on it |}];
   print_result
     t
     (comment t agent ~path:"a.txt" ~first:1 ~last:1 ~anchor:"one" "  ");
@@ -166,7 +166,7 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   print_endline (mask t (List.nth_exn (Queue.to_list sent) 1));
   [%expect
     {|
-    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet.
+    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
 
     <comment id="c1" file="$DIR/a.txt" lines="1" status="open">
     <code>
@@ -237,7 +237,7 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   [%expect
     {|
     (Ok 1)
-    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet.
+    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
 
     <comment id="c2" file="$DIR/a.txt" lines="2-3" status="open">
     <code>
@@ -361,14 +361,14 @@ let%expect_test "the RPC methods" =
   [%expect
     {|
     {"comments":[],"approvals":[]}
-    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false}]}
+    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false}]}
     error: param "first" must be a whole number
-    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
+    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
     error: unknown status "done": open or resolved
-    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
+    {"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}
     error: c1 has no proposed change at post 0
-    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.ml","hash":"abc"}]}
-    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[]}
+    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[{"path":"a.ml","hash":"abc"}]}
+    {"comments":[{"id":"c1","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"new","anchor":"let x = 1","status":"resolved","thread":[{"author":"user","text":"why?","at_ms":<ms>,"delivered":false},{"author":"user","text":"well?","at_ms":<ms>,"delivered":false}]}],"approvals":[]}
     {}
     not a review method
     |}];
@@ -430,4 +430,147 @@ let%expect_test "fs_write: the editor saves a file unless it changed" =
     one
     three
     |}]
+;;
+
+let%expect_test "comments on selected text, and on removed lines" =
+  let sent = Queue.create () in
+  with_agent
+    ~on_request:(fun request ->
+      match List.last request.messages with
+      | Some (Message.User u) -> Queue.enqueue sent u.text
+      | _ -> ())
+    [ Reply.text "Looking." ]
+  @@ fun t agent ->
+  let add ~first ~last ?(side = Review_comment.Side.New) ?columns ~anchor text =
+    print_result
+      t
+      (Agent.update_review agent ~f:(fun r ->
+         Review_state.add
+           r
+           ~root:t.dir
+           ~path:"a.ml"
+           ~range:{ first; last; side; columns }
+           ~anchor
+           ~text
+           ~at:0.))
+  in
+  let cols start_col end_col = { Review_comment.Columns.start_col; end_col } in
+  (* What does not fit the lines is refused, saying why. *)
+  add ~first:3 ~last:3 ~columns:(cols 4 4) ~anchor:"let c = 3" "empty";
+  add ~first:3 ~last:3 ~columns:(cols 4 40) ~anchor:"let c = 3" "past";
+  add ~first:3 ~last:4 ~columns:(cols 4 5) ~anchor:"let c = 3" "short";
+  [%expect
+    {|
+    error: columns 4-4 select nothing: select some text first
+    error: columns 4-40 are outside the selected lines: they are byte offsets into the first and the last line
+    error: a selection's anchor needs the text of its 2 lines, not 1
+    |}];
+  (* A word of one line; across two lines (the characters counted, not the
+     bytes); and lines the change removed. *)
+  add ~first:3 ~last:3 ~columns:(cols 4 5) ~anchor:"let c = 3 * 2" "Rename c";
+  add
+    ~first:4
+    ~last:5
+    ~columns:(cols 8 7)
+    ~anchor:"let s = \"é…\"\nlet d = 4"
+    "Join these";
+  add ~first:3 ~last:3 ~side:Old ~anchor:"let c = 3" "Why drop it?";
+  show_review t (Agent.review_state agent);
+  [%expect
+    {|
+    c1 $DIR/a.ml:3 open
+      user (unsent): Rename c
+    c2 $DIR/a.ml:4-5 open
+      user (unsent): Join these
+    c3 $DIR/a.ml:old 3 open
+      user (unsent): Why drop it?
+    |}];
+  print_s [%sexp (Agent.submit_review agent : int Or_error.t)];
+  Agent.wait_idle agent;
+  print_endline (mask t (Queue.last_exn sent));
+  [%expect
+    {|
+    (Ok 3)
+    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
+
+    <comment id="c1" file="$DIR/a.ml" lines="3" selection="3:5-3:5" status="open">
+    <code>
+    3  let ⟦c⟧ = 3 * 2
+    </code>
+    <selected>
+    c
+    </selected>
+    <post from="user" new="true">
+    Rename c
+    </post>
+    </comment>
+
+    <comment id="c2" file="$DIR/a.ml" lines="4-5" selection="4:9-5:7" status="open">
+    <code>
+    4  let s = ⟦"é…"
+    5  let d =⟧ 4
+    </code>
+    <selected>
+    "é…"
+    let d =
+    </selected>
+    <post from="user" new="true">
+    Join these
+    </post>
+    </comment>
+
+    <comment id="c3" file="$DIR/a.ml" lines="3" side="old" status="open">
+    <code>
+    3  let c = 3
+    </code>
+    <post from="user" new="true">
+    Why drop it?
+    </post>
+    </comment>
+    |}];
+  (* The RPC: a selection's side and columns, sent back as they came. *)
+  let call = dispatch t agent in
+  call
+    "review_comment"
+    (sprintf
+       {|{"root":%S,"path":"a.ml","first":2,"last":2,"side":"old","start_col":4,"end_col":5,"anchor":"let x = 1","text":"x?"}|}
+       t.dir);
+  call
+    "review_comment"
+    {|{"root":"/r","path":"a.ml","first":2,"last":2,"start_col":4,"anchor":"let x = 1","text":"x?"}|};
+  call
+    "review_comment"
+    {|{"root":"/r","path":"a.ml","first":2,"last":2,"side":"left","anchor":"let x = 1","text":"x?"}|};
+  [%expect
+    {|
+    {"id":"c4","root":"$DIR","path":"a.ml","first":2,"last":2,"side":"old","start_col":4,"end_col":5,"anchor":"let x = 1","status":"open","thread":[{"author":"user","text":"x?","at_ms":<ms>,"delivered":false}]}
+    error: a selection needs both start_col and end_col (or neither, for whole lines)
+    error: unknown side "left": old or new
+    |}];
+  (* How the session keeps them; one saved before selections (no side, no
+     columns) still reads, as whole lines of the file as it is. *)
+  let range json = Review_comment.Range.t_of_jsonaf (Jsonaf.of_string json) in
+  print_s [%sexp (range {|{"first":3,"last":4}|} : Review_comment.Range.t)];
+  print_endline
+    (Jsonaf.to_string
+       (Review_comment.Range.jsonaf_of_t
+          { first = 3; last = 4; side = Old; columns = Some (cols 1 2) }));
+  print_endline
+    (Jsonaf.to_string
+       (Review_comment.Range.jsonaf_of_t
+          (Review_comment.Range.lines ~first:3 ~last:4)));
+  [%expect
+    {|
+    ((first 3) (last 4))
+    {"first":3,"last":4,"side":["Old"],"columns":{"start_col":1,"end_col":2}}
+    {"first":3,"last":4}
+    |}];
+  let loaded =
+    Or_error.ok_exn (Session.load (Session.path (Agent.session agent)))
+  in
+  print_s
+    [%sexp
+      (Review_state.equal (Agent.review_state agent) (Session.review loaded)
+       : bool)];
+  [%expect {| true |}]
 ;;

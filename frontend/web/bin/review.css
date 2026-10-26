@@ -139,20 +139,89 @@
 
 .review-scroll { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 40px; }
 
-/* ---- the code: a diff whose new line numbers select */
+/* ---- the code: select text in it to comment on it */
 
-.review-code { font: 12.5px/1.6 var(--mono); }
+.review-code { font: 12.5px/1.6 var(--mono); position: relative; }
 .review-code table.review-diff { background: var(--well); border-radius: var(--r-control); }
+.review-code ::selection { background: color-mix(in srgb, var(--sodium) 42%, transparent); }
 table.review-diff td.ln.pick { cursor: pointer; }
-table.review-diff td.ln.pick:hover { color: var(--sodium); }
-table.review-diff tr.commented td.ln.pick { color: var(--chalk); box-shadow: inset -2px 0 0 var(--rule-2); }
+table.review-diff td.ln.pick:hover { color: var(--chalk); }
+table.review-diff tr.commented td.ln { box-shadow: inset -2px 0 0 var(--sodium-line); }
+table.review-diff tr.commented td.ln:not(.old) { color: var(--chalk); }
 table.review-diff tr.selected { background: var(--sodium-wash); }
 table.review-diff tr.selected td.ln.pick { color: var(--sodium); box-shadow: inset -2px 0 0 var(--sodium); }
-table.review-diff tr.review-insert > td { padding: 6px 12px 8px 7ch; background: var(--graphite); }
+table.review-diff tr.review-insert > td { padding: 6px 12px 8px 6ch; background: var(--graphite); }
+/* A selection dragged across a thread is of the code: the thread's chrome
+   stays out of it (its posts can still be copied). */
+table.review-diff tr.review-insert { user-select: none; }
+table.review-diff tr.review-insert :is(.review-post-text, .review-quote, textarea) { user-select: text; }
 table.review-diff tr.hunk td { border-top: 1px solid var(--rule); }
 table.review-diff tr.hunk:first-child td { border-top: 0; }
 .review-select-bar { display: flex; gap: 8px; align-items: center; }
 .review-select-bar .icon { width: 13px; height: 13px; }
+
+/* The code a comment is on: a tint, an underline in the accent, brighter
+   while its thread is pointed at. */
+mark.review-mark {
+  color: inherit;
+  background: var(--sodium-wash);
+  box-shadow: inset 0 -1.5px 0 var(--sodium-line);
+  border-radius: 2px;
+  transition: background-color 120ms ease;
+}
+mark.review-mark.many { background: var(--sodium-glow); }
+mark.review-mark.hot, mark.review-mark.draft { background: var(--sodium-glow-bright); box-shadow: inset 0 -1.5px 0 var(--sodium); }
+mark.review-mark[data-comment] { cursor: default; }
+
+/* Text selected: Comment, floating under its end. */
+.review-pop {
+  position: absolute;
+  z-index: 5;
+  animation: review-pop-in 110ms ease-out;
+}
+.review-pop .btn {
+  gap: 6px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--edge-shadow) 70%, transparent), 0 0 0 1px var(--sodium-line);
+}
+.review-pop .icon { width: 13px; height: 13px; }
+.review-pop-key {
+  font: 600 10.5px/1 var(--mono);
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--sodium-ink) 18%, transparent);
+  color: inherit;
+}
+@keyframes review-pop-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-pop { animation: none; }
+  mark.review-mark { transition: none; }
+}
+@media (pointer: coarse) {
+  /* Under the system's own selection menu, and big enough for a thumb. */
+  .review-pop .btn { min-height: 36px; padding: 0 14px; }
+}
+
+/* The selected text, quoted by its comment. */
+.review-quote {
+  margin: 4px 0 2px;
+  padding: 3px 8px;
+  border-left: 2px solid var(--sodium-line);
+  background: var(--well);
+  border-radius: 0 var(--r-chip) var(--r-chip) 0;
+}
+.review-quote pre {
+  margin: 0;
+  font: 12px/1.5 var(--mono);
+  color: var(--chalk);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-quote.old pre { color: var(--del-fg); }
+.review-flag.old { color: var(--del-fg); }
+.review-thread.hot { border-color: var(--sodium-line); border-left-color: var(--sodium); }
 
 .review-note { display: flex; align-items: center; gap: 8px; color: var(--faint); font: 12px var(--sans); margin-bottom: 8px; }
 .review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted); font: 13px var(--sans); padding: 18px 4px; }

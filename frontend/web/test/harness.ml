@@ -19,6 +19,7 @@ let act t action =
      | Reconnect _
      | Place_popover
      | Set_url_session _
+     | Clear_text_selection
      | Expire_toast _
      | Focus _
      | Set_caret _

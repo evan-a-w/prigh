@@ -204,6 +204,7 @@ module Command = struct
         ; after_ms : int
         }
     | Focus of string
+    | Clear_text_selection
     | Place_popover
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
@@ -782,7 +783,8 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
-    | Focus id -> m, cmds @ [ Command.Focus id ])
+    | Focus id -> m, cmds @ [ Command.Focus id ]
+    | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ])
 ;;
 
 let with_review (m : Model.t) (review, outs) = review_out { m with review } outs

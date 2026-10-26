@@ -1133,10 +1133,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   twice for a locked one), prunes one whose directory is gone, and keeps
   the branch. Errors say what to do, like `Git_diff`'s.
 - `Review_comment`, `Review_state` — the session's review of the working
-  tree: comments (`c1`, `c2`, ... never reused) on a line range of a file
-  (relative to the repository's `root`, as `git_diff` names it) with the
-  lines' text as `anchor` (frontends find the lines again with it when the
-  file moved), `Open | Resolved`, and a thread of posts (the user's, the
+  tree: comments (`c1`, `c2`, ... never reused) on a `Range` of a file
+  (relative to the repository's `root`, as `git_diff` names it: lines,
+  their `Side` (`New`, the file as it is, or `Old`, lines the change
+  removed, numbered as before it) and, for text the user selected,
+  `Columns` (byte offsets into the first and the last line); comments
+  saved before selections have only lines and read as `New` whole lines)
+  with the lines' text as `anchor` (the selected text and its context:
+  frontends find the code again with it when the file moved), `Open | Resolved`, and a thread of posts (the user's, the
   agent's; each `delivered` once the agent has seen it), an agent's post
   possibly carrying a `Proposal` (`edits`, `Pending | Accepted | Rejected
   | Failed`); and the approvals, a hash per path (the frontends' hash of
@@ -1149,8 +1153,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   them, then a `Review_changed` event with the whole review) and offers
   `reply_to_comment` while there are comments. `submit_review` turns the
   user's undelivered posts into one message (instructions on replying,
-  then each comment with them as `<comment id file lines status>` with its
-  numbered `<code>` and `<post from new>`s; `Injected.Source.Review_comments
+  then each comment with them as `<comment id file lines side? selection?
+  status>` with its numbered `<code>` (a selection marked `⟦…⟧`, and
+  quoted whole in `<selected>`) and `<post from new>`s; `Injected.Source.Review_comments
   {count}`), queued as a steer (it starts a run when idle) and marks them
   delivered; `decide_proposal` runs the proposal's `edit` on the active
   host (`Failed` with its error when it no longer applies) and adds the
@@ -1331,7 +1336,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   when the file's MD5, which `fs_preview` gives a whole text file as
   `md5`, is no longer `expected`), and the review's (`Review_rpc`, on the
   calling client's session): `get_review` (`{comments, approvals}`),
-  `review_comment {root, path, first, last, anchor, text}`, `review_reply
+  `review_comment {root, path, first, last, side?, start_col?, end_col?,
+  anchor, text}` (a selection's columns come together; `side` is `new`
+  without one), `review_reply
   {id, text}`, `review_set_status {id, status}` (each answering the
   comment), `review_delete {id}`, `review_submit` (`{count}`),
   `review_decide {id, post, accept}`, `review_approve {path, hash}` and
@@ -1697,9 +1704,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     changed file with its approval and its comments' threads, then the
     comments on files no longer changed. `File_approval` (an approval
     counts while its hash is the file's `Diff_files.File.hash`, the MD5
-    of its section of the diff) and `Comment_anchor` (a comment's lines
-    now: where its anchor text is, nearest to where it was, else
-    outdated) are shared with prigh-web.
+    of its section of the diff) and `Comment_anchor` (a comment's code
+    now: where its anchor text is, nearest to where it was, else where
+    its selected text alone still is, else outdated) are shared with
+    prigh-web.
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
@@ -2289,21 +2297,36 @@ terminal frontend and `web/` prigh-web, the browser one.
       file, after any `edit`/`write`/`apply_patch`/`bash` of the agent or
       a subagent and at every run's end), one request at a time with
       another wanted once it is in; the page's file, mode (`Comment |
-      Edit`) and layout (`Unified | Full`); a selection of lines, the
-      comment being written on them and the replies being typed; the
+      Edit`) and layout (`Unified | Full`); the code selected (a
+      `Review_comment.Range` with its lines' text, and where its floating
+      button goes), the comment being written on it, the comment pointed
+      at (`hover`) and the replies being typed; the
       files' texts (`fs_preview`, read again when their change does, and
       taken from the browser's preview); the editor's text with the MD5 it
       was read with). Its `update`/`reply` return `Out.t`s that `App`
       turns into requests (`Reply_tag.Review`), toasts and focus.
-      `Review_code_view` draws a file: the hunks, or the whole file with
-      them inline (`full_rows` fills the lines between hunks from its
-      text), highlighted, the rows and their tokens made once per file
-      version and layout and each row a `View_cache` node; new line
-      numbers select (Shift: a range), a bar under the selection offers
-      Comment, and each comment's thread (posts, an agent's proposal as a
-      diff with Accept and Reject, the reply field, Resolve and Delete)
-      sits under the line its anchor is on now, those whose lines are gone
-      or not shown above the file. `Review_page_view` is the page: in
+      `Code_review.rows` are a file's rows: the hunks, or the whole file
+      with them inline (`full_rows` fills the lines between hunks from its
+      text), made once per file version and layout. Text selected in them
+      comes from the page (`Selection_listeners`, in `app/`: once the
+      selection settles, a mouse let go or a touch's long press, its ends
+      as the rows' `data-side`/`data-line` and UTF-16 offsets into their
+      text, and where the button goes) as `Select_text`, and
+      `Code_selection` (pure, unit-tested) makes it a range: ordered, a
+      start at a line's end or an end at a line's start moved onto the
+      line, on removed lines only the old text, otherwise without the
+      removed lines at its ends, whole lines without columns, and the
+      lines' text (from the file between hunks). `Review_code_view` draws
+      the rows highlighted (tokens made once per rows value, each row a
+      `View_cache` node) with one number each (the old one, struck, for
+      removed lines; a number selects its line, Shift: to there), a
+      floating Comment button by a selection's end (its `mousedown` keeps
+      the page's selection), each comment's code in `<mark>`s (lit with
+      its thread when either is pointed at), and each thread (the
+      selected text quoted, posts, an agent's proposal as a diff with
+      Accept and Reject, the reply field, Resolve and Delete) under the
+      row its code ends on now, those whose code is gone or not shown
+      above the file. `Review_page_view` is the page: in
       `.app.reviewing` it comes before `.main`, which narrows to a column
       (`review.css`); its head (the approvals strip, refresh, the mode and
       layout, Send N comments, close), the files with their approval
@@ -2312,7 +2335,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       transparent `textarea` over its own highlighted text, Ctrl+S saving
       with `fs_write`; after a conflict the next save overwrites). Keys
       (`Keys.Target.Review`, the page focused but not its fields): `]`
-      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere. `Files_view`
+      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere; c also wherever
+      code is selected but in a field. In the comment and reply fields
+      Enter sends and Shift+Enter is a new line. `Files_view`
       marks changed entries (a dot, a sage tick once approved, sodium once
       changed after; a directory's count) and previews a text file of the
       repository with `Review_code_view`, under a bar with its approval,
@@ -2396,7 +2421,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
-    output unless scrolled up. `Chat_listeners` copies code blocks and
+    output unless scrolled up. `Selection_listeners` reports text
+    selected in a review's code (above). `Chat_listeners` copies code blocks and
     closes an open image with Esc; `Agents_listeners` opens a subagent's
     card (`data-agent`) in the agents panel, keeps a
     shown transcript or job output at its end unless scrolled up, and
