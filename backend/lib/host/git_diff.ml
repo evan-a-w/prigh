@@ -7,6 +7,10 @@ module Result = struct
     ; against : string
     ; diff : string
     ; truncated : bool
+    ; branch : string option [@sexp.option] [@jsonaf.option]
+    ; base : string [@default "HEAD"]
+    ; main : bool [@default true]
+    ; branches : string list [@sexp.list] [@jsonaf.default []]
     }
   [@@deriving sexp, jsonaf, equal]
 
@@ -32,15 +36,18 @@ end
 let op = "$git_diff"
 let max_bytes = 1_000_000
 let max_untracked = 200
+let max_branches = 500
 
 (* git's id of the empty tree, to diff against before the first commit. *)
 let empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-let args ?path ?base () =
+let args ?path ?base ?dir ?(default_base = false) () =
   `Object
     (List.filter_opt
        [ Option.map path ~f:(fun p -> "path", `String p)
        ; Option.map base ~f:(fun b -> "base", `String b)
+       ; Option.map dir ~f:(fun d -> "dir", `String d)
+       ; Option.some_if default_base ("default_base", `True)
        ])
 ;;
 
@@ -89,10 +96,65 @@ let run ~env ~cancel ~cwd ~arguments =
       Some (String.strip s)
     | _ -> None
   in
+  let bool_arg name =
+    match Json.member name arguments with
+    | Some `True -> true
+    | _ -> false
+  in
+  let verify ~dir rev =
+    Core.Result.is_ok
+      (git ~dir [ "rev-parse"; "--verify"; "--quiet"; rev ^ "^{commit}" ])
+  in
+  let config ~dir key =
+    match git ~dir [ "config"; "--get"; key ] with
+    | Ok v when not (String.is_empty (String.strip v)) -> Some (String.strip v)
+    | Ok _ | Error _ -> None
+  in
+  let default_base ~dir ~branch =
+    let recorded =
+      Option.bind branch ~f:(fun b -> config ~dir (Worktree.base_key b))
+    in
+    let remotes =
+      Option.bind branch ~f:(fun b -> config ~dir (sprintf "branch.%s.remote" b))
+      |> Option.filter ~f:(fun r -> not (String.equal r "."))
+      |> Option.to_list
+      |> fun rs ->
+      rs @ List.filter [ "origin" ] ~f:(fun o -> not (List.mem rs o ~equal:String.equal))
+    in
+    let remote_heads =
+      List.filter_map remotes ~f:(fun r ->
+        match
+          git
+            ~dir
+            [ "symbolic-ref"; "--quiet"; "--short"; sprintf "refs/remotes/%s/HEAD" r ]
+        with
+        | Ok head when not (String.is_empty (String.strip head)) ->
+          Some (String.strip head)
+        | Ok _ | Error _ -> None)
+    in
+    List.find
+      (Option.to_list recorded
+       @ remote_heads
+       @ [ "main"; "master"; "origin/main"; "origin/master" ])
+      ~f:(fun base ->
+        (not (Option.exists branch ~f:(String.equal base))) && verify ~dir base)
+  in
   try
+    let dir =
+      match string_arg "dir" with
+      | Some dir -> Tool.resolve ~cwd dir
+      | None -> cwd
+    in
     let root =
-      match git ~dir:cwd [ "rev-parse"; "--show-toplevel" ] with
+      match git ~dir [ "rev-parse"; "--show-toplevel" ] with
       | Ok root -> String.strip root
+      | Error _ when Option.is_some (string_arg "dir") ->
+        raise
+          (Failed
+             (sprintf
+                "not a git repository: %s (name a worktree of the repository: \
+                 /worktree lists them)"
+                dir))
       | Error _ ->
         raise
           (Failed
@@ -101,29 +163,68 @@ let run ~env ~cancel ~cwd ~arguments =
                  one)"
                 cwd))
     in
-    let against =
+    let branch =
+      match git ~dir:root [ "symbolic-ref"; "--quiet"; "--short"; "HEAD" ] with
+      | Ok b when not (String.is_empty (String.strip b)) -> Some (String.strip b)
+      | Ok _ | Error _ -> None
+    in
+    let main =
+      match
+        git
+          ~dir:root
+          [ "rev-parse"; "--path-format=absolute"; "--git-dir"; "--git-common-dir" ]
+      with
+      | Ok out ->
+        (match String.split_lines out with
+         | [ git_dir; common ] -> String.equal git_dir common
+         | _ -> true)
+      | Error _ -> true
+    in
+    let merge_base base =
+      match git ~dir:root [ "merge-base"; "HEAD"; base ] with
+      | Ok sha -> String.strip sha
+      | Error _ -> base
+    in
+    let head () =
+      match git ~dir:root [ "rev-parse"; "--verify"; "--quiet"; "HEAD" ] with
+      | Ok _ -> "HEAD"
+      | Error _ -> empty_tree
+    in
+    let against, base =
       match string_arg "base" with
+      | Some "HEAD" -> head (), "HEAD"
       | Some base ->
-        (match
-           git
-             ~dir:root
-             [ "rev-parse"; "--verify"; "--quiet"; base ^ "^{commit}" ]
-         with
-         | Error _ ->
-           raise
-             (Failed
-                (sprintf
-                   "%s %S: name a branch, tag or commit (e.g. main)"
-                   unknown_revision
-                   base))
-         | Ok _ ->
-           (match git ~dir:root [ "merge-base"; "HEAD"; base ] with
-            | Ok sha -> String.strip sha
-            | Error _ -> base))
-      | None ->
-        (match git ~dir:root [ "rev-parse"; "--verify"; "--quiet"; "HEAD" ] with
-         | Ok _ -> "HEAD"
-         | Error _ -> empty_tree)
+        if not (verify ~dir:root base)
+        then
+          raise
+            (Failed
+               (sprintf
+                  "%s %S: name a branch, tag or commit (e.g. main)"
+                  unknown_revision
+                  base));
+        merge_base base, base
+      | None when bool_arg "default_base" && not main ->
+        (match default_base ~dir:root ~branch with
+         | Some base -> merge_base base, base
+         | None -> head (), "HEAD")
+      | None -> head (), "HEAD"
+    in
+    let branches =
+      match
+        git
+          ~dir:root
+          [ "for-each-ref"; "--format=%(refname)"; "refs/heads"; "refs/remotes" ]
+      with
+      | Ok out ->
+        List.filter_map (String.split_lines out) ~f:(fun ref_ ->
+          if String.is_suffix ref_ ~suffix:"/HEAD"
+          then None
+          else
+            Option.first_some
+              (String.chop_prefix ref_ ~prefix:"refs/heads/")
+              (String.chop_prefix ref_ ~prefix:"refs/remotes/"))
+        |> fun l -> List.take l max_branches
+      | Error _ -> []
     in
     let pathspec =
       match string_arg "path" with
@@ -175,7 +276,8 @@ let run ~env ~cancel ~cwd ~arguments =
     in
     Tool_result.ok
       (Json.to_string
-         ([%jsonaf_of: Result.t] { root; against; diff; truncated }))
+         ([%jsonaf_of: Result.t]
+            { root; against; diff; truncated; branch; base; main; branches }))
   with
   | Failed message -> Tool_result.error message
 ;;

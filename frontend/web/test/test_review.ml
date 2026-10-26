@@ -159,6 +159,7 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     (Comment) (Edit)
     (Changes) (Whole file)
     (Send comments) (Close the review (Esc, Alt+R))
+    Reviewing /home/me/proj against HEAD (the uncommitted changes)
     (○ src/ main.ml +2 −1)
     (○ src/ util.ml +2 −0)
     2 files changed, +4 −1
@@ -215,7 +216,9 @@ let%expect_test
     {|
     (Review (Toggle_approval src/main.ml))
     (Rpc (method_ review_approve)
-     (params ((path src/main.ml) (hash 7f57d42d80a860a5b495b9ed7f7e860e)))
+     (params
+      ((root /home/me/proj) (path src/main.ml)
+       (hash 7f57d42d80a860a5b495b9ed7f7e860e)))
      (tag (Review (Changed ()))))
     |}];
   H.reply
@@ -377,7 +380,8 @@ let%expect_test
     {|
     (Send 1 comment)
     (Review Submit)
-    (Rpc (method_ review_submit) (params ()) (tag (Review Submitted)))
+    (Rpc (method_ review_submit) (params ((root /home/me/proj)))
+     (tag (Review Submitted)))
     |}];
   H.reply h "review_submit" {|{"count":1}|};
   [%expect {| (Expire_toast (id 0) (after_ms 2500)) |}];

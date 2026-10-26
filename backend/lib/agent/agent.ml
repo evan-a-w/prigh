@@ -2671,7 +2671,7 @@ let compact ?instructions t =
 
 (* ---- /diff, /review, /init ------------------------------------------ *)
 
-let git_diff ?path ?base t =
+let git_diff ?path ?base ?dir ?default_base t =
   host_exec
     t
     ~cancel:Cancellation.never
@@ -2679,7 +2679,7 @@ let git_diff ?path ?base t =
     ~call_id:"git_diff"
     ~cwd:t.cwd
     ~name:Git_diff.op
-    ~arguments:(Git_diff.args ?path ?base ())
+    ~arguments:(Git_diff.args ?path ?base ?dir ?default_base ())
   |> Git_diff.of_tool_result
 ;;
 
@@ -2788,13 +2788,13 @@ let init t =
 
 let review_state t = t.review
 
-let submit_review t =
+let submit_review ?root t =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map
       (update_review t ~f:(fun review ->
-         Or_error.map (Review_state.submit review) ~f:(fun (text, n, changes) ->
+         Or_error.map (Review_state.submit ?root review) ~f:(fun (text, n, changes) ->
            (text, n), changes)))
       ~f:(fun (text, count) ->
         enqueue_queued
@@ -2825,7 +2825,7 @@ let decide_proposal t ~id ~post ~accept =
           ~cancel:Cancellation.never
           ~on_output:ignore
           ~call_id:"review"
-          ~cwd:t.cwd
+          ~cwd:comment.root
           ~name:"edit"
           ~arguments:
             (`Object

@@ -25,7 +25,8 @@ val config : Config.t -> Json.t
     error?}}]}]. *)
 val review_comment : Review_comment.t -> Json.t
 
-(** [{comments, approvals: [{path, hash}]}]. *)
+(** [{comments, approvals: [{root?, path, hash}]}] ([root] missing: approved
+    before worktrees were told apart, in the session's repository). *)
 val review : Review_state.t -> Json.t
 
 val model : Model.t -> Json.t

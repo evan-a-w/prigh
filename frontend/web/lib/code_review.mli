@@ -11,8 +11,25 @@ open! Import
     a changed file. Pure: [update] and [reply] return [Out.t]s, which [App]
     turns into requests and toasts.
 
-    Paths are relative to the repository's root, as [git diff] names
-    them. *)
+    The page reviews one worktree at a time ([Target]): the session's own,
+    or another (from [/review WORKTREE], the worktree picker, the sidebar),
+    against its base or one chosen. [review] is that worktree's part of the
+    session's review ([all]): comments and approvals of other worktrees stay
+    out of it, and what is sent or approved here is the worktree's.
+
+    Paths are relative to the worktree's root, as [git diff] names them. *)
+
+module Target : sig
+  (** What the page reviews: the worktree at [dir] ([None]: the session's)
+      compared with [base] ([None]: its default, see [git_diff]). *)
+  type t =
+    { dir : string option
+    ; base : string option
+    }
+  [@@deriving sexp_of, equal]
+
+  val default : t
+end
 
 module Mode : sig
   type t =
@@ -92,7 +109,13 @@ end
 
 type t =
   { session : string option (** whose review this is *)
-  ; review : Review.t
+  ; target : Target.t
+  ; requested : Target.t (** of the [git_diff] on its way *)
+  ; own_root : string option
+    (** the session's worktree, once a diff of it came: approvals from
+        before worktrees were told apart are its *)
+  ; all : Review.t (** every worktree's *)
+  ; review : Review.t (** the reviewed worktree's ({!Review.scope}) *)
   ; diff : Git_diff.t option
   ; files : Prigh_ui.Diff_files.File.t list
   ; diff_error : string option
@@ -135,7 +158,8 @@ module Out : sig
         { method_ : Request.Method.t
         ; reply : Reply.t
         }
-    | Get_diff (** [git_diff] for the whole tree, answered as [Reply.Diff] *)
+    | Get_diff of Target.t
+    (** [git_diff] for the whole worktree, answered as [Reply.Diff] *)
     | Toast of
         { text : string
         ; error : bool
@@ -148,6 +172,9 @@ end
 module Action : sig
   type t =
     | Open of string option (** the page, at a file *)
+    | Show of Target.t
+    (** the page, reviewing that worktree against that base: from the
+        first file when it is another *)
     | Close
     | Toggle
     | Go of string (** the page's file *)

@@ -25,6 +25,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Worktree
+    | Review
     | Server
     | Pr
   [@@deriving sexp_of, equal]
@@ -163,12 +164,14 @@ let all =
        N shows one, new [title] creates one from the current branch, checkout \
        N checks one out in a git worktree"
   ; c
+      ~argument:Argument.Review
       "review"
-      "[base] [instructions]"
-      "alone: the changed files' approvals and review comments (prigh-web: the \
-       review page); with a base (HEAD: the uncommitted changes) or \
-       instructions, have the model review the changes for prioritised \
-       findings"
+      "[worktree] [--base REV]"
+      "the changed files' approvals and review comments (prigh-web: the \
+       review page) of the session's worktree or another (its branch, path or \
+       name), against its base or REV; /review BASE [instructions] (HEAD: \
+       the uncommitted changes) has the model review the changes for \
+       prioritised findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"

@@ -71,8 +71,22 @@ module Editor = struct
   [@@deriving sexp_of, equal]
 end
 
+module Target = struct
+  type t =
+    { dir : string option
+    ; base : string option
+    }
+  [@@deriving sexp_of, equal]
+
+  let default = { dir = None; base = None }
+end
+
 type t =
   { session : string option
+  ; target : Target.t
+  ; requested : Target.t
+  ; own_root : string option
+  ; all : Review.t
   ; review : Review.t
   ; diff : Git_diff.t option
   ; files : Diff_files.File.t list
@@ -96,6 +110,10 @@ type t =
 
 let empty =
   { session = None
+  ; target = Target.default
+  ; requested = Target.default
+  ; own_root = None
+  ; all = Review.empty
   ; review = Review.empty
   ; diff = None
   ; files = []
@@ -136,7 +154,7 @@ module Out = struct
         { method_ : Request.Method.t
         ; reply : Reply.t
         }
-    | Get_diff
+    | Get_diff of Target.t
     | Toast of
         { text : string
         ; error : bool
@@ -149,6 +167,7 @@ end
 module Action = struct
   type t =
     | Open of string option
+    | Show of Target.t
     | Close
     | Toggle
     | Go of string
@@ -201,6 +220,28 @@ let rpc method_ reply = Out.Rpc { method_; reply }
 let toast ?(error = false) text = Out.Toast { text; error }
 let root t = Option.map t.diff ~f:(fun d -> d.root)
 
+(* The reviewed worktree's part of [all]; before its diff is in, all of the
+   session's own (as before worktrees were told apart), none of another. *)
+let scoped t =
+  let review =
+    match root t with
+    | Some root ->
+      Review.scope
+        t.all
+        ~root
+        ~own:
+          (Option.is_none t.target.dir
+           || Option.equal String.equal t.own_root (Some root))
+    | None -> if Option.is_none t.target.dir then t.all else Review.empty
+  in
+  { t with review }
+;;
+
+let with_all t all = scoped { t with all }
+
+(* Changes to one comment, made to every worktree's review. *)
+let map_comments t ~f = with_all t { t.all with comments = f t.all.comments }
+
 let relative t ~abs =
   Option.bind (root t) ~f:(fun root ->
     String.chop_prefix
@@ -240,7 +281,7 @@ let mark t ~abs =
 let get_diff t =
   if t.loading
   then { t with again = true }, []
-  else { t with loading = true }, [ Out.Get_diff ]
+  else { t with loading = true; requested = t.target }, [ Out.Get_diff t.target ]
 ;;
 
 let refresh = get_diff
@@ -475,7 +516,7 @@ let select t ~path ~start ~end_ ~pop =
 
 let comment_busy t id = { t with busy = Set.add t.busy id }
 
-let update t (action : Action.t) =
+let rec update t (action : Action.t) =
   match action with
   | Open path ->
     let t = { t with open_ = true } in
@@ -489,6 +530,25 @@ let update t (action : Action.t) =
          | None -> settle_current t)
     in
     t, diff @ more @ [ Out.Focus "review-page" ]
+  | Show target when Target.equal target t.target -> update t (Open None)
+  | Show target ->
+    (* Another worktree or base: its own files, from the first. *)
+    let t =
+      { t with
+        target
+      ; diff = None
+      ; files = []
+      ; diff_error = None
+      ; current = None
+      ; selection = None
+      ; draft = None
+      ; hover = None
+      ; contents = String.Map.empty
+      ; editor = None
+      ; mode = Comment
+      }
+    in
+    update (scoped t) (Open None)
   | Close -> { t with open_ = false; selection = None }, [ Out.Focus "editor" ]
   | Toggle ->
     if t.open_
@@ -617,17 +677,24 @@ let update t (action : Action.t) =
     (match file t path with
      | None -> t, [ toast (sprintf "%s has no changes to approve." path) ]
      | Some f ->
-       (match approval t f with
-        | Approved -> t, [ rpc (Review_unapprove { path }) (Changed None) ]
-        | Changed | Unapproved ->
-          t, [ rpc (Review_approve { path; hash = f.hash }) (Changed None) ]))
+       (match approval t f, Review.approval t.review path with
+        | Approved, Some { root; _ } ->
+          t, [ rpc (Review_unapprove { root; path }) (Changed None) ]
+        | _ ->
+          ( t
+          , [ rpc
+                (Review_approve { root = root t; path; hash = f.hash })
+                (Changed None)
+            ] )))
   | Submit ->
     if unsent t = 0
     then
       t, [ toast "No new comments to send: select some code to comment on it." ]
     else if t.submitting
     then t, []
-    else { t with submitting = true }, [ rpc Review_submit Submitted ]
+    else
+      ( { t with submitting = true }
+      , [ rpc (Review_submit { root = root t }) Submitted ] )
   | Edit_input text ->
     ( { t with
         editor =
@@ -659,13 +726,14 @@ let update t (action : Action.t) =
   | Refresh -> get_diff t
 ;;
 
-let set_review t review = { t with review }
+let set_review t review = with_all t review
 
 let set_session t session ~watching =
   if Option.equal String.equal t.session session
   then t, []
   else (
     let t = { empty with session; layout = t.layout } in
+    (* [empty]'s target: the session's own worktree. *)
     match session with
     | None -> t, []
     | Some _ ->
@@ -705,6 +773,9 @@ let error_text e = String.capitalize e
 
 let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   match why, result with
+  | Diff, _ when not (Target.equal t.requested t.target) ->
+    (* For the worktree or base reviewed before. *)
+    get_diff { t with loading = false; again = false }
   | Diff, Error e ->
     let t = { t with loading = false; diff_error = Some (error_text e) } in
     if t.again then get_diff { t with again = false } else t, []
@@ -715,12 +786,15 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
      | Ok diff ->
        let before = t.files in
        let t =
-         { t with
-           loading = false
-         ; diff = Some diff
-         ; files = Diff_files.parse diff.diff
-         ; diff_error = None
-         }
+         scoped
+           { t with
+             loading = false
+           ; diff = Some diff
+           ; files = Diff_files.parse diff.diff
+           ; diff_error = None
+           ; own_root =
+               (if Option.is_none t.target.dir then Some diff.root else t.own_root)
+           }
        in
        let t, contents = refresh_contents t ~before in
        let t, current = settle_current t in
@@ -731,7 +805,7 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   | Review, Error e -> t, [ toast ~error:true (error_text e) ]
   | Review, Ok json ->
     (match Review.of_json json with
-     | Ok review -> { t with review }, []
+     | Ok review -> with_all t review, []
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Comment_added, Error e ->
     ( { t with draft = Option.map t.draft ~f:(fun d -> { d with busy = false }) }
@@ -740,12 +814,11 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     let t = { t with draft = None; selection = None } in
     (match Review_comment.of_json json with
      | Ok c ->
-       let review =
-         if List.exists t.review.comments ~f:(fun o -> String.equal o.id c.id)
-         then t.review
-         else { t.review with comments = t.review.comments @ [ c ] }
-       in
-       { t with review }, []
+       ( map_comments t ~f:(fun comments ->
+           if List.exists comments ~f:(fun o -> String.equal o.id c.id)
+           then comments
+           else comments @ [ c ])
+       , [] )
      | Error _ -> t, [])
   | Decided id, result ->
     (* An accepted change edited the file. *)
@@ -769,29 +842,19 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
        (* An approval answers with the review; a comment with itself (the
           [review] event brings the rest). *)
        (match Review.of_json json with
-        | Ok review when Option.is_none id -> { t with review }, []
+        | Ok review when Option.is_none id -> with_all t review, []
         | _ ->
           (match Review_comment.of_json json with
            | Ok c ->
-             ( { t with
-                 review =
-                   { t.review with
-                     comments =
-                       List.map t.review.comments ~f:(fun o ->
-                         if String.equal o.id c.id then c else o)
-                   }
-               }
+             ( map_comments t ~f:(fun comments ->
+                 List.map comments ~f:(fun o ->
+                   if String.equal o.id c.id then c else o))
              , [] )
            | Error _ ->
              (* Deleted. *)
-             ( { t with
-                 review =
-                   { t.review with
-                     comments =
-                       List.filter t.review.comments ~f:(fun o ->
-                         not (Option.exists id ~f:(String.equal o.id)))
-                   }
-               }
+             ( map_comments t ~f:(fun comments ->
+                 List.filter comments ~f:(fun o ->
+                   not (Option.exists id ~f:(String.equal o.id))))
              , [] ))))
   | Content path, Error e ->
     ( { t with

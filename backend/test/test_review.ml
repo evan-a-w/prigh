@@ -54,8 +54,12 @@ let show_review t (r : Review_state.t) =
              (match state with
               | Failed e -> "failed: " ^ mask t e
               | state -> Review_comment.Proposal.State.to_string state))));
-  Map.iteri r.approvals ~f:(fun ~key ~data ->
-    printf "approved %s at %s\n" key data)
+  Map.iteri r.approvals ~f:(fun ~key:{ root; path } ~data ->
+    printf
+      "approved %s%s at %s\n"
+      (Option.value_map root ~default:"" ~f:(fun r -> mask t r ^ ": "))
+      path
+      data)
 ;;
 
 let print_result t = function
@@ -166,9 +170,9 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   print_endline (mask t (List.nth_exn (Queue.to_list sent) 1));
   [%expect
     {|
-    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
+    The user left review comments on the changes in a worktree (each comment's file is its absolute path, in the worktree it names: edit that file, even when it is not under your directory; line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
 
-    <comment id="c1" file="$DIR/a.txt" lines="1" status="open">
+    <comment id="c1" worktree="$DIR" file="$DIR/a.txt" lines="1" status="open">
     <code>
     1  one
     </code>
@@ -177,7 +181,7 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
     </post>
     </comment>
 
-    <comment id="c2" file="$DIR/a.txt" lines="2-3" status="open">
+    <comment id="c2" worktree="$DIR" file="$DIR/a.txt" lines="2-3" status="open">
     <code>
     2  two
     3  three
@@ -237,9 +241,9 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   [%expect
     {|
     (Ok 1)
-    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
+    The user left review comments on the changes in a worktree (each comment's file is its absolute path, in the worktree it names: edit that file, even when it is not under your directory; line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
 
-    <comment id="c2" file="$DIR/a.txt" lines="2-3" status="open">
+    <comment id="c2" worktree="$DIR" file="$DIR/a.txt" lines="2-3" status="open">
     <code>
     2  two
     3  three
@@ -282,7 +286,7 @@ let%expect_test "comments reach the agent, which replies and proposes edits" =
   print_result
     t
     (Agent.update_review agent ~f:(fun _ ->
-       Ok ((), Review_state.approve ~path:"a.txt" ~hash:"h1")));
+       Ok ((), Review_state.approve ~path:"a.txt" ~hash:"h1" ())));
   print_result
     t
     (Agent.update_review agent ~f:(fun r ->
@@ -491,9 +495,9 @@ let%expect_test "comments on selected text, and on removed lines" =
   [%expect
     {|
     (Ok 3)
-    The user left review comments on the changes in the working tree (line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
+    The user left review comments on the changes in a worktree (each comment's file is its absolute path, in the worktree it names: edit that file, even when it is not under your directory; line numbers are as when they commented: the file may have changed since). Answer every comment with reply_to_comment: say what you did, or why not. Make the changes they ask for; where the user should decide, propose the change with the reply's edits instead of making it (it is applied when they accept it). Resolve a comment (resolve: true) when it needs nothing more. Posts marked new are what you have not seen yet. A comment on text the user selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one with side="old" is on lines the change removed, numbered as in the file before it.
 
-    <comment id="c1" file="$DIR/a.ml" lines="3" selection="3:5-3:5" status="open">
+    <comment id="c1" worktree="$DIR" file="$DIR/a.ml" lines="3" selection="3:5-3:5" status="open">
     <code>
     3  let ⟦c⟧ = 3 * 2
     </code>
@@ -505,7 +509,7 @@ let%expect_test "comments on selected text, and on removed lines" =
     </post>
     </comment>
 
-    <comment id="c2" file="$DIR/a.ml" lines="4-5" selection="4:9-5:7" status="open">
+    <comment id="c2" worktree="$DIR" file="$DIR/a.ml" lines="4-5" selection="4:9-5:7" status="open">
     <code>
     4  let s = ⟦"é…"
     5  let d =⟧ 4
@@ -519,7 +523,7 @@ let%expect_test "comments on selected text, and on removed lines" =
     </post>
     </comment>
 
-    <comment id="c3" file="$DIR/a.ml" lines="3" side="old" status="open">
+    <comment id="c3" worktree="$DIR" file="$DIR/a.ml" lines="3" side="old" status="open">
     <code>
     3  let c = 3
     </code>
