@@ -76,6 +76,13 @@ let rec show_event (e : Agent_event.t) =
       usage.output
       usage.cache_read
       (Float.to_string cost_usd)
+  | Worktrees_changed { added; removed } ->
+    sprintf
+      "worktrees_changed +%s -%s"
+      (String.concat
+         ~sep:","
+         (List.map added ~f:(fun (w : Session_worktree.t) -> w.path)))
+      (String.concat ~sep:"," removed)
 ;;
 
 let run ?cancel ?steer ?max_turns ?tools ?(context = []) t provider prompt =
