@@ -166,11 +166,11 @@ let all =
   ; c
       ~argument:Argument.Review
       "review"
-      "[worktree|branch] [--base REV] [--direct]"
+      "[target] [--base REV ...]"
       "the changed files' approvals and review comments (prigh-web: the review \
        page) of the session's worktree or another (its branch, path or name), \
        or of a branch not checked out (read-only), against its base or REV \
-       since their merge base (--direct: REV itself); /review BASE \
+       since their merge base (--direct: against REV itself); /review BASE \
        [instructions] (HEAD: the uncommitted changes) has the model review the \
        changes for prioritised findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
