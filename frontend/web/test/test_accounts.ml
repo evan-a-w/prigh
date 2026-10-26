@@ -164,6 +164,8 @@ let%expect_test "the settings page: the account, switching it, signing out" =
     carol prigh.example.com
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
+    Settings Ctrl+,
+    Commands and keys /help
     Sign out forget this account in this browser
     |}];
   H.key h "Escape" ~target:Page;
@@ -196,7 +198,7 @@ let%expect_test "the settings page: the account, switching it, signing out" =
 let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (A alice) (Commands and keys (/help)) |}];
+  [%expect {| (A alice) (Settings (Ctrl+, or /settings)) |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
   [%expect
@@ -212,6 +214,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     carol prigh.example.com
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
+    Settings Ctrl+,
+    Commands and keys /help
     Sign out forget this account in this browser
     ↑↓ to move, Enter to choose, Esc to close
     |}];
@@ -241,6 +245,28 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     (Focus dialog)
     (Focus editor)
     Sign_out
+    |}];
+  (* The settings and the commands and keys are in it too: each opens the
+     page that its command and its key open. *)
+  List.iter
+    [ "settings", App.Action.Open_settings; "help", Open_help ]
+    ~f:(fun (id, action) ->
+      H.quiet h (fun () -> H.act h Open_accounts);
+      H.act h (Picker_choose id);
+      let chosen = (H.model h).dialog in
+      H.quiet h (fun () -> H.act h Close_dialog);
+      H.quiet h (fun () -> H.act h action);
+      print_s
+        [%sexp
+          (id : string)
+        , (Option.equal Dialog.equal chosen (H.model h).dialog : bool)];
+      H.quiet h (fun () -> H.act h Close_dialog));
+  [%expect
+    {|
+    (Focus dialog)
+    (settings true)
+    (Focus dialog)
+    (help true)
     |}];
   (* Esc closes it without doing anything. *)
   H.act h Open_accounts;
@@ -287,6 +313,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
     Act as… see and work in another user's sessions
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
+    Settings Ctrl+,
+    Commands and keys /help
     Sign out forget this account in this browser
     ↑↓ to move, Enter to choose, Esc to close
     |}];
@@ -320,6 +348,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
     Back to alice your own sessions
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
+    Settings Ctrl+,
+    Commands and keys /help
     Sign out forget this account in this browser
     ↑↓ to move, Enter to choose, Esc to close
     |}];
@@ -356,6 +386,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
     (Focus dialog)
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
+    Settings Ctrl+,
+    Commands and keys /help
     Sign out forget this account in this browser
     |}]
 ;;
@@ -375,7 +407,7 @@ let%expect_test "switching user resets everything that was the old user's" =
        ));
   H.act h (Run "/btw what was that?");
   H.act h (Set_session_query "ali");
-  H.act h Open_model_picker;
+  H.act h (Run "/model");
   H.act h (Run "/setusr bob");
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
   let m = H.model h in
@@ -419,5 +451,5 @@ let%expect_test "token-only backends show the account too" =
            Some { backend; user = None; token = Some "t"; session = None }
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (T token) (Commands and keys (/help)) |}]
+  [%expect {| (T token) (Settings (Ctrl+, or /settings)) |}]
 ;;

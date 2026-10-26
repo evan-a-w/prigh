@@ -348,7 +348,9 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
-    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));

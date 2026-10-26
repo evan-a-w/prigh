@@ -86,7 +86,7 @@ let%expect_test "projects, their worktrees and their sessions" =
   [%expect
     {|
     (prigh main) (New session in ~/src/prigh) (New worktree: work on a branch of its own, in a new session)
-    (Main work 2m ago) (Archive (A)) (Delete session (Delete))
+    (Main work 2m ago) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Backend tests 1d ago backend/) (Archive (A)) (Delete session (Delete))
     (agent/fix-the-parser subagent) (New session in this worktree) (Remove this worktree (/worktree rm))
     from (Main work)
@@ -162,7 +162,7 @@ let%expect_test
   [%expect
     {|
     (prigh main) (New session in ~/src/prigh) (New worktree: work on a branch of its own, in a new session)
-    (Main work 2m ago) (Archive (A)) (Delete session (Delete))
+    (Main work 2m ago) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (Backend tests 1d ago backend/) (Archive (A)) (Delete session (Delete))
     (agent/fix-the-parser subagent) (New session in this worktree) (Remove this worktree (/worktree rm))
     from (Main work)

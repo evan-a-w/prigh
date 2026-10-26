@@ -169,14 +169,14 @@ let%expect_test "the listing follows the directory and resets with the session" 
                             \nbackend\
                             \n/elsewhere") (purpose (Sidebar 3)))))
     (feat/login) (New session in this worktree)
-    (Login fix 2m ago) (Archive (A)) (Delete session (Delete))
+    (Login fix 2m ago /elsewhere) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     |}];
   H.reply h "list_worktrees" (listing ());
   section h;
   [%expect
     {|
     (feat/login 3 changed ↑2 ↓1) (New session in this worktree) (Remove this worktree (/worktree rm))
-    (Login fix 2m ago) (Archive (A)) (Delete session (Delete))
+    (Login fix 2m ago /elsewhere) (Rename (/name)) (Archive (A)) (Delete session (Delete))
     (docs) (New session in this worktree) (Remove this worktree (/worktree rm))
     (old gone) (Remove this worktree (/worktree rm))
     |}];

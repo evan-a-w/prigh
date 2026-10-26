@@ -35,6 +35,7 @@ module Row = struct
     ; loading : bool
     ; age : string
     ; where : string (** its directory, as the list puts it *)
+    ; cwd : string
     }
   [@@deriving equal]
 end
@@ -50,6 +51,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; loading
       ; age
       ; where
+      ; cwd
       }
     =
     row
@@ -139,7 +141,10 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                 [ span ~cls:"session-age" age
                 ; (if String.is_empty where
                    then Node.none
-                   else span ~cls:"session-cwd" where)
+                   else
+                     Node.span
+                       ~attrs:[ Attr.class_ "session-cwd"; Attr.title cwd ]
+                       [ Node.text where ])
                 ; (if selecting
                    then
                      span ~cls:"session-size" (Session_summary.size_string s.bytes)
@@ -152,7 +157,16 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
        else
          Node.span
            ~attrs:[ Attr.class_ "session-actions" ]
-           [ (if s.archived
+           [ (if selected
+              then
+                action
+                  ~cls:"rename"
+                  ~title:"Rename (/name)"
+                  ~label:("Rename " ^ title)
+                  ~icon:Pencil
+                  (inject Action.Open_rename)
+              else Node.none)
+           ; (if s.archived
               then
                 action
                   ~cls:"unarchive"
@@ -182,14 +196,20 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
    cwd. *)
 let session ?within (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
   let selected = Option.equal String.equal current (Some s.id) in
+  let cwd =
+    (* The current session's as it is now: [/cd] moves it. *)
+    match m.state with
+    | Some state when selected -> state.cwd
+    | _ -> s.cwd
+  in
   let where =
     match within with
-    | None -> home_relative s.cwd
-    | Some dir when String.equal dir s.cwd -> ""
+    | None -> home_relative cwd
+    | Some dir when String.equal dir cwd -> ""
     | Some dir ->
-      (match String.chop_prefix s.cwd ~prefix:(dir ^ "/") with
+      (match String.chop_prefix cwd ~prefix:(dir ^ "/") with
        | Some sub -> sub ^ "/"
-       | None -> home_relative s.cwd)
+       | None -> home_relative cwd)
   in
   let deps =
     { Row.selected
@@ -203,6 +223,7 @@ let session ?within (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
          | Some Starting | None -> false)
     ; age = age m s
     ; where
+    ; cwd
     }
   in
   View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
@@ -290,6 +311,16 @@ let delete_archived ~inject archived =
       ; Attr.on_click (fun _ -> inject Action.Ask_delete_archived)
       ]
     [ Node.text "Delete archived" ]
+;;
+
+let settings ~inject =
+  button
+    ~cls:"icon ghost settings-toggle"
+    ~title:"Settings (Ctrl+, or /settings)"
+    ~label:"Settings"
+    ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
+    ~on_click:(inject Action.Open_settings)
+    [ icon Gear ]
 ;;
 
 (* ---- the tree: projects, their worktrees, their sessions *)
@@ -566,13 +597,6 @@ let project
 ;;
 
 let user_footer (m : App.Model.t) ~inject =
-  let help =
-    button
-      ~cls:"icon ghost"
-      ~title:"Commands and keys (/help)"
-      ~on_click:(inject Action.Open_help)
-      [ icon Help ]
-  in
   let sign_out =
     button
       ~cls:"icon ghost"
@@ -581,7 +605,8 @@ let user_footer (m : App.Model.t) ~inject =
       [ icon Logout ]
   in
   match Account_view.trigger m ~inject with
-  | Some account -> div ~cls:"sidebar-footer" [ account; help ]
+  | Some account ->
+    div ~cls:"sidebar-footer" [ account; settings ~inject ]
   | None ->
     div
       ~cls:"sidebar-footer"
@@ -590,11 +615,12 @@ let user_footer (m : App.Model.t) ~inject =
           ~title:"Commands and keys (/help)"
           ~on_click:(inject Action.Open_help)
           [ icon Help; Node.text "Commands & keys" ]
+      ; settings ~inject
       ; (if m.saved_login then sign_out else Node.none)
       ]
 ;;
 
-let view (m : App.Model.t) ~inject =
+let view (m : App.Model.t) ~inject ~session:card =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
   let sessions = Session_list.filter m.sessions ~query:m.session_query in
   Node.aside
@@ -688,6 +714,7 @@ let view (m : App.Model.t) ~inject =
                  else [ delete_archived ~inject archived ]
                else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
+    ; card
     ; user_footer m ~inject
     ]
 ;;

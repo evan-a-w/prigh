@@ -399,8 +399,8 @@ last line. Selecting one shows a subagent's live transcript at the panel's
 width or a job's output, with what it is pinned under it however far you
 scroll: its task (and who started it), how it stands or ended, its model,
 turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
-which scrolls to its card. It opens from the status ("2 agents running"), the top bar's
-robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
+which scrolls to its card. It opens from the status ("2 agents running"), the
+robot button at the chat's top right, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
 left to the browser (it moves the focus back), and on macOS Option+digit
@@ -425,7 +425,7 @@ backend elsewhere, `?session=ID` joins a session and `?name=` names the
 frontend in `/host`. Tools run on a tool host (a browser cannot host
 them). In Docker it is `PRIGH_MODE=web` (port 7790, see `DOCKER.md`).
 
-The terminal button in the top bar (or `/terminal`, or Ctrl+`) opens a
+The terminal button at the chat's top right (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its
 directory) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
@@ -439,7 +439,7 @@ the user you act as; when the shell exits, "New shell" starts another,
 and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
-The folder button in the top bar (or `/files [path]`, or Ctrl+Shift+F)
+The folder button at the chat's top right (or `/files [path]`, or Ctrl+Shift+F)
 opens the file browser, a drawer right of the chat (a full-screen sheet on
 a phone) on the machine where the session's tools run (the backend, the
 Docker container, or a laptop connected as a tool host), in the session's
@@ -558,26 +558,50 @@ with its line counts); `/notify on|off`, the settings page and the
 account menu control browser notifications while the tab is hidden, and the
 title (`(2) prigh`) and favicon count what happened meanwhile.
 
-The composer is one box: the editor on top and, along its bottom edge, the
-model, the thinking level ("Thinking high", "No thinking" for a model
-without levels) and the approval mode ("Asks: edits & commands", "Asks:
-commands", "Auto: never asks", "Plan mode", lit), each opening its picker
-(the modes with what each asks first), then attach, stop and send on the
-right. Ctrl+L, Alt+T and Alt+M switch or cycle them; in a narrow composer
-the labels get short (`high`, `ask`, `plan`). The top bar has the session's
-title, cwd and branch on the left (the cwd losing its middle rather than
-the directory it ends in), the panel toggles and the settings gear on the
-right, and the status in the middle: the context (click for `/session`'s
-details), tokens and cost (or the budget), then what the agent is doing, in
-a slot of its own width so that nothing moves as a turn starts and ends.
-Whatever applies follows the status, beside the panel toggles (before it on
-a phone), so that it never moves the status either: the goal, reminders, a
-scheduled resume, queued messages to take back, background agents and jobs,
-transfers, the tool host, the verbosity, the plan chip `plan 2/5: step`
-that runs `/todos`. A narrower chat column drops the tokens and cost, then
-says what applies with icons alone; the bar never changes height.
+The composer is one box: the editor on top and, along its bottom edge in
+the box's own quiet text, the model, the thinking level ("Thinking high",
+"No thinking" for a model without levels) and the approval mode ("Asks:
+edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
+lit), each lit with a chevron when pointed at, then attach, stop and send
+on the right. A chip opens a small menu standing on it, above the composer
+(below it only when there is no room above), with its command's choices
+(`/model`, `/thinking`, `/mode`), the current one checked: the models under
+their providers with their context windows and a filter field to type in
+(the list scrolls; filtered, best match first), the thinking levels with
+how hard each thinks, the modes with what each asks first. ↑↓ move, Enter
+or a click takes the choice, Esc or a click beside the menu closes it
+unchanged and gives the editor back the focus; ← →, Tab and a click on
+another chip open the next chip's menu, one at a time. On a phone the menu
+is as wide as the composer. The commands themselves open the larger
+picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
+other two; in a narrow composer the labels get short
+(`high`, `ask`, `plan`, after an icon). There is no bar over the chat
+while the sidebar is open: the files, terminal and agents buttons sit
+quietly in the chat's top right corner (lit while their panel is open),
+and the session's status is in a card at the foot of the sidebar, above
+the account, under the tree of projects. The tree marks which session it
+is (its row has the cwd as it is now, relative to its project or worktree,
+and a rename button). The card has whatever applies at
+the top — the goal, reminders, a scheduled resume, queued messages to take
+back, background agents and jobs, transfers, the verbosity, the plan chip
+`plan 2/5: step` that runs `/todos` — then the status on a grid: what the
+agent is doing, with where tools run (click for the `/host` picker) and the
+branch across from it; the context across the card (click for
+`/session`'s details); the tokens and the cost (or the budget). Each part
+keeps its place, so nothing moves as a turn starts and ends. Your account
+is under it, with the settings gear; the account menu also has Settings
+and Commands and keys (`/help`). With the sidebar closed, and always on a
+phone (where the sidebar is a drawer), a slim bar over the chat keeps the
+essentials on one line: the sidebar's button and the title, what applies
+(with the tool host when it is not the backend), the status, the panel
+toggles and the settings gear. What applies comes before the status, and
+the activity has a slot of its own width, so that nothing moves the
+status; a narrower chat column drops the tokens and cost, then says what
+applies with icons alone, then shows the activity as a dot; the bar never
+changes height.
 
-The settings page (the gear, `/settings` or Ctrl+,) holds what is not
+The settings page (the gear beside your account at the foot of the
+sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session: the theme and accent, notifications (on or off, and
 what to do when the browser has not been asked, blocks them or cannot show
 them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),

@@ -266,7 +266,7 @@ try {
   await phone.locator("form input[type=password]").fill(token);
   await phone.locator("form button[type=submit]").click();
   await phone.locator(".composer textarea").waitFor();
-  await phone.locator(".topbar .toggle-sidebar").click();
+  await phone.locator(".session-bar .toggle-sidebar").click();
   await phone.locator(".sidebar .project").first().waitFor();
   await phone.waitForTimeout(400); // the sidebar slides in
   await tree("on a phone", phone);

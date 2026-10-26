@@ -28,16 +28,16 @@ let%expect_test "the names of the controls" =
     button "work" -- /work
     button "New session in work" -- New session in /work
     button "Fix the build 2m ago" -- /sessions/s1.jsonl
+    button "Rename Fix the build" -- Rename (/name)
     button "Archive Fix the build" -- Archive (A)
     button "Delete Fix the build" -- Delete session (Delete)
     button "Archived 1" -- Show the archived sessions
-    button "Commands & keys" -- Commands and keys (/help)
-    button "Sessions" -- Sessions (Ctrl+B)
-    button "New session" -- Rename (/name)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "backend" -- Tools run on the backend (/host switches)
+    button "Commands & keys" -- Commands and keys (/help)
+    button "Settings" -- Settings (Ctrl+, or /settings)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
-    button "Settings" -- Settings (Ctrl+, or /settings)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
@@ -45,8 +45,8 @@ let%expect_test "the names of the controls" =
     button "Send" -- Send (Enter)
     input "Search sessions"
     textarea "Message"
-    [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [status] span "Ready"
+    [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
     [group] div "Model, thinking and mode"
     |}];
@@ -62,9 +62,13 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
+    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Commands & keys" -- Commands and keys (/help)
+    button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"
     [checkbox] button "Fix the build 2m ago 0 B" -- /sessions/s1.jsonl
+    [status] span "Ready"
     |}]
 ;;
 
@@ -163,7 +167,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Deny" -- n or Esc
     button "Deny, saying why" -- r
     |}];
-  H.quiet h (fun () -> H.act h Open_model_picker);
+  H.quiet h (fun () -> H.act h (Run "/model"));
   names ~within:".modal " h;
   [%expect
     {|
@@ -194,7 +198,7 @@ let%expect_test "the closed drawer on a phone is inert" =
   [%expect
     {|
     <aside class="sidebar">
-    <header class="topbar">
+    <header class="session-bar">
     <div class="chat-frame">
     <footer class="composer">
     |}]
