@@ -309,7 +309,9 @@ val transcript_rows : Model.t -> int
 val init : Model.t
 val format_tokens : int -> string
 
-(** [path] with the home directory shown as [~]. *)
+(** [path] with the active tool host's home directory (from the state's
+    [hosts]; this frontend's own when that host is ours and did not say, or
+    when no host says) shown as [~]. *)
 val tilde : Model.t -> string -> string
 
 (** Rows a picker lists at once (its page size), capped by the transcript

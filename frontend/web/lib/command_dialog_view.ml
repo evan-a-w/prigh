@@ -270,7 +270,7 @@ let dialog_error = function
   | None -> Node.none
 ;;
 
-let new_worktree (d : New_worktree.t) ~inject =
+let new_worktree ?home (d : New_worktree.t) ~inject =
   let field (f : New_worktree.Field.t) ~label ~value ~placeholder ~note =
     Node.label
       ~attrs:[ Attr.class_ "field" ]
@@ -328,7 +328,7 @@ let new_worktree (d : New_worktree.t) ~inject =
              | Some dir ->
                sprintf
                  "Created in %s, then this session works there."
-                 (Sidebar_view.home_relative dir)
+                 (Sidebar_view.home_relative ?home dir)
              | None -> "This session works there once it is created.")
         ]
     ; dialog_error d.error
@@ -569,7 +569,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Pull _
   | Pr_create _
   | Pr_checked_out _ -> None
-  | New_worktree d -> Some (new_worktree d ~inject)
+  | New_worktree d ->
+    Some (new_worktree ?home:(Sidebar_view.state_home m) d ~inject)
   | Remove_worktree { worktree; force; busy; error; repo = _ } ->
     Some (remove_worktree worktree ~force ~busy ~error ~inject)
 ;;
