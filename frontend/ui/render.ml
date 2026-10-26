@@ -143,6 +143,18 @@ let disconnected_hint (m : App.Model.t) =
        | None -> "")
 ;;
 
+(* What the editor sends to: [→ a1], after what the main agent does. *)
+let focused_agent_hint ~main (a : Agent_view.t) =
+  [ span
+      ~style:attention
+      (main
+       ^
+       match a.status with
+       | Running -> sprintf "→ %s · Esc: main agent" a.id
+       | Done _ | Failed _ -> sprintf "→ %s (finished) · Esc: main agent" a.id)
+  ]
+;;
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
   | Disconnected _ -> Some [ span ~style:attention (disconnected_hint m) ]
@@ -310,6 +322,19 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                             (doing m)
                       else "Esc dismisses btw")
                  ]
+             else if Option.is_some (App.focused_agent m)
+             then
+               Option.map
+                 (App.focused_agent m)
+                 ~f:
+                   (focused_agent_hint
+                      ~main:
+                        (if s.running
+                         then
+                           spinner_frames.(m.spinner
+                                           % Array.length spinner_frames)
+                           ^ sprintf " %s · " (doing m)
+                         else ""))
              else if s.running
              then
                Some
@@ -941,7 +966,7 @@ let status (m : App.Model.t) : Content.Line.t =
                ] )
            ]
          | None -> [])
-      @ (let queued = List.length m.queued_messages in
+      @ (let queued = List.length (App.shown_queue m) in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
@@ -1078,7 +1103,8 @@ let max_queued_shown = 3
 
 (** The queued steers and follow-ups, oldest first. *)
 let queued_block (m : App.Model.t) ~width : Overlay.t option =
-  let total = List.length m.queued_messages in
+  let queued = App.shown_queue m in
+  let total = List.length queued in
   if total = 0
   then None
   else (
@@ -1086,11 +1112,14 @@ let queued_block (m : App.Model.t) ~width : Overlay.t option =
       [ span
           ~style:dim
           (sprintf
-             "queued (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             "queued%s (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             (match m.focus with
+              | `Main -> ""
+              | `Agent id -> " for " ^ id)
              total)
       ]
     in
-    let shown = List.take m.queued_messages max_queued_shown in
+    let shown = List.take queued max_queued_shown in
     let rows =
       List.map shown ~f:(fun (q : Queued_message.t) ->
         [ span
@@ -1567,6 +1596,20 @@ let exactly rows (lines : Content.t) =
 
 (* The editor's rows for the mode, and the cursor in them: the typed text
    (or the draft kept while a dialog asks something else). *)
+(* An empty editor says where what is typed goes. *)
+let placeholder (a : Agent_view.t) =
+  match a.status with
+  | Running ->
+    sprintf
+      "Steer %s · %s (Enter: steer, Alt+Enter: follow-up)"
+      a.id
+      (Text_width.truncate
+         (String.concat ~sep:" " (String.split_lines a.task))
+         ~width:30)
+  | Done _ | Failed _ ->
+    sprintf "%s has finished · Esc goes back to the main agent" a.id
+;;
+
 let composer (m : App.Model.t) : Content.t * (int * int) =
   let marker_style = Style.bold (Style.fg Yellow) in
   let elsewhere = Style.fg Gray in
@@ -1586,7 +1629,16 @@ let composer (m : App.Model.t) : Content.t * (int * int) =
       ~mask:false
   | Text_prompt _ | Confirm _ ->
     editor_rows m ~marker:"? " ~marker_style ~mask:false
-  | Editing | Output _ -> editor_rows m ~marker:"> " ~marker_style ~mask:false
+  | Editing | Output _ ->
+    let rows, cursor = editor_rows m ~marker:"> " ~marker_style ~mask:false in
+    (match App.focused_agent m with
+     | Some a when Editor.is_empty m.editor ->
+       ( [ [ span ~style:marker_style "> "
+           ; span ~style:dim (" " ^ placeholder a)
+           ]
+         ]
+       , cursor )
+     | _ -> rows, cursor)
   | Picker _ | Question _ | Sign_in _ | Pr_form _ | Search _ ->
     editor_rows m ~marker:"> " ~marker_style:elsewhere ~mask:false
 ;;

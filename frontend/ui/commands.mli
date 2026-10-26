@@ -33,6 +33,7 @@ module Argument : sig
     | Review (** [/review]: a worktree or [--base], then a base branch *)
     | Server (** [/connect]: [local], the current or the saved address *)
     | Pr (** [/pr]'s subcommands *)
+    | Agents (** [/agents]' subcommands, then a subagent *)
   [@@deriving sexp_of, equal]
 end
 

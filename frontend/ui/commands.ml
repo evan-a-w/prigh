@@ -28,6 +28,7 @@ module Argument = struct
     | Review
     | Server
     | Pr
+    | Agents
   [@@deriving sexp_of, equal]
 end
 
@@ -198,9 +199,12 @@ let all =
       "delete sessions, after a confirmation (none: pick them in /sessions)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
+      ~argument:Argument.Agents
       "agents"
-      "[cancel <n>]"
-      "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
+      "[steer|cancel ...]"
+      "focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N \
+       (its number or id) at its next step, follow-up N TEXT: before it \
+       reports; cancel N"
   ; c
       "jobs"
       "[id|kill <id>]"
