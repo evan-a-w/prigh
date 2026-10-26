@@ -62,14 +62,6 @@ module Item : sig
   val danger : t -> bool
 end
 
-(** The items for a session (or a worktree under it); [current]: it is the
-    session on show. *)
-val items
-  :  Target.t
-  -> Session_summary.t
-  -> current:bool
-  -> (Item.t * string * string) list
-
 (** As a [Picker]: ids from {!Item.id}, the label, the detail (the slash
     command that does the same). *)
 val picker : Target.t -> Session_summary.t -> current:bool -> Picker.t
