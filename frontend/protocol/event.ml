@@ -78,6 +78,9 @@ type t =
       { steer : string list
       ; follow_up : string list
       }
+  | Agent_queues of Agent_queue.t list
+  (** the background subagents' queues ({!Agent_queue}), those not empty;
+      after every change of one *)
   | Subagent_start of
       { call_id : string
       ; agent_id : string
@@ -207,6 +210,9 @@ let rec of_json j =
     let%bind steer = texts "steer_texts" in
     let%map follow_up = texts "follow_up_texts" in
     Queue_update { steer; follow_up }
+  | "agent_queues" ->
+    Json.optional_list_field j "agents" ~f:Agent_queue.of_json
+    >>| fun agents -> Agent_queues agents
   | "subagent_start" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in

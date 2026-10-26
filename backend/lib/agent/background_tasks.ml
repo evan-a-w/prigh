@@ -258,7 +258,8 @@ let spawn ?input ?inbox t ~kind ~label ~run =
     in
     (* Before it counts as finished, so no message is accepted that nothing
        would take. *)
-    Option.iter inbox ~f:(fun inbox -> ignore (Subagent_inbox.close inbox : string list));
+    Option.iter inbox ~f:(fun inbox ->
+      ignore (Subagent_inbox.close inbox : string list));
     finish t task outcome;
     (* Its report is still delivered (and its waiters woken) when the
        agent's bookkeeping fails; the switch is the server's. *)
@@ -456,7 +457,9 @@ let inbox_of t id =
 let send t ~id kind ~from text =
   if String.is_empty (String.strip text)
   then Or_error.error_string "the message is empty: type what to tell the agent"
-  else Or_error.bind (inbox_of t id) ~f:(fun inbox -> Subagent_inbox.push inbox kind ~from text)
+  else
+    Or_error.bind (inbox_of t id) ~f:(fun inbox ->
+      Subagent_inbox.push inbox kind ~from text)
 ;;
 
 let queues t =
@@ -488,11 +491,11 @@ let rec take_next ?interrupt t ~cancel =
          | Some interrupt ->
            Fiber.first
              (fun () ->
-               await_any running;
-               `Finished)
+                await_any running;
+                `Finished)
              (fun () ->
-               interrupt ();
-               `Interrupted)
+                interrupt ();
+                `Interrupted)
        in
        (match Cancellation.protect cancel ~f:wait with
         | None | Some `Interrupted -> []

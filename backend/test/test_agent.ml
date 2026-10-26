@@ -47,6 +47,7 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
              "queue: steer=%d follow_up=%d"
              (List.length steer)
              (List.length follow_up))
+      | Subagent_queues _ -> None
       | Tool_exec { name; _ } -> Some ("tool_exec: " ^ name)
       | Tool_exec_cancel _ -> Some "tool_exec_cancel"
       | Tool_exec_input _ -> Some "tool_exec_input"

@@ -242,7 +242,9 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
     Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_steers
   in
   let all () = Option.value_map inbox ~default:[] ~f:Subagent_inbox.take_all in
-  let steer () = deliveries (Background_tasks.take_undelivered jobs) @ steers () in
+  let steer () =
+    deliveries (Background_tasks.take_undelivered jobs) @ steers ()
+  in
   let rec wake () =
     match all () with
     | _ :: _ as messages -> messages
@@ -251,7 +253,8 @@ let feeds ~(context : Tool.Context.t) ~jobs inbox =
          Background_tasks.take_next
            jobs
            ~cancel:context.cancel
-           ?interrupt:(Option.map inbox ~f:(fun inbox () -> Subagent_inbox.await inbox))
+           ?interrupt:
+             (Option.map inbox ~f:(fun inbox () -> Subagent_inbox.await inbox))
        with
        | _ :: _ as tasks -> deliveries tasks @ all ()
        | [] ->

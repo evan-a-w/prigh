@@ -101,9 +101,10 @@ module Event : sig
     | Queue_update of
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
-        ; agents : Subagent_inbox.Listing.t list
-          (** the background subagents' queues, those with messages *)
         }
+    | Subagent_queues of Subagent_inbox.Listing.t list
+    (** the background subagents' queues, those with messages; after every
+        change of one *)
     | Tool_exec of
         { host : string (** only delivered to this host *)
         ; exec_id : string

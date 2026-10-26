@@ -15,7 +15,8 @@ module Kind = struct
   let of_string = function
     | "steer" -> Ok Steer
     | "follow_up" | "follow-up" -> Ok Follow_up
-    | other -> Or_error.errorf "%S is not a queue: use \"steer\" or \"follow_up\"" other
+    | other ->
+      Or_error.errorf "%S is not a queue: use \"steer\" or \"follow_up\"" other
   ;;
 end
 
