@@ -424,8 +424,7 @@ let rewind_confirm ~text ~inject =
     ]
 ;;
 
-let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject
-  =
+let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
   let text = Jump.headline point.text in
   Modal.view
     ~cls:"trim-confirm"
@@ -450,9 +449,13 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject
     ; Node.blockquote
         ~attrs:[ Attr.class_ "rewind-quote" ]
         [ Node.text
-            (if String.is_empty text then "(an image)" else String.prefix text 400)
+            (if String.is_empty text
+             then "(an image)"
+             else String.prefix text 400)
         ; Option.value_map point.at ~default:Node.none ~f:(fun at ->
-            span ~cls:"quote-time" (Message_time.short (App.Model.message_time m) at))
+            span
+              ~cls:"quote-time"
+              (Message_time.short (App.Model.message_time m) at))
         ]
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]

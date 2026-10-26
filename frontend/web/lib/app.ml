@@ -4914,7 +4914,8 @@ let ask_trim (m : Model.t) target =
     loading
       m
       trim_title
-      [ call Get_trim_points ~tag:(Trim_points (Before { from_end; at = p.at })) ]
+      [ call Get_trim_points ~tag:(Trim_points (Before { from_end; at = p.at }))
+      ]
   | Some _ ->
     toast
       m

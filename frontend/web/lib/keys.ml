@@ -226,7 +226,8 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Delete", Picker { kind = Jump; picker } when plain t ->
     Option.bind (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
       match Jump.Target.of_string item.id with
-      | Some ((Entry _ | Message _) as target) -> Some (App.Action.Ask_trim target)
+      | Some ((Entry _ | Message _) as target) ->
+        Some (App.Action.Ask_trim target)
       | Some Trimmed | None -> None)
   | "Delete", Picker { kind = Worktrees _; picker } when plain t ->
     Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->

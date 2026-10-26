@@ -97,7 +97,8 @@ module Trim_purpose : sig
   type t =
     | Picker (** [/trim] *)
     | Before of
-        { from_end : int (** the user's message, from the newest ({!Jump.from_end}) *)
+        { from_end : int
+        (** the user's message, from the newest ({!Jump.from_end}) *)
         ; at : Time_ns.Alternate_sexp.t option
         (** when it was sent: the point found must be the same *)
         } (** its "Trim everything before this" *)

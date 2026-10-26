@@ -37,7 +37,7 @@ module Point : sig
     { target : Target.t
     ; kind : Kind.t
     ; text : string
-    (** its first line; empty for a compaction; for [Trimmed], how much *)
+      (** its first line; empty for a compaction; for [Trimmed], how much *)
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]

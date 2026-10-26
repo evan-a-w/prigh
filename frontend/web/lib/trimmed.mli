@@ -18,7 +18,7 @@ type t =
   { shown : Shown.t
   ; restoring : bool (** an [untrim] is on its way *)
   ; reveal : string option
-  (** this page trimmed before this message (an entry id): once the
+    (** this page trimmed before this message (an entry id): once the
       transcript is reloaded starting there, it shows the divider *)
   }
 [@@deriving sexp_of]

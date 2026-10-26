@@ -125,7 +125,14 @@ let per_session = function
   | Remove_worktree _
   | Picker
       { kind =
-          ( Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
+          ( Fork _
+          | Rewind _
+          | Tree
+          | Hosts
+          | Skills
+          | Mcp _
+          | Modes
+          | Jump
           | Trim _ )
       ; _
       }

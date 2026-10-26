@@ -210,12 +210,12 @@ let transcript (m : Model.t) ~inject =
         | Some _ -> [ Trim_view.view m ~inject ]
         | None -> [])
      @ [ Chat_view.view
-        ~fold:(Model.fold m)
-        ~trim_after:
-          (* The first message in the context has nothing before it. *)
-          (if m.paging.older = 0
-           then Chat.first m.chat
-           else Chat.first m.chat - 1)
+           ~fold:(Model.fold m)
+           ~trim_after:
+             (* The first message in the context has nothing before it. *)
+             (if m.paging.older = 0
+              then Chat.first m.chat
+              else Chat.first m.chat - 1)
            (Model.message_time m)
            m.chat
        ])

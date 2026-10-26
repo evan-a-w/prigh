@@ -8,12 +8,7 @@ open! Import
     where the day changes. Tool outputs fold as [fold] (default
     [Fold.default]) says. With [trim_after], the user's messages numbered
     after it have "Trim everything before this" ([trim_attribute]). *)
-val view
-  :  ?fold:Fold.t
-  -> ?trim_after:int
-  -> Message_time.t
-  -> Chat.t
-  -> Node.t
+val view : ?fold:Fold.t -> ?trim_after:int -> Message_time.t -> Chat.t -> Node.t
 
 (** The attribute of a message's "Trim everything before this": the entry's
     number. *)
