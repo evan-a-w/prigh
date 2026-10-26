@@ -2165,6 +2165,19 @@ promote` accepts new output everywhere:
    scenarios of `harness.sh` with the built TUI inside tmux and compare the
    captured panes, including a backend kill and reconnect.
 
+To tune compaction with data rather than guesses, `prigh compaction-eval
+SESSION...` (or `-all`; a developer's tool, not in `prigh -help`) replays
+saved sessions under no compaction, masking, summarising and both, and
+prints what each costs (peak and total input tokens, with and without a
+prompt cache, cache invalidations) and what it keeps (the user's
+messages, the files touched, the errors). It manages the context as the
+agent would with your `config.json` (`compact_at_tokens` sets where it
+summarises, `-compact-at` overrides it); `-window`, `-threshold-tokens`,
+`-keep-turns`, `-mask-min-bytes`, `-mask-at` and the other flags vary
+the parameters, `-json`/`-sexp` print it for scripts, and `-live` (which
+costs money) has a model write the summaries (`compaction_model`, or
+`-compaction-model`, when set) and answer questions about what is left. It only reads the session files.
+
 prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
 and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
 against the real backend, its scripts all at once; the flake runs it as a

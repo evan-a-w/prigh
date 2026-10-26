@@ -18,7 +18,9 @@ open! Import
 val keep_turns : int
 
 (** Tool output (and tool-call arguments) shorter than this many bytes is
-    kept. *)
+    kept by default; of large arguments, the string fields of at least half
+    of it are masked. A smaller [min_bytes] must stay well over the size of
+    a placeholder (256 bytes is enough), so that masking stays idempotent. *)
 val min_bytes : int
 
 (** The message with its tool output, or its tool calls' large string
@@ -27,7 +29,7 @@ val min_bytes : int
     arguments stay valid JSON. Images in a tool result are dropped (the
     placeholder says how many there were). Masking a masked message changes
     nothing. *)
-val mask : Message.t -> Message.t
+val mask : ?min_bytes:int -> Message.t -> Message.t
 
 module Plan : sig
   type t =
@@ -40,7 +42,7 @@ end
 
 (** Masking every message before the last [keep_turns] (default
     {!keep_turns}) assistant messages; [None] when that changes nothing. *)
-val plan : ?keep_turns:int -> Message.t list -> Plan.t option
+val plan : ?keep_turns:int -> ?min_bytes:int -> Message.t list -> Plan.t option
 
 (** [mask]s the messages up to index [through]. *)
-val apply : through:int -> Message.t list -> Message.t list
+val apply : ?min_bytes:int -> through:int -> Message.t list -> Message.t list
