@@ -7,13 +7,14 @@
 // there, a terminal there, removal: refused with changes, then forced),
 // folding, searching, /worktree's picker, and the list on a phone. Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
-// prigh_web.expected).
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { end } from "./end.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -248,7 +249,9 @@ try {
   // and changes nothing.
   await session("A landing page").locator(".session-open").focus();
   await page.keyboard.press("Shift+F10");
+  await page.locator(".context-menu.placed").waitFor();
   await page.keyboard.press("ArrowDown");
+  await page.locator(".context-menu .menu-item").nth(1).and(page.locator(".selected")).waitFor();
   await menuText("from the keyboard");
   await closeMenu();
   section("Esc changed nothing");
@@ -348,11 +351,11 @@ try {
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
+  process.exitCode = 1;
   await screenshot("failure");
   console.error(frames.filter(f => /worktree|sessions/.test(f)).map(f => f.slice(0, 600)).join("\n"));
   console.error(errors.join("\n"));
   throw error;
 } finally {
-  await browser.close();
-  server.kill();
+  await end(() => server.kill(), () => browser.close());
 }
