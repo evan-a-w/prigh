@@ -69,6 +69,10 @@ module Reply_tag : sig
         ; target : P.Git_diff.Target.t
           (** [Dir None]: the session's own worktree *)
         }
+    | Review_since of
+        { review : P.Review.t
+        ; diff : P.Git_diff.t
+        } (** then what changed since the files' last actions *)
     | Review_named of
         { command : string
         ; name : string

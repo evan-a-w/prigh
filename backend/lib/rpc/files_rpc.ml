@@ -154,7 +154,7 @@ let upload agent params =
   return (`Object [ "url", ticket agent kind; "path", `String path ])
 ;;
 
-let dispatch agent ~meth ~params =
+let dispatch ?by agent ~meth ~params =
   let call op fields = File_ops.call agent op fields in
   match meth with
   | "fs_list" ->
@@ -195,6 +195,29 @@ let dispatch agent ~meth ~params =
          | _ -> Or_error.error_string "missing param \"text\""
        in
        let%bind expected = string_opt params "expected" in
-       File_ops.write agent ~path ~text ~expected)
+       let%bind review_root = string_opt params "review_root" in
+       match
+         Option.bind review_root ~f:(fun root ->
+           Option.map
+             (String.chop_prefix
+                path
+                ~prefix:(if String.equal root "/" then "/" else root ^ "/"))
+             ~f:(fun rel -> root, rel))
+       with
+       | None -> File_ops.write agent ~path ~text ~expected
+       | Some (root, rel) ->
+         (* Saved in the review's editor: an action on the file. *)
+         let%bind written = File_ops.write agent ~path ~text ~expected in
+         let%map () =
+           Agent.update_review_file
+             ?by
+             ~text
+             agent
+             ~root
+             ~path:rel
+             ~action:Edited
+             ~f:(fun _ -> Ok ((), []))
+         in
+         written)
   | _ -> None
 ;;

@@ -19,13 +19,22 @@ open! Import
     - [review_approve {root?, path, hash}], [review_unapprove {root?,
       path}]: the review. [root] is the worktree's top directory, as
       [git_diff] says; without it, the approval is of the session's
-      repository (as before worktrees were told apart). *)
+      repository (as before worktrees were told apart).
+    - [review_since {root, path?, index?}]: [{files}], what changed since
+      the last action on each file of the worktree [root] that has one (or
+      on [path]; with [index], since that action of its history, oldest
+      first), as {!Rpc_json.review_since}.
+
+    Approving, unapproving, commenting, replying and deciding a proposal
+    (also [fs_write] with [review_root]) record the file's
+    {!Review_snapshot}, by the user [by]. *)
 
 val methods : string list
 
 (** [None] for other methods. *)
 val dispatch
-  :  Agent.t
+  :  ?by:string
+  -> Agent.t
   -> meth:string
   -> params:Json.t
   -> Json.t Or_error.t option

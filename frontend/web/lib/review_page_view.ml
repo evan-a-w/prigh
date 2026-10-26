@@ -84,6 +84,16 @@ let file_row (t : Code_review.t) (f : Diff_files.File.t) ~inject =
         ; (if comments > 0
            then span ~cls:"review-file-comments" (Int.to_string comments)
            else Node.none)
+        ; (match
+             Option.bind (Map.find t.since f.path) ~f:File_approval.since_label
+           with
+           | Some label ->
+             span
+               ~cls:"review-file-since"
+               ~attrs:
+                 [ Attr.title ("Changed after your last action: " ^ label) ]
+               label
+           | None -> Node.none)
         ; span
             ~cls:"review-file-counts"
             (match f.status with
@@ -539,17 +549,28 @@ let view (m : App.Model.t) ~inject =
                   , Code_review.Mode.equal t.mode Edit
                   , inject (review (Set_mode Edit)) )
                 ]
-            ; segmented
-                ~label:"Show"
-                [ ( "Changes"
-                  , "Only the changed hunks (v)"
-                  , Code_review.Layout.equal t.layout Unified
-                  , inject (review (Set_layout Unified)) )
-                ; ( "Whole file"
-                  , "The whole file with its changes inline (v)"
-                  , Code_review.Layout.equal t.layout Full
-                  , inject (review (Set_layout Full)) )
-                ]
+            ; (let layout =
+                 Option.value_map
+                   t.current
+                   ~default:t.layout
+                   ~f:(Code_review.layout_of t)
+               in
+               segmented
+                 ~label:"Show"
+                 ([ ( "Changes"
+                    , "Only the changed hunks (v)"
+                    , Code_review.Layout.equal layout Unified
+                    , inject (review (Set_layout Unified)) )
+                  ; ( "Whole file"
+                    , "The whole file with its changes inline (v)"
+                    , Code_review.Layout.equal layout Full
+                    , inject (review (Set_layout Full)) )
+                  ]
+                  @ Option.to_list
+                      (Option.bind t.current ~f:(fun path ->
+                         Review_since_view.segment m path ~inject))))
+            ; Option.value_map t.current ~default:Node.none ~f:(fun path ->
+                Review_since_view.menu m path ~inject)
             ; button
                 ~cls:(if unsent > 0 then "small primary" else "small")
                 ~disabled:(unsent = 0 || t.submitting)

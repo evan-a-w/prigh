@@ -871,6 +871,10 @@ let fork ?at t ~dir =
       (* Copies get new ids, which a compaction's references follow. *)
       let ids = String.Table.create () in
       let renamed id = Option.value (Hashtbl.find ids id) ~default:id in
+      (* A snapshot's text is kept with the first snapshot of its content,
+         which may be on another branch. *)
+      let texts = String.Hash_set.create () in
+      let review = lazy (review t) in
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
@@ -883,6 +887,17 @@ let fork ?at t ~dir =
                    ; kept_from = renamed kept_from
                    ; pinned = Option.map pinned ~f:renamed
                    })
+            | Review
+                (Snapshot
+                   { snapshot = { content = Text { md5 }; _ } as s; text }) ->
+              let text =
+                match text with
+                | Some _ -> text
+                | None when Hash_set.mem texts md5 -> None
+                | None -> Review_state.blob (force review) ~md5
+              in
+              if Option.is_some text then Hash_set.add texts md5;
+              Some (Review (Snapshot { snapshot = s; text }))
             | Archived _ | Spend _ | Resume_at _ | Agent_worktree _ -> None
             | payload -> Some payload
           in

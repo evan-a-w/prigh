@@ -101,6 +101,11 @@ module Method = struct
         { root : string option
         ; path : string
         }
+    | Review_since of
+        { root : string
+        ; path : string option
+        ; index : int option
+        }
     | Fs_preview of { path : string }
     | Git_show of
         { dir : string option
@@ -111,6 +116,7 @@ module Method = struct
         { path : string
         ; text : string
         ; expected : string option
+        ; review_root : string option
         }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
@@ -150,6 +156,7 @@ module Method = struct
     | Review_decide _ -> "review_decide"
     | Review_approve _ -> "review_approve"
     | Review_unapprove _ -> "review_unapprove"
+    | Review_since _ -> "review_since"
     | Fs_preview _ -> "fs_preview"
     | Git_show _ -> "git_show"
     | Fs_write _ -> "fs_write"
@@ -201,13 +208,19 @@ module Method = struct
     | Review_unapprove { root; path } ->
       root_param root @ [ "path", Json.str path ]
     | Fs_preview { path } -> [ "path", Json.str path ]
+    | Review_since { root; path; index } ->
+      [ "root", Json.str root ]
+      @ Option.value_map path ~default:[] ~f:(fun p -> [ "path", Json.str p ])
+      @ Option.value_map index ~default:[] ~f:(fun i -> [ "index", Json.int i ])
     | Git_show { dir; rev; path } ->
       Option.value_map dir ~default:[] ~f:(fun d -> [ "dir", Json.str d ])
       @ Git_diff.show_params ~rev ~path
-    | Fs_write { path; text; expected } ->
+    | Fs_write { path; text; expected; review_root } ->
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->
         [ "expected", Json.str e ])
+      @ Option.value_map review_root ~default:[] ~f:(fun r ->
+        [ "review_root", Json.str r ])
     | List_worktrees { cwd = None } -> []
     | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]

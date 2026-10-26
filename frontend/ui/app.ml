@@ -64,6 +64,10 @@ module Reply_tag = struct
         ; target : P.Git_diff.Target.t
           (** [Dir None]: the session's own worktree *)
         }
+    | Review_since of
+        { review : P.Review.t
+        ; diff : P.Git_diff.t
+        } (** then what changed since the files' last actions *)
     | Review_named of
         { command : string
         ; name : string
@@ -5243,6 +5247,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (* Not a repository: no worktree by that name, the model reviews. *)
        review_action m ~command (Model args)
      | Review_named { command; _ } -> error (restore_command m command) e, []
+     | Review_since { review; diff } ->
+       (* An older backend, or a file not readable: without it. *)
+       output m ~title:"Review" (File_approval.render diff review), []
      | Forge_refresh ->
        (* A backend without git hosting: the hosts stay unlisted. *)
        m, []
@@ -5469,7 +5476,18 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   (Diff_files.where diff)
                   (Diff_files.against diff))
            , [] )
-         else output m ~title:"Review" (File_approval.render diff review), [])
+         else if List.is_empty review.snapshots
+         then output m ~title:"Review" (File_approval.render diff review), []
+         else
+           ( m
+           , [ rpc
+                 "review_since"
+                 ~params:[ "root", P.Json.str diff.root ]
+                 ~tag:(Review_since { review; diff })
+             ] ))
+     | Review_since { review; diff } ->
+       decode json ~f:P.Review_since.of_json (fun since ->
+         output m ~title:"Review" (File_approval.render ~since diff review), [])
      | Review_started ->
        (* The run's first message shows what started; a busy agent queues it. *)
        (match m.state with

@@ -814,6 +814,23 @@ are kept with the session (also across rewinds, reloads and restarts).
 In the TUI, `/review` alone lists the changed files with their approvals
 and the comments with their threads.
 
+Each thing you do to a file in the review (approve or unapprove it,
+comment, reply, accept or reject a proposal, save it in Edit) records the
+file as it was then, so you can see just what changed in it afterwards:
+next to Changes and Whole file, "Since you approved · 14:32" (`l`) shows
+the file then against the file now, in the same view (select its current
+lines to comment on them). A file that changed after your last action
+opens in that view, and the file list says by how much (`+3 −1 since
+approved`); with several actions on a file, a menu next to it compares
+with an earlier one, and a file that has not changed says "Nothing
+changed since …". The file browser's preview of a changed file has the
+same view, and the TUI's `/review` says `changed since approved (+3 −1)`.
+The texts are kept with the session's review, each distinct content once,
+read where the tools run (so remote tool hosts too); files over 1 MiB,
+binary files, and new contents once a session keeps 32 MiB of them record
+only a digest: the review then says that the file changed, not how. A
+branch reviewed without checking it out (below) has no such view.
+
 Any worktree of the repository can be reviewed, not only the session's,
 and compared with anything. The review page's head reads "Reviewing
 BRANCH (PATH) against BASE (merge base SHA)", and both are pickers (click

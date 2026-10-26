@@ -6135,8 +6135,7 @@ let main_event (m : Model.t) (event : Event.t) =
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
-  | Review review ->
-    { m with review = Code_review.set_review m.review review }, []
+  | Review review -> with_review m (Code_review.set_review m.review review)
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
