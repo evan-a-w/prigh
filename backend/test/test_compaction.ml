@@ -834,6 +834,145 @@ let%expect_test "files from summaries and tool calls" =
     |}]
 ;;
 
+let failed id =
+  Message.Tool_result
+    { tool_call_id = id
+    ; tool_name = "t"
+    ; text = "no such file"
+    ; is_error = true
+    ; images = []
+    }
+;;
+
+let%expect_test "files: resolved against the cwd, only successful calls" =
+  let show files = print_s [%sexp (files : Compaction_files.t)] in
+  let messages =
+    [ Message.user "go"
+    ; assistant_calls
+        [ "c1", "read", {|{"path":"src/a.ml"}|}
+        ; "c2", "read", {|{"path":"./src/b.ml"}|}
+        ; "c3", "read", {|{"path":"~/notes.txt"}|}
+        ; "c4", "edit", {|{"path":"missing.ml","edits":[]}|}
+        ; "c5", "write", {|{"path":"/ro/x","content":""}|}
+        ; "c6", "read", {|{"path":"gone.ml"}|}
+        ; "c7", "edit", {|{"path":"no-result.ml","edits":[]}|}
+        ]
+    ; result "c1"
+    ; result "c2"
+    ; result "c3"
+    ; failed "c4"
+    ; failed "c5"
+    ; failed "c6"
+      (* After a cd: the relative path is another file, the absolute one
+         the file read before. *)
+    ; assistant_calls
+        [ "c8", "edit", {|{"path":"src/a.ml","edits":[]}|}
+        ; "c9", "write", {|{"path":"/w/src/b.ml","content":""}|}
+        ; ( "c10"
+          , "apply_patch"
+          , {|{"input":"*** Begin Patch\n*** Add File: lib/c.ml\n+x\n*** End Patch"}|}
+          )
+        ]
+    ; result "c8"
+    ; result "c9"
+    ; result "c10"
+    ]
+  in
+  let cwd i = Some (if i < 8 then "/w" else "/v") in
+  show (Compaction_files.add_calls ~cwd Compaction_files.empty messages);
+  (* Without a cwd, paths are kept as they were given. *)
+  show (Compaction_files.add_calls Compaction_files.empty messages);
+  [%expect
+    {|
+    ((read (/w/src/a.ml ~/notes.txt))
+     (modified (/v/src/a.ml /w/src/b.ml /v/lib/c.ml)))
+    ((read (./src/b.ml ~/notes.txt)) (modified (src/a.ml /w/src/b.ml lib/c.ml)))
+    |}];
+  (* A file touched again moves to the end; one read and then modified is
+     listed as modified only. *)
+  show
+    (Compaction_files.add_calls
+       { read = [ "/w/src/a.ml"; "/w/README.md" ]; modified = [ "/w/x" ] }
+       [ assistant_calls
+           [ "d1", "read", {|{"path":"/w/src/a.ml"}|}
+           ; "d2", "edit", {|{"path":"/w/README.md","edits":[]}|}
+           ; "d3", "edit", {|{"path":"/w/x","edits":[]}|}
+           ; "d4", "read", {|{"path":"/w/y"}|}
+           ]
+       ; result "d1"
+       ; result "d2"
+       ; result "d3"
+       ; result "d4"
+       ]);
+  [%expect {| ((read (/w/src/a.ml /w/y)) (modified (/w/README.md /w/x))) |}]
+;;
+
+let%expect_test "files: each line lists the 100 most recent" =
+  let paths prefix n = List.init n ~f:(sprintf "%s%03d" prefix) in
+  let files =
+    { Compaction_files.read = paths "r" 103; modified = paths "m" 100 }
+  in
+  let summary = Compaction_files.append "TEXT" files in
+  List.iter (String.split_lines summary) ~f:(fun line ->
+    if String.length line > 60
+    then printf "%s ... %s\n" (String.prefix line 30) (String.suffix line 30)
+    else print_endline line);
+  let text, parsed = Compaction_files.of_summary summary in
+  printf
+    "%S read=%d (%s ...) modified=%d\n"
+    text
+    (List.length parsed.read)
+    (List.hd_exn parsed.read)
+    (List.length parsed.modified);
+  [%expect
+    {|
+    TEXT
+
+    ## Files touched (recorded from tool calls)
+    Files read: r003, r004, r005,  ...  r100, r101, r102 (and 3 more)
+    Files modified: m000, m001, m0 ... , m095, m096, m097, m098, m099
+    "TEXT" read=100 (r003 ...) modified=100
+    |}]
+;;
+
+let%expect_test "a session's files are resolved against its cwd at the time" =
+  with_sandbox
+  @@ fun t ->
+  let session = Session.create ~dir:t.dir ~cwd:"/w" () in
+  let append m = ignore (Session.append_message session m : Session.Entry.t) in
+  append (Message.user "go");
+  append (assistant_calls [ "c1", "read", {|{"path":"a.ml"}|} ]);
+  append (result "c1");
+  ignore (Session.set_cwd session ~cwd:"/v" () : Session.Entry.t);
+  append (assistant_calls [ "c2", "edit", {|{"path":"a.ml","edits":[]}|} ]);
+  append (result "c2");
+  append (assistant_calls [ "c3", "edit", {|{"path":"/w/a.ml","edits":[]}|} ]);
+  append (result ~text:big "c3");
+  append (assistant_calls [ "c4", "filler", "{}" ]);
+  append (result "c4");
+  print_s [%sexp (Session.context_cwds session : string list)];
+  let provider = Faux_provider.create [ reply "S" ] in
+  (match
+     Compaction.compact ~env:t.env ~provider ~model:opus ~prompt session
+   with
+   | Ok outcome -> print_endline outcome.summary
+   | Error e -> print_s [%sexp (e : Error.t)]);
+  print_s
+    [%sexp
+      (Session.context_cwds
+         (Or_error.ok_exn (Session.load (Session.path session)))
+       : string list)];
+  [%expect
+    {|
+    (/w /w /w /v /v /v /v /v /v)
+    S
+
+    ## Files touched (recorded from tool calls)
+    Files modified: /v/a.ml, /w/a.ml
+    (/w /v /v /v)
+    |}]
+;;
+
 (* ---- the user's messages are carried over ---------------------------- *)
 
 (* The user's earlier messages are pinned shortened, the newest first while
@@ -934,7 +1073,7 @@ let%expect_test "the user's own messages are pinned, shortened, within a budget"
 let%expect_test "pinned messages in a session survive a reload, old files load" =
   with_sandbox
   @@ fun t ->
-  let session = Session.create ~dir:t.dir ~cwd:t.dir () in
+  let session = Session.create ~dir:t.dir ~cwd:"/w" () in
   List.iter
     (List.hd_exn work
      :: Message.user ("long " ^ String.make 5000 'y')
@@ -962,10 +1101,10 @@ let%expect_test "pinned messages in a session survive a reload, old files load" 
     U(fix the parser) (14)
     U(long yyyyyyyyyyyyyyy) (2030)
     U(and keep the public ) (30)
-    S(S) (161)
+    S(S) (173)
     A[c7]
     T(c7,2)
-    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Compaction",{"summary":"S\n\n## Files touched (recorded from tool calls)\nFiles read: src/lexer.ml\nFiles modified: src/parser.ml, src/api.mli, notes.txt","kept_from":"<id>","pinned":[{"id":"<id>","shortened":true},{"id":"<id>","shortened":true},{"id":"<id>"}]}]}]
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Compaction",{"summary":"S\n\n## Files touched (recorded from tool calls)\nFiles read: /w/src/lexer.ml\nFiles modified: /w/src/parser.ml, /w/src/api.mli, /w/notes.txt","kept_from":"<id>","pinned":[{"id":"<id>","shortened":true},{"id":"<id>","shortened":true},{"id":"<id>"}]}]}]
     |}];
   show (Or_error.ok_exn (Session.load (Session.path session)));
   [%expect
@@ -973,7 +1112,7 @@ let%expect_test "pinned messages in a session survive a reload, old files load" 
     U(fix the parser) (14)
     U(long yyyyyyyyyyyyyyy) (2030)
     U(and keep the public ) (30)
-    S(S) (161)
+    S(S) (173)
     A[c7]
     T(c7,2)
     |}];

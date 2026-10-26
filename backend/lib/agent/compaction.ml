@@ -353,6 +353,7 @@ let summarise
       ~prompt
       ~overflowed
       ~cancel
+      ?cwd
       ?instructions
       older
   =
@@ -363,7 +364,7 @@ let summarise
       let text, files = Compaction_files.of_summary summary in
       Some text, files
   in
-  let files = Compaction_files.add_calls files older in
+  let files = Compaction_files.add_calls ?cwd files older in
   let stream request = provider.stream request ~cancel ~on_event:ignore in
   let transcript () =
     stream (transcript_request model ~previous ?instructions older)
@@ -412,6 +413,7 @@ let compact_messages
       ?(overflowed = false)
       ?(keep_recent_tokens = default_keep_recent_tokens)
       ?(cancel = Cancellation.never)
+      ?cwd
       ?instructions
       messages
   =
@@ -426,6 +428,7 @@ let compact_messages
          ~prompt
          ~overflowed
          ~cancel
+         ~cwd:(fun _ -> cwd)
          ?instructions
          older)
       ~f:(fun (outcome : Outcome.t) ->
@@ -453,6 +456,7 @@ let compact
   =
   let messages = Session.messages session in
   let ids = Array.of_list (Session.context_ids session) in
+  let cwds = Array.of_list (Session.context_cwds session) in
   match plan ~keep_recent_tokens messages with
   | None -> Or_error.error_string nothing_to_compact
   | Some { kept_from; pinned } ->
@@ -467,6 +471,7 @@ let compact
             ~prompt
             ~overflowed
             ~cancel
+            ~cwd:(fun i -> Some cwds.(i))
             ?instructions
             older)
          ~f:(fun (outcome : Outcome.t) ->

@@ -1214,7 +1214,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   apart, as `<previous-summary>`). `Compaction_files` appends a section
   listing the files the summarised `read`, `write`, `edit` and
   `apply_patch` calls touched (`Files read:`, `Files modified:`), starting
-  from the previous summary's, so the list does not depend on the model.
+  from the previous summary's, so the list does not depend on the model:
+  only calls whose results are not errors count, relative paths are
+  resolved against the cwd the call was made in (`Session.context_cwds`;
+  a subagent's own), each path is listed once where last touched, and each
+  line keeps the 100 most recent (`(and N more)`).
   `compact_messages` works on a list (subagents), `compact` on a session
   (appending a `Compaction` entry); both return the summary and its usage
   (of both requests when the first fell back).
