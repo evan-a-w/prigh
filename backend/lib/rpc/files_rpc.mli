@@ -19,8 +19,11 @@ open! Import
       uploads directory {!File_ops.uploads_dir} under the session cwd, under
       a free name.
 
-    - [fs_write {path, text, expected?}]: {!File_ops.write}'s [{path,
-      md5}]; [expected] is the [md5] of the text the editor started from.
+    - [fs_write {path, text, expected?, review_root?}]: {!File_ops.write}'s
+      [{path, md5}]; [expected] is the [md5] of the text the editor started
+      from. With [review_root] (the review's editor, of a file under that
+      worktree), the save is an action on the file in the review: it is
+      snapshotted ({!Agent.update_review_file}, by [by]).
 
     URLs are paths on the web server ({!File_http}). *)
 
@@ -28,7 +31,8 @@ val methods : string list
 
 (** [None] for other methods. *)
 val dispatch
-  :  Agent.t
+  :  ?by:string
+  -> Agent.t
   -> meth:string
   -> params:Json.t
   -> Json.t Or_error.t option

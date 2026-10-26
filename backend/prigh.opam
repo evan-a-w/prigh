@@ -17,6 +17,7 @@ depends: [
   "ca-certs"
   "mirage-crypto-rng"
   "digestif"
+  "patience_diff"
   "base64"
   "ohex"
   "uri"

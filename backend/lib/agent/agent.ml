@@ -1520,6 +1520,72 @@ let update_review t ~f =
 
 let now t = Eio.Time.now (Eio.Stdenv.clock t.env)
 
+let read_review_file t ~root ~path =
+  let result =
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"review"
+      ~cwd:root
+      ~name:Host_files.read_op
+      ~arguments:
+        (`Object
+            [ "path", `String (Filename.concat root path)
+            ; "offset", `Number "0"
+            ; "length", `Number (Int.to_string Review_snapshot.max_bytes)
+            ])
+  in
+  if result.is_error
+  then
+    if String.is_suffix (String.strip result.text) ~suffix:"does not exist"
+    then Ok (Review_snapshot.content_of None ~size:0)
+    else Or_error.error_string (String.strip result.text)
+  else
+    let open Or_error.Let_syntax in
+    let%bind json = Json.parse result.text in
+    let%bind data =
+      match Json.member "data" json with
+      | Some (`String data) ->
+        Result.map_error (Base64.decode data) ~f:(fun (`Msg m) ->
+          Error.of_string ("bad data from the host: " ^ m))
+      | _ -> Or_error.error_string "bad reply from the host"
+    in
+    let size =
+      match Json.member "size" json with
+      | Some (`Number n) ->
+        Option.value (Int.of_string_opt n) ~default:(String.length data)
+      | _ -> String.length data
+    in
+    Ok (Review_snapshot.content_of (Some data) ~size)
+;;
+
+let update_review_file ?by ?text t ~root ~path ~action ~f =
+  Or_error.map (f t.review) ~f:(fun (result, changes) ->
+    let after = List.fold changes ~init:t.review ~f:Review_state.apply in
+    let current =
+      match text with
+      | Some text ->
+        Ok (Review_snapshot.content_of (Some text) ~size:(String.length text))
+      | None -> read_review_file t ~root ~path
+    in
+    let snapshot =
+      match current with
+      | Error _ -> []
+      | Ok (content, text) ->
+        Review_state.snapshot
+          after
+          { root; path; action; by; at = now t; content }
+          ~text
+    in
+    List.iter (changes @ snapshot) ~f:(fun change ->
+      ignore (Session.record_review t.session change : Session.Entry.t);
+      t.review <- Review_state.apply t.review change);
+    if not (List.is_empty changes && List.is_empty snapshot)
+    then broadcast t (Review_changed t.review);
+    result)
+;;
+
 let reply_tools t =
   if List.is_empty t.review.comments
   then []
@@ -2813,7 +2879,7 @@ let submit_review ?root t =
         count)
 ;;
 
-let decide_proposal t ~id ~post ~accept =
+let decide_proposal ?by t ~id ~post ~accept =
   let open Or_error.Let_syntax in
   let%bind comment, edits = Review_state.proposal t.review ~id ~post in
   let state : Review_comment.Proposal.State.t =
@@ -2842,8 +2908,29 @@ let decide_proposal t ~id ~post ~accept =
       in
       if result.is_error then Failed (String.strip result.text) else Accepted)
   in
-  update_review t ~f:(fun review ->
-    Review_state.decide review ~id ~post state ~at:(now t))
+  update_review_file
+    ?by
+    t
+    ~root:comment.root
+    ~path:comment.path
+    ~action:(if accept then Accepted else Rejected)
+    ~f:(fun review -> Review_state.decide review ~id ~post state ~at:(now t))
+;;
+
+let review_since t ~root ?path ?index () =
+  let open Or_error.Let_syntax in
+  let paths =
+    match path with
+    | Some path -> [ path ]
+    | None ->
+      Map.keys t.review.snapshots
+      |> List.filter_map ~f:(fun (k : Review_state.File_key.t) ->
+        Option.some_if (Option.exists k.root ~f:(String.equal root)) k.path)
+  in
+  List.map paths ~f:(fun path ->
+    let%bind current = read_review_file t ~root ~path in
+    Review_state.since t.review ~root ~path ?index ~current ())
+  |> Or_error.all
 ;;
 
 (* ---- budget, goal and resume ----------------------------------------- *)
