@@ -156,6 +156,7 @@ module Connection = struct
     | Switching of
         { generation : int
         ; previous : t (** back to it when the new server cannot be reached *)
+        ; notices : string list
         }
     | Disconnected of { reason : string }
   [@@deriving sexp_of, equal]
@@ -1925,7 +1926,7 @@ let relink ?doing m change =
     let generation = m.reconnect_generation + 1 in
     let m =
       { m with
-        connection = Switching { generation; previous }
+        connection = Switching { generation; previous; notices = [] }
       ; reconnect_generation = generation
       }
     in
@@ -2014,7 +2015,8 @@ let connected_notice m (link : Server_link.t) =
 
 let relinked m ~generation (outcome : Server_link.Outcome.t) =
   match m.connection with
-  | Switching { generation = current; previous } when generation = current ->
+  | Switching { generation = current; previous; notices }
+    when generation = current ->
     let m = { m with server = Some outcome.link } in
     (match outcome.result with
      | Unreachable e ->
@@ -2057,6 +2059,11 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
+       let m =
+         List.fold_right notices ~init:m ~f:(fun text m ->
+           with_transcript m ~f:(fun t ->
+             Transcript.apply t (P.Event.Notice text)))
+       in
        follow (notice m (connected_notice m outcome.link)), refill_commands)
   | _ -> m, []
 ;;
@@ -5509,6 +5516,14 @@ let update m (action : Action.t) =
          | None -> m, [])
       | Intent i -> intent { m with notice = None } i
       | Event e ->
+        let m =
+          match m.connection, e with
+          | Switching s, Notice text ->
+            { m with
+              connection = Switching { s with notices = text :: s.notices }
+            }
+          | _ -> m
+        in
         let m, cmds = event m e in
         m, cmds @ notify m e
       | Protocol_error text ->
