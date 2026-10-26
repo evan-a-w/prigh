@@ -6,7 +6,7 @@ open! Async
 type t =
   { reader : Reader.t
   ; write : string -> unit (** does nothing once closed *)
-  ; close : unit -> unit
+  ; close : unit -> unit (** after flushing what was written *)
   }
 
 (** With TCP keepalive on. *)

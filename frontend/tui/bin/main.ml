@@ -276,19 +276,23 @@ let command =
            Core.eprintf "-connect: %s\n" e;
            Core.exit 2);
        let headers =
-         (match headers with
-          | [] ->
-            Option.value_map
-              (Sys.getenv "PRIGH_CONNECT_HEADERS")
-              ~default:[]
-              ~f:(String.split_lines)
-            |> List.filter ~f:(Fn.non (String.for_all ~f:Char.is_whitespace))
-          | headers -> headers)
-         |> List.map ~f:(fun header ->
+         let source, headers =
+           match headers with
+           | [] ->
+             ( "$PRIGH_CONNECT_HEADERS"
+             , Option.value_map
+                 (Sys.getenv "PRIGH_CONNECT_HEADERS")
+                 ~default:[]
+                 ~f:String.split_lines
+               |> List.filter
+                    ~f:(Fn.non (String.for_all ~f:Char.is_whitespace)) )
+           | headers -> "-header", headers
+         in
+         List.map headers ~f:(fun header ->
            match Prigh_client_unix.Websocket_transport.parse_header header with
            | Ok header -> header
            | Error e ->
-             Core.eprintf "-header: %s\n" e;
+             Core.eprintf "%s: %s\n" source e;
              Core.exit 2)
        in
        if not detached

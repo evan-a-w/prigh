@@ -1,0 +1,21 @@
+; Test-only servers and certificates for prigh_client_unix's network
+; transports: everything on localhost.
+
+(library
+ (name prigh_client_unix_testing)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core
+  async
+  base64
+  digestif
+  tls
+  x509
+  ptime
+  ptime.clock.os
+  domain-name
+  ipaddr
+  mirage-crypto-rng
+  mirage-crypto-rng.unix
+  prigh_client_unix))

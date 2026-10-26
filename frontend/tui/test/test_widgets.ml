@@ -725,7 +725,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
-    /connect [HOST:PORT|local]         switch to the backend at HOST:PORT (saved for next time) or to a local one; none: asks, with the current address
+    /connect [HOST:PORT|URL|local]     switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, through an HTTPS proxy; saved for next time) or to a local one; none: asks, with the current address
     /signin [user]                     sign in to the server, as another user or again
     /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them

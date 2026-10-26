@@ -25,6 +25,7 @@ module Servers = struct
   let address : Link.Endpoint.t -> string = function
     | Process _ -> "spawned"
     | Tcp { host; port } -> sprintf "%s:%d" host port
+    | Websocket { url; _ } -> url
   ;;
 
   let param params name =
@@ -134,6 +135,7 @@ let make
       ?(session = None)
       ?(token = None)
       ?(user = None)
+      ?headers
       ~home
       ~servers
       ~target
@@ -143,6 +145,7 @@ let make
   Link.create
     ~open_transport:(Servers.open_ servers ~home)
     ~spawn_worker:(fun () -> Deferred.Or_error.error_string "no worker here")
+    ?headers
     ~home
     ~backend:"/bin/prigh"
     ~spawn_args:[ "serve"; "-cwd"; "/w" ]
@@ -487,6 +490,54 @@ let%expect_test
     (connected "")
     ((address (srv:4)) (user ()) (saved (srv:4)))
     (Ok null)
+    |}];
+  return ()
+;;
+
+let%expect_test
+    "a prigh-web URL: a WebSocket with the headers, tools here, saved as the \
+     URL"
+  =
+  with_home
+  @@ fun home ->
+  let servers = servers () in
+  let link =
+    make
+      ~home
+      ~servers
+      ~headers:[ "X-Auth", "secret" ]
+      ~target:(Remote "srv:3")
+      ~saved:None
+      ()
+  in
+  let%bind (_ : Prigh_ui.Server_link.Outcome.result) = Link.start link in
+  let%bind o = Link.relink link (Connect (Some "wss://srv.example/prigh/ws")) in
+  outcome o;
+  saved ~home;
+  tool_host link;
+  let%bind o = Link.relink link (Connect (Some "ws://[::1]:7790/ws")) in
+  outcome o;
+  [%expect
+    {|
+    open (Tcp (host srv) (port 3))
+    srv:3 hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    open (Websocket (url wss://srv.example/prigh/ws)
+     (address
+      ((tls true) (host srv.example) (port 443) (prefix /prigh) (lines false)))
+     (headers ((X-Auth secret))))
+    wss://srv.example/prigh/ws hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (connected "")
+    ((address (wss://srv.example/prigh/ws))
+     (user ())
+     (saved (wss://srv.example/prigh/ws)))
+    (((connect wss://srv.example/prigh/ws)))
+    tool host: true
+    open (Websocket (url ws://[::1]:7790/ws)
+     (address ((tls false) (host ::1) (port 7790) (prefix "") (lines false)))
+     (headers ((X-Auth secret))))
+    ws://[::1]:7790/ws hello {"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (connected "")
+    ((address (ws://[::1]:7790/ws)) (user ()) (saved (ws://[::1]:7790/ws)))
     |}];
   return ()
 ;;

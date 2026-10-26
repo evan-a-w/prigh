@@ -718,6 +718,45 @@ prints the captured panes.
   deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
   === saved (600)
   ((connect 127.0.0.1:<port>) (token s3cret))
+  $ bash ./harness.sh connect_websocket
+  === refused at startup: the sign-in dialog names the URL
+  ┌─ Sign in to ws://127.0.0.1:<port> ────────────────────────────────────────────────────────────────┐
+  │ user                                                                                             │
+  │ token                                                                                            │
+  │ unauthorised: bad user name or password                                                          │
+  │ prigh serve -tokens: your user name and password; -token: no user                                │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  Tab next field · Enter signs in · Esc closes
+  === signed in: server:ws://127.0.0.1:<port>
+    tools now run on <host> in $TMP/cwd
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  ────────────────────────────────────────────────────────────── connected to ws://127.0.0.1:<port> ───
+  >
+  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
+  === saved (600)
+  ((connect ws://127.0.0.1:<port>/ws) (token s3cret))
+  === a turn over the WebSocket
+    tools now run on <host> in $TMP/cwd
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ hello
+    faux reply
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
+  === /connect completes the URL
+    tools now run on <host> in $TMP/cwd
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ hello
+    faux reply
+  ▸ ws://127.0.0.1:<port>/ws  the current server
+    local                    a backend started here, like prigh-tui -local
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  > /connect
+  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Tab accepts · Enter as typed · Esc hides
   $ bash ./harness.sh detached
   === from inside tmux, relative DIR and -auth-file, odd values
   prigh is running in tmux session prigh-cwd: $TMP/tmux.sh switch-client -t prigh-cwd
