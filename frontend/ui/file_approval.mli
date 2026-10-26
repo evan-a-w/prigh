@@ -21,6 +21,21 @@ val status : P.Review.t -> Diff_files.File.t -> Status.t
 (** How many of [files] are approved. *)
 val approved : P.Review.t -> Diff_files.File.t list -> int
 
-(** The terminal's [/review]: each changed file with its status and its
-    comments' threads, after a summary. *)
-val render : P.Git_diff.t -> P.Review.t -> Content.t
+(** What changed in a file since the last action on it, for lists: [+3 −1
+    since approved] ([changed since approved] when it has no counts, binary
+    or too large); [None] when nothing did. *)
+val since_label : P.Review_since.File.t -> string option
+
+(** A file's status with what changed since the last action:
+    [changed since approved (+3 −1)], [not approved, +2 −0 since
+    commented]. *)
+val describe : Status.t -> P.Review_since.File.t option -> string
+
+(** The terminal's [/review]: each changed file with its status (and what
+    changed since the last action on it, from [since]) and its comments'
+    threads, after a summary. *)
+val render
+  :  ?since:P.Review_since.t
+  -> P.Git_diff.t
+  -> P.Review.t
+  -> Content.t

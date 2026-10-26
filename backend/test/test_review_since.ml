@@ -323,7 +323,7 @@ let%expect_test "deleted, new, binary and large files" =
     @@ -0,0 +1,1 @@
     +back
     big.txt: since #0 approved changed=false +0 -0
-    bin.dat: since #0 approved changed=true +0 -0 (a binary file, so not compared)
+    bin.dat: since #0 approved changed=true +0 -0 (it is a binary file)
     new.txt: since #0 approved changed=true +0 -1
     diff --git a/new.txt b/new.txt
     --- a/new.txt

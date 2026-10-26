@@ -447,17 +447,23 @@ let code_review_bar (m : App.Model.t) path ~inject =
           "Unchanged. Click a line number to comment on it."
       ]
   | Some f ->
-    let layout (l : Code_review.Layout.t) text title =
-      let on = Code_review.Layout.equal t.layout l in
+    let segment (text, title, on, action) =
       Node.button
         ~attrs:
           [ classes [ "segment" ] [ "on", on ]
           ; Attr.type_ "button"
           ; Attr.create "aria-pressed" (Bool.to_string on)
           ; Attr.title title
-          ; Attr.on_click (fun _ -> inject (review (Set_layout l)))
+          ; Attr.on_click (fun _ -> action)
           ]
         [ Node.text text ]
+    in
+    let layout (l : Code_review.Layout.t) text title =
+      segment
+        ( text
+        , title
+        , Code_review.Layout.equal (Code_review.layout_of t path) l
+        , inject (review (Set_view { path; layout = l })) )
     in
     div
       ~cls:"files-review-bar"
@@ -476,9 +482,14 @@ let code_review_bar (m : App.Model.t) path ~inject =
             ; Attr.role "group"
             ; Attr.create "aria-label" "Show"
             ]
-          [ layout Unified "Changes" "Only the changed hunks"
-          ; layout Full "Whole file" "The whole file with its changes inline"
-          ]
+          ([ layout Unified "Changes" "Only the changed hunks"
+           ; layout Full "Whole file" "The whole file with its changes inline"
+           ]
+           @ Option.to_list
+               (Option.map
+                  (Review_since_view.segment m path ~inject)
+                  ~f:segment))
+      ; Review_since_view.menu m path ~inject
       ; Review_page_view.open_button ~path m ~inject
       ]
 ;;

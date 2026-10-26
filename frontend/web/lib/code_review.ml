@@ -14,6 +14,7 @@ module Layout = struct
   type t =
     | Unified
     | Full
+    | Since
   [@@deriving sexp_of, equal]
 end
 
@@ -105,6 +106,11 @@ type t =
   ; contents : Content.t String.Map.t
   ; editor : Editor.t option
   ; submitting : bool
+  ; since : Review_since.File.t String.Map.t
+  ; since_loading : bool
+  ; since_again : bool
+  ; picked : (int * Review_since.File.t option) String.Map.t
+  ; views : Layout.t String.Map.t
   }
 [@@deriving sexp_of]
 
@@ -132,6 +138,11 @@ let empty =
   ; contents = String.Map.empty
   ; editor = None
   ; submitting = false
+  ; since = String.Map.empty
+  ; since_loading = false
+  ; since_again = false
+  ; picked = String.Map.empty
+  ; views = String.Map.empty
   }
 ;;
 
@@ -145,6 +156,12 @@ module Reply = struct
     | Content of string
     | Saved of string
     | Submitted
+    | Since of string
+    | Since_picked of
+        { root : string
+        ; path : string
+        ; index : int
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -174,6 +191,14 @@ module Action = struct
     | Step of int
     | Set_mode of Mode.t
     | Set_layout of Layout.t
+    | Set_view of
+        { path : string
+        ; layout : Layout.t
+        }
+    | Pick_since of
+        { path : string
+        ; index : int
+        }
     | Select_line of
         { path : string
         ; side : Review_comment.Side.t
@@ -260,6 +285,48 @@ let file t path =
 ;;
 
 let approval t f = File_approval.status t.review f
+let history t path = Review.history t.review path
+
+let since t path =
+  match Map.find t.picked path with
+  | Some (_, picked) -> picked
+  | None -> Map.find t.since path
+;;
+
+let changed_since t path =
+  Option.exists (Map.find t.since path) ~f:(fun s -> s.changed)
+;;
+
+let layout_of t path : Layout.t =
+  let chosen =
+    match Map.find t.views path with
+    | Some layout -> layout
+    | None -> if changed_since t path then Since else t.layout
+  in
+  match chosen with
+  | Since when List.is_empty (history t path) -> Unified
+  | layout -> layout
+;;
+
+let get_since t =
+  match root t with
+  | None -> t, []
+  | Some _ when t.since_loading -> { t with since_again = true }, []
+  | Some root ->
+    ( { t with since_loading = true }
+    , [ rpc (Review_since { root; path = None; index = None }) (Since root) ] )
+;;
+
+let get_picked t ~path ~index =
+  match root t with
+  | None -> t, []
+  | Some root ->
+    ( t
+    , [ rpc
+          (Review_since { root; path = Some path; index = Some index })
+          (Since_picked { root; path; index })
+      ] )
+;;
 let approved t = File_approval.approved t.review t.files
 let unsent t = Review.unsent t.review
 
@@ -455,6 +522,7 @@ module Rows = struct
     ; hash : string option
     ; text : string option
     ; full : bool
+    ; since : string option
     }
 
   let memo : (string, key * Diff_view.Row.t list) Hashtbl.t =
@@ -466,6 +534,7 @@ module Rows = struct
     && Option.equal String.equal a.hash b.hash
     && Option.equal phys_equal a.text b.text
     && Bool.equal a.full b.full
+    && Option.equal String.equal a.since b.since
   ;;
 
   let find key ~make =
@@ -481,20 +550,31 @@ end
 let rows t ~path =
   let file = file t path in
   let text = text_of t path in
-  let full = Layout.equal t.layout Full in
+  let layout = layout_of t path in
+  let full = Layout.equal layout Full in
+  let since =
+    match layout with
+    | Since -> Some (Option.value_map (since t path) ~default:"" ~f:(fun s -> s.diff))
+    | Unified | Full -> None
+  in
   Rows.find
     { path
     ; hash = Option.map file ~f:(fun f -> f.hash)
     ; text = (if full || Option.is_none file then text else None)
     ; full
+    ; since
     }
     ~make:(fun () ->
       let lines () =
         Array.of_list (String.split_lines (Option.value text ~default:""))
       in
-      match file with
-      | None -> plain_rows (lines ())
-      | Some f ->
+      match since, file with
+      | Some diff, _ ->
+        (match Diff_files.parse diff with
+         | [] -> []
+         | f :: _ -> Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks))
+      | None, None -> plain_rows (lines ())
+      | None, Some f ->
         let hunk_rows =
           Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
         in
@@ -508,11 +588,27 @@ let lines t path =
     Array.of_list (String.split_lines text))
 ;;
 
+(* In the since-view the removed lines are the file as it was at the action,
+   not what the change removed: they take no comments. *)
+let on_snapshot t ~path (range : Review_comment.Range.t) =
+  Layout.equal (layout_of t path) Since
+  && Review_comment.Side.equal range.side Old
+;;
+
+let snapshot_lines =
+  "The removed lines here are the file as it was at that action: comment on \
+   the current lines, or on removed ones in Changes."
+;;
+
 let select t ~path ~start ~end_ ~pop =
-  Option.map
-    (Code_selection.resolve (rows t ~path) ~lines:(lines t path) ~start ~end_)
-    ~f:(fun (range, anchor) ->
-      { Selection.path; range; anchor; from = None; pop })
+  match
+    Code_selection.resolve (rows t ~path) ~lines:(lines t path) ~start ~end_
+  with
+  | Some (range, _) when on_snapshot t ~path range ->
+    None, [ toast snapshot_lines; Out.Clear_text_selection ]
+  | Some (range, anchor) ->
+    Some { Selection.path; range; anchor; from = None; pop }, []
+  | None -> None, []
 ;;
 
 let comment_busy t id = { t with busy = Set.add t.busy id }
@@ -547,6 +643,9 @@ let rec update t (action : Action.t) =
       ; contents = String.Map.empty
       ; editor = None
       ; mode = Comment
+      ; since = String.Map.empty
+      ; picked = String.Map.empty
+      ; views = String.Map.empty
       }
     in
     update (scoped t) (Open None)
@@ -582,10 +681,33 @@ let rec update t (action : Action.t) =
        in
        t, outs @ [ Out.Focus "review-editor" ])
   | Set_layout layout ->
-    let t = { t with layout } in
-    (match layout, t.current with
-     | Full, Some path -> fetch_content t path
-     | _ -> t, [])
+    (match t.current with
+     | Some path -> update t (Set_view { path; layout })
+     | None -> { t with layout }, [])
+  | Set_view { path; layout } ->
+    let t =
+      { t with
+        layout
+      ; views = Map.set t.views ~key:path ~data:layout
+      ; selection = None
+      }
+    in
+    (match layout with
+     | Full -> fetch_content t path
+     | Since when List.is_empty (history t path) ->
+       t, [ toast (sprintf "No review actions on %s yet: approve it or comment on it first." path) ]
+     | Unified | Since -> t, [])
+  | Pick_since { path; index } ->
+    let t =
+      { t with views = Map.set t.views ~key:path ~data:Since; selection = None }
+    in
+    if index >= List.length (history t path) - 1
+    then { t with picked = Map.remove t.picked path }, []
+    else
+      get_picked
+        { t with picked = Map.set t.picked ~key:path ~data:(index, None) }
+        ~path
+        ~index
   | Select_line { path; side; line; extend } ->
     let here = { Code_selection.Point.side; line; offset = 0 } in
     let from =
@@ -602,6 +724,8 @@ let rec update t (action : Action.t) =
          ~from
          ~to_:here
      with
+     | Some (range, _) when on_snapshot t ~path range ->
+       t, outs @ [ toast snapshot_lines ]
      | Some (range, anchor) ->
        ( { t with
            selection =
@@ -610,7 +734,8 @@ let rec update t (action : Action.t) =
        , outs @ [ Out.Clear_text_selection ] )
      | None -> t, outs @ [ toast "The file is still being read: try again." ])
   | Select_text { path; start; end_; pop } ->
-    { t with selection = select t ~path ~start ~end_ ~pop }, []
+    let selection, outs = select t ~path ~start ~end_ ~pop in
+    { t with selection }, outs
   | Clear_selection ->
     if Option.is_some t.selection
     then { t with selection = None }, [ Out.Clear_text_selection ]
@@ -715,6 +840,7 @@ let rec update t (action : Action.t) =
                 { path = absolute t e.path
                 ; text = e.text
                 ; expected = (if e.conflict then None else e.md5)
+                ; review_root = root t
                 })
              (Saved e.path)
          ] ))
@@ -772,6 +898,8 @@ let refresh_contents t ~before =
 
 let error_text e = String.capitalize e
 
+let root_of = root
+
 let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
   match why, result with
   | Diff, _ when not (Target.equal t.requested t.target) ->
@@ -801,10 +929,11 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
        in
        let t, contents = refresh_contents t ~before in
        let t, current = settle_current t in
+       let t, since = get_since t in
        let t, again =
          if t.again then get_diff { t with again = false } else t, []
        in
-       t, contents @ current @ again)
+       t, contents @ current @ since @ again)
   | Review, Error e -> t, [ toast ~error:true (error_text e) ]
   | Review, Ok json ->
     (match Review.of_json json with
@@ -815,14 +944,15 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     , [ toast ~error:true (error_text e) ] )
   | Comment_added, Ok json ->
     let t = { t with draft = None; selection = None } in
+    let t, since = get_since t in
     (match Review_comment.of_json json with
      | Ok c ->
        ( map_comments t ~f:(fun comments ->
            if List.exists comments ~f:(fun o -> String.equal o.id c.id)
            then comments
            else comments @ [ c ])
-       , [] )
-     | Error _ -> t, [])
+       , since )
+     | Error _ -> t, since)
   | Decided id, result ->
     (* An accepted change edited the file. *)
     let t, outs = reply t (Changed (Some id)) result in
@@ -842,6 +972,10 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
          | Some id -> { t with replies = Map.remove t.replies id }
          | None -> t
        in
+       (* An approval or a reply is an action on the file. *)
+       let t, since = get_since t in
+       let with_since (t, outs) = t, outs @ since in
+       with_since @@
        (* An approval answers with the review; a comment with itself (the
           [review] event brings the rest). *)
        (match Review.of_json json with
@@ -925,6 +1059,43 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
     in
     let t, diff = get_diff t in
     t, toast (sprintf "Saved %s" path) :: diff
+  | Since root, _ when not (Option.equal String.equal (Some root) (root_of t)) ->
+    (* Of the worktree reviewed before. *)
+    get_since { t with since_loading = false; since_again = false }
+  | Since _, result ->
+    let t = { t with since_loading = false } in
+    let t =
+      match Result.bind result ~f:(fun j -> Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum) with
+      | Ok files ->
+        { t with
+          since =
+            String.Map.of_alist_reduce
+              (List.map files ~f:(fun (f : Review_since.File.t) -> f.path, f))
+              ~f:(fun a _ -> a)
+        }
+      | Error _ ->
+        (* An older backend, or a file not readable: no since-view. *)
+        t
+    in
+    let t, picked =
+      List.fold (Map.to_alist t.picked) ~init:(t, []) ~f:(fun (t, outs) (path, (index, _)) ->
+        let t, more = get_picked t ~path ~index in
+        t, outs @ more)
+    in
+    if t.since_again
+    then (
+      let t, again = get_since { t with since_again = false } in
+      t, picked @ again)
+    else t, picked
+  | Since_picked { root; path; index }, result ->
+    (match Map.find t.picked path with
+     | Some (i, _) when i = index && Option.equal String.equal (Some root) (root_of t) ->
+       (match Result.bind result ~f:(fun j -> Result.map_error (Review_since.of_json j) ~f:Error.to_string_hum) with
+        | Ok [ f ] -> { t with picked = Map.set t.picked ~key:path ~data:(index, Some f) }, []
+        | Ok _ -> { t with picked = Map.remove t.picked path }, []
+        | Error e ->
+          { t with picked = Map.remove t.picked path }, [ toast ~error:true (error_text e) ])
+     | Some _ | None -> t, [])
   | Submitted, Error e ->
     { t with submitting = false }, [ toast ~error:true (error_text e) ]
   | Submitted, Ok json ->
@@ -950,7 +1121,19 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
     | "c" when Mode.equal t.mode Comment -> Some Start_comment
     | "e" -> Some (Set_mode (if Mode.equal t.mode Edit then Comment else Edit))
     | "v" ->
-      Some (Set_layout (if Layout.equal t.layout Full then Unified else Full))
+      let layout =
+        Option.value_map t.current ~default:t.layout ~f:(layout_of t)
+      in
+      Some (Set_layout (if Layout.equal layout Full then Unified else Full))
+    | "l" ->
+      (match Option.map t.current ~f:(layout_of t) with
+       | Some Since ->
+         Some
+           (Set_layout
+              (match t.layout with
+               | Since -> Unified
+               | layout -> layout))
+       | Some (Unified | Full) | None -> Some (Set_layout Since))
     | "s" when not shift -> Some Submit
     | "Escape" ->
       if Option.is_some t.draft

@@ -356,9 +356,9 @@ let since t ~root ~path ?index ~current () =
       | None, _ -> Some "its text then was not kept", nothing
       | _, None -> Some "it cannot be read now", nothing
       | Some `Too_large, _ | _, Some `Too_large ->
-        Some "larger than 1 MiB, so not compared", nothing
+        Some "it is larger than 1 MiB", nothing
       | Some `Binary, _ | _, Some `Binary ->
-        Some "a binary file, so not compared", nothing
+        Some "it is a binary file", nothing
     in
     Ok
       { Since.path
