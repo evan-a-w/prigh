@@ -66,6 +66,8 @@ module Reply_tag : sig
     (** [set_config] of [/fallback]'s text, back in the editor if refused *)
     | Default_dir_shown (** [get_config] for [/default-dir] *)
     | Default_dir_saved of string (** like [Fallback_saved] *)
+    | Compaction_shown (** [get_config] for [/compaction] *)
+    | Compaction_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done

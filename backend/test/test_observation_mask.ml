@@ -167,40 +167,79 @@ let%expect_test "a plan masks what comes before the last turns" =
     |}]
 ;;
 
-let%expect_test "when masking is worth it" =
-  let model = { Model.default with context_window = 100_000 } in
+let%expect_test "when masking is worth it: relative to the compaction threshold"
+  =
   let plan tokens_saved =
     { Observation_mask.Plan.through = 0; masked = 1; tokens_saved }
   in
-  List.iter
+  let show ~window ~cap cases =
+    let model = { Model.default with context_window = window } in
+    let settings = { Compaction_settings.window_only with max_tokens = cap } in
+    printf
+      "window %d, cap %s: compacts past %d\n"
+      window
+      (Option.value_map cap ~default:"none" ~f:Int.to_string)
+      (Compaction_settings.threshold settings model);
+    List.iter cases ~f:(fun (input_tokens, overflowed, saved) ->
+      printf
+        "  %6d tokens, overflowed %-5b, saves %5d: %b\n"
+        input_tokens
+        overflowed
+        saved
+        (Compaction_settings.worth_masking
+           settings
+           model
+           ~input_tokens
+           ~overflowed
+           (plan saved)))
+  in
+  (* 80% of the window: masks past half of it when that frees a tenth, past
+     the threshold too (only an overflow masks whatever it frees). *)
+  show
+    ~window:100_000
+    ~cap:None
     [ 40_000, false, 50_000
-    ; 60_000, false, 5_000
+    ; 50_000, false, 10_000
+    ; 50_001, false, 10_000
+    ; 60_000, false, 9_999
     ; 60_000, false, 10_000
     ; 90_000, false, 9_999
     ; 90_000, false, 10_000
     ; 60_000, true, 5
     ; 0, true, 1
-    ]
-    ~f:(fun (input_tokens, overflowed, saved) ->
-      printf
-        "%6d tokens, overflowed %-5b, saves %5d: %b\n"
-        input_tokens
-        overflowed
-        saved
-        (Observation_mask.worth_masking
-           model
-           ~input_tokens
-           ~overflowed
-           (plan saved)));
+    ];
+  (* A 1M window compacted at the 200k cap masks past 125k when that frees
+     25k, as a 250k window would; the window alone would wait for 500k. *)
+  show
+    ~window:1_000_000
+    ~cap:(Some 200_000)
+    [ 125_000, false, 25_000
+    ; 125_001, false, 24_999
+    ; 125_001, false, 25_000
+    ; 400_000, false, 30_000
+    ; 400_000, false, 24_999
+    ];
+  show ~window:1_000_000 ~cap:None [ 400_000, false, 30_000 ];
   [%expect
     {|
-    40000 tokens, overflowed false, saves 50000: false
-    60000 tokens, overflowed false, saves  5000: false
-    60000 tokens, overflowed false, saves 10000: true
-    90000 tokens, overflowed false, saves  9999: false
-    90000 tokens, overflowed false, saves 10000: true
-    60000 tokens, overflowed true , saves     5: true
-        0 tokens, overflowed true , saves     1: true
+    window 100000, cap none: compacts past 80000
+       40000 tokens, overflowed false, saves 50000: false
+       50000 tokens, overflowed false, saves 10000: false
+       50001 tokens, overflowed false, saves 10000: true
+       60000 tokens, overflowed false, saves  9999: false
+       60000 tokens, overflowed false, saves 10000: true
+       90000 tokens, overflowed false, saves  9999: false
+       90000 tokens, overflowed false, saves 10000: true
+       60000 tokens, overflowed true , saves     5: true
+           0 tokens, overflowed true , saves     1: true
+    window 1000000, cap 200000: compacts past 200000
+      125000 tokens, overflowed false, saves 25000: false
+      125001 tokens, overflowed false, saves 24999: false
+      125001 tokens, overflowed false, saves 25000: true
+      400000 tokens, overflowed false, saves 30000: true
+      400000 tokens, overflowed false, saves 24999: false
+    window 1000000, cap none: compacts past 800000
+      400000 tokens, overflowed false, saves 30000: false
     |}]
 ;;
 
@@ -260,7 +299,12 @@ let filler_call ?(size = 8000) i =
     ()
 ;;
 
-let run_loop ?(mask_observations = true) ?(context = []) replies =
+let run_loop
+      ?(model = model)
+      ?(compaction = Compaction_settings.window_only)
+      ?(context = [])
+      replies
+  =
   with_sandbox
   @@ fun t ->
   let provider =
@@ -279,7 +323,7 @@ let run_loop ?(mask_observations = true) ?(context = []) replies =
         ; max_tokens = None
         ; retries = 0
         ; cache_key = None
-        ; mask_observations
+        ; compaction
         }
       ~cwd:t.dir
       ~emit:(function
@@ -326,7 +370,8 @@ let%expect_test "a long run masks in batches and never summarises" =
 
 let%expect_test "with masking off, the same run summarises" =
   run_loop
-    ~mask_observations:false
+    ~compaction:
+      { Compaction_settings.window_only with mask_observations = false }
     (List.map (List.range 1 17) ~f:filler_call
      @ [ Reply.text "SUMMARY"; Reply.text "done" ]);
   [%expect
@@ -394,6 +439,67 @@ let%expect_test "over the threshold, masking still waits for a large batch" =
     request: 48 messages, ~36629 tokens, masked [c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12]
     request: 50 messages, ~37384 tokens, masked [c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12]
     added: 50 messages
+    |}]
+;;
+
+let%expect_test "a capped window masks as early, relative to the cap" =
+  (* 400k tokens, compacted at the 32k cap: masks as the 40k window does. *)
+  let model = { model with context_window = 400_000 } in
+  let replies =
+    List.map (List.range 1 18) ~f:filler_call @ [ Reply.text "done" ]
+  in
+  run_loop
+    ~model
+    ~compaction:
+      { Compaction_settings.window_only with max_tokens = Some 32_000 }
+    replies;
+  [%expect
+    {|
+    request: 1 messages, ~2 tokens, masked []
+    request: 3 messages, ~2006 tokens, masked []
+    request: 5 messages, ~4011 tokens, masked []
+    request: 7 messages, ~6016 tokens, masked []
+    request: 9 messages, ~8021 tokens, masked []
+    request: 11 messages, ~10025 tokens, masked []
+    request: 13 messages, ~12030 tokens, masked []
+    request: 15 messages, ~14035 tokens, masked []
+    request: 17 messages, ~16040 tokens, masked []
+    request: 19 messages, ~18044 tokens, masked []
+    request: 21 messages, ~20049 tokens, masked []
+    request: 23 messages, ~22054 tokens, masked []
+    request: 25 messages, ~24059 tokens, masked []
+    masked 3 messages, saving ~5934 tokens
+    request: 27 messages, ~20130 tokens, masked [c1 c2 c3]
+    request: 29 messages, ~22135 tokens, masked [c1 c2 c3]
+    request: 31 messages, ~24140 tokens, masked [c1 c2 c3]
+    masked 3 messages, saving ~5934 tokens
+    request: 33 messages, ~20211 tokens, masked [c1 c2 c3 c4 c5 c6]
+    request: 35 messages, ~22216 tokens, masked [c1 c2 c3 c4 c5 c6]
+    added: 36 messages
+    |}];
+  (* Without the cap, 36k tokens are far from 320k: nothing is masked. *)
+  run_loop ~model replies;
+  [%expect
+    {|
+    request: 1 messages, ~2 tokens, masked []
+    request: 3 messages, ~2006 tokens, masked []
+    request: 5 messages, ~4011 tokens, masked []
+    request: 7 messages, ~6016 tokens, masked []
+    request: 9 messages, ~8021 tokens, masked []
+    request: 11 messages, ~10025 tokens, masked []
+    request: 13 messages, ~12030 tokens, masked []
+    request: 15 messages, ~14035 tokens, masked []
+    request: 17 messages, ~16040 tokens, masked []
+    request: 19 messages, ~18044 tokens, masked []
+    request: 21 messages, ~20049 tokens, masked []
+    request: 23 messages, ~22054 tokens, masked []
+    request: 25 messages, ~24059 tokens, masked []
+    request: 27 messages, ~26063 tokens, masked []
+    request: 29 messages, ~28068 tokens, masked []
+    request: 31 messages, ~30073 tokens, masked []
+    request: 33 messages, ~32078 tokens, masked []
+    request: 35 messages, ~34082 tokens, masked []
+    added: 36 messages
     |}]
 ;;
 

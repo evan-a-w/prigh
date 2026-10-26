@@ -61,6 +61,8 @@ module Reply_tag = struct
     | Fallback_saved of string
     | Default_dir_shown
     | Default_dir_saved of string
+    | Compaction_shown
+    | Compaction_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -2809,6 +2811,20 @@ let set_default_dir m (cmd : Commands.Parsed.t) =
     ] )
 ;;
 
+let compaction_command m (cmd : Commands.Parsed.t) =
+  match Compaction_command.parse cmd.rest with
+  | Show ->
+    show_config m ~tag:Compaction_shown ~summary:Compaction_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/compaction " ^ cmd.rest))) e, []
+  | (Set_at _ | Set_model _ | Set_mask _) as action ->
+    ( m
+    , [ set_config
+          ~tag:(Compaction_saved ("/compaction " ^ cmd.rest))
+          (Compaction_command.fields action)
+      ] )
+;;
+
 (* ---- snippets ---------------------------------------------------------- *)
 
 let snippets m = Option.map m.config ~f:(fun (c : P.Config.t) -> c.snippets)
@@ -3380,6 +3396,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "default-dir", [] ->
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
+  | "compaction", _ -> compaction_command m cmd
   | "auth", _ ->
     ( m
     , [ rpc "auth_status" ~tag:Auth_show; call Forge_status ~tag:Forge_refresh ]
@@ -5571,7 +5588,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Skill_prompt text -> skill_prompt_failed m text e, []
      | Agent_message { agent_id; kind; text; retry } ->
        agent_message_failed m ~agent_id ~kind ~text ~retry e, []
-     | Fallback_saved text | Default_dir_saved text ->
+     | Fallback_saved text | Default_dir_saved text | Compaction_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
          if Editor.is_empty m.editor
@@ -6115,6 +6132,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Default_dir_shown | Default_dir_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          notice { m with config = Some config } (default_dir_summary config), [])
+     | Compaction_shown | Compaction_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Compaction_command.summary config)
+         , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])

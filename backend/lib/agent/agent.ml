@@ -798,11 +798,21 @@ let set_config t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "generate_model: %s" (Error.to_string_hum e))
   in
+  let%bind compaction_model =
+    match config.compaction_model with
+    | None -> Ok None
+    | Some name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:(fun m -> Some (Model.key m))
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "compaction_model: %s" (Error.to_string_hum e))
+  in
   let config =
     { config with
       fallback_models =
         List.stable_dedup fallback_models ~compare:String.compare
     ; generate_model
+    ; compaction_model
     }
   in
   let%bind () =
@@ -1783,6 +1793,21 @@ let goal_tools t =
   | Some _ | None -> []
 ;;
 
+(* A [compaction_model] that names no known model (a hand-edited file, which
+   [Model_registry]'s problems report) leaves summaries to the session's. *)
+let compaction_settings t =
+  { Compaction_settings.max_tokens = Config.compact_at t.config
+  ; model =
+      Option.bind t.config.compaction_model ~f:(fun name ->
+        Result.ok (Model_registry.resolve t.models name))
+  ; mask_observations = t.config.mask_observations
+  }
+;;
+
+let summary_model t =
+  Compaction_settings.summary_model (compaction_settings t) t.model
+;;
+
 let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
@@ -1792,7 +1817,7 @@ let loop_config t =
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
   ; cache_key = Some (Session.id t.session)
-  ; mask_observations = t.config.mask_observations
+  ; compaction = compaction_settings t
   }
 ;;
 
@@ -1980,13 +2005,13 @@ let mask_session session ~through =
     Or_error.error_s [%message "no entry to mask up to" (through : int)]
 ;;
 
-let compacted t (outcome : Compaction.Outcome.t) =
+let compacted t ~model (outcome : Compaction.Outcome.t) =
   account
     t
     (Compacted
        { summary = outcome.summary
        ; usage = outcome.usage
-       ; cost_usd = Model.cost_usd t.model outcome.usage
+       ; cost_usd = Model.cost_usd model outcome.usage
        });
   broadcast t (Compacted { summary = outcome.summary })
 ;;
@@ -2123,12 +2148,14 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                  else []
                in
                deliveries t @ note @ queued @ due_reminders t)
-             ~compact:(fun ~keep_recent_tokens ~overflowed ~cancel _messages ->
+             ~compact:
+               (fun
+                 ~model ~keep_recent_tokens ~overflowed ~cancel _messages ->
                match
                  Compaction.compact
                    ~env:t.env
                    ~provider:t.provider
-                   ~model:t.model
+                   ~model
                    ~prompt:(Agent_loop.Config.compaction_prompt config)
                    ~overflowed
                    ~keep_recent_tokens
@@ -2439,14 +2466,19 @@ and auto_describe t =
       Promise.resolve resolve ()))
 
 and auto_compact t =
+  let settings = compaction_settings t in
+  let should_compact tokens =
+    Compaction_settings.should_compact settings t.model ~input_tokens:tokens
+  in
   let tokens = (state t).context_tokens in
   let tokens =
     match
       Option.filter
         (Observation_mask.plan (Session.messages t.session))
         ~f:(fun plan ->
-          t.config.mask_observations
-          && Observation_mask.worth_masking
+          settings.mask_observations
+          && Compaction_settings.worth_masking
+               settings
                t.model
                ~input_tokens:tokens
                ~overflowed:false
@@ -2463,17 +2495,18 @@ and auto_compact t =
               (Masked { masked = plan.masked; tokens_saved = plan.tokens_saved }));
          tokens - plan.tokens_saved)
   in
-  if Compaction.should_compact t.model ~input_tokens:tokens
+  if should_compact tokens
   then (
+    let model = summary_model t in
     match
       Compaction.compact
         ~env:t.env
         ~provider:t.provider
-        ~model:t.model
+        ~model
         ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
         t.session
     with
-    | Ok outcome -> compacted t outcome
+    | Ok outcome -> compacted t ~model outcome
     | Error e ->
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
@@ -2942,18 +2975,19 @@ let set_thinking t thinking =
 let compact ?instructions t =
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
-  else
+  else (
+    let model = summary_model t in
     Compaction.compact
       ~env:t.env
       ~provider:t.provider
-      ~model:t.model
+      ~model
       ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
       ?instructions
       t.session
     |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
-      compacted t outcome;
+      compacted t ~model outcome;
       state_changed t;
-      outcome.summary)
+      outcome.summary))
 ;;
 
 (* ---- /diff, /review, /init ------------------------------------------ *)

@@ -109,6 +109,7 @@ let%expect_test "background guidance follows the tools" =
     - Be concise. Explain non-trivial decisions briefly. No filler.
     - Ask before destructive or irreversible actions.
     - You are the orchestrator: for substantial work (implementing a feature, a multi-file change, a long investigation), spawn subagents with self-contained tasks rather than doing it all yourself, and run independent tasks in parallel. Keep your own context for planning, coordinating, reviewing their reports and talking to the user; do small, quick things directly.
+    - Delegate wide exploration (searching a large codebase, reading many files, long investigations) to subagents too, asking for a concise report: only the report enters your context, which stays small and sharp.
 
     Background work: never block on it.
     - Commands that may take long (builds, test suites, installs, image builds, deployments) or that keep running (servers, watchers) go in the background: bash with background: true. Stop servers with job_kill when done.

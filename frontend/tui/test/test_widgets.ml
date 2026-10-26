@@ -374,7 +374,7 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> mode model scoped-models import permissions
+    "mo" -> mode model scoped-models import compaction permissions
     "lo" -> login logout clone
     "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions
     "sw" -> switch
@@ -709,6 +709,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
+    /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /trim [undo|show|hide]             drop everything before one of your messages from the model's context: pick the message (newest first, with what it frees), confirm; undo brings the latest trim back, show/hide unfolds the trimmed messages
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
     /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
@@ -2242,7 +2243,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=5
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=6
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1

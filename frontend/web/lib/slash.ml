@@ -26,6 +26,7 @@ module Argument = struct
     | Resume
     | Snippet
     | Remind
+    | Compaction
     | Pr
     | Worktree
     | Review
@@ -123,6 +124,15 @@ let every =
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
+  ; c
+      ~argument:Compaction
+      ~args:"[at|model|mask ...]"
+      "compaction"
+      "show when conversations are compacted and what summarises them; at \
+       TOKENS|off: also once the context exceeds TOKENS, not only at 80% of \
+       the window; model MODEL|off: the model that writes the summaries (off: \
+       the session's); mask on|off: replace old tool outputs with placeholders \
+       first"
   ; c
       ~argument:Path
       ~args:"[path]"

@@ -274,6 +274,21 @@ let unknown_start_model t ~home =
        ])
 ;;
 
+let unknown_compaction_model t ~home =
+  match Config.load ~home with
+  | Ok { compaction_model = Some name; _ } ->
+    (match resolve t name with
+     | Ok _ -> []
+     | Error e ->
+       [ sprintf
+           "compaction_model in %s is ignored, so each conversation's own \
+            model summarises it (/compaction model MODEL sets another): %s"
+           (Config.path ~home)
+           (Error.to_string_hum e)
+       ])
+  | Ok _ | Error _ -> []
+;;
+
 let reload ?listed t =
   match t.source with
   | None -> ()
@@ -298,7 +313,11 @@ let reload ?listed t =
     List.iter changed ~f:(fun p -> Hashtbl.remove t.listings p.name);
     Option.iter listed ~f:(fun (name, models) ->
       if Option.is_some (find_provider t name) then set_listed t name models);
-    let problems = problems @ unknown_start_model t ~home:source.home in
+    let problems =
+      problems
+      @ unknown_start_model t ~home:source.home
+      @ unknown_compaction_model t ~home:source.home
+    in
     let new_problems =
       List.filter problems ~f:(fun p ->
         not (List.mem t.config_problems p ~equal:String.equal))
