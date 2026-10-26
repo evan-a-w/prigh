@@ -196,9 +196,7 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
-    | Forge_status
-    | Get_review
+    | Delete_archived | Forge_status | Get_review
     | Review_submit { root = None } -> []
     | Review_submit { root = Some root } -> [ "root", Json.str root ]
     | Review_comment { root; path; range; anchor; text } ->

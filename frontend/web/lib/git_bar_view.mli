@@ -14,7 +14,4 @@ val tick
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
 
-val commit_box
-  :  App.Model.t
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t
+val commit_box : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

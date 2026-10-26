@@ -325,8 +325,8 @@ let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
         ~value:d.branch
         ~placeholder:"feature/name, or the task to name it from"
         ~note:
-          "A new branch, or an existing one to check out (✦ names one from \
-           the task typed here)"
+          "A new branch, or an existing one to check out (✦ names one from the \
+           task typed here)"
     ; field
         Base
         ~label:"Base"

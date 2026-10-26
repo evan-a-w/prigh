@@ -49,7 +49,8 @@ module Reply : sig
   type t =
     | Status
     | Staged
-    | Staged_to_draft (** the ticked files staged, so their diff is drafted from *)
+    | Staged_to_draft
+    (** the ticked files staged, so their diff is drafted from *)
     | Committed
     | Pushed
   [@@deriving sexp_of, equal]

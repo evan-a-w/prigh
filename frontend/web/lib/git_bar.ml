@@ -83,13 +83,20 @@ module Files = struct
   type t = (string * bool) list
 end
 
-let status_rpc t = Out.Rpc { method_ = Git_status { dir = t.dir }; reply = Status }
+let status_rpc t =
+  Out.Rpc { method_ = Git_status { dir = t.dir }; reply = Status }
+;;
 
 let watch t ~dir =
   let t =
     if Option.equal String.equal t.dir dir && Option.is_some t.status
     then t
-    else { empty with dir; message = (if Option.equal String.equal t.dir dir then t.message else "") }
+    else
+      { empty with
+        dir
+      ; message =
+          (if Option.equal String.equal t.dir dir then t.message else "")
+      }
   in
   t, [ status_rpc t ]
 ;;
@@ -128,9 +135,7 @@ let to_commit t ~files =
   staged + List.length (pending t ~files)
 ;;
 
-let on_branch t =
-  Option.exists t.status ~f:(fun s -> Option.is_some s.branch)
-;;
+let on_branch t = Option.exists t.status ~f:(fun s -> Option.is_some s.branch)
 
 let rpc t method_ reply ~busy =
   ( { t with busy = Some busy; failure = None; notice = None }
@@ -161,7 +166,10 @@ let update t ~files (action : Action.t) =
          ~busy:Staging
      | Some _, Checked -> { t with excluded = Set.add t.excluded path }, []
      | Some f, (Partly | Unchecked) ->
-       stage { t with excluded = Set.remove t.excluded path } [ f.path ] ~reply:Staged)
+       stage
+         { t with excluded = Set.remove t.excluded path }
+         [ f.path ]
+         ~reply:Staged)
   | Stage_approved ->
     let paths =
       List.filter_map files ~f:(fun (path, approved) ->
@@ -209,7 +217,8 @@ let reply t (reply : Reply.t) result =
   let decode f json ~ok =
     match f json with
     | Ok v -> ok v
-    | Error e -> { t with busy = None; failure = Some (Error.to_string_hum e) }, []
+    | Error e ->
+      { t with busy = None; failure = Some (Error.to_string_hum e) }, []
   in
   match reply, result with
   | Status, Error e -> { t with error = Some e; status = None }, []
@@ -238,7 +247,8 @@ let reply t (reply : Reply.t) result =
                  "Committed %s %s%s"
                  (short c.sha)
                  c.subject
-                 (Option.value_map c.status.branch ~default:"" ~f:(fun b -> " on " ^ b)))
+                 (Option.value_map c.status.branch ~default:"" ~f:(fun b ->
+                    " on " ^ b)))
         }
       , [ Out.Changed ] ))
   | Pushed, Ok json ->

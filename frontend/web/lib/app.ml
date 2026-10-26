@@ -1299,7 +1299,9 @@ let new_pr ?back ?dir (m : Model.t) ~title =
   let m, cmds =
     open_dialog m (Pr_create (Pr_create.create ?back ?dir ~title ()))
   in
-  m, cmds @ [ call (Pr_defaults { dir }) ~tag:(Forge (Defaults (session_id m))) ]
+  ( m
+  , cmds @ [ call (Pr_defaults { dir }) ~tag:(Forge (Defaults (session_id m))) ]
+  )
 ;;
 
 let checkout_pr (m : Model.t) number =
@@ -4728,7 +4730,10 @@ let start_generate (m : Model.t) (target : Generate.Target.t) =
        let m =
          match target, m.dialog with
          | Pr, Some (Pr_create f) ->
-           { m with generate; dialog = Some (Pr_create { f with error = None }) }
+           { m with
+             generate
+           ; dialog = Some (Pr_create { f with error = None })
+           }
          | Commit_message, _ ->
            { m with generate; git_bar = { m.git_bar with failure = None } }
          | _ -> { m with generate }
@@ -5736,7 +5741,8 @@ let main_event (m : Model.t) (event : Event.t) =
   | Generate_delta { gen_id; delta } ->
     (match Generate.delta m.generate ~id:gen_id delta with
      | generate, Some (target, text) ->
-       set_field_texts { m with generate } target (streamed_texts target text), []
+       ( set_field_texts { m with generate } target (streamed_texts target text)
+       , [] )
      | generate, None -> { m with generate }, [])
   | _ -> m, []
 ;;
@@ -6562,14 +6568,16 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (New_worktree _), Some { target = Worktree_branch; _ }
      | Some (Rename _), Some { target = Session_title; _ } -> stop_generate m
      | _ ->
-     match m.dialog with
-     | Some (Login { failed = None; provider; _ }) ->
-       let m, cmds = close_dialog { m with cancelled_login = Some provider } in
-       m, cmds @ [ rpc "auth_cancel" [] ]
-     | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
-       open_picker m (Pulls l)
-     | Some _ -> close_dialog m
-     | None -> m, [])
+       (match m.dialog with
+        | Some (Login { failed = None; provider; _ }) ->
+          let m, cmds =
+            close_dialog { m with cancelled_login = Some provider }
+          in
+          m, cmds @ [ rpc "auth_cancel" [] ]
+        | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
+          open_picker m (Pulls l)
+        | Some _ -> close_dialog m
+        | None -> m, []))
   | Login_choose i ->
     (match m.dialog with
      | Some (Login flow) ->
