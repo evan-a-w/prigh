@@ -221,7 +221,10 @@ let%expect_test
       (worktrees_dir ())
       (archive_after_days 7)
       (notify             bell)
-      (snippets ())))
+      (snippets ())
+      (compact_at_tokens 200000)
+      (compaction_model ())
+      (mask_observations true)))
     |}]
 ;;
 

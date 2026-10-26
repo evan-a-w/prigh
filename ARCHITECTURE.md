@@ -879,14 +879,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   always gets a result (a `[cancelled]` one if needed) so the context stays
   valid. Before each turn after the first, the latest response's input
   and output tokens plus an estimate of what was appended since decide the
-  two tiers of compaction. First, with `Config.mask_observations`, when
-  `Observation_mask.worth_masking` says so (see `Observation_mask`), the
+  two tiers of compaction, both set by `Config.compaction`
+  (`Compaction_settings`). First, with its `mask_observations`, when
+  `Compaction_settings.worth_masking` says so (see `Observation_mask`), the
   context is masked through the `mask` hook (default:
   `Observation_mask.apply`, in memory; the agent's appends a `Masked`
   entry to its session and returns `Session.messages`), the estimate drops
   by what it saved, and `Masked {masked; tokens_saved}` is emitted. Then,
-  when what is left still crosses `Compaction.should_compact`, the context
-  is compacted through the `compact` hook (default:
+  when what is left still crosses `Compaction_settings.should_compact`
+  (its `threshold`: 80% of the window, or `compact_at_tokens` if lower),
+  the context is compacted, summarised by `summary_model`, through the
+  `compact` hook (default:
   `Compaction.compact_messages`, in memory; the agent's compacts its
   session) and the run goes on with the result; a failed compaction is not
   retried within the run. A request rejected as too long
@@ -916,7 +919,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   still matches (the frontend's view may be stale), `shell` = runs
   a `!cmd` through the bash machinery), automatic compaction after a run
   (masking first, as between turns, then summarising at 80% of the context
-  window), and a subscriber list receiving `Agent.Event.t` (`Loop of
+  window or `compact_at_tokens` if lower, summarised by
+  `compaction_model`: `Compaction_settings`, resolved per run; the
+  summary model is used only when its window holds what is summarised,
+  and its cost is counted at its price), and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
   Queue_update | Subagent_queues`, the latter, `agent_queues` on the wire,
   listing the subagents with queued messages after every change; `get_pending`
@@ -1053,7 +1059,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   numbers the repeats and reports, once, the ones that used theirs up (a
   `Notice`). Both are user messages with `Source.Reminder`, carrying the
   plan mode note like goal messages. The frontends parse `/remind` with
-  the shared `Remind_command` (`frontend/ui`).
+  the shared `Remind_command` (`frontend/ui`), and `/compaction` (the
+  config's `compact_at_tokens`, `compaction_model` and
+  `mask_observations`) with
+  `Compaction_command`.
 - `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
   30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
@@ -1063,8 +1072,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
-  validated by `Snippet`), loaded at agent
+  300, 0 = never), `generate_model`, `mask_observations` (default true),
+  `compact_at_tokens` (default 200000,
+  0 = 80% of the window only), `compaction_model` and `snippets`, the
+  frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones;
   a leftover `reminders` says reminders are per session now),
@@ -1073,7 +1084,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   defaults; `archive_after_days` (default 7, 0 = never) is when an
   inactive session counts as archived (`Session.Summary.is_archived`).
   `set_config` merges the given fields over the current ones and
-  resolves `fallback_models` like `set_model` (stored as keys). A new
+  resolves `fallback_models`, `generate_model` and `compaction_model`
+  like `set_model` (stored as keys; an unknown name is refused with the
+  closest matches). A new
   session starts in `default_cwd` (on the backend host) and on
   `default_model`, else the first of `fallback_models`.
 - `User_prefs` — a user's preferences and data that frontends keep on the
@@ -1242,8 +1255,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   request: the caller's `Compaction.Prompt` (system prompt, tools,
   thinking and cache key: `Agent_loop.Config.compaction_prompt`) and a
   final user message asking for the summary and no tool calls, so the
-  provider's prompt cache serves the conversation. When that would not
-  fit the window (estimated), the compaction follows an overflow
+  provider's prompt cache serves the conversation. A `compaction_model`
+  other than the agent's gets the same request (thinking off if it does
+  not support it), which its cache cannot serve. When that would not
+  fit the summariser's window (estimated), the compaction follows an overflow
   (`overflowed`), or the provider rejects it as too long (or answers
   without text), a transcript (`render_transcript`, tool output cut,
   thinking dropped, its middle cut if it would not fit) goes in a request
@@ -1271,15 +1286,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   all) with one, keeping the JSON valid; errors and small results stay.
   `plan` masks everything before the last 10 assistant messages
   (`keep_turns`), saying where it ends (`through`) and the tokens it saves;
-  `worth_masking` takes it after an overflow (anything that helps) or when
-  the context is over half the window and it saves a tenth of the window,
-  over the summarisation threshold too: masking rewrites the prompt's
+  `Compaction_settings.worth_masking` takes it after an overflow (anything
+  that helps) or when the context is over 5/8 of the compaction threshold
+  and it saves 1/8 of it (half and a tenth of the window when compacting at
+  80%; relative to the threshold so that a `compact_at_tokens` cap moves
+  masking with it), over the threshold too: masking rewrites the prompt's
   prefix, and so the provider's cache, so it is done in batches, not every
   turn (a smaller floor past the threshold re-masked each turn's output as
   it aged whenever no summary followed: nothing to summarise, or it
-  failed).
-  `mask_observations` in `config.json` (default true) turns it off, also
-  for subagents (`Tool_subagent.create ~mask_observations`).
+  failed). `mask_observations` in `config.json` (default true;
+  `/compaction mask on|off`) turns it off, also for subagents
+  (`Tool_subagent.create ~compaction`, the session's
+  `Compaction_settings`).
 - `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
   `git diff` against `HEAD` (or a base's merge base) plus untracked files
   as new ones, optionally one path, cut at 1 MB, in the session cwd's

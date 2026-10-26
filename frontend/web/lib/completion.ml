@@ -219,8 +219,14 @@ let argument_items
       ; "new", "new [title]: create one from this branch"
       ; "checkout", "checkout N: its branch in a worktree"
       ]
-  | Models | Directory | Backend_directory | Path | Remind | Worktree | Review
-    -> []
+  | Models
+  | Directory
+  | Backend_directory
+  | Path
+  | Remind
+  | Compaction
+  | Worktree
+  | Review -> []
 ;;
 
 let word_at text ~cursor =
@@ -342,10 +348,12 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | (Remind | Worktree | Review) as kind ->
+             | (Remind | Compaction | Worktree | Review) as kind ->
                let rest = String.lstrip rest in
                Option.bind
                  (match kind with
+                  | Compaction ->
+                    Prigh_ui.Compaction_command.complete ~models rest
                   | Worktree ->
                     Prigh_ui.Worktree_command.complete ~worktrees rest
                     |> Option.map ~f:(fun (offset, candidates) ->

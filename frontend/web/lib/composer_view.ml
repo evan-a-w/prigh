@@ -29,6 +29,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Budget -> "Budget"
       | Argument Goal -> "Goal"
       | Argument Remind -> "Reminders"
+      | Argument Compaction -> "Compaction"
       | Argument Worktree -> "Worktrees"
       | Argument Review -> "Review"
       | Argument Resume -> "Automatic resume"
