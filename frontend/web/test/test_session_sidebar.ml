@@ -121,13 +121,13 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
   list h;
   [%expect
     {|
-    (Main work 2m ago prigh ⎇ main) (3) (More (right-click, Shift+F10))
+    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10))
     (feat/login) (agent/fix-the-parser subagent) (pr-7 #7)
-    (Login form 20m ago prigh ⎇ feat/login) (1) (More (right-click, Shift+F10))
+    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10))
     (feat/login here)
-    (Landing page 2h ago site ⎇ trunk) (More (right-click, Shift+F10))
+    (Landing page 2h ago site trunk) (More (right-click, Shift+F10))
     (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10))
-    (New hero 3d ago site ⎇ redesign) (1) (More (right-click, Shift+F10))
+    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10))
     (redesign here)
     (Archived 1)
     |}];
@@ -201,12 +201,12 @@ let%expect_test "folding a session's worktrees: a preference, by session" =
     (Cache_prefs (((key web.sidebar-folded) (value ((s1))))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-folded (s1))))))
      (tag Show_error))
-    (Main work 2m ago prigh ⎇ main) (3) (More (right-click, Shift+F10))
-    (Login form 20m ago prigh ⎇ feat/login) (1) (More (right-click, Shift+F10))
+    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10))
+    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10))
     (feat/login here)
-    (Landing page 2h ago site ⎇ trunk) (More (right-click, Shift+F10))
+    (Landing page 2h ago site trunk) (More (right-click, Shift+F10))
     (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10))
-    (New hero 3d ago site ⎇ redesign) (1) (More (right-click, Shift+F10))
+    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10))
     (redesign here)
     (Archived 1)
     |}];
@@ -252,7 +252,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
      ((target (Session /sessions/s3.jsonl)) (anchor (Point (x 40) (y 200)))))
     (Focus dialog)
     (Place_menu (Point (x 40) (y 200)))
-    Landing page site ⎇ trunk
+    Landing page site trunk
     Open Enter
     Open in new tab
     Rename… /name
@@ -274,7 +274,13 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
          class="context-menu menu-surface">
       <div class="context-menu-head">
         <span class="context-menu-title"> Landing page </span>
-        <span class="context-menu-sub"> site ⎇ trunk </span>
+        <span title="~/src/site" class="context-menu-sub session-place">
+          <span class="session-repo"> site </span>
+          <span class="session-branch">
+            <icon class="branch"> </icon>
+            trunk
+          </span>
+        </span>
       </div>
       <div class="menu-section">
         <div role="menuitem" data-item="open" class="menu-item selected" @on_click>
@@ -370,7 +376,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
     (Focus dialog)
     (Place_menu (Element session-s1))
-    Main work prigh ⎇ main
+    Main work prigh main
     Open in new tab
     Rename… /name
     Fork… /fork
@@ -622,7 +628,7 @@ let%expect_test "a worktree's menu and its items" =
       (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
-    ⎇ feat/login in Main work
+    feat/login in Main work
     Switch session here /worktree open feat/login
     New session here /worktree open -n feat/login
     Review changes /review feat/login
@@ -795,7 +801,7 @@ let%expect_test "removing a worktree from its menu, or Delete on its row" =
       (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-pr-7))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-pr-7))
-    ⎇ pr-7 in Main work
+    pr-7 in Main work
     Switch session here /worktree open pr-7
     New session here /worktree open -n pr-7
     Review changes /review pr-7

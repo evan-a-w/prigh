@@ -169,6 +169,29 @@ let worktree_row
     ]
 ;;
 
+let place ?cls (s : Session_summary.t) ~cwd =
+  let class_ base = Attr.classes (base :: Option.to_list cls) in
+  match s.repo with
+  | Some r ->
+    Node.span
+      ~attrs:
+        [ class_ "session-place"
+        ; Attr.title (home_relative cwd)
+        ]
+      [ span ~cls:"session-repo" (Session_worktrees.repo_name r)
+      ; (match r.branch with
+         | Some branch ->
+           Node.span
+             ~attrs:[ Attr.class_ "session-branch" ]
+             [ icon ~cls:"place-icon" Branch; Node.text branch ]
+         | None -> Node.none)
+      ]
+  | None ->
+    Node.span
+      ~attrs:[ class_ "session-cwd"; Attr.title cwd ]
+      [ Node.text (home_relative cwd) ]
+;;
+
 (* What a row shows besides its session: rebuilt only when one changes
    (the list is drawn again at every event otherwise). *)
 module Row = struct
@@ -180,7 +203,6 @@ module Row = struct
     ; marked : bool
     ; loading : bool
     ; age : string
-    ; where : string (** its repository and branch, else its directory *)
     ; cwd : string
     ; worktrees : Session_worktrees.Node.t list
     ; folded : bool (** its worktrees *)
@@ -199,7 +221,6 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; marked
       ; loading
       ; age
-      ; where
       ; cwd
       ; worktrees
       ; folded
@@ -320,12 +341,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                 ; div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
-                    ; (if String.is_empty where
-                       then Node.none
-                       else
-                         Node.span
-                           ~attrs:[ Attr.class_ "session-cwd"; Attr.title cwd ]
-                           [ Node.text where ])
+                    ; place s ~cwd
                     ; (if selecting
                        then
                          span
@@ -365,11 +381,6 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     | Some state when selected -> state.cwd
     | _ -> s.cwd
   in
-  let where =
-    match Session_worktrees.place s with
-    | Some place -> place
-    | None -> home_relative cwd
-  in
   let deps =
     { Row.selected
     ; running = s.running || (selected && App.Model.active m)
@@ -381,7 +392,6 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
          | Some (Switching path) -> String.equal path s.path
          | Some Starting | None -> false)
     ; age = age m s
-    ; where
     ; cwd
     ; worktrees =
         Session_worktrees.of_session
