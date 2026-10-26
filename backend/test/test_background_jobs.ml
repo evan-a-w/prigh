@@ -757,9 +757,13 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
     h
     "shell"
     {|{"command": "sleep 30 & echo $! > sleep.pid; echo sleeping; wait", "background": true}|};
+  (* Its output comes from the host: killed before it arrives, the report
+     would not have it. *)
   ignore
     (eventually t (fun () ->
-       Sys_unix.file_exists_exn (Filename.concat host_dir "sleep.pid"))
+       match Agent.job_output agent ~job_id:"j2" ~lines:10 with
+       | Ok text -> String.is_substring text ~substring:"\nsleeping"
+       | Error _ -> false)
      : bool);
   rpc t h "kill_job" {|{"job_id": "j2"}|};
   rpc t h "kill_job" {|{"job_id": "j9"}|};
