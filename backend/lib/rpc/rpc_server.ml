@@ -71,6 +71,7 @@ let methods =
   ; "rewind"
   ; "session_stats"
   ; "set_cwd"
+  ; "worktree_back"
   ; "list_paths"
   ; "list_dirs"
   ; "get_config"
@@ -229,6 +230,7 @@ module Listed = struct
     ; description : string option
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
+    ; home : Session.Home.t option
     }
   [@@deriving equal]
 
@@ -241,6 +243,7 @@ module Listed = struct
     ; description = Session.description session
     ; repo = Session.repo session
     ; worktrees = Session.worktrees session
+    ; home = Session.home session
     }
   ;;
 end
@@ -2343,9 +2346,15 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
       Or_error.bind (if_missing_param params) ~f:(fun if_missing ->
-        Or_error.map
-          (Agent.set_cwd agent ~path ~if_missing)
-          ~f:Dir_change.Outcome.to_json))
+        Or_error.bind
+          (bool_param params "worktree" ~default:false)
+          ~f:(fun worktree ->
+            Or_error.map
+              (Agent.set_cwd agent ~path ~if_missing ~worktree)
+              ~f:Dir_change.Outcome.to_json)))
+  | "worktree_back" ->
+    Or_error.bind (bool_param params "main" ~default:false) ~f:(fun main ->
+      Or_error.map (Agent.switch_back agent ~main) ~f:Dir_change.Outcome.to_json)
   | "list_paths" ->
     let prefix =
       match param params "prefix" with

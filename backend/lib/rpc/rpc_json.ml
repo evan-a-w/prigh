@@ -368,6 +368,28 @@ let repo (r : Git_location.t) =
     ]
 ;;
 
+let session_home (h : Session.Home.t) =
+  `Object
+    [ "cwd", str h.cwd
+    ; ( "host"
+      , Option.value_map
+          h.host
+          ~default:`Null
+          ~f:(fun (host : Session.Host.t) ->
+            `Object [ "id", str host.id; "name", str host.name ]) )
+    ; "repo", Option.value_map h.repo ~default:`Null ~f:repo
+    ]
+;;
+
+(* Only while set: most sessions never have one. *)
+let home = Option.value_map ~default:[] ~f:(fun h -> [ "home", session_home h ])
+
+let state (s : Agent.State.t) =
+  match state s with
+  | `Object fields -> `Object (fields @ home s.home)
+  | json -> json
+;;
+
 let session_summary (s : Session.Summary.t) =
   [ "id", str s.id
   ; "path", str s.path
@@ -387,6 +409,7 @@ let session_summary (s : Session.Summary.t) =
   @ [ "worktrees", `Array (List.map s.worktrees ~f:session_worktree)
     ; "bytes", int s.bytes
     ]
+  @ home s.home
   |> fun fields -> `Object fields
 ;;
 
@@ -445,6 +468,7 @@ let entry (e : Session.Entry.t) =
     | Worktree w -> [ "kind", str "worktree"; "path", str w.path ]
     | Worktree_removed { path } ->
       [ "kind", str "worktree_removed"; "path", str path ]
+    | Home _ -> [ "kind", str "home" ]
   in
   `Object
     ([ "id", str e.id

@@ -171,6 +171,10 @@ module Reply_tag : sig
     (** [create_worktree]: the session moves there *)
     | Worktree_entered of string
     (** [set_cwd] into a worktree: the notice shown once there *)
+    | Worktree_went_back of
+        { command : string (** as typed *)
+        ; home : Session_home.t option
+        } (** [worktree_back], from that home *)
     | Worktree_session of
         { path : string
         ; notice : string

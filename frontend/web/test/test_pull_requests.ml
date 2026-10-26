@@ -336,7 +336,7 @@ let%expect_test "/pr checkout N from the editor offers to work there" =
     (Focus dialog)
     Dialog_accept
     (Focus editor)
-    (Rpc (method_ set_cwd) (params ((path /work-wt/pr-24) (if_missing ask)))
+    (Rpc (method_ set_cwd) (params ((path /work-wt/pr-24) (worktree true)))
      (tag (Dir_changed Cwd)))
     |}];
   H.type_ h "/pr checkout 7";
