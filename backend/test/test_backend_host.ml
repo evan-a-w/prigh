@@ -524,3 +524,68 @@ let%expect_test "backend host disabled: no access to the backend's other files" 
     {"type":"response","id":"r","ok":true,"result":{"path":"/home/me/proj/out.md"}}
     |}]
 ;;
+
+(* prigh-web opened by [prigh web] is no tool host, but names the one on its
+   machine: its sessions move there while that host is connected (whichever
+   connects first), and new ones start there; without the host they stay
+   on the backend. *)
+let%expect_test "hello's prefer_host: a page's sessions run on its machine" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let server = make_server t ~sw ~backend_host:true [] in
+  let hello client params =
+    ignore
+      (Rpc_server.handle
+         server
+         client
+         (Json.of_string
+            (sprintf {|{"id": 1, "method": "hello", "params": %s}|} params))
+       : Json.t)
+  in
+  let new_session client =
+    ignore
+      (Rpc_server.handle
+         server
+         client
+         (Json.of_string {|{"id": 2, "method": "new_session", "params": {}}|})
+       : Json.t)
+  in
+  let page = Rpc_server.connect server ~send:ignore in
+  hello page {|{"name": "prigh-web", "prefer_host": "host-laptop"}|};
+  let agent () = Rpc_server.agent_of_client server page in
+  show_state t (agent ());
+  [%expect
+    {| ((active_host backend) (cwd $DIR) (git_branch ()) (hosts (backend))) |}];
+  let laptop = Rpc_server.connect server ~send:ignore in
+  hello
+    laptop
+    {|{"name": "laptop", "tools": true, "host_id": "host-laptop", "cwd": "/home/me/proj"}|};
+  show_state t (agent ());
+  new_session page;
+  show_state t (agent ());
+  [%expect
+    {|
+    ((active_host host-laptop) (cwd /home/me/proj) (git_branch ())
+     (hosts (backend host-laptop)))
+    ((active_host host-laptop) (cwd /home/me/proj) (git_branch ())
+     (hosts (backend host-laptop)))
+    |}];
+  (* A second page, once the host is there; one naming no host (or one not
+     connected) stays on the backend. *)
+  let other = Rpc_server.connect server ~send:ignore in
+  hello other {|{"name": "prigh-web", "prefer_host": "host-laptop"}|};
+  show_state t (Rpc_server.agent_of_client server other);
+  let plain = Rpc_server.connect server ~send:ignore in
+  hello plain {|{"name": "prigh-web", "prefer_host": "host-elsewhere"}|};
+  new_session plain;
+  show_state t (Rpc_server.agent_of_client server plain);
+  [%expect
+    {|
+    ((active_host host-laptop) (cwd /home/me/proj) (git_branch ())
+     (hosts (backend host-laptop)))
+    ((active_host backend) (cwd $DIR) (git_branch ())
+     (hosts (backend host-laptop)))
+    |}]
+;;

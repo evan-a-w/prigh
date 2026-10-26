@@ -25,6 +25,13 @@ module Error : sig
   val to_string : t -> string
 end
 
+(** A TLS client over [flow], checking the server's certificate against the
+    system's CAs and [host] (when a domain name). *)
+val tls_client
+  :  host:string
+  -> [> Eio.Flow.two_way_ty | Eio.Resource.close_ty ] Eio.Resource.t
+  -> Tls_eio.t
+
 (** Adds the scheme's port when the URI has none, so that connecting never
     needs a service-name lookup. *)
 val with_default_port : Uri.t -> Uri.t

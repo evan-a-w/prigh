@@ -11,7 +11,7 @@ tools of MCP servers.
 ```
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
  browser ─── prigh-web (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ┘  (`-web`: Web_server serves the page and /ws)
-                │                                                      │
+                │   (or `prigh web`: the site served locally, /ws relayed)  │
                 └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
                                                                        ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
                                                                        │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
@@ -98,7 +98,10 @@ A brand-new session made by or for a client (`new_session`, `fork`,
 host, a saved session that never had a host when switched to) starts on a
 host chosen from that client's context (`Rpc_server.start_location`), never
 on whichever host connected first: on the client itself when it is a tool
-host, in the cwd the client's current session had there (`new_session`,
+host (or on the connected tool host its `hello`'s `prefer_host` names: the
+page `prigh web` opens names the tool host it runs; attaching such a client
+to a session prefers that host too, as a tool host client's attach does,
+and so does that host connecting after the client), in the cwd the client's current session had there (`new_session`,
 `fork`, `clone`) or the client's own cwd (or the cwd an imported or loaded
 session recorded there); otherwise where the client's current session is,
 in its cwd, also while that host is away (the new session waits for it like
@@ -1419,6 +1422,34 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   sites (zopfli, brotli); local dune builds stay uncompressed. Upgraded sockets set `TCP_NODELAY`, so that a
   large reply's last segment does not wait for a delayed ACK. The token check is the same `hello` check as
   for TCP; the static files are public.
+- `Backend_address` / `Backend_socket` — a `-connect` target: `HOST:PORT`
+  (JSON lines over TCP) or a prigh-web URL (`ws`/`wss`/`http`/`https`,
+  with the path the site is under, for a backend behind a TLS-terminating
+  proxy: the RPC goes over its `/ws`, `Websocket.connect` being the client
+  side of the handshake, over `Http_client.tls_client` for `wss`).
+  `Tool_host.connect` (so `prigh tool-host -connect`) and `prigh web` use
+  them.
+- `Web_connect` / `Web_proxy` / `Signin_handoff` — `prigh web`: prigh-web
+  on this machine for a backend elsewhere, with nothing of a backend
+  running locally. `Web_connect.Check` says `hello` once to tell an
+  unreachable server, a URL with no prigh-web and refused credentials apart
+  (each with what to do next) before anything is served; then
+  `Web_server.listen` serves the site (`Static_site`, as `serve -web`), with
+  its `routes` hook taking `/signin-handoff` and the file paths:
+  `Web_proxy` relays `/ws` line by line to a `Backend_socket` (so either of
+  the backend's ports works for `HOST:PORT`), `/terminal` message by
+  message to the remote's WebSocket, and file transfers byte for byte
+  (rewritten to the remote's prefix and `Host`, `Connection: close`), so
+  the page only ever talks to its own origin. The page is signed in by a
+  one-time code in its URL's fragment (never in a request line):
+  `Signin_handoff` answers the first `POST` of it with the token, user and
+  the local tool host's id, which the page sends as `hello`'s
+  `prefer_host`. A `Tool_host.connect` fiber (unless `-tools remote`) is
+  the machine's tool host, by `~/.prigh/host-id`.
+- `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
+  (which has the same module in `client/unix/`): `prigh web` resolves and
+  saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
+  passed, and only `HOST:PORT` addresses (the TUI connects to no URLs).
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -1482,7 +1513,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 overrides the site), `-stdio` as well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
-killed), `tool-host` (the local tool worker), `run <prompt>`
+killed), `tool-host` (the local tool worker, or with `-connect
+HOST:PORT|URL` a tool host of its own), `web` (`-connect HOST:PORT|URL`,
+else `$PRIGH_CONNECT` or the saved connection; prigh-web for that backend,
+above; `./prigh -web` runs it when given `-connect` or `-remote`; the site
+listens on `-listen`, `$PRIGH_WEB_LISTEN` or the first free port from
+127.0.0.1:7790), `run <prompt>`
 (headless, streams to stdout; it denies confirmations and answers
 `ask_user` as unavailable, since nobody is there), `sessions`, `login <provider> [-method]`,
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
@@ -2393,7 +2429,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     that shows it, so that the editor's height, scrolling and focus never
     show a frame late), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
     `Terminal_panel` (the `/terminal` URL; whether an event is inside the
-    panel). `Web_main.run`: connects a `Ws_transport`
+    panel). `Web_main.run`: first, on a page `prigh web` opened
+    (`#signin=CODE`, `Signin_link`), drops the fragment from the URL, trades
+    the code for the credentials (`POST /signin-handoff`), activates them as
+    the account (over any sign-out or refusal noted before) and keeps the
+    local tool host's id (`prigh.prefer_host`, sent as `hello`'s
+    `prefer_host` from then on); then connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`Login`) and
     `?session=` (giving up after 10s); when the backend refuses, or the
