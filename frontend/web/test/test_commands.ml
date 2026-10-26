@@ -199,7 +199,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button, or a running subagent shown in the panel; /agents steer N TEXT)
+    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
@@ -1514,7 +1514,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Close (Alt+0))
     Loading the transcript…
     lint
-    (Steering) (Stopping…) (Show in chat) Running 30s m  1 turn
+    (Steer) (Stopping…) (Show in chat) Running 30s m  1 turn
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel a1") (max 500))) (tag Ignore))
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
