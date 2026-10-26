@@ -377,6 +377,7 @@ let%expect_test "/pr new: prefilled, edited, refused, then created" =
     New pull request
     (Close (Esc))
     feat/x into [main] evan-a-w/prigh
+    (✦ Generate title and description)
     Title
     [Add the x feature]
     Description (Markdown)
@@ -420,6 +421,7 @@ let%expect_test "/pr new: prefilled, edited, refused, then created" =
   [%expect
     {|
     feat/x into [main] evan-a-w/prigh
+    (✦ Generate title and description)
     Title
     [Add the x feature]
     Description (Markdown)

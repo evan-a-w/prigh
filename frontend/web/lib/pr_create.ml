@@ -22,10 +22,11 @@ type t =
   ; busy : bool
   ; error : string option
   ; back : Pull_requests.t option
+  ; dir : string option
   }
 [@@deriving sexp_of, equal]
 
-let create ?back ~title () =
+let create ?back ?dir ~title () =
   { defaults = None
   ; failed = None
   ; title
@@ -36,6 +37,7 @@ let create ?back ~title () =
   ; busy = false
   ; error = None
   ; back
+  ; dir
   }
 ;;
 
@@ -68,7 +70,7 @@ let request t : (Request.Method.t, string) Result.t =
     let base = String.strip t.base in
     Ok
       (Pr_create
-         { dir = None
+         { dir = t.dir
          ; title
          ; body = t.body
          ; base = (if String.is_empty base then None else Some base)

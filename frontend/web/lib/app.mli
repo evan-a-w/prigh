@@ -215,6 +215,8 @@ module Reply_tag : sig
         (it restarted before saving it): we are on another one *)
     | Forge of Forge_reply.t
     | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
+    | Generated of string (** [generate_text]: the draft's id *)
+    | Git of Git_bar.Reply.t (** the review's git bar *)
   [@@deriving sexp_of, equal]
 end
 
@@ -520,6 +522,12 @@ module Action : sig
     | Preview_accent of string
     (** a colour, while the settings' colour input is being dragged: shown,
         not saved ([Run "/accent #hex"] saves it) *)
+    | Generate of Generate.Target.t
+    (** ✦ Generate (Alt+G): the model drafts the field's text *)
+    | Generate_stop (** Stop, or Esc while it drafts: what came stays *)
+    | Generate_undo of Generate.Target.t
+    (** the field's text from before its last draft *)
+    | Git of Git_bar.Action.t (** the review page's git bar *)
   [@@deriving sexp_of]
 end
 
@@ -598,6 +606,8 @@ module Model : sig
     ; theme_preview : Theme.t option
       (** an accent being picked in the settings, shown but not saved *)
     ; prefs : Pref_sync.t
+    ; generate : Generate.t (** the field being drafted by the model *)
+    ; git_bar : Git_bar.t (** the review page's *)
     }
   [@@deriving sexp_of]
 

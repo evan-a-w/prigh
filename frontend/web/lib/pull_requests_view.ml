@@ -382,7 +382,7 @@ let toggle ~on ~label ~action ~inject =
     [ Html.check on; Node.text label ]
 ;;
 
-let create (f : Pr_create.t) ~inject =
+let create (generate : Generate.t) (f : Pr_create.t) ~inject =
   let input ~id ~label ~value ~placeholder action =
     Node.input
       ~attrs:
@@ -411,6 +411,14 @@ let create (f : Pr_create.t) ~inject =
             ~placeholder:d.base
             (fun s -> Pr_create.Action.Base s)
         ; span ~cls:"pr-repo" (Forge_repo.slug d.repo)
+        ]
+    ; div
+        ~cls:"pr-generate"
+        [ Generate_view.button
+            ~label:"Generate title and description"
+            generate
+            Pr
+            ~inject
         ]
     ; field
         ~id:"pr-title"

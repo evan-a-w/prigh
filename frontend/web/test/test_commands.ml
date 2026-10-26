@@ -80,7 +80,7 @@ let%expect_test "every command does something (none is unknown)" =
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /compact                   toast: Compacting the conversation…
     /diff                      toast: Reading the changes…
-    /review                    rpc git_diff
+    /review                    rpc git_diff, rpc git_status
     /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
@@ -197,6 +197,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
+    Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
+    Ctrl+Enter (the review's commit message) commit the ticked files (approved files come ticked; untick to leave one out)
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder

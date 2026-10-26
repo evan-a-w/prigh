@@ -1756,3 +1756,14 @@ kbd {
 @media (pointer: coarse) {
   .chip-popover > .menu-keys, .popover-shortcut { display: none; }
 }
+
+/* ---- ✦ Generate: a field's draft by the model, in its corner */
+
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.generate { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.generate .btn { padding-inline: 8px; }
+.generate-spark { color: var(--sodium); margin-right: 4px; font-size: 11px; }
+.generate-stop { color: var(--sodium); }
+.generate-field { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.generate-field > .generate { align-self: flex-end; }
+.pr-generate { display: flex; justify-content: flex-end; margin-bottom: -6px; }
