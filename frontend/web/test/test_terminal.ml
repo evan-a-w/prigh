@@ -86,7 +86,7 @@ let%expect_test
         </button>
       </div>
       <div class="terminal-body">
-        <div class="xterm-widget"> ((session s1)(host backend)(online true)(as_user())(generation 0)) </div>
+        <div class="xterm-widget"> ((session s1)(host backend)(online true)(as_user())(generation 0)(dir())) </div>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
     </section>
@@ -140,7 +140,7 @@ let%expect_test "the panel follows the session, the host and the user" =
   [%expect
     {|
     backend /work (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s1)(host backend)(online true)(as_user())(generation 0))
+    ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}];
   (* Another session: its own terminal, connecting afresh. *)
   state_event h ~session:"s2" ();
@@ -161,7 +161,7 @@ let%expect_test "the panel follows the session, the host and the user" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s2)(host backend)(online true)(as_user())(generation 0))
+    ((session s2)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}];
   status h Connected;
   (* /host moved the tools: the shell is there now. *)
@@ -174,7 +174,7 @@ let%expect_test "the panel follows the session, the host and the user" =
                             \nc7\
                             \n/work") (purpose (Sidebar 3)))))
     laptop ~/proj connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s2)(host c7)(online true)(as_user())(generation 0))
+    ((session s2)(host c7)(online true)(as_user())(generation 0)(dir()))
     |}];
   (* A superuser acting as bob gets bob's terminal. *)
   H.reply h "get_messages_page" (H.page "[]");
@@ -186,7 +186,7 @@ let%expect_test "the panel follows the session, the host and the user" =
     {|
     Scroll_to_bottom
     laptop ~/proj connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s2)(host c7)(online true)(as_user(bob))(generation 0))
+    ((session s2)(host c7)(online true)(as_user(bob))(generation 0)(dir()))
     |}];
   (* While the backend is away there is nothing to connect to. *)
   H.act h Backend_closed;
@@ -215,7 +215,7 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     laptop ~/proj connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s2)(host c7)(online true)(as_user())(generation 0))
+    ((session s2)(host c7)(online true)(as_user())(generation 0)(dir()))
     |}]
 ;;
 
@@ -231,19 +231,20 @@ let%expect_test "an exited shell, a failure and what to do next" =
      (tag Show_error))
     Focus_terminal
     c9 (offline) /work unavailable (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s1)(host c9)(online false)(as_user())(generation 0))
+    ((session s1)(host c9)(online false)(as_user())(generation 0)(dir()))
     No terminal: the tool host "c9" is not connected Pick a connected tool host with /host, or Retry once it is back.
     (Retry)
     |}];
   (* The host is back: a new attempt. *)
   state_event h ~active_host:"c7" ();
   H.text h ~selector:".terminal-body";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    ((session s1)(host c7)(online true)(as_user())(generation 0))
+    ((session s1)(host c7)(online true)(as_user())(generation 0)(dir()))
     |}];
   status h (Failed "tmux not found: install tmux or set PRIGH_TMUX");
   H.text h ~selector:".terminal-notice";
@@ -257,14 +258,14 @@ let%expect_test "an exited shell, a failure and what to do next" =
   [%expect
     {|
     Focus_terminal
-    ((session s1)(host c7)(online true)(as_user())(generation 1))
+    ((session s1)(host c7)(online true)(as_user())(generation 1)(dir()))
     |}];
   status h Exited;
   H.text h ~selector:".terminal-panel";
   [%expect
     {|
     laptop ~/proj exited (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s1)(host c7)(online true)(as_user())(generation 1))
+    ((session s1)(host c7)(online true)(as_user())(generation 1)(dir()))
     The shell exited: press a key in it, or (New shell)
     |}];
   status h Reconnecting;
@@ -291,17 +292,12 @@ let%expect_test "/terminal, the top bar's button and the height" =
   (* Already open: back to it. *)
   H.type_ h "/terminal";
   H.act h Send;
-  H.type_ h "/terminal now";
-  H.act h Send;
   H.text h ~selector:".toast";
   [%expect
     {|
     (Rpc (method_ push_pref) (params ((key history) (value /terminal) (max 500)))
      (tag Ignore))
     Focus_terminal
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/terminal now") (max 500))) (tag Ignore))
-    Usage: /terminal (Ctrl+` opens and closes it; × in its header too) (Dismiss)
     |}];
   H.show h ~selector:".terminal-toggle";
   [%expect
@@ -373,7 +369,7 @@ let%expect_test "/terminal, the top bar's button and the height" =
         </button>
       </div>
       <div class="terminal-body">
-        <div class="xterm-widget"> ((session s1)(host backend)(online true)(as_user())(generation 0)) </div>
+        <div class="xterm-widget"> ((session s1)(host backend)(online true)(as_user())(generation 0)(dir())) </div>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
     </section>
@@ -457,6 +453,43 @@ let%expect_test "after a reload the panel reopens without taking the keyboard" =
     {|
     (Apply_theme ((name Original) (accent (Preset Orange))))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    ((session s1)(host backend)(online true)(as_user())(generation 0))
+    ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
+    |}]
+;;
+
+let%expect_test "/terminal DIR: a shell of its own there, for that session" =
+  let h = H.create ~state:(state ()) ~verbose:false () in
+  let show () =
+    H.text h ~selector:".terminal-head";
+    H.text h ~selector:".terminal-body"
+  in
+  let run command =
+    H.type_ h command;
+    H.act h Send
+  in
+  H.quiet h (fun () -> run "/terminal /wt/feat-x");
+  show ();
+  [%expect
+    {|
+    backend /wt/feat-x connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
+    ((session s1)(host backend)(online true)(as_user())(generation 0)(dir(/wt/feat-x)))
+    |}];
+  (* Another session has its own shell; back in this one, the directory's. *)
+  H.quiet h (fun () -> state_event h ~session:"s2" ());
+  H.text h ~selector:".terminal-body";
+  H.quiet h (fun () -> state_event h ~session:"s1" ());
+  H.text h ~selector:".terminal-body";
+  [%expect
+    {|
+    ((session s2)(host backend)(online true)(as_user())(generation 0)(dir()))
+    ((session s1)(host backend)(online true)(as_user())(generation 0)(dir(/wt/feat-x)))
+    |}];
+  (* /terminal alone: the session's own shell again. *)
+  H.quiet h (fun () -> run "/terminal");
+  show ();
+  [%expect
+    {|
+    backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
+    ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}]
 ;;

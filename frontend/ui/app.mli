@@ -59,8 +59,20 @@ module Reply_tag : sig
     | Models_for_scoped
     | Compact_done
     | Git_diff
-    | Review_comments (** [/review]: then the diff *)
-    | Review_status of P.Review.t
+    | Review_comments of
+        { dir : string option
+        ; base : string option
+        } (** [/review [WORKTREE] [--base REV]]: then the diff *)
+    | Review_status of
+        { review : P.Review.t
+        ; dir : string option (** [None]: the session's own worktree *)
+        }
+    | Review_named of
+        { command : string
+        ; name : string
+        ; base : string option
+        ; model : string option
+        } (** [/review NAME]: [list_worktrees], to find it *)
     | Review_started
     | Abort_done
     | Notice_on_success of string

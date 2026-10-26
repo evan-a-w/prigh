@@ -1,10 +1,13 @@
-// Projects and their worktrees against real git repositories: the sidebar's
-// tree (a repository with a worktree that has uncommitted changes, one made
-// for a subagent, one made from the project's row with a session in it,
-// another repository, a plain folder), folding a project, searching, removing
-// a worktree (refused with changes, then forced; a subagent's), /worktree's
-// picker, and the tree on a phone. Run by prigh_web.sh; prints normalised
-// snapshots (the expected output is in ENGINE.expected).
+// Sessions and the worktrees that matter to them, against real git
+// repositories: a flat list of sessions, each with its repository and
+// branch, its worktrees under it (one made for a subagent, one made from the
+// session's menu, one moved into that has uncommitted changes, one shared
+// with another session), their context menus (right-click, Shift+F10, a
+// long press on a phone) and what they do (a new worktree, a new session
+// there, a terminal there, removal: refused with changes, then forced),
+// folding, searching, /worktree's picker, and the list on a phone. Run by
+// prigh_web.sh; prints normalised snapshots (the expected output is in
+// ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
@@ -54,7 +57,9 @@ const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-token", token, "-cwd", repo],
-  { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+  // The terminal's tmux server is ours, so its shell is $SHELL.
+  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" },
+    stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -105,22 +110,33 @@ const show = async (label, selector) => {
   await page.waitForTimeout(200); // its fade in
   await screenshot(label);
 };
-// The tree, a line per row: its text, indented by depth, and its state.
+// The list, a line per row: its text (worktrees indented under their
+// session) and its state.
 const tree = async (label, target = page) => {
   section(label);
   const rows = await target.locator(".sessions").evaluate(list =>
-    [...list.querySelectorAll(".project-row, .worktree-row, .worktree-origin, .session")].map(row => {
-      const owner = row.classList.contains("session") || row.classList.contains("worktree-origin")
-        ? row : row.parentElement;
-      const depth = (row.closest(".project-body") ? "│ " : "")
-        + (row.closest(".worktree") && !row.classList.contains("worktree-row") ? "│ " : "");
+    [...list.querySelectorAll(".session, .worktree")].map(row => {
+      const worktree = row.classList.contains("worktree");
       const text = row.innerText.split("\n").map(s => s.trim()).filter(s => s).join(" | ");
-      const marks = [...owner.classList].filter(c =>
-        ["here", "folded", "selected", "dirty", "agent", "running"].includes(c));
-      return `${depth}${text}${marks.length ? ` [${marks.sort().join(" ")}]` : ""}`;
+      const marks = [...row.classList].filter(c =>
+        ["here", "selected", "dirty", "agent", "running", "gone"].includes(c));
+      if (!worktree && row.parentElement.querySelector(".session-fold.folded")) marks.push("folded");
+      return `${worktree ? "│ " : ""}${text}${marks.length ? ` [${marks.sort().join(" ")}]` : ""}`;
     }));
   console.log(clean(rows.join("\n")));
   await target.waitForTimeout(200);
+  await screenshot(label, target);
+};
+// The open context menu: its heading and items.
+const menuText = async (label, target = page) => {
+  section(label);
+  const menu = target.locator(".context-menu.placed");
+  await menu.waitFor();
+  console.log(clean(await menu.evaluate(m =>
+    [m.querySelector(".context-menu-head").innerText.replace(/\n/g, " — "),
+      ...[...m.querySelectorAll(".menu-item")].map(i =>
+        `${i.classList.contains("selected") ? "▸ " : "  "}${i.innerText.split("\n").join("  ")}`)].join("\n"))));
+  await target.waitForTimeout(150); // its fade in
   await screenshot(label, target);
 };
 const toastHas = text => page.locator(".toast", { hasText: text }).first().waitFor();
@@ -137,15 +153,22 @@ const run = async command => {
   await editor().fill(command);
   await editor().press("Control+Enter");
 };
-const project = name =>
-  page.locator(".project", { has: page.locator(".project-name", { hasText: new RegExp(`^${name}$`) }) });
-const worktree = branch =>
-  page.locator(".worktree", { has: page.locator(".worktree-branch", { hasText: new RegExp(`^${branch}$`) }) });
+const session = title => page.locator(".session-item", { has: page.locator(".session-title", { hasText: title }) });
+const worktree = (branch, within = page) =>
+  within.locator(".worktree", { has: page.locator(".worktree-branch", { hasText: new RegExp(`^${branch}$`) }) });
+const choose = async item => {
+  await page.locator(`.context-menu.placed [data-item=${item}]`).click();
+  await page.waitForSelector(".context-menu", { state: "detached" });
+};
 const newSession = async cwd => {
   await page.locator(".new-session").click();
   await page.waitForFunction(() => !document.querySelector(".new-session.opening"));
   await run(`/cd ${cwd}`);
   await page.waitForFunction(d => document.body.innerText.includes(d), cwd.split("/").pop());
+};
+const closeMenu = async () => {
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".context-menu", { state: "detached" });
 };
 
 try {
@@ -158,6 +181,24 @@ try {
   await send("Tidy the docs in a worktree");
   await worktree("agent/tidy-the-docs").waitFor();
   await page.locator(".chat", { hasText: "agent/tidy-the-docs" }).first().waitFor();
+  const first = session("Tidy the docs");
+
+  // The session's menu, by right-click: New worktree… moves it there.
+  await first.locator(".session").click({ button: "right", position: { x: 60, y: 12 } });
+  await menuText("a session's menu");
+  await choose("new_worktree");
+  await page.locator(".worktree-dialog").waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("the new worktree dialog", ".worktree-dialog");
+  await page.locator("#worktree-branch").fill("feat/login");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".worktree-dialog", { state: "detached" });
+  await page.waitForFunction(() =>
+    document.querySelector(".session-item.selected .worktree.here")?.innerText.includes("feat/login"));
+  // Into another worktree of the repository, which has changes.
+  await run("/worktree open docs");
+  await page.waitForFunction(() =>
+    document.querySelector(".session-item.selected .worktree.here")?.innerText.includes("docs"));
 
   // Another repository, and a plain folder.
   await newSession(web);
@@ -165,70 +206,94 @@ try {
   await newSession(notes);
   await send("Shopping list");
 
-  // A new worktree from the project's row: a new session starts in it.
-  await project("prigh").locator(".project-row").hover();
-  await project("prigh").getByRole("button", { name: "New worktree of prigh" }).click();
-  await page.locator(".worktree-dialog").waitFor();
-  await page.waitForTimeout(300); // its fade in
-  await show("the new worktree dialog", ".worktree-dialog");
-  await page.locator("#worktree-branch").fill("feat/login");
-  await page.keyboard.press("Enter");
+  // From a worktree's menu: a new session there, which shares it.
+  await worktree("feat/login", first).click();
+  await menuText("a worktree's menu");
+  await choose("new_session_here");
   await toastHas("New session in");
-  await page.waitForSelector(".worktree-dialog", { state: "detached" });
   await send("The login form");
-  await worktree("feat/login").locator(".session").waitFor();
+  await worktree("feat/login", session("The login form")).waitFor();
 
-  // Back to the first session: its repository's other worktrees show, with
-  // their changes.
-  await page.locator(".session", { hasText: "Tidy the docs" }).first().locator(".session-open").click();
+  // Back to the first session.
+  await first.locator(".session-open").click();
   await page.locator(".session.selected", { hasText: "Tidy the docs" }).waitFor();
-  await worktree("docs").waitFor();
   await page.waitForFunction(() => document.querySelector(".worktree-changes"));
   await page.mouse.move(1000, 400);
-  await tree("the project tree");
-  // How it looks, with a project's and a worktree's actions at hand, in the
-  // dark and light themes (screenshots only).
+  await tree("sessions and their worktrees");
+  // How it looks, the menus open, in the dark and light themes
+  // (screenshots only).
   const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
   const started = await theme();
   for (const look of ["dark", "light"]) {
     await run(`/theme ${look}`);
     await page.waitForFunction(t => document.documentElement.dataset.theme === t, look);
-    await project("prigh").locator(".project-row").first().hover();
+    await first.locator(".session").hover();
     await page.waitForTimeout(200);
-    await screenshot(`the project tree, ${look}, a project's actions`);
-    await worktree("feat/login").locator(".worktree-row").hover();
+    await screenshot(`sessions, ${look}, a session pointed at`);
+    await first.locator(".session").click({ button: "right", position: { x: 80, y: 14 } });
+    await page.locator(".context-menu.placed").waitFor();
     await page.waitForTimeout(200);
-    await screenshot(`the project tree, ${look}, a worktree's actions`);
+    await screenshot(`sessions, ${look}, a session's menu`);
+    await closeMenu();
+    await worktree("agent/tidy-the-docs", first).click({ button: "right" });
+    await page.locator(".context-menu.placed").waitFor();
+    await page.waitForTimeout(200);
+    await screenshot(`sessions, ${look}, a subagent's worktree's menu`);
+    await closeMenu();
   }
   await run(`/theme ${started}`);
   await page.waitForFunction(t => document.documentElement.dataset.theme === t, started);
   await page.mouse.move(1000, 400);
 
-  // Folding a project: its count stays on its row.
-  await project("site").locator(".project-toggle").click();
-  await project("site").locator(".tree-count").waitFor();
-  await page.mouse.move(1000, 400);
-  await tree("a folded project");
-  await project("site").locator(".project-toggle").click();
+  // The keyboard: Shift+F10 on a row opens its menu, ↓ moves, Esc closes it
+  // and changes nothing.
+  await session("A landing page").locator(".session-open").focus();
+  await page.keyboard.press("Shift+F10");
+  await page.keyboard.press("ArrowDown");
+  await menuText("from the keyboard");
+  await closeMenu();
+  section("Esc changed nothing");
+  console.log(await page.locator(".session.selected .session-title").textContent());
 
-  // Search finds sessions in every project (what else matches depends on
-  // the temporary directory's name: only the match is printed).
-  await page.locator("#session-search").fill("login form");
-  const match = page.locator(".session", { hasText: "The login form" });
-  await page.locator(".session", { hasText: "Shopping list" }).waitFor({ state: "detached" }).catch(() => {});
-  await match.waitFor();
+  // A terminal in a worktree: a shell of its own there.
+  await worktree("feat/login", first).click({ button: "right" });
+  await choose("terminal");
+  // Connected, the shell drawn: closing earlier would cut the connection.
+  const shellUp = () => page.waitForFunction(() =>
+    !/connecting/.test(document.querySelector(".terminal-state")?.textContent ?? "")
+    && document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim());
+  await page.locator(".terminal-panel .terminal-cwd", { hasText: "feat-login" }).waitFor();
+  await shellUp();
+  section("a terminal in the worktree");
+  console.log(clean(await page.locator(".terminal-head .terminal-cwd").innerText()));
+  await screenshot("a terminal in the worktree");
+  await run("/terminal");
+  await page.locator(".terminal-panel .terminal-cwd", { hasText: "docs" }).waitFor();
+  await shellUp();
+  await page.keyboard.press("Control+`");
+  await page.locator(".terminal-panel").waitFor({ state: "detached" });
+
+  // Folding a session's worktrees: their count stays on its row.
+  await first.locator(".session-fold").click();
+  await first.locator(".session-fold.folded").waitFor();
+  await page.mouse.move(1000, 400);
+  await tree("folded");
+  await first.locator(".session-fold").click();
+
+  // Search finds sessions by their worktrees' branches.
+  await page.locator("#session-search").fill("tidy-the-docs");
+  await page.locator(".session", { hasText: "Shopping list" }).waitFor({ state: "detached" });
   section("searching");
-  console.log(await match.evaluate(row => [
-    row.closest(".project").querySelector(".project-name").textContent,
-    row.closest(".worktree")?.querySelector(".worktree-branch").textContent,
-    row.querySelector(".session-title").textContent,
-  ].join(" › ")));
+  console.log((await page.locator(".sessions .session-title").allTextContents()).join("\n"));
   await screenshot("searching");
   await page.locator("#session-search").fill("");
 
-  // Removing the one with changes: refused, then forced.
-  await worktree("docs").locator(".worktree-row").hover();
-  await page.getByRole("button", { name: "Remove docs" }).click();
+  // Removing the one with changes, from its menu: refused, then forced
+  // (once the session has moved out of it).
+  await run(`/cd ${repo}`);
+  await page.waitForFunction(() => !document.querySelector(".session-item.selected .worktree.here"));
+  await worktree("docs", first).click({ button: "right" });
+  await choose("remove");
   await page.locator(".remove-worktree-dialog").waitFor();
   await page.waitForTimeout(300); // its fade in
   await show("remove: asked first", ".remove-worktree-dialog");
@@ -238,9 +303,9 @@ try {
   await page.getByRole("button", { name: "Discard changes and remove" }).click();
   await toastHas("Removed the worktree docs");
   await worktree("docs").waitFor({ state: "detached" });
-  // The subagent's: its session forgets it.
-  await worktree("agent/tidy-the-docs").locator(".worktree-row").hover();
-  await page.getByRole("button", { name: "Remove agent/tidy-the-docs" }).click();
+  // The subagent's, with Delete on its row: its session forgets it.
+  await worktree("agent/tidy-the-docs", first).focus();
+  await page.keyboard.press("Delete");
   await page.locator(".remove-worktree-dialog").waitFor();
   await page.keyboard.press("Enter");
   await toastHas("Removed the worktree agent/tidy-the-docs");
@@ -248,7 +313,7 @@ try {
   await page.mouse.move(1000, 400);
   await tree("removed");
 
-  // /worktree: a picker of the repository's worktrees.
+  // /worktree: a picker of all the repository's worktrees.
   await run("/worktree");
   await page.locator(".picker-dialog").waitFor();
   await page.waitForTimeout(300); // its fade in
@@ -256,7 +321,8 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector(".picker-dialog", { state: "detached" });
 
-  // On a phone: the sidebar over the chat, every action at hand.
+  // On a phone: the sidebar over the chat; a long press opens a row's menu,
+  // a sheet at the foot of the screen.
   const phone = await (await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: engineName === "chromium",
@@ -268,9 +334,17 @@ try {
   await phone.locator("form button[type=submit]").click();
   await phone.locator(".composer textarea").waitFor();
   await phone.locator(".session-bar .toggle-sidebar").click();
-  await phone.locator(".sidebar .project").first().waitFor();
+  await phone.locator(".sidebar .worktree").first().waitFor();
   await phone.waitForTimeout(400); // the sidebar slides in
   await tree("on a phone", phone);
+  const row = phone.locator(".sidebar .worktree").first();
+  const box = await row.boundingBox();
+  await row.dispatchEvent("pointerdown", {
+    pointerType: "touch", isPrimary: true, clientX: box.x + 30, clientY: box.y + 10, bubbles: true,
+  });
+  await phone.waitForTimeout(700);
+  await row.dispatchEvent("pointerup", { pointerType: "touch", bubbles: true });
+  await menuText("a long press on a phone", phone);
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

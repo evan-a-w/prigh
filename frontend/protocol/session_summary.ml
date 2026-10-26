@@ -20,8 +20,8 @@ type t =
   ; host : string option (** the tool host its cwd is on, when recorded *)
   ; repo : Repo.t option
     (** where its cwd is in git; [None] outside a repository, or unknown *)
-  ; agent_worktrees : Agent_worktree.t list
-    (** worktrees made for its subagents, not removed yet *)
+  ; worktrees : Session_worktree.t list
+    (** those that matter to it, not removed yet, by when they first did *)
   }
 [@@deriving sexp_of, equal]
 
@@ -43,8 +43,8 @@ let of_json j =
     | None | Some `Null -> Ok None
     | Some r -> Repo.of_json r >>| Option.some
   in
-  let%map agent_worktrees =
-    Json.optional_list_field j "agent_worktrees" ~f:Agent_worktree.of_json
+  let%map worktrees =
+    Json.optional_list_field j "worktrees" ~f:Session_worktree.of_json
   in
   let opt_bool name =
     Result.ok (Json.bool_field j name) |> Option.value ~default:false
@@ -70,7 +70,7 @@ let of_json j =
   ; bytes = opt_int "bytes"
   ; host
   ; repo
-  ; agent_worktrees
+  ; worktrees
   }
 ;;
 

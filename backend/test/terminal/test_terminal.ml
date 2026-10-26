@@ -316,6 +316,30 @@ let%expect_test "reconnecting within the idle timeout reattaches" =
     |}]
 ;;
 
+let%expect_test "[dir]: a shell of its own there, beside the session's" =
+  with_fixture ~idle_timeout:60.
+  @@ fun f ->
+  let dir = Filename.concat f.sandbox.dir "wt" in
+  Core_unix.mkdir_p dir;
+  let a = Peer.connect f "token=sekrit&session=s8" in
+  let b = Peer.connect f (sprintf "token=sekrit&session=s8&dir=%s" dir) in
+  ignore (Peer.read_until f b (Peer.saw "$") : bool);
+  Peer.type_ b "pwd\r";
+  print_s [%sexp (Peer.read_until f b (Peer.saw (dir ^ "\r\n")) : bool)];
+  ignore (Peer.read_until f a (Peer.saw "$") : bool);
+  List.iter (Terminals.live f.terminals) ~f:(fun (key, _, viewers) ->
+    printf
+      "%s %d\n"
+      (String.substr_replace_all key ~pattern:f.sandbox.dir ~with_:"$DIR")
+      viewers);
+  [%expect
+    {|
+    true
+    s8 1
+    s8@$DIR/wt 1
+    |}]
+;;
+
 let%expect_test "a silent socket is dropped after the heartbeat timeout" =
   with_fixture ~heartbeat_timeout:0.3 ~idle_timeout:60.
   @@ fun f ->

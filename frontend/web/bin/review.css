@@ -377,3 +377,30 @@ mark.review-mark[data-comment] { cursor: default; }
 .app.narrow .review-controls { margin-left: 0; }
 .app.narrow .review-head { padding: 8px 10px; }
 .app.narrow .review-progress { flex: 1 1 120px; }
+
+/* ---- what is reviewed: the worktree and its base, each a picker */
+
+.review-target {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 6px 14px 6px 18px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--slate);
+  font: 12px var(--sans);
+  color: var(--muted);
+}
+.review-target-text { white-space: nowrap; }
+.review-select {
+  font: 12px var(--mono);
+  color: var(--chalk);
+  background: var(--graphite);
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+  padding: 3px 6px;
+  max-width: min(46ch, 100%);
+  text-overflow: ellipsis;
+}
+.review-select:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.review-merge-base { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }

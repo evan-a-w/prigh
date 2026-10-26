@@ -2,26 +2,43 @@ open! Core
 open! Import
 module C = Review_comment
 
+module File_key = struct
+  module T = struct
+    type t =
+      { root : string option
+      ; path : string
+      }
+    [@@deriving sexp, compare, equal]
+  end
+
+  include T
+  include Comparable.Make (T)
+end
+
 module Change = struct
   type t =
     | Comment of Review_comment.t
     | Delete of { id : string }
     | Approve of
-        { path : string
+        { root : string option [@sexp.option] [@jsonaf.option]
+        ; path : string
         ; hash : string
         }
-    | Unapprove of { path : string }
+    | Unapprove of
+        { root : string option [@sexp.option] [@jsonaf.option]
+        ; path : string
+        }
   [@@deriving sexp, jsonaf, equal]
 end
 
 type t =
   { comments : Review_comment.t list
-  ; approvals : string String.Map.t
+  ; approvals : string File_key.Map.t
   ; next_id : int
   }
 [@@deriving sexp_of, equal]
 
-let empty = { comments = []; approvals = String.Map.empty; next_id = 1 }
+let empty = { comments = []; approvals = File_key.Map.empty; next_id = 1 }
 
 let number id =
   Option.bind (String.chop_prefix id ~prefix:"c") ~f:Int.of_string_opt
@@ -52,9 +69,10 @@ let apply t (change : Change.t) =
     { t with
       comments = List.filter t.comments ~f:(fun c -> not (String.equal c.id id))
     }
-  | Approve { path; hash } ->
-    { t with approvals = Map.set t.approvals ~key:path ~data:hash }
-  | Unapprove { path } -> { t with approvals = Map.remove t.approvals path }
+  | Approve { root; path; hash } ->
+    { t with approvals = Map.set t.approvals ~key:{ root; path } ~data:hash }
+  | Unapprove { root; path } ->
+    { t with approvals = Map.remove t.approvals { root; path } }
 ;;
 
 let of_changes = List.fold ~init:empty ~f:apply
@@ -190,20 +208,24 @@ let decide t ~id ~post:index (state : C.Proposal.State.t) ~at =
 ;;
 
 let instructions =
-  "The user left review comments on the changes in the working tree (line \
-   numbers are as when they commented: the file may have changed since). \
-   Answer every comment with reply_to_comment: say what you did, or why not. \
-   Make the changes they ask for; where the user should decide, propose the \
-   change with the reply's edits instead of making it (it is applied when they \
-   accept it). Resolve a comment (resolve: true) when it needs nothing more. \
-   Posts marked new are what you have not seen yet. A comment on text the user \
-   selected marks it ⟦like this⟧ in its code and quotes it in <selected>; one \
-   with side=\"old\" is on lines the change removed, numbered as in the file \
-   before it."
+  "The user left review comments on the changes in a worktree (each comment's \
+   file is its absolute path, in the worktree it names: edit that file, even \
+   when it is not under your directory; line numbers are as when they \
+   commented: the file may have changed since). Answer every comment with \
+   reply_to_comment: say what you did, or why not. Make the changes they ask \
+   for; where the user should decide, propose the change with the reply's \
+   edits instead of making it (it is applied when they accept it). Resolve a \
+   comment (resolve: true) when it needs nothing more. Posts marked new are \
+   what you have not seen yet. A comment on text the user selected marks it \
+   ⟦like this⟧ in its code and quotes it in <selected>; one with side=\"old\" \
+   is on lines the change removed, numbered as in the file before it."
 ;;
 
-let submit t =
-  match List.filter t.comments ~f:C.unsent with
+let submit ?root t =
+  match
+    List.filter t.comments ~f:(fun c ->
+      C.unsent c && Option.for_all root ~f:(String.equal c.root))
+  with
   | [] ->
     Or_error.error_string
       "no new comments to send: select text in a changed file to comment on it"
@@ -224,8 +246,10 @@ let submit t =
     Ok (text, List.length comments, changes)
 ;;
 
-let approve ~path ~hash = [ Change.Approve { path; hash } ]
+let approve ?root ~path ~hash () = [ Change.Approve { root; path; hash } ]
 
-let unapprove t ~path =
-  if Map.mem t.approvals path then [ Change.Unapprove { path } ] else []
+let unapprove ?root t ~path =
+  if Map.mem t.approvals { root; path }
+  then [ Change.Unapprove { root; path } ]
+  else []
 ;;

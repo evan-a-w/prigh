@@ -1,0 +1,1482 @@
+=== chromium: sign-in page ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+User name
+Password
+Backend
+Sign in
+=== chromium: signed in: sidebar ===
+prigh
+web
+New session
+No sessions yet: send a message to start one.
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
+T
+token
+=== chromium: signed in: chat ===
+What are we building?
+<CWD>
+/ commands
+@ mention a file
+! run a command
+Ctrl+L switch model
+Ctrl+K find a session
+=== chromium: signed in: the session's card ===
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
+=== chromium: a dialog keeps the focus ===
+Tab: dialog: Close (Esc)
+Tab: dialog: Keys
+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+Shift+Tab: dialog: Close (Esc)
+Shift+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+after Esc: editor
+=== chromium: a mistyped command ===
+Unknown command /modle. Did you mean /mode? (/help lists them)
+editor: /modle
+=== chromium: snippets: Alt+N, filtered ===
+Snippets
+tests
+Run the tests and fix failures.
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: snippets: inserted at the caret ===
+value "Please Run the tests and fix failures. now", caret 38-38, focused true
+typing goes after it: "Please Run the tests and fix failures.! now"
+=== chromium: snippets: /snippet, filtered by the text ===
+Snippets
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: snippets: /snippet inserted ===
+value "Review the diff for bugs.\nList them by severity.", caret 48-48, focused true
+=== chromium: snippets: /snippet tests ===
+value "Run the tests and fix failures.", caret 31-31, focused true
+=== chromium: snippets: #rev completes ===
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#review
+Review the diff for bugs.
+=== chromium: snippets: #rev replaced ===
+value "a Review the diff for bugs.\nList them by severity. b", caret 50-50, focused true
+typing goes after it: "a Review the diff for bugs.\nList them by severity.! b"
+=== chromium: snippets: # that is not a snippet ===
+"# Title #123 x#rev": no popup
+=== chromium: snippets: /snippet add ===
+snippet fix saved: Fix the failing test. (/snippet fix inserts it)
+config: review, tests, fix
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#fix
+Fix the failing test.
+value "Fix the failing test.", caret 21-21, focused true
+=== chromium: snippets: /snippet rm ===
+snippet fix removed
+config: review, tests
+#fi: no popup
+=== chromium: reminders: added ===
+Reminder r1 added (when the agent ends its turn, up to 3 in a row): Keep going until the tests pass. · /remind rm r1 removes it
+Reminder r2 added (every 5 turns): Check the disk space. · /remind rm r2 removes it
+status: Remind 2
+=== chromium: reminders: /remind ===
+Reminders
+r1
+on stop 0/3 · Keep going until the tests pass.
+Remove
+r2
+every 5 turns · Check the disk space.
+Remove
+↑↓ to move, Enter to show, Delete to remove, Esc to close
+=== chromium: reminders: Delete removes the highlighted one ===
+Reminder r1 removed
+Reminder r2 removed
+status: no reminders
+=== chromium: bash run ===
+count some lines
+<TIME>
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+one
+two
+three
+three lines
+<TIME>
+=== chromium: the session's card after a run ===
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
+=== chromium: a budget in the status line ===
+0%
+↑0 ↓0
+$<COST>/$<COST>
+Ready
+=== chromium: long output, folded ===
+bash
+seq 1 30
+1
+2
+3
+4
+5
+6
+Show all 30 lines
+=== chromium: long output, expanded ===
+33 lines, ending: 30 / Fold to 6 lines
+folded again: Show all 30 lines
+=== chromium: read an image ===
+what does flag.png look like?
+<TIME>
+opening it
+read
+flag.png
+Read image file [image/png, 24x16]
+a red flag with a blue stripe
+<TIME>
+=== chromium: the read tool's image ===
+data:image/png;base64, 24x16
+=== chromium: attached in the composer ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+composer cleared: true
+=== chromium: the prompt's images ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+=== chromium: the backend's copy of the prompt ===
+what are these?
+image/png 20x10
+image/png 12x30
+url has the session: true
+same session after reload: true
+=== chromium: sidebar after reload ===
+prigh
+web
+New session
+Sessions
+Select
+count some lines
+<AGE>
+<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
+T
+token
+=== chromium: new session ===
+What are we building?
+<CWD>
+/ commands
+@ mention a file
+! run a command
+Ctrl+L switch model
+Ctrl+K find a session
+=== chromium: sending ===
+hello again
+Sending…
+send button: Sending…
+new session in the url: true
+=== chromium: two sessions ===
+prigh
+web
+New session
+Sessions
+Select
+hello again
+<AGE>
+<CWD>
+count some lines
+<AGE>
+<CWD>
+0%
+↑0 ↓0
+$<COST>
+Ready
+<HOSTNAME>
+T
+token
+=== chromium: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+switched back: true
+=== chromium: switched back ===
+count some lines
+<TIME>
+=== chromium: backend gone ===
+Reconnecting…
+Connection lost: reconnecting…
+same session after reconnecting: true
+=== chromium: after reconnecting ===
+still there?
+<TIME>
+back again
+<TIME>
+=== chromium: agents panel ===
+Agents
+Subagents
+2
+Done
+Survey the project
+The survey: 3 files.
+Done
+Count the files
+There are 3 files.
+Jobs
+1
+Done
+sleep 1; echo built
+<T>
+built
+=== chromium: a nested subagent ===
+Subagent a1/n1
+There are 3 files.
+<TIME>
+Survey the project
+›
+Count the files
+Show in chat
+Done
+deepseek-flash  1 turn  $<COST>
+the nested card is in view in the chat
+=== chromium: a background job ===
+Job j1
+built
+Output, lines 1-1 of 1
+sleep 1; echo built
+Done
+<T>
+6 B
+=== chromium: a card opens its agent ===
+Subagent a1
+Its subagents
+1
+Done
+Count the files
+There are 3 files.
+asking a helper
+subagent
+Count the files
+Open ›
+Report
+There are 3 files.
+Transcript
+2 messages
+The survey: 3 files.
+<TIME>
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== chromium: the agent's footer stays in sight ===
+at the top: scrolls true, footer at the panel's foot true, under the transcript true
+at the end: scrolls true, footer at the panel's foot true, under the transcript true
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== chromium: a shell in the terminal panel ===
+<HOSTNAME>
+<CWD>
+$ echo hello-from-prigh-web
+hello-from-prigh-web
+$ pwd
+<CWD>
+$ cat -v
+^[
+^[
+$
+the shell has the panel's rows: true
+taller after dragging: true; the panel's rows: true
+closed: the editor has the keyboard
+=== chromium: reopened: the same shell ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+reloaded: the same height: true
+=== chromium: reloaded: the panel and the shell are back ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+another session: another shell
+back: the first one again
+=== chromium: the terminal on a phone ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+=== chromium: /diff ===
+Changes
+<CWD> against HEAD 2 files changed, +5 −1
+notes.txt
++2
+−1
+@@ -1,3 +1,4 @@
+1		one
+2	-	two
+2	+	2
+3		three
+4	+	four
+todo.md
+new
++3
+−0
+@@ -0,0 +1,3 @@
+1	+	# Todo
+2	+
+3	+	- ship it
+/diff PATH shows one file or directory
+Review
+Done
+=== chromium: a missing directory ===
+Create folder?
+This folder doesn't exist on <HOSTNAME>:
+<CWD>/sub
+Missing parent folders are created too.
+Enter creates, Esc cancels
+Cancel
+Create folder and switch
+created on the host: true
+=== chromium: an environment note above the prompt ===
+cwd closed: ⌂
+Working directory is now <CWD>/sub
+=== chromium: the prompt shows only what was typed ===
+anything new?
+<TIME>
+=== chromium: a margin note unfolded ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+=== chromium: the model saw the note ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+anything new?
+=== chromium: the model, thinking and mode controls ===
+DeepSeek V4.1 Flash
+Thinking
+on
+Auto: never asks
+=== chromium: the host picker, from the session's card ===
+Where tools run
+<HOSTNAME>
+<CWD>/sub
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
+answer straight away
+Low
+a little
+On
+the provider's default budget
+High
+more
+Max
+as much as the model allows
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== chromium: the mode chip's menu, from the model's with → → ===
+When tools ask first
+Alt+M cycles
+Asks: edits & commands
+bash, job_input, edits and MCP tools ask first
+Asks: commands
+file edits run; bash, job_input and MCP tools ask first
+Auto: never asks
+tools run without asking
+Plan mode
+read-only planning: no file edits; bash, job_input and MCP tools ask first
+Enter chooses, ← → the next setting, Esc closes
+mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: mode ask ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Asks: edits & commands
+=== chromium: a confirmation ===
+Confirm
+Run bash: echo built-ok?
+y
+Allow once
+a
+Always allow bash(echo:*) this session
+n
+Deny
+r
+Deny, saying why
+=== chromium: allowed always ===
+build it
+<TIME>
+building
+bash
+echo built-ok
+built-ok
+Built.
+<TIME>
+=== chromium: a question ===
+Storage
+Which database?
+Postgres
+the one in prod
+SQLite
+Other:
+Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
+Decline
+Send
+=== chromium: answered ===
+ask me
+<TIME>
+one question
+ask_user
+Q: Which database?
+A: SQLite
+SQLite it is.
+<TIME>
+=== chromium: plan mode (Alt+M) ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Plan mode
+=== chromium: plan mode: the status line ===
+0%
+↑0 ↓0
+$<COST>
+Ready
+=== chromium: a plan to approve ===
+Plan
+Approve the plan and start implementing?
+Write the schema
+Test it
+y
+Approve: leave plan mode and implement
+n
+Keep planning
+r
+Keep planning, saying what to change
+=== chromium: the plan approved ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Auto: never asks
+=== chromium: the plan approved: the status line ===
+plan 0/2: Write the schema
+0%
+↑0 ↓0
+$<COST>
+Ready
+=== chromium: implementing ===
+◇
+Plan mode on: the model was told to plan, not change files
+plan it
+<TIME>
+here is the plan
+update_plan
+0/2 done
+Write the schema
+Test it
+exit_plan_mode
+approved
+Write the schema
+Test it
+Implementing.
+<TIME>
+=== chromium: permissions ===
+Permissions
+Mode: auto (tools run without asking)
+Allowed this session: bash(echo:*)
+Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+/mode or Alt+M switches the mode.
+Done
+=== chromium: two queued messages ===
+Steers this turn
+also check the docs
+Edit
+After this turn
+then write the changelog
+Edit
+=== chromium: one removed ===
+Steers this turn
+also check the docs
+Edit
+=== chromium: the steer delivered ===
+Steer delivered: also check the docs
+=== chromium: the steer in the transcript ===
+also check the docs
+<TIME>
+Done waiting.
+<TIME>
+=== chromium: phone: a chip's menu ===
+thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
+=== chromium: archived, folded ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+Archived
+1
+=== chromium: archived ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+Archived
+1
+hello again
+<AGE>
+<CWD>
+Delete archived
+muted: 1
+=== chromium: selected ===
+Cancel
+Delete 2 sessions (<SIZE>)
+=== chromium: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== chromium: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+cwd
+main
+session files after: 1
+=== chromium: /cd: the directory popup ===
+Directories
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+<CWD>/sub/
+=== chromium: files: the session's directory ===
+<HOSTNAME>
+Review
+cwd
+=== chromium: files: listed ===
+sub/
+1
+<TIME>
+flag.png
+88 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== chromium: files: a text preview ===
+notes.txt
+17 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -1,3 +1,4 @@
+1		one
+2	-	two
+2	+	2
+3		three
+4	+	four
+=== chromium: files: an image preview ===
+ 24x16
+toast: Uploaded "hello.txt"
+on the host: "hello\n"
+=== chromium: files: replace? ===
+Replace hello.txt?
+<CWD> already has a hello.txt. Replace it with the one you are uploading (12 B)?
+Skip
+Replace
+replaced: "hello again\n"
+=== chromium: files: a downloaded file ===
+notes.txt
+"one\n2\nthree\nfour\n"
+=== chromium: files: a typed path ===
+sub
+inner.txt
+7 B
+<TIME>
+=== chromium: files: a directory downloaded ===
+sub.tar.gz
+sub/
+sub/inner.txt
+toast: Created folder "made"
+toast: Renamed "made" to "renamed"
+=== chromium: files: delete? ===
+Delete renamed?
+<CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
+Cancel
+Delete
+toast: Deleted "renamed"
+renamed on the host: false
+=== chromium: files: after the changes ===
+sub/
+1
+<TIME>
+flag.png
+88 B
+<TIME>
+hello.txt
+12 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== chromium: files: uploads in the status line ===
+Uploading 2 files
+=== chromium: files: attachments in the composer ===
+hello.txt
+12 B
+dropped.txt
+13 B
+data.bin
+7 B
+uploads on the host: .gitignore data.bin dropped.txt
+=== chromium: files: sent with the prompt ===
+⌂
+Working directory is now <CWD>
+read these
+@hello.txt
+@.prigh/uploads/dropped.txt
+@.prigh/uploads/data.bin
+<TIME>
+Read the attachments.
+<TIME>
+=== chromium: files: what the model saw ===
+read these
+<file path="hello.txt">
+hello again
+<file path=".prigh/uploads/dropped.txt">
+dropped text
+<file path=".prigh/uploads/data.bin">
+[binary file, 7 bytes: not shown; inspect it with tools]
+=== chromium: files on a phone ===
+sub/
+1
+flag.png
+88 B
+hello.txt
+12 B
+notes.txt
+17 B
+todo.md
+18 B
+=== chromium: resize: a highlighted preview ===
+hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+=== chromium: resize: the file browser's edge ===
+handles: sidebar 280, files 400, files-split 45
+while dragging: resizing-x; no text selected: true
+dragged 160px left: 400 -> 560 (aria 560), kept 560
+as wide as it goes: 600, the chat keeps 400
+double-clicked: 400, kept null
+arrow keys: 480
+=== chromium: resize: the list over the preview ===
+dragged down: the list taller, over 45%: true
+=== chromium: resize: the sidebar's edge ===
+dragged 80px right: 280 -> 360
+=== chromium: resize: kept after a reload ===
+sidebar 360, files 480
+=== chromium: resize: a narrower window ===
+sidebar 306, files 413, chat 401
+wide again: sidebar 360, files 480
+on a phone: 0 handles
+=== chromium: resize: highlighted code in a reply ===
+hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
+hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
+=== chromium: the session: a 700px chat column ===
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
+.composer: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== chromium: the session: a 520px chat column ===
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
+.composer: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== chromium: the session: a 400px chat column ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+.session-card, .session-bar: fits
+.composer: fits
+the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+=== chromium: settings ===
+Settings
+Appearance
+Theme
+Follows you to every browser you sign in on.
+Original
+Dark
+Light
+Accent
+Your turns, the selection, focus and work in progress.
+Custom
+Preferences
+Notifications
+Tell you when a turn ends or something waits for you while this tab is hidden.
+The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+Transcript detail
+How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+Quiet
+Normal
+Verbose
+On the backend
+Tool confirmation
+Ask before bash, edits and MCP tools run, in this session and new ones.
+Model providers
+Not logged in to any: log in to one to use its models.
+Manage providers
+Git hosting
+GitHub
+github.com
+Not signed in.
+No OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
+Connect with a token
+Forgejo
+codeberg.org
+Not signed in.
+Signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges."codeberg.org".client_id sets your own
+Use a token
+Connect
+Another Forgejo host
+A self-hosted Forgejo or Gitea, by its host name.
+Add host…
+Account
+T
+Signed in as token
+127.0.0.1:<PORT>
+Switch account
+Sign out
+Keyboard shortcuts
+Done
+a choice keeps it open: true
+Esc closes it, the editor has the focus: true
+=== chromium: the session's bar: a 900px chat column without the sidebar ===
+chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== chromium: the session's bar: a 600px chat column without the sidebar ===
+chat 600; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== chromium: the session's bar: a 400px chat column without the sidebar ===
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
+.session-card, .session-bar: fits
+.composer: fits
+=== chromium: errors ===
+none
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: alice's menu ===
+A
+alice
+127.0.0.1:<PORT>
+signed in
+Act as…
+see and work in another user's sessions
+Add account…
+sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
+Sign out
+forget this account in this browser
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: accounts: add an account ===
+prigh
+web
+Add an account
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Saved accounts
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+Back to alice
+=== chromium: accounts: sessions ===
+I am bob
+=== chromium: accounts: bob's menu ===
+B
+bob
+127.0.0.1:<PORT>
+signed in
+Switch to
+A
+alice
+127.0.0.1:<PORT>
+Add account…
+sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
+Sign out
+forget this account in this browser
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: act as ===
+alice
+you
+bob
+=== chromium: accounts: sessions ===
+I am bob
+=== chromium: accounts: acting as bob ===
+A
+alice
+acting as bob
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: signed out ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Signed out.
+Continue as
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+=== chromium: accounts: alice again ===
+A
+alice
+=== chromium: accounts: saved accounts ===
+alice
+=== chromium: accounts: errors ===
+none
+=== chromium: reconnect: a long session, halfway up ===
+scrolled: true
+draft: half-written thought
+images in the composer: 1
+=== chromium: reconnect: offline ===
+Connection lost: reconnecting…
+composer: Offline: send once back
+=== chromium: reconnect: network back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== chromium: reconnect: backend gone ===
+Connection lost: reconnecting…
+=== chromium: reconnect: backend back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== chromium: reconnect: reloaded ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+jump button: 1
+=== chromium: reconnect: reloaded out of reach ===
+Connection lost: reconnecting…
+sign-in page: false
+=== chromium: reconnect: back in reach ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+=== chromium: reconnect: errors ===
+none
+=== chromium: paging: opened ===
+steps 26 to 40 (15)
+earlier: Show earlier messages 100 more
+at the end: true
+=== chromium: paging: scrolled up ===
+steps 11 to 40 (30)
+earlier: Show earlier messages 40 more
+step 26 kept in place: true
+=== chromium: paging: at the start ===
+steps 1 to 40 (40)
+earlier: none
+=== chromium: paging: a long output ===
+shown lines: 6
+toggle: Show all 2000 lines
+loaded whole: 2000 lines
+=== chromium: paging: reloaded ===
+steps 1 to 40 (40)
+step 5 at the same place: true
+=== chromium: paging: jump: the rail ===
+steps 26 to 40 (15)
+marks: 40, not loaded: 25
+button: Jump to a message
+the one in view: Step 39
+along the chat's right edge: true
+=== chromium: paging: jump: a mark's tooltip ===
+Step 30: look at module 30. | <TIME>
+=== chromium: paging: jump: to a loaded message ===
+step 30 at the top, marked: true
+the one in view: Step 30
+=== chromium: paging: jump: to a message not loaded ===
+steps 1 to 40 (40)
+not loaded: 0
+the one in view: Step 3
+=== chromium: paging: jump: the list ===
+Step 40: look at module 40. | 40 of 40 <TIME>
+Step 17: look at module 17. | 17 of 40 <TIME>
+step 17 at the top
+=== chromium: paging: jump: on a phone ===
+marks: 0
+the list: 40 messages
+=== chromium: paging: errors ===
+none
+=== chromium: resilience: a long chat ===
+newest answer on show: true
+=== chromium: resilience: a slow network, the page shown again and again ===
+sockets opened: 1
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== chromium: resilience: a connection that drops while the session loads ===
+sockets opened: 6
+banner: The backend keeps dropping the connection while loading this session: open another session, or reload. Retry now Another session Reload
+status: Stopped reconnecting
+"Reconnected" said: 0
+transcript still on show: true
+sockets opened since: 6
+=== chromium: resilience: retry now ===
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== chromium: resilience: errors ===
+none
+=== chromium: stability: idle ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and the session's status: none
+=== chromium: stability: a reply streamed ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and the session's status: none
+=== chromium: stability: the streamed reply once ended ===
+its parts kept: true
+selection kept: true
+=== chromium: stability: the editor ===
+frames sampled: true
+frames with lines out of view: 0
+frames empty but still tall: 0
+=== chromium: stability: a turn starts and ends: the status in the sidebar ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== chromium: stability: a turn starts and ends on a phone: the status in the bar ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== chromium: stability: errors ===
+none
+=== chromium: themes: first paint before choosing ===
+- -; original orange #f0b44c on #1b1e23
+=== chromium: themes: settings ===
+Appearance
+Theme
+Follows you to every browser you sign in on.
+Original
+Dark
+Light
+Accent
+Your turns, the selection, focus and work in progress.
+Custom
+=== chromium: themes: dark from the settings ===
+dark orange #f0b44c on #1d1d1d; checked: Dark
+=== chromium: themes: saved on the backend ===
+web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue"
+=== chromium: themes: reloaded ===
+first paint: dark blue; dark blue #6aa6f8 on #1d1d1d
+=== chromium: themes: another browser ===
+first paint: - -; dark blue #6aa6f8 on #1d1d1d
+=== chromium: themes: changed live in the other ===
+light custom #c2410c on #f4f5f7
+its history: /accent #c2410c
+=== chromium: themes: picker ===
+Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c"
+=== chromium: themes: back ===
+original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
+=== chromium: themes: errors ===
+none
+=== chromium: worktrees: a session's menu ===
+Tidy the docs in a worktree — prigh — main
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== chromium: worktrees: the new worktree dialog ===
+New worktree
+Branch
+A new branch, or an existing one to check out
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in <DIR>/home/.prigh/worktrees/prigh, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== chromium: worktrees: a worktree's menu ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== chromium: worktrees: sessions and their worktrees ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [selected]
+│ agent/tidy-the-docs | subagent [agent]
+│ feat/login
+│ docs | here | ● 2 [dirty here]
+=== chromium: worktrees: from the keyboard ===
+A landing page — site — trunk
+Open  Enter
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== chromium: worktrees: Esc changed nothing ===
+Tidy the docs in a worktree
+=== chromium: worktrees: a terminal in the worktree ===
+<DIR>/home/.prigh/worktrees/prigh/feat-login
+=== chromium: worktrees: folded ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | 3 [folded selected]
+=== chromium: worktrees: searching ===
+Tidy the docs in a worktree
+=== chromium: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/prigh-docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== chromium: worktrees: removed ===
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+│ feat/login
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== chromium: worktrees: the /worktree picker ===
+Worktrees of <DIR>/prigh
+main
+<DIR>/prigh · main worktree · here · 1 session
+feat/login
+<DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
+Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
+=== chromium: worktrees: on a phone ===
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+│ feat/login
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== chromium: worktrees: a long press on a phone ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== chromium: worktrees: errors ===
+none
+=== chromium: review: files: changes marked ===
+src (changed: 2)
+README.md
+=== chromium: review: files: a changed file's diff ===
+main.ml
+395 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== chromium: review: files: the whole file ===
+rows: 32
+=== chromium: review: files: text selected ===
+selected: "12 * 2"
+Comment
+c
+=== chromium: review: files: writing a comment ===
+Comment on line 12
+12 * 2
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== chromium: review: files: the comment under its code ===
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+=== chromium: review: files: its code marked ===
+[ '12 * 2' ]
+=== chromium: review: page: opened ===
+Review
+0/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 1 comment
+=== chromium: review: page: the files ===
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
++3 −0
+2 files changed, +5 −1
+chat still shown: true
+file browser hidden: true
+=== chromium: review: page: a second comment, not sent yet ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+not sent yet
+Name it for what it does.
+=== chromium: review: page: text selected across lines ===
+selection ends with: "let doubled"
+=== chromium: review: page: writing a comment across lines ===
+Comment on lines 12–13
+* 2
+let doubled
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== chromium: review: page: Esc dropped the comment ===
+threads: 2
+=== chromium: review: page: comments on selections ===
+src/main.ml
+Approve
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+not sent yet
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+not sent yet
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== chromium: review: page: the marked code ===
+c4: v12
+c1: 12 
+c1 (lit): * 2
+c3 (lit): let doubled
+=== chromium: review: page: main.ml approved ===
+Review
+1/2 approved
+Comment
+Edit
+Changes
+Whole file
+Send 4 comments
+=== chromium: review: page: the files after the agent's edit ===
+README.md
++1 −1
+src/
+main.ml
+3
++2 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +6 −2
+=== chromium: review: page: the agent's reply ===
+src/main.ml
+Approved
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== chromium: review: chat: what the agent did ===
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+edit
+README.md
++1
+−1
+@@ -1,3 +1,3 @@
+1		# Demo
+2
+3	-	A small project.
+3	+	A small project, reviewed.
+Replied to both comments and updated the README.
+<TIME>
+=== chromium: review: page: a proposed change ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accept
+Reject
+=== chromium: review: page: accepted, the file changed ===
+src/util.mlnew
+Approve
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
+=== chromium: review: page: changed since approved ===
+src/main.ml
+Changed since you approved it
+Approve again
+main.ml ends: "let late = 0\nlet edited = 1\n"
+Esc closed it: true
+/review opened it: true
+=== chromium: review: worktree: what is reviewed ===
+Reviewing feat/login (<WT>) against main (merge base <SHA>)
+base: main
+=== chromium: review: worktree: the files ===
+README.md
++1 −1
+src/
+login.ml
++1 −0
+2 files changed, +2 −1
+=== chromium: review: worktree: against HEAD ===
+README.md
++1 −1
+1 file changed, +1 −1
+=== chromium: review: worktree: against HEAD, what is reviewed ===
+Reviewing feat/login (<WT>) against HEAD
+=== chromium: review: worktree: back to the session's own ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +8 −2
+=== chromium: review: phone ===
+sheet: fixed
+Alt+R closed it
+=== chromium: review: errors ===
+none
+=== chromium: remote: prigh web ===
+http://127.0.0.1:<PORT>/#signin=<code>
+=== chromium: remote: opened ===
+http://127.0.0.1:<PORT>/?session=<id>
+sign-in form: 0
+=== chromium: remote: the tool ran on the laptop ===
+in the laptop's directory: true
+in the server's directory: false
+=== chromium: remote: reloaded ===
+sign-in form: 0
+prefer_host: host-laptop
+=== chromium: remote: the spent link elsewhere ===
+Sign in
+=== chromium: remote: errors ===
+none

@@ -395,7 +395,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
+    /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
     /switch [path] switch to a saved session
     /rewind go back to an earlier message in this session
     /skills pick a skill to invoke (/skill:name)
@@ -409,7 +409,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
-    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
+    /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /unarchive [session] unarchive a session (this one without an argument)
     /permissions show the mode and the allow/ask/deny rules (config and this session)

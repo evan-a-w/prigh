@@ -351,36 +351,49 @@ a session the backend no longer has (it restarted before saving it)
 stays on show, read-only, with a banner offering a new session or the
 list.
 
-The sidebar lists the active sessions as a tree of projects. A project is
-a git repository, named by its main checkout (its folder icon has a branch
-in it, and the main checkout's branch follows its name), or a plain folder
-(a session outside any repository). Sessions in the main checkout hang
-directly from the project; each other worktree of the repository (a branch
-being worked on, one made for a subagent, any other worktree of the
-repository the session is in) hangs from it as a branch off its rail, with
-its sessions under it, `● 3 changed` when it has uncommitted changes and ↑↓
-commits against its upstream. A subagent's worktree is tagged `subagent`
-and says which session it came from (click it to go there). Each session
+The sidebar lists the active sessions, most recently used first. Each
 has its lamp (lit while its turn or its background subagents and jobs
-run), its age and, when it works in a subdirectory, that directory. The
-project and worktree the open session is in have the accent on their rail.
-Clicking a project or a worktree folds it (its row then counts its
-sessions, with the lamp when one is running); the folds are kept with your
-preferences, so they follow you to other browsers. Hovering a project shows
-"+" (a new session there) and, for a repository, "New worktree" (a branch,
-and a base that defaults to the main checkout's branch: Enter creates it
-under `worktrees_dir` and starts a new session in it, Esc cancels);
-hovering a worktree shows "+" (a new session there) and its bin, which asks
-to remove it ("Discard changes and remove" when it has changes; not the one
-the open session works in). Projects come most recently used first. Below
-the tree a faint "Archived 14" rule unfolds the archived sessions, muted,
-with their directory. A search (Ctrl+K) finds sessions in every project, by
-title, prompt, directory, project or branch, and shows the matches
-whatever is folded, the archived ones too. Where a session is in git is found on its
+run), its age and where it works: its repository and branch (`prigh ⎇
+main`), or its directory outside a repository. A session has a repository
+attached rather than living in one: sessions are not grouped by
+repository. Under each session hang the worktrees that matter to it, each
+a branch off a rail: those it made (`/worktree new`, the New worktree
+dialog), moved into (`/cd`, `/worktree open`), checked a pull request out
+in (`/pr checkout`, tagged `#7`) or made for its subagents (tagged
+`subagent`), with `● 3` when one has uncommitted changes and ↑↓ commits
+against its upstream; the one it works in says `here`. A worktree two
+sessions use is under both; one removed (from any session, or outside
+prigh) goes. On disk worktrees still go by repository
+(`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
+repository's. The fold at the right of a session's second line (`⑂ 3`)
+hides its worktrees; the folds are kept with your preferences, so they
+follow you to other browsers.
+
+Right-click a session or a worktree (or press Shift+F10 or the context
+menu key on it, long-press it on a phone, or use the ⋯ that shows while
+pointing at a session) for its menu; each item names the command that
+does the same. A session's: Open, Open in new tab, Rename… (`/name`),
+Fork… (`/fork`), New worktree… (`/worktree new`: a branch, and a base that
+defaults to the session's branch; Enter creates it under `worktrees_dir`
+and the session moves there), Review changes (`/review`), Open in file
+browser (`/files`), Open terminal there (`/terminal`), Copy path, Copy
+session id, Archive or Unarchive (A) and Delete… (Delete). A worktree's:
+Switch session here (`/worktree open`), New session here (`/worktree open
+-n`), Review changes (`/review <worktree>`), Open in file browser (`/files
+<path>`), Open terminal there (`/terminal <path>`, a shell of its own in
+that directory), Create pull request… (the session moves there, then `/pr
+new`), Copy path and Remove worktree… (`/worktree rm`; "Discard changes
+and remove" when it has changes; not the one the open session works in;
+Delete on a focused worktree does the same). An item on a session other
+than the open one switches to it first. ↑↓ move through the menu, Enter
+chooses, Esc closes it and changes nothing. Below
+the list a faint "Archived 14" rule unfolds the archived sessions, muted,
+with their directory. A search (Ctrl+K) finds sessions by title, prompt,
+directory, repository, branch or their worktrees' branches, the archived
+ones too. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
-older prigh cannot tell, and its sessions show as plain folders. Hovering a session shows its archive (or unarchive) and delete
-buttons; on a focused session A archives or unarchives it and Delete
+older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
 deletes it. "Select" (or `/delete` with no argument) turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
 range from the last one (across the divider), and Delete (or the bar at
@@ -391,9 +404,10 @@ which ones the backend will keep (running, open in another tab or terminal,
 or the one you are in): those are not asked for, and with nothing left to
 delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
-repository the open session is in are listed again when the session, its
-directory or its tool host changes, when a turn ends and after creating or
-removing one.
+repositories the sessions' worktrees belong to are listed (for their
+changes and to drop removed ones) when the session, its directory or its
+tool host changes, when a session's worktrees change, when a turn ends
+and after creating or removing one.
 
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
@@ -434,7 +448,8 @@ them). In Docker it is `PRIGH_MODE=web` (port 7790, see `DOCKER.md`).
 
 The terminal button at the chat's top right (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its
-directory) in a panel under the chat: drag its top edge to resize it (the
+directory; `/terminal DIR`, or a worktree's "Open terminal there", a shell
+of its own in DIR) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
 are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
 gives the keyboard back to the editor. It is a tmux session (on the
@@ -738,6 +753,23 @@ are kept with the session (also across rewinds, reloads and restarts).
 In the TUI, `/review` alone lists the changed files with their approvals
 and the comments with their threads.
 
+Any worktree of the repository can be reviewed, not only the session's:
+`/review WORKTREE` (its path, branch or directory name, as `/worktree`
+lists them; completed), the worktree picker's Alt+R, or the worktree
+pickers in the review page's head, which reads "Reviewing BRANCH (PATH)
+against BASE". A linked worktree (a subagent's, a feature branch, a `/pr`
+checkout) is compared with its base: the merge base with the branch it was
+made from (recorded when prigh created it, as git config
+`branch.<branch>.prighBase`), else the remote's default branch
+(`origin/HEAD`), else `main` or `master`, so its commits show as well as
+what is uncommitted and untracked. The main checkout is compared with
+`HEAD`, as before. `--base REV` (or the base picker) compares with another
+branch or commit; `HEAD` shows only what is uncommitted. Comments and
+approvals are kept per worktree; comments sent to the agent name the
+worktree and each file's absolute path, and accepted proposals and the
+editor's saves go to that worktree's files. The page reads the reviewed
+worktree again whenever the agent or a subagent edits.
+
 ### prigh-web for a backend elsewhere
 
 The page can also be served from your own machine for a backend on another
@@ -1007,9 +1039,10 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-`/sessions` lists the active sessions first, grouped by project and
-worktree under a divider naming each (`── prigh ──`, `── prigh ⎇ feat/x
-──`, `── notes ──`; the filter matches these names too), and then, after an
+`/sessions` lists the active sessions first, most recent first, each with
+its repository and branch (`prigh ⎇ main`) and, beside its directory, the
+worktrees that matter to it (`⎇ feat/x · ⎇ agent/fix (subagent)`; the
+filter matches these too), and then, after an
 `── archived ──` divider and dimmed, the archived ones. `▶` marks a running session (its
 turn, or background subagents and jobs: `2 in background`), `●` one loaded
 in the backend and `*` the one you are in; the list follows changes made
@@ -1084,7 +1117,7 @@ session is (in the same subdirectory), and the subagent works there; its
 report ends with where the work is (`[worktree: the work is on branch
 agent/fix-the-parser-bug, checked out in ...]`) so that you can review it,
 merge the branch or remove the worktree. The session records the worktree
-until it is removed: prigh-web shows it in the project's tree, tagged
+until it is removed: prigh-web shows it under the session, tagged
 `subagent`, and `/worktree` lists it like any other (open it, or start a
 session there, to look at the work).
 
@@ -1401,7 +1434,7 @@ it.
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
-| `/review [base] [instructions]` | alone: the review page (prigh-web) or the files' approvals and the comments (TUI), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
+| `/review [WORKTREE] [--base REV]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name) and `--base`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree against its base, see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
@@ -1418,7 +1451,7 @@ it.
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
-| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
+| `/worktree [list\|new BRANCH [BASE]\|open [-n] TARGET\|rm [-f] TARGET]` | the repository's git worktrees: alone, a picker (Enter works there, TUI Ctrl+N / prigh-web Alt+Enter in a new session, Alt+R reviews its changes, TUI Ctrl+D / prigh-web Delete removes); `new` creates one and moves the session there; `open` moves there (`-n`: a new session); `rm` removes one once you confirm (`-f`: with uncommitted changes) |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
@@ -1556,8 +1589,8 @@ Removing asks first (saying what would be lost and which sessions work
 there), keeps the branch, and is refused for the main checkout, for the
 worktree the session itself is in (open another first) and, without
 `-f`, for one with uncommitted changes or locked; a worktree whose
-directory was deleted is pruned. prigh-web's sidebar shows the worktrees
-in its tree of projects (below).
+directory was deleted is pruned. prigh-web's sidebar shows, under each
+session, the worktrees it made, moved into or gave its subagents (above).
 
 Snippets are texts you insert into the editor often, kept in `config.json`
 and shared by every frontend:
