@@ -1570,7 +1570,12 @@ let%expect_test "git hosting: replies and auth events" =
      (branch (feat/git-hosting))
      (base main)
      (main true)
-     (branches ()))
+     (branches        ())
+     (remote_branches ())
+     (tags            ())
+     (commits         ())
+     (rev             ())
+     (direct false))
     ((repo (
        (host   github.com)
        (kind   github)

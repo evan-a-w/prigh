@@ -102,6 +102,11 @@ module Method = struct
         ; path : string
         }
     | Fs_preview of { path : string }
+    | Git_show of
+        { dir : string option
+        ; rev : string
+        ; path : string
+        }
     | Fs_write of
         { path : string
         ; text : string
@@ -146,6 +151,7 @@ module Method = struct
     | Review_approve _ -> "review_approve"
     | Review_unapprove _ -> "review_unapprove"
     | Fs_preview _ -> "fs_preview"
+    | Git_show _ -> "git_show"
     | Fs_write _ -> "fs_write"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
@@ -195,6 +201,9 @@ module Method = struct
     | Review_unapprove { root; path } ->
       root_param root @ [ "path", Json.str path ]
     | Fs_preview { path } -> [ "path", Json.str path ]
+    | Git_show { dir; rev; path } ->
+      Option.value_map dir ~default:[] ~f:(fun d -> [ "dir", Json.str d ])
+      @ Git_diff.show_params ~rev ~path
     | Fs_write { path; text; expected } ->
       [ "path", Json.str path; "text", Json.str text ]
       @ Option.value_map expected ~default:[] ~f:(fun e ->

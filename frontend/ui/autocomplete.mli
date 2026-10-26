@@ -56,6 +56,7 @@ val compute
   -> agents:Agent_view.t list (** for [/agents steer] and the like *)
   -> worktrees:P.Worktree.t list option
        (** for [/worktree open] and [rm]; [None]: not fetched yet *)
+  -> refs:P.Git_diff.Refs.t (** for [/review]'s branches and tags *)
   -> logged_in:(string -> bool)
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)

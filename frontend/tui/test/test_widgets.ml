@@ -709,7 +709,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
     /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [title] creates one from the current branch, checkout N checks one out in a git worktree
-    /review [worktree] [--base REV]    the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
+    /review [target] [--base REV ...]  the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
@@ -2203,6 +2203,7 @@ let%expect_test
       ~reminders:[]
       ~agents:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2285,6 +2286,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~reminders:[]
       ~agents:[]
       ~worktrees:None
+      ~refs:Prigh_protocol.Git_diff.Refs.empty
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2439,6 +2441,7 @@ let%expect_test
         ~reminders:[]
         ~agents:[]
         ~worktrees:None
+        ~refs:Prigh_protocol.Git_diff.Refs.empty
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None

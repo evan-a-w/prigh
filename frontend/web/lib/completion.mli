@@ -33,8 +33,8 @@ val compute
   -> ?forges:Forge_account.t list (** for [/login] and [/logout] *)
   -> ?worktrees:Worktree.t list
        (** the repository's, for [/worktree] and [/review] *)
-  -> ?branches:string list
-       (** the reviewed repository's, for [/review --base] *)
+  -> ?refs:Git_diff.Refs.t
+       (** the reviewed repository's branches and tags, for [/review] *)
   -> superuser:bool (** offers the commands only superusers have *)
   -> text:string
   -> cursor:int

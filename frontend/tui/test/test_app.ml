@@ -2817,7 +2817,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 263 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 265 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -7191,7 +7191,7 @@ let%expect_test "Alt+R in the /worktree picker reviews the highlighted one" =
     (Rpc
       (method_ get_review)
       (params ())
-      (tag (Review_comments (dir (/w/feat)) (base ()))))
+      (tag (Review_comments (target (Dir (/w/feat))) (base ()) (direct false))))
     editing
     |}]
 ;;

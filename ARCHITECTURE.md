@@ -1169,8 +1169,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   branch it was made from (`Worktree.base_key`), else its remote's
   `HEAD`, else `main`/`master`; the result names the worktree's `branch`,
   the `base`, whether it is the `main` checkout and the repository's
-  `branches` (to pick another base). Errors say what to do
-  (not a repository, no git, unknown base). `Review` writes `/review`'s
+  `branches`, `remote_branches`, `tags` and last `commits` (sha and
+  subject; for the pickers). With `rev` it reviews a branch (any commit)
+  without a checkout: `git diff BASE...REV` (no untracked files; `HEAD` is
+  no base for it), its base found as a linked worktree's; with `direct`
+  the diff is against the base itself (two-dot) rather than the merge
+  base. Errors say what to do (not a repository, no git, an unknown base
+  or `rev`, with the closest refs by `Edit_distance`). `$git_show` reads a
+  file as a commit has it (the review of a branch not checked out) and
+  `$git_refs` lists the branches and tags (the TUI's `/review`
+  completion). A comment on such a branch is rooted at `branch:NAME`
+  (`Review_comment.branch`): sent to the agent naming the branch and
+  `NAME:path`. `Review` writes `/review`'s
   prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
   go through `Agent.command_prompt`, which queues them like a prompt, with
   the long text as `Queued.expanded` and the `Injected.Source` as origin.
@@ -1399,10 +1409,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
-  `resume_now`, `git_diff {path?, base?, dir?}`
-  (`{root, against, diff, truncated, branch?, base, main, branches}`: `dir`
-  any worktree on the host, a linked one compared with its default base
-  when no `base` is given), `review {args?}` (`[base]
+  `resume_now`, `git_diff {path?, base?, dir?, rev?, direct?}`
+  (`{root, against, diff, truncated, branch?, base, main, branches,
+  remote_branches, tags, commits, rev?, direct}`: `dir` any worktree on
+  the host, a linked one compared with its default base when no `base` is
+  given; `rev` a branch not checked out; `direct` two-dot), `git_show
+  {rev, path, dir?}` (`{text, truncated}`), `git_refs {dir?}`
+  (`{branches, remote_branches, tags}`), `review {args?}` (`[base]
   [instructions]`) and `init`, `list_worktrees {cwd?}` (`{root,
   project_dir, worktrees}`), `create_worktree {branch, base?, cwd?}`
   (`{worktree, new_branch, root, cwd}`: `cwd` is the directory it was
@@ -1859,7 +1872,13 @@ terminal frontend and `web/` prigh-web, the browser one.
     so a refusal goes back to the editor. `/review` alone reads
     `get_review`, then `git_diff`, and shows `File_approval.render`: each
     changed file with its approval and its comments' threads, then the
-    comments on files no longer changed. `File_approval` (an approval
+    comments on files no longer changed, under what was compared
+    (`Diff_files.where`/`against`: "feat/x (not checked out) against main
+    directly"); `Review_command` (shared with prigh-web) parses
+    `[WORKTREE|BRANCH] [--base REV] [--direct]` (a name that is no worktree
+    is a branch to review read-only) and completes worktrees, branches not
+    checked out, remote branches and tags, which the TUI caches from
+    `git_refs` (`refs`, a `Location_cache`). `File_approval` (an approval
     counts while its hash is the file's `Diff_files.File.hash`, the MD5
     of its section of the diff) and `Comment_anchor` (a comment's code
     now: where its anchor text is, nearest to where it was, else where
@@ -2527,7 +2546,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       transparent `textarea` over its own highlighted text, Ctrl+S saving
       with `fs_write`; after a conflict the next save overwrites). Keys
       (`Keys.Target.Review`, the page focused but not its fields): `]`
-      `[` n p j k, a, c, e, v, s, Esc; Alt+R everywhere; c also wherever
+      `[` n p j k, a, c, e, v, s, Esc; r, b, d; Alt+R everywhere; c also wherever
       code is selected but in a field. In the comment and reply fields
       Enter sends and Shift+Enter is a new line. `Files_view`
       marks changed entries (a dot, a sage tick once approved, sodium once
@@ -2535,6 +2554,23 @@ terminal frontend and `web/` prigh-web, the browser one.
       repository with `Review_code_view`, under a bar with its approval,
       counts, the layout and Review. `Tool_view` draws `reply_to_comment`
       as its reply and proposed diff.
+      What the page reviews is a `Code_review.Target` (a worktree, or a
+      branch not checked out: `Git_diff.Target.Rev`, read-only, its files
+      read with `git_show`, Edit and Accept refused) with a base and
+      `direct`; a base git does not know goes back to the target before
+      (`fallback`) with the error's closest names in a toast. The head's
+      two pickers are `Review_picker`s (`Dialog.Review_pick`, drawn under
+      their buttons by `Review_picker_view` with the composer chips'
+      classes: worktrees then branches not checked out; HEAD, branches,
+      remote branches, tags, recent commits and what is typed), rebuilt
+      when the diff or the worktrees (listed again on opening) come in;
+      the page stays live under them, the rest of it inert. Since merge
+      base / Directly is a segmented control (`Review_direct`), "Check out
+      into a worktree" `create_worktree` (`Review_checked_out`).
+      `Review_memory` keeps the last comparison per worktree or branch and
+      each session worktree's last target in the `web.review` preference:
+      written once a chosen diff is in, used when the page opens on its
+      defaults and when a target comes without a base.
     - Worktrees: `Worktrees` keeps the listing of the session's place
       (session, tool host, directory; reset on a session or user switch,
       stale after a turn, a create or remove, or other sessions moving)

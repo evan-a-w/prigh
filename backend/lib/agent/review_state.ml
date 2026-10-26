@@ -221,6 +221,13 @@ let instructions =
    is on lines the change removed, numbered as in the file before it."
 ;;
 
+let branch_instructions =
+  "A comment with a branch is on a branch that is not checked out: its file is \
+   BRANCH:PATH, as git show reads it. To change it, check the branch out first \
+   (in a worktree of its own if it is not yours), or say what you would \
+   change."
+;;
+
 let submit ?root t =
   match
     List.filter t.comments ~f:(fun c ->
@@ -230,6 +237,11 @@ let submit ?root t =
     Or_error.error_string
       "no new comments to send: select text in a changed file to comment on it"
   | comments ->
+    let instructions =
+      if List.exists comments ~f:(fun c -> Option.is_some (C.branch c))
+      then instructions ^ " " ^ branch_instructions
+      else instructions
+    in
     let text =
       String.concat
         ~sep:"\n\n"
