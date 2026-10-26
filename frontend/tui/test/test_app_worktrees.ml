@@ -965,6 +965,49 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "/review completion: worktrees and branches not checked out, then remote \
+     branches and tags after --base"
+  =
+  let h = connected ~height:20 () in
+  let popup () =
+    let ac = Option.value_exn h.H.model.autocomplete in
+    print_s
+      [%sexp
+        (List.map (Autocomplete.items ac) ~f:(fun i -> i.id)
+         : string list)]
+  in
+  H.keys h "/review ";
+  H.reply h (Worktrees_for_autocomplete key) listing_json;
+  H.reply
+    h
+    (Refs_for_autocomplete key)
+    {|{"branches":["feat/a","fix/b","main","old-work"],"remote_branches":["origin/main","origin/feat/r"],"tags":["v2","v1"]}|};
+  popup ();
+  H.keys h "old-work --base ";
+  popup ();
+  H.keys h "origin/m";
+  H.key h (Key.plain Tab);
+  H.keys h " --d";
+  H.key h (Key.plain Tab);
+  editor h;
+  [%expect {|
+    (Rpc
+      (method_ list_worktrees)
+      (params ())
+      (tag (
+        Worktrees_for_autocomplete
+        "abc123 backend:/h/.prigh/worktrees/repo/fix-b")))
+    (Rpc
+      (method_ git_refs)
+      (params ())
+      (tag (Refs_for_autocomplete "abc123 backend:/h/.prigh/worktrees/repo/fix-b")))
+    (--base --direct main feat/a fix/b old old-work origin/main origin/feat/r)
+    (HEAD feat/a fix/b main old old-work origin/main origin/feat/r v2 v1)
+    editor: /review old-work --base origin/main --direct
+    |}]
+;;
+
 let%expect_test "the backend's refusals are shown, the command kept to retry" =
   let h = connected () in
   H.reply_error
