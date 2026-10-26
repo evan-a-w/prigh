@@ -139,7 +139,7 @@ let disconnected_hint (m : App.Model.t) =
     sprintf
       "not signed in%s · /signin signs in · /connect switches server"
       (match Option.bind m.server ~f:(fun s -> s.address) with
-       | Some address -> " to " ^ address
+       | Some address -> " to " ^ Server_address.display_string address
        | None -> "")
 ;;
 
@@ -546,7 +546,9 @@ let sign_in_dialog ~width form =
     1 + row, 2 + Int.min (Content.Line.width line) (inner - 1)
   in
   ( Boxed.render
-      ~title:("Sign in to " ^ Sign_in_form.address form)
+      ~title:
+        ("Sign in to "
+         ^ Server_address.display_string (Sign_in_form.address form))
       ~width
       (rows @ note @ Content.wrap hint ~width:inner)
   , cursor )
@@ -864,7 +866,13 @@ let context_text (s : P.State.t) =
 
 let server_part (m : App.Model.t) =
   match Option.bind m.server ~f:(fun s -> s.address) with
-  | Some address -> [ 6, [ span ~style:gray ("server:" ^ address) ] ]
+  | Some address ->
+    [ 6
+    , [ span
+          ~style:gray
+          ("server:" ^ Server_address.display_string address)
+      ]
+    ]
   | None -> []
 ;;
 

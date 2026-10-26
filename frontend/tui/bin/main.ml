@@ -92,9 +92,19 @@ let command =
          "-connect"
          (optional string)
          ~doc:
-           "HOST:PORT connect to a running `prigh serve -listen` instead of \
-            spawning one (default: $PRIGH_CONNECT, else the saved connection); \
+           "ADDRESS connect to a running backend instead of spawning one: \
+            HOST:PORT of `prigh serve -listen`, or a prigh-web URL \
+            (wss://host/ws, https://host/, ws://, http://), e.g. behind an \
+            HTTPS proxy (default: $PRIGH_CONNECT, else the saved connection); \
             saved for next time with -token and -user"
+     and headers =
+       flag
+         "-header"
+         (listed string)
+         ~doc:
+           "'NAME: VALUE' send this header with a prigh-web URL's WebSocket \
+            upgrade, e.g. a proxy's credentials (repeatable; default: \
+            $PRIGH_CONNECT_HEADERS, one per line; not saved)"
      and token =
        flag
          "-token"
@@ -199,6 +209,7 @@ let command =
          let switch name b = if b then [ name ] else [] in
          opt "-backend" (Option.map backend ~f:path_like)
          @ opt "-connect" connect
+         @ List.concat_map headers ~f:(fun h -> [ "-header"; h ])
          @ opt "-token" token
          @ opt "-user" user
          @ switch "-local" local
@@ -243,20 +254,43 @@ let command =
        let { S.Resolved.settings = { connect; token; user }; save } =
          S.resolve
            ~saved
-           ~flags:{ connect; token; user }
+           ~flags:
+             { connect = Option.map connect ~f:Prigh_ui.Server_address.normalize
+             ; token
+             ; user
+             }
            ~env:
-             { connect = Sys.getenv "PRIGH_CONNECT"
+             { connect =
+                 Option.map
+                   (Sys.getenv "PRIGH_CONNECT")
+                   ~f:Prigh_ui.Server_address.normalize
              ; token = Sys.getenv "PRIGH_TOKEN"
              ; user = Sys.getenv "PRIGH_USER"
              }
            ~local
        in
        Option.iter connect ~f:(fun address ->
-         match Prigh_ui.Server_link.parse_address address with
+         match Prigh_ui.Server_address.parse address with
          | Ok _ -> ()
          | Error e ->
            Core.eprintf "-connect: %s\n" e;
            Core.exit 2);
+       let headers =
+         (match headers with
+          | [] ->
+            Option.value_map
+              (Sys.getenv "PRIGH_CONNECT_HEADERS")
+              ~default:[]
+              ~f:(String.split_lines)
+            |> List.filter ~f:(Fn.non (String.for_all ~f:Char.is_whitespace))
+          | headers -> headers)
+         |> List.map ~f:(fun header ->
+           match Prigh_client_unix.Websocket_transport.parse_header header with
+           | Ok header -> header
+           | Error e ->
+             Core.eprintf "-header: %s\n" e;
+             Core.exit 2)
+       in
        if not detached
        then Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
        let module Link = Prigh_tui.Backend_link in
@@ -295,6 +329,7 @@ let command =
          in
          Prigh_tui.Term_app.run
            (Link.create
+              ~headers
               ~home
               ~backend
               ~spawn_args
