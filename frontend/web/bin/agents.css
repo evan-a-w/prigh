@@ -256,6 +256,7 @@
 .agents-children { margin: 0 -10px; }
 
 .agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; padding: 4px 0 4px 24px; }
+.agents-note.failed { color: var(--brick); }
 .agents-note.small { font-size: 12px; color: var(--faint); padding: 0; }
 
 /* The main chat's transcript at the panel's width: the spine under the

@@ -114,15 +114,19 @@ val subagents_to_load : t -> string list
 (** Fills in a [subagent] call's transcript, unless events already did. *)
 val set_subagent : t -> call_id:string -> Subagent.t -> t
 
-(** A subagent by its agent id, at any depth. *)
+(** A subagent by its agent id, at any depth, also one kept detached. *)
 val find_subagent : t -> string -> Subagent.t option
 
-(** [set_subagent] in the transcript of the subagent [parent] (at any depth),
-    or in [t] itself. *)
+(** A [get_subagent] reply: [set_subagent] in the transcript of the subagent
+    [parent] (at any depth), or in [t] itself. While that call is not loaded
+    (in an older page, or its parent not fetched yet) the subagent is kept
+    detached: found, and kept up to date by its events, and put on its call
+    once the call is loaded; or, unless [detach], dropped. *)
 val set_nested_subagent
   :  t
   -> parent:string option
   -> call_id:string
+  -> detach:bool
   -> Subagent.t
   -> t
 
