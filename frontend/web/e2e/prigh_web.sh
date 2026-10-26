@@ -21,6 +21,7 @@
 #   ENGINES              browsers to run (default: chromium firefox)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once
+#   SCRIPT_TIMEOUT       seconds a script may take (default 300)
 #   TIMES=1              print how long each script took
 #   UPDATE=1             rewrite ENGINE.expected instead of diffing
 set -euo pipefail
@@ -48,7 +49,9 @@ run_one() {
 	local file=${script%%:*} part=${script#*:}
 	[ "$part" != "$script" ] || part=""
 	mkdir -p "$tmp/$engine/$script"
-	TEST_DIR="$tmp/$engine/$script" node "$here/$file.mjs" "$engine" $part \
+	# A script that hangs fails, with what it printed, instead of hanging the run.
+	TEST_DIR="$tmp/$engine/$script" timeout -k 10 "${SCRIPT_TIMEOUT:-300}" \
+		node "$here/$file.mjs" "$engine" $part \
 		>"$tmp/$engine-$script.out" 2>"$tmp/$engine-$script.err" || status=$?
 	if [ -n "${TIMES:-}" ]; then
 		printf '%-9s %-11s %6.1fs\n' "$engine" "$script" "$(awk "BEGIN { print $EPOCHREALTIME - $start }")" >&2
@@ -71,7 +74,8 @@ for engine in $engines; do
 		if [ "$(cat "$tmp/$engine-$script.status")" != 0 ]; then
 			failed="$failed $engine/$script"
 			ok=""
-			echo "--- $engine $script failed; its stderr:" >&2
+			echo "--- $engine $script failed (status $(cat "$tmp/$engine-$script.status")); its output and stderr:" >&2
+			tail -20 "$tmp/$engine-$script.out" >&2
 			cat "$tmp/$engine-$script.err" >&2
 		fi
 	done
