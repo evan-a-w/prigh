@@ -26,6 +26,8 @@ module Target : sig
     ; online : bool (** whether the active host is connected *)
     ; as_user : string option (** a superuser acting as another user *)
     ; generation : int (** bumped by "New shell" and "Retry" *)
+    ; dir : string option
+      (** a shell of its own there ([/terminal DIR]), not the session's *)
     }
   [@@deriving sexp_of, equal]
 
@@ -37,6 +39,9 @@ type t =
   ; generation : int
   ; status : (string * Status.t) option
     (** the latest report, for the target with this key *)
+  ; dir : (string * string) option
+    (** the session (its id) whose shell is in this directory instead: for
+        that session only *)
   }
 [@@deriving sexp_of]
 
@@ -47,7 +52,10 @@ val target : t -> State.t -> hello:Hello_reply.t option -> Target.t
 val status : t -> Target.t -> Status.t
 
 (** Where the shell runs: the active host's name and directory. *)
-val where : State.t -> string * string
+val where : t -> State.t -> string * string
+
+(** The session's own shell again ([None]), or one in [dir]. *)
+val set_dir : t -> State.t -> string option -> t
 
 (** What to do about a [Failed] message. *)
 val advice : string -> string

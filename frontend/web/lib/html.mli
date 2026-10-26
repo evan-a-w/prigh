@@ -77,6 +77,10 @@ module Icon : sig
     | Toc
     | Repo
     | Branch_plus
+    | More
+    | Fork
+    | Pull_request
+    | Review
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

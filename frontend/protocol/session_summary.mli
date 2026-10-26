@@ -20,8 +20,8 @@ type t =
   ; host : string option (** the tool host its cwd is on, when recorded *)
   ; repo : Repo.t option
     (** where its cwd is in git; [None] outside a repository, or unknown *)
-  ; agent_worktrees : Agent_worktree.t list
-    (** worktrees made for its subagents, not removed yet *)
+  ; worktrees : Session_worktree.t list
+    (** those that matter to it, not removed yet, by when they first did *)
   }
 [@@deriving sexp_of, equal]
 
