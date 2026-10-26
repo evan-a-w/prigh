@@ -363,7 +363,10 @@ let%expect_test "fuzzy ranking: a typo's subsequence prefers runs of letters" =
 ;;
 
 let%expect_test "fuzzy ranking: command names" =
-  let names = List.map Commands.all ~f:(fun (c : Commands.Spec.t) -> c.name) in
+  let names =
+    List.map (Commands.all ~superuser:true) ~f:(fun (c : Commands.Spec.t) ->
+      c.name)
+  in
   List.iter [ "mo"; "lo"; "s"; "sw"; "xyz" ] ~f:(fun query ->
     printf
       "%-4S -> %s\n"
@@ -459,16 +462,30 @@ let%expect_test "commands" =
     ()
     (((name x) (args ()) (rest "")))
     |}];
-  List.iter [ "modle"; "hlep"; "sess"; "zzzz" ] ~f:(fun s ->
+  List.iter [ "modle"; "hlep"; "sess"; "zzzz"; "nix-g" ] ~f:(fun s ->
+    let closest superuser =
+      Option.map (Commands.closest ~superuser s) ~f:(fun c -> c.name)
+    in
     print_s
       [%message
-        s (Option.map (Commands.closest s) ~f:(fun c -> c.name) : string option)]);
+        s
+          ~others:(closest false : string option)
+          ~superusers:(closest true : string option)]);
   [%expect
     {|
-    (modle ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (mode)))
-    (hlep ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (help)))
-    (sess ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (session)))
-    (zzzz ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" ()))
+    (modle
+      (others     (mode))
+      (superusers (mode)))
+    (hlep
+      (others     (help))
+      (superusers (help)))
+    (sess
+      (others     (session))
+      (superusers (session)))
+    (zzzz
+      (others     ())
+      (superusers ()))
+    (nix-g (others ()) (superusers (nix-gc)))
     |}]
 ;;
 
@@ -614,7 +631,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     ()
     |}];
   print_endline (Content.to_plain Keymap.help);
-  print_endline (Content.to_plain Commands.help);
+  print_endline (Content.to_plain (Commands.help ~superuser:true));
   print_endline (Content.to_plain Commands.input_help);
   print_endline (Content.to_plain Keymap.list_help);
   [%expect
@@ -729,6 +746,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /signin [user]                     sign in to the server, as another user or again
     /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them
+    /nix-gc [run [DAYS|all]]           show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones)
     /quit                              exit
     !command   run a shell command; its output joins the context
     !!command  run a shell command without adding it to the context
@@ -2171,6 +2189,7 @@ let%expect_test
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~superuser:false
       ~current_session:None
       ~line
       ~col:(String.length line)
@@ -2251,6 +2270,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~superuser:false
       ~current_session:None
       ~line
       ~col:(String.length line)
@@ -2403,6 +2423,7 @@ let%expect_test
   let show ?col ?default_dir_host line =
     match
       Autocomplete.compute
+        ~superuser:false
         ~current_session:None
         ~line
         ~col:(Option.value col ~default:(String.length line))
