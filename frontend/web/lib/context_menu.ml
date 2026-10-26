@@ -100,9 +100,9 @@ let worktree_items (s : Session_summary.t) ~path : (Item.t * string * string) li
   in
   [ Item.Switch_here, "Switch session here", "/worktree open " ^ target
   ; New_session_here, "New session here", "/worktree open -n " ^ target
-  ; Review, "Review changes", "/review"
-  ; Files, "Open in file browser", "/files"
-  ; Terminal, "Open terminal there", "/terminal"
+  ; Review, "Review changes", "/review " ^ target
+  ; Files, "Open in file browser", "/files " ^ path
+  ; Terminal, "Open terminal there", "/terminal " ^ path
   ; Create_pr, "Create pull request…", "/pr new"
   ; Copy_path, "Copy path", ""
   ; Remove, "Remove worktree…", "/worktree rm " ^ target

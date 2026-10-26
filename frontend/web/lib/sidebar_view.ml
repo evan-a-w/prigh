@@ -29,16 +29,14 @@ module Session_worktrees = Prigh_ui.Session_worktrees
    gives no position) under the row. *)
 let open_menu ~inject target ~row (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t)
   =
-  let x = ev##.clientX
-  and y = ev##.clientY in
+  let x = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientX)
+  and y = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientY) in
   let anchor : Context_menu.Anchor.t =
     if x = 0 && y = 0 then Element row else Point { x; y }
   in
+  Js_of_ocaml.Dom.preventDefault ev;
   Effect.Many
-    [ Effect.Prevent_default
-    ; Effect.Stop_propagation
-    ; inject (Action.Open_menu { target; anchor })
-    ]
+    [ Effect.Stop_propagation; inject (Action.Open_menu { target; anchor }) ]
 ;;
 
 (* The row's ⋯: its menu, under the button. *)
@@ -48,7 +46,7 @@ let more_button ~inject ~id ~label target =
       [ Attr.class_ "btn icon ghost more"
       ; Attr.type_ "button"
       ; Attr.id id
-      ; Attr.title "More: open, rename, fork, worktrees, delete… (right-click, Shift+F10)"
+      ; Attr.title "More (right-click, Shift+F10)"
       ; Attr.create "aria-label" ("More for " ^ label)
       ; Attr.create "aria-haspopup" "menu"
       ; Attr.on_click (fun _ ->

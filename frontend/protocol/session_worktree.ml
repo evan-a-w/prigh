@@ -26,10 +26,10 @@ let of_json j =
   let%bind branch = Json.string_opt_field j "branch" in
   let%bind root = Json.string_field j "root" in
   let%bind source = Json.string_field j "source" in
-  let%map source : Source.t =
+  let%map source =
     match source with
-    | "created" -> Ok Created
-    | "entered" -> Ok Entered
+    | "created" -> Ok Source.Created
+    | "entered" -> Ok Source.Entered
     | "pull_request" ->
       let%map number = Json.int_field j "pr" in
       Source.Pull_request number

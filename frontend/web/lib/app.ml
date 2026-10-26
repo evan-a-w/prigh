@@ -1786,6 +1786,14 @@ let with_terminal (m : Model.t) ~f = { m with terminal = f m.terminal }
 
 (* The shell takes the keyboard (Ctrl+` gives it back); on a phone the panel
    covers the page, the sidebar's drawer included. *)
+(* [/terminal DIR]: a shell of its own there, for this session; [None]:
+   the session's own again. *)
+let with_terminal_dir (m : Model.t) dir =
+  match m.state with
+  | None -> m
+  | Some state -> with_terminal m ~f:(fun t -> Terminal.set_dir t state dir)
+;;
+
 let open_terminal (m : Model.t) =
   ( { m with
       terminal = { m.terminal with open_ = true }
@@ -3529,11 +3537,20 @@ let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
           ] )
       | None -> m, []
     in
-    (* Only the repositories on the session's tool host can be listed. *)
+    (* Only the repositories on the session's tool host can be listed; its
+       own repository's listing is the one above. *)
+    let own_root =
+      List.find_map m.sessions ~f:(fun s ->
+        if String.equal s.id state.session_id
+        then Option.map s.repo ~f:(fun r -> r.root)
+        else None)
+    in
     let roots =
       Prigh_ui.Session_worktrees.roots
         (List.filter m.sessions ~f:(fun s ->
            Option.for_all s.host ~f:(String.equal state.active_host)))
+      |> List.filter ~f:(fun root ->
+        not (Option.exists own_root ~f:(String.equal root)))
       |> Repo_listings.wanted m.repo_worktrees
     in
     ( { m with repo_worktrees = Repo_listings.requested m.repo_worktrees roots }
@@ -3838,7 +3855,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
   | "files", "" -> with_files m (Files.update m.files (Open None))
   | "files", path -> with_files m (Files.update m.files (Open (Some path)))
-XX
+  | "terminal", "" -> open_terminal (with_terminal_dir m None)
+  | "terminal", dir -> open_terminal (with_terminal_dir m (Some dir))
   | "agents", "" -> open_agents m None
   | "agents", _ ->
     (match words with
@@ -5742,9 +5760,21 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Fork -> plan ~run:"/fork" ()
      | New_worktree -> plan ~run:"/worktree new" ()
      | Switch_here ->
-       plan ~enter:dir ~notice:("Working in the worktree " ^ dir) ()
+       let label =
+         List.find s.worktrees ~f:(fun w -> String.equal w.path dir)
+         |> Option.value_map ~default:(Filename.basename dir) ~f:Session_worktree.label
+       in
+       plan
+         ~enter:dir
+         ~notice:(sprintf "Working in the worktree %s (%s)" label dir)
+         ()
      | New_session_here -> new_session_in m dir
-     | Review -> plan ?enter:worktree ~run:"/review" ()
+     | Review ->
+       plan
+         ~run:
+           (Option.value_map worktree ~default:"/review" ~f:(fun w ->
+              "/review " ^ w))
+         ()
      | Files -> plan ~run:("/files " ^ dir) ()
      | Terminal ->
        plan

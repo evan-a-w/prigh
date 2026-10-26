@@ -97,9 +97,10 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
           then close
           else Effect.Ignore)
       ; Attr.on_contextmenu (fun ev ->
+          Js_of_ocaml.Dom.preventDefault ev;
           if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-          then Effect.Many [ Effect.Prevent_default; close ]
-          else Effect.Prevent_default)
+          then close
+          else Effect.Ignore)
       ]
     [ Node.div
         ~attrs:

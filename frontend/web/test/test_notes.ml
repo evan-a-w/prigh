@@ -409,7 +409,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
-    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
+    /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /unarchive [session] unarchive a session (this one without an argument)
     /permissions show the mode and the allow/ask/deny rules (config and this session)

@@ -9,7 +9,7 @@ module Target = struct
     | Session_search
     | Session of string
     | Worktree of
-        { session : string (** the id of the session it is under *)
+        { session : string
         ; path : string
         }
     | Terminal
