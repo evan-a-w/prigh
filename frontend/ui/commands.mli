@@ -15,7 +15,6 @@ module Argument : sig
     | Login
     | Logout
     | Sessions
-    | Session_list (** several, completed word by word *)
     | Path
     | Directory
     | Default_directory
@@ -27,7 +26,7 @@ module Argument : sig
     | Goal (** [off], [resume], or the goal *)
     | Resume (** [now] or [cancel] *)
     | Trim (** [after], [undo], [show] or [hide] *)
-    | Delete (** [undo] *)
+    | Delete (** [undo], or several sessions, completed word by word *)
     | Snippet (** a snippet name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
     | Worktree

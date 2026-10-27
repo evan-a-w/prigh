@@ -13,6 +13,8 @@ module Picker_kind = struct
     | Fork of Entry.t list
     | Rewind of Entry.t list
     | Trim of Trim.Point.t list
+    | Trim_after of Message_point.t list
+    | Delete_message of Message_point.t list
     | Tree of Entry.t list
     | Agents
     | Jobs
@@ -63,6 +65,7 @@ module Confirm_action = struct
     | Forge_logout of string (** the host *)
     | Rewind of string
     | Trim of string
+    | Trim_after of string
     | Delete_sessions of
         { paths : string list
         ; back : Open_picker.t option
