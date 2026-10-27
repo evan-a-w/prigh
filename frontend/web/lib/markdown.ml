@@ -21,6 +21,10 @@ module Inline = struct
         { href : string
         ; children : t list
         }
+    | Math of
+        { tex : string
+        ; display : bool
+        }
     | Break
   [@@deriving sexp_of, equal]
 
@@ -57,6 +61,70 @@ module Inline = struct
       Some (text, after)
   ;;
 
+  (* The first [closer] at or after [j], skipping backslash escapes. *)
+  let find_unescaped s j ~hi ~closer =
+    let len = String.length closer in
+    let rec go j =
+      if j + len > hi
+      then None
+      else if String.is_substring_at s ~pos:j ~substring:closer
+      then Some j
+      else if Char.equal s.[j] '\\'
+      then go (j + 2)
+      else go (j + 1)
+    in
+    go j
+  ;;
+
+  (* Math opening at [i]: its TeX, whether it is display math, and the index
+     after it. [$$..$$], [\[..\]] and [\(..\)] close at their first closer;
+     [$..$] by pandoc's rule, so that prices and shell variables stay text:
+     the opening [$] is followed by a non-space (and not preceded by a letter
+     or digit: US$3), and the first [$] after it closes, if it follows a
+     non-space and is not followed by a letter or digit ($5 and $10, $HOME/$USER). *)
+  let math_span s i ~hi =
+    let span ~display ~closer =
+      match find_unescaped s (i + 2) ~hi ~closer with
+      | None -> None
+      | Some j ->
+        let tex = String.sub s ~pos:(i + 2) ~len:(j - i - 2) in
+        if String.for_all tex ~f:Char.is_whitespace
+        then None
+        else Some (tex, display, j + String.length closer)
+    in
+    if i + 1 >= hi
+    then None
+    else (
+      match s.[i], s.[i + 1] with
+      | '$', '$' -> span ~display:true ~closer:"$$"
+      | '\\', '(' -> span ~display:false ~closer:"\\)"
+      | '\\', '[' -> span ~display:true ~closer:"\\]"
+      | '$', c
+        when (not (Char.is_whitespace c))
+             && not (i > 0 && Char.is_alphanum s.[i - 1]) ->
+        let rec close j =
+          if j >= hi
+          then None
+          else (
+            match s.[j] with
+            | '\\' -> close (j + 2)
+            | '$' ->
+              if
+                (not (Char.is_whitespace s.[j - 1]))
+                && not (j + 1 < hi && Char.is_alphanum s.[j + 1])
+              then
+                Some (String.sub s ~pos:(i + 1) ~len:(j - i - 1), false, j + 1)
+              else None
+            | _ -> close (j + 1))
+        in
+        close (i + 1)
+      | _ -> None)
+  ;;
+
+  let after_math s i ~hi =
+    Option.map (math_span s i ~hi) ~f:(fun (_, _, after) -> after)
+  ;;
+
   (* The next unescaped [c] at depth zero outside code spans, from [i]. *)
   let find_matching s i ~hi ~open_ ~close =
     let rec go j depth =
@@ -64,18 +132,21 @@ module Inline = struct
       then None
       else (
         let c = s.[j] in
-        if Char.equal c '\\'
-        then go (j + 2) depth
-        else if Char.equal c '`'
-        then (
-          match code_span s j ~hi with
-          | Some (_, after) -> go after depth
-          | None -> go (j + run s j ~hi '`') depth)
-        else if Char.equal c close
-        then if depth = 0 then Some j else go (j + 1) (depth - 1)
-        else if Char.equal c open_
-        then go (j + 1) (depth + 1)
-        else go (j + 1) depth)
+        match after_math s j ~hi with
+        | Some after -> go after depth
+        | None ->
+          if Char.equal c '\\'
+          then go (j + 2) depth
+          else if Char.equal c '`'
+          then (
+            match code_span s j ~hi with
+            | Some (_, after) -> go after depth
+            | None -> go (j + run s j ~hi '`') depth)
+          else if Char.equal c close
+          then if depth = 0 then Some j else go (j + 1) (depth - 1)
+          else if Char.equal c open_
+          then go (j + 1) (depth + 1)
+          else go (j + 1) depth)
     in
     go i 0
   ;;
@@ -85,7 +156,12 @@ module Inline = struct
     let rec go j =
       if j >= hi
       then None
-      else if Char.equal s.[j] '\\'
+      else (
+        match after_math s j ~hi with
+        | Some after -> go after
+        | None -> step j)
+    and step j =
+      if Char.equal s.[j] '\\'
       then go (j + 2)
       else if Char.equal s.[j] '`'
       then (
@@ -183,47 +259,53 @@ module Inline = struct
       then ()
       else (
         let c = s.[i] in
-        match c with
-        | '\\' when i + 1 < hi && Char.equal s.[i + 1] '\n' ->
-          emit Break;
-          go (i + 2)
-        | '\\' when i + 1 < hi && is_punct s.[i + 1] ->
-          Buffer.add_char buf s.[i + 1];
-          go (i + 2)
-        | '\n' ->
-          let contents = Buffer.contents buf in
-          Buffer.clear buf;
-          Buffer.add_string buf (String.rstrip contents);
-          emit Break;
-          let rec skip j =
-            if j < hi && Char.equal s.[j] ' ' then skip (j + 1) else j
-          in
-          go (skip (i + 1))
-        | '`' ->
-          (match code_span s i ~hi with
-           | Some (code, after) ->
-             emit (Code code);
-             go after
-           | None when partial ->
-             let n = run s i ~hi '`' in
-             if i + n < hi
-             then emit (Code (String.sub s ~pos:(i + n) ~len:(hi - i - n)))
-           | None ->
-             let n = run s i ~hi '`' in
-             text i (i + n);
-             go (i + n))
-        | '*' | '_' | '~' -> emphasis i c
-        | '!' when i + 1 < hi && Char.equal s.[i + 1] '[' -> link i ~image:true
-        | '[' -> link i ~image:false
-        | '<' -> autolink i
-        | 'h' when starts_url s i ~hi ->
-          let stop = url_end s i ~hi in
-          let url = String.sub s ~pos:i ~len:(stop - i) in
-          emit (Link { href = url; children = [ Text url ] });
-          go stop
-        | _ ->
-          Buffer.add_char buf c;
-          go (i + 1))
+        match math_span s i ~hi with
+        | Some (tex, display, after) ->
+          emit (Math { tex; display });
+          go after
+        | None ->
+          (match c with
+           | '\\' when i + 1 < hi && Char.equal s.[i + 1] '\n' ->
+             emit Break;
+             go (i + 2)
+           | '\\' when i + 1 < hi && is_punct s.[i + 1] ->
+             Buffer.add_char buf s.[i + 1];
+             go (i + 2)
+           | '\n' ->
+             let contents = Buffer.contents buf in
+             Buffer.clear buf;
+             Buffer.add_string buf (String.rstrip contents);
+             emit Break;
+             let rec skip j =
+               if j < hi && Char.equal s.[j] ' ' then skip (j + 1) else j
+             in
+             go (skip (i + 1))
+           | '`' ->
+             (match code_span s i ~hi with
+              | Some (code, after) ->
+                emit (Code code);
+                go after
+              | None when partial ->
+                let n = run s i ~hi '`' in
+                if i + n < hi
+                then emit (Code (String.sub s ~pos:(i + n) ~len:(hi - i - n)))
+              | None ->
+                let n = run s i ~hi '`' in
+                text i (i + n);
+                go (i + n))
+           | '*' | '_' | '~' -> emphasis i c
+           | '!' when i + 1 < hi && Char.equal s.[i + 1] '[' ->
+             link i ~image:true
+           | '[' -> link i ~image:false
+           | '<' -> autolink i
+           | 'h' when starts_url s i ~hi ->
+             let stop = url_end s i ~hi in
+             let url = String.sub s ~pos:i ~len:(stop - i) in
+             emit (Link { href = url; children = [ Text url ] });
+             go stop
+           | _ ->
+             Buffer.add_char buf c;
+             go (i + 1)))
     and emphasis i c =
       let r = run s i ~hi c in
       let after = i + r in
@@ -311,7 +393,7 @@ module Inline = struct
 
   let rec to_plain l =
     List.map l ~f:(function
-      | Text s | Code s -> s
+      | Text s | Code s | Math { tex = s; _ } -> s
       | Strong l | Emph l | Strike l | Link { children = l; _ } -> to_plain l
       | Break -> " ")
     |> String.concat
@@ -336,6 +418,7 @@ module Block = struct
         ; text : string
         ; closed : bool
         }
+    | Math of string
     | Quote of t list
     | List of
         { start : int option
@@ -401,6 +484,73 @@ module Fence = struct
             line
             (ind + Inline.run line ind ~hi:(String.length line) t.char))
   ;;
+end
+
+(* Display math on lines of its own: [$$] or [\\[] starting a line, up to the
+   first line ending with [$$] or [\\]]. *)
+module Math_fence = struct
+  (* The closer that [line] opens math for, and the rest of the line. *)
+  let opening line =
+    let ind = indent line in
+    if ind > 3
+    then None
+    else (
+      let rest = String.drop_prefix line ind in
+      List.find_map
+        [ "$$", "$$"; "\\[", "\\]" ]
+        ~f:(fun (opener, closer) ->
+          Option.map (String.chop_prefix rest ~prefix:opener) ~f:(fun rest ->
+            closer, rest)))
+  ;;
+
+  (* The math starting at line [i] and the line after it, if it closes
+     there or on a later line. The closer is the first one after the opener:
+     [$$a$$ and $$b$$] is a paragraph. *)
+  let block lines i =
+    match opening lines.(i) with
+    | None -> None
+    | Some (closer, first) ->
+      let ends line = String.chop_suffix (String.rstrip line) ~suffix:closer in
+      let has_closer line = String.is_substring line ~substring:closer in
+      let tex =
+        match ends first with
+        | Some tex when not (has_closer tex) -> Some (tex, i + 1)
+        | Some _ -> None
+        | None when has_closer first -> None
+        | None ->
+          let rec find j =
+            if j >= Array.length lines
+            then None
+            else (
+              match ends lines.(j) with
+              | Some last when not (has_closer last) ->
+                let middle = Array.sub lines ~pos:(i + 1) ~len:(j - i - 1) in
+                Some
+                  ( String.concat
+                      ~sep:"\n"
+                      ((first :: Array.to_list middle) @ [ last ])
+                  , j + 1 )
+              | Some _ -> None
+              | None -> if has_closer lines.(j) then None else find (j + 1))
+          in
+          find (i + 1)
+      in
+      Option.bind tex ~f:(fun (tex, stop) ->
+        if String.for_all tex ~f:Char.is_whitespace
+        then None
+        else Some (String.strip tex, stop))
+  ;;
+
+  (* For [block_starts], which cannot see what is to come: whether [line]
+     opens math still open after it, and whether [line] closes it. *)
+  let opens line =
+    match opening line with
+    | Some (closer, rest) when not (String.is_substring rest ~substring:closer)
+      -> Some closer
+    | _ -> None
+  ;;
+
+  let closes ~closer line = String.is_substring line ~substring:closer
 end
 
 let heading line =
@@ -570,6 +720,7 @@ let table_start lines i =
 let starts_block lines i =
   let line = lines.(i) in
   Option.is_some (Fence.opening line)
+  || Option.is_some (Math_fence.block lines i)
   || Option.is_some (heading line)
   || is_rule line
   || Option.is_some (quote_content line)
@@ -597,9 +748,12 @@ let rec parse_lines ?(partial = false) lines =
       if is_blank line
       then go (i + 1)
       else (
-        match Fence.opening line with
-        | Some fence -> go (code fence (i + 1))
-        | None ->
+        match Fence.opening line, Math_fence.block lines i with
+        | Some fence, _ -> go (code fence (i + 1))
+        | None, Some (tex, stop) ->
+          add (Block.Math tex);
+          go stop
+        | None, None ->
           (match heading line with
            | Some (level, text) ->
              add
@@ -799,6 +953,7 @@ let rec first_inlines (blocks : Block.t list) =
     (match List.find (String.split_lines text) ~f:(Fn.non is_blank) with
      | Some line -> Some [ Text line ]
      | None -> first_inlines rest)
+  | Math tex :: _ -> Some [ Text tex ]
   | Rule :: rest -> first_inlines rest
 ;;
 
@@ -845,17 +1000,26 @@ let block_starts text =
       let line = String.sub text ~pos ~len:(stop - pos) in
       let next = stop + 1 in
       match fence with
-      | Some f ->
-        let fence = if Fence.closes f line then None else Some f in
+      | Some (`Code f) ->
+        let fence = if Fence.closes f line then None else fence in
+        go next ~fence ~after_blank:false ~listy acc
+      | Some (`Math closer) ->
+        let fence = if Math_fence.closes ~closer line then None else fence in
         go next ~fence ~after_blank:false ~listy acc
       | None when is_blank line -> go next ~fence ~after_blank:true ~listy acc
       | None ->
         let start =
           after_blank && pos > 0 && not (listy && may_continue line)
         in
+        let fence =
+          match Fence.opening line, Math_fence.opens line with
+          | Some f, _ -> Some (`Code f)
+          | None, Some closer -> Some (`Math closer)
+          | None, None -> None
+        in
         go
           next
-          ~fence:(Fence.opening line)
+          ~fence
           ~after_blank:false
           ~listy:(item_or_quote line || (listy && not start))
           (if start then pos :: acc else acc))

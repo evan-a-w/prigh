@@ -1,8 +1,16 @@
 open! Core
 
 (** Markdown as a tree: the subset language models write (CommonMark-ish
-    blocks, GitHub tables, task lists and strikethrough). Total: any input
-    parses. Single newlines inside a paragraph are line breaks.
+    blocks, GitHub tables, task lists and strikethrough) and TeX math. Total:
+    any input parses. Single newlines inside a paragraph are line breaks.
+
+    Math is [$..$] or [\(..\)] inline, [$$..$$] or [\[..\]] for display
+    (inline, or on lines of their own), outside code. A [$] opens math only
+    before a non-space and not after a letter or digit, and closes it only
+    after a non-space and not before a letter or digit (pandoc's rule,
+    stricter), so that prices ([$5 and $10], [US$3]) and shell variables
+    ([$HOME/$PATH]) stay text; [\$] is a dollar. Math left open is text, so
+    a reply streaming its math shows it as written until it closes.
 
     [partial]: the text is a prefix still being streamed, so spans left open
     at its end (emphasis, code, links) are shown as if closed and a lone
@@ -18,6 +26,10 @@ module Inline : sig
     | Link of
         { href : string (** http, https or mailto only *)
         ; children : t list
+        }
+    | Math of
+        { tex : string
+        ; display : bool (** [$$..$$] or [\[..\]], not [$..$] or [\(..\)] *)
         }
     | Break
   [@@deriving sexp_of, equal]
@@ -44,6 +56,7 @@ module Block : sig
         ; text : string
         ; closed : bool (** false while the closing fence is still to come *)
         }
+    | Math of string (** display math on lines of its own *)
     | Quote of t list
     | List of
         { start : int option (** [Some n] for an ordered list *)
