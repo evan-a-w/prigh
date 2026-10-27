@@ -65,9 +65,10 @@ val empty : t
 
 (** Oldest first: what is trimmed from the context ([trim]), the outline's
     points before the first message loaded ([paging.older]), then those of
-    [chat]. *)
+    [chat] but those [deleting] (entries hidden while deleted). *)
 val points
-  :  t
+  :  ?deleting:Int.Set.t
+  -> t
   -> path:string option
   -> paging:Paging.t
   -> trim:Trim.t option

@@ -126,7 +126,12 @@ let note (m : App.Model.t) ~inject =
   if Transcript_filter.is_all m.transcript_filter
   then []
   else (
-    let hidden = Chat_view.hidden ~fold:(App.Model.fold m) m.chat in
+    let hidden =
+      Chat_view.hidden
+        ~deleting:m.trimmed.deleting
+        ~fold:(App.Model.fold m)
+        m.chat
+    in
     List.return
     @@ Node.div
          ~attrs:[ Attr.class_ "filter-note"; Attr.role "status" ]

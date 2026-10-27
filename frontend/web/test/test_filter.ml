@@ -83,6 +83,7 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -90,11 +91,14 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     |}]
 ;;
 
@@ -157,13 +161,17 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     == without assistant
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding replies (/filter)
     Hiding replies · 2 items hidden (Show all)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -171,54 +179,69 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     == without thinking
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
     Hiding thinking · 1 item hidden (Show all)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     ✓ bash ls
     README.md
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     == without tools
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding tool calls (/filter)
     Hiding tool calls · 1 item hidden (Show all)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     Thought Let me look first.
     Let me look first.
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     == without subagents
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding subagents (/filter)
     Hiding subagents · 1 item hidden (Show all)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
     README.md
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
     ■ Interrupted
+    (✂ Trim before) (✕ Delete)
     == without notes
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
     Hiding notices · 1 item hidden (Show all)
     Survey the repository
+    (✂ Trim after) (✕ Delete)
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -226,10 +249,13 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Twelve modules and a README.
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     And the tests?
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     Looking
+    (✂ Trim before) (✕ Delete)
     |}]
 ;;
 

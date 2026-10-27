@@ -282,7 +282,7 @@ let argument_items
   | Logout ->
     Some (provider_items auth @ pairs (Forge_accounts.logout_completions forge))
   | Pr -> Some (pairs Pr_command.subcommands)
-  | Sessions | Session_list ->
+  | Sessions | Delete ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
@@ -314,6 +314,10 @@ let argument_items
   | Trim ->
     Some
       [ Picker.Item.create
+          ~id:"after"
+          ~detail:"drop everything after a message instead"
+          "after"
+      ; Picker.Item.create
           ~id:"undo"
           ~detail:"bring the latest trim's messages back into the context"
           "undo"
@@ -439,14 +443,19 @@ let compute_argument
                         "off"
                     ]
                   ~candidates:(model_items ~logged_in models)
-              | Session_list when Option.is_some sessions ->
+              | Delete when Option.is_some sessions ->
                 compute_words
                   ~spec
                   ~line
                   ~col
                   ~line_index
                   ~start
-                  ~first:[]
+                  ~first:
+                    [ Picker.Item.create
+                        ~id:"undo"
+                        ~detail:"bring the latest deleted message back"
+                        "undo"
+                    ]
                   ~candidates:
                     (Option.value_map sessions ~default:[] ~f:session_items)
               | Commands.Argument.Path | Directory | Default_directory ->
@@ -518,7 +527,7 @@ let compute_argument
                       ; selected = 0
                       ; navigated = false
                       })
-              | (Sessions | Session_list) when Option.is_none sessions ->
+              | (Sessions | Delete) when Option.is_none sessions ->
                 (* Loading; the app fetches the session list. *)
                 Some
                   { source = Source.Argument spec

@@ -27,6 +27,12 @@ module Picker_kind : sig
     | Trim of Trim.Point.t list
     (** [/trim]: where to trim the context before; item ids are
         [Trim.Point.before]s *)
+    | Delete_message of Message_point.t list
+    (** [/delete]: a message to delete; item ids are
+        [Message_point.message]s *)
+    | Trim_after of Message_point.t list
+    (** [/trim after]: where to trim the context after; item ids are
+        [Message_point.message]s *)
     | Worktrees of Worktree.Listing.t (** item ids are their paths *)
     | Themes (** item ids are [Theme.Name.to_string]s *)
     | Accents (** item ids are [Theme.Accent.to_string]s *)
@@ -81,6 +87,11 @@ type t =
       ; busy : bool (** trimming: waiting for the backend *)
       ; error : string option
       } (** trim the context before [point]? *)
+  | Trim_after_confirm of
+      { point : Message_point.t
+      ; busy : bool (** trimming: waiting for the backend *)
+      ; error : string option
+      } (** trim the context after [point]? *)
   | Create_dir of
       { target : Dir_change.Target.t
       ; path : string (** absolute, on the target's host *)

@@ -2113,10 +2113,11 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
-  (* Without arguments it opens the picker, where Tab marks. *)
+  (* Without arguments it picks a message to delete; /sessions picks
+     sessions. *)
   run h "/delete";
   [%expect
-    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker)) |}]
+    {| (Rpc (method_ get_message_points) (params ()) (tag (Message_points Delete))) |}]
 ;;
 
 let%expect_test "/delete completes session after session" =
@@ -2124,6 +2125,8 @@ let%expect_test "/delete completes session after session" =
   H.keys h "/delete ";
   [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache)) |}];
   H.reply h Sessions_cache archive_sessions_json;
+  (* [undo] first, as the only word. *)
+  H.key h (Key.plain Down);
   H.key h (Key.plain Tab);
   H.keys h " ";
   H.show h;
@@ -2826,7 +2829,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 297 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 301 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes

@@ -38,7 +38,20 @@ module Method : sig
     (** what is trimmed from the client's session: {!Trim.trimmed_of_json} *)
     | Trim of { before : string (** {!Trim.Point.before} *) }
     (** drops what comes before it from the model's context: {!Trim.Freed} *)
-    | Untrim (** cancels the latest trim: {!Trim.Freed} *)
+    | Untrim (** cancels the latest trim (before or after): {!Hidden} *)
+    | Get_message_points
+    (** the client's session's messages that can be deleted or trimmed
+        after: {!Message_point.list_of_json} *)
+    | Get_hidden of { entry : string (** {!Hidden.entry} *) }
+    (** what that range keeps out of the context: {!Trim.trimmed_of_json} *)
+    | Trim_after of { after : string (** {!Message_point.message} *) }
+    (** drops what comes after it, up to the newest message, from the
+        model's context: {!Hidden} *)
+    | Delete_message of { message : string (** {!Message_point.message} *) }
+    (** drops it (and its tool calls' results) from the model's context:
+        {!Hidden} *)
+    | Undelete (** cancels the latest deletion: {!Hidden} *)
+    | Restore of Hidden.t (** cancels that range: {!Hidden} *)
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option (** in this subagent's transcript *)

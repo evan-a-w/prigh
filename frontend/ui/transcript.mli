@@ -52,13 +52,17 @@ module Item : sig
     | Block of Content.t
     | Compaction of string
     | Trimmed of
-        { messages : int
+        { after : string option
+          (** a trim after a message: its range's entry ({!P.Hidden.t.entry});
+              [None]: the trims before one *)
+        ; messages : int
         ; tokens : int
         ; shown : P.Message.t list option
           (** unfolded ([/trim show]): the messages out of the context *)
         }
-    (** the divider standing for what is trimmed from the model's context,
-        at the transcript's start *)
+    (** the divider standing for what is trimmed from the model's context:
+        at the transcript's start for the trims before a message, where the
+        messages were for a trim after one *)
     | Delivery of string
     (** finished background subagents' reports handed to the main agent *)
     | Skill of
@@ -105,9 +109,14 @@ val apply : t -> P.Event.t -> t
 
 val notice : ?severity:Severity.t -> t -> string -> t
 
-(** Unfolds ([Some messages]) or folds the [Trimmed] divider; [false] when
-    there is none. *)
-val show_trimmed : t -> P.Message.t list option -> t * bool
+(** Unfolds ([Some messages]) or folds the [Trimmed] divider whose [after]
+    is [after]; [false] when there is none. *)
+val show_trimmed
+  :  t
+  -> after:string option
+  -> P.Message.t list option
+  -> t * bool
+
 val clear : t -> t
 
 (** Without the items (and the text streaming) of the kinds [filter] hides. *)

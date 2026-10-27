@@ -1180,8 +1180,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Pinned_messages.shorten`, and their latest verbatim; files from before
   there could be several have one id, which loads as one unshortened pin;
   `context_ids` gives each message's entry id); a `Trim {before}` entry
-  (`append_trim`, only before a user message in the context other than the
-  first, and never parting a tool call from its result) drops everything
+  (`append_trim`, only before a user message or a reply in the context
+  other than the first, never a tool result, so never parting a tool call
+  from its result; `Provider.Request.prepare` puts a user turn ahead of a
+  context that then starts with a reply) drops everything
   before that message, the summary and pinned messages too when it cuts
   into a compaction's kept part (a pinned message can itself be the trim
   point: the pins before it go), and `Untrim`
@@ -1197,7 +1199,28 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   and `trim`). `rewind` and `fork` keep the trim in effect: recorded again
   after the head moves while its message is still in the context (rewinding
   to before it drops it), cancelled when there was none. `Trim_point`
-  lists where a trim may go, with what each frees. Every message up to
+  lists where a trim may go, with what each frees. `Trim_after {after;
+  through}` (`append_trim_after`: not the newest message, not at or before
+  a compaction's summary, never parting a call from its result) drops the
+  messages after `after` up to `through`, the newest when it was made, so
+  later ones stay; `Delete {message}` (`append_delete`: a user or assistant
+  message in the context) drops it and, for a reply, its calls' results
+  (`Message_point.deleted_with`, paired as `Tool_pairing` pairs them); and
+  `Restore {entry}` (`append_untrim ~entry`, `append_undelete`) cancels the
+  range that entry made, `Untrim` still the latest trim of either kind.
+  All of them fold into `Hidden` ranges (`hidden`: kind, the entry to undo,
+  messages, tokens, a trim after's `divider` position); what a cancelled
+  range took out comes back where it was, but for what another range in
+  effect also covers. A compaction folds the context as it is, so it
+  neither summarises nor pins what is hidden, and undoing a range from
+  before it brings its messages back ahead of the summary. `rewind` and
+  `fork` record each range in effect again while its message is on the
+  path (a trim after then reaching as far as the path does), and cancel
+  those on the new path that were not. `Message_point` lists the context's
+  messages with what deleting each, or trimming after it, takes out.
+  `Provider.Request.prepare` puts a placeholder user turn in front of a
+  request that starts with a reply (its first message deleted), which
+  Anthropic would refuse. Every message up to
   the last `Masked` entry's `through` is masked (`Observation_mask.mask`,
   cached by entry id; pinned messages are the user's, which masking leaves
   as they are). Masking is a pure function of the message, so a masked
@@ -1564,7 +1587,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
-  `get_trim_points`, `get_trimmed`,
+  `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
+  `get_message_points`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
@@ -1656,15 +1680,25 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   sessions read from disk that way or evicted, and subagent logs, are
   kept (`File_cache`) while their files are unchanged.
   `get_trim_points {session?}` (`Trim_point`) answers `{points: [{before,
-  index, text, at?, messages, tokens}]}` (the user's messages in the
-  context but the first, `index` and `text` as the outline's), `trim
+  index, role, text, at?, messages, tokens}]}` (the user's messages and the
+  replies in the context but the first; `role` `user` or `assistant`, absent
+  meaning `user`; a user message's `text` as the outline's), `trim
   {before}` and `untrim` answer `{messages, tokens}` (what they took out or
   brought back; refused while a run is in progress), and `get_trimmed
   {session?}` has the trimmed messages, as `get_messages` (long tool outputs
   cut), oldest first; `get_state`'s `trim` (`{before, messages, tokens,
   at?}`, only while something is trimmed) tells every client, which reload
   their transcript when it changes. Pages and the outline are the context,
-  so they start at the trim.
+  so they start at the trim. `trim_after {after}`, `delete {message}`,
+  `untrim {entry?}` and `undelete {entry?}` answer the range they made or
+  cancelled (`{entry, kind: trim_before|trim_after|deleted, message,
+  through?, messages, tokens, at?, divider?}`; `trim` still answers
+  `{messages, tokens}`), `get_trimmed {entry}` has that range's messages,
+  `get_message_points` (`Message_point`) answers `{points: [{message,
+  index, role, text, at?, trim_before?, delete?, trim_after?}]}` (what each would take
+  out; absent where refused), and `get_state`'s `hidden` lists every range
+  in effect, so clients reload when it changes. Deleted and trimmed-after
+  messages are not in pages, the outline or `get_messages`.
   `get_outline {session?}` (`Outline`) answers `{points: [{index, kind,
   text, at?}]}`, the transcript's landmarks for a frontend that has only
   some pages loaded: the user's messages (what they wrote, or the title of
@@ -1961,6 +1995,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     of a trimmed session and unfolds with `/trim show`'s `get_trimmed`; a
     changed `trim` in a state reloads the messages, `Trim_reload`; `/trim`
     is a picker of `get_trim_points`, newest first, then a confirmation;
+    a changed `State.hidden` reloads them too, with a `Trimmed` divider
+    (`after`: its range's entry) at each trim after's `divider`, and
+    `/delete` and `/trim after` are pickers of `get_message_points`;
     Ctrl+↑ stops at the divider; `Transcript.apply` is the one
     event→transcript function, used for the main transcript and each
     subagent; it renders items as `Log_line`s, lines with a two-column
@@ -2426,10 +2463,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       message once `paging.older = 0`, and Show's messages (`get_trimmed`)
       dimmed and read-only above it. A user message is matched to its
       `get_trim_points` entry by counting from the newest end
-      (`Jump.from_end`), checked by its time; its hover action is a
-      `data-trim-entry` button handled by a page-level click listener, like
-      folds, and opens the confirmation dialog (`Dialog.Trim_confirm`), as
-      `/trim`'s picker and Delete in the jump list do. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
+      (`Jump.from_end`), checked by its time, for the jump list's Delete.
+      Every message of the context has one row of actions (`Chat_view`'s
+      `.msg-actions`, shown on hover, or on a phone when a tap focuses the
+      message): ✂ Trim before (`data-trim-entry`, opening
+      `Dialog.Trim_confirm`, as `/trim`'s picker does), ✂ Trim after and ✕
+      Delete, buttons handled by a page-level click listener, like folds.
+      `Message_index` maps the loaded entries to their context positions,
+      for the row's trim before, ✕ Delete (a tool call's deletes its reply)
+      and ✂ Trim after (`Dialog.Trim_after_confirm`), checked against
+      `get_message_points`, and for placing each `State.hidden` trim after's
+      divider; a deletion hides its entry at once and shows a toast with
+      Undo (`Restore`); a changed `hidden` reloads the newest page. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
       `Jump_older` when none is above the first loaded. `app/`'s
       `Jump_listeners` marks the rail's mark of the landmark at the upper
       third of the view (`aria-current`, as the chat scrolls) and the entry
@@ -2691,7 +2736,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       mean"), the account; its controls are
       `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
-      column; a repeat is counted rather than stacked, a notice's lifetime
+      column, beside the jump-to-the-end button rather than over it; a
+      repeat is counted rather than stacked, one of a kind (a setting's, a
+      trim's or its undo's: `replaces`) takes the place of the last, a notice's lifetime
       grows with its length, errors stay until dismissed, long paths are
       elided in the middle with the whole text as the title; with a dialog
       or a phone's sheet open, the newest one at the bottom of the page,

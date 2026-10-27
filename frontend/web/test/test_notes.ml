@@ -390,7 +390,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /trim [undo] drop everything before one of your messages from the model's context (the transcript keeps it folded); undo brings back the last trim
+    /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /quit how to leave (close the tab; /signout signs out)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)

@@ -1677,3 +1677,120 @@ let%expect_test "git hosting: replies and auth events" =
     (Event (Auth (Forge_logged_out codeberg.org)))
     |}]
 ;;
+
+let%expect_test "hidden ranges, message points and the requests about them" =
+  let hidden =
+    {|[{"entry":"t0","kind":"trim_before","message":"u2","messages":2,"tokens":100},
+       {"entry":"t1","kind":"trim_after","message":"a3","through":"a4","messages":2,"tokens":200,"at":1700001000000,"divider":4},
+       {"entry":"d1","kind":"deleted","message":"a2","messages":2,"tokens":1200}]|}
+  in
+  (match
+     Fixtures.state_json ~extra:[ "hidden", hidden ] ()
+     |> Json.parse
+     |> Or_error.bind ~f:State.of_json
+   with
+   | Ok state ->
+     print_s [%sexp (state.hidden : Hidden.t list)];
+     print_s [%sexp (Hidden.trims_after state.hidden : Hidden.t list)];
+     List.iter state.hidden ~f:(fun h ->
+       print_s
+         [%sexp
+           (h.entry : string)
+         , (Hidden.is_trim h : bool)
+         , (Hidden.deleted_label h : string)])
+   | Error e -> print_s [%message "error" (e : Error.t)]);
+  (* Absent: nothing hidden. *)
+  (match
+     Json.parse (Fixtures.state_json ()) |> Or_error.bind ~f:State.of_json
+   with
+   | Ok state -> print_s [%sexp (state.hidden : Hidden.t list)]
+   | Error e -> print_s [%message "error" (e : Error.t)]);
+  (* [untrim] answers a range, which [Trim.Freed] decodes too. *)
+  print_s
+    [%sexp
+      (Json.parse
+         {|{"entry":"t1","kind":"trim_after","message":"a3","through":"a4","messages":2,"tokens":200}|}
+       |> Or_error.bind ~f:Trim.Freed.of_json
+       : Trim.Freed.t Or_error.t)];
+  print_s
+    [%sexp
+      (Json.parse
+         {|{"points":[
+           {"message":"u1","index":0,"role":"user","text":"first","at":1700000000000,"delete":{"messages":1,"tokens":40},"trim_after":{"messages":7,"tokens":2400}},
+           {"message":"a2","index":3,"role":"assistant","text":"bash","delete":{"messages":2,"tokens":1200}},
+           {"message":"r2","index":4,"role":"tool_result","text":"bash","trim_after":{"messages":3,"tokens":1100}}]}|}
+       |> Or_error.bind ~f:Message_point.list_of_json
+       : Message_point.t list Or_error.t)];
+  List.iter
+    [ Request.Method.Get_message_points
+    ; Delete_message { message = "a2" }
+    ; Undelete
+    ; Trim_after { after = "a3" }
+    ; Untrim
+    ; Get_hidden { entry = "t1" }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    (((entry    t0)
+      (kind     Trim_before)
+      (message  u2)
+      (messages 2)
+      (tokens   100))
+     ((entry t1)
+      (kind (Trim_after (through a4)))
+      (message  a3)
+      (messages 2)
+      (tokens   200)
+      (at       "2023-11-14 22:30:00Z")
+      (divider  4))
+     ((entry    d1)
+      (kind     Deleted)
+      (message  a2)
+      (messages 2)
+      (tokens   1200)))
+    ((
+      (entry t1)
+      (kind (Trim_after (through a4)))
+      (message  a3)
+      (messages 2)
+      (tokens   200)
+      (at       "2023-11-14 22:30:00Z")
+      (divider  4)))
+    (t0 true "2 messages deleted")
+    (t1 true "2 messages deleted")
+    (d1 false "2 messages deleted")
+    ()
+    (Ok (
+      (messages 2)
+      (tokens   200)))
+    (Ok (
+      ((message u1)
+       (index   0)
+       (role    User)
+       (text    first)
+       (at      "2023-11-14 22:13:20Z")
+       (delete     ((messages 1) (tokens 40)))
+       (trim_after ((messages 7) (tokens 2400))))
+      ((message a2)
+       (index   3)
+       (role    Assistant)
+       (text    bash)
+       (delete (
+         (messages 2)
+         (tokens   1200))))
+      ((message r2)
+       (index   4)
+       (role    Tool_result)
+       (text    bash)
+       (trim_after (
+         (messages 3)
+         (tokens   1100))))))
+    {"id":1,"method":"get_message_points","params":{}}
+    {"id":1,"method":"delete","params":{"message":"a2"}}
+    {"id":1,"method":"undelete","params":{}}
+    {"id":1,"method":"trim_after","params":{"after":"a3"}}
+    {"id":1,"method":"untrim","params":{}}
+    {"id":1,"method":"get_trimmed","params":{"entry":"t1"}}
+    |}]
+;;

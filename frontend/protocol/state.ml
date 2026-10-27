@@ -65,6 +65,7 @@ type t =
   ; plan : Plan.t option
   ; session_rules : string list
   ; trim : Trim.t option [@sexp.option]
+  ; hidden : Hidden.t list [@sexp.list]
   }
 [@@deriving sexp_of, equal]
 
@@ -139,7 +140,8 @@ let of_json j =
   let%bind session_rules =
     Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
   in
-  let%map trim = Trim.field j in
+  let%bind trim = Trim.field j in
+  let%map hidden = Hidden.field j in
   { session_id
   ; session_path
   ; session_name
@@ -167,5 +169,6 @@ let of_json j =
   ; plan
   ; session_rules
   ; trim
+  ; hidden
   }
 ;;
