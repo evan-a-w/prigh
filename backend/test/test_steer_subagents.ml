@@ -647,3 +647,96 @@ let%expect_test
     (complete, 2 messages)
     |}]
 ;;
+
+(* Resolves after [n] of a1's turns have ended. *)
+let after_turns agent n =
+  let p, r = Eio.Promise.create () in
+  let seen = ref 0 in
+  Agent.subscribe agent ~f:(fun (event : Agent.Event.t) ->
+    match event with
+    | Loop (Subagent { agent_id = "a1"; event = Turn_end _; _ }) ->
+      incr seen;
+      if !seen = n then Eio.Promise.resolve r ()
+    | _ -> ());
+  p
+;;
+
+let%expect_test
+    "steering a subagent that waits for its own background job: it wakes, \
+     then waits again"
+  =
+  let job =
+    Reply.tool_call
+      ~id:"t1"
+      ~name:"bash"
+      ~arguments:
+        {|{"command":"timeout 30 sh -c 'while [ ! -f gate ]; do sleep 0.02; done'; echo finished","background":true}|}
+      ()
+  in
+  with_agent
+    ~on_request:print_requests
+    ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got it" ]
+    [ ( "work"
+      , [ job
+        ; Reply.text "waiting"
+        ; Reply.text "steered, still waiting"
+        ; Reply.text "job done"
+        ] )
+    ]
+  @@ fun t agent ->
+  let waiting = after_turns agent 2 in
+  let steered = after_turns agent 3 in
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  Eio.Promise.await waiting;
+  log_subagent agent;
+  print_endline "--- steer while it waits for j1";
+  send agent "use the tests";
+  Eio.Promise.await steered;
+  print_endline "--- j1 finishes";
+  Tool_test_helpers.write t "gate" "";
+  Agent.wait_idle agent;
+  transcript agent "a1";
+  [%expect {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    request work: u(work)
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    agent_end
+    state: running=false subagents=[a1 running]
+    request work: u(work) a[t1] r[t1]
+    --- steer while it waits for j1
+    queue: a1 steer=[use the tests] follow_up=[]
+    (Ok ())
+    queue:
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    request work: u(work) a[t1] r[t1] a u([The user sends you this)
+      [a1] assistant: steered, still waiting
+    --- j1 finishes
+      [a1] user: [job j1 exited 0] timeout 30 sh -c 'while [ ! -f gate ]; do sleep 0.02; done'… | finished
+    request work: u(work) a[t1] r[t1] a u([The user sends you this) a u([job j1 exited 0] timeou)
+      [a1] assistant: job done
+    subagent_end a1: ok job done | [subagent: 4 turns, 50 in / 23 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | job done | [subagent: 4 turns, 50 in / 23 out tokens, $0.0000]
+    assistant: got it
+    agent_end
+    state: running=false subagents=[]
+    --- a1's transcript
+    user: work
+    assistant:  bash{"command":"timeout 30 sh -c 'while [ ! -f gate ]; do sleep 0.02; done'; echo finished","background":true}
+    tool_result bash: started job j1: timeout 30 sh -c 'while [ ! -f gate ]; do sleep 0.02; done'…; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to peek, job_kill to stop it.
+    assistant: waiting
+    user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    assistant: steered, still waiting
+    user: [job j1 exited 0] timeout 30 sh -c 'while [ ! -f gate ]; do sleep 0.02; done'… | finished
+    assistant: job done
+    (complete, 8 messages)
+    |}]
+;;
