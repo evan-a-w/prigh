@@ -574,6 +574,50 @@ let%expect_test "/trim show unfolds every divider, read-only; hide folds them" =
     |}]
 ;;
 
+let%expect_test "under /filter, both dividers stay where they were" =
+  let h = both () in
+  run h "/filter -user -tools";
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_messages) (params ()) (tag Trim_reload))
+    (Rpc
+      (method_ set_prefs)
+      (params ((prefs ((tui.transcript-filter user,tools)))))
+      (tag Ignore))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ──── 2 messages trimmed · ~100 tokens ──── /trim show · /trim undo
+      two files
+
+    ──── 2 messages trimmed · ~200 tokens ──── /trim show · /trim undo
+      fourth answer
+    ──────────────────────── filter: −user −tools — /filter all shows everything ───
+    > ▏
+    deepseek-flash  think:off  mode:auto  filter: −user −tools  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test "only a trim after: /trim show asks for its range alone" =
   let h = connected () in
   H.event h (State (state ~extra:(hidden [ trim_after_json ~divider:2 ]) ()));

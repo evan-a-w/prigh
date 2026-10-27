@@ -33,6 +33,7 @@ let%expect_test "the names of the controls" =
     button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
+    button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)

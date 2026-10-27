@@ -692,6 +692,7 @@ let loading ~title ~inject =
 let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   match dialog with
   | Hotkeys -> Some (hotkeys ~inject)
+  | Filter _ -> None
   | Scoped_models { picker; checked } ->
     Some (scoped_models picker checked ~inject)
   | Prompt p -> Some (prompt m p ~inject)

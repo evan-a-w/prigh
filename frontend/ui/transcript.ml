@@ -65,6 +65,17 @@ module Item = struct
         ; joined : bool
         }
   [@@deriving sexp_of, equal]
+
+  let kind : t -> Transcript_filter.Kind.t option = function
+    | User _ | Skill _ -> Some User
+    | Assistant _ -> Some Assistant
+    | Thinking _ -> Some Thinking
+    | Tool { subagent = Some _; _ } -> Some Subagents
+    | Tool { call; _ } -> Some (Transcript_filter.Kind.of_tool call.name)
+    | Server_tool _ -> Some Tools
+    | Trimmed _ -> None
+    | Notice _ | Block _ | Compaction _ | Delivery _ | Note _ -> Some Notes
+  ;;
 end
 
 let summary_prefix = "Summary of the conversation so far:\n"
@@ -131,6 +142,24 @@ let add t (item : Item.t) =
 
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
+
+let filter t filter =
+  if Transcript_filter.is_all filter
+  then t
+  else (
+    let shows item =
+      Option.for_all (Item.kind item) ~f:(Transcript_filter.shows filter)
+    in
+    { items_rev = List.filter t.items_rev ~f:shows
+    ; stream =
+        Option.filter t.stream ~f:(fun (kind, _) ->
+          Transcript_filter.shows
+            filter
+            (match (kind : Stream_kind.t) with
+             | Text -> Assistant
+             | Thinking -> Thinking))
+    })
+;;
 
 let show_trimmed t ~after shown =
   let found = ref false in
@@ -879,10 +908,26 @@ let render_all t ~width ~verbosity : Content.t =
     ~f:(fun item -> render_item item ~width ~verbosity)
 ;;
 
-let user_message_lines t ~width ~verbosity : int list =
-  let rec go items acc offset =
+let user_message_lines ?(filter = Transcript_filter.all) t ~width ~verbosity
+  : int list
+  =
+  let shows item =
+    Option.for_all (Item.kind item) ~f:(Transcript_filter.shows filter)
+  in
+  (* [hidden_turn]: a message of the user's is hidden since the last item
+     shown, so the next one shown marks its turn. *)
+  let rec go items acc offset ~hidden_turn =
     match items with
     | [] -> List.rev acc
+    | item :: rest when not (shows item) ->
+      let hidden_turn =
+        hidden_turn
+        ||
+        match item with
+        | Item.User _ | Item.Skill _ -> true
+        | _ -> false
+      in
+      go rest acc offset ~hidden_turn
     | item :: rest ->
       let acc =
         match item with
@@ -891,11 +936,16 @@ let user_message_lines t ~width ~verbosity : int list =
         (* The divider, past the folded messages and the blank line. *)
         | Item.Trimmed _ ->
           (offset + List.length (render_item item ~width ~verbosity) - 1) :: acc
+        | _ when hidden_turn -> offset :: acc
         | _ -> acc
       in
-      go rest acc (offset + List.length (render_item item ~width ~verbosity))
+      go
+        rest
+        acc
+        (offset + List.length (render_item item ~width ~verbosity))
+        ~hidden_turn:false
   in
-  go (List.rev (all_items_rev t)) [] 0
+  go (List.rev (all_items_rev t)) [] 0 ~hidden_turn:false
 ;;
 
 let render_window t ~width ~rows ~top ~verbosity : Content.t =

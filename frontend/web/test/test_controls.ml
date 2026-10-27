@@ -242,6 +242,16 @@ let%expect_test
     <div class="chat-tools">
       <div class="panel-toggles">
         <button type="button"
+                title="Filter the transcript (/filter)"
+                aria-label="Filter the transcript"
+                id="filter-toggle"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                class="btn filter-toggle ghost icon"
+                @on_click>
+          <icon class="filter"> </icon>
+        </button>
+        <button type="button"
                 title="Files (Ctrl+Shift+F)"
                 aria-label="Files"
                 aria-expanded="false"
@@ -467,6 +477,16 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
       </div>
       <div class="panel-toggles">
         <button type="button"
+                title="Filter the transcript (/filter)"
+                aria-label="Filter the transcript"
+                id="filter-toggle"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                class="btn filter-toggle ghost icon"
+                @on_click>
+          <icon class="filter"> </icon>
+        </button>
+        <button type="button"
                 title="Files (Ctrl+Shift+F)"
                 aria-label="Files"
                 aria-expanded="false"
@@ -499,7 +519,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
     {|
     (Sessions (Ctrl+B)) (New session)
     (0%) ↑0 ↓0 $0.0000 Ready
-    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
   (* Its toggle brings the sidebar back, and the card with it. *)

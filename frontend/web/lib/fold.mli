@@ -4,12 +4,22 @@ open! Import
 (** Which tool outputs show in full. Normal verbosity folds every output to a
     few lines, verbose shows them all; the user toggles one (its call id, or
     a delivered job's id) from that default, and [scope] tells apart the
-    same call ids in subagents' transcripts. *)
+    same call ids in subagents' transcripts. Also which kinds of the
+    transcript show at all ([/filter]), in subagents' transcripts too. *)
 
 type t [@@deriving sexp_of]
 
-(** [toggled]: keys ([key]) the user unfolded, or in verbose folded. *)
-val create : verbosity:Prigh_ui.Verbosity.t -> toggled:String.Set.t -> t
+(** [toggled]: keys ([key]) the user unfolded, or in verbose folded.
+    [filter]: everything, by default. *)
+val create
+  :  ?filter:Transcript_filter.t
+  -> verbosity:Prigh_ui.Verbosity.t
+  -> toggled:String.Set.t
+  -> unit
+  -> t
+
+val filter : t -> Transcript_filter.t
+val shows : t -> Transcript_filter.Kind.t -> bool
 
 (** Normal verbosity, nothing toggled. *)
 val default : t

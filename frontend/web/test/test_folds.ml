@@ -292,7 +292,7 @@ let%expect_test "diffs fold to 8 rows" =
   [%expect
     {| - line 1 - line 2 - line 3 - line 4 - line 5 - line 6 - line 7 - line 8 Show all 24 lines |}];
   Chat_harness.text
-    ~fold:(Fold.create ~verbosity:Verbose ~toggled:String.Set.empty)
+    ~fold:(Fold.create ~verbosity:Verbose ~toggled:String.Set.empty ())
     ~selector:"button.fold"
     chat;
   [%expect {| Fold to 8 lines |}]
@@ -302,7 +302,7 @@ let%expect_test "subagents' calls fold under their own keys" =
   let fold = Fold.scoped Fold.default "a1/c3" in
   print_s [%sexp (Fold.key fold "c1" : string)];
   let toggled =
-    Fold.create ~verbosity:Normal ~toggled:(String.Set.singleton "a1/c3/c1")
+    Fold.create ~verbosity:Normal ~toggled:(String.Set.singleton "a1/c3/c1") ()
   in
   print_s
     [%sexp

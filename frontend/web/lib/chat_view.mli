@@ -23,7 +23,10 @@ end
     context starts with), "Trim everything after this"
     ([trim_after_attribute]; but on the newest) and "Delete"
     ([delete_attribute]). The entries in [deleting] are left out; [dividers]
-    go after their entries. *)
+    go after their entries, whatever the filter. What [Fold.filter] hides is
+    left out, with its actions, in subagents' transcripts too; a landmark of
+    [Jump] or a message of the context left out keeps an empty [.filtered]
+    with its attributes in its place. *)
 val view
   :  ?fold:Fold.t
   -> ?first:int
@@ -33,6 +36,11 @@ val view
   -> Message_time.t
   -> Chat.t
   -> Node.t
+
+(** How many parts of the loaded entries [Fold.filter] hides: messages,
+    blocks of replies, how replies stopped. The entries in [deleting] do not
+    count. *)
+val hidden : ?deleting:Int.Set.t -> fold:Fold.t -> Chat.t -> int
 
 (** The attributes of a message's "Trim everything before this", "Delete"
     and "Trim everything after this": the entry's number. *)

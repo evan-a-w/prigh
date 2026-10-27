@@ -257,6 +257,16 @@ let argument_items
   | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
+  | Filter ->
+    Some
+      (List.map Transcript_filter.words ~f:(fun word ->
+         Picker.Item.create
+           ~id:word
+           ~detail:
+             (match Transcript_filter.Kind.of_name word with
+              | Some kind -> Transcript_filter.Kind.label kind
+              | None -> "show everything")
+           word))
   | Confirm | Plan -> Some (confirm_items ())
   | Mode -> Some (mode_items ())
   | Notify -> Some (notify_items ())

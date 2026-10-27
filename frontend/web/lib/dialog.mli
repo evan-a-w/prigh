@@ -58,6 +58,9 @@ type t =
       { chip : Chip.t
       ; picker : Picker.t
       } (** a composer chip's menu, over the chip *)
+  | Filter of Filter_menu.t
+  (** the transcript filter's menu, under its button in the chat's top
+      corner *)
   | Review_pick of Review_picker.t
   (** the review page's menu of what to review or compare with, over its
       button *)

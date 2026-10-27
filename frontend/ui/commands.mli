@@ -8,6 +8,7 @@ module Argument : sig
     | Models (** several, completed word by word ([off] first) *)
     | Thinking
     | Verbosity
+    | Filter (** [/filter]: [all] and the kinds *)
     | Confirm
     | Mode
     | Plan
