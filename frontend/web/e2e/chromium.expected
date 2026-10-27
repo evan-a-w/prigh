@@ -745,17 +745,17 @@ hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
 chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
 chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
 Appearance
@@ -2083,4 +2083,59 @@ tapped: ✂Trim before, ✂Trim after, ✕Delete
 over its text: false
 Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 === chromium: trim: errors ===
+none
+=== chromium: filter: opened ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+note: none
+=== chromium: filter: menu ===
+> [x] Your messages
+  [x] Replies
+  [x] Thinking
+  [x] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+below the button: true; inside the window: true; focused: true
+=== chromium: filter: thinking and tools hidden ===
+  [x] Your messages
+  [x] Replies
+  [ ] Thinking
+> [ ] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+=== chromium: filter: Esc ===
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+=== chromium: filter: clicked outside ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== chromium: filter: reloaded ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== chromium: filter: another session ===
+user 1, replies 1, thinking 0, tools 0, subagents 0, stopped 0
+note: Hiding thinking, tool calls, subagents · 1 item hidden | Show all
+=== chromium: filter: your messages hidden ===
+user 0, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+rail: 2 marks
+the rail's first mark: jumped to where the message is
+Ctrl+J lists: 2 messages
+=== chromium: filter: show all ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+=== chromium: filter: image viewer ===
+#filter-toggle: under the image; .composer-controls .chip-button: under the image
+=== chromium: filter: phone ===
+below the button: true; inside the window: true; focused: true
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+note inside the screen: true; Show all clickable; button inside: true
+after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+=== chromium: filter: errors ===
 none

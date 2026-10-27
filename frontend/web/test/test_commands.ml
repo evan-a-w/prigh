@@ -41,6 +41,7 @@ let%expect_test "every command does something (none is unknown)" =
         (match dialog with
          | Picker { picker; _ } -> "picker: " ^ Picker.title picker
          | Scoped_models _ -> "scoped models dialog"
+         | Filter _ -> "transcript filter menu"
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
          | (Loading _ | Pulls _) as d ->
@@ -79,6 +80,7 @@ let%expect_test "every command does something (none is unknown)" =
     /thinking                  picker: Thinking level
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
+    /filter                    transcript filter menu
     /theme                     picker: Theme
     /accent                    picker: Accent colour (or type #rrggbb)
     /confirm                   picker: Tool confirmation
@@ -186,6 +188,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
     Alt+N insert a snippet at the caret: a list to filter (/snippet)
     Ctrl+O cycle the transcript verbosity
+    ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, its button left of the files'): choose a kind, show or hide it, keep the filter, or put back the one it opened with
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
@@ -1734,11 +1737,11 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+        (web.theme web.accent web.notify web.verbosity web.transcript-filter
+         web.terminal-open web.sidebar-folded web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1789,11 +1792,11 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+        (web.theme web.accent web.notify web.verbosity web.transcript-filter
+         web.terminal-open web.sidebar-folded web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

@@ -82,6 +82,11 @@ module Item : sig
         [/review], ... (reports of background work are [Delivery], the
         compaction summary [Compaction]) *)
   [@@deriving sexp_of, equal]
+
+  (** What [/filter] calls it: a message's notes go with it. [None]: always
+      on show (the divider in place of what is trimmed, which [/jump] goes
+      to). *)
+  val kind : t -> Transcript_filter.Kind.t option
 end
 
 module Stream_kind : sig
@@ -113,6 +118,9 @@ val show_trimmed
   -> t * bool
 
 val clear : t -> t
+
+(** Without the items (and the text streaming) of the kinds [filter] hides. *)
+val filter : t -> Transcript_filter.t -> t
 
 (** Streaming: [append] accumulates; a kind change or [flush] turns the
     accumulated text into an item. *)
@@ -156,8 +164,14 @@ val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
 
 (** Wrapped line index of each user turn's first line, oldest first, and of
     the [Trimmed] divider's (its messages are not turns of the
-    transcript). *)
-val user_message_lines : t -> width:int -> verbosity:Verbosity.t -> int list
+    transcript), in [t] as [filter] (default: everything) shows it: where
+    it hides your messages, the first line shown after each. *)
+val user_message_lines
+  :  ?filter:Transcript_filter.t
+  -> t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> int list
 
 (** Renders the wrapped lines in [\[top, top + rows)]. *)
 val render_window

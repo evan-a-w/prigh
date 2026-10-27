@@ -6,6 +6,7 @@ module Argument = struct
     | Models
     | Thinking
     | Verbosity
+    | Filter
     | Confirm
     | Mode
     | Plan
@@ -96,6 +97,12 @@ let every =
       "verbosity"
       "[quiet|normal|verbose]"
       "set the transcript verbosity"
+  ; c
+      ~argument:Argument.Filter
+      "filter"
+      "[all|KIND...|-KIND|+KIND]"
+      "show only some kinds of the transcript (user, assistant, thinking, \
+       tools, subagents, notes); the model's context is unchanged"
   ; c
       ~argument:Argument.Confirm
       "confirm"

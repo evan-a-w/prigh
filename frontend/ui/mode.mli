@@ -9,6 +9,7 @@ module Picker_kind : sig
     | Scoped_models
     | Thinking
     | Verbosity
+    | Transcript_filter (** [/filter]: the kinds on show, checked *)
     | Login
     | Logout
     | Sessions of Session_selection.t

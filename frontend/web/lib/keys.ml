@@ -54,6 +54,10 @@ let help =
   ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"
   ; "Alt+N", "insert a snippet at the caret: a list to filter (/snippet)"
   ; "Ctrl+O", "cycle the transcript verbosity"
+  ; ( "↑ ↓ / Space / Enter / Esc (transcript filter)"
+    , "the filter's menu (/filter, its button left of the files'): choose a \
+       kind, show or hide it, keep the filter, or put back the one it opened \
+       with" )
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; ( "Ctrl+↑ / Ctrl+↓"
     , "previous / next of your messages in the transcript (loading earlier \
@@ -198,8 +202,10 @@ let review_key (m : App.Model.t) t : App.Action.t option =
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
+  | " ", Filter _ when plain t -> Some (Filter_press None)
   | ( "ArrowUp"
     , ( Picker _
+      | Filter _
       | Popover _
       | Review_pick _
       | Login _
@@ -208,6 +214,7 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       | Pulls _ ) ) -> Some (Dialog_move (-1))
   | ( "ArrowDown"
     , ( Picker _
+      | Filter _
       | Popover _
       | Review_pick _
       | Login _

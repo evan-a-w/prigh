@@ -972,3 +972,77 @@ let%expect_test
      (restoring_ranges ()) (deleting ()) (reveal_hidden ()))
     |}]
 ;;
+
+let%expect_test
+    "under a filter: the divider stays, the actions go with what is hidden, a \
+     deleted message is not counted"
+  =
+  let h = trimmed_after () in
+  H.quiet h (fun () -> H.act h (Run "/filter -user"));
+  chat h;
+  (* Hidden messages keep their places, with nothing to focus. *)
+  H.elements h ~selector:".entries > .filtered[data-message-entry]";
+  H.elements h ~selector:".entries > [tabindex]";
+  [%expect
+    {|
+    Hiding your messages · 3 items hidden (Show all)
+    answer 1
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
+    answer 4
+    (✂ Trim before) (✕ Delete)
+    <div class="filtered">
+    <div class="filtered">
+    <div class="filtered">
+    <div class="assistant msg">
+    <div class="assistant msg">
+    |}];
+  (* What the divider shows is filtered too. *)
+  H.act h (Show_hidden { entry = "t1"; show = true });
+  H.reply
+    h
+    "get_trimmed"
+    (sprintf
+       {|{"messages":%s}|}
+       (messages [ assistant "answer 2"; user 3; assistant "answer 3" ]));
+  H.text h ~selector:".hidden-range";
+  [%expect
+    {|
+    (Rpc (method_ get_trimmed) (params ((entry t1)))
+     (tag (Hidden_messages (path /sessions/s1.jsonl) (entry t1))))
+    ✂ 3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
+    Not in the model's context Kept in the transcript only; the model no longer sees them.
+    answer 2
+    answer 3
+    |}];
+  (* Deleting a hidden message (from /delete): it is no longer counted. *)
+  H.act h (Ask_delete_message 3);
+  H.reply
+    h
+    "get_message_points"
+    (points
+       [ point ~at:1 ~message:"u1" ~index:0 ~role:"user" "question 1"
+       ; point ~message:"a1" ~index:1 ~role:"assistant" "answer 1"
+       ; point ~at:2 ~message:"u2" ~index:2 ~role:"user" "question 2"
+       ; point
+           ~at:4
+           ~message:"u4"
+           ~index:3
+           ~role:"user"
+           ~delete:(1, 500)
+           "question 4"
+       ; point ~message:"a4" ~index:4 ~role:"assistant" "answer 4"
+       ]);
+  H.text h ~selector:".filter-note";
+  H.elements h ~selector:".entries > .filtered[data-message-entry]";
+  [%expect
+    {|
+    (Rpc (method_ get_message_points) (params ())
+     (tag
+      (Message_points (Delete (entry 3) (index 3) (at ("2026-10-05 10:04:00Z"))))))
+    (Rpc (method_ delete) (params ((message u4))) (tag (Deleted (entry (3)))))
+    Hiding your messages · 2 items hidden (Show all)
+    <div class="filtered">
+    <div class="filtered">
+    |}]
+;;

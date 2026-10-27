@@ -324,6 +324,50 @@ let footer times (message : Message.Assistant.t) =
   | parts -> div "meta" parts
 ;;
 
+(* What [/filter] calls each part of an entry: a user's message with its
+   notes; each block of a reply, then how it stopped. *)
+let user_kind (u : Message.User.t) : Transcript_filter.Kind.t =
+  match Message.User.source u with
+  | Some _ -> Notes
+  | None -> User
+;;
+
+let content_kind : Content.t -> Transcript_filter.Kind.t = function
+  | Text _ -> Assistant
+  | Thinking _ -> Thinking
+  | Tool_call call -> Transcript_filter.Kind.of_tool call.name
+  | Server_tool _ -> Tools
+;;
+
+let blank : Content.t -> bool = function
+  | Text text | Thinking text -> String.is_empty (String.strip text)
+  | Tool_call _ | Server_tool _ -> false
+;;
+
+let parts : Chat.Entry.t -> Transcript_filter.Kind.t list = function
+  | User u -> [ user_kind u ]
+  | Shell _ -> [ Tools ]
+  | Compaction _ -> [ Notes ]
+  | Assistant { message; streaming = _ } ->
+    List.filter_map message.content ~f:(fun c ->
+      Option.some_if (not (blank c)) (content_kind c))
+    @
+    (match message.stop_reason with
+     | Error _ | Aborted | Length -> [ Notes ]
+     | End_turn | Tool_use -> [])
+;;
+
+let hidden ?(deleting = Int.Set.empty) ~fold chat =
+  if Transcript_filter.is_all (Fold.filter fold)
+  then 0
+  else
+    List.foldi (Chat.entries chat) ~init:0 ~f:(fun i sum e ->
+      if Set.mem deleting (Chat.first chat + i)
+      then sum
+      else
+        sum + List.count (parts e) ~f:(fun kind -> not (Fold.shows fold kind)))
+;;
+
 module Deps = struct
   type t =
     { n : int
@@ -333,10 +377,12 @@ module Deps = struct
     ; expanded : bool list (** the entry's folds *)
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     ; actions : Actions.t
+    ; filter : Transcript_filter.t
     }
 
   let equal a b =
     a.n = b.n
+    && Transcript_filter.equal a.filter b.filter
     && Actions.equal a.actions b.actions
     && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
@@ -385,6 +431,7 @@ and assistant
     List.mapi message.content ~f:(fun i content ->
       let last = i = count - 1 in
       match (content : Content.t) with
+      | content when not (Fold.shows fold (content_kind content)) -> Node.none
       | Text text when String.is_empty (String.strip text) -> Node.none
       | Text text -> Markdown_view.render ~streaming:(streaming && last) text
       | Thinking text
@@ -432,7 +479,7 @@ and assistant
         ])
     else Node.none
   in
-  let stopped = stopped message in
+  let stopped = if Fold.shows fold Notes then stopped message else Node.none in
   if List.is_empty blocks && (not streaming) && phys_equal stopped Node.none
   then Node.none
   else
@@ -440,12 +487,19 @@ and assistant
       (if streaming then "msg assistant streaming" else "msg assistant")
       ((pending :: blocks)
        @ [ stopped
-         ; (if streaming then Node.none else footer times message)
+         ; (if streaming
+               || (List.is_empty blocks
+                   && not (Transcript_filter.is_all (Fold.filter fold)))
+            then Node.none
+            else footer times message)
          ; actions
          ])
 
 and render_entry ?actions ~fold times chat (entry : Chat.Entry.t) =
   match entry with
+  | User u when not (Fold.shows fold (user_kind u)) -> Node.none
+  | Shell _ when not (Fold.shows fold Tools) -> Node.none
+  | Compaction _ when not (Fold.shows fold Notes) -> Node.none
   | User u ->
     let notes =
       Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) -> o.notes)
@@ -559,6 +613,7 @@ and entry ?first ?index ~fold times chat ~n (entry : Chat.Entry.t) =
                Option.exists tool ~f:(fun t -> Option.is_some t.subagent)))
             fold
       ; actions
+      ; filter = Fold.filter fold
       }
     ~equal:Deps.equal
     ~f:(fun () ->
@@ -577,13 +632,17 @@ and entry ?first ?index ~fold times chat ~n (entry : Chat.Entry.t) =
           chat
           entry
       in
-      let attrs =
+      let places =
         (if Jump.landmark entry
          then [ Attr.create "data-entry" (Int.to_string n) ]
          else [])
-        @ (if Option.is_some span
-           then [ Attr.create message_attribute (Int.to_string n) ]
-           else [])
+        @
+        if Option.is_some span
+        then [ Attr.create message_attribute (Int.to_string n) ]
+        else []
+      in
+      let attrs =
+        places
         @
         (* Focusable, so that a tap on a phone, which has no hover, shows
            its actions. *)
@@ -592,6 +651,9 @@ and entry ?first ?index ~fold times chat ~n (entry : Chat.Entry.t) =
       match node with
       | Element e when not (List.is_empty attrs) ->
         Element (Node.Element.map_attrs e ~f:(fun a -> Attr.many (a :: attrs)))
+      | node when phys_equal node Node.none && not (List.is_empty places) ->
+        (* Filtered out: the place stays for jumping and scrolling to. *)
+        Node.div ~attrs:(Attr.class_ "filtered" :: places) []
       | node -> node)
 
 (* Entries keep their keys as older ones are added before them, so that the

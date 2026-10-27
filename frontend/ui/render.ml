@@ -177,6 +177,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
      | None -> None
      | Some s ->
        (match m.mode with
+        | Picker { kind = Transcript_filter; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Space toggles · Enter applies · Esc cancels"
+            ]
         | Picker { kind = Scoped_models; _ } ->
           Some
             [ span
@@ -950,8 +956,13 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ]
       @ mode_part s
-      @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
-        ; 2, [ span ~style:(context_style context) (context_text s) ]
+      @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ] ]
+      @ Option.value_map
+          (Transcript_filter.summary m.transcript_filter)
+          ~default:[]
+          ~f:(fun summary ->
+            [ 3, [ span ~style:attention ("filter: " ^ summary) ] ])
+      @ [ 2, [ span ~style:(context_style context) (context_text s) ]
         ; ( 4
           , match Loop_status.budget_part s with
             | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
@@ -1736,9 +1747,11 @@ let frame (m : App.Model.t) =
     | _ -> None, rows
   in
   let source =
-    match focused with
-    | Some agent -> agent.transcript
-    | None -> m.transcript
+    Transcript.filter
+      (match focused with
+       | Some agent -> agent.transcript
+       | None -> m.transcript)
+      m.transcript_filter
   in
   let overlays = overlays m ~width:area ~rows in
   let overlay_lines = List.concat_map overlays ~f:(fun o -> o.lines) in

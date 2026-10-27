@@ -205,7 +205,10 @@ let%expect_test "the git hosts: fetched at start, listed by /auth" =
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
-    (Rpc (method_ get_prefs) (params ((keys (history)))) (tag Prefs_history))
+    (Rpc
+      (method_ get_prefs)
+      (params ((keys (history tui.transcript-filter))))
+      (tag Prefs_history))
     |}];
   let h = connected ~height:24 () in
   run h "/auth";

@@ -47,6 +47,7 @@ type t =
       { chip : Chip.t
       ; picker : Picker.t
       }
+  | Filter of Filter_menu.t
   | Review_pick of Review_picker.t
   | Help
   | Rename of string
@@ -164,6 +165,7 @@ let per_session = function
   | Help
   | Hotkeys
   | Settings
+  | Filter _
   | Scoped_models _
   | Delete _
   | Login _

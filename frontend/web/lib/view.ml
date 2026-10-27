@@ -230,7 +230,8 @@ let transcript (m : Model.t) ~inject =
           })))
   in
   Node.fragment
-    ([ Paging.view m.paging ~load:(inject Action.Load_older) ]
+    (Filter_view.note m ~inject
+     @ [ Paging.view m.paging ~load:(inject Action.Load_older) ]
      @ (match Option.bind m.state ~f:(fun s -> s.trim) with
         | Some _ -> [ Trim_view.view m ~inject ]
         | None -> [])
