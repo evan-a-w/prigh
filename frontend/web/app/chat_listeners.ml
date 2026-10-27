@@ -61,19 +61,40 @@ let toggle_fold ~schedule (ev : Dom_html.mouseEvent Js.t) =
            schedule (Prigh_web.App.Action.Toggle_fold (Js.to_string key))))
 ;;
 
-let trim_before ~schedule (ev : Dom_html.mouseEvent Js.t) =
+let attribute (el : Dom_html.element Js.t) name =
+  Js.Opt.to_option (el##getAttribute (Js.string name))
+  |> Option.map ~f:Js.to_string
+;;
+
+(* The clicked element with [attribute], and its value. *)
+let clicked (ev : Dom_html.mouseEvent Js.t) name =
+  Option.bind (Js.Opt.to_option ev##.target) ~f:(fun el ->
+    Option.bind (closest el (sprintf "[%s]" name)) ~f:(fun el ->
+      attribute el name |> Option.map ~f:(fun value -> el, value)))
+;;
+
+(* A message's "Trim everything before this", "Delete" and "Trim everything
+   after this". *)
+let entry_action ~schedule name action (ev : Dom_html.mouseEvent Js.t) =
+  Option.iter (clicked ev name) ~f:(fun (_, n) ->
+    Option.iter (Int.of_string_opt n) ~f:(fun n -> schedule (action n)))
+;;
+
+(* A trim after a message's divider's Show, Hide and Undo. *)
+let hidden_action ~schedule (ev : Dom_html.mouseEvent Js.t) =
   Option.iter
-    (Option.bind
-       (Js.Opt.to_option ev##.target)
-       ~f:(fun el ->
-         closest el (sprintf "[%s]" Prigh_web.Chat_view.trim_attribute)))
-    ~f:(fun el ->
-      Js.Opt.iter
-        (el##getAttribute (Js.string Prigh_web.Chat_view.trim_attribute))
-        (fun n ->
-           Option.iter
-             (Int.of_string_opt (Js.to_string n))
-             ~f:(fun n -> schedule (Prigh_web.App.Action.Ask_trim (Entry n)))))
+    (clicked ev Prigh_web.Chat_view.hidden_action_attribute)
+    ~f:(fun (el, what) ->
+      Option.iter
+        (attribute el Prigh_web.Chat_view.hidden_attribute)
+        ~f:(fun entry ->
+          match what with
+          | "show" ->
+            schedule (Prigh_web.App.Action.Show_hidden { entry; show = true })
+          | "hide" ->
+            schedule (Prigh_web.App.Action.Show_hidden { entry; show = false })
+          | "undo" -> schedule (Prigh_web.App.Action.Restore_range entry)
+          | _ -> ()))
 ;;
 
 let install ~schedule =
@@ -90,6 +111,18 @@ let install ~schedule =
   in
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
-  listen Dom_html.Event.click (trim_before ~schedule);
+  listen
+    Dom_html.Event.click
+    (entry_action ~schedule Prigh_web.Chat_view.trim_attribute (fun n ->
+       Ask_trim (Entry n)));
+  listen
+    Dom_html.Event.click
+    (entry_action ~schedule Prigh_web.Chat_view.delete_attribute (fun n ->
+       Ask_delete_message n));
+  listen
+    Dom_html.Event.click
+    (entry_action ~schedule Prigh_web.Chat_view.trim_after_attribute (fun n ->
+       Ask_trim_after n));
+  listen Dom_html.Event.click (hidden_action ~schedule);
   listen Dom_html.Event.keydown close_image
 ;;
