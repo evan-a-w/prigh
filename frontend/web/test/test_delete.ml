@@ -175,9 +175,10 @@ let%expect_test
   H.names h ~selector:".msg-actions button";
   [%expect
     {|
-    button "\226\156\149 Delete" -- Delete this message from the transcript and the model's context
-    button "\226\156\130 Trim everything after this" -- Trim everything after this from the model's context
-    button "\226\156\149 Delete" -- Delete this reply from the transcript and the model's context
+    button "Trim everything after this" -- Trim everything after this message from the model's context
+    button "Delete" -- Delete this message from the transcript and the model's context
+    button "Trim everything before this" -- Trim everything before this reply from the model's context
+    button "Delete" -- Delete this reply from the transcript and the model's context
     |}];
   (* A tool call's Delete is its reply's, with all its calls and results;
      trimming after it keeps its results. *)
@@ -187,23 +188,42 @@ let%expect_test
     {|
     <div class="msg-actions">
       <button type="button"
+              title="Trim everything before this reply from the model's context"
+              aria-label="Trim everything before this"
+              data-trim-entry="1"
+              class="trim-before">
+        <span aria-hidden="true" class="glyph"> ✂ </span>
+        Trim before
+      </button>
+      <button type="button"
+              title="Trim everything after this reply (with its tool call's result) from the model's context"
+              aria-label="Trim everything after this"
+              data-trim-after-entry="1"
+              class="trim-after">
+        <span aria-hidden="true" class="glyph"> ✂ </span>
+        Trim after
+      </button>
+      <button type="button"
               title="Delete this reply with its tool call and their results from the transcript and the model's context"
+              aria-label="Delete"
               data-delete-entry="1"
               class="msg-delete">
         <span aria-hidden="true" class="glyph"> ✕ </span>
         Delete
       </button>
-      <button type="button"
-              title="Trim everything after this (and its tool results) from the model's context"
-              data-trim-after-entry="1"
-              class="trim-after">
-        <span aria-hidden="true" class="glyph"> ✂ </span>
-        Trim everything after this
-      </button>
     </div>
     <div class="msg-actions">
       <button type="button"
+              title="Trim everything before this reply from the model's context"
+              aria-label="Trim everything before this"
+              data-trim-entry="2"
+              class="trim-before">
+        <span aria-hidden="true" class="glyph"> ✂ </span>
+        Trim before
+      </button>
+      <button type="button"
               title="Delete this reply from the transcript and the model's context"
+              aria-label="Delete"
               data-delete-entry="2"
               class="msg-delete">
         <span aria-hidden="true" class="glyph"> ✕ </span>
@@ -216,13 +236,13 @@ let%expect_test
     {|
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     Listing.
     ✓ bash ls
     a b
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     done
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     |}]
 ;;
 
@@ -239,16 +259,16 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
       (Message_points (Delete (entry 2) (index 2) (at ("2026-10-05 10:02:00Z"))))))
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     question 3 2 of 2  10:03 (Trim before)
     question 1 1 of 2  10:01
     |}];
@@ -286,16 +306,16 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
     (Scroll_to_message 1)
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     question 3 2 of 2  10:03 (Trim before)
     question 1 1 of 2  10:01
     |}];
@@ -322,19 +342,19 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
     Scroll_to_bottom
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     Back in the context: 1 message (~500 tokens)
     |}]
 ;;
@@ -349,9 +369,9 @@ let%expect_test "Delete on a tool call deletes its reply" =
      (tag (Message_points (Delete (entry 1) (index 1) (at ())))))
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     done
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     |}];
   H.reply
     h
@@ -410,15 +430,23 @@ let%expect_test "two deletions: a toast each, each Undo its own" =
     H.reply
       h
       "delete"
-      (hidden ~entry:"d2" ~kind:"deleted" ~message:"u1" ~messages:1 ~tokens:500 ()));
+      (hidden
+         ~entry:"d2"
+         ~kind:"deleted"
+         ~message:"u1"
+         ~messages:1
+         ~tokens:500
+         ()));
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Message deleted (Undo)
     Message deleted (Undo)
     |}];
   H.click h ~selector:".toast:first-child .toast-undo";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Restore_hidden
      ((entry d1) (kind Deleted) (message u2) (messages 1) (tokens 500)
       (at "2026-10-05 10:10:00Z")))
@@ -443,19 +471,19 @@ let%expect_test "a failed or stale delete shows the message again" =
     {|
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     Cannot delete a message while a run is in progress: wait for the run to end or abort it (Esc) (Dismiss)
     |}];
   (* The backend has other messages there. *)
@@ -468,19 +496,19 @@ let%expect_test "a failed or stale delete shows the message again" =
     {|
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     That message is not in the model's context any more: /delete lists those you can delete. (Dismiss)
     |}]
 ;;
@@ -575,11 +603,11 @@ let%expect_test
   [%expect
     {|
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 5020))
+    (Expire_toast (id 0) (after_ms 3780))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 60)))
      (tag (Page (path /sessions/s1.jsonl) (before ()))))
-    Trimmed 3 messages (~3.0k tokens) from the context: Undo on the divider brings them back
+    Trimmed 3 messages (~3.0k tokens): Undo is on the divider
     |}];
   H.reply
     h
@@ -593,12 +621,12 @@ let%expect_test
     (Scroll_to_hidden t1)
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete)
+    10:02
+    (✂ Trim before) (✕ Delete)
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 2 2 of 2  10:02 (Trim before)
     question 1 1 of 2  10:01
@@ -625,18 +653,18 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     {|
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 4
-    10:04 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:04
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 4
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     question 4 3 of 3  10:04 (Trim before)
     question 2 2 of 3  10:02 (Trim before)
     question 1 1 of 3  10:01
@@ -664,12 +692,12 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     {|
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     ✂ 3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
     Not in the model's context Kept in the transcript only; the model no longer sees them.
     answer 2
@@ -677,10 +705,10 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     10:03
     answer 3
     question 4
-    10:04 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:04
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 4
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     |}];
   H.act h (Show_hidden { entry = "t1"; show = false });
   H.text h ~selector:".hidden-range";
@@ -708,19 +736,19 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     Scroll_to_bottom
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     Back in the context: 3 messages (~3.0k tokens)
     |}]
 ;;
@@ -756,16 +784,16 @@ let%expect_test "with a trim before: two dividers, each Undo its own" =
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
     10:02
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 5
-    10:05 (✂ Trim everything before this)
-    (✕ Delete)
+    10:05
+    (✂ Trim before) (✕ Delete)
     |}];
   (* The first divider's Undo: the trim before, though the trim after is
      newer. *)
@@ -818,16 +846,16 @@ let%expect_test "/delete: a picker, newest first; /delete undo" =
     (Rpc (method_ delete) (params ((message u3))) (tag (Deleted (entry (4)))))
     question 1
     10:01
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim after) (✕ Delete)
     answer 1
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
-    (✕ Delete) (✂ Trim everything after this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
-    (✕ Delete) (✂ Trim everything after this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
-    (✕ Delete)
+    (✂ Trim before) (✕ Delete)
     |}];
   (* Nothing deleted: undo says what to do. *)
   H.type_ h "/delete undo";

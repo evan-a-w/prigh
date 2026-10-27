@@ -131,49 +131,11 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .msg.user .time { grid-column: 2; }
 
-/* "Trim everything before this": a tab on the message's top edge, where the
-   cut would be, shown with the message on hover or focus. */
-.entries > .msg.user, .entries > .msg.noted > .msg.user { position: relative; }
-.trim-before {
-  position: absolute;
-  top: 0;
-  right: 14px;
-  transform: translateY(-55%);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 1px 10px 2px 8px;
-  border: 1px solid var(--rule-2);
-  border-radius: 999px;
-  background: var(--slate-2);
-  color: var(--muted);
-  font: 12px/1.5 var(--sans);
-  white-space: nowrap;
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease-out, visibility 0.12s;
-}
-.trim-before > .scissors { color: var(--sodium); font-size: 13px; line-height: 1; }
-.msg.user:hover > .trim-before,
-.msg.user:focus-within > .trim-before { opacity: 1; visibility: visible; }
-.trim-before:hover { color: var(--fg); border-color: var(--sodium-line); }
-.trim-before:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-/* Where it would cut. */
-.msg.user:has(> .trim-before:is(:hover, :focus-visible))::before {
-  content: "";
-  position: absolute;
-  left: -2px;
-  right: 0;
-  top: -1px;
-  border-top: 1px dashed var(--sodium);
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) { .trim-before { transition: none; } }
-
-/* "Delete" and "Trim everything after this": tabs on the message's bottom
-   edge, where the trim would cut, shown with the message on hover or focus. */
-.entries > .msg { position: relative; }
+/* "Trim before", "Trim after" and "Delete": one row of tabs on the
+   message's bottom edge, shown with the message on hover, focus or a tap.
+   Hovering one shows what it does: a dashed line where a trim would cut,
+   the message faded for a delete. */
+.entries > .msg, .entries > .msg.noted > .msg.user { position: relative; }
 .msg-actions {
   position: absolute;
   bottom: 0;
@@ -181,7 +143,12 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   z-index: 1;
   transform: translateY(55%);
   display: inline-flex;
-  gap: 6px;
+  align-items: stretch;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: var(--slate-2);
+  box-shadow: var(--float-shadow);
+  overflow: hidden;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease-out, visibility 0.12s;
@@ -189,39 +156,60 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .msg-actions > button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 1px 10px 2px 8px;
-  border: 1px solid var(--rule-2);
-  border-radius: 999px;
-  background: var(--slate-2);
+  gap: 5px;
+  padding: 1px 10px 2px;
+  border: 0;
+  background: none;
   color: var(--muted);
   font: 12px/1.5 var(--sans);
   white-space: nowrap;
   cursor: pointer;
 }
-.msg-actions .glyph { font-size: 12px; line-height: 1; }
-.trim-after > .glyph { color: var(--sodium); }
-.msg:hover > .msg-actions,
-.msg:focus-within > .msg-actions { opacity: 1; visibility: visible; }
-.msg-actions > button:hover { color: var(--fg); border-color: var(--sodium-line); }
-.msg-actions > .msg-delete:hover { border-color: var(--brick); }
-.msg-actions > .msg-delete:hover > .glyph { color: var(--brick); }
-.msg-actions > button:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-/* Where it would cut; what would go. */
+.msg-actions > button + button { border-left: 1px solid var(--rule-2); }
+.msg-actions .glyph { font-size: 12px; line-height: 1; color: var(--sodium); }
+.msg-actions > .msg-delete > .glyph { color: var(--brick); }
+@media (hover: hover) { .msg:hover > .msg-actions { opacity: 1; visibility: visible; } }
+.msg:has(> .msg-actions > :focus-visible) > .msg-actions { opacity: 1; visibility: visible; }
+.msg:focus-visible { outline: none; }
+/* No hover on a phone: a tap on the message (focusable for it) shows them
+   under it, in the flow, as there is no room beside its last line; a tap
+   elsewhere hides them. */
+@media (hover: none) {
+  .msg:focus-within > .msg-actions {
+    position: static;
+    transform: none;
+    align-self: flex-end;
+    width: fit-content;
+    margin: 8px 0 0 auto;
+    opacity: 1;
+    visibility: visible;
+  }
+  .msg:not(:focus-within) > .msg-actions { display: none; }
+}
+.msg-actions > button:hover { color: var(--fg); background: var(--panel-3); }
+.msg-actions > .msg-delete:hover { color: var(--brick); background: var(--brick-wash); }
+.msg-actions > button:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; border-radius: 999px; }
+/* ::after, as ::before is a reply's spine. */
+.msg:has(> .msg-actions > .trim-before:is(:hover, :focus-visible))::after,
 .msg:has(> .msg-actions > .trim-after:is(:hover, :focus-visible))::after {
   content: "";
   position: absolute;
   left: -2px;
   right: 0;
-  bottom: -1px;
   border-top: 1px dashed var(--sodium);
   pointer-events: none;
 }
+.msg:has(> .msg-actions > .trim-before:is(:hover, :focus-visible))::after { top: -1px; }
+.msg:has(> .msg-actions > .trim-after:is(:hover, :focus-visible))::after { bottom: -1px; }
 .msg:has(> .msg-actions > .msg-delete:is(:hover, :focus-visible)) > :not(.msg-actions) {
   opacity: 0.45;
   transition: opacity 0.12s ease-out;
 }
 @media (prefers-reduced-motion: reduce) { .msg-actions { transition: none; } }
+/* A finger's worth. */
+@media (pointer: coarse) {
+  .msg-actions > button { padding: 5px 12px 6px; font-size: 13px; }
+}
 .msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 
 /* A subagent's task is a prompt too, but not the user's. */

@@ -236,7 +236,7 @@ let transcript (m : Model.t) ~inject =
         | None -> [])
      @ [ Chat_view.view
            ~fold:(Model.fold m)
-           ~trim_after:
+           ~first:
              (* The first message in the context has nothing before it. *)
              (if m.paging.older = 0
               then Chat.first m.chat

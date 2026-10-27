@@ -14,6 +14,7 @@ type t =
   ; role : Role.t
   ; text : string
   ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
+  ; trim_before : Trim.Freed.t option [@sexp.option]
   ; delete : Trim.Freed.t option [@sexp.option]
   ; trim_after : Trim.Freed.t option [@sexp.option]
   }
@@ -38,9 +39,10 @@ let of_json j =
   in
   let%bind text = Json.string_field j "text" in
   let%bind at = Json.time_ms_opt_field j "at" in
+  let%bind trim_before = effect j "trim_before" in
   let%bind delete = effect j "delete" in
   let%map trim_after = effect j "trim_after" in
-  { message; index; role; text; at; delete; trim_after }
+  { message; index; role; text; at; trim_before; delete; trim_after }
 ;;
 
 let list_of_json j = Json.list_field j "points" ~f:of_json

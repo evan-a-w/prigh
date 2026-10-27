@@ -5,8 +5,8 @@ open! Import
     of each entry's message as [get_messages_page] counts them
     ({!Message_page.older}, {!Message_point.index}), from the loaded pages
     (messages and entries go one for one, but tool results, which join
-    their calls' entries). For the actions on a message (delete, trim after
-    it), checked against [get_message_points] when used, and for the
+    their calls' entries). For the actions on a message (trim before or after
+    it, delete it), checked against [get_message_points] when used, and for the
     dividers of what is trimmed after a message. *)
 
 module Span : sig

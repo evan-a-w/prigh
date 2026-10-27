@@ -23,12 +23,12 @@ val lifetime_ms : t -> int option
 
 (** [push toasts ~id ?replaces ~error text] adds a toast, collapsing one
     saying the same into it (counting the repeat; not those with an Undo,
-    which undo each their own), and dropping those starting
-    with [replaces]: cycling a setting shows only where it ended up. *)
+    which undo each their own), and dropping those starting with one of
+    [replaces]: cycling a setting shows only where it ended up. *)
 val push
   :  t list
   -> id:int
-  -> ?replaces:string
+  -> ?replaces:string list
   -> ?undo:Hidden.t
   -> error:bool
   -> string

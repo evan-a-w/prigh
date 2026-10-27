@@ -17,15 +17,16 @@ end
     transcripts), compactions, notices and how a reply stopped. Messages show
     when they were sent (replies: when they ended) and a separator marks
     where the day changes. Tool outputs fold as [fold] (default
-    [Fold.default]) says. With [trim_after], the user's messages numbered
-    after it have "Trim everything before this" ([trim_attribute]). With
-    [index], the messages of the context have "Delete"
-    ([delete_attribute]) and, but the newest, "Trim everything after this"
-    ([trim_after_attribute]). The entries in [deleting] are left out;
-    [dividers] go after their entries. *)
+    [Fold.default]) says. With [index], the messages of the context have a
+    row of actions: "Trim everything before this" ([trim_attribute]; on the
+    user's messages and the replies numbered after [first], the entry the
+    context starts with), "Trim everything after this"
+    ([trim_after_attribute]; but on the newest) and "Delete"
+    ([delete_attribute]). The entries in [deleting] are left out; [dividers]
+    go after their entries. *)
 val view
   :  ?fold:Fold.t
-  -> ?trim_after:int
+  -> ?first:int
   -> ?index:Message_index.t
   -> ?deleting:Int.Set.t
   -> ?dividers:Divider.t list

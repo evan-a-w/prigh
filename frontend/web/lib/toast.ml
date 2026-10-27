@@ -23,7 +23,7 @@ let lifetime_ms t =
       (Int.clamp_exn (1500 + (40 * String.length t.text)) ~min:2500 ~max:6000)
 ;;
 
-let push toasts ~id ?replaces ?undo ~error text =
+let push toasts ~id ?(replaces = []) ?undo ~error text =
   (* Each undoable toast undoes its own. *)
   let same (t : t) =
     String.equal t.text text
@@ -37,7 +37,7 @@ let push toasts ~id ?replaces ?undo ~error text =
   in
   let stale (t : t) =
     same t
-    || Option.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
+    || List.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
   in
   let toast = { id; text; error; repeats; undo } in
   let toasts = List.filter toasts ~f:(Fn.non stale) @ [ toast ] in

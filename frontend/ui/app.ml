@@ -3295,32 +3295,6 @@ let trim_time m at =
   sprintf "%s %02d:%02d" (Date.to_string date) parts.hr parts.min
 ;;
 
-let trim_picker m (points : P.Trim.Point.t list) =
-  match List.rev points with
-  | [] ->
-    notice
-      m
-      "nothing to trim: the context starts at your only message (/compact \
-       summarises instead)"
-  | newest_first ->
-    let items =
-      List.map newest_first ~f:(fun (p : P.Trim.Point.t) ->
-        Picker.Item.create
-          ~id:p.before
-          ~search:p.text
-          ~detail:
-            (String.concat
-               ~sep:"  "
-               (Option.to_list (Option.map p.at ~f:(trim_time m))
-                @ [ P.Trim.label ~messages:p.messages ~tokens:p.tokens ]))
-          (first_line p.text))
-    in
-    open_picker
-      m
-      (Trim points)
-      (Picker.create ~title:"Trim everything before" items)
-;;
-
 let freed_label ({ messages; tokens } : P.Trim.Freed.t) =
   sprintf
     "%d message%s · %s"
@@ -3333,6 +3307,35 @@ let role_label : P.Message_point.Role.t -> string = function
   | User -> "you"
   | Assistant -> "reply"
   | Tool_result -> "result"
+;;
+
+(* [/trim]: the user's messages and the replies, newest first, as
+   [/trim after] and [/delete] list them. *)
+let trim_picker m (points : P.Trim.Point.t list) =
+  match List.rev points with
+  | [] ->
+    notice
+      m
+      "nothing to trim: nothing comes before the context's first message \
+       (/compact summarises instead)"
+  | newest_first ->
+    let items =
+      List.map newest_first ~f:(fun (p : P.Trim.Point.t) ->
+        let role = role_label (if p.reply then Assistant else User) in
+        Picker.Item.create
+          ~id:p.before
+          ~search:(role ^ " " ^ p.text)
+          ~detail:
+            (String.concat
+               ~sep:"  "
+               (Option.to_list (Option.map p.at ~f:(trim_time m))
+                @ [ P.Trim.label ~messages:p.messages ~tokens:p.tokens ]))
+          (sprintf "%-6s  %s" role (first_line p.text)))
+    in
+    open_picker
+      m
+      (Trim points)
+      (Picker.create ~title:"Trim everything before" items)
 ;;
 
 (* [/delete] and [/trim after]: the context's messages that allow it, newest

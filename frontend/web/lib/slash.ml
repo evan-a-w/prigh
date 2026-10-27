@@ -179,9 +179,9 @@ let every =
       ~argument:Trim
       ~args:"[after|undo]"
       "trim"
-      "drop everything before one of your messages from the model's context \
-       (the transcript keeps it folded); after: everything after a message \
-       instead (what you send later stays); undo brings back the last trim"
+      "drop everything before a message from the model's context (the \
+       transcript keeps it folded); after: everything after a message instead \
+       (what you send later stays); undo brings back the last trim"
   ; c "tree" "show the session tree and move to any message in it"
   ; c
       ~argument:Directory

@@ -442,18 +442,20 @@ let%expect_test "/verbosity and Ctrl+O" =
           <div dir="auto" class="bubble"> fix the build </div>
           <div class="msg-actions">
             <button type="button"
+                    title="Trim everything after this message from the model's context"
+                    aria-label="Trim everything after this"
+                    data-trim-after-entry="0"
+                    class="trim-after">
+              <span aria-hidden="true" class="glyph"> ✂ </span>
+              Trim after
+            </button>
+            <button type="button"
                     title="Delete this message from the transcript and the model's context"
+                    aria-label="Delete"
                     data-delete-entry="0"
                     class="msg-delete">
               <span aria-hidden="true" class="glyph"> ✕ </span>
               Delete
-            </button>
-            <button type="button"
-                    title="Trim everything after this from the model's context"
-                    data-trim-after-entry="0"
-                    class="trim-after">
-              <span aria-hidden="true" class="glyph"> ✂ </span>
-              Trim everything after this
             </button>
           </div>
         </div>
@@ -474,7 +476,16 @@ let%expect_test "/verbosity and Ctrl+O" =
           </div>
           <div class="msg-actions">
             <button type="button"
+                    title="Trim everything before this reply from the model's context"
+                    aria-label="Trim everything before this"
+                    data-trim-entry="1"
+                    class="trim-before">
+              <span aria-hidden="true" class="glyph"> ✂ </span>
+              Trim before
+            </button>
+            <button type="button"
                     title="Delete this reply from the transcript and the model's context"
+                    aria-label="Delete"
                     data-delete-entry="1"
                     class="msg-delete">
               <span aria-hidden="true" class="glyph"> ✕ </span>
