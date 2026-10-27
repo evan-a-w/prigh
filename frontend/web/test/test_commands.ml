@@ -438,7 +438,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div data-entry="0" data-message-entry="0" class="msg user">
+        <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
           <div dir="auto" class="bubble"> fix the build </div>
           <div class="msg-actions">
             <button type="button"
@@ -459,7 +459,7 @@ let%expect_test "/verbosity and Ctrl+O" =
             </button>
           </div>
         </div>
-        <div data-message-entry="1" class="assistant msg">
+        <div data-message-entry="1" tabindex="-1" class="assistant msg">
           <div class="markdown">
             <div class="md-part">
               <p dir="auto">

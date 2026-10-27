@@ -486,7 +486,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div data-entry="0" data-message-entry="0" class="msg skill user">
+        <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg skill user">
           <details class="skill-card">
             <summary>
               <span class="label"> skill frontend-design </span>
