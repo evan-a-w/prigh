@@ -29,7 +29,11 @@ const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
-const waitFor = file => `until [ -f ${file} ]; do sleep 0.1; done; echo ${file}`;
+// Each waits at most as long as the script may run, and every gate is
+// opened at teardown, so no shell is left polling (#67).
+const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
+const gates = ["sub-go", "main-go"];
+
 writeFileSync(
   join(dir, "script.json"),
   JSON.stringify([
@@ -206,5 +210,6 @@ try {
   console.error(errors.join("\n"));
   throw error;
 } finally {
+  for (const gate of gates) writeFileSync(join(cwd, gate), "");
   await end(() => server.kill(), () => browser.close());
 }

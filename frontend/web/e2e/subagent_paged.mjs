@@ -27,7 +27,11 @@ setTimeout(() => { console.error("subagent_paged.mjs: timed out"); process.exit(
 
 // The main agent and the subagent share the faux script's replies, in
 // order: the main agent waits in its bash call while the subagent works.
-const waitFor = file => `until [ -f ${file} ]; do sleep 0.1; done; echo ${file}`;
+// Each waits at most as long as the script may run, and every gate is
+// opened at teardown, so no shell is left polling (#67).
+const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
+const gates = ["main-go", "end"];
+
 const steps = 35;
 writeFileSync(
   join(dir, "script.json"),
@@ -131,5 +135,6 @@ try {
   console.error(errors.join("\n"));
   throw error;
 } finally {
+  for (const gate of gates) writeFileSync(join(cwd, gate), "");
   await end(() => server.kill(), () => browser.close());
 }
