@@ -657,7 +657,15 @@ when the backend refuses it (a directory that doesn't exist yet opens a
 "Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
-unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
+unfolds everything (verbose); `/filter`, or the funnel button left of the
+files', opens a menu under it that shows or hides whole kinds of the
+transcript (↑↓, Space or a click toggles at once, Enter or a click outside
+keeps, Esc puts back what it was; "Show all" resets): the button is accented
+with how many kinds are hidden, and a line over the transcript says what is
+hidden, how many items, with "Show all". It is a preference
+(`web.transcript-filter`), so it stays across sessions, reloads and
+browsers; the jump rail and Ctrl+J still list your messages when they are
+hidden, and land where they are; `/copy` (Ctrl+X with nothing selected) copies
 the last reply. `/skills` is a picker of the skills where the tools run
 (name, description, directory) whose Enter puts `/skill:name ` in the
 editor for you to add the arguments; typing `/skill:` completes their
@@ -1278,6 +1286,21 @@ Ctrl+O cycles the transcript verbosity:
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
 `view:`.
 
+`/filter` hides whole kinds of the transcript, for reading only: the model's
+context is unchanged. The kinds are your messages (`user`), the model's
+replies (`assistant`), thinking, tool calls with their output (`tools`),
+subagents with their work (`subagents`) and the harness's notes (`notes`:
+errors, how a reply stopped, compactions, hand-overs, reports of background
+work); the divider where messages were trimmed always shows. Bare `/filter`
+opens a checklist (Space toggles, Enter applies, Esc leaves it as it was);
+`/filter tools` shows only the tool calls, `/filter -thinking -tools` hides
+those, `+thinking` shows it again and `/filter all` shows everything. While
+it hides something the status line says what (`filter: −thinking −tools`).
+The TUI keeps it in the backend's preferences (`tui.transcript-filter`), so
+it lasts across runs and sessions; prigh-web keeps its own
+(`web.transcript-filter`, below). `/jump` still lists every message of
+yours, hidden or not.
+
 The terminal does not draw images: each one in a prompt or a tool result shows
 as a line like `[image: image/png, 34.2 KB]` (in quiet, the tool line counts
 them: `✓ read shot.png  1 image`).
@@ -1710,6 +1733,7 @@ it.
 | `/pr [list [open\|closed\|all]\|view N\|new [--generate] [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch (`--generate`: the model drafts its title and body), or check one out in a git worktree |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
+| `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
 | `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
