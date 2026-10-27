@@ -15,6 +15,8 @@ let options ~display =
      ; "maxExpand", Js.Unsafe.inject 1000
      ; "maxSize", Js.Unsafe.inject 20
      ; "strict", Js.Unsafe.inject (Js.string "ignore")
+       (* What [trust] refuses shows as its source, in the theme's red. *)
+     ; "errorColor", Js.Unsafe.inject (Js.string "var(--brick)")
     |]
 ;;
 
@@ -31,7 +33,15 @@ let render ~display tex =
            [| Js.Unsafe.inject (Js.string tex); options ~display |])
     with
     | html -> Some (Ok html)
-    | exception Js_error.Exn e -> Some (Error (Js_error.message e)))
+    | exception Js_error.Exn e ->
+      (* KaTeX underlines where it stopped with combining low lines, which
+         a title shows as noise. *)
+      Some
+        (Error
+           (String.Search_pattern.replace_all
+              (String.Search_pattern.create "\u{0332}")
+              ~in_:(Js_error.message e)
+              ~with_:"")))
 ;;
 
 let loaded () = Page_assets.loaded assets
