@@ -49,8 +49,7 @@ module Widget = struct
     let el = Dom_html.createSpan Dom_html.document in
     let state = ref input in
     draw el input;
-    if not (Katex.loaded ())
-    then Katex.when_loaded (fun () -> draw el !state);
+    if not (Katex.loaded ()) then Katex.when_loaded (fun () -> draw el !state);
     state, el
   ;;
 
@@ -67,7 +66,9 @@ module Widget = struct
   let to_vdom_for_testing =
     `Custom
       (fun (input : Input.t) ->
-        Node.span ~attrs:[ Attr.classes (classes input) ] [ Node.text input.tex ])
+        Node.span
+          ~attrs:[ Attr.classes (classes input) ]
+          [ Node.text input.tex ])
   ;;
 end
 
