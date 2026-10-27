@@ -90,6 +90,23 @@ module Trim_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Points_purpose = struct
+  type t =
+    | Delete_picker
+    | Trim_after_picker
+    | Delete of
+        { entry : int
+        ; index : int
+        ; at : Time_ns.Alternate_sexp.t option
+        }
+    | Trim_after of
+        { index : int
+        ; last : int
+        ; at : Time_ns.Alternate_sexp.t option
+        }
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -219,6 +236,14 @@ module Reply_tag = struct
     | Trimmed
     | Untrimmed
     | Trimmed_messages of string
+    | Message_points of Points_purpose.t
+    | Deleted of { entry : int option }
+    | Trimmed_after
+    | Range_restored of string
+    | Hidden_messages of
+        { path : string
+        ; entry : string
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -259,6 +284,8 @@ module Command = struct
     | Scroll_to_entry of int
     | Scroll_to_bottom
     | Scroll_to_trimmed
+    | Scroll_to_hidden of string
+    | Scroll_to_message of int
     | Focus_terminal
     | Notify of Prigh_ui.Notify.t
     | Request_notification_permission
@@ -448,6 +475,14 @@ module Action = struct
     | Ask_trim of Jump.Target.t
     | Show_trimmed of bool
     | Untrim
+    | Ask_delete_message of int
+    | Ask_trim_after of int
+    | Restore_hidden of Hidden.t
+    | Restore_range of string
+    | Show_hidden of
+        { entry : string
+        ; show : bool
+        }
     | Chat_scrolled of { at_bottom : bool }
     | Jump_to_bottom
     | Run of string
@@ -624,6 +659,7 @@ module Model = struct
   ;;
 
   let fold t = Fold.create ~verbosity:t.verbosity ~toggled:t.folds
+  let message_index t = Message_index.create ~paging:t.paging t.chat
 
   let message_time t =
     Message_time.create
@@ -733,9 +769,9 @@ let call ?tag (method_ : Request.Method.t) =
 
 let str s = `String s
 
-let toast (m : Model.t) ?(error = false) ?replaces text =
+let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
   let toasts, toast =
-    Toast.push m.toasts ~id:m.next_toast ?replaces ~error text
+    Toast.push m.toasts ~id:m.next_toast ?replaces ?undo ~error text
   in
   ( { m with toasts; next_toast = m.next_toast + 1 }
   , match Toast.lifetime_ms toast with
@@ -1039,7 +1075,9 @@ let set_state_without_files (m : Model.t) (state : State.t) =
   in
   let trim_changed =
     Option.exists m.state ~f:(fun (old : State.t) ->
-      not ([%equal: Trim.t option] old.trim state.trim))
+      not
+        ([%equal: Trim.t option] old.trim state.trim
+         && [%equal: Hidden.t list] old.hidden state.hidden))
   in
   let m = { m with state = Some state; pending } in
   if changed
@@ -1081,7 +1119,9 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; scrolled_up = false
       ; skills = Skills.empty
       ; worktrees = Worktrees.reset m.worktrees
-      ; toasts = List.filter m.toasts ~f:(fun t -> not t.error)
+      ; toasts =
+          List.filter m.toasts ~f:(fun t ->
+            not (t.error || Option.is_some t.undo))
       ; session_gone = None
       }
     , cancel_btw m
@@ -1107,7 +1147,14 @@ let set_state_without_files (m : Model.t) (state : State.t) =
     ( { m with
         chat = Chat.set_running m.chat state.running
       ; jump = Jump.empty
-      ; trimmed = { m.trimmed with shown = Folded }
+      ; trimmed =
+          { m.trimmed with
+            shown = Folded
+          ; ranges =
+              Map.filter_keys m.trimmed.ranges ~f:(fun entry ->
+                List.exists state.hidden ~f:(fun h ->
+                  String.equal h.entry entry))
+          }
       }
     , background_changed @ fetch ))
   else
@@ -4239,9 +4286,14 @@ let agents_message (m : Model.t) rest =
          ~draft:(String.strip ("/agents " ^ verb ^ " " ^ rest)))
 ;;
 
-(* Undoing the latest trim of the context ([/trim undo], the divider's Undo). *)
+(* Undoing the trim before a message (its divider's Undo): that range, even
+   when a trim after a message came later. *)
 
 let trim_state (m : Model.t) = Option.bind m.state ~f:(fun s -> s.trim)
+
+let hidden_state (m : Model.t) =
+  Option.value_map m.state ~default:[] ~f:(fun (s : State.t) -> s.hidden)
+;;
 
 let untrim (m : Model.t) =
   match trim_state m with
@@ -4252,8 +4304,16 @@ let untrim (m : Model.t) =
        before."
   | Some _ when m.trimmed.restoring -> m, []
   | Some _ ->
+    let method_ : Request.Method.t =
+      match
+        List.find (hidden_state m) ~f:(fun (h : Hidden.t) ->
+          Hidden.Kind.equal h.kind Trim_before)
+      with
+      | Some h -> Restore h
+      | None -> Untrim
+    in
     ( { m with trimmed = { m.trimmed with restoring = true } }
-    , [ call Untrim ~tag:Untrimmed ] )
+    , [ call method_ ~tag:Untrimmed ] )
 ;;
 
 let untrimmed (m : Model.t) result =
@@ -4269,6 +4329,431 @@ let untrimmed (m : Model.t) result =
            (if freed.messages = 1 then "" else "s")
            (Trim.tokens_label freed.tokens)))
   | Error e -> error m (String.capitalize e)
+;;
+
+(* ---- deleting messages, trimming the context after a message *)
+
+let running_error = function
+  | `Delete ->
+    "Cannot delete a message while a run is in progress: wait for the run to \
+     end or abort it (Esc)."
+  | `Trim ->
+    "Cannot trim while a run is in progress: wait for the run to end or abort \
+     it (Esc)."
+  | `Undo_trim ->
+    "Cannot undo a trim while a run is in progress: wait for the run to end or \
+     abort it (Esc)."
+  | `Undo_delete ->
+    "Cannot undo a deletion while a run is in progress: wait for the run to \
+     end or abort it (Esc)."
+;;
+
+let entry_at (m : Model.t) n =
+  match List.nth (Chat.entries m.chat) (n - Chat.first m.chat) with
+  | Some (User u) -> Some u.at
+  | Some (Assistant { message; _ }) -> Some message.at
+  | Some (Shell _ | Compaction _) | None -> None
+;;
+
+let not_in_context what =
+  sprintf
+    "That message is not in the model's context any more: %s lists those you \
+     can %s."
+    (match what with
+     | `Delete -> "/delete"
+     | `Trim -> "/trim after")
+    (match what with
+     | `Delete -> "delete"
+     | `Trim -> "trim after")
+;;
+
+let undelete_entry (m : Model.t) entry =
+  { m with
+    trimmed =
+      { m.trimmed with
+        deleting = Option.fold entry ~init:m.trimmed.deleting ~f:Set.remove
+      }
+  }
+;;
+
+(* Hidden at once; the backend says where it is in the context. *)
+let ask_delete_message (m : Model.t) n =
+  match Message_index.span (Model.message_index m) n, entry_at m n with
+  | None, _ | _, None -> m, []
+  | Some _, Some _ when Model.running m -> error m (running_error `Delete)
+  | Some span, Some at ->
+    ( { m with
+        trimmed = { m.trimmed with deleting = Set.add m.trimmed.deleting n }
+      }
+    , [ call
+          Get_message_points
+          ~tag:(Message_points (Delete { entry = n; index = span.first; at }))
+      ] )
+;;
+
+let delete_point (m : Model.t) ~entry (point : Message_point.t) =
+  let m =
+    { m with
+      trimmed =
+        { m.trimmed with
+          deleting = Option.fold entry ~init:m.trimmed.deleting ~f:Set.add
+        }
+    }
+  in
+  ( m
+  , [ call (Delete_message { message = point.message }) ~tag:(Deleted { entry })
+    ] )
+;;
+
+let delete_chosen (m : Model.t) (point : Message_point.t) =
+  if Model.running m
+  then error m (running_error `Delete)
+  else
+    delete_point
+      m
+      ~entry:(Message_index.entry_of_index (Model.message_index m) point.index)
+      point
+;;
+
+(* Where the page goes once the transcript is reloaded without what this
+   page took out. *)
+let reveal_hidden (m : Model.t) =
+  match m.trimmed.reveal_hidden, m.state with
+  | Some (entry, target), Some state
+    when List.exists state.hidden ~f:(fun h -> String.equal h.entry entry)
+         && not (Chat_cache.loading m.chat_cache state.session_path) ->
+    let m = { m with trimmed = { m.trimmed with reveal_hidden = None } } in
+    (match target with
+     | None -> m, [ Command.Scroll_to_hidden entry ]
+     | Some index ->
+       ( m
+       , Option.to_list
+           (Option.map
+              (Message_index.entry_at (Model.message_index m) index)
+              ~f:(fun n -> Command.Scroll_to_message n)) ))
+  | _ -> m, []
+;;
+
+let deleted (m : Model.t) ~entry result =
+  match result with
+  | Ok json ->
+    decode m json Hidden.of_json ~f:(fun (h : Hidden.t) ->
+      let index =
+        Option.bind entry ~f:(fun n ->
+          Message_index.span (Model.message_index m) n)
+        |> Option.map ~f:(fun (span : Message_index.Span.t) ->
+          Int.max 0 (span.first - 1))
+      in
+      let m, cmds = toast m ~undo:h (Hidden.deleted_label h) in
+      let m, reveal =
+        reveal_hidden
+          { m with
+            trimmed =
+              { m.trimmed with
+                reveal_hidden = Option.map index ~f:(fun i -> h.entry, Some i)
+              }
+          }
+      in
+      m, cmds @ reveal)
+  | Error e -> error (undelete_entry m entry) (String.capitalize e)
+;;
+
+let restore_hidden (m : Model.t) (h : Hidden.t) =
+  if Model.running m
+  then
+    error
+      m
+      (running_error (if Hidden.is_trim h then `Undo_trim else `Undo_delete))
+  else if Set.mem m.trimmed.restoring_ranges h.entry
+  then m, []
+  else
+    ( { m with
+        trimmed =
+          { m.trimmed with
+            restoring_ranges = Set.add m.trimmed.restoring_ranges h.entry
+          }
+      ; toasts =
+          List.filter m.toasts ~f:(fun t ->
+            not ([%equal: Hidden.t option] t.undo (Some h)))
+      }
+    , [ call (Restore h) ~tag:(Range_restored h.entry) ] )
+;;
+
+let restore_range (m : Model.t) entry =
+  match
+    List.find (hidden_state m) ~f:(fun (h : Hidden.t) ->
+      String.equal h.entry entry)
+  with
+  | Some h -> restore_hidden m h
+  | None ->
+    error
+      m
+      "That is back in the context already: /trim undo brings back the latest \
+       trim."
+;;
+
+let restored (m : Model.t) entry result =
+  let m =
+    { m with
+      trimmed =
+        { m.trimmed with
+          restoring_ranges = Set.remove m.trimmed.restoring_ranges entry
+        }
+    }
+  in
+  match result with
+  | Ok json ->
+    decode m json Hidden.of_json ~f:(fun (h : Hidden.t) ->
+      toast
+        m
+        (sprintf
+           "Back in the context: %d message%s (%s)"
+           h.messages
+           (if h.messages = 1 then "" else "s")
+           (Trim.tokens_label h.tokens)))
+  | Error e -> error m (String.capitalize e)
+;;
+
+(* [/delete undo]. *)
+let undelete (m : Model.t) =
+  match
+    List.rev (hidden_state m)
+    |> List.find ~f:(fun (h : Hidden.t) -> Hidden.Kind.equal h.kind Deleted)
+  with
+  | None -> error m "Nothing is deleted: /delete picks a message to delete."
+  | Some h -> restore_hidden m h
+;;
+
+(* [/trim undo]: the latest trim, before or after a message. *)
+let untrim_latest (m : Model.t) =
+  match List.rev (hidden_state m) |> List.find ~f:Hidden.is_trim with
+  | Some ({ kind = Trim_after _; _ } as h) -> restore_hidden m h
+  | Some { kind = Trim_before | Deleted; _ } | None -> untrim m
+;;
+
+let trim_after_title = "Trim the context after"
+
+(* "Trim everything after this": after its tool calls' results too. *)
+let ask_trim_after (m : Model.t) n =
+  match Message_index.span (Model.message_index m) n, entry_at m n with
+  | None, _ | _, None -> m, []
+  | Some _, Some _ when Model.running m -> error m (running_error `Trim)
+  | Some span, Some at ->
+    loading
+      m
+      trim_after_title
+      [ call
+          Get_message_points
+          ~tag:
+            (Message_points
+               (Trim_after { index = span.first; last = span.next - 1; at }))
+      ]
+;;
+
+let message_picker (m : Model.t) ~title ~freed (points : Message_point.t list) =
+  let times = Model.message_time m in
+  Picker.create
+    ~title
+    (List.rev_map points ~f:(fun (p : Message_point.t) ->
+       let text = Jump.headline p.text in
+       let who =
+         match p.role with
+         | User -> "you"
+         | Assistant -> "reply"
+         | Tool_result -> "result"
+       in
+       Picker.Item.create
+         ~id:p.message
+         ~detail:
+           (String.concat
+              ~sep:"  "
+              ([ who ]
+               @ Option.to_list (Option.map p.at ~f:(Message_time.short times))
+               @ Option.to_list
+                   (Option.map (freed p) ~f:(fun (f : Trim.Freed.t) ->
+                      sprintf
+                        "%d message%s · %s"
+                        f.messages
+                        (if f.messages = 1 then "" else "s")
+                        (Trim.tokens_label f.tokens)))))
+         ~search:text
+         (if String.is_empty text then "(an image)" else text)))
+;;
+
+let trim_after_confirm (m : Model.t) point =
+  open_dialog m (Trim_after_confirm { point; busy = false; error = None })
+;;
+
+let same_time at (point : Message_point.t) =
+  Option.is_none at
+  || Option.is_none point.at
+  || [%equal: Time_ns.t option] at point.at
+;;
+
+let message_points_arrived
+      (m : Model.t)
+      (purpose : Points_purpose.t)
+      (points : Message_point.t list)
+  =
+  let at index =
+    List.find points ~f:(fun (p : Message_point.t) -> p.index = index)
+  in
+  match purpose with
+  | Delete_picker ->
+    (match
+       List.filter points ~f:(fun (p : Message_point.t) ->
+         Option.is_some p.delete)
+     with
+     | [] -> toast m "Nothing to delete: the model's context has no messages."
+     | points ->
+       open_picker
+         m
+         (Picker
+            { kind = Delete_message points
+            ; picker =
+                message_picker
+                  m
+                  ~title:"Delete a message"
+                  ~freed:(fun p -> p.delete)
+                  points
+            }))
+  | Trim_after_picker ->
+    (match
+       List.filter points ~f:(fun (p : Message_point.t) ->
+         Option.is_some p.trim_after)
+     with
+     | [] ->
+       toast
+         m
+         "Nothing to trim: no message of the model's context has anything \
+          after it that can go."
+     | points ->
+       open_picker
+         m
+         (Picker
+            { kind = Trim_after points
+            ; picker =
+                message_picker
+                  m
+                  ~title:"Trim the context after"
+                  ~freed:(fun p -> p.trim_after)
+                  points
+            }))
+  | Delete { entry; index; at = time } ->
+    (match at index with
+     | Some point when same_time time point && Option.is_some point.delete ->
+       delete_point m ~entry:(Some entry) point
+     | _ -> error (undelete_entry m (Some entry)) (not_in_context `Delete))
+  | Trim_after { index; last; at = time } ->
+    (match at index, at last with
+     | Some point, Some ({ trim_after = Some _; _ } as last)
+       when same_time time point ->
+       (* What it says is the message's; where it cuts, after its results. *)
+       trim_after_confirm
+         m
+         { point with message = last.message; trim_after = last.trim_after }
+     | Some point, Some _ when same_time time point ->
+       error
+         m
+         (if List.for_all points ~f:(fun p -> p.index <= last)
+          then
+            "That is the newest message in the model's context: there is \
+             nothing after it to trim."
+          else
+            "Trimming there would part a tool call from its result: /trim \
+             after lists where you can trim.")
+     | _ -> error m (not_in_context `Trim))
+;;
+
+let trim_after (m : Model.t) =
+  match m.dialog with
+  | Some (Trim_after_confirm ({ busy = false; point; _ } as d)) ->
+    ( { m with
+        dialog = Some (Trim_after_confirm { d with busy = true; error = None })
+      }
+    , [ call (Trim_after { after = point.message }) ~tag:Trimmed_after ] )
+  | _ -> m, []
+;;
+
+let trimmed_after (m : Model.t) result =
+  match result with
+  | Ok json ->
+    decode m json Hidden.of_json ~f:(fun (h : Hidden.t) ->
+      let m, close =
+        match m.dialog with
+        | Some (Trim_after_confirm { busy = true; _ }) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, cmds =
+        toast
+          m
+          (sprintf
+             "Trimmed %d message%s (%s) from the context: Undo on the divider \
+              brings them back"
+             h.messages
+             (if h.messages = 1 then "" else "s")
+             (Trim.tokens_label h.tokens))
+      in
+      let m, reveal =
+        reveal_hidden
+          { m with
+            trimmed = { m.trimmed with reveal_hidden = Some (h.entry, None) }
+          }
+      in
+      m, close @ cmds @ reveal)
+  | Error e ->
+    (match m.dialog with
+     | Some (Trim_after_confirm ({ busy = true; _ } as d)) ->
+       ( { m with
+           dialog =
+             Some
+               (Trim_after_confirm
+                  { d with busy = false; error = Some (String.capitalize e) })
+         }
+       , [] )
+     | _ -> error m (String.capitalize e))
+;;
+
+let show_hidden (m : Model.t) ~entry ~show =
+  match session_path m, show, Trimmed.range m.trimmed entry with
+  | Some path, true, Folded ->
+    ( { m with
+        trimmed =
+          { m.trimmed with
+            ranges = Map.set m.trimmed.ranges ~key:entry ~data:Loading
+          }
+      }
+    , [ call (Get_hidden { entry }) ~tag:(Hidden_messages { path; entry }) ] )
+  | _, false, _ ->
+    ( { m with
+        trimmed = { m.trimmed with ranges = Map.remove m.trimmed.ranges entry }
+      }
+    , [] )
+  | _ -> m, []
+;;
+
+let hidden_messages (m : Model.t) ~path ~entry result =
+  match Trimmed.range m.trimmed entry, result with
+  | Loading, Ok json when is_current m path ->
+    decode m json Trim.trimmed_of_json ~f:(fun messages ->
+      ( { m with
+          trimmed =
+            { m.trimmed with
+              ranges =
+                Map.set
+                  m.trimmed.ranges
+                  ~key:entry
+                  ~data:(Shown (Chat.of_messages messages))
+            }
+        }
+      , [] ))
+  | Loading, Error e when is_current m path ->
+    error
+      { m with
+        trimmed = { m.trimmed with ranges = Map.remove m.trimmed.ranges entry }
+      }
+      (String.capitalize e)
+  | _ -> m, []
 ;;
 
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
@@ -4461,13 +4946,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Ok s -> set_archived m s ~archived
      | Error e -> prompt_failed m e)
   | "delete", "" ->
-    let m, cmds =
-      toast
+    if Model.running m
+    then error m (running_error `Delete)
+    else
+      loading
         m
-        "Click the sessions to delete (Shift+click for a range), then Delete."
-    in
-    ( { m with sidebar_open = true; marks = { m.marks with selecting = true } }
-    , cmds )
+        "Delete a message"
+        [ call Get_message_points ~tag:(Message_points Delete_picker) ]
+  | "delete", "undo" -> undelete m
   | "delete", keys ->
     (match
        String.split keys ~on:' '
@@ -4489,9 +4975,20 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       "Trim the context"
       [ call Get_trim_points ~tag:(Trim_points Picker) ]
-  | "trim", "undo" -> untrim m
+  | "trim", "undo" -> untrim_latest m
+  | "trim", "after" ->
+    if Model.running m
+    then error m (running_error `Trim)
+    else
+      loading
+        m
+        trim_after_title
+        [ call Get_message_points ~tag:(Message_points Trim_after_picker) ]
   | "trim", _ ->
-    error m "Usage: /trim (pick the message to trim before) or /trim undo"
+    error
+      m
+      "Usage: /trim (pick the message to trim before), /trim after (pick the \
+       message to trim after) or /trim undo"
   | "tree", _ ->
     loading
       m
@@ -4841,6 +5338,7 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
           ; paging = entry.paging
           ; scrolled_up = false
           ; pending = { m.pending with messages = false }
+          ; trimmed = { m.trimmed with deleting = Int.Set.empty }
           }
       in
       ( m
@@ -4868,6 +5366,7 @@ let fetch_outline (m : Model.t) =
 
 let jump_points (m : Model.t) =
   Jump.points
+    ~deleting:m.trimmed.deleting
     m.jump
     ~path:(session_path m)
     ~paging:m.paging
@@ -6017,6 +6516,19 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Trimmed, result -> trimmed m result
   | Untrimmed, result -> untrimmed m result
   | Trimmed_messages path, result -> trimmed_messages m path result
+  | Message_points purpose, Ok json ->
+    decode
+      m
+      json
+      Message_point.list_of_json
+      ~f:(message_points_arrived m purpose)
+  | Message_points (Delete { entry; _ }), Error e ->
+    error (undelete_entry m (Some entry)) (String.capitalize e)
+  | Deleted { entry }, result -> deleted m ~entry result
+  | Trimmed_after, result -> trimmed_after m result
+  | Range_restored entry, result -> restored m entry result
+  | Hidden_messages { path; entry }, result ->
+    hidden_messages m ~path ~entry result
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -6052,7 +6564,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       let m, cmds = newest_page m path page in
       let m, outline = if is_current m path then fetch_outline m else m, [] in
       let m, reveal = reveal_trimmed m path in
-      m, cmds @ outline @ reveal)
+      let m, hidden = if is_current m path then reveal_hidden m else m, [] in
+      m, cmds @ outline @ reveal @ hidden)
   | Trim_points purpose, Ok json ->
     decode m json Trim.Point.list_of_json ~f:(trim_points_arrived m purpose)
   | Outline path, Ok json ->
@@ -6439,6 +6952,7 @@ let loads : Reply_tag.t -> bool = function
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
   | Mcp Picker
   | Trim_points _ -> true
+  | Message_points (Delete_picker | Trim_after_picker | Trim_after _) -> true
   | _ -> false
 ;;
 
@@ -7078,6 +7592,21 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some point -> trim_confirm m point
        | None -> m, [])
+    | Delete_message points ->
+      (match
+         List.find points ~f:(fun (p : Message_point.t) ->
+           String.equal p.message item.id)
+       with
+       | Some point -> delete_chosen m point
+       | None -> m, [])
+    | Trim_after points ->
+      (match
+         List.find points ~f:(fun (p : Message_point.t) ->
+           String.equal p.message item.id)
+       with
+       | Some _ when Model.running m -> error m (running_error `Trim)
+       | Some point -> trim_after_confirm m point
+       | None -> m, [])
     | Worktrees listing ->
       (match
          List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id)
@@ -7206,6 +7735,7 @@ let dialog_accept (m : Model.t) =
     let m, start = start_nix_gc m (Some generations) in
     m, cmds @ start
   | Some (Trim_confirm _) -> trim m
+  | Some (Trim_after_confirm _) -> trim_after m
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
@@ -7692,6 +8222,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Ask_trim target -> ask_trim m target
   | Show_trimmed show -> show_trimmed m show
   | Untrim -> untrim m
+  | Ask_delete_message n -> ask_delete_message m n
+  | Ask_trim_after n -> ask_trim_after m n
+  | Restore_hidden h -> restore_hidden m h
+  | Restore_range entry -> restore_range m entry
+  | Show_hidden { entry; show } -> show_hidden m ~entry ~show
   | Open_jump_list ->
     (match jump_points m with
      | points

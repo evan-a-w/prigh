@@ -100,7 +100,14 @@ let entry_point n (entry : Chat.Entry.t) : Point.t option =
 
 let landmark entry = Option.is_some (entry_point 0 entry)
 
-let points t ~path ~(paging : Paging.t) ~(trim : Trim.t option) chat =
+let points
+      ?(deleting = Int.Set.empty)
+      t
+      ~path
+      ~(paging : Paging.t)
+      ~(trim : Trim.t option)
+      chat
+  =
   let trimmed =
     Option.value_map trim ~default:[] ~f:(fun (trim : Trim.t) ->
       [ { Point.target = Trimmed
@@ -131,7 +138,8 @@ let points t ~path ~(paging : Paging.t) ~(trim : Trim.t option) chat =
   trimmed
   @ unloaded
   @ List.filter_mapi (Chat.entries chat) ~f:(fun i entry ->
-    entry_point (Chat.first chat + i) entry)
+    let n = Chat.first chat + i in
+    if Set.mem deleting n then None else entry_point n entry)
 ;;
 
 (* Messages and entries go one for one, but tool results, which join their

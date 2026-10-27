@@ -95,10 +95,12 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
           <span dir="auto"> Answered </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <div role="status" title="Dismiss" class="toast" @on_click>
           <span dir="auto"> Copied the last reply to the clipboard </span>
           <span class="toast-repeats"> ×3 </span>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
@@ -123,12 +125,14 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
           <span dir="auto"> Copied the last reply to the clipboard </span>
           <span class="toast-repeats"> ×3 </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <div role="alert"
              title="Working directory: /tmp/nix-shell.MOI5Ul/nix-shell.cHNpd9/tmp.bHrKSDsr6i/chromium/cwd (click to dismiss)"
              class="error toast"
              @on_click>
           <span dir="auto"> Working directory: /tmp/…/chromium/cwd </span>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <button type="button"
                   title="Dismiss"

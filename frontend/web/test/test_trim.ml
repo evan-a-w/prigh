@@ -100,11 +100,27 @@ let%expect_test "the user's messages but the first have the action" =
   H.show h ~selector:".msg.user";
   [%expect
     {|
-    <div data-entry="0" class="msg user">
+    <div data-entry="0" data-message-entry="0" class="msg user">
       <div dir="auto" class="bubble"> question 1 </div>
       <time title="Monday 5 October 2026, 10:01:00" datetime="2026-10-05T10:01:00Z" class="time"> 10:01 </time>
+      <div class="msg-actions">
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                data-delete-entry="0"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+        <button type="button"
+                title="Trim everything after this from the model's context"
+                data-trim-after-entry="0"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim everything after this
+        </button>
+      </div>
     </div>
-    <div data-entry="2" class="msg user">
+    <div data-entry="2" data-message-entry="2" class="msg user">
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
       <button type="button"
@@ -114,8 +130,24 @@ let%expect_test "the user's messages but the first have the action" =
         <span aria-hidden="true" class="scissors"> ✂ </span>
         Trim everything before this
       </button>
+      <div class="msg-actions">
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                data-delete-entry="2"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+        <button type="button"
+                title="Trim everything after this from the model's context"
+                data-trim-after-entry="2"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim everything after this
+        </button>
+      </div>
     </div>
-    <div data-entry="4" class="msg user">
+    <div data-entry="4" data-message-entry="4" class="msg user">
       <div dir="auto" class="bubble"> question 3 </div>
       <time title="Monday 5 October 2026, 10:03:00" datetime="2026-10-05T10:03:00Z" class="time"> 10:03 </time>
       <button type="button"
@@ -125,6 +157,22 @@ let%expect_test "the user's messages but the first have the action" =
         <span aria-hidden="true" class="scissors"> ✂ </span>
         Trim everything before this
       </button>
+      <div class="msg-actions">
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                data-delete-entry="4"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+        <button type="button"
+                title="Trim everything after this from the model's context"
+                data-trim-after-entry="4"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim everything after this
+        </button>
+      </div>
     </div>
     |}]
 ;;
@@ -204,10 +252,14 @@ let%expect_test
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
     10:02
+    (✕ Delete) (✂ Trim everything after this)
     answer 2
+    (✕ Delete) (✂ Trim everything after this)
     question 3
     10:03 (✂ Trim everything before this)
+    (✕ Delete) (✂ Trim everything after this)
     answer 3
+    (✕ Delete)
     |}];
   (* The new first message has nothing before it to trim. *)
   H.act h (Ask_trim (Entry 0));
@@ -264,10 +316,14 @@ let%expect_test
     ✂ 2 messages trimmed · ~19k tokens (Hide) · (Undo)
     question 2
     10:02
+    (✕ Delete) (✂ Trim everything after this)
     answer 2
+    (✕ Delete) (✂ Trim everything after this)
     question 3
     10:03 (✂ Trim everything before this)
+    (✕ Delete) (✂ Trim everything after this)
     answer 3
+    (✕ Delete)
     |}];
   (* Read-only: no actions, no landmarks of the transcript. *)
   H.show h ~selector:".trimmed-messages .msg.user";
@@ -293,7 +349,10 @@ let%expect_test
       "get_state"
       (H.state_json ~fields:[ "session_id", `String "s2" ] ()));
   print_s [%sexp ((H.model h).trimmed : Trimmed.t)];
-  [%expect {| ((shown Folded) (restoring false) (reveal ())) |}]
+  [%expect {|
+    ((shown Folded) (restoring false) (reveal ()) (ranges ())
+     (restoring_ranges ()) (deleting ()) (reveal_hidden ()))
+    |}]
 ;;
 
 let%expect_test
@@ -327,13 +386,19 @@ let%expect_test
     Scroll_to_bottom
     question 1
     10:01
+    (✕ Delete) (✂ Trim everything after this)
     answer 1
+    (✕ Delete) (✂ Trim everything after this)
     question 2
     10:02 (✂ Trim everything before this)
+    (✕ Delete) (✂ Trim everything after this)
     answer 2
+    (✕ Delete) (✂ Trim everything after this)
     question 3
     10:03 (✂ Trim everything before this)
+    (✕ Delete) (✂ Trim everything after this)
     answer 3
+    (✕ Delete)
     Back in the context: 2 messages (~19k tokens)
     |}];
   (* Nothing trimmed: Undo says so. *)
@@ -457,6 +522,7 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
   [%expect
     {|
     Trim ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    after pick a message to trim everything after
     undo bring back what the last trim took out of the context
     |}]
 ;;

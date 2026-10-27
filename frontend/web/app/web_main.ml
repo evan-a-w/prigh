@@ -402,7 +402,7 @@ let jump_to_user_message direction =
 
 (* A landmark jumped to ([Jump]): at the top of the view, marked for a
    moment. *)
-let scroll_to find =
+let scroll_to ?(mark = true) find =
   Browser.after_render (fun () ->
     Option.iter (chat_element ()) ~f:(fun chat ->
       Option.iter (find chat) ~f:(fun (el : Dom_html.element Js.t) ->
@@ -413,7 +413,7 @@ let scroll_to find =
           -. Js.to_float chat##getBoundingClientRect##.top
         in
         chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 12.);
-        Jump_listeners.arrived el)))
+        if mark then Jump_listeners.arrived el)))
 ;;
 
 let scroll_to_entry n = scroll_to (fun chat -> Jump_listeners.entry chat n)
@@ -423,6 +423,29 @@ let scroll_to_trimmed () =
     Js.Opt.to_option
       (chat##querySelector
          (Js.string (":scope > ." ^ Prigh_web.Trim_view.divider_class))))
+;;
+
+let scroll_to_hidden entry =
+  scroll_to (fun chat ->
+    Js.Opt.to_option
+      (chat##querySelector
+         (Js.string
+            (sprintf
+               ".trim-divider[%s=\"%s\"]"
+               Prigh_web.Chat_view.hidden_attribute
+               entry))))
+;;
+
+(* Where a deleted message was: the one before it at the top, unmarked. *)
+let scroll_to_message n =
+  scroll_to ~mark:false (fun chat ->
+    Js.Opt.to_option
+      (chat##querySelector
+         (Js.string
+            (sprintf
+               ":scope > .entries > [%s=\"%d\"]"
+               Prigh_web.Chat_view.message_attribute
+               n))))
 ;;
 
 let perform client settings ctx (model : App.Model.t) (command : App.Command.t) =
@@ -538,6 +561,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       else inject App.Action.Jump_older
     | Scroll_to_entry n -> Effect.of_sync_fun scroll_to_entry n
     | Scroll_to_trimmed -> Effect.of_sync_fun scroll_to_trimmed ()
+    | Scroll_to_hidden entry -> Effect.of_sync_fun scroll_to_hidden entry
+    | Scroll_to_message n -> Effect.of_sync_fun scroll_to_message n
     | Focus_terminal -> Effect.of_sync_fun Terminal_widget.focus ()
     | Notify notification ->
       Effect.of_sync_fun Page_notifications.show notification

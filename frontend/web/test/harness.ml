@@ -43,6 +43,8 @@ let act t action =
      | Keep_scroll_position
      | Scroll_to_entry _
      | Scroll_to_trimmed
+     | Scroll_to_hidden _
+     | Scroll_to_message _
      | Probe_connection
      | Drop_connection
      | Reload_page _

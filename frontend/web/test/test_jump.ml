@@ -198,6 +198,7 @@ let%expect_test
     (Scroll_to_entry -2)
     question 3
     10:03 (✂ Trim everything before this)
+    (✕ Delete) (✂ Trim everything after this)
     <button class="tick unloaded user">
     |}];
   (* Further up than a page brought: the next one, then there. *)
@@ -215,6 +216,7 @@ let%expect_test
     (Scroll_to_entry -6)
     question 1
     10:01
+    (✕ Delete) (✂ Trim everything after this)
     |}]
 ;;
 

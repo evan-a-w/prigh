@@ -98,7 +98,7 @@ let%expect_test "every command does something (none is unknown)" =
     /switch                    sidebar
     /archive                   toast: This session isn't saved yet: send a message first.
     /unarchive                 toast: This session isn't saved yet: send a message first.
-    /delete                    toast: Click the sessions to delete (Shift+click for a range), then Delete.
+    /delete                    loading Delete a message: rpc push_pref, rpc get_message_points
     /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
     /fork                      loading Fork from: rpc push_pref, rpc get_entries
@@ -438,10 +438,26 @@ let%expect_test "/verbosity and Ctrl+O" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div data-entry="0" class="msg user">
+        <div data-entry="0" data-message-entry="0" class="msg user">
           <div dir="auto" class="bubble"> fix the build </div>
+          <div class="msg-actions">
+            <button type="button"
+                    title="Delete this message from the transcript and the model's context"
+                    data-delete-entry="0"
+                    class="msg-delete">
+              <span aria-hidden="true" class="glyph"> ✕ </span>
+              Delete
+            </button>
+            <button type="button"
+                    title="Trim everything after this from the model's context"
+                    data-trim-after-entry="0"
+                    class="trim-after">
+              <span aria-hidden="true" class="glyph"> ✂ </span>
+              Trim everything after this
+            </button>
+          </div>
         </div>
-        <div class="assistant msg">
+        <div data-message-entry="1" class="assistant msg">
           <div class="markdown">
             <div class="md-part">
               <p dir="auto">
@@ -455,6 +471,15 @@ let%expect_test "/verbosity and Ctrl+O" =
             <span> m </span>
             <span> 10 in </span>
             <span> 5 out </span>
+          </div>
+          <div class="msg-actions">
+            <button type="button"
+                    title="Delete this reply from the transcript and the model's context"
+                    data-delete-entry="1"
+                    class="msg-delete">
+              <span aria-hidden="true" class="glyph"> ✕ </span>
+              Delete
+            </button>
           </div>
         </div>
       </div>
