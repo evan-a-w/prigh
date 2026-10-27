@@ -4,6 +4,44 @@ open Chat_html
 
 let image_src = Image_view.src
 let trim_attribute = "data-trim-entry"
+let delete_attribute = "data-delete-entry"
+let trim_after_attribute = "data-trim-after-entry"
+let message_attribute = "data-message-entry"
+let hidden_attribute = "data-hidden"
+let hidden_action_attribute = "data-hidden-action"
+
+module Divider = struct
+  type t =
+    { after : int
+    ; hidden : Hidden.t
+    ; shown : Trimmed.Shown.t
+    ; restoring : bool
+    }
+
+  let equal a b =
+    a.after = b.after
+    && Hidden.equal a.hidden b.hidden
+    && Bool.equal a.restoring b.restoring
+    &&
+    match a.shown, b.shown with
+    | Folded, Folded | Loading, Loading -> true
+    | Shown a, Shown b -> phys_equal a b
+    | (Folded | Loading | Shown _), _ -> false
+  ;;
+end
+
+module Actions = struct
+  type t =
+    { trim_before : bool
+    ; trim_after : bool
+    ; delete : bool
+    ; calls : int (** a reply's tool calls, deleted with it *)
+    }
+  [@@deriving equal]
+
+  let none = { trim_before = false; trim_after = false; delete = false; calls = 0 }
+  let any t = t.trim_before || t.trim_after || t.delete
+end
 
 let tokens n =
   if n < 1000
@@ -72,24 +110,93 @@ let margin_note ?at times (n : Origin.Note.t) =
   note ?at times ~kind:n.kind ~title:n.title n.text
 ;;
 
-(* Revealed with the message on hover or focus; the page's click listener
-   turns it into [Ask_trim]. *)
-let trim_button n =
-  Node.button
-    ~attrs:
-      [ Attr.class_ "trim-before"
-      ; Attr.type_ "button"
-      ; Attr.title "Trim everything before this from the model's context"
-      ; Attr.create trim_attribute (Int.to_string n)
+(* "Trim everything before this", "Trim everything after this" and
+   "Delete": one row on the message's bottom edge, revealed with it on hover,
+   focus or a tap; the page's click listener turns them into [Ask_trim],
+   [Ask_trim_after] and [Ask_delete_message]. *)
+let actions_bar n ~(actions : Actions.t) ~reply =
+  let button ~cls ~attribute ~title ~label ~glyph text =
+    Node.button
+      ~attrs:
+        [ Attr.class_ cls
+        ; Attr.type_ "button"
+        ; Attr.title title
+        ; Attr.create "aria-label" label
+        ; Attr.create attribute (Int.to_string n)
+        ]
+      [ Node.span
+          ~attrs:[ Attr.class_ "glyph"; Attr.create "aria-hidden" "true" ]
+          [ Node.text glyph ]
+      ; Node.text text
       ]
-    [ Node.span
-        ~attrs:[ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
-        [ Node.text "✂" ]
-    ; Node.text "Trim everything before this"
-    ]
+  in
+  let this = if reply then "this reply" else "this message" in
+  let with_calls =
+    match actions.calls with
+    | 0 -> ""
+    | 1 -> " (with its tool call's result)"
+    | _ -> " (with its tool calls' results)"
+  in
+  if not (Actions.any actions)
+  then Node.none
+  else
+    div
+      "msg-actions"
+      [ (if actions.trim_before
+         then
+           button
+             ~cls:"trim-before"
+             ~attribute:trim_attribute
+             ~title:
+               (sprintf
+                  "Trim everything before %s from the model's context"
+                  this)
+             ~label:"Trim everything before this"
+             ~glyph:"✂"
+             "Trim before"
+         else Node.none)
+      ; (if actions.trim_after
+         then
+           button
+             ~cls:"trim-after"
+             ~attribute:trim_after_attribute
+             ~title:
+               (sprintf
+                  "Trim everything after %s%s from the model's context"
+                  this
+                  with_calls)
+             ~label:"Trim everything after this"
+             ~glyph:"✂"
+             "Trim after"
+         else Node.none)
+      ; (if actions.delete
+         then
+           button
+             ~cls:"msg-delete"
+             ~attribute:delete_attribute
+             ~title:
+               (match reply, actions.calls with
+                | false, _ ->
+                  "Delete this message from the transcript and the model's \
+                   context"
+                | true, 0 ->
+                  "Delete this reply from the transcript and the model's \
+                   context"
+                | true, calls ->
+                  sprintf
+                    "Delete this reply with its %s and their results from the \
+                     transcript and the model's context"
+                    (if calls = 1
+                     then "tool call"
+                     else sprintf "%d tool calls" calls))
+             ~label:"Delete"
+             ~glyph:"✕"
+             "Delete"
+         else Node.none)
+      ]
 ;;
 
-let user ?skill ?trim times (u : Message.User.t) =
+let user ?skill ?(actions = Node.none) times (u : Message.User.t) =
   let notes, attachments =
     match u.origin with
     | None -> [], []
@@ -122,7 +229,7 @@ let user ?skill ?trim times (u : Message.User.t) =
                   ~attrs:[ Attr.class_ "attachment"; Attr.title "Attached file" ]
                   [ Node.text ("@" ^ path) ])))
       ; Option.value_map u.at ~default:Node.none ~f:(time times)
-      ; Option.value_map trim ~default:Node.none ~f:trim_button
+      ; actions
       ]
   in
   match notes with
@@ -225,12 +332,12 @@ module Deps = struct
     ; times : Message_time.t
     ; expanded : bool list (** the entry's folds *)
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
-    ; trim : bool (** it has "Trim everything before this" *)
+    ; actions : Actions.t
     }
 
   let equal a b =
     a.n = b.n
-    && Bool.equal a.trim b.trim
+    && Actions.equal a.actions b.actions
     && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
     && Message_time.equal a.times b.times
@@ -240,12 +347,22 @@ module Deps = struct
 end
 
 module Chat_deps = struct
-  type t = Message_time.t * Fold.t * int option
+  type t =
+    { times : Message_time.t
+    ; fold : Fold.t
+    ; first : int option
+    ; index : Message_index.t option
+    ; deleting : Int.Set.t
+    ; dividers : Divider.t list
+    }
 
-  let equal (times, fold, trim_after) (times', fold', trim_after') =
-    Message_time.equal times times'
-    && Fold.equal fold fold'
-    && Option.equal Int.equal trim_after trim_after'
+  let equal a b =
+    Message_time.equal a.times b.times
+    && Fold.equal a.fold b.fold
+    && Option.equal Int.equal a.first b.first
+    && Option.equal phys_equal a.index b.index
+    && Set.equal a.deleting b.deleting
+    && List.equal Divider.equal a.dividers b.dividers
   ;;
 end
 
@@ -255,7 +372,14 @@ let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 let rec nested ~fold times (s : Chat.Subagent.t) =
   view ~fold:(Fold.scoped fold s.agent_id) times s.chat
 
-and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
+and assistant
+      ?(actions = Node.none)
+      ~fold
+      times
+      chat
+      (message : Message.Assistant.t)
+      ~streaming
+  =
   let count = List.length message.content in
   let blocks =
     List.mapi message.content ~f:(fun i content ->
@@ -315,9 +439,12 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
     div
       (if streaming then "msg assistant streaming" else "msg assistant")
       ((pending :: blocks)
-       @ [ stopped; (if streaming then Node.none else footer times message) ])
+       @ [ stopped
+         ; (if streaming then Node.none else footer times message)
+         ; actions
+         ])
 
-and render_entry ?trim ~fold times chat (entry : Chat.Entry.t) =
+and render_entry ?actions ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     let notes =
@@ -344,7 +471,11 @@ and render_entry ?trim ~fold times chat (entry : Chat.Entry.t) =
             ~default:u.text)
      | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
      | None ->
-       user ?skill:(Skill_message.parse (Message.User.body u)) ?trim times u)
+       user
+         ?skill:(Skill_message.parse (Message.User.body u))
+         ?actions
+         times
+         u)
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
@@ -361,17 +492,33 @@ and render_entry ?trim ~fold times chat (entry : Chat.Entry.t) =
       ]
   | Compaction summary -> compaction summary
   | Assistant { message; streaming } ->
-    assistant ~fold times chat message ~streaming
+    assistant ?actions ~fold times chat message ~streaming
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ?trim_after ~fold times chat ~n (entry : Chat.Entry.t) =
-  let trim =
-    match trim_after, entry with
-    | Some after, User u
-      when n > after && Option.is_none (Message.User.source u) ->
-      Jump.landmark entry
-    | _ -> false
+and entry ?first ?index ~fold times chat ~n (entry : Chat.Entry.t) =
+  let after_first = Option.exists first ~f:(fun first -> n > first) in
+  let span = Option.bind index ~f:(fun index -> Message_index.span index n) in
+  let actions : Actions.t =
+    match span, index, entry with
+    | Some _, Some index, User _ ->
+      { trim_before = after_first
+      ; trim_after =
+          not ([%equal: int option] (Message_index.newest index) (Some n))
+      ; delete = true
+      ; calls = 0
+      }
+    | Some _, Some index, Assistant { message; streaming = false } ->
+      { trim_before = after_first
+      ; trim_after =
+          not ([%equal: int option] (Message_index.newest index) (Some n))
+      ; delete = true
+      ; calls =
+          List.count message.content ~f:(function
+            | Tool_call _ -> true
+            | Text _ | Thinking _ | Server_tool _ -> false)
+      }
+    | _ -> Actions.none
   in
   let ids =
     match entry with
@@ -411,18 +558,40 @@ and entry ?trim_after ~fold times chat ~n (entry : Chat.Entry.t) =
             (List.exists tools ~f:(fun tool ->
                Option.exists tool ~f:(fun t -> Option.is_some t.subagent)))
             fold
-      ; trim
+      ; actions
       }
     ~equal:Deps.equal
     ~f:(fun () ->
       let node =
-        render_entry ?trim:(Option.some_if trim n) ~fold times chat entry
+        render_entry
+          ~actions:
+            (actions_bar
+               n
+               ~actions
+               ~reply:
+                 (match entry with
+                  | Assistant _ -> true
+                  | User _ | Shell _ | Compaction _ -> false))
+          ~fold
+          times
+          chat
+          entry
+      in
+      let attrs =
+        (if Jump.landmark entry
+         then [ Attr.create "data-entry" (Int.to_string n) ]
+         else [])
+        @ (if Option.is_some span
+           then [ Attr.create message_attribute (Int.to_string n) ]
+           else [])
+        @
+        (* Focusable, so that a tap on a phone, which has no hover, shows
+           its actions. *)
+        if Actions.any actions then [ Attr.tabindex (-1) ] else []
       in
       match node with
-      | Element e when Jump.landmark entry ->
-        Element
-          (Node.Element.map_attrs e ~f:(fun a ->
-             Attr.many [ a; Attr.create "data-entry" (Int.to_string n) ]))
+      | Element e when not (List.is_empty attrs) ->
+        Element (Node.Element.map_attrs e ~f:(fun a -> Attr.many (a :: attrs)))
       | node -> node)
 
 (* Entries keep their keys as older ones are added before them, so that the
@@ -435,15 +604,122 @@ and keyed key (node : Node.t) : Node.t =
 
 (* Days are marked where they change, not above the first message: its time
    already says which day it is. *)
-and view ?(fold = Fold.default) ?trim_after times chat =
+and view
+      ?(fold = Fold.default)
+      ?first
+      ?index
+      ?(deleting = Int.Set.empty)
+      ?(dividers = [])
+      times
+      chat
+  =
   View_cache.find
     chats
     chat
-    ~deps:(times, fold, trim_after)
+    ~deps:{ Chat_deps.times; fold; first; index; deleting; dividers }
     ~equal:Chat_deps.equal
-    ~f:(fun () -> entries_view ?trim_after ~fold times chat)
+    ~f:(fun () ->
+      entries_view ?first ?index ~deleting ~dividers ~fold times chat)
 
-and entries_view ?trim_after ~fold times chat =
+(* What a trim after a message keeps out of the context: a divider where it
+   was, with Show (the messages below it, dimmed and read-only) or Hide, and
+   Undo; the page's click listener turns them into actions. *)
+and divider ~fold times (d : Divider.t) =
+  let h = d.hidden in
+  let label = Trim.label ~messages:h.messages ~tokens:h.tokens in
+  let busy text =
+    Node.span
+      ~attrs:[ Attr.class_ "trim-busy"; Attr.role "status" ]
+      [ Html.lamp (); Node.text text ]
+  in
+  let action ~title ?(attrs = []) ~what text =
+    Node.button
+      ~attrs:
+        ([ Attr.class_ "trim-action"
+         ; Attr.type_ "button"
+         ; Attr.title title
+         ; Attr.create hidden_attribute h.entry
+         ; Attr.create hidden_action_attribute what
+         ]
+         @ attrs)
+      [ Node.text text ]
+  in
+  let toggle =
+    match d.shown with
+    | Folded ->
+      action
+        ~title:"Show the trimmed messages below, read-only"
+        ~attrs:[ Attr.create "aria-expanded" "false" ]
+        ~what:"show"
+        "Show"
+    | Loading -> busy "Loading…"
+    | Shown _ ->
+      action
+        ~title:"Fold the trimmed messages again"
+        ~attrs:[ Attr.create "aria-expanded" "true" ]
+        ~what:"hide"
+        "Hide"
+  in
+  let undo =
+    if d.restoring
+    then busy "Restoring…"
+    else
+      action
+        ~title:"Bring them back into the model's context"
+        ~what:"undo"
+        "Undo"
+  in
+  Node.div
+    ~attrs:[ Attr.class_ "hidden-range" ]
+    [ Node.div
+        ~attrs:
+          [ Attr.class_ "trim-divider after"
+          ; Attr.role "group"
+          ; Attr.create "aria-label" label
+          ; Attr.create hidden_attribute h.entry
+          ]
+        [ Node.span
+            ~attrs:[ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
+            [ Node.text "✂" ]
+        ; span "trim-label" label
+        ; Node.span
+            ~attrs:[ Attr.class_ "trim-actions" ]
+            [ toggle
+            ; Node.span
+                ~attrs:
+                  [ Attr.class_ "trim-sep"; Attr.create "aria-hidden" "true" ]
+                [ Node.text "·" ]
+            ; undo
+            ]
+        ]
+    ; (match d.shown with
+       | Shown chat ->
+         Node.section
+           ~attrs:
+             [ Attr.class_ "trimmed-messages"
+             ; Attr.create
+                 "aria-label"
+                 "Trimmed messages, not in the model's context"
+             ]
+           [ div
+               "trimmed-head"
+               [ span "trimmed-title" "Not in the model's context"
+               ; span
+                   "trimmed-note"
+                   "Kept in the transcript only; the model no longer sees them."
+               ]
+           ; view ~fold times chat
+           ]
+       | Folded | Loading -> Node.none)
+    ]
+
+and entries_view ?first ?index ~deleting ~dividers ~fold times chat =
+  let dividers_after n =
+    List.filter_map dividers ~f:(fun (d : Divider.t) ->
+      Option.some_if
+        (d.after = n)
+        (keyed ("hidden-" ^ d.hidden.entry) (divider ~fold times d)))
+  in
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
     | Assistant { message; _ } -> message.at
@@ -452,19 +728,27 @@ and entries_view ?trim_after ~fold times chat =
   let _, _, rev_nodes =
     List.fold
       (Chat.entries chat)
-      ~init:(None, Chat.first chat, [])
+      ~init:
+        (None, Chat.first chat, List.rev (dividers_after (Chat.first chat - 1)))
       ~f:(fun (last_day, i, rev_nodes) e ->
-        let day = Option.map (entry_time e) ~f:(Message_time.date times) in
-        let rev_nodes =
-          match last_day, day with
-          | Some last, Some day when not (Date.equal last day) ->
-            keyed (sprintf "day%d" i) (day_separator times day) :: rev_nodes
-          | _ -> rev_nodes
-        in
-        ( Option.first_some day last_day
-        , i + 1
-        , keyed (Int.to_string i) (entry ?trim_after ~fold times chat ~n:i e)
-          :: rev_nodes ))
+        if Set.mem deleting i
+        then last_day, i + 1, List.rev_append (dividers_after i) rev_nodes
+        else (
+          let day = Option.map (entry_time e) ~f:(Message_time.date times) in
+          let rev_nodes =
+            match last_day, day with
+            | Some last, Some day when not (Date.equal last day) ->
+              keyed (sprintf "day%d" i) (day_separator times day) :: rev_nodes
+            | _ -> rev_nodes
+          in
+          ( Option.first_some day last_day
+          , i + 1
+          , List.rev_append
+              (dividers_after i)
+              (keyed
+                 (Int.to_string i)
+                 (entry ?first ?index ~fold times chat ~n:i e)
+               :: rev_nodes) )))
   in
   div "entries" (List.rev rev_nodes)
 ;;

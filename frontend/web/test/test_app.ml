@@ -64,10 +64,28 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ prompt) (params ((text hello)))
      (tag (Sent (text hello) (images ()))))
     <div class="entries">
-      <div data-entry="0" class="msg user">
+      <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
         <div dir="auto" class="bubble"> hello </div>
+        <div class="msg-actions">
+          <button type="button"
+                  title="Trim everything after this message from the model's context"
+                  aria-label="Trim everything after this"
+                  data-trim-after-entry="0"
+                  class="trim-after">
+            <span aria-hidden="true" class="glyph"> ✂ </span>
+            Trim after
+          </button>
+          <button type="button"
+                  title="Delete this message from the transcript and the model's context"
+                  aria-label="Delete"
+                  data-delete-entry="0"
+                  class="msg-delete">
+            <span aria-hidden="true" class="glyph"> ✕ </span>
+            Delete
+          </button>
+        </div>
       </div>
-      <div class="assistant msg streaming">
+      <div data-message-entry="1" class="assistant msg streaming">
         <div class="markdown">
           <div class="md-part">
             <p dir="auto">
@@ -97,8 +115,10 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     {|
     hello
     11:58
+    (✂ Trim after) (✕ Delete)
     Hi
     m 10 in 5 out 11:59
+    (✂ Trim before) (✕ Delete)
     |}];
   (* Ten hours behind UTC, it has just turned midnight: they were yesterday. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr (-10.)));
@@ -107,8 +127,10 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     {|
     hello
     Yesterday 23:58
+    (✂ Trim after) (✕ Delete)
     Hi
     m 10 in 5 out Yesterday 23:59
+    (✂ Trim before) (✕ Delete)
     |}];
   (* A day later in Paris. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
@@ -118,8 +140,10 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     {|
     hello
     Yesterday 11:58
+    (✂ Trim after) (✕ Delete)
     Hi
     m 10 in 5 out Yesterday 11:59
+    (✂ Trim before) (✕ Delete)
     |}];
   Harness.show h ~selector:".msg.user time";
   [%expect

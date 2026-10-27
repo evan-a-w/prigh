@@ -36,6 +36,7 @@ let methods =
   ; "get_messages_page"
   ; "get_outline"
   ; "get_trim_points"
+  ; "get_message_points"
   ; "get_trimmed"
   ; "get_tool_output"
   ; "get_entries"
@@ -74,7 +75,10 @@ let methods =
   ; "clone"
   ; "rewind"
   ; "trim"
+  ; "trim_after"
   ; "untrim"
+  ; "delete"
+  ; "undelete"
   ; "session_stats"
   ; "set_cwd"
   ; "worktree_back"
@@ -986,14 +990,25 @@ let trim_points t client params =
     Trim_point.to_json (Trim_point.create (Session.identified_messages session)))
 ;;
 
-let trimmed t client params =
+let message_points t client params =
   Or_error.map (read_session t client params) ~f:(fun session ->
-    `Object
-      [ ( "messages"
-        , `Array
-            (List.map (Session.trimmed_messages session) ~f:(fun (_, m) ->
-               Message_page.message m)) )
-      ])
+    Message_point.to_json
+      (Message_point.create (Session.identified_messages session)))
+;;
+
+(* Without [entry], what the trims before a message dropped. *)
+let trimmed t client params =
+  let%bind.Or_error session = read_session t client params in
+  let%map.Or_error entry = string_param_opt params "entry" in
+  let messages =
+    match entry with
+    | None -> Session.trimmed_messages session
+    | Some entry -> Session.hidden_messages session ~entry
+  in
+  `Object
+    [ ( "messages"
+      , `Array (List.map messages ~f:(fun (_, m) -> Message_page.message m)) )
+    ]
 ;;
 
 (* Searches the whole session file, so that outputs from before a
@@ -2038,6 +2053,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "get_messages_page" -> Some (messages_page t client params)
   | "get_outline" -> Some (outline t client params)
   | "get_trim_points" -> Some (trim_points t client params)
+  | "get_message_points" -> Some (message_points t client params)
   | "get_trimmed" -> Some (trimmed t client params)
   | "get_tool_output" -> Some (tool_output t client params)
   | "delete_session" ->
@@ -2462,7 +2478,18 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "trim" ->
     Or_error.bind (string_param params "before") ~f:(fun before ->
       Or_error.map (Agent.trim agent ~before) ~f:Rpc_json.trim_result)
-  | "untrim" -> Or_error.map (Agent.untrim agent) ~f:Rpc_json.trim_result
+  | "trim_after" ->
+    Or_error.bind (string_param params "after") ~f:(fun after ->
+      Or_error.map (Agent.trim_after agent ~after) ~f:Rpc_json.hidden)
+  | "untrim" ->
+    Or_error.bind (string_param_opt params "entry") ~f:(fun entry ->
+      Or_error.map (Agent.untrim ?entry agent) ~f:Rpc_json.hidden)
+  | "delete" ->
+    Or_error.bind (string_param params "message") ~f:(fun message ->
+      Or_error.map (Agent.delete_message agent ~message) ~f:Rpc_json.hidden)
+  | "undelete" ->
+    Or_error.bind (string_param_opt params "entry") ~f:(fun entry ->
+      Or_error.map (Agent.undelete ?entry agent) ~f:Rpc_json.hidden)
   | "session_stats" -> ok (Rpc_json.session_stats (Agent.session_stats agent))
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->

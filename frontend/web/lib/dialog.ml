@@ -22,6 +22,8 @@ module Picker_kind = struct
     | Mcp of Mcp_list.t
     | Jump
     | Trim of Trim.Point.t list
+    | Delete_message of Message_point.t list
+    | Trim_after of Message_point.t list
     | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
@@ -64,6 +66,11 @@ type t =
       }
   | Trim_confirm of
       { point : Trim.Point.t
+      ; busy : bool
+      ; error : string option
+      }
+  | Trim_after_confirm of
+      { point : Message_point.t
       ; busy : bool
       ; error : string option
       }
@@ -111,6 +118,7 @@ let per_session = function
   | Prompt _
   | Rewind_confirm _
   | Trim_confirm _
+  | Trim_after_confirm _
   | Create_dir _
   | Session _
   | Text _
@@ -133,7 +141,9 @@ let per_session = function
           | Mcp _
           | Modes
           | Jump
-          | Trim _ )
+          | Trim _
+          | Delete_message _
+          | Trim_after _ )
       ; _
       }
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true

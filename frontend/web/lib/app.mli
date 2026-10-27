@@ -105,6 +105,31 @@ module Trim_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Points_purpose : sig
+  (** Why we asked for [get_message_points]. *)
+  type t =
+    | Delete_picker (** [/delete] *)
+    | Trim_after_picker (** [/trim after] *)
+    | Trim_before of
+        { index : int (** its message ({!Message_index.Span.first}) *)
+        ; at : Time_ns.Alternate_sexp.t option
+        (** when it was sent: the point found must be the same *)
+        } (** a message's "Trim everything before this" *)
+    | Delete of
+        { entry : int (** the transcript's entry, hidden meanwhile *)
+        ; index : int (** its message ({!Message_index.Span.first}) *)
+        ; at : Time_ns.Alternate_sexp.t option
+        (** when it was sent: the point found must be the same *)
+        } (** a message's "Delete" *)
+    | Trim_after of
+        { index : int (** the entry's message *)
+        ; last : int (** its last ({!Message_index.Span.next} - 1): the
+                         trim is after it, after the entry's tool results *)
+        ; at : Time_ns.Alternate_sexp.t option
+        } (** a message's "Trim everything after this" *)
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -251,6 +276,15 @@ module Reply_tag : sig
     | Trimmed (** [trim]: the confirmation closes, or says why not *)
     | Untrimmed
     | Trimmed_messages of string (** [get_trimmed] of this session's path *)
+    | Message_points of Points_purpose.t
+    | Deleted of { entry : int option }
+    (** [delete]: the entry hidden meanwhile, shown again if it fails *)
+    | Trimmed_after (** [trim_after]: the confirmation closes, or says why not *)
+    | Range_restored of string (** [restore] of this {!Hidden.entry} *)
+    | Hidden_messages of
+        { path : string
+        ; entry : string
+        } (** [get_hidden] of this session's range ({!Hidden.entry}) *)
   [@@deriving sexp_of, equal]
 end
 
@@ -305,6 +339,12 @@ module Command : sig
     | Scroll_to_trimmed
     (** the main chat to the divider of what is trimmed from the context,
         once rendered, marking it for a moment *)
+    | Scroll_to_hidden of string
+    (** the main chat to the divider of what this trim after a message
+        ({!Hidden.entry}) keeps out of the context, once rendered *)
+    | Scroll_to_message of int
+    (** the main chat to this entry (any message, {!Chat_view.message_attribute}),
+        once rendered *)
     | Focus_terminal (** the terminal panel's shell, once mounted *)
     | Notify of Prigh_ui.Notify.t (** a browser notification *)
     | Request_notification_permission
@@ -530,7 +570,23 @@ module Action : sig
     | Show_trimmed of bool
     (** the messages trimmed from the context, above the divider, or folded
         again *)
-    | Untrim (** the divider's Undo, [/trim undo] *)
+    | Untrim
+    (** the divider's Undo: what is trimmed before a message back ([/trim
+        undo] brings back the latest trim, before or after a message) *)
+    | Ask_delete_message of int
+    (** this entry's "Delete": its message (a reply with its tool calls'
+        results) out of the transcript and the context, at once *)
+    | Ask_trim_after of int
+    (** this entry's "Trim everything after this": confirmed first *)
+    | Restore_hidden of Hidden.t
+    (** back into the context: a deletion's toast's Undo *)
+    | Restore_range of string
+    (** a trim after a message's divider's Undo: the range of
+        [State.hidden] with this {!Hidden.entry} *)
+    | Show_hidden of
+        { entry : string (** {!Hidden.entry} *)
+        ; show : bool
+        } (** a trim after a message's divider's Show (or Hide) *)
     | Chat_scrolled of { at_bottom : bool }
     (** from the page: the user scrolled the chat away from (or back to) its
         end *)
@@ -702,6 +758,9 @@ module Model : sig
 
   (** How tool outputs fold in the transcripts. *)
   val fold : t -> Fold.t
+
+  (** Where the transcript's entries are in the context. *)
+  val message_index : t -> Message_index.t
 
   (** What the panels' sizes depend on. *)
   val shown : t -> Resize.Shown.t

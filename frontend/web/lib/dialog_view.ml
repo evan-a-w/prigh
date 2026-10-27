@@ -24,7 +24,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Reminders -> "Reminders"
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
-  | Trim _ -> "Messages"
+  | Trim _ | Delete_message _ | Trim_after _ -> "Messages"
   | Worktrees _ -> "Worktrees"
   | Themes -> "Themes"
   | Accents -> "Colours"
@@ -46,6 +46,7 @@ let mcp_problems : Dialog.Picker_kind.t -> Node.t = function
 let trimmable (m : App.Model.t) =
   let paging = m.paging in
   Jump.points
+    ~deleting:m.trimmed.deleting
     m.jump
     ~path:(Option.map m.state ~f:(fun s -> s.session_path))
     ~paging

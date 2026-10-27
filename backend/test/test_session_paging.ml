@@ -554,6 +554,16 @@ let%expect_test "sessions read again are cached until their file changes" =
     |}]
 ;;
 
+(* A range's [hidden] JSON without its ids and time. *)
+let brief json =
+  Json.to_string
+    (`Object
+        (List.filter_map
+           [ "kind"; "messages"; "tokens"; "divider" ]
+           ~f:(fun name ->
+             Option.map (Json.member name json) ~f:(fun v -> name, v))))
+;;
+
 let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
   =
   with_sandbox
@@ -569,19 +579,23 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
     |> Json.member_exn "points"
     |> Json.list_exn
   in
-  List.iter (List.take points 3) ~f:(fun p ->
+  (* The user's messages and the replies. *)
+  List.iter (List.take points 5) ~f:(fun p ->
     let field name = Json.to_string (Json.member_exn name p) in
     printf
-      "%s %s messages=%s tokens=%s\n"
+      "%s %s %s messages=%s tokens=%s\n"
       (field "index")
+      (field "role")
       (field "text")
       (field "messages")
       (field "tokens"));
   [%expect
     {|
-    4 "turn 2" messages=4 tokens=17
-    8 "turn 3" messages=8 tokens=34
-    12 "turn 4" messages=12 tokens=51
+    1 "assistant" "running 1" messages=1 tokens=1
+    3 "assistant" "done 1" messages=3 tokens=16
+    4 "user" "turn 2" messages=4 tokens=17
+    5 "assistant" "running 2" messages=5 tokens=18
+    7 "assistant" "done 2" messages=7 tokens=33
     |}];
   let before point = Json.member_exn "before" point in
   let summary () =
@@ -615,9 +629,18 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
   summary ();
   print_endline
     (Json.to_string
-       (Client.call c "trim" [ "before", before (List.nth_exn points 2) ]));
+       (Client.call
+          c
+          "trim"
+          [ ( "before"
+            , before
+                (List.find_exn points ~f:(fun p ->
+                   String.equal
+                     (Json.string_exn (Json.member_exn "text" p))
+                     "turn 4")) )
+          ]));
   summary ();
-  print_endline (Json.to_string (Client.call c "untrim" []));
+  print_endline (brief (Client.call c "untrim" []));
   summary ();
   print_s
     [%sexp
@@ -631,10 +654,125 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
     trim=none page=41 trimmed=0 first point="turn 1"
     {"messages":12,"tokens":51}
     trim={"messages":12,"tokens":51} page=29 trimmed=12 first point="turn 4"
-    {"messages":12,"tokens":51}
+    {"kind":"trim_before","messages":12,"tokens":51}
     trim=none page=41 trimmed=0 first point="turn 1"
     (Error "nothing is trimmed: /trim picks a point")
     (Error
-     "message nope is not in the model's context: trim before one of your messages that /trim lists")
+     "message nope is not in the model's context: trim before one of the messages that /trim lists")
+    |}]
+;;
+
+let%expect_test "delete and trim after over the RPC" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let session = saved t in
+  let path = Session.path session in
+  let c = server t ~sw in
+  ignore (Client.call c "switch_session" [ "path", `String path ] : Json.t);
+  let points () =
+    Client.call c "get_message_points" []
+    |> Json.member_exn "points"
+    |> Json.list_exn
+  in
+  let field name p =
+    Option.value_map (Json.member name p) ~default:"-" ~f:Json.to_string
+  in
+  let print_points ps =
+    List.iter ps ~f:(fun p ->
+      printf
+        "%s %s %s delete=%s trim_after=%s\n"
+        (field "index" p)
+        (field "role" p)
+        (field "text" p)
+        (field "delete" p)
+        (field "trim_after" p))
+  in
+  (* The last turn: a reply with two calls (one a subagent's), their
+     results, and the final reply. *)
+  print_points (List.drop (points ()) 34);
+  [%expect
+    {|
+    34 "tool_result" "bash" delete=- trim_after={"messages":6,"tokens":4260}
+    35 "assistant" "done 9" delete={"messages":1,"tokens":1} trim_after={"messages":5,"tokens":4259}
+    36 "user" "turn 10" delete={"messages":1,"tokens":1} trim_after={"messages":4,"tokens":4258}
+    37 "assistant" "running 10" delete={"messages":3,"tokens":4257} trim_after=-
+    38 "tool_result" "bash" delete=- trim_after=-
+    39 "tool_result" "subagent" delete=- trim_after={"messages":1,"tokens":1}
+    40 "assistant" "done 10" delete={"messages":1,"tokens":1} trim_after=-
+    |}];
+  let at index =
+    List.find_exn (points ()) ~f:(fun p ->
+      String.equal (field "index" p) (Int.to_string index))
+    |> Json.member_exn "message"
+  in
+  let summary () =
+    let state = Client.call c "get_state" [] in
+    let page = Client.call c "get_messages_page" [ "limit", `Number "100" ] in
+    printf
+      "hidden=[%s] page=%d context_tokens=%s\n"
+      (String.concat
+         ~sep:"; "
+         (List.map
+            (Option.value_map
+               (Json.member "hidden" state)
+               ~default:[]
+               ~f:Json.list_exn)
+            ~f:brief))
+      (List.length (Json.list_exn (Json.member_exn "messages" page)))
+      (Json.to_string (Json.member_exn "context_tokens" state))
+  in
+  summary ();
+  (* Deleting the reply that ran the subagent takes the results with it. *)
+  print_endline (brief (Client.call c "delete" [ "message", at 37 ]));
+  summary ();
+  (* A tool result goes with its call. *)
+  print_s
+    [%sexp
+      (Client.result (Client.request c "delete" [ "message", at 2 ])
+       : (Json.t, string) Result.t)];
+  let after = at 7 in
+  print_endline (brief (Client.call c "trim_after" [ "after", after ]));
+  summary ();
+  let hidden =
+    Json.list_exn (Json.member_exn "hidden" (Client.call c "get_state" []))
+  in
+  List.iter hidden ~f:(fun h ->
+    printf
+      "%s: get_trimmed entry=%d\n"
+      (field "kind" h)
+      (List.length
+         (Client.call c "get_trimmed" [ "entry", Json.member_exn "entry" h ]
+          |> Json.member_exn "messages"
+          |> Json.list_exn)));
+  (* Trims stack; the deletion undone, what it took out is still after the
+     first trim's point, so that trim keeps it out. *)
+  print_endline (brief (Client.call c "trim_after" [ "after", at 0 ]));
+  print_endline (brief (Client.call c "undelete" []));
+  summary ();
+  print_s
+    [%sexp
+      (Client.result (Client.request c "undelete" [])
+       : (Json.t, string) Result.t)];
+  print_endline (brief (Client.call c "untrim" []));
+  summary ();
+  [%expect
+    {|
+    hidden=[] page=41 context_tokens=0
+    {"kind":"deleted","messages":3,"tokens":4257}
+    hidden=[{"kind":"deleted","messages":3,"tokens":4257}] page=38 context_tokens=0
+    (Error
+     "a tool result goes with its call: delete the assistant message that made the call (/delete lists it)")
+    {"kind":"trim_after","messages":30,"tokens":121,"divider":8}
+    hidden=[{"kind":"deleted","messages":3,"tokens":4257}; {"kind":"trim_after","messages":30,"tokens":121,"divider":8}] page=8 context_tokens=0
+    "deleted": get_trimmed entry=3
+    "trim_after": get_trimmed entry=30
+    {"kind":"trim_after","messages":7,"tokens":33,"divider":1}
+    {"kind":"deleted","messages":3,"tokens":4257}
+    hidden=[{"kind":"trim_after","messages":33,"tokens":4378,"divider":1}; {"kind":"trim_after","messages":7,"tokens":33,"divider":1}] page=1 context_tokens=0
+    (Error "nothing is deleted: /delete picks a message to delete")
+    {"kind":"trim_after","messages":7,"tokens":33,"divider":1}
+    hidden=[{"kind":"trim_after","messages":33,"tokens":4378,"divider":8}] page=8 context_tokens=0
     |}]
 ;;

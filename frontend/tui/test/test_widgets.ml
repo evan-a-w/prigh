@@ -710,7 +710,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
-    /trim [undo|show|hide]             drop everything before one of your messages from the model's context: pick the message (newest first, with what it frees), confirm; undo brings the latest trim back, show/hide unfolds the trimmed messages
+    /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
+    /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
     /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
     /commit [-a] [-m MSG|--generate]   commit the staged changes of the session's worktree (-a: every change to tracked files first; MSG: the rest of the line, or quoted); --generate has the model draft the message into the editor to edit and send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping its message without -m
@@ -723,7 +724,6 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D deletes all archived, Ctrl+N named)
     /archive [session]                 archive a session (the current one without an argument)
     /unarchive [session]               unarchive a session (the current one without an argument)
-    /delete [session...]               delete sessions, after a confirmation (none: pick them in /sessions)
     /delete-archived                   delete every archived session, after a confirmation
     /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one

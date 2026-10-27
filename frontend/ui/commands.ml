@@ -13,7 +13,6 @@ module Argument = struct
     | Login
     | Logout
     | Sessions
-    | Session_list (** several, completed word by word *)
     | Path
     | Directory
     | Default_directory
@@ -23,6 +22,7 @@ module Argument = struct
     | Goal
     | Resume
     | Trim
+    | Delete
     | Snippet
     | Remind
     | Worktree
@@ -165,10 +165,18 @@ let every =
   ; c
       ~argument:Argument.Trim
       "trim"
-      "[undo|show|hide]"
-      "drop everything before one of your messages from the model's context: \
-       pick the message (newest first, with what it frees), confirm; undo \
-       brings the latest trim back, show/hide unfolds the trimmed messages"
+      "[after|undo|show|hide]"
+      "drop everything before a message from the model's context: pick the \
+       message (newest first, with what it frees), confirm; after: everything \
+       after a message instead (what you send later stays); undo brings the \
+       latest trim back, show/hide unfolds the trimmed messages"
+  ; c
+      ~argument:Argument.Delete
+      "delete"
+      "[undo|session...]"
+      "drop a message from the transcript and the model's context (a reply \
+       with its tool results): pick it, newest first; undo brings the latest \
+       deletion back; with sessions: delete them, after a confirmation"
   ; c
       ~argument:Argument.Path
       "diff"
@@ -227,11 +235,6 @@ let every =
       "unarchive"
       "[session]"
       "unarchive a session (the current one without an argument)"
-  ; c
-      ~argument:Argument.Session_list
-      "delete"
-      "[session...]"
-      "delete sessions, after a confirmation (none: pick them in /sessions)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
       ~argument:Argument.Agents

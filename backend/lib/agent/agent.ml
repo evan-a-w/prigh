@@ -104,6 +104,7 @@ module State = struct
     ; session_rules : string list
     ; home : Session.Home.t option
     ; trim : Session.Trim.t option [@sexp.option]
+    ; hidden : Session.Hidden.t list [@sexp.list]
     }
   [@@deriving sexp_of]
 end
@@ -465,6 +466,7 @@ let state t =
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
   ; home = Session.home t.session
   ; trim = Session.trim t.session
+  ; hidden = Session.hidden t.session
   }
 ;;
 
@@ -2541,7 +2543,8 @@ let background_changed t =
 ;;
 
 (* Seeds subagent ids so they do not repeat ids the model has already seen
-   in this conversation. *)
+   in this conversation: counted on the whole path, as a deletion or a
+   compaction may have taken calls out of the context. *)
 let subagent_calls messages =
   List.sum
     (module Int)
@@ -2690,12 +2693,8 @@ let create
         Background_tasks.create
           ~env
           ~sw
-          ~first_subagent_id:(subagent_calls (Session.messages session) + 1)
-          ~first_job_id:
-            (last_job_number
-               (List.map (Session.timed_messages session) ~f:(fun m ->
-                  m.Timed_message.message))
-             + 1)
+          ~first_subagent_id:(subagent_calls (path_messages session) + 1)
+          ~first_job_id:(last_job_number (path_messages session) + 1)
           ()
     ; subagent_log = Subagent_log.create ()
     ; mcp
@@ -3528,28 +3527,37 @@ let fork t ?at () =
     ~f:(fun session -> replace_session t session ~keep_host:true)
 ;;
 
-let trim_refused = "wait for the run to end or abort it (Esc)"
-
-let trim t ~before =
+let unless_running t ~doing f =
   if is_running t
   then
-    Or_error.error_string
-      ("cannot trim while a run is in progress: " ^ trim_refused)
+    Or_error.errorf
+      "cannot %s while a run is in progress: wait for the run to end or abort \
+       it (Esc)"
+      doing
   else
-    Or_error.map (Session.append_trim t.session ~before) ~f:(fun trim ->
+    Or_error.map (f t.session) ~f:(fun result ->
       state_changed t;
-      trim)
+      result)
 ;;
 
-let untrim t =
-  if is_running t
-  then
-    Or_error.error_string
-      ("cannot undo a trim while a run is in progress: " ^ trim_refused)
-  else
-    Or_error.map (Session.append_untrim t.session) ~f:(fun trim ->
-      state_changed t;
-      trim)
+let trim t ~before =
+  unless_running t ~doing:"trim" (Session.append_trim ~before)
+;;
+
+let trim_after t ~after =
+  unless_running t ~doing:"trim" (Session.append_trim_after ~after)
+;;
+
+let untrim ?entry t =
+  unless_running t ~doing:"undo a trim" (Session.append_untrim ?entry)
+;;
+
+let delete_message t ~message =
+  unless_running t ~doing:"delete a message" (Session.append_delete ~message)
+;;
+
+let undelete ?entry t =
+  unless_running t ~doing:"undo a deletion" (Session.append_undelete ?entry)
 ;;
 
 let rewind t ~to_ =

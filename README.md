@@ -365,9 +365,10 @@ is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 
-To shrink the context without summarising it, rest the pointer on one of
-your messages and choose ✂ Trim everything before this (or press Delete on
-it in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
+To shrink the context without summarising it, rest the pointer on a
+message (yours or a reply; on a phone, tap it) and choose ✂ Trim before in
+the row of actions under its corner (or press Delete on one of your
+messages in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
 messages and tokens it frees (Enter trims, Esc cancels). The transcript then
 starts at one divider, `✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
 Show unfolds the trimmed messages above it, dimmed and read-only (they are
@@ -375,6 +376,17 @@ not in the model's context), and Undo (or `/trim undo`) brings them back.
 The rail draws what is trimmed as one dashed cut at its top, and the jump
 list ends with a "Trimmed: 142 messages" row; both go to the divider. See
 [Trimming the context](#trimming-the-context).
+
+The same row, the same on every message, has ✂ Trim after and ✕ Delete.
+Delete takes the message out of the transcript and the model's context at
+once (a reply goes with its tool calls' results; Delete on a tool call
+deletes the reply that made it), and a "Message deleted · Undo" toast
+brings it back (as does `/delete undo`). Trim after drops what follows a
+message, up to the
+newest, after the same kind of confirmation; it folds into a divider like
+the one above (Show, Undo), and what you send afterwards comes below it
+and stays in the context. Deleted and trimmed messages leave the rail and
+the jump list.
 
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
@@ -451,7 +463,7 @@ ones too. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
 older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
-deletes it. "Select" (or `/delete` with no argument) turns the list into
+deletes it. "Select" turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
 range from the last one (across the divider), and Delete (or the bar at
 the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
@@ -1609,16 +1621,18 @@ wide exploration to subagents, so the main context stays small.
 
 #### Trimming the context
 
-`/trim` drops everything before one of your messages from the model's
-context, without a summary: pick the message (newest first, each with its
+`/trim` drops everything before a message, one of yours or a reply, from
+the model's context, without a summary: pick the message (newest first, each with its
 time and the messages and tokens trimming there frees), confirm, and the
 next request starts at it. The session file keeps everything: the
 transcript folds the trimmed part into one divider (`──── 142 messages
 trimmed · ~38k tokens ────`; `/trim show` unfolds it read-only in the TUI,
 Show in prigh-web), and `/trim undo` brings back what the latest trim took
 out (trims stack: each undo cancels one). The context use in the status line
-goes down by the estimate at once. The cut is always at one of your
-messages, so a tool call never loses its result, and it is refused while a
+goes down by the estimate at once. The cut is never between a tool call
+and its result (trimming before a reply keeps its tool results; the
+request then starts with a short note that earlier messages were removed,
+as models expect the user to speak first), and it is refused while a
 run is in progress (wait for it to end or abort it with Esc). It works with
 compaction both ways: a `/compact` after a trim summarises, and carries
 over, only your messages after it, and a trim after a compaction can start
@@ -1626,6 +1640,24 @@ at one of the messages it carried over, or cut into what it kept, dropping
 those messages and the summary too. A fork or clone keeps the trim, and so does
 `/rewind` while the trimmed-to message stays on the path (rewinding to
 before it drops the trim).
+
+`/trim after` cuts the other way: pick a message (newest first, with what
+goes) and confirm, and everything after it, up to the newest message, leaves
+the context, folded into a divider at that point (`/trim show` and Show
+unfold it). It does not branch the session, unlike `/rewind`: what you send
+afterwards comes after the divider and is in the context. `/delete` picks one
+message (newest first, with its start and what goes) and drops it from the
+transcript and the context at once; deleting a reply also drops its tool
+calls' results (a tool result goes with its call), and `/delete undo` brings
+back the latest deletion (`/delete` with a session's name or path still
+deletes sessions). Deleted messages leave no divider. `/trim undo` cancels
+the latest trim of either kind; trims and deletions stack, are refused
+while a run is in progress, move the status line's context use by their
+estimate, and survive a reload, fork and `/rewind` while their message is
+on the path. The context sent to the model always stays well formed: a
+request that would start with a reply (your first message deleted) starts
+with a short note that earlier messages were removed, and a `/compact` afterwards
+neither summarises nor carries over what is deleted or trimmed.
 
 `/budget DOLLARS` sets a cost budget for the session (`/budget off` removes
 it, `/budget` shows it): once the session has cost that much — subagents and
@@ -1717,7 +1749,8 @@ it.
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
-| `/trim [undo\|show\|hide]` | drop everything before one of your messages from the model's context (a picker, then a confirmation); `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
+| `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
+| `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
 | `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`) |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
@@ -1734,7 +1767,7 @@ it.
 | `/session` | show session statistics |
 | `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
-| `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
+| `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory (on the active tool host: `~` is that host's home, a relative path is under the current directory); a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
