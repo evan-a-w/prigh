@@ -94,6 +94,19 @@ let print_result names result =
   | Error e -> print_endline ("error: " ^ Error.to_string_hum e)
 ;;
 
+let untrim session =
+  Result.map (Session.append_untrim session) ~f:(fun (h : Session.Hidden.t) ->
+    { Session.Trim.before =
+        (match h.kind with
+         | Trim_before { before } -> before
+         | Trim_after { after; _ } -> after
+         | Deleted { message } -> message)
+    ; messages = h.messages
+    ; tokens = h.tokens
+    ; at = h.at
+    })
+;;
+
 let with_session f =
   with_sandbox
   @@ fun t ->
@@ -118,8 +131,12 @@ let%expect_test "a trim drops what comes before its message from the context" =
   print_s [%sexp (Session.context_tokens session : int)];
   [%expect
     {|
+    point 1 a1 (one): 1 messages, ~100 tokens
     point 2 u2 (second): 2 messages, ~100 tokens
+    point 3 a2 (looking): 3 messages, ~101 tokens
+    point 5 a2' (two): 5 messages, ~104 tokens
     point 6 u3 (third): 6 messages, ~104 tokens
+    point 7 a3 (three): 7 messages, ~105 tokens
     500
     |}];
   print_result names (Session.append_trim session ~before:(names.id "u3"));
@@ -140,11 +157,11 @@ let%expect_test "a trim drops what comes before its message from the context" =
     U(aaaaaaaaaaaa) A(one) U(second) A[c1] T(c1) A(two)
     396
     |}];
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   print_trim names session;
   print_s [%sexp (Session.context_tokens session : int)];
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   [%expect
     {|
     ok: before u3: 6 messages, ~104 tokens
@@ -155,10 +172,10 @@ let%expect_test "a trim drops what comes before its message from the context" =
     |}]
 ;;
 
-let%expect_test "only before one of the user's messages, never the first" =
+let%expect_test "before a user message or a reply, never the first or a result" =
   with_session
   @@ fun ~dir:_ session names ->
-  List.iter [ "u1"; "a1"; "t1"; "a2'" ] ~f:(fun name ->
+  List.iter [ "u1"; "t1" ] ~f:(fun name ->
     printf "%s: " name;
     print_result names (Session.append_trim session ~before:(names.id name)));
   print_result names (Session.append_trim session ~before:"nope");
@@ -166,22 +183,44 @@ let%expect_test "only before one of the user's messages, never the first" =
   [%expect
     {|
     u1: error: nothing to trim: that message is the first one in the model's context
-    a1: error: the context can only be trimmed before one of your messages, so that every tool call keeps its result: pick one that /trim lists
-    t1: error: the context can only be trimmed before one of your messages, so that every tool call keeps its result: pick one that /trim lists
-    a2': error: the context can only be trimmed before one of your messages, so that every tool call keeps its result: pick one that /trim lists
-    error: message nope is not in the model's context: trim before one of your messages that /trim lists
+    t1: error: a tool result goes with its call: trim before the reply that made the call (/trim lists it)
+    error: message nope is not in the model's context: trim before one of the messages that /trim lists
     no trim
     |}];
+  (* A reply: the context starts with it. *)
+  List.iter [ "a1"; "a2"; "a2'" ] ~f:(fun name ->
+    printf "%s: " name;
+    print_result names (Session.append_trim session ~before:(names.id name));
+    print_context session;
+    print_result names (untrim session));
+  [%expect
+    {|
+    a1: ok: before a1: 1 messages, ~100 tokens
+    A(one) U(second) A[c1] T(c1) A(two) U(third) A(three)
+    ok: before a1: 1 messages, ~100 tokens
+    a2: ok: before a2: 3 messages, ~101 tokens
+    A[c1] T(c1) A(two) U(third) A(three)
+    ok: before a2: 3 messages, ~101 tokens
+    a2': ok: before a2': 5 messages, ~104 tokens
+    A(two) U(third) A(three)
+    ok: before a2': 5 messages, ~104 tokens
+    |}];
   (* A user message between a call and its result (a steer recorded
-     there) is no place to cut. *)
+     there), or a reply with a call answered after it, is no place to
+     cut. *)
   let (_ : Session.Entry.t) =
     Session.append_message session (assistant ~calls:[ "c2" ] "again")
   in
   let steer = Session.append_message session (Message.user "steer") in
+  let late = Session.append_message session (assistant "late") in
   let (_ : Session.Entry.t) = Session.append_message session (result "c2") in
   print_result names (Session.append_trim session ~before:steer.id);
+  print_result names (Session.append_trim session ~before:late.id);
   [%expect
-    {| error: trimming there would part a tool call from its result: pick an earlier or later message |}]
+    {|
+    error: trimming there would part a tool call from its result: pick an earlier or later message
+    error: trimming there would part a tool call from its result: pick an earlier or later message
+    |}]
 ;;
 
 let%expect_test "trims stack: undo cancels the latest" =
@@ -191,7 +230,7 @@ let%expect_test "trims stack: undo cancels the latest" =
   print_result names (Session.append_trim session ~before:(names.id "u3"));
   print_context session;
   print_trim names session;
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   print_trim names session;
   [%expect
@@ -213,7 +252,7 @@ let%expect_test "a trim persists, and loads again" =
   let reloaded = Or_error.ok_exn (Session.load (Session.path session)) in
   print_context reloaded;
   print_trim names reloaded;
-  print_result names (Session.append_untrim reloaded);
+  print_result names (untrim reloaded);
   let reloaded = Or_error.ok_exn (Session.load (Session.path session)) in
   print_context reloaded;
   [%expect
@@ -238,7 +277,7 @@ let%expect_test "a compaction after a trim summarises only what is after it" =
   print_context session;
   print_trim names session;
   (* Undoing the trim puts u1 a1 back ahead of the summary. *)
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   [%expect
     {|
@@ -268,7 +307,7 @@ let%expect_test "a trim after a compaction cuts into its kept part" =
     (shapes
        (List.map (Session.trimmed_messages session) ~f:(fun (_, m) ->
           m.Timed_message.message)));
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   [%expect
     {|
@@ -309,7 +348,7 @@ let%expect_test "rewinds keep the trim while its message stays" =
   Or_error.ok_exn (Session.rewind session ~to_:(names.id "a3"));
   print_result names (Session.append_trim session ~before:(names.id "u2"));
   let after_trim = Option.value_exn (Session.head session) in
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   let (_ : Session.Entry.t) =
     Session.append_message session (Message.user "five")
   in
@@ -381,8 +420,12 @@ let with_agent replies f =
                  || String.is_prefix l ~prefix:"r")
                 (String.prefix l 12))))
     | _, Some last when is_ask last ->
-      printf "summarise: %s\n" (shapes (List.drop_last_exn r.messages))
-    | _ -> printf "request: %s\n" (shapes r.messages)
+      printf
+        "summarise: %s\n"
+        (shapes (List.drop_last_exn (Provider.Request.prepare r).messages))
+    | _ ->
+      (* What the model receives. *)
+      printf "request: %s\n" (shapes (Provider.Request.prepare r).messages)
   in
   let provider = Faux_provider.create ~on_request replies in
   let agent =
@@ -484,7 +527,7 @@ let%expect_test "trimming is refused while a run is in progress" =
     [%sexp
       (Agent.trim agent ~before:(user_entry agent "q2")
        : Session.Trim.t Or_error.t)];
-  print_s [%sexp (Agent.untrim agent : Session.Trim.t Or_error.t)];
+  print_s [%sexp (Agent.untrim agent : Session.Hidden.t Or_error.t)];
   Agent.wait_idle agent;
   [%expect
     {|
@@ -531,7 +574,7 @@ let%expect_test "/compact after a trim summarises only what is after it" =
     |}];
   (* Undoing the trim puts q1 back ahead of the carried-over q2 and the
      summary. *)
-  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
   run agent "q5";
   [%expect
     {| request: U(q1) A(r1) U(q2) S(SUMMARY) U(q3) A(r3) U(q4) A(r4) U(q5) |}]
@@ -582,7 +625,9 @@ let%expect_test "a trim after a compaction: its carried-over messages" =
     {|
     point 1 (q2): 1 messages, ~507 tokens
     point 3 (q3): 3 messages, ~517 tokens
+    point 4 (r3): 4 messages, ~517 tokens
     point 5 (q4): 5 messages, ~517 tokens
+    point 6 (r4): 6 messages, ~517 tokens
     |}];
   (* A trim at a carried-over message drops the ones before it. *)
   print_s
@@ -591,7 +636,7 @@ let%expect_test "a trim after a compaction: its carried-over messages" =
        |> Result.map ~f:(fun t -> t.messages, t.tokens)
        : (int * int) Or_error.t)];
   run agent "q5";
-  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
   (* One in the compaction's kept part drops them all, and the summary. *)
   print_s
     [%sexp
@@ -607,5 +652,168 @@ let%expect_test "a trim after a compaction: its carried-over messages" =
     (Ok (3 517))
     request: U(q3) A(r3) U(q4) A(r4) U(q5) A(r5) U(q6)
     state: messages=8 context_tokens=10 trim=3 messages, ~517 tokens
+    |}]
+;;
+
+let reply_entry agent text =
+  List.find_map_exn
+    (Session.active_path (Agent.session agent))
+    ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Message (Assistant a)
+        when String.equal (Message.Assistant.text a) text
+             || List.exists (Message.Assistant.tool_calls a) ~f:(fun c ->
+               String.equal c.id text) -> Some e.id
+      | _ -> None)
+;;
+
+let print_trimmed agent ~before =
+  print_s
+    [%sexp
+      (Agent.trim agent ~before |> Result.map ~f:(fun t -> t.messages, t.tokens)
+       : (int * int) Or_error.t)]
+;;
+
+let%expect_test "a trim before a reply: the model gets a user turn ahead of it" =
+  with_agent
+    [ Reply.text "r1"
+    ; Reply.tool_call ~id:"c1" ~name:"bash" ~arguments:{|{"command":"true"}|} ()
+    ; Reply.text "r2"
+    ; Reply.text "r3"
+    ; Reply.text "r4"
+    ; Reply.text "r5"
+    ]
+  @@ fun agent ->
+  run agent "q1";
+  run agent "q2";
+  [%expect
+    {|
+    request: U(q1)
+    request: U(q1) A(r1) U(q2)
+    request: U(q1) A(r1) U(q2) A[c1] T(c1)
+    |}];
+  print_points agent;
+  [%expect
+    {|
+    point 1 (r1): 1 messages, ~0 tokens
+    point 2 (q2): 2 messages, ~0 tokens
+    point 3 (bash): 3 messages, ~0 tokens
+    point 5 (r2): 5 messages, ~5 tokens
+    |}];
+  (* At the reply with the call: its result goes with it. *)
+  print_trimmed agent ~before:(reply_entry agent "c1");
+  print_state agent;
+  run agent "q3";
+  [%expect
+    {|
+    (Ok (3 0))
+    state: messages=3 context_tokens=10 trim=3 messages, ~0 tokens
+    request: U([the convers) A[c1] T(c1) A(r2) U(q3)
+    |}];
+  (* Trims stack; undo cancels the latest. *)
+  print_trimmed agent ~before:(reply_entry agent "r2");
+  run agent "q4";
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
+  run agent "q5";
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
+  print_state agent;
+  [%expect
+    {|
+    (Ok (2 5))
+    request: U([the convers) A(r2) U(q3) A(r3) U(q4)
+    request: U([the convers) A[c1] T(c1) A(r2) U(q3) A(r3) U(q4) A(r4) U(q5)
+    state: messages=12 context_tokens=10 trim=none
+    |}]
+;;
+
+let%expect_test "a trim before a reply, with compactions" =
+  let long = String.make 40_000 'x' in
+  with_agent
+    [ Reply.text "r1"
+    ; Reply.text ("r2" ^ long)
+    ; Reply.text "r3"
+    ; Reply.text "SUMMARY"
+    ; Reply.text "r4"
+    ; Reply.text "r5"
+    ; Reply.text "SUMMARY2"
+    ; Reply.text "r6"
+    ; Reply.text "r7"
+    ]
+  @@ fun agent ->
+  run agent "q1";
+  run agent "q2";
+  run agent "q3";
+  ignore (Or_error.ok_exn (Agent.compact agent) : string);
+  run agent "q4";
+  [%expect
+    {|
+    request: U(q1)
+    request: U(q1) A(r1) U(q2)
+    request: U(q1) A(r1) U(q2) A(r2xxxxxxxxxx) U(q3)
+    summarise: U(q1) A(r1) U(q2) A(r2xxxxxxxxxx)
+    request: U(q1) U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
+    |}];
+  (* At a reply in the compaction's kept part: the carried-over messages and
+     the summary go. *)
+  print_trimmed agent ~before:(reply_entry agent "r3");
+  run agent "q5";
+  print_state agent;
+  [%expect
+    {|
+    (Ok (4 10))
+    request: U([the convers) A(r3) U(q4) A(r4) U(q5)
+    state: messages=5 context_tokens=10 trim=4 messages, ~10 tokens
+    |}];
+  (* A compaction now summarises only what is after the trim (the provider
+     puts the user turn ahead of it too). *)
+  ignore (Or_error.ok_exn (Agent.compact agent) : string);
+  run agent "q6";
+  [%expect
+    {|
+    summarise: U([the convers) A(r3)
+    request: S(SUMMARY2) U(q4) A(r4) U(q5) A(r5) U(q6)
+    |}];
+  (* Undone: the trimmed messages are back ahead of the new summary. *)
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
+  run agent "q7";
+  [%expect
+    {| request: U(q1) U(q2) S(SUMMARY) U(q3) S(SUMMARY2) U(q4) A(r4) U(q5) A(r5) U(q6) A(r6) U(q7) |}]
+;;
+
+let%expect_test "a trim before a reply: rewinds, forks, reloads, masking" =
+  with_session
+  @@ fun ~dir session names ->
+  ignore
+    (Session.append_masked session ~through:(names.id "t1") : Session.Entry.t);
+  print_result names (Session.append_trim session ~before:(names.id "a2"));
+  print_context session;
+  let reloaded = Or_error.ok_exn (Session.load (Session.path session)) in
+  print_context reloaded;
+  print_trim names reloaded;
+  [%expect
+    {|
+    ok: before a2: 3 messages, ~101 tokens
+    A[c1] T(c1) A(two) U(third) A(three)
+    A[c1] T(c1) A(two) U(third) A(three)
+    before a2: 3 messages, ~101 tokens
+    |}];
+  let fork = Or_error.ok_exn (Session.fork session ~at:(names.id "t1") ~dir) in
+  print_context fork;
+  print_endline
+    (Option.value_map (Session.trim fork) ~default:"no trim" ~f:(fun t ->
+       sprintf "%d messages, ~%d tokens" t.messages t.tokens));
+  (* To the reply itself: still trimmed; to before it: the trim goes. *)
+  Or_error.ok_exn (Session.rewind session ~to_:(names.id "a2"));
+  print_context session;
+  Or_error.ok_exn (Session.rewind session ~to_:(names.id "u2"));
+  print_context session;
+  print_trim names session;
+  [%expect
+    {|
+    A[c1] T(c1)
+    3 messages, ~101 tokens
+    A[c1]
+    U(aaaaaaaaaaaa) A(one) U(second)
+    no trim
     |}]
 ;;

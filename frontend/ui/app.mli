@@ -72,9 +72,18 @@ module Reply_tag : sig
     | Models_for_scoped
     | Compact_done
     | Trim_points_picker
-    | Trimmed of [ `Trim | `Untrim ] (** what [trim] or [untrim] moved *)
-    | Trim_reload (** the context's messages, after the trim changed *)
-    | Trimmed_shown (** [/trim show]'s [get_trimmed] *)
+    | Message_points of [ `Delete | `Trim_after ]
+    (** [get_message_points], for [/delete]'s or [/trim after]'s picker *)
+    | Trimmed of [ `Trim | `Trim_after | `Untrim ]
+    (** what [trim], [trim_after] or [untrim] moved *)
+    | Deleted of [ `Delete | `Undelete ]
+    (** what [delete] or [undelete] moved *)
+    | Trim_reload
+    (** the context's messages, after what it hides (trims, deletions)
+        changed *)
+    | Trimmed_shown of string option
+    (** [/trim show]: [get_trimmed] without an entry (the trims before a
+        message), else that trim after one's *)
     | Git_diff
     | Review_comments of
         { target : P.Git_diff.Target.t

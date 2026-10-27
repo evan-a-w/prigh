@@ -68,7 +68,7 @@ let%expect_test
   [%expect
     {|
     Waiting for the model
-    <div class="assistant msg streaming">
+    <div data-message-entry="0" class="assistant msg streaming">
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Waiting for the model… </span>
@@ -76,7 +76,7 @@ let%expect_test
     </div>
     ---
     Thinking
-    <div class="assistant msg streaming">
+    <div data-message-entry="0" class="assistant msg streaming">
       <div class="live thinking">
         <div class="thinking-head">
           <span aria-hidden="true" class="lamp"> </span>
@@ -86,7 +86,7 @@ let%expect_test
     </div>
     ---
     Retrying in 2s (attempt 2/6): overloaded_error: Overloaded
-    <div class="assistant msg streaming">
+    <div data-message-entry="0" class="assistant msg streaming">
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Retrying in 2s (attempt 2 of 6)… </span>
@@ -95,7 +95,7 @@ let%expect_test
     </div>
     ---
     Waiting for the model (attempt 2/6, after: overloaded_error: Overloaded)
-    <div class="assistant msg streaming">
+    <div data-message-entry="0" class="assistant msg streaming">
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Waiting for the model (attempt 2 of 6)… </span>

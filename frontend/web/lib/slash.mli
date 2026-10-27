@@ -35,7 +35,8 @@ module Argument : sig
     | Worktree
     (** a [/worktree] subcommand, then a worktree, flag or base branch *)
     | Review (** [/review]: a worktree or [--base], then a base branch *)
-    | Trim (** [undo] *)
+    | Trim (** [after], [undo] *)
+    | Delete (** [undo], or sessions *)
   [@@deriving sexp_of, equal]
 end
 

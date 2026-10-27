@@ -1040,13 +1040,15 @@ kbd {
   align-items: flex-start;
   gap: 8px;
 }
+.toast .btn.toast-undo { margin: -2px -4px -2px 4px; padding: 0 8px; color: var(--sodium); font-weight: 600; flex-shrink: 0; }
 .toast-repeats { font: 11.5px/1.7 var(--mono); color: var(--faint); }
 .toast .btn.icon.toast-close { width: 22px; height: 22px; margin: -1px -6px -1px 0; flex-shrink: 0; color: var(--faint); }
 .toast-close .icon { width: 13px; height: 13px; }
 .toast:hover .toast-close, .toast-close:focus-visible { color: var(--chalk); }
 .toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
-/* Above the jump-to-the-end button; under the composer's popup. */
-.main:has(.jump-to-bottom) .toasts { bottom: 56px; }
+/* Right of the jump-to-the-end button, in the middle, not over it (on a
+   phone, above it). */
+.main:has(.jump-to-bottom) .toast { max-width: min(460px, calc(50% - 44px)); }
 /* A dialog or a phone's sheet covers the chat: the newest one under it, at
    the bottom of the page. */
 .app:has(.modal-backdrop) .toasts,
@@ -1147,6 +1149,8 @@ kbd {
   .composer { padding: 6px 8px 8px; }
   .popup { left: 8px; right: 8px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
+  .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
+  .main:has(.jump-to-bottom) .toast { max-width: none; }
   .modal-backdrop { padding-top: 8vh; }
   .help-table td:first-child { white-space: normal; }
   /* No room beside the name: the detail goes under it, whole. */

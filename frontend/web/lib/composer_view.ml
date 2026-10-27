@@ -39,6 +39,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Accent -> "Accent colours"
       | Argument Trim -> "Trim"
       | Argument Filter -> "Show only"
+      | Argument Delete -> "Delete"
     in
     div
       ~cls:"popup"

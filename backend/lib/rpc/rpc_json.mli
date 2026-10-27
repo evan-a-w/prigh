@@ -15,6 +15,13 @@ val state : Agent.State.t -> Json.t
 (** What [trim] or [untrim] took out or brought back: [{messages, tokens}]. *)
 val trim_result : Session.Trim.t -> Json.t
 
+(** A range out of the context ([get_state]'s [hidden], and what
+    [trim_after], [delete], [untrim] and [undelete] answer): [{entry, kind:
+    trim_before|trim_after|deleted, message, through?, messages, tokens,
+    at?, divider?}]; [message] is the entry id of the message it is about,
+    [entry] the one to undo. *)
+val hidden : Session.Hidden.t -> Json.t
+
 (** [{"name", "text", "on": "stop", "max_repeats", "repeats"}] or [{"name",
     "text", "every_turns"}]; [repeats]: the times it fired in a row, from
     [stops] (see [Agent.State.reminder_stops]). *)

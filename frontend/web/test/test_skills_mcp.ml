@@ -486,7 +486,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div data-entry="0" class="msg skill user">
+        <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg skill user">
           <details class="skill-card">
             <summary>
               <span class="label"> skill frontend-design </span>
@@ -512,6 +512,16 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
             </div>
           </details>
           <div dir="auto" class="bubble"> the pricing page </div>
+          <div class="msg-actions">
+            <button type="button"
+                    title="Delete this message from the transcript and the model's context"
+                    aria-label="Delete"
+                    data-delete-entry="0"
+                    class="msg-delete">
+              <span aria-hidden="true" class="glyph"> ✕ </span>
+              Delete
+            </button>
+          </div>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>

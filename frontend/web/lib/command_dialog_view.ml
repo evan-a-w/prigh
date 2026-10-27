@@ -441,10 +441,11 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
       ]
     [ Node.p
         [ Node.textf
-            "Trim %d message%s (%s) before this message?"
+            "Trim %d message%s (%s) before this %s?"
             point.messages
             (if point.messages = 1 then "" else "s")
             (Trim.tokens_label point.tokens)
+            (if point.reply then "reply" else "message")
         ]
     ; Node.blockquote
         ~attrs:[ Attr.class_ "rewind-quote" ]
@@ -462,6 +463,61 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
         [ Node.text
             "They leave the model's context; the transcript keeps them folded, \
              and Undo brings them back."
+        ]
+    ; dialog_error error
+    ]
+;;
+
+let trim_after_confirm
+      (m : App.Model.t)
+      (point : Message_point.t)
+      ~busy
+      ~error
+      ~inject
+  =
+  let text = Jump.headline point.text in
+  let freed =
+    Option.value
+      point.trim_after
+      ~default:{ Trim.Freed.messages = 0; tokens = 0 }
+  in
+  Modal.view
+    ~cls:"trim-confirm"
+    ~title:"Trim the context after this?"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ keys_hint "Enter trims, Esc cancels"
+      ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"primary"
+          ~disabled:busy
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text (if busy then "Trimming…" else "Trim") ]
+      ]
+    [ Node.p
+        [ Node.textf
+            "Trim %d message%s (%s) after this message?"
+            freed.messages
+            (if freed.messages = 1 then "" else "s")
+            (Trim.tokens_label freed.tokens)
+        ]
+    ; Node.blockquote
+        ~attrs:[ Attr.class_ "rewind-quote" ]
+        [ Node.text
+            (if String.is_empty text
+             then "(an image)"
+             else String.prefix text 400)
+        ; Option.value_map point.at ~default:Node.none ~f:(fun at ->
+            span
+              ~cls:"quote-time"
+              (Message_time.short (App.Model.message_time m) at))
+        ]
+    ; Node.p
+        ~attrs:[ Attr.class_ "dialog-note" ]
+        [ Node.text
+            "They leave the model's context; the transcript keeps them folded \
+             where they were, what you send next goes after them, and Undo \
+             brings them back."
         ]
     ; dialog_error error
     ]
@@ -643,6 +699,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
   | Trim_confirm { point; busy; error } ->
     Some (trim_confirm m point ~busy ~error ~inject)
+  | Trim_after_confirm { point; busy; error } ->
+    Some (trim_after_confirm m point ~busy ~error ~inject)
   | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)

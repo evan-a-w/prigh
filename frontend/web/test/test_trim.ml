@@ -33,24 +33,72 @@ let exchanges ns =
 ;;
 
 (* What [get_trim_points] says of exchanges [first..last] in the context: a
-   point at each question but the first. *)
+   point at each message but the first. *)
 let trim_points ?(first = 1) last =
   sprintf
     {|{"points":[%s]}|}
     (String.concat
        ~sep:","
-       (List.map
-          (List.range (first + 1) (last + 1))
+       (List.concat_map
+          (List.range first (last + 1))
           ~f:(fun n ->
             let index = 2 * (n - first) in
-            sprintf
-              {|{"before":"u%d","index":%d,"text":"question %d","at":%.0f,"messages":%d,"tokens":%d}|}
-              n
-              index
-              n
-              (base_ms +. Float.of_int (n * 60_000))
-              index
-              (index * 9_500))))
+            (if index = 0
+             then []
+             else
+               [ sprintf
+                   {|{"before":"u%d","index":%d,"role":"user","text":"question %d","at":%.0f,"messages":%d,"tokens":%d}|}
+                   n
+                   index
+                   n
+                   (base_ms +. Float.of_int (n * 60_000))
+                   index
+                   (index * 9_500)
+               ])
+            @ [ sprintf
+                  {|{"before":"a%d","index":%d,"role":"assistant","text":"answer %d","messages":%d,"tokens":%d}|}
+                  n
+                  (index + 1)
+                  n
+                  (index + 1)
+                  ((index + 1) * 9_500)
+              ])))
+;;
+
+(* What [get_message_points] says of exchanges [first..last] in the
+   context: a trim before each message but the first. *)
+let message_points ?(first = 1) last =
+  sprintf
+    {|{"points":[%s]}|}
+    (String.concat
+       ~sep:","
+       (List.concat_map
+          (List.range first (last + 1))
+          ~f:(fun n ->
+            let index = 2 * (n - first) in
+            let trim_before index =
+              if index = 0
+              then ""
+              else
+                sprintf
+                  {|,"trim_before":{"messages":%d,"tokens":%d}|}
+                  index
+                  (index * 9_500)
+            in
+            [ sprintf
+                {|{"message":"u%d","index":%d,"role":"user","text":"question %d","at":%.0f%s}|}
+                n
+                index
+                n
+                (base_ms +. Float.of_int (n * 60_000))
+                (trim_before index)
+            ; sprintf
+                {|{"message":"a%d","index":%d,"role":"assistant","text":"answer %d"%s}|}
+                n
+                (index + 1)
+                n
+                (trim_before (index + 1))
+            ])))
 ;;
 
 let trim_json ~before ~messages ~tokens =
@@ -95,36 +143,92 @@ let dialog h = H.text h ~selector:".modal"
 let toasts h = H.text h ~selector:".toast"
 let divider h = H.text h ~selector:".trim-divider"
 
-let%expect_test "the user's messages but the first have the action" =
+let%expect_test "every message but the first has the row of actions" =
   let h = session () in
   H.show h ~selector:".msg.user";
   [%expect
     {|
-    <div data-entry="0" class="msg user">
+    <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 1 </div>
       <time title="Monday 5 October 2026, 10:01:00" datetime="2026-10-05T10:01:00Z" class="time"> 10:01 </time>
+      <div class="msg-actions">
+        <button type="button"
+                title="Trim everything after this message from the model's context"
+                aria-label="Trim everything after this"
+                data-trim-after-entry="0"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim after
+        </button>
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                aria-label="Delete"
+                data-delete-entry="0"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+      </div>
     </div>
-    <div data-entry="2" class="msg user">
+    <div data-entry="2" data-message-entry="2" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
-      <button type="button"
-              title="Trim everything before this from the model's context"
-              data-trim-entry="2"
-              class="trim-before">
-        <span aria-hidden="true" class="scissors"> ✂ </span>
-        Trim everything before this
-      </button>
+      <div class="msg-actions">
+        <button type="button"
+                title="Trim everything before this message from the model's context"
+                aria-label="Trim everything before this"
+                data-trim-entry="2"
+                class="trim-before">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim before
+        </button>
+        <button type="button"
+                title="Trim everything after this message from the model's context"
+                aria-label="Trim everything after this"
+                data-trim-after-entry="2"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim after
+        </button>
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                aria-label="Delete"
+                data-delete-entry="2"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+      </div>
     </div>
-    <div data-entry="4" class="msg user">
+    <div data-entry="4" data-message-entry="4" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 3 </div>
       <time title="Monday 5 October 2026, 10:03:00" datetime="2026-10-05T10:03:00Z" class="time"> 10:03 </time>
-      <button type="button"
-              title="Trim everything before this from the model's context"
-              data-trim-entry="4"
-              class="trim-before">
-        <span aria-hidden="true" class="scissors"> ✂ </span>
-        Trim everything before this
-      </button>
+      <div class="msg-actions">
+        <button type="button"
+                title="Trim everything before this message from the model's context"
+                aria-label="Trim everything before this"
+                data-trim-entry="4"
+                class="trim-before">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim before
+        </button>
+        <button type="button"
+                title="Trim everything after this message from the model's context"
+                aria-label="Trim everything after this"
+                data-trim-after-entry="4"
+                class="trim-after">
+          <span aria-hidden="true" class="glyph"> ✂ </span>
+          Trim after
+        </button>
+        <button type="button"
+                title="Delete this message from the transcript and the model's context"
+                aria-label="Delete"
+                data-delete-entry="4"
+                class="msg-delete">
+          <span aria-hidden="true" class="glyph"> ✕ </span>
+          Delete
+        </button>
+      </div>
     </div>
     |}]
 ;;
@@ -138,14 +242,14 @@ let%expect_test
   [%expect
     {|
     (Focus dialog)
-    (Rpc (method_ get_trim_points) (params ())
-     (tag (Trim_points (Before (from_end 1) (at ("2026-10-05 10:02:00Z"))))))
+    (Rpc (method_ get_message_points) (params ())
+     (tag (Message_points (Trim_before (index 2) (at ("2026-10-05 10:02:00Z"))))))
     Trim the context
     (Close (Esc))
     Loading…
     Esc closes
     |}];
-  H.reply h "get_trim_points" (trim_points 3);
+  H.reply h "get_message_points" (message_points 3);
   dialog h;
   [%expect
     {|
@@ -166,7 +270,7 @@ let%expect_test
     |}];
   H.quiet h (fun () ->
     H.act h (Ask_trim (Entry 2));
-    H.reply h "get_trim_points" (trim_points 3));
+    H.reply h "get_message_points" (message_points 3));
   (* Enter trims; the dialog says so until the backend answers. *)
   H.key h "Enter" ~target:Page;
   dialog h;
@@ -192,8 +296,8 @@ let%expect_test
      (params ((session /sessions/s1.jsonl) (limit 60)))
      (tag (Page (path /sessions/s1.jsonl) (before ()))))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 6000))
-    Trimmed 2 messages (~19k tokens) from the context: Undo on the divider at the top (or /trim undo) brings them back
+    (Expire_toast (id 0) (after_ms 3740))
+    Trimmed 2 messages (~19k tokens): Undo is on the divider
     |}];
   H.reply h "get_messages_page" (H.page (exchanges [ 2; 3 ]));
   H.text h ~selector:"#chat";
@@ -204,10 +308,14 @@ let%expect_test
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
     10:02
+    (✂ Trim after) (✕ Delete)
     answer 2
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
+    (✂ Trim before) (✕ Delete)
     |}];
   (* The new first message has nothing before it to trim. *)
   H.act h (Ask_trim (Entry 0));
@@ -215,7 +323,7 @@ let%expect_test
   toasts h;
   [%expect
     {|
-    Trimmed 2 messages (~19k tokens) from the context: Undo on the divider at the top (or /trim undo) brings them back
+    Trimmed 2 messages (~19k tokens): Undo is on the divider
     That is the first message in the model's context: there is nothing before it to trim.
     |}]
 ;;
@@ -264,10 +372,14 @@ let%expect_test
     ✂ 2 messages trimmed · ~19k tokens (Hide) · (Undo)
     question 2
     10:02
+    (✂ Trim after) (✕ Delete)
     answer 2
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
+    (✂ Trim before) (✕ Delete)
     |}];
   (* Read-only: no actions, no landmarks of the transcript. *)
   H.show h ~selector:".trimmed-messages .msg.user";
@@ -293,7 +405,11 @@ let%expect_test
       "get_state"
       (H.state_json ~fields:[ "session_id", `String "s2" ] ()));
   print_s [%sexp ((H.model h).trimmed : Trimmed.t)];
-  [%expect {| ((shown Folded) (restoring false) (reveal ())) |}]
+  [%expect
+    {|
+    ((shown Folded) (restoring false) (reveal ()) (ranges ())
+     (restoring_ranges ()) (deleting ()) (reveal_hidden ()))
+    |}]
 ;;
 
 let%expect_test
@@ -327,13 +443,19 @@ let%expect_test
     Scroll_to_bottom
     question 1
     10:01
+    (✂ Trim after) (✕ Delete)
     answer 1
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 2
-    10:02 (✂ Trim everything before this)
+    10:02
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 2
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     question 3
-    10:03 (✂ Trim everything before this)
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     answer 3
+    (✂ Trim before) (✕ Delete)
     Back in the context: 2 messages (~19k tokens)
     |}];
   (* Nothing trimmed: Undo says so. *)
@@ -352,7 +474,7 @@ let%expect_test
   let h = session () in
   H.quiet h (fun () ->
     H.act h (Ask_trim (Entry 4));
-    H.reply h "get_trim_points" (trim_points 3);
+    H.reply h "get_message_points" (message_points 3);
     H.act h Dialog_accept);
   H.fail
     h
@@ -405,8 +527,11 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
     Trim the context before
     (Close (Esc))
     []
-    question 3 10:03  4 messages trimmed · ~38k tokens
-    question 2 10:02  2 messages trimmed · ~19k tokens
+    answer 3 reply  5 messages trimmed · ~48k tokens
+    question 3 you  10:03  4 messages trimmed · ~38k tokens
+    answer 2 reply  3 messages trimmed · ~29k tokens
+    question 2 you  10:02  2 messages trimmed · ~19k tokens
+    answer 1 reply  1 message trimmed · ~9.5k tokens
     ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.key h "Enter" ~target:Field;
@@ -417,8 +542,8 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
     (Focus dialog)
     Trim the context here?
     (Close (Esc))
-    Trim 4 messages (~38k tokens) before this message?
-    question 3 10:03
+    Trim 5 messages (~48k tokens) before this reply?
+    answer 3
     They leave the model's context; the transcript keeps them folded, and Undo brings them back.
     Enter trims, Esc cancels (Cancel) (Trim)
     |}];
@@ -426,7 +551,7 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
   [%expect
     {|
     Dialog_accept
-    (Rpc (method_ trim) (params ((before u3))) (tag Trimmed))
+    (Rpc (method_ trim) (params ((before a3))) (tag Trimmed))
     |}];
   (* With one message, nothing to trim before. *)
   let h = H.create () in
@@ -438,9 +563,9 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
   toasts h;
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 5540))
+    (Expire_toast (id 0) (after_ms 5620))
     (Focus editor)
-    Nothing to trim: the context starts at your first message. /trim drops what comes before a later one.
+    Nothing to trim: the context has no message after its first. /trim drops what comes before a later one.
     |}];
   let h = trimmed () in
   H.type_ h "/trim undo";
@@ -457,6 +582,7 @@ let%expect_test "/trim: a picker of where to trim, newest first; /trim undo" =
   [%expect
     {|
     Trim ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    after pick a message to trim everything after
     undo bring back what the last trim took out of the context
     |}]
 ;;
@@ -465,7 +591,7 @@ let%expect_test "a message no longer in the context is not trimmed before" =
   let h = session () in
   H.quiet h (fun () -> H.act h (Ask_trim (Entry 2)));
   (* The backend has another message there (the transcript changed). *)
-  H.reply h "get_trim_points" (trim_points ~first:2 4);
+  H.reply h "get_message_points" (message_points ~first:2 4);
   toasts h;
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
@@ -546,8 +672,8 @@ let%expect_test "the rail and the jump list: one mark for what is trimmed" =
     {|
     (Ask_trim (Entry 2))
     (Focus dialog)
-    (Rpc (method_ get_trim_points) (params ())
-     (tag (Trim_points (Before (from_end 0) (at ("2026-10-05 10:03:00Z"))))))
+    (Rpc (method_ get_message_points) (params ())
+     (tag (Message_points (Trim_before (index 2) (at ("2026-10-05 10:03:00Z"))))))
     |}];
   H.quiet h (fun () ->
     H.act h Close_dialog;
@@ -589,5 +715,82 @@ let%expect_test "jumping to the divider loads the pages down to it" =
     Keep_scroll_position
     Scroll_to_trimmed
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
+    |}]
+;;
+
+let%expect_test
+    "trim before a reply: the transcript starts at it; Undo's toast replaces \
+     the trim's"
+  =
+  let h = session () in
+  H.act h (Ask_trim (Entry 3));
+  H.reply h "get_message_points" (message_points 3);
+  dialog h;
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ get_message_points) (params ())
+     (tag (Message_points (Trim_before (index 3) (at ())))))
+    (Focus dialog)
+    Trim the context here?
+    (Close (Esc))
+    Trim 3 messages (~29k tokens) before this reply?
+    answer 2
+    They leave the model's context; the transcript keeps them folded, and Undo brings them back.
+    Enter trims, Esc cancels (Cancel) (Trim)
+    |}];
+  H.key h "Enter" ~target:Page;
+  state_event h ~trim:(trim_json ~before:"a2" ~messages:3 ~tokens:28_500);
+  H.reply h "trim" {|{"messages":3,"tokens":28500}|};
+  H.reply
+    h
+    "get_messages_page"
+    (H.page
+       ("["
+        ^ String.concat
+            ~sep:","
+            (assistant "answer 2" :: List.concat_map [ 3 ] ~f:exchange)
+        ^ "]"));
+  H.text h ~selector:"#chat";
+  toasts h;
+  [%expect
+    {|
+    Dialog_accept
+    (Rpc (method_ trim) (params ((before a2))) (tag Trimmed))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 3740))
+    Scroll_to_bottom
+    Scroll_to_trimmed
+    ✂ 3 messages trimmed · ~29k tokens (Show) · (Undo)
+    answer 2
+    (✂ Trim after) (✕ Delete)
+    question 3
+    10:03
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    answer 3
+    (✂ Trim before) (✕ Delete)
+    Trimmed 3 messages (~29k tokens): Undo is on the divider
+    |}];
+  jump_list h;
+  [%expect
+    {|
+    question 3 1 of 1  10:03 (Trim before)
+    Trimmed: 3 messages · ~29k tokens out of the model's context
+    |}];
+  H.act h Untrim;
+  state_event h;
+  H.reply h "untrim" {|{"messages":3,"tokens":28500}|};
+  toasts h;
+  [%expect
+    {|
+    (Rpc (method_ untrim) (params ()) (tag Untrimmed))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
+    (Expire_toast (id 1) (after_ms 3300))
+    Back in the context: 3 messages (~29k tokens)
     |}]
 ;;

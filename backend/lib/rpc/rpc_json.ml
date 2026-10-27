@@ -437,13 +437,35 @@ let trim (trim : Session.Trim.t) =
      @ Option.value_map trim.at ~default:[] ~f:(fun at -> [ "at", ms at ]))
 ;;
 
+let hidden (h : Session.Hidden.t) =
+  let kind =
+    match h.kind with
+    | Trim_before { before } ->
+      [ "kind", str "trim_before"; "message", str before ]
+    | Trim_after { after; through } ->
+      [ "kind", str "trim_after"; "message", str after; "through", str through ]
+    | Deleted { message } -> [ "kind", str "deleted"; "message", str message ]
+  in
+  `Object
+    ([ "entry", str h.entry ]
+     @ kind
+     @ [ "messages", int h.messages; "tokens", int h.tokens ]
+     @ Option.value_map h.at ~default:[] ~f:(fun at -> [ "at", ms at ])
+     @ Option.value_map h.divider ~default:[] ~f:(fun d -> [ "divider", int d ])
+    )
+;;
+
 let state (s : Agent.State.t) =
   match state s with
   | `Object fields ->
     `Object
       (fields
        @ home s.home
-       @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ]))
+       @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ])
+       @
+       if List.is_empty s.hidden
+       then []
+       else [ "hidden", `Array (List.map s.hidden ~f:hidden) ])
   | json -> json
 ;;
 
@@ -538,6 +560,10 @@ let entry (e : Session.Entry.t) =
     | Home _ -> [ "kind", str "home" ]
     | Trim { before } -> [ "kind", str "trim"; "before", str before ]
     | Untrim -> [ "kind", str "untrim" ]
+    | Trim_after { after; through } ->
+      [ "kind", str "trim_after"; "after", str after; "through", str through ]
+    | Delete { message } -> [ "kind", str "delete"; "message", str message ]
+    | Restore { entry } -> [ "kind", str "restore"; "entry", str entry ]
   in
   `Object
     ([ "id", str e.id
