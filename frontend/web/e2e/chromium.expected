@@ -2019,16 +2019,16 @@ There are 3 files.
 none
 === chromium: trim: opened ===
 steps: 1 2 3 4 5
-⋯: 10
-opacity before hover: 0
-over its text: false
-over a reply's text: false
+focusable: 10
+⋯: 0
 === chromium: trim: the first message's menu ===
 Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything before this — The context starts here | Trim everything after this — /trim after | Delete — /delete
 === chromium: trim: a reply's menu ===
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === chromium: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
+at the pointer: 2,0
+marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
 === chromium: trim: selected text ===
@@ -2040,11 +2040,12 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === chromium: trim: keyboard ===
+under the message: 0,2
 highlighted: Trim everything before this
 === chromium: trim: trimmed ===
 divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
 steps: 3 4 5
-⋯: 6
+focusable: 6
 divider in view: true
 toast: Trimmed 4 messages (~196 tokens): Undo is on the divider
 === chromium: trim: rail ===
@@ -2053,7 +2054,7 @@ tooltip: Not in the model's context | 4 messages trimmed · ~196 tokens | <TIME>
 === chromium: trim: shown ===
 head: Not in the model's context | Kept in the transcript only; the model no longer sees them.
 trimmed: Step 1, Step 2
-⋯ on them: 0
+menus on them: 0
 dimmed: true
 divider: ✂ | 4 messages trimmed · ~196 tokens | Hide | · | Undo
 hidden again
@@ -2084,7 +2085,7 @@ after Esc: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 
 transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo]
 user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>"
 shown: Module 3, Step 4, Module 4, Step 5, Module 5
-⋯ on them: 0
+menus on them: 0
 dimmed: true
 === chromium: trim: sent after the trim ===
 transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo], Step 6, Noted after the trim

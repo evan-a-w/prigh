@@ -140,7 +140,6 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
   [%expect
     {|
     button "Show all 30 lines"
-    button "More for this message" -- More (right-click, Shift+F10)
     [img] span "Done"
     button "Remove image"
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)

@@ -131,42 +131,15 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .msg.user .time { grid-column: 2; }
 
-/* A message's ⋯: its context menu (copy, trim, delete), a small round
-   button straddling its bottom edge at the right, between it and the next,
-   shown on hover or focus (on a phone, after a tap), and while its menu is
-   open. The menu's highlighted item shows what it would do: a dashed line
+/* A message with a context menu (copy, trim, delete): right-click it,
+   long-press it on a phone, or Shift+F10 on it. While its menu is open it is
+   outlined, and the highlighted item shows what it would do: a dashed line
    where a trim would cut, the message faded for a delete. */
-.entries > .msg, .entries > .msg.noted > .msg.user { position: relative; }
-.msg-more {
-  position: absolute;
-  bottom: 0;
-  right: 10px;
-  z-index: 1;
-  transform: translateY(50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid var(--rule-2);
-  border-radius: 999px;
-  background: var(--slate-2);
-  color: var(--muted);
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease-out, visibility 0.12s;
-}
-.msg-more > .icon { width: 14px; height: 14px; }
-@media (hover: hover) { .msg:hover > .msg-more { opacity: 1; visibility: visible; } }
-.msg:focus > .msg-more, .msg-more:focus-visible, .msg-more.open { opacity: 1; visibility: visible; }
-.msg-more:hover, .msg-more.open { color: var(--chalk); background: var(--panel-3); }
-.msg-more:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.entries > .msg { position: relative; }
 .msg:focus-visible { outline: none; }
-.msg:focus-visible:has(> .msg-more) { box-shadow: inset 0 0 0 1px var(--sodium-line); }
+.msg[tabindex]:focus-visible, .msg.menu-open { box-shadow: inset 0 0 0 1px var(--sodium-line); }
 /* ::after, as ::before is a reply's spine. */
-.msg:has(> .msg-more:is(.preview-trim-before, .preview-trim-after))::after {
+.msg:is(.preview-trim-before, .preview-trim-after)::after {
   content: "";
   position: absolute;
   left: -2px;
@@ -174,17 +147,13 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   border-top: 1px dashed var(--sodium);
   pointer-events: none;
 }
-.msg:has(> .msg-more.preview-trim-before)::after { top: -1px; }
-.msg:has(> .msg-more.preview-trim-after)::after { bottom: -1px; }
-.msg:has(> .msg-more.preview-delete) > :not(.msg-more) {
+.msg.preview-trim-before::after { top: -1px; }
+.msg.preview-trim-after::after { bottom: -1px; }
+.msg.preview-delete > * {
   opacity: 0.45;
   transition: opacity 0.12s ease-out;
 }
-@media (prefers-reduced-motion: reduce) { .msg-more { transition: none; } }
-/* A finger's worth. */
-@media (pointer: coarse) {
-  .msg-more { width: 32px; height: 26px; }
-}
+@media (prefers-reduced-motion: reduce) { .msg.preview-delete > * { transition: none; } }
 .msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 
 /* A subagent's task is a prompt too, but not the user's. */

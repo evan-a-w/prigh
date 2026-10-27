@@ -366,12 +366,12 @@ to your previous or next message, loading earlier ones past the first
 loaded.
 
 To shrink the context without summarising it, open a message's menu (yours
-or a reply's): right-click it, press its ⋯ (at its bottom-right corner on
-hover or focus), press Shift+F10 or the Menu key on it, or long-press it on
-a phone. Choose "Trim everything before this" (or press Delete on one of your
-messages in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
-messages and tokens it frees (Enter trims, Esc cancels). The transcript then
-starts at one divider, `✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
+or a reply's): right-click it, press Shift+F10 or the Menu key on it, or
+long-press it on a phone. Choose "Trim everything before this" (or press
+Delete on one of your messages in the Ctrl+J list, or pick it in `/trim`);
+a confirmation says how many messages and tokens it frees (Enter trims,
+Esc cancels). The transcript then starts at one divider,
+`✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
 Show unfolds the trimmed messages above it, dimmed and read-only (they are
 not in the model's context), and Undo (or `/trim undo`) brings them back.
 The rail draws what is trimmed as one dashed cut at its top, and the jump

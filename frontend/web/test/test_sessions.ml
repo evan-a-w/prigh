@@ -645,7 +645,6 @@ let%expect_test "new session and switching session reload the state" =
     {|
     Scroll_to_bottom
     older work
-    (More (right-click, Shift+F10))
     |}];
   (* A switch the backend refuses leaves the session as it was. *)
   Harness.act h (Switch_session "/sessions/s1.jsonl");
@@ -663,7 +662,6 @@ let%expect_test "new session and switching session reload the state" =
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     older work
-    (More (right-click, Shift+F10))
     Couldn't open the session: no such session (Dismiss)
     |}];
   (* So does a transcript that fails to load, saying so. *)
@@ -680,7 +678,6 @@ let%expect_test "new session and switching session reload the state" =
      (tag Reload_state))
     (Focus editor)
     hello
-    (More (right-click, Shift+F10))
     Couldn't load the session's messages: disk on fire. Reload the page to try again. (Dismiss)
     |}]
 ;;
