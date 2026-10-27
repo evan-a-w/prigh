@@ -442,3 +442,208 @@ let%expect_test "two steers and a follow-up queued while a tool runs" =
     (complete, 8 messages)
     |}]
 ;;
+
+let%expect_test
+    "steering after the main context was compacted and trimmed: the same \
+     agent, and new ids stay new"
+  =
+  let tool, started, release = gate_tool "slow" in
+  let long = String.make 40_000 'x' in
+  with_agent
+    ~extra_tools:[ tool ]
+    ~on_request:print_requests
+    ~main:
+      [ spawn "work"
+      ; Reply.text long
+      ; Reply.text "SUMMARY"
+      ; spawn ~id:"c2" "again"
+      ; Reply.text "spawned again"
+      ; Reply.text "got both"
+      ]
+    [ ( "work"
+      , [ Reply.tool_call ~id:"t1" ~name:"slow" ~arguments:"{}" ()
+        ; Reply.text "steered"
+        ] )
+    ; "again", [ Reply.text "again done" ]
+    ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  Eio.Promise.await started;
+  print_endline "--- compact and trim the main context while a1 runs";
+  print_s [%sexp (Agent.compact agent : string Or_error.t)];
+  let last =
+    List.find_map_exn
+      (List.rev (Session.active_path (Agent.session agent)))
+      ~f:(fun (e : Session.Entry.t) ->
+        match e.payload with
+        | Message (Assistant _) -> Some e.id
+        | _ -> None)
+  in
+  print_s
+    [%sexp
+      (Or_error.map (Agent.trim agent ~before:last) ~f:ignore : unit Or_error.t)];
+  print_s
+    [%sexp
+      (List.map (Agent.messages agent) ~f:(fun m ->
+         String.prefix (message_line m) 40)
+       : string list)];
+  log_subagent agent;
+  send agent "use the tests";
+  release ();
+  Agent.wait_idle agent;
+  transcript agent "a1";
+  transcript agent "a2";
+  [%expect {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    request work: u(work)
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: <40000 chars>
+    agent_end
+    state: running=false subagents=[a1 running]
+    --- compact and trim the main context while a1 runs
+    (Ok SUMMARY)
+    (Ok ())
+    ("assistant: <40000 chars>")
+    queue: a1 steer=[use the tests] follow_up=[]
+    (Ok ())
+      [a1] tool_result slow: released
+    queue:
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    request work: u(work) a[t1] r[t1] u([The user sends you this)
+      [a1] assistant: steered
+    subagent_end a1: ok steered | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | steered | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    assistant:  subagent{"task":"again"}
+    subagent_start a2: again
+      [a2] user: again
+    request again: u(again)
+    state: running=true subagents=[a2 running]
+    tool_result subagent: started agent a2 (again); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+      [a2] assistant: again done
+    subagent_end a2: ok again done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a2 done]
+    assistant: spawned again
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a2 finished] again | again done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: got both
+    agent_end
+    state: running=false subagents=[]
+    --- a1's transcript
+    user: work
+    assistant:  slow{}
+    tool_result slow: released
+    user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    assistant: steered
+    (complete, 5 messages)
+    --- a2's transcript
+    user: again
+    assistant: again done
+    (complete, 2 messages)
+    |}]
+;;
+
+let%expect_test
+    "a steered subagent's transcript after a reload: once, and new ids skip \
+     it"
+  =
+  Tool_test_helpers.with_sandbox
+  @@ fun (t : Tool_test_helpers.t) ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let tool, started, release = gate_tool "slow" in
+  let provider =
+    Routed_provider.create
+      ~on_request:print_requests
+      ~main:
+        [ spawn "work"
+        ; Reply.text "spawned"
+        ; Reply.text "got it"
+        ; spawn ~id:"c2" "again"
+        ; Reply.text "spawned again"
+        ; Reply.text "got it again"
+        ]
+      [ ( "work"
+        , [ Reply.tool_call ~id:"t1" ~name:"slow" ~arguments:"{}" ()
+          ; Reply.text "steered"
+          ] )
+      ; "again", [ Reply.text "again done" ]
+      ]
+  in
+  let create ?session () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:(Tools.all @ subagent_tools ~provider @ [ tool ])
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ?session
+      ~cwd:t.dir
+      ()
+  in
+  let agent = create () in
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  Eio.Promise.await started;
+  send agent "use the tests";
+  release ();
+  Agent.wait_idle agent;
+  print_endline "--- reloaded";
+  let session =
+    Or_error.ok_exn (Session.load (Session.path (Agent.session agent)))
+  in
+  let agent = create ~session () in
+  log_events agent;
+  transcript agent "a1";
+  print_s [%sexp (send agent "more" : unit)];
+  Or_error.ok_exn (Agent.prompt agent "again");
+  Agent.wait_idle agent;
+  transcript agent "a2";
+  [%expect {|
+    request work: u(work)
+    (Ok ())
+    request work: u(work) a[t1] r[t1] u([The user sends you this)
+    --- reloaded
+    --- a1's transcript
+    user: work
+    assistant:  slow{}
+    tool_result slow: released
+    user: [The user sends you this while you work: take it into account and carry on.] |  | use the tests
+    assistant: steered
+    (complete, 5 messages)
+    (Error "unknown subagent \"a1\"; known: none")
+    ()
+    state: running=true subagents=[]
+    agent_start
+    user: again
+    assistant:  subagent{"task":"again"}
+    subagent_start a2: again
+    request again: u(again)
+    state: running=true subagents=[a2 running]
+    tool_result subagent: started agent a2 (again); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a2: ok again done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a2 done]
+    assistant: spawned again
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a2 finished] again | again done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: got it again
+    agent_end
+    state: running=false subagents=[]
+    --- a2's transcript
+    user: again
+    assistant: again done
+    (complete, 2 messages)
+    |}]
+;;
