@@ -143,7 +143,7 @@ let dialog h = H.text h ~selector:".modal"
 let toasts h = H.text h ~selector:".toast"
 let divider h = H.text h ~selector:".trim-divider"
 
-let%expect_test "every message but the first has the row of actions" =
+let%expect_test "every message has its ⋯ (its menu: test_message_menu.ml)" =
   let h = session () in
   H.show h ~selector:".msg.user";
   [%expect
@@ -151,84 +151,44 @@ let%expect_test "every message but the first has the row of actions" =
     <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 1 </div>
       <time title="Monday 5 October 2026, 10:01:00" datetime="2026-10-05T10:01:00Z" class="time"> 10:01 </time>
-      <div class="msg-actions">
-        <button type="button"
-                title="Trim everything after this message from the model's context"
-                aria-label="Trim everything after this"
-                data-trim-after-entry="0"
-                class="trim-after">
-          <span aria-hidden="true" class="glyph"> ✂ </span>
-          Trim after
-        </button>
-        <button type="button"
-                title="Delete this message from the transcript and the model's context"
-                aria-label="Delete"
-                data-delete-entry="0"
-                class="msg-delete">
-          <span aria-hidden="true" class="glyph"> ✕ </span>
-          Delete
-        </button>
-      </div>
+      <button type="button"
+              id="msg-more-0"
+              data-message-menu="0"
+              title="More (right-click, Shift+F10)"
+              aria-label="More for this message"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              class="msg-more">
+        <icon class="more"> </icon>
+      </button>
     </div>
     <div data-entry="2" data-message-entry="2" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
-      <div class="msg-actions">
-        <button type="button"
-                title="Trim everything before this message from the model's context"
-                aria-label="Trim everything before this"
-                data-trim-entry="2"
-                class="trim-before">
-          <span aria-hidden="true" class="glyph"> ✂ </span>
-          Trim before
-        </button>
-        <button type="button"
-                title="Trim everything after this message from the model's context"
-                aria-label="Trim everything after this"
-                data-trim-after-entry="2"
-                class="trim-after">
-          <span aria-hidden="true" class="glyph"> ✂ </span>
-          Trim after
-        </button>
-        <button type="button"
-                title="Delete this message from the transcript and the model's context"
-                aria-label="Delete"
-                data-delete-entry="2"
-                class="msg-delete">
-          <span aria-hidden="true" class="glyph"> ✕ </span>
-          Delete
-        </button>
-      </div>
+      <button type="button"
+              id="msg-more-2"
+              data-message-menu="2"
+              title="More (right-click, Shift+F10)"
+              aria-label="More for this message"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              class="msg-more">
+        <icon class="more"> </icon>
+      </button>
     </div>
     <div data-entry="4" data-message-entry="4" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 3 </div>
       <time title="Monday 5 October 2026, 10:03:00" datetime="2026-10-05T10:03:00Z" class="time"> 10:03 </time>
-      <div class="msg-actions">
-        <button type="button"
-                title="Trim everything before this message from the model's context"
-                aria-label="Trim everything before this"
-                data-trim-entry="4"
-                class="trim-before">
-          <span aria-hidden="true" class="glyph"> ✂ </span>
-          Trim before
-        </button>
-        <button type="button"
-                title="Trim everything after this message from the model's context"
-                aria-label="Trim everything after this"
-                data-trim-after-entry="4"
-                class="trim-after">
-          <span aria-hidden="true" class="glyph"> ✂ </span>
-          Trim after
-        </button>
-        <button type="button"
-                title="Delete this message from the transcript and the model's context"
-                aria-label="Delete"
-                data-delete-entry="4"
-                class="msg-delete">
-          <span aria-hidden="true" class="glyph"> ✕ </span>
-          Delete
-        </button>
-      </div>
+      <button type="button"
+              id="msg-more-4"
+              data-message-menu="4"
+              title="More (right-click, Shift+F10)"
+              aria-label="More for this message"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              class="msg-more">
+        <icon class="more"> </icon>
+      </button>
     </div>
     |}]
 ;;
@@ -307,15 +267,13 @@ let%expect_test
     Scroll_to_trimmed
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
-    10:02
-    (✂ Trim after) (✕ Delete)
+    10:02 (More (right-click, Shift+F10))
     answer 2
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    (More (right-click, Shift+F10))
     question 3
-    10:03
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    10:03 (More (right-click, Shift+F10))
     answer 3
-    (✂ Trim before) (✕ Delete)
+    (More (right-click, Shift+F10))
     |}];
   (* The new first message has nothing before it to trim. *)
   H.act h (Ask_trim (Entry 0));
@@ -371,15 +329,13 @@ let%expect_test
     answer 1
     ✂ 2 messages trimmed · ~19k tokens (Hide) · (Undo)
     question 2
-    10:02
-    (✂ Trim after) (✕ Delete)
+    10:02 (More (right-click, Shift+F10))
     answer 2
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    (More (right-click, Shift+F10))
     question 3
-    10:03
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    10:03 (More (right-click, Shift+F10))
     answer 3
-    (✂ Trim before) (✕ Delete)
+    (More (right-click, Shift+F10))
     |}];
   (* Read-only: no actions, no landmarks of the transcript. *)
   H.show h ~selector:".trimmed-messages .msg.user";
@@ -442,20 +398,17 @@ let%expect_test
     {|
     Scroll_to_bottom
     question 1
-    10:01
-    (✂ Trim after) (✕ Delete)
+    10:01 (More (right-click, Shift+F10))
     answer 1
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    (More (right-click, Shift+F10))
     question 2
-    10:02
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    10:02 (More (right-click, Shift+F10))
     answer 2
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    (More (right-click, Shift+F10))
     question 3
-    10:03
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    10:03 (More (right-click, Shift+F10))
     answer 3
-    (✂ Trim before) (✕ Delete)
+    (More (right-click, Shift+F10))
     Back in the context: 2 messages (~19k tokens)
     |}];
   (* Nothing trimmed: Undo says so. *)
@@ -766,12 +719,11 @@ let%expect_test
     Scroll_to_trimmed
     ✂ 3 messages trimmed · ~29k tokens (Show) · (Undo)
     answer 2
-    (✂ Trim after) (✕ Delete)
+    (More (right-click, Shift+F10))
     question 3
-    10:03
-    (✂ Trim before) (✂ Trim after) (✕ Delete)
+    10:03 (More (right-click, Shift+F10))
     answer 3
-    (✂ Trim before) (✕ Delete)
+    (More (right-click, Shift+F10))
     Trimmed 3 messages (~29k tokens): Undo is on the divider
     |}];
   jump_list h;

@@ -512,16 +512,16 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
             </div>
           </details>
           <div dir="auto" class="bubble"> the pricing page </div>
-          <div class="msg-actions">
-            <button type="button"
-                    title="Delete this message from the transcript and the model's context"
-                    aria-label="Delete"
-                    data-delete-entry="0"
-                    class="msg-delete">
-              <span aria-hidden="true" class="glyph"> ✕ </span>
-              Delete
-            </button>
-          </div>
+          <button type="button"
+                  id="msg-more-0"
+                  data-message-menu="0"
+                  title="More (right-click, Shift+F10)"
+                  aria-label="More for this message"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  class="msg-more">
+            <icon class="more"> </icon>
+          </button>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>

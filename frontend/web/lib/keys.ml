@@ -16,6 +16,7 @@ module Target = struct
     | Files
     | Review
     | Resize of Resize.Handle.t
+    | Message of int
     | Page
   [@@deriving sexp_of]
 end
@@ -79,6 +80,10 @@ let help =
     , "its menu: open, rename, fork, new worktree, review, files, terminal, \
        pull request, copy, delete or remove (also right-click, a long press or \
        its ⋯)" )
+  ; ( "Shift+F10 / ContextMenu (on a message)"
+    , "its menu: copy, trim everything before or after it, delete it (also \
+       right-click, a long press or its ⋯; with text selected, right-click is \
+       the browser's, to copy it)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -176,6 +181,7 @@ let on_control t =
   | Files
   | Review
   | Resize _
+  | Message _
   | Page -> false
 ;;
 
@@ -325,6 +331,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              | Session _
              | Worktree _
              | Resize _
+             | Message _
              | Page -> true) -> Some Agents_back
   | _ -> None
 ;;
@@ -457,6 +464,7 @@ let question_key t : Question_dialog.Action.t option =
     | Files
     | Review
     | Resize _
+    | Message _
     | Page -> false
   in
   match t.key with
@@ -479,7 +487,7 @@ let commenting (m : App.Model.t) t =
   && Option.is_none m.review.draft
   &&
   match t.target with
-  | Page | Files | Review -> true
+  | Page | Message _ | Files | Review -> true
   | Editor _
   | Field
   | Multiline
@@ -565,9 +573,14 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Files ->
           Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
           |> Option.map ~f:(fun a -> App.Action.Files a)
-        | None, Page when m.review.open_ -> review_key m t
+        | None, Message n when menu_key t ->
+          Some
+            (Open_menu
+               { target = Message n; anchor = Element (Chat_view.more_id n) })
+        | None, (Page | Message _) when m.review.open_ -> review_key m t
         | None, Review -> review_key m t
         | None, Resize h ->
           resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
-        | None, (Field | Multiline | Control | Terminal | Page) -> None))
+        | None, (Field | Multiline | Control | Terminal | Page | Message _) ->
+          None))
 ;;

@@ -8,6 +8,7 @@ module Target = struct
         { session : string
         ; path : string
         }
+    | Message of int
   [@@deriving sexp_of, equal]
 end
 
@@ -47,6 +48,9 @@ module Item = struct
     | Unarchive
     | Delete
     | Remove
+    | Copy_message
+    | Trim_before
+    | Trim_after
   [@@deriving sexp_of, equal, enumerate]
 
   let id t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -69,7 +73,10 @@ module Item = struct
     | Copy_path
     | Copy_id
     | Archive
-    | Unarchive -> false
+    | Unarchive
+    | Copy_message
+    | Trim_before
+    | Trim_after -> false
   ;;
 end
 
@@ -122,14 +129,14 @@ let worktree_items (s : Session_summary.t) ~path
 
 let items ?host_home (target : Target.t) s ~current =
   match target with
-  | Session _ -> session_items ?host_home s ~current
+  | Session _ | Message _ -> session_items ?host_home s ~current
   | Worktree { path; _ } -> worktree_items s ~path
 ;;
 
 let picker ?host_home target (s : Session_summary.t) ~current =
   let title =
     match target with
-    | Target.Session _ -> "Session"
+    | Target.Session _ | Message _ -> "Session"
     | Worktree { path; _ } ->
       (match List.find s.worktrees ~f:(fun w -> String.equal w.path path) with
        | Some w -> "Worktree " ^ Session_worktree.label w
@@ -143,15 +150,73 @@ let picker ?host_home target (s : Session_summary.t) ~current =
          Picker.Item.create ~id:(Item.id item) ~detail label))
 ;;
 
+module Message = struct
+  type t =
+    { reply : bool
+    ; calls : int
+    ; text : string
+    ; first : bool
+    ; newest : bool
+    ; running : bool
+    }
+  [@@deriving sexp_of, equal]
+
+  let title t =
+    match t.reply, t.calls with
+    | false, _ -> "Your message"
+    | true, 0 -> "Reply"
+    | true, 1 -> "Reply with a tool call"
+    | true, n -> sprintf "Reply with %d tool calls" n
+  ;;
+end
+
+let message_picker (msg : Message.t) =
+  let running = "Wait for the run to end, or stop it (Esc)" in
+  let item (kind : Item.t) label ~command ~unless:(disabled, why) =
+    Picker.Item.create
+      ~id:(Item.id kind)
+      ~detail:(if disabled then why else command)
+      ~dimmed:disabled
+      label
+  in
+  Picker.create
+    ~title:(Message.title msg)
+    [ item
+        Copy_message
+        "Copy"
+        ~command:""
+        ~unless:
+          (String.is_empty (String.strip msg.text), "No text: only tool calls")
+    ; item
+        Trim_before
+        "Trim everything before this"
+        ~command:"/trim"
+        ~unless:
+          (if msg.running
+           then true, running
+           else msg.first, "The context starts here")
+    ; item
+        Trim_after
+        "Trim everything after this"
+        ~command:"/trim after"
+        ~unless:
+          (if msg.running
+           then true, running
+           else msg.newest, "Nothing after it: the newest message")
+    ; item Delete "Delete" ~command:"/delete" ~unless:(msg.running, running)
+    ]
+;;
+
 let worktree t =
   match t.target with
-  | Session _ -> None
+  | Session _ | Message _ -> None
   | Worktree { path; _ } -> Some path
 ;;
 
 let session t =
   match t.target with
-  | Session path | Worktree { session = path; _ } -> path
+  | Session path | Worktree { session = path; _ } -> Some path
+  | Message _ -> None
 ;;
 
 let worktree_dom_id ~session path =
