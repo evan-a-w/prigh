@@ -148,7 +148,7 @@ let%expect_test "every message but the first has the row of actions" =
   H.show h ~selector:".msg.user";
   [%expect
     {|
-    <div data-entry="0" data-message-entry="0" class="msg user">
+    <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 1 </div>
       <time title="Monday 5 October 2026, 10:01:00" datetime="2026-10-05T10:01:00Z" class="time"> 10:01 </time>
       <div class="msg-actions">
@@ -170,7 +170,7 @@ let%expect_test "every message but the first has the row of actions" =
         </button>
       </div>
     </div>
-    <div data-entry="2" data-message-entry="2" class="msg user">
+    <div data-entry="2" data-message-entry="2" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
       <div class="msg-actions">
@@ -200,7 +200,7 @@ let%expect_test "every message but the first has the row of actions" =
         </button>
       </div>
     </div>
-    <div data-entry="4" data-message-entry="4" class="msg user">
+    <div data-entry="4" data-message-entry="4" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 3 </div>
       <time title="Monday 5 October 2026, 10:03:00" datetime="2026-10-05T10:03:00Z" class="time"> 10:03 </time>
       <div class="msg-actions">
