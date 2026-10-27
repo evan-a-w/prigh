@@ -317,3 +317,128 @@ let%expect_test "steering a subagent on its last allowed turn" =
     (complete, 2 messages)
     |}]
 ;;
+
+let%expect_test "steering a finished subagent is refused; nothing runs again" =
+  with_agent
+    ~on_request:print_requests
+    ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got it" ]
+    [ "work", [ Reply.text "done" ] ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  log_subagent agent;
+  print_endline "--- after its report was delivered";
+  send agent "and another thing";
+  send agent ~kind:Follow_up "and another thing";
+  print_s
+    [%sexp
+      (Agent.steer_subagent agent ~agent_id:"a7" ~kind:Steer "hello"
+       : unit Or_error.t)];
+  Agent.wait_idle agent;
+  print_s [%sexp (Agent.is_running agent : bool)];
+  transcript agent "a1";
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    request work: u(work)
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
+    assistant: spawned
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: got it
+    agent_end
+    state: running=false subagents=[]
+    --- after its report was delivered
+    (Error
+     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
+    (Error
+     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
+    (Error "unknown subagent \"a7\"; known: a1")
+    false
+    --- a1's transcript
+    user: work
+    assistant: done
+    (complete, 2 messages)
+    |}]
+;;
+
+let%expect_test "two steers and a follow-up queued while a tool runs" =
+  let tool, started, release = gate_tool "slow" in
+  with_agent
+    ~extra_tools:[ tool ]
+    ~on_request:print_requests
+    ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got it" ]
+    [ ( "work"
+      , [ Reply.tool_call ~id:"t1" ~name:"slow" ~arguments:"{}" ()
+        ; Reply.text "steered"
+        ; Reply.text "followed up"
+        ] )
+    ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  wait_turn agent;
+  Eio.Promise.await started;
+  log_subagent agent;
+  send agent "one";
+  send agent ~kind:Follow_up "later";
+  send agent "two";
+  release ();
+  Agent.wait_idle agent;
+  transcript agent "a1";
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    request work: u(work)
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    agent_end
+    state: running=false subagents=[a1 running]
+    queue: a1 steer=[one] follow_up=[]
+    (Ok ())
+    queue: a1 steer=[one] follow_up=[later]
+    (Ok ())
+    queue: a1 steer=[one; two] follow_up=[later]
+    (Ok ())
+      [a1] tool_result slow: released
+    queue: a1 steer=[] follow_up=[later]
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | one
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | two
+    request work: u(work) a[t1] r[t1] u([The user sends you this) u([The user sends you this)
+      [a1] assistant: steered
+    queue:
+      [a1] user: [The user sends you this as you finish: deal with it before you report.] |  | later
+    request work: u(work) a[t1] r[t1] u([The user sends you this) u([The user sends you this) a u([The user sends you this)
+      [a1] assistant: followed up
+    subagent_end a1: ok followed up | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | followed up | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    assistant: got it
+    agent_end
+    state: running=false subagents=[]
+    --- a1's transcript
+    user: work
+    assistant:  slow{}
+    tool_result slow: released
+    user: [The user sends you this while you work: take it into account and carry on.] |  | one
+    user: [The user sends you this while you work: take it into account and carry on.] |  | two
+    assistant: steered
+    user: [The user sends you this as you finish: deal with it before you report.] |  | later
+    assistant: followed up
+    (complete, 8 messages)
+    |}]
+;;
