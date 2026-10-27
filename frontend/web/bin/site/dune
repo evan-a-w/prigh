@@ -130,6 +130,12 @@
  (action
   (copy ../vendor/addon-fit.js addon-fit.js)))
 
+; KaTeX (vendored, see ../vendor/README.md), loaded the first time math is
+; shown: its script, stylesheet, copy-tex and fonts.
+
+(copy_files
+ (files ../vendor/katex/*))
+
 (install
  (section share)
  (package prigh_frontend)
@@ -154,4 +160,10 @@
   (terminal.js as web/terminal.js)
   (xterm.js as web/xterm.js)
   (xterm.css as web/xterm.css)
-  (addon-fit.js as web/addon-fit.js)))
+  (addon-fit.js as web/addon-fit.js)
+  (katex.min.js as web/katex.min.js)
+  (katex.min.css as web/katex.min.css)
+  (copy-tex.min.js as web/copy-tex.min.js)
+  (LICENSE-katex as web/LICENSE-katex)
+  (glob_files
+   (KaTeX_*.woff2 with_prefix web))))

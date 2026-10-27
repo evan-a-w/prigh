@@ -367,6 +367,45 @@ let%expect_test "Copy: the message's text, acknowledged" =
     |}]
 ;;
 
+let%expect_test "Copy: a reply with math copies its TeX as written" =
+  let h = H.create ~state:(state ()) () in
+  newest
+    h
+    (messages
+       [ user 1
+       ; assistant
+           {|Area $\\pi r^2$, not $5 or $10:\n\n$$\n\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\n$$|}
+       ]);
+  H.show h ~selector:".msg.assistant .markdown";
+  right_click h 1;
+  H.click h ~selector:".context-menu [data-item=copy_message]";
+  [%expect {|
+    <div class="markdown">
+      <div class="md-part">
+        <p dir="auto">
+          Area
+          <span class="math math-inline"> \pi r^2 </span>
+          , not $5 or $10:
+        </p>
+      </div>
+      <div class="md-part">
+        <span class="math math-display"> \begin{pmatrix} a & b \\ c & d \end{pmatrix} </span>
+      </div>
+    </div>
+    (Focus dialog)
+    (Place_menu (Point (x 300) (y 120)))
+    (Picker_choose copy_message)
+    (Focus editor)
+    (Copy
+      "Area $\\pi r^2$, not $5 or $10:\
+     \n\
+     \n$$\
+     \n\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\
+     \n$$")
+    (Expire_toast (id 0) (after_ms 2820))
+    |}]
+;;
+
 let%expect_test "Trim before and after: the confirmation, as before" =
   let h = session () in
   right_click h 2;
