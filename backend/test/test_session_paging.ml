@@ -579,19 +579,23 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
     |> Json.member_exn "points"
     |> Json.list_exn
   in
-  List.iter (List.take points 3) ~f:(fun p ->
+  (* The user's messages and the replies. *)
+  List.iter (List.take points 5) ~f:(fun p ->
     let field name = Json.to_string (Json.member_exn name p) in
     printf
-      "%s %s messages=%s tokens=%s\n"
+      "%s %s %s messages=%s tokens=%s\n"
       (field "index")
+      (field "role")
       (field "text")
       (field "messages")
       (field "tokens"));
   [%expect
     {|
-    4 "turn 2" messages=4 tokens=17
-    8 "turn 3" messages=8 tokens=34
-    12 "turn 4" messages=12 tokens=51
+    1 "assistant" "running 1" messages=1 tokens=1
+    3 "assistant" "done 1" messages=3 tokens=16
+    4 "user" "turn 2" messages=4 tokens=17
+    5 "assistant" "running 2" messages=5 tokens=18
+    7 "assistant" "done 2" messages=7 tokens=33
     |}];
   let before point = Json.member_exn "before" point in
   let summary () =
@@ -625,7 +629,16 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
   summary ();
   print_endline
     (Json.to_string
-       (Client.call c "trim" [ "before", before (List.nth_exn points 2) ]));
+       (Client.call
+          c
+          "trim"
+          [ ( "before"
+            , before
+                (List.find_exn points ~f:(fun p ->
+                   String.equal
+                     (Json.string_exn (Json.member_exn "text" p))
+                     "turn 4")) )
+          ]));
   summary ();
   print_endline (brief (Client.call c "untrim" []));
   summary ();
@@ -645,7 +658,7 @@ let%expect_test "trim over the RPC: points, trim, state, pages, trimmed, untrim"
     trim=none page=41 trimmed=0 first point="turn 1"
     (Error "nothing is trimmed: /trim picks a point")
     (Error
-     "message nope is not in the model's context: trim before one of your messages that /trim lists")
+     "message nope is not in the model's context: trim before one of the messages that /trim lists")
     |}]
 ;;
 

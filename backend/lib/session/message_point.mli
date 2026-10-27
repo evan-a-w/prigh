@@ -1,9 +1,9 @@
 open! Core
 open! Import
 
-(** The messages of a session's context that can be deleted or trimmed after
-    ([get_message_points], [/delete], [/trim after]), with what doing so
-    would take out. *)
+(** The messages of a session's context, with what trimming before each,
+    deleting it or trimming after it would take out ([get_message_points],
+    [/trim], [/delete], [/trim after]). *)
 
 module Role : sig
   type t =
@@ -11,6 +11,9 @@ module Role : sig
     | Assistant
     | Tool_result
   [@@deriving sexp_of]
+
+  (** [user], [assistant], [tool_result]. *)
+  val name : t -> string
 end
 
 module Effect : sig
@@ -29,6 +32,11 @@ type t =
     (** its start: what the user wrote, the reply's text (or its tool calls),
         the tool's name; cut as {!Outline.Point.text} *)
   ; at : float option
+  ; trim_before : Effect.t option
+    (** what trimming before it takes out: what comes before it; [None] for
+        the first message, a tool result (a trim before its call's reply
+        keeps them together) and where that would part a call from its
+        result *)
   ; delete : Effect.t option
     (** what deleting it takes out (with its calls' results); [None] for a
         tool result, which goes with its call *)
@@ -42,7 +50,8 @@ type t =
 val create : (string option * Timed_message.t) list -> t list
 
 (** [{points: [{message, index, role: user|assistant|tool_result, text,
-    at?, delete?: {messages, tokens}, trim_after?: {messages, tokens}}]}]. *)
+    at?, trim_before?: {messages, tokens}, delete?: {messages, tokens},
+    trim_after?: {messages, tokens}}]}]. *)
 val to_json : t list -> Json.t
 
 (** Whether any call made in [dropped] has its result in [kept]. *)

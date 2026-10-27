@@ -262,8 +262,10 @@ val trimmed_messages : t -> (string option * Timed_message.t) list
 val hidden_messages : t -> entry:string -> (string option * Timed_message.t) list
 
 (** Drops everything before the message [before] from the context: it must
-    be a user message in {!messages} other than the first (a cut there never
-    parts a tool call from its result). Answers what it dropped. *)
+    be a user message or a reply in {!messages} other than the first, not
+    after a call whose result comes after it. The context may then start
+    with a reply ([Provider.Request.prepare] puts a user turn ahead of it).
+    Answers what it dropped. *)
 val append_trim : t -> before:string -> Trim.t Or_error.t
 
 (** Drops everything after the message [after] from the context, up to the
