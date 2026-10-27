@@ -745,17 +745,17 @@ hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
 chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
 chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
 .session-card, .session-bar: fits
 .composer: fits
-the panels' toggles: 2 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: settings ===
 Settings
 Appearance
@@ -2047,4 +2047,59 @@ hidden again
 steps: 1 2 3 4 5
 user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>" | user "Your message 4, Step 4: look at module 4., <TIME>" | user "Your message 5, Step 5: look at module 5., <TIME>"
 === firefox: trim: errors ===
+none
+=== firefox: filter: opened ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+note: none
+=== firefox: filter: menu ===
+> [x] Your messages
+  [x] Replies
+  [x] Thinking
+  [x] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+below the button: true; inside the window: true; focused: true
+=== firefox: filter: thinking and tools hidden ===
+  [x] Your messages
+  [x] Replies
+  [ ] Thinking
+> [ ] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+=== firefox: filter: Esc ===
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+=== firefox: filter: clicked outside ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== firefox: filter: reloaded ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== firefox: filter: another session ===
+user 1, replies 1, thinking 0, tools 0, subagents 0, stopped 0
+note: Hiding thinking, tool calls, subagents · 1 item hidden | Show all
+=== firefox: filter: your messages hidden ===
+user 0, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+rail: 2 marks
+the rail's first mark: jumped to where the message is
+Ctrl+J lists: 2 messages
+=== firefox: filter: show all ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+=== firefox: filter: image viewer ===
+#filter-toggle: under the image; .composer-controls .chip-button: under the image
+=== firefox: filter: phone ===
+below the button: true; inside the window: true; focused: true
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+note inside the screen: true; Show all clickable; button inside: true
+after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+=== firefox: filter: errors ===
 none
