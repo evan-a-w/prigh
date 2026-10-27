@@ -131,67 +131,42 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .msg.user .time { grid-column: 2; }
 
-/* "Trim before", "Trim after" and "Delete": one row of tabs on the
-   message's bottom edge, shown with the message on hover, focus or a tap.
-   Hovering one shows what it does: a dashed line where a trim would cut,
-   the message faded for a delete. */
+/* A message's ⋯: its context menu (copy, trim, delete), a small round
+   button straddling its bottom edge at the right, between it and the next,
+   shown on hover or focus (on a phone, after a tap), and while its menu is
+   open. The menu's highlighted item shows what it would do: a dashed line
+   where a trim would cut, the message faded for a delete. */
 .entries > .msg, .entries > .msg.noted > .msg.user { position: relative; }
-.msg-actions {
+.msg-more {
   position: absolute;
   bottom: 0;
-  right: 14px;
+  right: 10px;
   z-index: 1;
-  transform: translateY(55%);
+  transform: translateY(50%);
   display: inline-flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
   border: 1px solid var(--rule-2);
   border-radius: 999px;
   background: var(--slate-2);
-  box-shadow: var(--float-shadow);
-  overflow: hidden;
+  color: var(--muted);
+  cursor: pointer;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease-out, visibility 0.12s;
 }
-.msg-actions > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 10px 2px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: 12px/1.5 var(--sans);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.msg-actions > button + button { border-left: 1px solid var(--rule-2); }
-.msg-actions .glyph { font-size: 12px; line-height: 1; color: var(--sodium); }
-.msg-actions > .msg-delete > .glyph { color: var(--brick); }
-@media (hover: hover) { .msg:hover > .msg-actions { opacity: 1; visibility: visible; } }
-.msg:has(> .msg-actions > :focus-visible) > .msg-actions { opacity: 1; visibility: visible; }
+.msg-more > .icon { width: 14px; height: 14px; }
+@media (hover: hover) { .msg:hover > .msg-more { opacity: 1; visibility: visible; } }
+.msg:focus > .msg-more, .msg-more:focus-visible, .msg-more.open { opacity: 1; visibility: visible; }
+.msg-more:hover, .msg-more.open { color: var(--chalk); background: var(--panel-3); }
+.msg-more:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .msg:focus-visible { outline: none; }
-/* No hover on a phone: a tap on the message (focusable for it) shows them
-   under it, in the flow, as there is no room beside its last line; a tap
-   elsewhere hides them. */
-@media (hover: none) {
-  .msg:focus-within > .msg-actions {
-    position: static;
-    transform: none;
-    align-self: flex-end;
-    width: fit-content;
-    margin: 8px 0 0 auto;
-    opacity: 1;
-    visibility: visible;
-  }
-  .msg:not(:focus-within) > .msg-actions { display: none; }
-}
-.msg-actions > button:hover { color: var(--fg); background: var(--panel-3); }
-.msg-actions > .msg-delete:hover { color: var(--brick); background: var(--brick-wash); }
-.msg-actions > button:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; border-radius: 999px; }
+.msg:focus-visible:has(> .msg-more) { box-shadow: inset 0 0 0 1px var(--sodium-line); }
 /* ::after, as ::before is a reply's spine. */
-.msg:has(> .msg-actions > .trim-before:is(:hover, :focus-visible))::after,
-.msg:has(> .msg-actions > .trim-after:is(:hover, :focus-visible))::after {
+.msg:has(> .msg-more:is(.preview-trim-before, .preview-trim-after))::after {
   content: "";
   position: absolute;
   left: -2px;
@@ -199,16 +174,16 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   border-top: 1px dashed var(--sodium);
   pointer-events: none;
 }
-.msg:has(> .msg-actions > .trim-before:is(:hover, :focus-visible))::after { top: -1px; }
-.msg:has(> .msg-actions > .trim-after:is(:hover, :focus-visible))::after { bottom: -1px; }
-.msg:has(> .msg-actions > .msg-delete:is(:hover, :focus-visible)) > :not(.msg-actions) {
+.msg:has(> .msg-more.preview-trim-before)::after { top: -1px; }
+.msg:has(> .msg-more.preview-trim-after)::after { bottom: -1px; }
+.msg:has(> .msg-more.preview-delete) > :not(.msg-more) {
   opacity: 0.45;
   transition: opacity 0.12s ease-out;
 }
-@media (prefers-reduced-motion: reduce) { .msg-actions { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .msg-more { transition: none; } }
 /* A finger's worth. */
 @media (pointer: coarse) {
-  .msg-actions > button { padding: 5px 12px 6px; font-size: 13px; }
+  .msg-more { width: 32px; height: 26px; }
 }
 .msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 

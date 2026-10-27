@@ -237,11 +237,20 @@ let transcript (m : Model.t) ~inject =
         | None -> [])
      @ [ Chat_view.view
            ~fold:(Model.fold m)
-           ~first:
-             (* The first message in the context has nothing before it. *)
-             (if m.paging.older = 0
-              then Chat.first m.chat
-              else Chat.first m.chat - 1)
+           ?menu:
+             (match m.dialog with
+              | Some
+                  (Picker { kind = Menu { target = Message entry; _ }; picker })
+                ->
+                Some
+                  { Chat_view.Menu.entry
+                  ; highlighted =
+                      Option.bind (Picker.selected_item picker) ~f:(fun item ->
+                        if item.dimmed
+                        then None
+                        else Context_menu.Item.of_id item.id)
+                  }
+              | _ -> None)
            ~index
            ~deleting:m.trimmed.deleting
            ~dividers

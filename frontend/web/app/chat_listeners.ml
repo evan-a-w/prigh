@@ -73,11 +73,63 @@ let clicked (ev : Dom_html.mouseEvent Js.t) name =
       attribute el name |> Option.map ~f:(fun value -> el, value)))
 ;;
 
-(* A message's "Trim everything before this", "Delete" and "Trim everything
-   after this". *)
-let entry_action ~schedule name action (ev : Dom_html.mouseEvent Js.t) =
-  Option.iter (clicked ev name) ~f:(fun (_, n) ->
-    Option.iter (Int.of_string_opt n) ~f:(fun n -> schedule (action n)))
+let open_menu ~schedule n anchor =
+  schedule (Prigh_web.App.Action.Open_menu { target = Message n; anchor })
+;;
+
+(* A message's ⋯: its menu, under the button. *)
+let more ~schedule (ev : Dom_html.mouseEvent Js.t) =
+  Option.iter (clicked ev Prigh_web.Chat_view.menu_attribute) ~f:(fun (_, n) ->
+    Option.iter (Int.of_string_opt n) ~f:(fun n ->
+      open_menu ~schedule n (Element (Prigh_web.Chat_view.more_id n))))
+;;
+
+(* Whether the selection has text in [el]: its menu is the browser's then,
+   to copy it. *)
+let selects (el : Dom_html.element Js.t) =
+  let selection = Js.Unsafe.meth_call Dom_html.window "getSelection" [||] in
+  (not (Js.to_bool (Js.Unsafe.get selection "isCollapsed")))
+  && Js.to_bool
+       (Js.Unsafe.meth_call
+          selection
+          "containsNode"
+          [| Js.Unsafe.inject el; Js.Unsafe.inject Js._true |])
+;;
+
+(* A right-click (or a long press, {!Menu_listeners}) on a message with a
+   menu: the menu at the pointer, or, from the keyboard, under its ⋯. A
+   link's or an image's menu, or one with text selected in the message, is
+   the browser's. *)
+let context_menu ~schedule (ev : Dom_html.mouseEvent Js.t) =
+  let long_press =
+    Js.Optdef.test (Js.Unsafe.get ev Menu_listeners.long_press_field)
+  in
+  match Js.Opt.to_option ev##.target with
+  | None -> ()
+  | Some target ->
+    (match
+       closest
+         target
+         (sprintf "[%s][tabindex]" Prigh_web.Chat_view.message_attribute)
+     with
+     | Some msg
+       when Option.is_none (closest target "a[href], img")
+            && (long_press || not (selects msg)) ->
+       Option.iter
+         (Option.bind
+            (attribute msg Prigh_web.Chat_view.message_attribute)
+            ~f:Int.of_string_opt)
+         ~f:(fun n ->
+           Dom.preventDefault ev;
+           let x = Float.to_int (Js.to_float ev##.clientX)
+           and y = Float.to_int (Js.to_float ev##.clientY) in
+           open_menu
+             ~schedule
+             n
+             (if x = 0 && y = 0
+              then Element (Prigh_web.Chat_view.more_id n)
+              else Point { x; y }))
+     | Some _ | None -> ())
 ;;
 
 (* A trim after a message's divider's Show, Hide and Undo. *)
@@ -111,18 +163,8 @@ let install ~schedule =
   in
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
-  listen
-    Dom_html.Event.click
-    (entry_action ~schedule Prigh_web.Chat_view.trim_attribute (fun n ->
-       Ask_trim (Entry n)));
-  listen
-    Dom_html.Event.click
-    (entry_action ~schedule Prigh_web.Chat_view.delete_attribute (fun n ->
-       Ask_delete_message n));
-  listen
-    Dom_html.Event.click
-    (entry_action ~schedule Prigh_web.Chat_view.trim_after_attribute (fun n ->
-       Ask_trim_after n));
+  listen Dom_html.Event.click (more ~schedule);
+  listen (Dom.Event.make "contextmenu") (context_menu ~schedule);
   listen Dom_html.Event.click (hidden_action ~schedule);
   listen Dom_html.Event.keydown close_image
 ;;

@@ -164,6 +164,7 @@ let%expect_test "help lists every key and command" =
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
+    Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click, a long press or its ⋯; with text selected, right-click is the browser's, to copy it)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Ctrl+, settings: notifications, transcript detail, your account (/settings)

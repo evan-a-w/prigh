@@ -365,9 +365,10 @@ is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 
-To shrink the context without summarising it, rest the pointer on a
-message (yours or a reply; on a phone, tap it) and choose ✂ Trim before in
-the row of actions under its corner (or press Delete on one of your
+To shrink the context without summarising it, open a message's menu (yours
+or a reply's): right-click it, press its ⋯ (at its bottom-right corner on
+hover or focus), press Shift+F10 or the Menu key on it, or long-press it on
+a phone. Choose "Trim everything before this" (or press Delete on one of your
 messages in the Ctrl+J list, or pick it in `/trim`); a confirmation says how many
 messages and tokens it frees (Enter trims, Esc cancels). The transcript then
 starts at one divider, `✂ 142 messages trimmed · ~38k tokens  Show · Undo`:
@@ -377,8 +378,12 @@ The rail draws what is trimmed as one dashed cut at its top, and the jump
 list ends with a "Trimmed: 142 messages" row; both go to the divider. See
 [Trimming the context](#trimming-the-context).
 
-The same row, the same on every message, has ✂ Trim after and ✕ Delete.
-Delete takes the message out of the transcript and the model's context at
+The same menu, on every message, has Copy (the message's text), "Trim
+everything after this" and Delete; what does not apply (nothing before the
+first message, nothing after the newest, anything but Copy while a run is
+going) is greyed out with the reason under it. Highlighting a trim draws a
+dashed line where it would cut; a right-click with text selected in the
+message leaves the browser's own menu, to copy the selection. Delete takes the message out of the transcript and the model's context at
 once (a reply goes with its tool calls' results; Delete on a tool call
 deletes the reply that made it), and a "Message deleted · Undo" toast
 brings it back (as does `/delete undo`). Trim after drops what follows a
@@ -677,8 +682,8 @@ with how many kinds are hidden, and a line over the transcript says what is
 hidden, how many items, with "Show all". It is a preference
 (`web.transcript-filter`), so it stays across sessions, reloads and
 browsers; the jump rail and Ctrl+J still list your messages when they are
-hidden, and land where they are. A hidden message's actions (trim before or
-after it, delete) go with it, the dividers of trims stay, and the count
+hidden, and land where they are. A hidden message's menu (copy, trim before or
+after it, delete) goes with it, the dividers of trims stay, and the count
 leaves out what is being deleted; `/copy` (Ctrl+X with nothing selected) copies
 the last reply. `/skills` is a picker of the skills where the tools run
 (name, description, directory) whose Enter puts `/skill:name ` in the

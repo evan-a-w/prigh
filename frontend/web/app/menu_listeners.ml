@@ -62,6 +62,8 @@ let listen ?(capture = false) target event handler =
      : Dom_html.event_listener_id)
 ;;
 
+let long_press_field = "prighLongPress"
+
 let install () =
   let doc = Dom_html.document in
   let timer = ref None in
@@ -83,7 +85,12 @@ let install () =
        (match
           Option.bind
             (Js.Opt.to_option ev##.target)
-            ~f:(fun el -> closest el "[data-session], [data-worktree]")
+            ~f:(fun el ->
+              closest
+                el
+                (sprintf
+                   "[data-session], [data-worktree], [%s][tabindex]"
+                   Prigh_web.Chat_view.message_attribute))
         with
         | Some row when touch ->
           let x = Js.to_float ev##.clientX
@@ -109,6 +116,18 @@ let install () =
                               |]
                          |]
                      in
+                     Js.Unsafe.set event long_press_field Js._true;
+                     (* The press may have started selecting a word: the
+                        menu has Copy. *)
+                     ignore
+                       (Js.Unsafe.meth_call
+                          (Js.Unsafe.meth_call
+                             Dom_html.window
+                             "getSelection"
+                             [||])
+                          "removeAllRanges"
+                          [||]
+                        : Js.Unsafe.any);
                      ignore
                        (Js.Unsafe.meth_call row "dispatchEvent" [| event |]
                         : bool Js.t))

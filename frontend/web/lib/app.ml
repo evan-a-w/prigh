@@ -676,6 +676,50 @@ module Model = struct
 
   let message_index t = Message_index.create ~paging:t.paging t.chat
 
+  let context_start t =
+    if t.paging.older = 0 then Chat.first t.chat else Chat.first t.chat - 1
+  ;;
+
+  let message_menu t n : Context_menu.Message.t option =
+    let index = message_index t in
+    let menu (_ : Message_index.Span.t) ~reply ~calls text =
+      Some
+        { Context_menu.Message.reply
+        ; calls
+        ; text
+        ; first = n <= context_start t
+        ; newest = [%equal: int option] (Message_index.newest index) (Some n)
+        ; running = running t
+        }
+    in
+    match
+      ( Message_index.span index n
+      , List.nth (Chat.entries t.chat) (n - Chat.first t.chat) )
+    with
+    | Some span, Some (User u) when Option.is_none (Message.User.source u) ->
+      let body = Message.User.body u in
+      menu
+        span
+        ~reply:false
+        ~calls:0
+        (Option.value_map (Skill_message.parse body) ~default:body ~f:(fun s ->
+           s.args))
+    | Some span, Some (Assistant { message; streaming = false }) ->
+      menu
+        span
+        ~reply:true
+        ~calls:
+          (List.count message.content ~f:(function
+             | Tool_call _ -> true
+             | Text _ | Thinking _ | Server_tool _ -> false))
+        (List.filter_map message.content ~f:(function
+           | Text t when not (String.is_empty (String.strip t)) ->
+             Some (String.strip t)
+           | Text _ | Thinking _ | Tool_call _ | Server_tool _ -> None)
+         |> String.concat ~sep:"\n\n")
+    | _ -> None
+  ;;
+
   let message_time t =
     Message_time.create
       ~now:(Option.value t.now ~default:Time_ns.epoch)
@@ -7590,16 +7634,61 @@ let accept_completion (m : Model.t) ~run =
     else edit_at_caret m ~cursor draft
 ;;
 
-(* A context menu's item: on the session or worktree it was opened on,
-   switching to that session first when it is not the one on show. *)
+let message_gone =
+  "That message is not in the model's context any more: /trim and /delete list \
+   those that are."
+;;
+
+(* A message's menu's item: what its trim and delete do from /trim, /trim
+   after and /delete. *)
+let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
+  match item, Model.message_menu m n with
+  | _, None -> error m message_gone
+  | Copy_message, Some msg ->
+    let m, cmds =
+      toast
+        m
+        (if msg.reply
+         then "Copied the reply to the clipboard"
+         else "Copied the message to the clipboard")
+    in
+    m, Command.Copy msg.text :: cmds
+  | Trim_before, Some _ -> ask_trim m (Entry n)
+  | Trim_after, Some _ -> ask_trim_after m n
+  | Delete, Some _ -> ask_delete_message m n
+  | ( ( Open
+      | Open_tab
+      | Rename
+      | Fork
+      | New_worktree
+      | Switch_back
+      | Switch_here
+      | New_session_here
+      | Review
+      | Files
+      | Terminal
+      | Create_pr
+      | Copy_path
+      | Copy_id
+      | Archive
+      | Unarchive
+      | Remove )
+    , Some _ ) -> m, []
+;;
+
+(* A context menu's item: on the message, session or worktree it was opened
+   on, switching to that session first when it is not the one on show. *)
 let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
   match
-    ( find_session_by_path m (Context_menu.session menu)
+    ( menu.target
+    , Option.bind (Context_menu.session menu) ~f:(find_session_by_path m)
     , Context_menu.Item.of_id id )
   with
-  | None, _ | _, None ->
+  | _, _, None -> m, []
+  | Message n, _, Some item -> message_chosen m n item
+  | (Session _ | Worktree _), None, _ ->
     error m "That session is gone: the sidebar lists the others."
-  | Some s, Some item ->
+  | (Session _ | Worktree _), Some s, Some item ->
     let worktree = Context_menu.worktree menu in
     let cwd =
       match m.state with
@@ -7648,10 +7737,11 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Archive -> set_archived m s ~archived:true
      | Unarchive -> set_archived m s ~archived:false
      | Delete -> ask_delete m [ s.path ]
-     | Remove -> ask_remove_session_worktree m dir)
+     | Remove -> ask_remove_session_worktree m dir
+     | Copy_message | Trim_before | Trim_after -> m, [])
 ;;
 
-let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
+let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
   let m = { m with dialog = None } in
   let m, cmds =
     match (kind : Dialog.Picker_kind.t) with
@@ -7771,6 +7861,13 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Menu menu -> menu_chosen m menu item.id
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
+;;
+
+let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
+  match (kind : Dialog.Picker_kind.t) with
+  (* Disabled: the menu stays, saying why. *)
+  | Menu _ when item.dimmed -> m, []
+  | _ -> picker_accepted m ~kind item
 ;;
 
 let with_picker (m : Model.t) ~f =
@@ -8283,8 +8380,21 @@ let update_connected (m : Model.t) (action : Action.t) =
       m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds)
   | Ask_remove_worktree path -> ask_remove_session_worktree m path
   | Remove_worktree { force } -> remove_worktree m ~force
+  | Open_menu ({ target = Message n; _ } as menu) ->
+    (match Model.message_menu m n with
+     | None -> error m message_gone
+     | Some msg ->
+       let m, cmds =
+         open_dialog
+           m
+           (Picker
+              { kind = Menu menu; picker = Context_menu.message_picker msg })
+       in
+       m, cmds @ [ Command.Place_menu menu.anchor ])
   | Open_menu menu ->
-    (match find_session_by_path m (Context_menu.session menu) with
+    (match
+       Option.bind (Context_menu.session menu) ~f:(find_session_by_path m)
+     with
      | None -> m, []
      | Some s ->
        let m, cmds =

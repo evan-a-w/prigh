@@ -20,18 +20,36 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Archive -> Archive
   | Unarchive -> Unarchive
   | Delete | Remove -> Trash
+  | Copy_message -> Copy
+  | Trim_before | Trim_after -> Scissors
 ;;
 
 (* What the menu is about, above its items. *)
 let heading (m : App.Model.t) (menu : Context_menu.t) =
   match
-    List.find m.sessions ~f:(fun s ->
-      String.equal s.path (Context_menu.session menu))
+    ( menu.target
+    , List.find m.sessions ~f:(fun s ->
+        [%equal: string option] (Some s.path) (Context_menu.session menu)) )
   with
-  | None -> Node.none
-  | Some s ->
+  | Message n, _ ->
+    (match App.Model.message_menu m n with
+     | None -> Node.none
+     | Some msg ->
+       div
+         ~cls:"context-menu-head"
+         [ span ~cls:"context-menu-title" (Context_menu.Message.title msg)
+         ; (match
+              String.split_lines msg.text
+              |> List.find ~f:(fun l -> not (String.is_empty (String.strip l)))
+            with
+            | Some line ->
+              span ~cls:"context-menu-sub preview" (String.strip line)
+            | None -> Node.none)
+         ])
+  | _, None -> Node.none
+  | (Session _ | Worktree _), Some s ->
     (match menu.target with
-     | Session _ ->
+     | Session _ | Message _ ->
        div
          ~cls:"context-menu-head"
          [ span ~cls:"context-menu-title" (Session_list.title s)
@@ -63,19 +81,34 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
   let row i (item : Picker.Item.t) =
     let kind = Context_menu.Item.of_id item.id in
     let danger = Option.exists kind ~f:Context_menu.Item.danger in
+    (* Dimmed: disabled, the detail says why. *)
+    let disabled = item.dimmed in
+    let selected = i = Picker.selected picker in
     Node.div
       ~attrs:
         [ classes
             [ "menu-item" ]
-            [ "selected", i = Picker.selected picker; "danger", danger ]
+            [ "selected", selected; "danger", danger; "disabled", disabled ]
         ; Attr.role "menuitem"
         ; Attr.create "data-item" item.id
+        ; (if disabled then Attr.create "aria-disabled" "true" else Attr.empty)
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
+        ; Attr.on_mouseenter (fun _ ->
+            if selected
+            then Effect.Ignore
+            else inject (Action.Picker_move (i - Picker.selected picker)))
         ]
       [ Option.value_map kind ~default:Node.none ~f:(fun k ->
           icon (item_icon k))
-      ; span ~cls:"menu-label" item.label
-      ; (if String.is_empty item.detail
+      ; (if disabled && not (String.is_empty item.detail)
+         then
+           Node.span
+             ~attrs:[ Attr.class_ "menu-text" ]
+             [ span ~cls:"menu-label" item.label
+             ; span ~cls:"menu-hint" item.detail
+             ]
+         else span ~cls:"menu-label" item.label)
+      ; (if String.is_empty item.detail || disabled
          then Node.none
          else
            Node.kbd
@@ -87,9 +120,9 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
      destructive ones. *)
   let group : Context_menu.Item.t -> int = function
     | Switch_back | Open | Open_tab | Switch_here | New_session_here -> 0
-    | Rename | Fork | New_worktree | Create_pr -> 1
+    | Rename | Fork | New_worktree | Create_pr | Trim_before | Trim_after -> 1
     | Review | Files | Terminal -> 2
-    | Copy_path | Copy_id -> 3
+    | Copy_path | Copy_id | Copy_message -> 3
     | Archive | Unarchive | Delete | Remove -> 4
   in
   let sections =
