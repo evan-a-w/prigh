@@ -2,7 +2,9 @@
 // "Trim everything before this" on hover, the confirmation saying what it
 // frees, the transcript then starting at the divider (Show unfolds the
 // trimmed messages read-only above it), the rail's mark for it, and Undo
-// bringing the messages back.
+// bringing the messages back. Then deleting a message (at once, with Undo
+// on its toast), and trimming everything after a message: confirmed, a
+// divider with Show and Undo, and what is sent next below it.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected).
 //
@@ -55,7 +57,7 @@ const writeSession = () => {
   writeFileSync(join(sessions, `20261001-100000000_${id}.jsonl`), lines.join("\n") + "\n");
 };
 writeSession();
-writeFileSync(join(dir, "script.json"), "[]");
+writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "Noted after the trim." }]));
 
 let server;
 const startServer = listen =>
@@ -122,6 +124,23 @@ const rail = () => page.evaluate(() =>
     .map(t => `${t.classList.contains("trimmed") ? "trimmed" : "user"} "${t.getAttribute("aria-label")}"`)
     .join("\n"));
 const step = n => page.locator("#chat > .entries > .msg.user", { hasText: `Step ${n}:` });
+const reply = n => page.locator("#chat > .entries > .msg.assistant", { hasText: `Module ${n} is fixed.` });
+// What the transcript shows, in order: the steps and replies, and dividers.
+const transcript = () => page.evaluate(() =>
+  [...document.querySelectorAll("#chat > .entries > *")].map(el => {
+    if (el.classList.contains("hidden-range")) return `[${el.querySelector(".trim-divider").innerText.replace(/\s*\n+\s*/g, " ")}]`;
+    const t = el.innerText;
+    return t.match(/Step \d+|Module \d+|Noted after the trim/)?.[0] ?? null;
+  }).filter(x => x).join(", "));
+// Hovers [el] and waits until its message's actions are shown.
+const hoverActions = async el => {
+  await el.hover();
+  await el.locator(":scope > .msg-actions").evaluate(a =>
+    new Promise(resolve => {
+      const check = () => getComputedStyle(a).opacity === "1" ? resolve() : requestAnimationFrame(check);
+      check();
+    }));
+};
 
 try {
   await page.goto(url);
@@ -210,6 +229,95 @@ try {
   console.log(`steps: ${await steps()}`);
   console.log(clean(await rail()));
   await screenshot("undone");
+
+  // 7. Delete: at once, no question; the toast's Undo brings it back.
+  section("delete");
+  console.log(`actions on a reply: ${await reply(2).locator(".msg-actions button").allTextContents().then(t => t.join(", "))}`);
+  console.log(`actions on the newest: ${await reply(5).locator(".msg-actions button").allTextContents().then(t => t.join(", "))}`);
+  await hoverActions(reply(2));
+  await reply(2).locator(".msg-delete").hover();
+  // What would go is dimmed.
+  await page.waitForFunction(() =>
+    getComputedStyle(document.querySelector("#chat [data-delete-entry='3']").closest(".msg").querySelector(".markdown")).opacity < 0.5);
+  await screenshot("delete hover");
+  await reply(2).locator(".msg-delete").click();
+  await page.locator(".toast", { hasText: "Message deleted" }).waitFor();
+  await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Module 2 is fixed."));
+  console.log(`toast: ${clean(await page.locator(".toast", { hasText: "Message deleted" }).innerText())}`);
+  console.log(`transcript: ${await transcript()}`);
+  console.log(`dividers: ${await page.locator(".trim-divider").count()}`);
+  await page.mouse.move(640, 790);
+  await screenshot("deleted");
+  await step(2).hover();
+  await step(2).locator(".msg-delete").click();
+  await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Step 2:"));
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 4);
+  console.log(`after deleting step 2: ${await transcript()}`);
+  console.log(clean(await rail()));
+  await page.locator(".toast", { hasText: "Message deleted" }).last().locator(".toast-undo").click();
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 5);
+  console.log(`undone: ${await transcript()}`);
+  await page.locator(".toast", { hasText: "Message deleted" }).first().locator(".toast-undo").click();
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Module 2 is fixed."));
+  console.log(`undone: ${await transcript()}`);
+
+  // 8. Trim after: confirmed; then a divider, Show and Undo.
+  await hoverActions(step(3));
+  await step(3).locator(".trim-after").hover();
+  await screenshot("trim after hover");
+  await step(3).locator(".trim-after").click();
+  await page.locator(".trim-confirm .rewind-quote").waitFor();
+  section("trim after: confirmation");
+  console.log(clean(await page.locator(".trim-confirm").innerText()));
+  await screenshot("trim after confirmation");
+  await page.keyboard.press("Escape");
+  await page.locator(".trim-confirm").waitFor({ state: "detached" });
+  console.log(`after Esc: ${await transcript()}`);
+  await step(3).hover();
+  await step(3).locator(".trim-after").click();
+  await page.locator(".trim-confirm .rewind-quote").waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".trim-divider.after").waitFor();
+  await page.locator(".trim-confirm").waitFor({ state: "detached" });
+  await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Step 4:"));
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 3);
+  section("trimmed after");
+  console.log(`transcript: ${await transcript()}`);
+  console.log(clean(await rail()));
+  await page.mouse.move(640, 790);
+  await page.waitForFunction(() => !document.querySelector(".trim-divider.jumped"));
+  await screenshot("trimmed after");
+  await page.locator(".trim-divider.after button", { hasText: "Show" }).click();
+  await page.locator(".hidden-range .trimmed-messages").waitFor();
+  console.log(`shown: ${await page.evaluate(() =>
+    [...document.querySelectorAll(".hidden-range .trimmed-messages .msg")].map(el => el.innerText.match(/Step \d+|Module \d+/)?.[0]).join(", "))}`);
+  console.log(`actions on them: ${await page.locator(".hidden-range .trimmed-messages button").count()}`);
+  console.log(`dimmed: ${await page.locator(".hidden-range .trimmed-messages > .entries").evaluate(el => Number(getComputedStyle(el).opacity) < 1)}`);
+  await page.locator(".trim-divider.after").evaluate(el => el.scrollIntoView({ block: "start" }));
+  await page.mouse.move(640, 790);
+  await screenshot("trimmed after shown");
+  await page.locator(".trim-divider.after button", { hasText: "Hide" }).click();
+  await page.locator(".hidden-range .trimmed-messages").waitFor({ state: "detached" });
+
+  // 9. What is sent next goes below the divider.
+  await page.locator(".composer textarea").fill("Step 6: after the trim.");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Noted after the trim."));
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 4);
+  section("sent after the trim");
+  console.log(`transcript: ${await transcript()}`);
+  await page.mouse.move(640, 790);
+  await page.waitForFunction(() => !document.querySelector(".trim-divider.jumped"));
+  await screenshot("sent after trim");
+
+  // 10. Undo: the trimmed messages are back, before what was sent after.
+  await page.locator(".trim-divider.after button", { hasText: "Undo" }).click();
+  await page.locator(".trim-divider.after").waitFor({ state: "detached" });
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Step 4:"));
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 6);
+  section("trim after undone");
+  console.log(`transcript: ${await transcript()}`);
+  await screenshot("trim after undone");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

@@ -1040,6 +1040,7 @@ kbd {
   align-items: flex-start;
   gap: 8px;
 }
+.toast .btn.toast-undo { margin: -2px -4px -2px 4px; padding: 0 8px; color: var(--sodium); font-weight: 600; flex-shrink: 0; }
 .toast-repeats { font: 11.5px/1.7 var(--mono); color: var(--faint); }
 .toast .btn.icon.toast-close { width: 22px; height: 22px; margin: -1px -6px -1px 0; flex-shrink: 0; color: var(--faint); }
 .toast-close .icon { width: 13px; height: 13px; }

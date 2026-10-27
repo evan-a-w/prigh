@@ -170,6 +170,58 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) { .trim-before { transition: none; } }
+
+/* "Delete" and "Trim everything after this": tabs on the message's bottom
+   edge, where the trim would cut, shown with the message on hover or focus. */
+.entries > .msg { position: relative; }
+.msg-actions {
+  position: absolute;
+  bottom: 0;
+  right: 14px;
+  z-index: 1;
+  transform: translateY(55%);
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease-out, visibility 0.12s;
+}
+.msg-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 10px 2px 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: var(--slate-2);
+  color: var(--muted);
+  font: 12px/1.5 var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.msg-actions .glyph { font-size: 12px; line-height: 1; }
+.trim-after > .glyph { color: var(--sodium); }
+.msg:hover > .msg-actions,
+.msg:focus-within > .msg-actions { opacity: 1; visibility: visible; }
+.msg-actions > button:hover { color: var(--fg); border-color: var(--sodium-line); }
+.msg-actions > .msg-delete:hover { border-color: var(--brick); }
+.msg-actions > .msg-delete:hover > .glyph { color: var(--brick); }
+.msg-actions > button:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+/* Where it would cut; what would go. */
+.msg:has(> .msg-actions > .trim-after:is(:hover, :focus-visible))::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: 0;
+  bottom: -1px;
+  border-top: 1px dashed var(--sodium);
+  pointer-events: none;
+}
+.msg:has(> .msg-actions > .msg-delete:is(:hover, :focus-visible)) > :not(.msg-actions) {
+  opacity: 0.45;
+  transition: opacity 0.12s ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .msg-actions { transition: none; } }
 .msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 
 /* A subagent's task is a prompt too, but not the user's. */

@@ -109,3 +109,11 @@
 .trimmed-note { color: var(--faint); }
 .trimmed-messages > .entries { opacity: 0.55; filter: saturate(0.35); }
 .trimmed-messages .msg.user { border-left-color: var(--faint-line); background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
+
+/* Trimmed after a message: the divider right under it, the trimmed messages
+   (shown) under the divider, then what was sent since. */
+.entries > .hidden-range { margin-top: 22px; }
+.hidden-range > .trim-divider { margin: 0 auto; }
+.hidden-range > .trimmed-messages { margin: 18px auto 0; }
+.entries > .hidden-range + .msg,
+.entries > .hidden-range + .msg.user { margin-top: 22px; }
