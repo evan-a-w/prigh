@@ -110,6 +110,11 @@ module Points_purpose : sig
   type t =
     | Delete_picker (** [/delete] *)
     | Trim_after_picker (** [/trim after] *)
+    | Trim_before of
+        { index : int (** its message ({!Message_index.Span.first}) *)
+        ; at : Time_ns.Alternate_sexp.t option
+        (** when it was sent: the point found must be the same *)
+        } (** a message's "Trim everything before this" *)
     | Delete of
         { entry : int (** the transcript's entry, hidden meanwhile *)
         ; index : int (** its message ({!Message_index.Span.first}) *)

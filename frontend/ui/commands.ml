@@ -166,10 +166,10 @@ let every =
       ~argument:Argument.Trim
       "trim"
       "[after|undo|show|hide]"
-      "drop everything before one of your messages from the model's context: \
-       pick the message (newest first, with what it frees), confirm; after: \
-       everything after a message instead (what you send later stays); undo \
-       brings the latest trim back, show/hide unfolds the trimmed messages"
+      "drop everything before a message from the model's context: pick the \
+       message (newest first, with what it frees), confirm; after: everything \
+       after a message instead (what you send later stays); undo brings the \
+       latest trim back, show/hide unfolds the trimmed messages"
   ; c
       ~argument:Argument.Delete
       "delete"

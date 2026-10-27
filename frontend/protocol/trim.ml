@@ -42,6 +42,7 @@ module Point = struct
   type t =
     { before : string
     ; index : int
+    ; reply : bool [@sexp.bool]
     ; text : string
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     ; messages : int
@@ -53,11 +54,20 @@ module Point = struct
     let open Or_error.Let_syntax in
     let%bind before = Json.string_field j "before" in
     let%bind index = Json.int_field j "index" in
+    let%bind reply =
+      match Json.field j "role" with
+      | None | Some `Null -> Ok false
+      | Some _ ->
+        (match%bind Json.string_field j "role" with
+         | "user" -> Ok false
+         | "assistant" -> Ok true
+         | role -> Or_error.error_s [%message "unknown role" role])
+    in
     let%bind text = Json.string_field j "text" in
     let%bind at = Json.time_ms_opt_field j "at" in
     let%bind messages = Json.int_field j "messages" in
     let%map tokens = Json.int_field j "tokens" in
-    { before; index; text; at; messages; tokens }
+    { before; index; reply; text; at; messages; tokens }
   ;;
 
   let list_of_json j = Json.list_field j "points" ~f:of_json

@@ -408,7 +408,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
-    /trim [after|undo] drop everything before one of your messages from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
+    /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it

@@ -441,10 +441,11 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
       ]
     [ Node.p
         [ Node.textf
-            "Trim %d message%s (%s) before this message?"
+            "Trim %d message%s (%s) before this %s?"
             point.messages
             (if point.messages = 1 then "" else "s")
             (Trim.tokens_label point.tokens)
+            (if point.reply then "reply" else "message")
         ]
     ; Node.blockquote
         ~attrs:[ Attr.class_ "rewind-quote" ]

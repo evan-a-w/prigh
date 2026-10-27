@@ -5,8 +5,8 @@ open Fixtures
 module H = Test_app.H
 module P = Prigh_protocol
 
-(* /trim: drop everything before one of your messages from the model's
-   context; the transcript folds it into one divider. *)
+(* /trim: drop everything before a message (one of yours or a reply) from
+   the model's context; the transcript folds it into one divider. *)
 
 let user text = sprintf {|{"role":"user","text":%S}|} text
 
@@ -26,8 +26,10 @@ let messages texts =
 
 let points_json =
   {|{"points":[
-      {"before":"u2","index":2,"text":"second question","at":1700000000000,"messages":2,"tokens":950},
-      {"before":"u3","index":4,"text":"third question\nwith more","at":1700000600000,"messages":4,"tokens":38000}]}|}
+      {"before":"a1","index":1,"role":"assistant","text":"first answer","messages":1,"tokens":400},
+      {"before":"u2","index":2,"role":"user","text":"second question","at":1700000000000,"messages":2,"tokens":950},
+      {"before":"a2","index":3,"role":"assistant","text":"second answer","messages":3,"tokens":1200},
+      {"before":"u3","role":"user","index":4,"text":"third question\nwith more","at":1700000600000,"messages":4,"tokens":38000}]}|}
 ;;
 
 let trim_json = {|{"before":"u3","messages":4,"tokens":38000}|}
@@ -63,7 +65,6 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    ▌ first question
       first answer
 
     ▌ second question
@@ -71,10 +72,12 @@ let%expect_test
 
     ▌ third question
       third answer
-    Trim everything before  (2)
+    Trim everything before  (4)
     / ▏
-    ▸  third question   2023-11-14 22:23  4 messages trimmed · ~38k tokens
-       second question  2023-11-14 22:13  2 messages trimmed · ~950 tokens
+    ▸  you     third question   2023-11-14 22:23  4 messages trimmed · ~38k tokens
+       reply   second answer    3 messages trimmed · ~1.2k tokens
+       you     second question  2023-11-14 22:13  2 messages trimmed · ~950 tokens
+       reply   first answer     1 message trimmed · ~400 tokens
     ────────────────────────────────────────────────────────────────────────────────
     >
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -119,6 +122,78 @@ let%expect_test
     ▌ third question
       third answer
     ────────────── trimmed 4 messages (~38k tokens): /trim undo brings them back ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/trim before a reply: the context starts at it" =
+  let h = connected () in
+  run h "/trim";
+  H.reply ~quiet:true h Trim_points_picker points_json;
+  H.keys h "second answer";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_trim_points) (params ()) (tag Trim_points_picker))
+
+    ▌ first question
+      first answer
+
+    ▌ second question
+      second answer
+
+    ▌ third question
+      third answer
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ Trim 3 messages (~1.2k tokens) before "second answer"? They leave the        │
+    │ model's context; /trim undo brings them back (y/n)                           │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.keys h "y";
+  [%expect
+    {| (Rpc (method_ trim) (params ((before a2))) (tag (Trimmed Trim))) |}];
+  H.reply h (Trimmed `Trim) {|{"messages":3,"tokens":1200}|};
+  H.event
+    h
+    (State
+       (state
+          ~extra:
+            [ ( "trim"
+              , {|{"before":"a2","role":"assistant","messages":3,"tokens":1200}|}
+              )
+            ]
+          ()));
+  H.reply
+    h
+    Trim_reload
+    (sprintf
+       "[%s,%s,%s]"
+       (assistant "second answer")
+       (user "third question")
+       (assistant "third answer"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_messages) (params ()) (tag Trim_reload))
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ──── 3 messages trimmed · ~1.2k tokens ──── /trim show · /trim undo
+      second answer
+
+    ▌ third question
+      third answer
+    ───────────── trimmed 3 messages (~1.2k tokens): /trim undo brings them back ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
@@ -383,7 +458,7 @@ let%expect_test "refused while a run is in progress; errors say what to do" =
     │ unknown /trim argument "later": /trim picks a message, /trim after, /trim    │
     │ undo, /trim show or /trim hide                                               │
     (Rpc (method_ get_trim_points) (params ()) (tag Trim_points_picker))
-    │ nothing to trim: the context starts at your only message (/compact           │
+    │ nothing to trim: nothing comes before the context's first message (/compact  │
     │ summarises instead)                                                          │
     (Rpc (method_ get_trim_points) (params ()) (tag Trim_points_picker))
     (Rpc (method_ trim) (params ((before u3))) (tag (Trimmed Trim)))

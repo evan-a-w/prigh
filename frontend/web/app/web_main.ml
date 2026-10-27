@@ -306,6 +306,10 @@ let chat_element () = Dom_html.getElementById_opt "chat"
    they scroll back to the end, press the jump button or send something. *)
 let following = ref true
 
+(* What the page last heard of [following] ([Chat_scrolled]): it follows
+   again whenever it scrolls to the end itself ([Scroll_to_bottom]). *)
+let reported = ref true
+
 (* Where we last put the chat's scroll position, to tell the user's scrolls
    from ours. *)
 let last_set = ref None
@@ -546,6 +550,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Scroll_to_bottom ->
       Effect.of_sync_fun
         (fun () ->
+           reported := true;
            Browser.after_render (fun () ->
              match Tab_memory.take_scroll () with
              | Some from_end -> restore_scroll from_end
@@ -960,7 +965,6 @@ let install_listeners ~schedule ~current =
   Review_margin.install ();
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
-  let reported = ref true in
   let set_following value =
     following := value;
     if not (Bool.equal value !reported)

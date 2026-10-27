@@ -515,6 +515,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
           <div class="msg-actions">
             <button type="button"
                     title="Delete this message from the transcript and the model's context"
+                    aria-label="Delete"
                     data-delete-entry="0"
                     class="msg-delete">
               <span aria-hidden="true" class="glyph"> ✕ </span>

@@ -94,6 +94,10 @@ module Points_purpose = struct
   type t =
     | Delete_picker
     | Trim_after_picker
+    | Trim_before of
+        { index : int
+        ; at : Time_ns.Alternate_sexp.t option
+        }
     | Delete of
         { entry : int
         ; index : int
@@ -780,6 +784,11 @@ let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
 ;;
 
 let error m text = toast m ~error:true text
+
+(* What a trim, or its undo, did to the context: only the latest shows. *)
+let context_toast m text =
+  toast m ~replaces:[ "Trimmed "; "Back in the context: " ] text
+;;
 
 (* At most [max] bytes, cut at a character. *)
 let clamp ?(max = 60) text =
@@ -1989,7 +1998,7 @@ let theme_named (m : Model.t) name =
     set_theme
       m
       { m.theme with name = n }
-      ~replaces:"Theme: "
+      ~replaces:[ "Theme: " ]
       ~notice:
         (sprintf
            "Theme: %s, %s"
@@ -2009,7 +2018,7 @@ let accent_named (m : Model.t) name =
     set_theme
       m
       { m.theme with accent }
-      ~replaces:"Accent: "
+      ~replaces:[ "Accent: " ]
       ~notice:(sprintf "Accent: %s" (Theme.Accent.to_string accent))
   | None ->
     error
@@ -2393,7 +2402,7 @@ let cycle_model (m : Model.t) step =
       let next = List.nth_exn models ((((index + step) % n) + n) % n) in
       let m = { m with state = Some { state with model = next } } in
       let m, cmds =
-        toast m ~replaces:"Model: " (sprintf "Model: %s" next.name)
+        toast m ~replaces:[ "Model: " ] (sprintf "Model: %s" next.name)
       in
       ( { m with pending = { m.pending with model = Some next.key } }
       , cmds @ [ rpc "set_model" [ "model", str next.key ] ~tag:Model_set ] ))
@@ -2419,7 +2428,7 @@ let cycle_thinking (m : Model.t) =
       in
       let m = { m with state = Some { state with thinking = next } } in
       let m, cmds =
-        toast m ~replaces:"Thinking: " (sprintf "Thinking: %s" next)
+        toast m ~replaces:[ "Thinking: " ] (sprintf "Thinking: %s" next)
       in
       ( { m with pending = { m.pending with thinking = Some next } }
       , cmds @ [ rpc "set_thinking" [ "thinking", str next ] ~tag:Thinking_set ]
@@ -2436,7 +2445,7 @@ let set_verbosity (m : Model.t) verbosity =
   let m, cmds =
     toast
       { m with verbosity; folds = String.Set.empty }
-      ~replaces:"Transcript: "
+      ~replaces:[ "Transcript: " ]
       (sprintf
          "Transcript: %s, %s (Ctrl+O cycles)"
          (Prigh_ui.Verbosity.name verbosity)
@@ -3780,7 +3789,10 @@ let worktree_created (m : Model.t) (c : Worktree.Created.t) =
       (Some c.worktree.path)
   in
   let m, cmds =
-    toast m ~replaces:creating (String.capitalize (Worktree_command.created c))
+    toast
+      m
+      ~replaces:[ creating ]
+      (String.capitalize (Worktree_command.created c))
   in
   ( m
   , close
@@ -3809,7 +3821,7 @@ let worktree_create_failed (m : Model.t) ~command e =
     toast
       (back_in_editor m command)
       ~error:true
-      ~replaces:creating
+      ~replaces:[ creating ]
       (sprintf "Couldn't create the worktree: %s." e)
 ;;
 
@@ -4110,7 +4122,7 @@ let review_checked_out
   let m, toasts =
     toast
       m
-      ~replaces:creating
+      ~replaces:[ creating ]
       (sprintf
          "Checked out %s into %s: edit it there."
          (Worktree.label c.worktree)
@@ -4321,7 +4333,7 @@ let untrimmed (m : Model.t) result =
   match result with
   | Ok json ->
     decode m json Trim.Freed.of_json ~f:(fun (freed : Trim.Freed.t) ->
-      toast
+      context_toast
         m
         (sprintf
            "Back in the context: %d message%s (%s)"
@@ -4504,7 +4516,7 @@ let restored (m : Model.t) entry result =
   match result with
   | Ok json ->
     decode m json Hidden.of_json ~f:(fun (h : Hidden.t) ->
-      toast
+      context_toast
         m
         (sprintf
            "Back in the context: %d message%s (%s)"
@@ -4639,6 +4651,43 @@ let message_points_arrived
                   ~freed:(fun p -> p.trim_after)
                   points
             }))
+  | Trim_before { index; at = time } ->
+    (match at index with
+     | Some ({ trim_before = Some freed; _ } as point) when same_time time point
+       ->
+       open_dialog
+         m
+         (Trim_confirm
+            { point =
+                { before = point.message
+                ; index = point.index
+                ; reply =
+                    (match point.role with
+                     | Assistant -> true
+                     | User | Tool_result -> false)
+                ; text = point.text
+                ; at = point.at
+                ; messages = freed.messages
+                ; tokens = freed.tokens
+                }
+            ; busy = false
+            ; error = None
+            })
+     | Some point when same_time time point ->
+       error
+         m
+         (if List.exists points ~f:(fun p -> p.index < index)
+          then
+            "Trimming there would part a tool call from its result: /trim \
+             lists where you can trim."
+          else
+            "That is the first message in the model's context: there is \
+             nothing before it to trim.")
+     | _ ->
+       error
+         m
+         "That message is not in the model's context any more: /trim lists \
+          those you can trim before.")
   | Delete { entry; index; at = time } ->
     (match at index with
      | Some point when same_time time point && Option.is_some point.delete ->
@@ -4685,11 +4734,10 @@ let trimmed_after (m : Model.t) result =
         | _ -> m, []
       in
       let m, cmds =
-        toast
+        context_toast
           m
           (sprintf
-             "Trimmed %d message%s (%s) from the context: Undo on the divider \
-              brings them back"
+             "Trimmed %d message%s (%s): Undo is on the divider"
              h.messages
              (if h.messages = 1 then "" else "s")
              (Trim.tokens_label h.tokens))
@@ -5462,22 +5510,46 @@ let jump_older (m : Model.t) =
 
 let trim_title = "Trim the context"
 
-(* "Trim everything before this": the backend says what that drops. *)
-let ask_trim (m : Model.t) target =
+(* "Trim everything before this": the backend says what that drops. A
+   message on the page is found by its place in the context; one in the
+   outline, not loaded, by its place among the user's messages. *)
+let first_in_context m =
+  toast
+    m
+    "That is the first message in the model's context: there is nothing before \
+     it to trim."
+;;
+
+let ask_trim (m : Model.t) (target : Jump.Target.t) =
   let points = jump_points m in
-  match Jump.from_end points target with
-  | Some (from_end, p) when Jump.trimmable ~paging:m.paging m.chat p ->
+  let on_page =
+    match target with
+    | Entry n ->
+      Option.both (Message_index.span (Model.message_index m) n) (entry_at m n)
+    | Message _ | Trimmed -> None
+  in
+  match on_page with
+  | Some ({ first = 0; _ }, _) -> first_in_context m
+  | Some ((span : Message_index.Span.t), at) ->
     loading
       m
       trim_title
-      [ call Get_trim_points ~tag:(Trim_points (Before { from_end; at = p.at }))
+      [ call
+          Get_message_points
+          ~tag:(Message_points (Trim_before { index = span.first; at }))
       ]
-  | Some _ ->
-    toast
-      m
-      "That is the first message in the model's context: there is nothing \
-       before it to trim."
-  | None -> m, []
+  | None ->
+    (match Jump.from_end points target with
+     | Some (from_end, p) when Jump.trimmable ~paging:m.paging m.chat p ->
+       loading
+         m
+         trim_title
+         [ call
+             Get_trim_points
+             ~tag:(Trim_points (Before { from_end; at = p.at }))
+         ]
+     | Some _ -> first_in_context m
+     | None -> m, [])
 ;;
 
 let trim_picker (m : Model.t) (points : Trim.Point.t list) =
@@ -5491,7 +5563,8 @@ let trim_picker (m : Model.t) (points : Trim.Point.t list) =
          ~detail:
            (String.concat
               ~sep:"  "
-              (Option.to_list (Option.map p.at ~f:(Message_time.short times))
+              ([ (if p.reply then "reply" else "you") ]
+               @ Option.to_list (Option.map p.at ~f:(Message_time.short times))
                @ [ Trim.label ~messages:p.messages ~tokens:p.tokens ]))
          ~search:text
          (if String.is_empty text then "(an image)" else text)))
@@ -5506,12 +5579,17 @@ let trim_points_arrived (m : Model.t) (purpose : Trim_purpose.t) points =
   | Picker, [] ->
     toast
       m
-      "Nothing to trim: the context starts at your first message. /trim drops \
-       what comes before a later one."
+      "Nothing to trim: the context has no message after its first. /trim \
+       drops what comes before a later one."
   | Picker, points ->
     open_picker m (Picker { kind = Trim points; picker = trim_picker m points })
   | Before { from_end; at }, points ->
-    (match List.nth (List.rev points) from_end with
+    (match
+       List.nth
+         (List.rev
+            (List.filter points ~f:(fun (p : Trim.Point.t) -> not p.reply)))
+         from_end
+     with
      | Some (point : Trim.Point.t)
        when Option.is_none at
             || Option.is_none point.at
@@ -5544,11 +5622,10 @@ let trimmed (m : Model.t) result =
         | _ -> m, []
       in
       let m, cmds =
-        toast
+        context_toast
           m
           (sprintf
-             "Trimmed %d message%s (%s) from the context: Undo on the divider \
-              at the top (or /trim undo) brings them back"
+             "Trimmed %d message%s (%s): Undo is on the divider"
              freed.messages
              (if freed.messages = 1 then "" else "s")
              (Trim.tokens_label freed.tokens))
@@ -6608,7 +6685,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Mode_set notice, Ok json ->
     decode m json State.of_json ~f:(fun state ->
       let m, cmds = set_state m state in
-      let m, toast_cmds = toast m ~replaces:"Mode: " notice in
+      let m, toast_cmds = toast m ~replaces:[ "Mode: " ] notice in
       m, cmds @ toast_cmds)
   | Job_started, Ok json ->
     (match Json.string_field json "job_id" with
@@ -6952,7 +7029,8 @@ let loads : Reply_tag.t -> bool = function
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
   | Mcp Picker
   | Trim_points _ -> true
-  | Message_points (Delete_picker | Trim_after_picker | Trim_after _) -> true
+  | Message_points
+      (Delete_picker | Trim_after_picker | Trim_before _ | Trim_after _) -> true
   | _ -> false
 ;;
 
@@ -7056,7 +7134,7 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
         { f with signing_out = Set.remove f.signing_out host })
     in
     let m, cmds =
-      toast m ~replaces:"Signing out of " (sprintf "Signed out of %s" host)
+      toast m ~replaces:[ "Signing out of " ] (sprintf "Signed out of %s" host)
     in
     m, cmds @ [ call Forge_status ~tag:(Forge Status) ]
   | Prompt { prompt = Secret _ | Text _ | Manual_code _; _ }, Some (Login flow)
