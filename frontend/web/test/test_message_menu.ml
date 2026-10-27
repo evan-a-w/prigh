@@ -1,9 +1,9 @@
 open! Core
-open Prigh_web
 module H = Harness
 
-(* A message's context menu: how it opens (right-click, its ⋯ button,
-   Shift+F10 or the Menu key on the focused message), what it offers
+(* A message's context menu: how it opens (right-click or long press at
+   the pointer, Shift+F10 or the Menu key on the focused message, under
+   it; messages have no ⋯ button), what it offers
    (Copy, Trim before, Trim after, Delete; disabled with the reason where
    they do not apply), what each does, the preview of the highlighted
    item, and the keyboard. *)
@@ -48,34 +48,34 @@ let session ?running () =
 let menu h = H.text h ~selector:".context-menu"
 
 (* What the page's listeners do ({!Chat_listeners}): a right-click (or a
-   long press) opens the message's menu at the pointer; its ⋯, under it. *)
+   long press) opens the message's menu at the pointer. *)
 let right_click h n =
   H.act
     h
     (Open_menu { target = Message n; anchor = Point { x = 300; y = 120 } })
 ;;
 
-let more h n =
-  H.act
-    h
-    (Open_menu { target = Message n; anchor = Element (Chat_view.more_id n) })
-;;
-
 let items h = H.names h ~selector:".context-menu [role=menuitem]"
 let toasts h = H.text h ~selector:".toast"
 let dialog h = H.text h ~selector:".modal"
 
-(* The ⋯ buttons, as [H.elements] shows them, and the preview they carry. *)
-let mores h = H.elements h ~selector:".msg-more"
+(* The messages with a menu, as [H.elements] shows them: the open one's,
+   and the preview it carries. *)
+let mores h = H.elements h ~selector:"[data-message-entry]"
 
 let%expect_test "a right-click on a message opens its menu there" =
   let h = session () in
   right_click h 2;
+  H.show h ~selector:".msg[data-message-entry=\"2\"]";
   H.show h ~selector:".context-menu";
   [%expect
     {|
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
+    <div data-entry="2" data-message-entry="2" id="msg-2" tabindex="-1" class="menu-open msg user">
+      <div dir="auto" class="bubble"> question 2 </div>
+      <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
+    </div>
     <div id="dialog"
          role="menu"
          aria-label="Your message"
@@ -121,43 +121,34 @@ let%expect_test "a right-click on a message opens its menu there" =
     |}]
 ;;
 
-let%expect_test "the ⋯ button opens it under itself, and says it is open" =
+let%expect_test "messages have no ⋯: they are focusable, the open one marked" =
   let h = session () in
+  H.elements h ~selector:".msg-more";
+  H.elements h ~selector:"[data-message-menu]";
+  H.elements h ~selector:"#chat button[aria-haspopup]";
   mores h;
   [%expect
     {|
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
     |}];
-  more h 1;
-  [%expect
-    {|
-    (Focus dialog)
-    (Place_menu (Element msg-more-1))
-    |}];
+  H.key h "F10" ~shift:true ~target:(Message 1);
   H.show h ~selector:".msg[data-message-entry=\"1\"]";
   [%expect
     {|
-    <div data-message-entry="1" tabindex="-1" class="assistant msg">
+    (Open_menu ((target (Message 1)) (anchor (Element msg-1))))
+    (Focus dialog)
+    (Place_menu (Element msg-1))
+    <div data-message-entry="1" id="msg-1" tabindex="-1" class="assistant menu-open msg">
       <div class="markdown">
         <div class="md-part">
           <p dir="auto"> answer 1 </p>
         </div>
       </div>
-      <button type="button"
-              id="msg-more-1"
-              data-message-menu="1"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="true"
-              class="msg-more open">
-        <icon class="more"> </icon>
-      </button>
     </div>
     |}];
   (* Esc closes it, nothing else. *)
@@ -166,13 +157,13 @@ let%expect_test "the ⋯ button opens it under itself, and says it is open" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    (Focus msg-1)
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
     |}]
 ;;
 
@@ -182,9 +173,9 @@ let%expect_test "Shift+F10 or the Menu key on the focused message" =
   menu h;
   [%expect
     {|
-    (Open_menu ((target (Message 4)) (anchor (Element msg-more-4))))
+    (Open_menu ((target (Message 4)) (anchor (Element msg-4))))
     (Focus dialog)
-    (Place_menu (Element msg-more-4))
+    (Place_menu (Element msg-4))
     Your message question 3
     Copy
     Trim everything before this /trim
@@ -195,15 +186,15 @@ let%expect_test "Shift+F10 or the Menu key on the focused message" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
+    (Focus msg-4)
     |}];
   H.key h "ContextMenu" ~target:(Message 5);
   menu h;
   [%expect
     {|
-    (Open_menu ((target (Message 5)) (anchor (Element msg-more-5))))
+    (Open_menu ((target (Message 5)) (anchor (Element msg-5))))
     (Focus dialog)
-    (Place_menu (Element msg-more-5))
+    (Place_menu (Element msg-5))
     Reply answer 3
     Copy
     Trim everything before this /trim
@@ -214,7 +205,7 @@ let%expect_test "Shift+F10 or the Menu key on the focused message" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
+    (Focus msg-5)
     |}];
   (* Elsewhere, F10 is the browser's. *)
   H.key h "F10" ~shift:true ~target:Page;
@@ -244,7 +235,7 @@ let%expect_test "what does not apply is disabled, saying why" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
+    (Focus msg-0)
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
     [menuitem] div "Copy"
@@ -263,12 +254,12 @@ let%expect_test "what does not apply is disabled, saying why" =
     (Dialog_move 1)
     (Dialog_move 1)
     Dialog_accept
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more open">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant menu-open msg">
     <div class="disabled menu-item selected">
     |}];
   H.key h "Escape" ~target:Page;
@@ -279,7 +270,7 @@ let%expect_test "what does not apply is disabled, saying why" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
+    (Focus msg-5)
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
     Your message question 2
@@ -298,17 +289,17 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
   mores h;
   [%expect
     {|
-    (Open_menu ((target (Message 2)) (anchor (Element msg-more-2))))
+    (Open_menu ((target (Message 2)) (anchor (Element msg-2))))
     (Focus dialog)
-    (Place_menu (Element msg-more-2))
+    (Place_menu (Element msg-2))
     (Dialog_move 1)
     <div class="menu-item selected">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more open preview-trim-before">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="menu-open msg preview-trim-before user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
     |}];
   H.key h "ArrowDown" ~target:Page;
   H.elements h ~selector:".context-menu .menu-item.selected";
@@ -317,12 +308,12 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
     {|
     (Dialog_move 1)
     <div class="menu-item selected">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more open preview-trim-after">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="menu-open msg preview-trim-after user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
     |}];
   H.key h "ArrowDown" ~target:Page;
   H.elements h ~selector:".context-menu .menu-item.selected";
@@ -331,12 +322,12 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
     {|
     (Dialog_move 1)
     <div class="danger menu-item selected">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more open preview-delete">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    <div class="msg user">
+    <div class="assistant msg">
+    <div class="menu-open msg preview-delete user">
+    <div class="assistant msg">
+    <div class="msg user">
+    <div class="assistant msg">
     |}];
   (* Enter: Delete, at once. *)
   H.key h "Enter" ~target:Page;
@@ -449,7 +440,7 @@ let%expect_test "a tool call's menu is its reply's" =
   H.show h ~selector:".msg.assistant";
   [%expect
     {|
-    <div data-message-entry="1" tabindex="-1" class="assistant msg">
+    <div data-message-entry="1" id="msg-1" tabindex="-1" class="assistant msg">
       <div class="markdown">
         <div class="md-part">
           <p dir="auto"> Listing. </p>
@@ -469,33 +460,13 @@ let%expect_test "a tool call's menu is its reply's" =
           </div>
         </div>
       </div>
-      <button type="button"
-              id="msg-more-1"
-              data-message-menu="1"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              class="msg-more">
-        <icon class="more"> </icon>
-      </button>
     </div>
-    <div data-message-entry="2" tabindex="-1" class="assistant msg">
+    <div data-message-entry="2" id="msg-2" tabindex="-1" class="assistant msg">
       <div class="markdown">
         <div class="md-part">
           <p dir="auto"> done </p>
         </div>
       </div>
-      <button type="button"
-              id="msg-more-2"
-              data-message-menu="2"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              class="msg-more">
-        <icon class="more"> </icon>
-      </button>
     </div>
     |}];
   right_click h 1;
@@ -524,7 +495,7 @@ let%expect_test "under a filter: only what shows has a menu, acting as before" =
   let h = session () in
   H.quiet h (fun () -> H.act h (Run "/filter -user"));
   H.elements h ~selector:".entries > *";
-  H.elements h ~selector:".entries > [tabindex] > .msg-more";
+  H.elements h ~selector:".entries > [tabindex]";
   [%expect
     {|
     <div class="filtered">
@@ -533,9 +504,9 @@ let%expect_test "under a filter: only what shows has a menu, acting as before" =
     <div class="assistant msg">
     <div class="filtered">
     <div class="assistant msg">
-    <button class="msg-more">
-    <button class="msg-more">
-    <button class="msg-more">
+    <div class="assistant msg">
+    <div class="assistant msg">
+    <div class="assistant msg">
     |}];
   (* The newest reply's Trim before still trims before it. *)
   right_click h 5;

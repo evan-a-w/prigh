@@ -64,18 +64,8 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ prompt) (params ((text hello)))
      (tag (Sent (text hello) (images ()))))
     <div class="entries">
-      <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
+      <div data-entry="0" data-message-entry="0" id="msg-0" tabindex="-1" class="msg user">
         <div dir="auto" class="bubble"> hello </div>
-        <button type="button"
-                id="msg-more-0"
-                data-message-menu="0"
-                title="More (right-click, Shift+F10)"
-                aria-label="More for this message"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                class="msg-more">
-          <icon class="more"> </icon>
-        </button>
       </div>
       <div data-message-entry="1" class="assistant msg streaming">
         <div class="markdown">
@@ -106,10 +96,9 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
   [%expect
     {|
     hello
-    11:58 (More (right-click, Shift+F10))
+    11:58
     Hi
     m 10 in 5 out 11:59
-    (More (right-click, Shift+F10))
     |}];
   (* Ten hours behind UTC, it has just turned midnight: they were yesterday. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr (-10.)));
@@ -117,10 +106,9 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
   [%expect
     {|
     hello
-    Yesterday 23:58 (More (right-click, Shift+F10))
+    Yesterday 23:58
     Hi
     m 10 in 5 out Yesterday 23:59
-    (More (right-click, Shift+F10))
     |}];
   (* A day later in Paris. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
@@ -129,10 +117,9 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
   [%expect
     {|
     hello
-    Yesterday 11:58 (More (right-click, Shift+F10))
+    Yesterday 11:58
     Hi
     m 10 in 5 out Yesterday 11:59
-    (More (right-click, Shift+F10))
     |}];
   Harness.show h ~selector:".msg.user time";
   [%expect

@@ -197,7 +197,7 @@ let%expect_test
     Keep_scroll_position
     (Scroll_to_entry -2)
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     <button class="tick unloaded user">
     |}];
   (* Further up than a page brought: the next one, then there. *)
@@ -214,7 +214,7 @@ let%expect_test
     Keep_scroll_position
     (Scroll_to_entry -6)
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     |}]
 ;;
 

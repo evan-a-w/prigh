@@ -31,10 +31,14 @@ let place (anchor : Prigh_web.Context_menu.Anchor.t) =
       let left =
         Float.max margin (Float.min x (window_width -. width -. margin))
       in
-      (* No room below: above the anchor instead. *)
+      (* No room below: above the anchor instead, in the window (a message
+         taller than it ends below it). *)
       let top =
         if Float.(y +. height +. margin > window_height)
-        then Float.max margin (y -. height)
+        then
+          Float.max
+            margin
+            (Float.min (y -. height) (window_height -. height -. margin))
         else y
       in
       set menu "left" left;

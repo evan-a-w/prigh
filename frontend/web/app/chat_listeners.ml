@@ -77,13 +77,6 @@ let open_menu ~schedule n anchor =
   schedule (Prigh_web.App.Action.Open_menu { target = Message n; anchor })
 ;;
 
-(* A message's ⋯: its menu, under the button. *)
-let more ~schedule (ev : Dom_html.mouseEvent Js.t) =
-  Option.iter (clicked ev Prigh_web.Chat_view.menu_attribute) ~f:(fun (_, n) ->
-    Option.iter (Int.of_string_opt n) ~f:(fun n ->
-      open_menu ~schedule n (Element (Prigh_web.Chat_view.more_id n))))
-;;
-
 (* Whether the selection has text in [el]: its menu is the browser's then,
    to copy it. *)
 let selects (el : Dom_html.element Js.t) =
@@ -97,7 +90,7 @@ let selects (el : Dom_html.element Js.t) =
 ;;
 
 (* A right-click (or a long press, {!Menu_listeners}) on a message with a
-   menu: the menu at the pointer, or, from the keyboard, under its ⋯. A
+   menu: the menu at the pointer, or, from the keyboard, under it. A
    link's or an image's menu, or one with text selected in the message, is
    the browser's. *)
 let context_menu ~schedule (ev : Dom_html.mouseEvent Js.t) =
@@ -127,7 +120,7 @@ let context_menu ~schedule (ev : Dom_html.mouseEvent Js.t) =
              ~schedule
              n
              (if x = 0 && y = 0
-              then Element (Prigh_web.Chat_view.more_id n)
+              then Element (Prigh_web.Chat_view.message_id n)
               else Point { x; y }))
      | Some _ | None -> ())
 ;;
@@ -163,7 +156,6 @@ let install ~schedule =
   in
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
-  listen Dom_html.Event.click (more ~schedule);
   listen (Dom.Event.make "contextmenu") (context_menu ~schedule);
   listen Dom_html.Event.click (hidden_action ~schedule);
   listen Dom_html.Event.keydown close_image

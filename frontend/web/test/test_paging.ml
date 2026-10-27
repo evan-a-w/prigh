@@ -67,13 +67,9 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 4) (before (e5)) (loading false))
     (Show earlier messages) 4 more
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     question 4
-    (More (right-click, Shift+F10))
     answer 4
-    (More (right-click, Shift+F10))
     |}];
   (* The page asks as the user scrolls near the top; asking again while it
      is on its way does nothing. *)
@@ -88,13 +84,9 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 4) (before (e5)) (loading true))
     Loading earlier messages…
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     question 4
-    (More (right-click, Shift+F10))
     answer 4
-    (More (right-click, Shift+F10))
     |}];
   (* Added above, what shows stays in place. *)
   Harness.reply
@@ -108,17 +100,11 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     question 4
-    (More (right-click, Shift+F10))
     answer 4
-    (More (right-click, Shift+F10))
     |}];
   Harness.click h ~selector:".load-older";
   Harness.reply h "get_messages_page" (Harness.page (exchanges [ 1 ]));
@@ -132,21 +118,13 @@ let%expect_test "the newest page first, older pages on scrolling up" =
     Keep_scroll_position
     ((older 0) (before ()) (loading false))
     question 1
-    (More (right-click, Shift+F10))
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     question 4
-    (More (right-click, Shift+F10))
     answer 4
-    (More (right-click, Shift+F10))
     |}];
   (* Everything is loaded. *)
   Harness.act h Load_older;
@@ -195,9 +173,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     Couldn't load earlier messages: the disk is full. Scroll up to try again. (Dismiss)
     |}];
   (* A page for a session left meanwhile is dropped. *)
@@ -212,9 +188,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
     Scroll_to_bottom
     ((older 0) (before ()) (loading false))
     question 7
-    (More (right-click, Shift+F10))
     answer 7
-    (More (right-click, Shift+F10))
     |}]
 ;;
 
@@ -352,9 +326,7 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
     (Rpc (method_ get_state) (params ()) (tag State))
     ((older 0) (before ()) (loading false))
     question 1
-    (More (right-click, Shift+F10))
     answer 1
-    (More (right-click, Shift+F10))
     |}];
   (* Unchanged: the same transcript (and the same views). *)
   let before = (Harness.model h).chat in
@@ -390,24 +362,15 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
      (tag (Resync (session s2) (from ()))))
     question 1
-    (More (right-click, Shift+F10))
     answer 1
-    (More (right-click, Shift+F10))
     question 3
-    (More (right-click, Shift+F10))
     ((older 0) (before ()) (loading false))
     question 1
-    (More (right-click, Shift+F10))
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     (same_entries 2)
     |}]
 ;;
@@ -448,11 +411,9 @@ let%expect_test "a cached transcript of a running session" =
   [%expect
     {|
     build it
-    (More (right-click, Shift+F10))
     bash
     Output from while this page was away shows when it ends.
     step 1
-    (More (right-click, Shift+F10))
     <div class="running tool tool-bash">
     bash
     Output from while this page was away shows when it ends.
@@ -501,9 +462,7 @@ let%expect_test "resting on a session in the sidebar fetches its newest page" =
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     |}]
 ;;
 
@@ -599,21 +558,13 @@ let%expect_test "reconnecting with older pages loaded" =
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     question 4
-    (More (right-click, Shift+F10))
     answer 4
-    (More (right-click, Shift+F10))
     question 5
-    (More (right-click, Shift+F10))
     answer 5
-    (More (right-click, Shift+F10))
     (kept 6)
     |}]
 ;;
@@ -670,9 +621,7 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     Scroll_to_bottom
     ((older 0) (before ()) (loading false))
     question 1
-    (More (right-click, Shift+F10))
     answer 1
-    (More (right-click, Shift+F10))
     |}]
 ;;
 
@@ -696,13 +645,9 @@ let%expect_test "compacted while on show" =
     {|
     ((older 0) (before ()) (loading false))
     question 21
-    (More (right-click, Shift+F10))
     answer 21
-    (More (right-click, Shift+F10))
     question 22
-    (More (right-click, Shift+F10))
     answer 22
-    (More (right-click, Shift+F10))
     Context compacted Worked on the parser.
     Worked on the parser.
     |}]
@@ -746,11 +691,8 @@ let%expect_test "scrolling up after the session was compacted" =
     Scroll_to_bottom
     ((older 0) (before ()) (loading false))
     Worked on the parser.
-    (More (right-click, Shift+F10))
     question 22
-    (More (right-click, Shift+F10))
     answer 22
-    (More (right-click, Shift+F10))
     Earlier messages were compacted: showing the session from its summary
     |}]
 ;;
