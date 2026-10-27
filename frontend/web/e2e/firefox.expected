@@ -2046,5 +2046,28 @@ hidden again
 === firefox: trim: undone ===
 steps: 1 2 3 4 5
 user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>" | user "Your message 4, Step 4: look at module 4., <TIME>" | user "Your message 5, Step 5: look at module 5., <TIME>"
+=== firefox: trim: delete ===
+actions on a reply: ✕Delete, ✂Trim everything after this
+actions on the newest: ✕Delete
+toast: Message deleted | Undo
+transcript: Step 1, Module 1, Step 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+dividers: 0
+after deleting step 2: Step 1, Module 1, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 3: look at module 3., <TIME>" | user "Your message 3, Step 4: look at module 4., <TIME>" | user "Your message 4, Step 5: look at module 5., <TIME>"
+undone: Step 1, Module 1, Step 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+undone: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+=== firefox: trim: trim after: confirmation ===
+Trim the context after this? | Trim 5 messages (~288 tokens) after this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded where they were, what you send next goes after them, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+after Esc: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+=== firefox: trim: trimmed after ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo]
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>"
+shown: Module 3, Step 4, Module 4, Step 5, Module 5
+actions on them: 0
+dimmed: true
+=== firefox: trim: sent after the trim ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo], Step 6, Noted after the trim
+=== firefox: trim: trim after undone ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5, Step 6, Noted after the trim
 === firefox: trim: errors ===
 none
