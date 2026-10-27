@@ -21,6 +21,9 @@ module Target : sig
     | Files (** the file browser's list (not its fields) *)
     | Review (** the review page (not its fields or buttons) *)
     | Resize of Resize.Handle.t (** a panel's resize handle *)
+    | Message of int
+    (** a focused message of the transcript with a context menu, by its
+        entry *)
     | Page
   [@@deriving sexp_of]
 end
