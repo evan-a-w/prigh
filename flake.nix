@@ -240,11 +240,19 @@
           test -f ${prighWebRoot}/xterm.js
           test -f ${prighWebRoot}/xterm.css
           test -f ${prighWebRoot}/addon-fit.js
+          test -f ${prighWebRoot}/katex.min.js
+          test -f ${prighWebRoot}/katex.min.css
+          test -f ${prighWebRoot}/copy-tex.min.js
+          test -f ${prighWebRoot}/KaTeX_Main-Regular.woff2
+          # every font the KaTeX stylesheet names is there
+          for font in $(grep -o 'url([^)]*)' ${prighWebRoot}/katex.min.css | sed 's/^url(//; s/)$//'); do
+            test -f "${prighWebRoot}/$font"
+          done
           # the release build: whole-program, no source map
           test "$(stat -c %s ${prighWebRoot}/main.bc.js)" -lt 5000000
           # precompressed, decoding to the file itself
           for f in ${prighWebRoot}/main.bc.js ${prighWebRoot}/index.html \
-                   ${prighWebRoot}/style.css; do
+                   ${prighWebRoot}/style.css ${prighWebRoot}/katex.min.js; do
             ${pkgs.gzip}/bin/gzip -dc "$f.gz" | cmp - "$f"
             ${pkgs.brotli}/bin/brotli -dc "$f.br" | cmp - "$f"
           done
