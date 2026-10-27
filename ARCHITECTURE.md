@@ -1970,7 +1970,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view; `Anchored` counts the lines and the finished items
     (`Transcript.finished`) that arrived beneath it, for the jump
-    indicator), `Verbosity` (quiet/normal/verbose), `Autocomplete`
+    indicator), `Verbosity` (quiet/normal/verbose), `Transcript_filter`
+    (`/filter`'s kinds, by `Transcript.Item.kind`; `Transcript.filter`
+    leaves out what it hides before rendering and counting lines, so the
+    viewport and the jump indicator see what is shown; the TUI keeps it
+    in the backend's prefs as `tui.transcript-filter`), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while
     `State.subagents` lists it as undelivered, then until the next prompt;
@@ -2198,8 +2202,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     reason). The rule is plain; a short notice sits on its right. The
     status line keeps the cwd and model, then fills remaining width by
     priority (mode hint, context, queued/agents/jobs and an
-    approval mode that asks, then thinking, `mode:auto` and cost, verbosity
-    last; a mode hint too wide to fit whole drops its last keys, the least
+    approval mode that asks, then thinking, `mode:auto` and cost, the
+    transcript filter (`filter: −thinking`, yellow), verbosity last; a mode hint too wide to fit whole drops its last keys, the least
     important, after the context has its place; dialogs list the rest of
     their keys in the box: the sessions picker on its title row, a question
     under its answer, the reason prompt is typed in its box under the call)
@@ -2340,7 +2344,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       `/agents` and `/jobs` open, select and stop items in the agents
       panel); `Model` also holds the transcript `verbosity` (a class on
       `#chat`: the CSS hides tool output in quiet and opens every
-      `<details>` in verbose) and `folds`, the outputs toggled from what it
+      `<details>` in verbose), the `transcript_filter` (`ui/`'s
+      `Transcript_filter`, carried in `Fold.t` so that `Chat_view` leaves
+      out what it hides, in subagents' transcripts too, keeping an empty
+      `.filtered` where a jump landmark was; `Filter_menu` is its menu's
+      state, `Filter_view` its button, menu and the note over the
+      transcript; kept as `web.transcript-filter`) and `folds`, the outputs toggled from what it
       shows (`Fold`), what we wait on the backend for (`In_flight`, below),
       the `Config` (`get_config` at startup: the scope Ctrl+P
       cycles, `/confirm`), the side question (`Btw`, streamed by
