@@ -615,3 +615,108 @@ let%expect_test "switching sessions forgets the steering and the queues" =
     ()
     |}]
 ;;
+
+let steer_message =
+  {|{"role":"user","text":"[The user sends you this while you work: take it into account and carry on.]\n\nuse the tests","origin":{"body":"use the tests","notes":[{"kind":"steer","title":"You (steer)","text":"[The user sends you this while you work: take it into account and carry on.]"}]}}|}
+;;
+
+(* What a1's transcript shows, one line per entry. *)
+let a1_transcript h =
+  match Chat.find_subagent (H.model h).chat "a1" with
+  | None -> print_endline "a1: no transcript"
+  | Some s ->
+    List.iter (Chat.entries s.chat) ~f:(fun (e : Chat.Entry.t) ->
+      print_endline
+        (match e with
+         | User u ->
+           "user: "
+           ^ String.prefix
+               (Option.value_map u.origin ~default:u.text ~f:(fun o ->
+                  Option.value o.body ~default:u.text))
+               40
+         | Assistant { message; _ } ->
+           "assistant: "
+           ^ String.concat
+               (List.filter_map message.content ~f:(function
+                  | Prigh_protocol.Content.Text t -> Some t
+                  | _ -> None))
+         | Shell _ -> "shell"
+         | Compaction _ -> "compaction"))
+;;
+
+let a1_list =
+  {|[{"id":"a1","call_id":"s1","parent":null,"task":"Survey the repository","model":"deepseek-flash","started_at_ms":0,"turns":1,"tool_calls":1,"stale":false},
+     {"id":"a1/n1","call_id":"n1","parent":"a1","task":"Count the modules","model":"deepseek-flash","started_at_ms":0,"turns":0,"tool_calls":0,"stale":false}]|}
+;;
+
+let%expect_test
+    "steering, then a reconnect while it runs: the steering stays, its \
+     transcript is fetched once and goes on"
+  =
+  let h = H.create () in
+  started h;
+  H.quiet h (fun () ->
+    H.act h (Select_item (Agent "a1"));
+    H.act h (Set_recipient (Agent "a1"));
+    H.type_ h "use the tests";
+    H.key h "Enter";
+    H.reply h "steer_agent" "{}";
+    events
+      h
+      [ agent_queues [ "a1", [ "use the tests" ], [] ]
+      ; in_a1 (sprintf {|{"event":"message_start","message":%s}|} steer_message)
+      ; in_a1 (sprintf {|{"event":"message_end","message":%s}|} steer_message)
+      ; agent_queues []
+      ]);
+  a1_transcript h;
+  [%expect
+    {|
+    Send
+    user: Survey the repository
+    assistant:
+    user: use the tests
+    |}];
+  H.act h Backend_closed;
+  H.quiet h (fun () ->
+    H.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
+    H.reply h "get_state" running);
+  H.reply
+    h
+    "get_messages_page"
+    (H.page
+       {|[{"role":"user","text":"survey"},
+          {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"Survey the repository\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
+          {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"started agent a1 (Survey the repository); its result will be delivered to you when it finishes","is_error":false}]|});
+  [%expect
+    {|
+    (Reconnect (generation 1) (delay_ms 0) (session (s1)))
+    (Rpc (method_ get_subagent) (params ((id s1) (elide true)))
+     (tag (Subagent s1)))
+    (Expire_toast (id 2) (after_ms 2500))
+    |}];
+  (* Its events go on while the snapshot is on its way. *)
+  H.event h (in_a1 (text_reply "noted"));
+  H.reply
+    h
+    "get_subagent"
+    (sprintf
+       {|{"subagent":{"id":"a1","call_id":"s1","parent":null,"task":"Survey the repository","model":"deepseek-flash","state":"running","turns":2},
+          "messages":[{"role":"user","text":"Survey the repository"},%s,{"role":"assistant","content":[{"type":"text","text":"noted"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}]}|}
+       steer_message);
+  H.reply h "list_subagents" a1_list;
+  H.event h (in_a1 (text_reply "carrying on"));
+  a1_transcript h;
+  recipient h;
+  print_s
+    [%sexp
+      (List.map (H.model h).agents.agents ~f:(fun a -> a.id) : string list)];
+  [%expect
+    {|
+    user: Survey the repository
+    user: use the tests
+    assistant: noted
+    assistant: carrying on
+    (Agent a1)
+    (a1 a1/n1)
+    |}]
+;;
