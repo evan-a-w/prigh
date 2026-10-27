@@ -55,6 +55,9 @@ type t =
   ; session_rules : string list
     (** rules the user allowed for the session ("don't ask again") *)
   ; trim : Trim.t option (** what is trimmed from the model's context *)
+  ; hidden : Hidden.t list
+    (** what trims and deletions keep out of the model's context, oldest
+        first *)
   }
 [@@deriving sexp_of, equal]
 
