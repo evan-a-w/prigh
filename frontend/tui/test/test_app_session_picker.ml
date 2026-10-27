@@ -249,7 +249,8 @@ let%expect_test
     > /unarchive
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
-    ▸ deploy       deploy it · /work
+    ▸ undo         bring the latest deleted message back
+      deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
       try a spike  archived · /old

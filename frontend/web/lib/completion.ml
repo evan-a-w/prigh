@@ -202,7 +202,18 @@ let argument_items
         ]
   | Budget -> simple [ "off", "no budget: turns start whatever it costs" ]
   | Trim ->
-    simple [ "undo", "bring back what the last trim took out of the context" ]
+    simple
+      [ "after", "pick a message to trim everything after"
+      ; "undo", "bring back what the last trim took out of the context"
+      ]
+  | Delete ->
+    simple [ "undo", "bring back the latest deleted message" ]
+    @ List.map sessions ~f:(fun s ->
+      Picker.Item.create
+        ~id:s.path
+        ~detail:s.cwd
+        ~search:(Session_list.title s ^ " " ^ s.path)
+        (Session_list.title s))
   | Goal ->
     simple [ "off", "clear the goal"; "resume", "make a stopped goal active" ]
   | Resume ->

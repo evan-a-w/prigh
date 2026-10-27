@@ -465,7 +465,9 @@ let%expect_test "deleting every archived session" =
     |}]
 ;;
 
-let%expect_test "/delete: by name or id with a confirmation, or select them" =
+let%expect_test
+    "/delete: sessions by name or id with a confirmation; alone, a message"
+  =
   let h = H.create ~sessions () in
   H.type_ h "/delete s4 Older docs";
   H.act h Send;
@@ -488,16 +490,20 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
     Old lexer 195.3 KB
     Older docs 1.2 MB
     |}];
+  (* Alone it picks a message to delete (sessions are selected in the
+     sidebar). *)
   H.act h Close_dialog;
   H.type_ h "/delete";
   H.act h Send;
-  H.text h ~selector:".sessions-toolbar";
+  H.text h ~selector:".modal h2";
   [%expect
     {|
     (Focus editor)
     (Rpc (method_ push_pref) (params ((key history) (value /delete) (max 500)))
      (tag Ignore))
-    (Expire_toast (id 1) (after_ms 4220))
-    Select sessions Shift for a range
+    (Focus dialog)
+    (Rpc (method_ get_message_points) (params ())
+     (tag (Message_points Delete_picker)))
+    Delete a message
     |}]
 ;;

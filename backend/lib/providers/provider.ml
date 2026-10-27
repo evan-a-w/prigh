@@ -21,8 +21,19 @@ module Request = struct
     else { t with messages = List.map t.messages ~f:Message.omit_images }
   ;;
 
+  (* Anthropic refuses a conversation that does not start with the user's
+     turn, as one does once its first message is deleted, or trimmed before
+     a reply. *)
+  let lead_with_user = function
+    | ([] | Message.User _ :: _) as messages -> messages
+    | messages ->
+      Message.user "[the conversation's earlier messages were removed]"
+      :: messages
+  ;;
+
   let prepare t =
-    omit_unsupported_images { t with messages = Tool_pairing.repair t.messages }
+    omit_unsupported_images
+      { t with messages = lead_with_user (Tool_pairing.repair t.messages) }
   ;;
 end
 

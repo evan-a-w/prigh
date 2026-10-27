@@ -48,7 +48,8 @@ module Item = struct
     | Block of Content.t
     | Compaction of string
     | Trimmed of
-        { messages : int
+        { after : string option
+        ; messages : int
         ; tokens : int
         ; shown : P.Message.t list option
         }
@@ -131,11 +132,12 @@ let add t (item : Item.t) =
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
 
-let show_trimmed t shown =
+let show_trimmed t ~after shown =
   let found = ref false in
   let items_rev =
     List.map t.items_rev ~f:(function
-      | Item.Trimmed trimmed ->
+      | Item.Trimmed trimmed when Option.equal String.equal trimmed.after after
+        ->
         found := true;
         Item.Trimmed { trimmed with shown }
       | item -> item)
@@ -814,7 +816,8 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
             ]
         in
         header :: report ~verbosity (String.concat ~sep:"\n" section.body))
-  | Trimmed { messages; tokens; shown } -> trimmed_rows ~messages ~tokens ~shown
+  | Trimmed { after = _; messages; tokens; shown } ->
+    trimmed_rows ~messages ~tokens ~shown
   | Compaction summary ->
     let heading =
       Log_line.indent (Content.Line.of_string ~style:cyan "context compacted")

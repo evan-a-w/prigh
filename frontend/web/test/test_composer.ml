@@ -403,12 +403,12 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /switch [path] switch to a saved session
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /unarchive [session] unarchive a session (this one without an argument)
-    /delete [session...] delete sessions, after a confirmation (none: select them in the sidebar)
+    /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
-    /trim [undo] drop everything before one of your messages from the model's context (the transcript keeps it folded); undo brings back the last trim
+    /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it

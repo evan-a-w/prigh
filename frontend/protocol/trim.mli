@@ -30,11 +30,14 @@ module Freed : sig
 end
 
 (** A place to trim before ([get_trim_points]): one of the user's messages
-    in the context but the first, with what trimming there drops. *)
+    or the model's replies in the context but the first, with what trimming
+    there drops. *)
 module Point : sig
   type t =
     { before : string (** the message's entry id, for [trim] *)
     ; index : int (** its position, as {!Outline.Point.index} counts *)
+    ; reply : bool [@sexp.bool]
+      (** it is the model's reply ([role: assistant]; absent: the user's) *)
     ; text : string (** as {!Outline.Point.text} *)
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     ; messages : int

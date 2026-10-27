@@ -66,6 +66,7 @@ let%expect_test "reconnecting after the backend goes away" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Expire_toast (id 0) (after_ms 2500))
     hello
+    (✕ Delete)
     ((connection Connected) (toasts 1))
     |}]
 ;;
@@ -182,10 +183,13 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     (Reconnect (generation 1) (delay_ms 250) (session (s1)))
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✕ Delete)
     README.md 2.0 KB (Remove README.md)
     ((connection (Reconnecting (attempt 1) (generation 1)))
      (draft "half a thought") (scrolled_up true) (files_open true) (dialog true)
@@ -242,13 +246,17 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
     {|
     (Expire_toast (id 1) (after_ms 2500))
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     third
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     three
+    (✂ Trim before) (✕ Delete)
     README.md 2.0 KB (Remove README.md)
     ((connection Connected) (draft "half a thought") (scrolled_up true)
      (files_open true) (dialog true) (same_entries 4))
@@ -298,10 +306,13 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     This session is no longer on the backend (it restarted before saving it): what it showed stays here, read-only. (New session) (Sessions)
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✕ Delete)
     <textarea id="editor"
               placeholder="Session gone: /new starts one"
               aria-label="Message"
@@ -324,10 +335,13 @@ let%expect_test "a session the backend lost stays on show, read-only" =
   [%expect
     {|
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✕ Delete)
     This session is no longer on the backend: start a new one (/new) or pick another in the sidebar. Your message stays here. (Dismiss)
     still here
     |}];
@@ -643,7 +657,9 @@ let%expect_test "losing the connection while a session loads" =
     Scroll_to_bottom
     (Expire_toast (id 0) (after_ms 2500))
     hi
+    (✂ Trim after) (✕ Delete)
     hello
+    (✂ Trim before) (✕ Delete)
     |}]
 ;;
 
@@ -726,12 +742,15 @@ let%expect_test "a message sent as the connection went" =
   [%expect
     {|
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     third
-    (✂ Trim everything before this)
+    (✂ Trim before) (✕ Delete)
     Reconnected
     (draft "")
     |}];
@@ -739,10 +758,13 @@ let%expect_test "a message sent as the connection went" =
   [%expect
     {|
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✕ Delete)
     Reconnected
     The connection went before your message reached the agent: it is back in the editor. (Dismiss)
     (draft third)
@@ -791,13 +813,15 @@ let%expect_test "reconnecting keeps a shell card the backend does not have" =
   [%expect
     {|
     first
+    (✂ Trim after) (✕ Delete)
     one
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     second
-    (✂ Trim everything before this)
+    (✂ Trim before) (✂ Trim after) (✕ Delete)
     two
+    (✂ Trim before) (✕ Delete)
     bash ls
     third
-    (✂ Trim everything before this)
     three
     (same_entries 6)
     |}]

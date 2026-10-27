@@ -117,6 +117,18 @@ let toasts (m : Model.t) ~inject =
              ; (if t.repeats > 0
                 then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
                 else Node.none)
+             ; Option.value_map t.undo ~default:Node.none ~f:(fun h ->
+                 Html.button
+                   ~cls:"ghost small toast-undo"
+                   ~title:
+                     "Bring it back into the transcript and the model's \
+                      context (/delete undo)"
+                   ~on_click:
+                     (Effect.Many
+                        [ Effect.Stop_propagation
+                        ; inject (Action.Restore_hidden h)
+                        ])
+                   [ Node.text "Undo" ])
              ; (if t.error
                 then
                   Html.button
@@ -204,6 +216,19 @@ let echoes (m : Model.t) =
 
 (* What is loaded of the transcript, after how much is not. *)
 let transcript (m : Model.t) ~inject =
+  let index = Model.message_index m in
+  let dividers =
+    Option.value_map m.state ~default:[] ~f:(fun s ->
+      Hidden.trims_after s.hidden)
+    |> List.filter_map ~f:(fun (hidden : Hidden.t) ->
+      Option.bind hidden.divider ~f:(fun divider ->
+        Option.map (Message_index.after index ~divider) ~f:(fun after ->
+          { Chat_view.Divider.after
+          ; hidden
+          ; shown = Trimmed.range m.trimmed hidden.entry
+          ; restoring = Set.mem m.trimmed.restoring_ranges hidden.entry
+          })))
+  in
   Node.fragment
     ([ Paging.view m.paging ~load:(inject Action.Load_older) ]
      @ (match Option.bind m.state ~f:(fun s -> s.trim) with
@@ -211,11 +236,14 @@ let transcript (m : Model.t) ~inject =
         | None -> [])
      @ [ Chat_view.view
            ~fold:(Model.fold m)
-           ~trim_after:
+           ~first:
              (* The first message in the context has nothing before it. *)
              (if m.paging.older = 0
               then Chat.first m.chat
               else Chat.first m.chat - 1)
+           ~index
+           ~deleting:m.trimmed.deleting
+           ~dividers
            (Model.message_time m)
            m.chat
        ])
