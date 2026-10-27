@@ -295,6 +295,8 @@ module Model : sig
       (** the main agent's, from its events; {!activity} squares it with the
           state *)
     ; verbosity : Verbosity.t
+    ; transcript_filter : Transcript_filter.t
+      (** [/filter]; kept in the backend's preferences *)
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option

@@ -99,7 +99,10 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
-    (Rpc (method_ get_prefs) (params ((keys (history)))) (tag Prefs_history))
+    (Rpc
+      (method_ get_prefs)
+      (params ((keys (history tui.transcript-filter))))
+      (tag Prefs_history))
     |}];
   H.reply h Initial_state (state_json ());
   H.reply
@@ -776,7 +779,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 67
+      ↕ 1–8 of 68
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -793,7 +796,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 67
+      ↕ 1–8 of 68
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -810,7 +813,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 67
+      ↕ 1–8 of 68
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -2823,7 +2826,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 294 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 297 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5217,7 +5220,10 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
-    (Rpc (method_ get_prefs) (params ((keys (history)))) (tag Prefs_history))
+    (Rpc
+      (method_ get_prefs)
+      (params ((keys (history tui.transcript-filter))))
+      (tag Prefs_history))
     |}];
   H.reply
     h
@@ -8305,7 +8311,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 67
+      ↕ 1–8 of 68
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8322,7 +8328,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 67
+      ↕ 1–8 of 68
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8605,7 +8611,7 @@ let%expect_test
                                 │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
                                 │   /default-dir [off|path]            show or set the directory new sessions start in
                                 │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 67
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 68
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
