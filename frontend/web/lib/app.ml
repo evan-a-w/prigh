@@ -358,6 +358,9 @@ module Action = struct
     | Set_model of string
     | Set_thinking of string
     | Open_chip of Chip.t
+    | Open_filter (** the transcript filter's menu; again: closes it *)
+    | Filter_press of Filter_menu.Row.t option
+    (** a row of the filter's menu (by click), or the one selected (Space) *)
     | Chip_step of int
     | Open_snippets of int option
     | Open_help
@@ -522,6 +525,7 @@ module Model = struct
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
+    ; transcript_filter : Transcript_filter.t
     ; config : Config.t option
     ; btw : Btw.t option
     ; btw_seq : int
@@ -623,7 +627,13 @@ module Model = struct
         || Agents.fetching t.agents)
   ;;
 
-  let fold t = Fold.create ~verbosity:t.verbosity ~toggled:t.folds
+  let fold t =
+    Fold.create
+      ~filter:t.transcript_filter
+      ~verbosity:t.verbosity
+      ~toggled:t.folds
+      ()
+  ;;
 
   let message_time t =
     Message_time.create
@@ -688,6 +698,7 @@ let init =
   ; agents = Agents.empty
   ; verbosity = Normal
   ; folds = String.Set.empty
+  ; transcript_filter = Transcript_filter.all
   ; config = None
   ; btw = None
   ; btw_seq = 0
@@ -1804,6 +1815,15 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
     if Prigh_ui.Verbosity.equal verbosity m.verbosity
     then m
     else { m with verbosity; folds = String.Set.empty })
+  else if String.equal key Key.transcript_filter
+  then
+    { m with
+      transcript_filter =
+        Option.value_map
+          string
+          ~default:Transcript_filter.all
+          ~f:Transcript_filter.of_string
+    }
   else if String.equal key Key.notify
   then (
     let enabled =
@@ -2401,6 +2421,57 @@ let set_verbosity (m : Model.t) verbosity =
       Key.verbosity
       (Some (`String (Prigh_ui.Verbosity.name verbosity)))
     @ cmds )
+;;
+
+(* ---- the transcript filter (Filter_menu) *)
+
+let save_filter (m : Model.t) =
+  save_pref
+    m
+    Key.transcript_filter
+    (if Transcript_filter.is_all m.transcript_filter
+     then None
+     else Some (`String (Transcript_filter.to_string m.transcript_filter)))
+;;
+
+(* [/filter ARGS]: acknowledged by a toast, as the transcript may not show
+   the change where the user looks. *)
+let set_filter (m : Model.t) filter =
+  let m = { m with transcript_filter = filter } in
+  let m, cmds =
+    toast
+      m
+      ~replaces:"Transcript filter: "
+      (match Transcript_filter.summary filter with
+       | None -> "Transcript filter: showing everything"
+       | Some summary ->
+         "Transcript filter: " ^ summary ^ " (/filter all shows everything)")
+  in
+  m, save_filter m @ cmds
+;;
+
+let open_filter (m : Model.t) =
+  match m.dialog with
+  | Some (Filter _) ->
+    let m, cmds = close_dialog m in
+    m, save_filter m @ cmds
+  | _ ->
+    let m, cmds =
+      open_dialog m (Filter (Filter_menu.create m.transcript_filter))
+    in
+    m, cmds @ [ Command.Place_menu (Element Filter_menu.anchor) ]
+;;
+
+let filter_press (m : Model.t) row =
+  match m.dialog with
+  | Some (Filter menu) ->
+    let row = Option.value row ~default:(Filter_menu.selected menu) in
+    ( { m with
+        dialog = Some (Filter (Filter_menu.select menu row))
+      ; transcript_filter = Filter_menu.press row m.transcript_filter
+      }
+    , [] )
+  | _ -> m, []
 ;;
 
 let verbosity_picker (m : Model.t) =
@@ -4325,6 +4396,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "theme", name -> theme_named m name
   | "accent", "" -> open_picker m (accent_picker m)
   | "accent", name -> accent_named m name
+  | "filter", "" -> open_filter m
+  | "filter", args ->
+    (match Transcript_filter.parse m.transcript_filter args with
+     | Ok filter -> set_filter m filter
+     | Error e -> error m e)
   | "verbosity", "" -> open_picker m (verbosity_picker m)
   | "verbosity", name ->
     (match
@@ -7149,6 +7225,7 @@ let dialog_accept (m : Model.t) =
     (match Review_picker.selected_item p with
      | Some item -> review_picked m item
      | None -> m, [])
+  | Some (Filter _) -> open_filter m
   | Some (Rename name) ->
     let name = String.strip name in
     if String.is_empty name
@@ -7442,6 +7519,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_chip chip -> open_chip m chip
+  | Open_filter -> open_filter m
+  | Filter_press row -> filter_press m row
   | Chip_step delta -> step_chip m delta
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
@@ -7509,6 +7588,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with dialog = Some (Review_pick (Review_picker.move p delta)) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
+     | Some (Filter menu) ->
+       { m with dialog = Some (Filter (Filter_menu.move menu delta)) }, []
      | Some (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
        with_picker m ~f:(fun p -> Picker.move p delta)
      | Some (Prompt prompt) ->
@@ -7530,6 +7611,8 @@ let update_connected (m : Model.t) (action : Action.t) =
           m, cmds @ [ rpc "auth_cancel" [] ]
         | Some (Pull { back = Some l; _ } | Pr_create { back = Some l; _ }) ->
           open_picker m (Pulls l)
+        | Some (Filter menu) ->
+          close_dialog { m with transcript_filter = menu.original }
         | Some _ -> close_dialog m
         | None -> m, []))
   | Login_choose i ->

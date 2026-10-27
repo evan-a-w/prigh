@@ -13,6 +13,7 @@ module Argument : sig
     | Directory
     | Backend_directory (** directories on the backend's host *)
     | Verbosity
+    | Filter (** [all] and the transcript's kinds *)
     | Theme (** [original], [dark] or [light] *)
     | Accent (** the presets' names, or a colour *)
     | Confirm

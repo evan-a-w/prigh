@@ -11,7 +11,8 @@ open! Import
     is. *)
 val card : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
-(** With the card: the panels' toggles (files, terminal, agents), floating
+(** With the card: the transcript filter's button and the panels' toggles
+    (files, terminal, agents), floating
     in the chat's top right corner. *)
 val tools : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 

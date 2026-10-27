@@ -217,6 +217,47 @@ let footer times (message : Message.Assistant.t) =
   | parts -> div "meta" parts
 ;;
 
+(* What [/filter] calls each part of an entry: a user's message with its
+   notes; each block of a reply, then how it stopped. *)
+let user_kind (u : Message.User.t) : Transcript_filter.Kind.t =
+  match Message.User.source u with
+  | Some _ -> Notes
+  | None -> User
+;;
+
+let content_kind : Content.t -> Transcript_filter.Kind.t = function
+  | Text _ -> Assistant
+  | Thinking _ -> Thinking
+  | Tool_call call -> Transcript_filter.Kind.of_tool call.name
+  | Server_tool _ -> Tools
+;;
+
+let blank : Content.t -> bool = function
+  | Text text | Thinking text -> String.is_empty (String.strip text)
+  | Tool_call _ | Server_tool _ -> false
+;;
+
+let parts : Chat.Entry.t -> Transcript_filter.Kind.t list = function
+  | User u -> [ user_kind u ]
+  | Shell _ -> [ Tools ]
+  | Compaction _ -> [ Notes ]
+  | Assistant { message; streaming = _ } ->
+    List.filter_map message.content ~f:(fun c ->
+      Option.some_if (not (blank c)) (content_kind c))
+    @
+    (match message.stop_reason with
+     | Error _ | Aborted | Length -> [ Notes ]
+     | End_turn | Tool_use -> [])
+;;
+
+let hidden ~fold chat =
+  if Transcript_filter.is_all (Fold.filter fold)
+  then 0
+  else
+    List.sum (module Int) (Chat.entries chat) ~f:(fun e ->
+      List.count (parts e) ~f:(fun kind -> not (Fold.shows fold kind)))
+;;
+
 module Deps = struct
   type t =
     { n : int
@@ -226,10 +267,12 @@ module Deps = struct
     ; expanded : bool list (** the entry's folds *)
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     ; trim : bool (** it has "Trim everything before this" *)
+    ; filter : Transcript_filter.t
     }
 
   let equal a b =
     a.n = b.n
+    && Transcript_filter.equal a.filter b.filter
     && Bool.equal a.trim b.trim
     && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
@@ -261,6 +304,7 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
     List.mapi message.content ~f:(fun i content ->
       let last = i = count - 1 in
       match (content : Content.t) with
+      | content when not (Fold.shows fold (content_kind content)) -> Node.none
       | Text text when String.is_empty (String.strip text) -> Node.none
       | Text text -> Markdown_view.render ~streaming:(streaming && last) text
       | Thinking text
@@ -308,17 +352,26 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
         ])
     else Node.none
   in
-  let stopped = stopped message in
+  let stopped = if Fold.shows fold Notes then stopped message else Node.none in
   if List.is_empty blocks && (not streaming) && phys_equal stopped Node.none
   then Node.none
   else
     div
       (if streaming then "msg assistant streaming" else "msg assistant")
       ((pending :: blocks)
-       @ [ stopped; (if streaming then Node.none else footer times message) ])
+       @ [ stopped
+         ; (if streaming
+               || (List.is_empty blocks
+                   && not (Transcript_filter.is_all (Fold.filter fold)))
+            then Node.none
+            else footer times message)
+         ])
 
 and render_entry ?trim ~fold times chat (entry : Chat.Entry.t) =
   match entry with
+  | User u when not (Fold.shows fold (user_kind u)) -> Node.none
+  | Shell _ when not (Fold.shows fold Tools) -> Node.none
+  | Compaction _ when not (Fold.shows fold Notes) -> Node.none
   | User u ->
     let notes =
       Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) -> o.notes)
@@ -412,17 +465,21 @@ and entry ?trim_after ~fold times chat ~n (entry : Chat.Entry.t) =
                Option.exists tool ~f:(fun t -> Option.is_some t.subagent)))
             fold
       ; trim
+      ; filter = Fold.filter fold
       }
     ~equal:Deps.equal
     ~f:(fun () ->
       let node =
         render_entry ?trim:(Option.some_if trim n) ~fold times chat entry
       in
+      let landmark = Attr.create "data-entry" (Int.to_string n) in
       match node with
       | Element e when Jump.landmark entry ->
         Element
-          (Node.Element.map_attrs e ~f:(fun a ->
-             Attr.many [ a; Attr.create "data-entry" (Int.to_string n) ]))
+          (Node.Element.map_attrs e ~f:(fun a -> Attr.many [ a; landmark ]))
+      | node when phys_equal node Node.none && Jump.landmark entry ->
+        (* Filtered out: the place stays for jumping to. *)
+        Node.div ~attrs:[ Attr.class_ "filtered"; landmark ] []
       | node -> node)
 
 (* Entries keep their keys as older ones are added before them, so that the

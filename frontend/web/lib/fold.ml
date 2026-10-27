@@ -5,20 +5,29 @@ type t =
   { verbose : bool
   ; toggled : String.Set.t
   ; scope : string
+  ; filter : Transcript_filter.t
   }
 [@@deriving sexp_of]
 
-let create ~(verbosity : Prigh_ui.Verbosity.t) ~toggled =
+let create
+      ?(filter = Transcript_filter.all)
+      ~(verbosity : Prigh_ui.Verbosity.t)
+      ~toggled
+      ()
+  =
   { verbose =
       (match verbosity with
        | Verbose -> true
        | Quiet | Normal -> false)
   ; toggled
   ; scope = ""
+  ; filter
   }
 ;;
 
-let default = create ~verbosity:Normal ~toggled:String.Set.empty
+let default = create ~verbosity:Normal ~toggled:String.Set.empty ()
+let filter t = t.filter
+let shows t kind = Transcript_filter.shows t.filter kind
 let scoped t agent_id = { t with scope = agent_id ^ "/" }
 let key t id = t.scope ^ id
 let expanded t id = Bool.( <> ) t.verbose (Set.mem t.toggled (key t id))
@@ -27,6 +36,7 @@ let equal a b =
   phys_equal a b
   || (Bool.equal a.verbose b.verbose
       && String.equal a.scope b.scope
+      && Transcript_filter.equal a.filter b.filter
       && (phys_equal a.toggled b.toggled || Set.equal a.toggled b.toggled))
 ;;
 

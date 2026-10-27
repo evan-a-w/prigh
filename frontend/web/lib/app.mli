@@ -417,6 +417,9 @@ module Action : sig
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Open_chip of Chip.t
+    | Open_filter (** the transcript filter's menu; again: closes it *)
+    | Filter_press of Filter_menu.Row.t option
+    (** a row of the filter's menu (by click), or the one selected (Space) *)
     (** its menu over the composer (Ctrl+L: the model's); again closes it *)
     | Chip_step of int
     (** the next ([1]) or previous ([-1]) chip's menu, from the open one *)
@@ -630,6 +633,8 @@ module Model : sig
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
       (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)
+    ; transcript_filter : Transcript_filter.t
+      (** [/filter]: the kinds on show, a preference of this browser's *)
     ; config : Config.t option
     ; btw : Btw.t option
     ; btw_seq : int

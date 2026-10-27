@@ -107,6 +107,7 @@ module Icon = struct
     | Fork
     | Pull_request
     | Review
+    | Filter
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -194,6 +195,7 @@ module Icon = struct
       {|<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/>|}
     | Review ->
       {|<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>|}
+    | Filter -> {|<path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

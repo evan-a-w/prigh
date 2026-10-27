@@ -42,7 +42,8 @@ let rename (m : App.Model.t) (state : State.t) ~inject =
 let panel_toggles (m : App.Model.t) ~inject =
   div
     ~cls:"panel-toggles"
-    [ Files_view.toggle m ~inject
+    [ Filter_view.button m ~inject
+    ; Files_view.toggle m ~inject
     ; Terminal_view.toggle m ~inject
     ; Agents_view.toggle m ~inject
     ]
