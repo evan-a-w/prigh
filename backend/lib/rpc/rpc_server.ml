@@ -65,6 +65,7 @@ let methods =
   ; "switch_session"
   ; "list_sessions"
   ; "set_session_name"
+  ; "set_transcript_filter"
   ; "delete_session"
   ; "delete_sessions"
   ; "delete_archived"
@@ -2461,6 +2462,10 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "set_session_name" ->
     Or_error.map (string_param params "name") ~f:(fun name ->
       Agent.set_session_name agent name;
+      `Object [])
+  | "set_transcript_filter" ->
+    Or_error.map (string_param_opt params "filter") ~f:(fun filter ->
+      Agent.set_transcript_filter agent filter;
       `Object [])
   | "export" ->
     Or_error.bind (string_param params "format") ~f:(fun format ->

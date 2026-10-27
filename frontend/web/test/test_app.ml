@@ -13,11 +13,11 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.transcript-filter
-         web.terminal-open web.sidebar-folded web.review history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Set_url_session s1)
     (Rpc (method_ get_messages_page)
@@ -37,7 +37,6 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value ())) ((key web.verbosity) (value ()))
-      ((key web.transcript-filter) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value ()))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))

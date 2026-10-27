@@ -236,6 +236,8 @@ module Reply_tag : sig
     | Plan_entered of Context_menu.Plan.t (** [set_cwd], likewise *)
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
     | Model_set (** [set_model]: the choice is no longer pending *)
+    | Filter_saved of string
+    (** [set_transcript_filter] in this session: one fewer pending *)
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)

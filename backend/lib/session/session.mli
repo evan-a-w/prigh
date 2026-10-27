@@ -104,6 +104,10 @@ module Entry : sig
       (** where a worktree switch took it from; [None]: cleared (it went
           back, or elsewhere). Like [Cwd], the last one on any branch
           counts. *)
+      | Transcript_filter of { filter : string option }
+      (** which kinds of the transcript prigh-web shows for the session,
+          opaque here; [None]: everything. The last one on any branch
+          counts; [fork] copies it. *)
       | Trim of { before : string }
       (** from here on the model's context starts at the message [before]
           (one of the user's): what comes before it is dropped (see
@@ -379,6 +383,11 @@ val worktree_removed : t -> path:string -> Entry.t
 val home : t -> Home.t option
 
 val set_home : t -> Home.t option -> Entry.t
+
+(** The last [Transcript_filter] entry, on any branch. *)
+val transcript_filter : t -> string option
+
+val set_transcript_filter : t -> string option -> Entry.t
 
 (** The [allow_rule] entries on the active path, oldest first. *)
 val allow_rules : t -> string list

@@ -206,6 +206,7 @@ module Reply_tag = struct
     | Plan_entered of Context_menu.Plan.t
     | Mode_set of string
     | Model_set
+    | Filter_saved of string
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
@@ -1107,6 +1108,32 @@ let subagent_rpc call_id =
     ~tag:(Subagent call_id)
 ;;
 
+(* The session's transcript filter, as the backend keeps it. *)
+let session_filter (state : State.t) =
+  Option.value_map
+    state.transcript_filter
+    ~default:Transcript_filter.all
+    ~f:Transcript_filter.of_string
+;;
+
+(* Another frontend changed the session's filter (or ours came back): an
+   open menu keeps what the user toggled in it, and Esc puts back the
+   session's. *)
+let filter_changed (m : Model.t) filter =
+  match m.dialog with
+  | Some (Filter menu) ->
+    let transcript_filter =
+      if Transcript_filter.equal m.transcript_filter menu.original
+      then filter
+      else m.transcript_filter
+    in
+    { m with
+      dialog = Some (Filter { menu with original = filter })
+    ; transcript_filter
+    }
+  | _ -> { m with transcript_filter = filter }
+;;
+
 let set_state_without_files (m : Model.t) (state : State.t) =
   let chat_cache = keep_chat m in
   let changed =
@@ -1143,6 +1170,16 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       not
         ([%equal: Trim.t option] old.trim state.trim
          && [%equal: Hidden.t list] old.hidden state.hidden))
+  in
+  let m =
+    match m.state with
+    | _ when changed -> { m with transcript_filter = session_filter state }
+    | Some old
+      when m.pending.filters > 0
+           || [%equal: string option]
+                old.transcript_filter
+                state.transcript_filter -> m
+    | Some _ | None -> filter_changed m (session_filter state)
   in
   let m = { m with state = Some state; pending } in
   if changed
@@ -1916,15 +1953,6 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
     if Prigh_ui.Verbosity.equal verbosity m.verbosity
     then m
     else { m with verbosity; folds = String.Set.empty })
-  else if String.equal key Key.transcript_filter
-  then
-    { m with
-      transcript_filter =
-        Option.value_map
-          string
-          ~default:Transcript_filter.all
-          ~f:Transcript_filter.of_string
-    }
   else if String.equal key Key.notify
   then (
     let enabled =
@@ -2526,13 +2554,21 @@ let set_verbosity (m : Model.t) verbosity =
 
 (* ---- the transcript filter (Filter_menu) *)
 
+(* Kept in the session, so that each has its own. *)
 let save_filter (m : Model.t) =
-  save_pref
-    m
-    Key.transcript_filter
-    (if Transcript_filter.is_all m.transcript_filter
-     then None
-     else Some (`String (Transcript_filter.to_string m.transcript_filter)))
+  match m.state with
+  | None -> m, []
+  | Some state ->
+    ( { m with pending = { m.pending with filters = m.pending.filters + 1 } }
+    , [ rpc
+          "set_transcript_filter"
+          [ ( "filter"
+            , if Transcript_filter.is_all m.transcript_filter
+              then `Null
+              else str (Transcript_filter.to_string m.transcript_filter) )
+          ]
+          ~tag:(Filter_saved state.session_id)
+      ] )
 ;;
 
 (* [/filter ARGS]: acknowledged by a toast, as the transcript may not show
@@ -2548,14 +2584,20 @@ let set_filter (m : Model.t) filter =
        | Some summary ->
          "Transcript filter: " ^ summary ^ " (/filter all shows everything)")
   in
-  m, save_filter m @ cmds
+  let m, save = save_filter m in
+  m, save @ cmds
 ;;
 
 let open_filter (m : Model.t) =
   match m.dialog with
-  | Some (Filter _) ->
+  | Some (Filter menu) ->
     let m, cmds = close_dialog m in
-    m, save_filter m @ cmds
+    let m, save =
+      if Transcript_filter.equal m.transcript_filter menu.original
+      then m, []
+      else save_filter m
+    in
+    m, save @ cmds
   | _ ->
     let m, cmds =
       open_dialog m (Filter (Filter_menu.create m.transcript_filter))
@@ -6667,6 +6709,31 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           Set.remove m.outputs_loading (output_key ~agent_id ~call_id)
       }
       (sprintf "Couldn't load the whole output: %s. Load them tries again." e)
+  | Filter_saved session_id, result ->
+    if
+      not
+        (Option.exists m.state ~f:(fun (s : State.t) ->
+           String.equal s.session_id session_id))
+    then m, []
+    else (
+      let m =
+        { m with
+          pending = { m.pending with filters = max 0 (m.pending.filters - 1) }
+        }
+      in
+      (* The backend has answered all ours: what it keeps is the filter. *)
+      let m =
+        match m.state with
+        | Some state when m.pending.filters = 0 ->
+          let filter = session_filter state in
+          if Transcript_filter.equal filter m.transcript_filter
+          then m
+          else filter_changed m filter
+        | _ -> m
+      in
+      match result with
+      | Ok _ -> m, []
+      | Error e -> error m (String.capitalize e))
   | Model_set, Error e ->
     error
       { m with pending = { m.pending with model = None } }

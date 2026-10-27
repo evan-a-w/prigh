@@ -105,6 +105,7 @@ module State = struct
     ; home : Session.Home.t option
     ; trim : Session.Trim.t option [@sexp.option]
     ; hidden : Session.Hidden.t list [@sexp.list]
+    ; transcript_filter : string option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -467,6 +468,7 @@ let state t =
   ; home = Session.home t.session
   ; trim = Session.trim t.session
   ; hidden = Session.hidden t.session
+  ; transcript_filter = Session.transcript_filter t.session
   }
 ;;
 
@@ -3573,6 +3575,14 @@ let rewind t ~to_ =
 let set_session_name t name =
   ignore (Session.set_name t.session ~name : Session.Entry.t);
   state_changed t
+;;
+
+let set_transcript_filter t filter =
+  if
+    not (Option.equal String.equal filter (Session.transcript_filter t.session))
+  then (
+    ignore (Session.set_transcript_filter t.session filter : Session.Entry.t);
+    state_changed t)
 ;;
 
 let set_cwd

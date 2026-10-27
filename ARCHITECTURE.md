@@ -1159,7 +1159,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Home {home}` (a `Session.Home.t`: the cwd, host and git location a
   worktree switch took the session from, `None` once cleared; like `Cwd`
   the last one on any branch counts: `home`, also in `Summary`, the
-  agent's state and `list_sessions`/`get_state`'s `home`). `set_cwd`'s
+  agent's state and `list_sessions`/`get_state`'s `home`);
+  `Transcript_filter {filter}` (what prigh-web shows of the transcript, an
+  opaque `Transcript_filter.to_string`, `None` for everything; the last one
+  on any branch counts, `fork` copies it: `transcript_filter`, the agent's
+  state and `get_state`'s `transcript_filter`, absent when none). `set_cwd`'s
   `worktree: true` (the frontends' `/worktree open`/`new`, `/pr checkout`,
   the sidebar's Switch session here) is a worktree switch: it records the
   home unless the session has one (A → B keeps the first), and switching
@@ -1617,7 +1621,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   updated_at}`; `pr_view` adds `checks {state, items: [{name, state,
   url}]}` (null when unreadable), `diff` and `truncated`, `pr_defaults`
   answers `{repo, head, base, title, body, commits, pushed}` and
-  `pr_checkout` `{path, branch, created}`), `set_budget {usd}` (a number, or null for none), `set_goal
+  `pr_checkout` `{path, branch, created}`), `set_budget {usd}` (a number, or null for none),
+  `set_transcript_filter {filter}` (a string, or null for none), `set_goal
   {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
   max_repeats?}` or `{text, every_turns}` (answers the reminder),
   `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
@@ -2386,8 +2391,11 @@ terminal frontend and `web/` prigh-web, the browser one.
       out what it hides, in subagents' transcripts too, keeping an empty
       `.filtered` where a jump landmark was; `Filter_menu` is its menu's
       state, `Filter_view` its button, menu and the note over the
-      transcript; kept as `web.transcript-filter`) and `folds`, the outputs toggled from what it
-      shows (`Fold`), what we wait on the backend for (`In_flight`, below),
+      transcript; kept in the session with `set_transcript_filter` and set
+      from its state when the session changes or another frontend changes
+      it, but not over what an open menu toggled, nor while our saves are
+      unanswered, `In_flight.filters`: their echoes are older) and
+      `folds`, the outputs toggled from what it shows (`Fold`), what we wait on the backend for (`In_flight`, below),
       the `Config` (`get_config` at startup: the scope Ctrl+P
       cycles, `/confirm`), the side question (`Btw`, streamed by
       `btw_delta`), the saved accounts and whether we may act as others

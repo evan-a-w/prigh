@@ -34,6 +34,7 @@ type t =
   ; model : string option
   ; thinking : string option
   ; mode : Session_mode.t option
+  ; filters : int
   }
 [@@deriving sexp_of]
 
@@ -47,6 +48,7 @@ let none =
   ; model = None
   ; thinking = None
   ; mode = None
+  ; filters = 0
   }
 ;;
 

@@ -173,6 +173,53 @@ let%expect_test "fork copies the active path up to a point" =
 ;;
 
 let%expect_test
+    "the transcript filter: the last one counts, on any branch; kept by reload \
+     and fork"
+  =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let show t = print_s [%sexp (Session.transcript_filter t : string option)] in
+  show t;
+  [%expect {| () |}];
+  let q1 = Session.append_message t (Message.user "q1") in
+  let (_ : Session.Entry.t) =
+    Session.set_transcript_filter t (Some "thinking,tools")
+  in
+  show t;
+  [%expect {| (thinking,tools) |}];
+  (* Rewinding past it keeps it: it is the session's, not the branch's. *)
+  Or_error.ok_exn (Session.rewind t ~to_:q1.id);
+  show t;
+  [%expect {| (thinking,tools) |}];
+  let (_ : Session.Entry.t) = Session.append_message t (assistant "a1") in
+  show (Or_error.ok_exn (Session.load (Session.path t)));
+  [%expect {| (thinking,tools) |}];
+  let forked = Or_error.ok_exn (Session.fork t ~at:q1.id ~dir) in
+  show forked;
+  show (Or_error.ok_exn (Session.load (Session.path forked)));
+  print_s [%sexp (kinds forked : string list)];
+  [%expect
+    {|
+    (thinking,tools)
+    (thinking,tools)
+    (user:q1)
+    |}];
+  let (_ : Session.Entry.t) = Session.set_transcript_filter t None in
+  show t;
+  show (Or_error.ok_exn (Session.load (Session.path t)));
+  show (Or_error.ok_exn (Session.fork t ~dir));
+  show forked;
+  [%expect
+    {|
+    ()
+    ()
+    ()
+    (thinking,tools)
+    |}]
+;;
+
+let%expect_test
     "a compaction's kept and pinned messages survive a fork and a reload"
   =
   with_dir

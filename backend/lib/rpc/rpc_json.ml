@@ -462,6 +462,8 @@ let state (s : Agent.State.t) =
       (fields
        @ home s.home
        @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ])
+       @ Option.value_map s.transcript_filter ~default:[] ~f:(fun f ->
+         [ "transcript_filter", str f ])
        @
        if List.is_empty s.hidden
        then []
@@ -558,6 +560,10 @@ let entry (e : Session.Entry.t) =
     | Worktree_removed { path } ->
       [ "kind", str "worktree_removed"; "path", str path ]
     | Home _ -> [ "kind", str "home" ]
+    | Transcript_filter { filter } ->
+      [ "kind", str "transcript_filter"
+      ; "filter", Option.value_map filter ~default:`Null ~f:str
+      ]
     | Trim { before } -> [ "kind", str "trim"; "before", str before ]
     | Untrim -> [ "kind", str "untrim" ]
     | Trim_after { after; through } ->
