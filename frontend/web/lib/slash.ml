@@ -31,6 +31,7 @@ module Argument = struct
     | Worktree
     | Review
     | Trim
+    | Delete
   [@@deriving sexp_of, equal]
 end
 
@@ -163,20 +164,24 @@ let every =
       "unarchive"
       "unarchive a session (this one without an argument)"
   ; c
-      ~argument:Session
-      ~args:"[session...]"
+      ~argument:Delete
+      ~args:"[undo|session...]"
       "delete"
-      "delete sessions, after a confirmation (none: select them in the sidebar)"
+      "delete a message from the transcript and the model's context (a reply \
+       with its tool calls' results): pick it, newest first; undo brings the \
+       latest deletion back; with sessions, deletes them after a \
+       confirmation"
   ; c "delete-archived" "delete every archived session, after a confirmation"
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"
   ; c
       ~argument:Trim
-      ~args:"[undo]"
+      ~args:"[after|undo]"
       "trim"
       "drop everything before one of your messages from the model's context \
-       (the transcript keeps it folded); undo brings back the last trim"
+       (the transcript keeps it folded); after: everything after a message \
+       instead (what you send later stays); undo brings back the last trim"
   ; c "tree" "show the session tree and move to any message in it"
   ; c
       ~argument:Directory

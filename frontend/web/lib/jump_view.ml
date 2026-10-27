@@ -125,6 +125,7 @@ let last : Memo.t option ref = ref None
 let view (m : App.Model.t) ~inject =
   let points =
     Jump.points
+      ~deleting:m.trimmed.deleting
       m.jump
       ~path:(Option.map m.state ~f:(fun s -> s.session_path))
       ~paging:m.paging

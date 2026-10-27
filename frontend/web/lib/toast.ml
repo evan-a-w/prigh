@@ -6,6 +6,7 @@ type t =
   ; text : string
   ; error : bool
   ; repeats : int
+  ; undo : Hidden.t option
   }
 [@@deriving sexp_of, equal]
 
@@ -15,13 +16,21 @@ let max_shown = 2
 let lifetime_ms t =
   if t.error
   then None
+  else if Option.is_some t.undo
+  then Some 8000
   else
     Some
       (Int.clamp_exn (1500 + (40 * String.length t.text)) ~min:2500 ~max:6000)
 ;;
 
-let push toasts ~id ?replaces ~error text =
-  let same (t : t) = String.equal t.text text && Bool.equal t.error error in
+let push toasts ~id ?replaces ?undo ~error text =
+  (* Each undoable toast undoes its own. *)
+  let same (t : t) =
+    String.equal t.text text
+    && Bool.equal t.error error
+    && Option.is_none t.undo
+    && Option.is_none undo
+  in
   let repeats =
     List.find toasts ~f:same
     |> Option.value_map ~default:0 ~f:(fun t -> t.repeats + 1)
@@ -30,7 +39,7 @@ let push toasts ~id ?replaces ~error text =
     same t
     || Option.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
   in
-  let toast = { id; text; error; repeats } in
+  let toast = { id; text; error; repeats; undo } in
   let toasts = List.filter toasts ~f:(Fn.non stale) @ [ toast ] in
   List.drop toasts (List.length toasts - max_shown), toast
 ;;
