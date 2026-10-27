@@ -161,6 +161,53 @@ let%expect_test "the Anthropic request is repaired" =
 ;;
 
 let%expect_test
+    "a request that would start with the model's turn starts with a user's"
+  =
+  let roles messages =
+    let body =
+      Anthropic.For_testing.request_body
+        ~oauth:false
+        { Provider.Request.model =
+            Option.value_exn (Model.find "claude-sonnet-4-5")
+        ; system = None
+        ; messages
+        ; tools = []
+        ; thinking = Off
+        ; max_tokens = Some 100
+        ; cache_key = None
+        }
+    in
+    List.iter
+      (Jsonaf.list_exn (Option.value_exn (Jsonaf.member "messages" body)))
+      ~f:(fun m ->
+        let content =
+          Jsonaf.list_exn (Option.value_exn (Jsonaf.member "content" m))
+        in
+        printf
+          "%s: %s\n"
+          (Jsonaf.string_exn (Option.value_exn (Jsonaf.member "role" m)))
+          (String.concat
+             ~sep:", "
+             (List.map content ~f:(fun c ->
+                match Jsonaf.member "text" c with
+                | Some text -> Jsonaf.string_exn text
+                | None ->
+                  Jsonaf.string_exn (Option.value_exn (Jsonaf.member "type" c))))))
+  in
+  (* The first user message deleted: the reply and its results lead. *)
+  roles [ assistant [ "toolu_1" ]; result "toolu_1"; Message.user "next" ];
+  [%expect
+    {|
+    user: [the conversation's earlier messages were removed]
+    assistant: tool_use
+    user: tool_result, next
+    |}];
+  (* A result left at the front answers nothing and goes. *)
+  roles [ result "toolu_1"; Message.user "next" ];
+  [%expect {| user: next |}]
+;;
+
+let%expect_test
     "after a restart mid-tool, the next run answers the call first and the \
      request is well-formed"
   =

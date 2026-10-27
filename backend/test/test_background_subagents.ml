@@ -568,6 +568,109 @@ let%expect_test "nested subagents stay synchronous; ids continue after reload" =
     |}]
 ;;
 
+let%expect_test
+    "a deleted subagent call: the model no longer sees it; its id is not reused"
+  =
+  with_agent
+    ~on_request:(fun ~key (r : Provider.Request.t) ->
+      if String.equal key "main" && List.length r.messages > 4
+      then (
+        print_endline "--- request";
+        List.iter r.messages ~f:(fun m -> print_endline (message_line m))))
+    ~main:
+      [ spawn "look"
+      ; Reply.text "spawned"
+      ; Reply.text "noted"
+      ; Reply.text "ok"
+      ]
+    [ "look", [ Reply.text "look report" ] ]
+  @@ fun t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  let call =
+    List.find_map_exn
+      (Session.active_path (Agent.session agent))
+      ~f:(fun (e : Session.Entry.t) ->
+        match e.payload with
+        | Message (Assistant a)
+          when not (List.is_empty (Message.Assistant.tool_calls a)) -> Some e.id
+        | _ -> None)
+  in
+  let deleted = Or_error.ok_exn (Agent.delete_message agent ~message:call) in
+  printf "--- deleted %d messages\n" deleted.messages;
+  Or_error.ok_exn (Agent.prompt agent "next");
+  Agent.wait_idle agent;
+  Eio.Switch.run
+  @@ fun sw ->
+  let provider =
+    Routed_provider.create
+      ~main:[ spawn "again"; Reply.text "ok"; Reply.text "ok" ]
+      [ "again", [ Reply.text "again report" ] ]
+  in
+  let reloaded =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:(Tools.all @ subagent_tools ~provider)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~session:(Agent.session agent)
+      ~cwd:t.dir
+      ()
+  in
+  Or_error.ok_exn (Agent.prompt reloaded "more");
+  Agent.wait_idle reloaded;
+  print_messages (List.drop (Agent.messages reloaded) 5);
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"look"}
+    subagent_start a1: look
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
+    assistant: spawned
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] look | look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    --- request
+    user: go
+    assistant:  subagent{"task":"look"}
+    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: spawned
+    user: [subagent a1 finished] look | look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: noted
+    agent_end
+    state: running=false subagents=[]
+    --- deleted 2 messages
+    state: running=true subagents=[]
+    agent_start
+    user: next
+    --- request
+    user: go
+    assistant: spawned
+    user: [subagent a1 finished] look | look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: noted
+    user: next
+    assistant: ok
+    agent_end
+    state: running=false subagents=[]
+    --- messages
+    assistant: ok
+    user: more
+    assistant:  subagent{"task":"again"}
+    tool_result subagent: started agent a2 (again); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: ok
+    user: [subagent a2 finished] again | again report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: ok
+    |}]
+;;
+
 let%expect_test "new_session in a single-agent embedding drops running agents" =
   let gates = Gates.create () in
   Gates.hold gates "doomed";

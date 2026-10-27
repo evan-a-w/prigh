@@ -78,6 +78,8 @@ module State : sig
       (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
     ; trim : Session.Trim.t option
       (** what is trimmed from the model's context ({!Session.trim}) *)
+    ; hidden : Session.Hidden.t list
+      (** what trims and deletions keep out of it ({!Session.hidden}) *)
     }
   [@@deriving sexp_of]
 end
@@ -708,8 +710,17 @@ val fork : t -> ?at:string -> unit -> unit Or_error.t
 (** {!Session.append_trim}, refused while a run is in progress. *)
 val trim : t -> before:string -> Session.Trim.t Or_error.t
 
+(** {!Session.append_trim_after}, refused while a run is in progress. *)
+val trim_after : t -> after:string -> Session.Hidden.t Or_error.t
+
 (** {!Session.append_untrim}, refused while a run is in progress. *)
-val untrim : t -> Session.Trim.t Or_error.t
+val untrim : ?entry:string -> t -> Session.Hidden.t Or_error.t
+
+(** {!Session.append_delete}, refused while a run is in progress. *)
+val delete_message : t -> message:string -> Session.Hidden.t Or_error.t
+
+(** {!Session.append_undelete}, refused while a run is in progress. *)
+val undelete : ?entry:string -> t -> Session.Hidden.t Or_error.t
 
 val rewind : t -> to_:string -> unit Or_error.t
 val set_session_name : t -> string -> unit

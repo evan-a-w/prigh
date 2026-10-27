@@ -29,6 +29,11 @@ module Point : sig
 end
 
 val text_limit : int
+
+(** [text] stripped and cut to at most [text_limit] bytes, at a
+    character's first byte. *)
+val cut : string -> string
+
 val create : (string option * Timed_message.t) list -> Point.t list
 
 (** [{points: [{index, kind, text, at?}]}], [kind] [user], [compaction] or
