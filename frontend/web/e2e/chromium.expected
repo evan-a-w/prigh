@@ -1986,7 +1986,7 @@ a1 has finished: you are writing to the main agent again
 === chromium: steer: its transcript ===
 Looking around.
 bash
-until [ -f sub-go ]; do sleep 0.1; done; echo sub-go
+timeout 300 sh -c 'until [ -f sub-go ]; do sleep 0.1; done'; echo sub-go
 sub-go
 →
 You (steer)
