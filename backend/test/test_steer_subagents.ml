@@ -21,8 +21,7 @@ let print_requests ~key (request : Provider.Request.t) =
          ~sep:" "
          (List.map request.messages ~f:(fun (m : Message.t) ->
             match m with
-            | User { text; _ } ->
-              "u(" ^ String.prefix (one_line text) 24 ^ ")"
+            | User { text; _ } -> "u(" ^ String.prefix (one_line text) 24 ^ ")"
             | Assistant a ->
               "a"
               ^ String.concat
@@ -152,7 +151,8 @@ let%expect_test
   Agent.wait_idle agent;
   transcript agent "a1";
   transcript agent "a1/n1";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: go
@@ -218,7 +218,7 @@ let%expect_test "steering a subagent just as it finishes" =
     match event with
     | Loop
         (Subagent
-          { agent_id = "a1"; event = Message_end (Assistant a); call_id = _ })
+           { agent_id = "a1"; event = Message_end (Assistant a); call_id = _ })
       ->
       if String.equal (Message.Assistant.text a) "first"
       then steer "its first reply"
@@ -229,7 +229,8 @@ let%expect_test "steering a subagent just as it finishes" =
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
   transcript agent "a1";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: go
@@ -287,7 +288,8 @@ let%expect_test "steering a subagent on its last allowed turn" =
   Gates.release gates "work";
   Agent.wait_idle agent;
   transcript agent "a1";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: go
@@ -494,7 +496,8 @@ let%expect_test
   Agent.wait_idle agent;
   transcript agent "a1";
   transcript agent "a2";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: go
@@ -553,8 +556,7 @@ let%expect_test
 ;;
 
 let%expect_test
-    "a steered subagent's transcript after a reload: once, and new ids skip \
-     it"
+    "a steered subagent's transcript after a reload: once, and new ids skip it"
   =
   Tool_test_helpers.with_sandbox
   @@ fun (t : Tool_test_helpers.t) ->
@@ -609,7 +611,8 @@ let%expect_test
   Or_error.ok_exn (Agent.prompt agent "again");
   Agent.wait_idle agent;
   transcript agent "a2";
-  [%expect {|
+  [%expect
+    {|
     request work: u(work)
     (Ok ())
     request work: u(work) a[t1] r[t1] u([The user sends you this)
@@ -662,8 +665,8 @@ let after_turns agent n =
 ;;
 
 let%expect_test
-    "steering a subagent that waits for its own background job: it wakes, \
-     then waits again"
+    "steering a subagent that waits for its own background job: it wakes, then \
+     waits again"
   =
   let job =
     Reply.tool_call
@@ -697,7 +700,8 @@ let%expect_test
   Tool_test_helpers.write t "gate" "";
   Agent.wait_idle agent;
   transcript agent "a1";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: go
