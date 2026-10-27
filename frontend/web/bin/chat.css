@@ -519,6 +519,34 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .markdown :is(th, td).center { text-align: center; }
 .markdown :is(th, td).right { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* TeX math (Math_view): KaTeX inherits the text's colour, so it follows
+   the theme. Display math scrolls sideways rather than widening the
+   column. Before KaTeX loads, and where it rejects the TeX, the TeX shows
+   as written; rejected TeX is tinted, with KaTeX's message as its title. */
+.math-display {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0 0 12px;
+  padding: 2px 0;
+  text-align: center;
+}
+.math-display > .katex-display { margin: 0; }
+.math:is(.math-pending, .math-error) {
+  font-family: var(--mono);
+  font-size: 0.87em;
+  white-space: pre-wrap;
+  text-align: left;
+}
+.math-error {
+  color: var(--brick);
+  background: var(--brick-wash);
+  border-radius: var(--r-chip);
+  padding: 1px 5px;
+  cursor: help;
+}
+.math-display.math-error { padding: 8px 10px; }
+
 /* Code blocks */
 
 .code {

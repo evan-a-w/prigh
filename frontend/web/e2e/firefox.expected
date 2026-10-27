@@ -2151,3 +2151,34 @@ note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === firefox: filter: errors ===
 none
+=== firefox: math: drawn ===
+inline: e^{i\pi} + 1 = 0; links: 0
+inline: a^2 + b^2 = c^2; links: 0
+display katex-display: \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}; links: 0
+display katex-display: A = \begin{pmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{pmatrix}; links: 0
+display katex-display: \begin{aligned} f(x) &= (x + 1)^2 \\ &= x^2 + 2x + 1 \end{aligned}; links: 0
+display katex-display: \sum_{k=1}^{n} \frac{k^2 + 3k + 2}{(k + 1)(k + 2)(k + 3)(k + 4)} + \sum_{j=1}^{m} \binom{m}{j} x^j y^{m - j} = \prod_{i=1}^{n} (1 + x_i); links: 0
+inline error: \frac{1}{\undefinedmacro} (title: KaTeX parse error: Undefined control sequence: \undefinedmacro at position 10: \frac{1}{\undefinedmacro})
+inline: \href{javascript:alert(1)}{click}; links: 0; refused
+=== firefox: math: prose and code ===
+It costs $5 and $10 (US$3 abroad); set $HOME and $PATH, or run echo $x$.
+math in it: 0, code: echo $x$
+=== firefox: math: loaded once ===
+katex.min.js: 1, copy-tex.min.js: 1, katex.min.css: 1
+=== firefox: math: original ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== firefox: math: dark ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== firefox: math: light ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== firefox: math: copy a selection ===
+Euler's identity $e^{i\pi} + 1 = 0$, and Pythagoras $a^2 + b^2 = c^2$.
+=== firefox: math: copy the message ===
+as written: true
+=== firefox: math: streamed ===
+math math-inline: \alpha + \beta = \gamma
+math math-display: \sqrt{2} \approx 1.414
+=== firefox: math: phone ===
+markdown fits: true; page fits: true; scrolling display math: 1, auto
+=== firefox: math: errors ===
+none

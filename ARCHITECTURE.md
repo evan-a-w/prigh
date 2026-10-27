@@ -2525,7 +2525,19 @@ terminal frontend and `web/` prigh-web, the browser one.
       once and reused as a lazy node: while a reply streams only the last is
       parsed again per delta, and a reply that ends is drawn in the same
       parts, so its DOM is patched, not drawn again (the selection and
-      everything else on it stay). Messages' times (`at`; the page stamps live events
+      everything else on it stay). TeX math (`$..$`, `\(..\)`, `$$..$$`,
+      `\[..\]`, ```` ```math ````) is `Markdown`'s `Math` inline and block,
+      under a pandoc-like rule for `$` (prices and shell variables stay
+      text; math left open while streaming is text until it closes);
+      `Math_view` draws it as a `Vdom.Node.widget_of_module` that sets
+      KaTeX's HTML as the span's `innerHTML` (`Katex`: `renderToString`
+      with `trust` off and bounded macro expansion, so the HTML has no
+      links, scripts or styles of the reply's making), or the TeX as written
+      until KaTeX loads (`math-pending`) and where it rejects it
+      (`math-error`, its message as the `title`). `Page_assets` loads
+      scripts and stylesheets once, on first use: the terminal's xterm.js
+      and KaTeX (`katex.min.js`, `copy-tex.min.js`, `katex.min.css`, the
+      first time math shows). Tests see the widget as a span of its TeX. Messages' times (`at`; the page stamps live events
       without one, from an older backend, with when it received them,
       `Chat.received`) show under user messages and in a reply's footer, as
       `Message_time` formats them: in the browser's time zone
@@ -3078,8 +3090,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     covers the page, a dialog, the image viewer or a phone's drawer, is
     over the composer's chips, which rise over a menu's backdrop only
     while their menu is open), the Recursive font cut to two woff2 instances (sans and mono;
-    `recursive-OFL.txt`), `terminal.js` and the
-    vendored xterm.js, assembled under
+    `recursive-OFL.txt`), `terminal.js`, the
+    vendored xterm.js and KaTeX (`bin/vendor/README.md`: its script,
+    stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
+    `.gz`, and 260 KB of fonts, of which a page fetches those its math
+    uses; none of it until a reply has math), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to

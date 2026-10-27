@@ -654,6 +654,16 @@ little sodium in types and numbers. A preview past 64 KiB is highlighted
 up to there (the rest plain, with a note), so a large file opens without
 a pause.
 
+TeX math in replies is typeset (KaTeX, bundled with the site, so it works
+offline): `$..$` or `\(..\)` inline, `$$..$$`, `\[..\]` or a ```` ```math ````
+block for display, never inside code. Prices and shell variables stay text
+(`$5 and $10`, `US$3`, `$HOME`; `\$` is a dollar). Math in the theme's
+text colour, and display math too wide for the column scrolls sideways.
+TeX KaTeX cannot read shows as written, tinted, with its error on hover;
+math still streaming shows as written until it closes. Copying a
+selection gives the math's TeX; the message menu's Copy, the reply as
+written. The TUI shows math as written.
+
 prigh-web has every slash command of the table below, as pickers and
 dialogs rather than lines in a transcript (a dialog keeps the keyboard
 until Esc closes it: Tab goes round it, the page behind is inert). A

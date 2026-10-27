@@ -41,6 +41,7 @@ let rec inline (i : Inline.t) =
   | Emph l -> Node.em (inlines l)
   | Strike l -> Node.del (inlines l)
   | Break -> Node.br ()
+  | Math { tex; display } -> Math_view.render ~display tex
   | Link { href; children } ->
     Node.a
       ~attrs:
@@ -78,6 +79,8 @@ let rec block ?(tight = false) (b : Block.t) =
       | _ -> Node.h6
     in
     h ~attrs:auto (inlines l)
+  | Math tex | Code { lang = "math"; text = tex; closed = true } ->
+    Math_view.render ~display:true tex
   | Code { lang; text; closed } -> code_block ~lang ~text ~closed
   | Quote blocks -> Node.blockquote ~attrs:auto (List.map blocks ~f:block)
   | Rule -> Node.hr ()
