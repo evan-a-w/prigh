@@ -178,11 +178,11 @@ let%expect_test "/trim show unfolds the trimmed messages, read-only; hide folds"
   [%expect
     {|
     (Rpc (method_ get_messages) (params ()) (tag Trim_reload))
-    (Rpc (method_ get_trimmed) (params ()) (tag Trimmed_shown))
+    (Rpc (method_ get_trimmed) (params ()) (tag (Trimmed_shown ())))
     |}];
   H.reply
     h
-    Trimmed_shown
+    (Trimmed_shown None)
     (sprintf
        {|{"messages":%s}|}
        (messages
@@ -380,8 +380,8 @@ let%expect_test "refused while a run is in progress; errors say what to do" =
     │ cannot undo a trim while a run is in progress: wait for the run to end or    │
     │ abort it (Esc)                                                               │
     ──────────────────────────────────── nothing is trimmed: /trim picks a point ───
-    │ unknown /trim argument "later": /trim picks a message, /trim undo, /trim     │
-    │ show or /trim hide                                                           │
+    │ unknown /trim argument "later": /trim picks a message, /trim after, /trim    │
+    │ undo, /trim show or /trim hide                                               │
     (Rpc (method_ get_trim_points) (params ()) (tag Trim_points_picker))
     │ nothing to trim: the context starts at your only message (/compact           │
     │ summarises instead)                                                          │
@@ -398,13 +398,12 @@ let%expect_test "/trim completes undo, show and hide" =
   H.show h;
   [%expect
     {|
-      second answer
-
     ▌ third question
       third answer
-    ▸ undo  bring the latest trim's messages back into the context
-      show  unfold the trimmed messages (read-only)
-      hide  fold them again
+    ▸ after  drop everything after a message instead
+      undo   bring the latest trim's messages back into the context
+      show   unfold the trimmed messages (read-only)
+      hide   fold them again
     ────────────────────────────────────────────────────────────────────────────────
     > /trim ▏
     deepseek-flash  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides

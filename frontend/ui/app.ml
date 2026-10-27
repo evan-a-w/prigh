@@ -67,9 +67,11 @@ module Reply_tag = struct
     | Models_for_scoped
     | Compact_done
     | Trim_points_picker
-    | Trimmed of [ `Trim | `Untrim ]
-    | Trim_reload (** the context's messages, after the trim changed *)
-    | Trimmed_shown
+    | Message_points of [ `Delete | `Trim_after ]
+    | Trimmed of [ `Trim | `Trim_after | `Untrim ]
+    | Deleted of [ `Delete | `Undelete ]
+    | Trim_reload (** the context's messages, after what it hides changed *)
+    | Trimmed_shown of string option
     | Git_diff
     | Review_comments of
         { target : P.Git_diff.Target.t
@@ -1328,8 +1330,19 @@ let user_entries entries =
     | _ -> None)
 ;;
 
+(* Deleted messages are gone from the transcript: not offered either. *)
 let entry_picker m kind ~title entries =
-  let users = user_entries entries in
+  let deleted =
+    Option.value_map m.state ~default:[] ~f:(fun (s : P.State.t) ->
+      List.filter_map s.hidden ~f:(fun (h : P.Hidden.t) ->
+        match h.kind with
+        | Deleted -> Some h.message
+        | Trim_before | Trim_after _ -> None))
+  in
+  let users =
+    List.filter (user_entries entries) ~f:(fun ((entry : P.Entry.t), _) ->
+      not (List.mem deleted entry.id ~equal:String.equal))
+  in
   let count = List.length users in
   let items =
     List.mapi users ~f:(fun i ((entry : P.Entry.t), user) ->
@@ -1843,13 +1856,15 @@ let set_state m (state : P.State.t) =
       then agent
       else { agent with status = Done { turns = 0; cost_usd = 0. } })
   in
-  (* A trim or an undo, here or in another frontend: the transcript is the
-     context, so it starts again. *)
+  (* A trim, a deletion or an undo, here or in another frontend: the
+     transcript is the context, so it starts again. *)
   let trim_changed =
     match m.state with
     | Some old ->
       String.equal old.session_id state.session_id
-      && not (Option.equal P.Trim.equal old.trim state.trim)
+      && not
+           (Option.equal P.Trim.equal old.trim state.trim
+            && List.equal P.Hidden.equal old.hidden state.hidden)
     | None -> false
   in
   ( { m with state = Some state; agents = m.agents @ adopted }
@@ -3200,6 +3215,10 @@ let trim_command m rest =
   | "" ->
     ( notice m "finding where to trim…"
     , [ call Get_trim_points ~tag:Trim_points_picker ] )
+  | "after" when running m -> error m trim_refused, []
+  | "after" ->
+    ( notice m "finding where to trim…"
+    , [ call Get_message_points ~tag:(Message_points `Trim_after) ] )
   | "undo" when running m ->
     ( error
         m
@@ -3208,20 +3227,62 @@ let trim_command m rest =
     , [] )
   | "undo" -> notice m "restoring…", [ call Untrim ~tag:(Trimmed `Untrim) ]
   | "show" ->
-    (match Option.bind m.state ~f:(fun s -> s.trim) with
-     | None -> notice m "nothing is trimmed: /trim picks a point", []
-     | Some _ -> m, [ call Get_trimmed ~tag:Trimmed_shown ])
+    let before, after =
+      match m.state with
+      | None -> None, []
+      | Some s -> s.trim, P.Hidden.trims_after s.hidden
+    in
+    (match before, after with
+     | None, [] -> notice m "nothing is trimmed: /trim picks a point", []
+     | _ ->
+       ( m
+       , Option.value_map before ~default:[] ~f:(fun _ ->
+           [ call Get_trimmed ~tag:(Trimmed_shown None) ])
+         @ List.map after ~f:(fun (h : P.Hidden.t) ->
+           call
+             (Get_hidden { entry = h.entry })
+             ~tag:(Trimmed_shown (Some h.entry))) ))
   | "hide" ->
-    let transcript, _ = Transcript.show_trimmed m.transcript None in
+    let after =
+      None
+      :: List.map
+           (Option.value_map m.state ~default:[] ~f:(fun s ->
+              P.Hidden.trims_after s.hidden))
+           ~f:(fun (h : P.Hidden.t) -> Some h.entry)
+    in
+    let transcript =
+      List.fold after ~init:m.transcript ~f:(fun t after ->
+        fst (Transcript.show_trimmed t ~after None))
+    in
     { m with transcript }, []
   | other ->
     ( error
         m
         (sprintf
-           "unknown /trim argument %S: /trim picks a message, /trim undo, \
-            /trim show or /trim hide"
+           "unknown /trim argument %S: /trim picks a message, /trim after, \
+            /trim undo, /trim show or /trim hide"
            other)
     , [] )
+;;
+
+let delete_command m rest =
+  match String.strip rest with
+  | "" when running m ->
+    ( error
+        m
+        "cannot delete a message while a run is in progress: wait for the run \
+         to end or abort it (Esc)"
+    , [] )
+  | "" ->
+    ( notice m "finding messages to delete…"
+    , [ call Get_message_points ~tag:(Message_points `Delete) ] )
+  | "undo" when running m ->
+    ( error
+        m
+        "cannot undo a deletion while a run is in progress: wait for the run \
+         to end or abort it (Esc)"
+    , [] )
+  | _undo -> notice m "restoring…", [ call Undelete ~tag:(Deleted `Undelete) ]
 ;;
 
 let trim_time m at =
@@ -3260,19 +3321,113 @@ let trim_picker m (points : P.Trim.Point.t list) =
       (Picker.create ~title:"Trim everything before" items)
 ;;
 
-(* The context's messages, after a trim or an undo (here or elsewhere):
-   the transcript starts again, at the divider. *)
-let add_context_messages m messages =
-  let m =
-    match Option.bind m.state ~f:(fun s -> s.trim) with
-    | None -> m
-    | Some { messages; tokens; _ } ->
-      with_transcript m ~f:(fun t ->
-        Transcript.add t (Trimmed { messages; tokens; shown = None }))
+let freed_label ({ messages; tokens } : P.Trim.Freed.t) =
+  sprintf
+    "%d message%s · %s"
+    messages
+    (if messages = 1 then "" else "s")
+    (P.Trim.tokens_label tokens)
+;;
+
+let role_label : P.Message_point.Role.t -> string = function
+  | User -> "you"
+  | Assistant -> "reply"
+  | Tool_result -> "result"
+;;
+
+(* [/delete] and [/trim after]: the context's messages that allow it, newest
+   first. *)
+let message_points_picker m how (points : P.Message_point.t list) =
+  let freed (p : P.Message_point.t) =
+    match how with
+    | `Delete -> p.delete
+    | `Trim_after -> p.trim_after
   in
-  { m with
-    transcript = List.fold messages ~init:m.transcript ~f:Transcript.add_message
-  }
+  let points = List.filter points ~f:(fun p -> Option.is_some (freed p)) in
+  match List.rev points, how with
+  | [], `Delete -> notice m "nothing to delete: the context has no messages"
+  | [], `Trim_after ->
+    notice
+      m
+      "nothing to trim after: no message has messages after it that can go \
+       (/trim trims before one)"
+  | newest_first, _ ->
+    let items =
+      List.map newest_first ~f:(fun (p : P.Message_point.t) ->
+        let what =
+          match how, freed p with
+          | `Delete, Some freed -> freed_label freed
+          | `Trim_after, Some { messages; tokens } ->
+            P.Trim.label ~messages ~tokens
+          | _, None -> ""
+        in
+        Picker.Item.create
+          ~id:p.message
+          ~search:(role_label p.role ^ " " ^ p.text)
+          ~detail:
+            (String.concat
+               ~sep:"  "
+               (Option.to_list (Option.map p.at ~f:(trim_time m)) @ [ what ]))
+          (sprintf "%-6s  %s" (role_label p.role) (first_line p.text)))
+    in
+    (match how with
+     | `Delete ->
+       open_picker
+         m
+         (Delete_message points)
+         (Picker.create ~title:"Delete a message" items)
+     | `Trim_after ->
+       open_picker
+         m
+         (Trim_after points)
+         (Picker.create ~title:"Trim everything after" items))
+;;
+
+(* The context's messages, after a trim, a deletion or an undo (here or
+   elsewhere): the transcript starts again, at the divider of the trims
+   before a message, with those of the trims after one where they were. *)
+let add_context_messages m messages =
+  let before, after =
+    match m.state with
+    | None -> None, []
+    | Some s -> s.trim, P.Hidden.trims_after s.hidden
+  in
+  let divider t (h : P.Hidden.t) =
+    Transcript.add
+      t
+      (Trimmed
+         { after = Some h.entry
+         ; messages = h.messages
+         ; tokens = h.tokens
+         ; shown = None
+         })
+  in
+  let dividers_at t i =
+    List.fold after ~init:t ~f:(fun t (h : P.Hidden.t) ->
+      if Option.value h.divider ~default:Int.max_value = i
+      then divider t h
+      else t)
+  in
+  let transcript =
+    match before with
+    | None -> m.transcript
+    | Some { messages; tokens; _ } ->
+      Transcript.add
+        m.transcript
+        (Trimmed { after = None; messages; tokens; shown = None })
+  in
+  let count = List.length messages in
+  let transcript =
+    List.foldi messages ~init:transcript ~f:(fun i t message ->
+      Transcript.add_message (dividers_at t i) message)
+  in
+  let transcript =
+    List.fold after ~init:transcript ~f:(fun t (h : P.Hidden.t) ->
+      match h.divider with
+      | Some i when i < count -> t
+      | _ -> divider t h)
+  in
+  { m with transcript }
 ;;
 
 let run_command m (cmd : Commands.Parsed.t) =
@@ -3482,6 +3637,7 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:Compact_done
       ] )
   | "trim", _ -> trim_command m cmd.rest
+  | "delete", ([] | [ "undo" ]) -> delete_command m cmd.rest
   | "pr", _ -> pr_command m cmd.rest
   | "commit", _ -> commit_command m cmd.rest
   | "push", _ -> push_command m cmd.rest
@@ -3519,7 +3675,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "jobs", [ id ] -> job_output m id
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
-  | "sessions", _ | "switch", [] | "delete", [] ->
+  | "sessions", _ | "switch", [] ->
     m, [ rpc "list_sessions" ~tag:Sessions_picker ]
   | "delete", args -> m, [ rpc "list_sessions" ~tag:(Sessions_to_delete args) ]
   | "delete-archived", _ -> m, [ rpc "list_sessions" ~tag:Archived_to_delete ]
@@ -3885,7 +4041,7 @@ let fetch_autocomplete m ac =
     { m with autocomplete = Some ac }, worktrees @ refs
   | Autocomplete.Source.Argument spec
     when match spec.argument with
-         | Some (Commands.Argument.Sessions | Session_list) ->
+         | Some (Commands.Argument.Sessions | Delete) ->
            Option.is_none m.sessions
          | _ -> false ->
     ( { m with autocomplete = Some ac }
@@ -4417,6 +4573,31 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
          }
        , [] )
      | None -> m, [])
+  | Trim_after points ->
+    (match
+       List.find points ~f:(fun (p : P.Message_point.t) ->
+         String.equal p.message item.id)
+     with
+     | Some ({ trim_after = Some { messages; tokens }; _ } as p) ->
+       ( { m with
+           mode =
+             Confirm
+               { question =
+                   sprintf
+                     "Trim %d message%s (%s) after %S? They leave the model's \
+                      context; /trim undo brings them back (y/n)"
+                     messages
+                     (if messages = 1 then "" else "s")
+                     (P.Trim.tokens_label tokens)
+                     (first_line p.text)
+               ; action = Trim_after p.message
+               }
+         }
+       , [] )
+     | Some _ | None -> m, [])
+  | Delete_message _ ->
+    ( notice m "deleting…"
+    , [ call (Delete_message { message = item.id }) ~tag:(Deleted `Delete) ] )
   | Rewind entries ->
     (match
        List.find entries ~f:(fun (entry : P.Entry.t) ->
@@ -5001,6 +5182,9 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Trim before ->
       notice m "trimming…", [ call (Trim { before }) ~tag:(Trimmed `Trim) ]
+    | Trim_after after ->
+      ( notice m "trimming…"
+      , [ call (Trim_after { after }) ~tag:(Trimmed `Trim_after) ] )
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
@@ -5028,6 +5212,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Forge_logout _
     | Rewind _
     | Trim _
+    | Trim_after _
     | Delete_sessions _
     | Remove_worktree _
     | Nix_gc _ -> notice m "cancelled", []
@@ -5872,6 +6057,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Trim_points_picker ->
        decode json ~f:P.Trim.Point.list_of_json (fun points ->
          trim_picker { m with notice = None } points, [])
+     | Message_points how ->
+       decode json ~f:P.Message_point.list_of_json (fun points ->
+         message_points_picker { m with notice = None } how points, [])
+     | Deleted how ->
+       decode json ~f:P.Hidden.of_json (fun hidden ->
+         ( notice
+             m
+             (match how, hidden.messages with
+              | `Delete, 1 -> "Message deleted: /delete undo brings it back"
+              | `Delete, _ ->
+                P.Hidden.deleted_label hidden
+                ^ " (a reply and its tool results): /delete undo brings them \
+                   back"
+              | `Undelete, 1 -> "Message restored"
+              | `Undelete, n -> sprintf "%d messages restored" n)
+         , [] ))
      | Trimmed how ->
        decode json ~f:P.Trim.Freed.of_json (fun { messages; tokens } ->
          let what =
@@ -5884,13 +6085,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ( notice
              m
              (match how with
-              | `Trim -> sprintf "trimmed %s: /trim undo brings them back" what
+              | `Trim | `Trim_after ->
+                sprintf "trimmed %s: /trim undo brings them back" what
               | `Untrim -> sprintf "%s back in the model's context" what)
          , [] ))
-     | Trimmed_shown ->
+     | Trimmed_shown after ->
        decode json ~f:P.Trim.trimmed_of_json (fun messages ->
          let transcript, found =
-           Transcript.show_trimmed m.transcript (Some messages)
+           Transcript.show_trimmed m.transcript ~after (Some messages)
          in
          if found
          then { m with transcript }, []

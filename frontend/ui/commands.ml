@@ -13,7 +13,6 @@ module Argument = struct
     | Login
     | Logout
     | Sessions
-    | Session_list (** several, completed word by word *)
     | Path
     | Directory
     | Default_directory
@@ -174,10 +173,10 @@ let every =
   ; c
       ~argument:Argument.Delete
       "delete"
-      "[undo]"
+      "[undo|session...]"
       "drop a message from the transcript and the model's context (a reply \
        with its tool results): pick it, newest first; undo brings the latest \
-       deletion back"
+       deletion back; with sessions: delete them, after a confirmation"
   ; c
       ~argument:Argument.Path
       "diff"
@@ -236,11 +235,6 @@ let every =
       "unarchive"
       "[session]"
       "unarchive a session (the current one without an argument)"
-  ; c
-      ~argument:Argument.Session_list
-      "delete"
-      "[session...]"
-      "delete sessions, after a confirmation (none: pick them in /sessions)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
       ~argument:Argument.Agents
