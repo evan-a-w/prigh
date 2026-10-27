@@ -23,6 +23,7 @@ module Argument = struct
     | Goal
     | Resume
     | Trim
+    | Delete
     | Snippet
     | Remind
     | Worktree
@@ -165,10 +166,18 @@ let every =
   ; c
       ~argument:Argument.Trim
       "trim"
-      "[undo|show|hide]"
+      "[after|undo|show|hide]"
       "drop everything before one of your messages from the model's context: \
-       pick the message (newest first, with what it frees), confirm; undo \
+       pick the message (newest first, with what it frees), confirm; after: \
+       everything after a message instead (what you send later stays); undo \
        brings the latest trim back, show/hide unfolds the trimmed messages"
+  ; c
+      ~argument:Argument.Delete
+      "delete"
+      "[undo]"
+      "drop a message from the transcript and the model's context (a reply \
+       with its tool results): pick it, newest first; undo brings the latest \
+       deletion back"
   ; c
       ~argument:Argument.Path
       "diff"

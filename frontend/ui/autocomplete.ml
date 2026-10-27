@@ -301,9 +301,20 @@ let argument_items
           ~detail:"stay stopped until you send a message"
           "cancel"
       ]
+  | Delete ->
+    Some
+      [ Picker.Item.create
+          ~id:"undo"
+          ~detail:"bring the latest deleted message back"
+          "undo"
+      ]
   | Trim ->
     Some
       [ Picker.Item.create
+          ~id:"after"
+          ~detail:"drop everything after a message instead"
+          "after"
+      ; Picker.Item.create
           ~id:"undo"
           ~detail:"bring the latest trim's messages back into the context"
           "undo"

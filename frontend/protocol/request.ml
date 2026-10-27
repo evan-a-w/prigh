@@ -32,6 +32,12 @@ module Method = struct
     | Get_trimmed
     | Trim of { before : string }
     | Untrim
+    | Get_message_points
+    | Get_hidden of { entry : string }
+    | Trim_after of { after : string }
+    | Delete_message of { message : string }
+    | Undelete
+    | Restore of Hidden.t
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option
@@ -165,6 +171,12 @@ module Method = struct
     | Get_trimmed -> "get_trimmed"
     | Trim _ -> "trim"
     | Untrim -> "untrim"
+    | Get_message_points -> "get_message_points"
+    | Get_hidden _ -> "get_trimmed"
+    | Trim_after _ -> "trim_after"
+    | Delete_message _ -> "delete"
+    | Undelete -> "undelete"
+    | Restore h -> if Hidden.is_trim h then "untrim" else "undelete"
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
@@ -231,7 +243,9 @@ module Method = struct
     | Nix_store_status
     | Get_trim_points
     | Get_trimmed
-    | Untrim -> []
+    | Untrim
+    | Get_message_points
+    | Undelete -> []
     | Nix_store_gc { delete_generations = None } -> []
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
@@ -287,6 +301,10 @@ module Method = struct
       @ [ "limit", Json.int limit ]
     | Get_outline { session } -> [ "session", Json.str session ]
     | Trim { before } -> [ "before", Json.str before ]
+    | Get_hidden { entry } -> [ "entry", Json.str entry ]
+    | Trim_after { after } -> [ "after", Json.str after ]
+    | Delete_message { message } -> [ "message", Json.str message ]
+    | Restore h -> [ "entry", Json.str h.entry ]
     | Get_tool_output { call_id; agent_id } ->
       [ "call_id", Json.str call_id ]
       @ Option.value_map agent_id ~default:[] ~f:(fun a ->
