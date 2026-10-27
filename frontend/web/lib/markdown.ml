@@ -135,18 +135,18 @@ module Inline = struct
         match after_math s j ~hi with
         | Some after -> go after depth
         | None ->
-        if Char.equal c '\\'
-        then go (j + 2) depth
-        else if Char.equal c '`'
-        then (
-          match code_span s j ~hi with
-          | Some (_, after) -> go after depth
-          | None -> go (j + run s j ~hi '`') depth)
-        else if Char.equal c close
-        then if depth = 0 then Some j else go (j + 1) (depth - 1)
-        else if Char.equal c open_
-        then go (j + 1) (depth + 1)
-        else go (j + 1) depth)
+          if Char.equal c '\\'
+          then go (j + 2) depth
+          else if Char.equal c '`'
+          then (
+            match code_span s j ~hi with
+            | Some (_, after) -> go after depth
+            | None -> go (j + run s j ~hi '`') depth)
+          else if Char.equal c close
+          then if depth = 0 then Some j else go (j + 1) (depth - 1)
+          else if Char.equal c open_
+          then go (j + 1) (depth + 1)
+          else go (j + 1) depth)
     in
     go i 0
   ;;
@@ -264,47 +264,48 @@ module Inline = struct
           emit (Math { tex; display });
           go after
         | None ->
-        match c with
-        | '\\' when i + 1 < hi && Char.equal s.[i + 1] '\n' ->
-          emit Break;
-          go (i + 2)
-        | '\\' when i + 1 < hi && is_punct s.[i + 1] ->
-          Buffer.add_char buf s.[i + 1];
-          go (i + 2)
-        | '\n' ->
-          let contents = Buffer.contents buf in
-          Buffer.clear buf;
-          Buffer.add_string buf (String.rstrip contents);
-          emit Break;
-          let rec skip j =
-            if j < hi && Char.equal s.[j] ' ' then skip (j + 1) else j
-          in
-          go (skip (i + 1))
-        | '`' ->
-          (match code_span s i ~hi with
-           | Some (code, after) ->
-             emit (Code code);
-             go after
-           | None when partial ->
-             let n = run s i ~hi '`' in
-             if i + n < hi
-             then emit (Code (String.sub s ~pos:(i + n) ~len:(hi - i - n)))
-           | None ->
-             let n = run s i ~hi '`' in
-             text i (i + n);
-             go (i + n))
-        | '*' | '_' | '~' -> emphasis i c
-        | '!' when i + 1 < hi && Char.equal s.[i + 1] '[' -> link i ~image:true
-        | '[' -> link i ~image:false
-        | '<' -> autolink i
-        | 'h' when starts_url s i ~hi ->
-          let stop = url_end s i ~hi in
-          let url = String.sub s ~pos:i ~len:(stop - i) in
-          emit (Link { href = url; children = [ Text url ] });
-          go stop
-        | _ ->
-          Buffer.add_char buf c;
-          go (i + 1))
+          (match c with
+           | '\\' when i + 1 < hi && Char.equal s.[i + 1] '\n' ->
+             emit Break;
+             go (i + 2)
+           | '\\' when i + 1 < hi && is_punct s.[i + 1] ->
+             Buffer.add_char buf s.[i + 1];
+             go (i + 2)
+           | '\n' ->
+             let contents = Buffer.contents buf in
+             Buffer.clear buf;
+             Buffer.add_string buf (String.rstrip contents);
+             emit Break;
+             let rec skip j =
+               if j < hi && Char.equal s.[j] ' ' then skip (j + 1) else j
+             in
+             go (skip (i + 1))
+           | '`' ->
+             (match code_span s i ~hi with
+              | Some (code, after) ->
+                emit (Code code);
+                go after
+              | None when partial ->
+                let n = run s i ~hi '`' in
+                if i + n < hi
+                then emit (Code (String.sub s ~pos:(i + n) ~len:(hi - i - n)))
+              | None ->
+                let n = run s i ~hi '`' in
+                text i (i + n);
+                go (i + n))
+           | '*' | '_' | '~' -> emphasis i c
+           | '!' when i + 1 < hi && Char.equal s.[i + 1] '[' ->
+             link i ~image:true
+           | '[' -> link i ~image:false
+           | '<' -> autolink i
+           | 'h' when starts_url s i ~hi ->
+             let stop = url_end s i ~hi in
+             let url = String.sub s ~pos:i ~len:(stop - i) in
+             emit (Link { href = url; children = [ Text url ] });
+             go stop
+           | _ ->
+             Buffer.add_char buf c;
+             go (i + 1)))
     and emphasis i c =
       let r = run s i ~hi c in
       let after = i + r in

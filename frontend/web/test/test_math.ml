@@ -92,7 +92,8 @@ let%expect_test "math hides markdown: emphasis, links and code inside are TeX" =
 let%expect_test "adjacent and nested" =
   tree "$a$$b$ $a$,$b$ $$x$$$$y$$ \\(\\$\\)";
   tree "$\\text{$x$}$";
-  [%expect {|
+  [%expect
+    {|
     ((Paragraph
       ((Math (tex a) (display false)) (Math (tex b) (display false)) (Text " ")
        (Math (tex a) (display false)) (Text ,) (Math (tex b) (display false))
@@ -115,7 +116,8 @@ let%expect_test "display math on lines of its own" =
   tree "\\[\n- x\n\n# y\n\\]";
   tree "$$ x = 1 $$";
   tree "```math\n\\frac{1}{2}\n```";
-  [%expect {|
+  [%expect
+    {|
     ((Paragraph ((Text Before)))
      (Math  "\\begin{pmatrix}\
            \na & b \\\\\
@@ -140,7 +142,8 @@ let%expect_test "streaming: math left open is text, nothing after it is lost" =
     ; "**bold $x"
     ]
     ~f:(fun text -> tree ~partial:true text);
-  [%expect {|
+  [%expect
+    {|
     ((Paragraph ((Text "Price: $x^2 +"))))
     ((Paragraph ((Text "Then (a +"))))
     ((Paragraph ((Text $$) Break (Text "\\sum_i"))))
@@ -158,10 +161,14 @@ let%expect_test "streaming: math left open is text, nothing after it is lost" =
 ;;
 
 let%expect_test "streaming: blocks are not cut inside display math" =
-  let text = "Intro.\n\n$$\na\n\nb\n$$\n\nAfter.\n\n```math\nx\n\ny\n```\n\nEnd" in
+  let text =
+    "Intro.\n\n$$\na\n\nb\n$$\n\nAfter.\n\n```math\nx\n\ny\n```\n\nEnd"
+  in
   List.iter (Markdown.block_starts text) ~f:(fun i ->
-    print_endline (String.escaped (String.prefix (String.drop_prefix text i) 10)));
-  [%expect {|
+    print_endline
+      (String.escaped (String.prefix (String.drop_prefix text i) 10)));
+  [%expect
+    {|
     $$\na\n\nb\n$$
     After.\n\n``
     ```math\nx\n
@@ -184,7 +191,8 @@ let%expect_test "streaming: blocks are not cut inside display math" =
 
 let%expect_test "rendered: placeholders KaTeX draws into" =
   show "Inline $x^2$ and\n\n$$\n\\frac{a}{b}\n$$\n\n```math\ny\n```";
-  [%expect {|
+  [%expect
+    {|
     <div class="markdown">
       <div class="md-part">
         <p dir="auto">
@@ -206,7 +214,8 @@ let%expect_test "rendered: placeholders KaTeX draws into" =
 let%expect_test "previews show the TeX" =
   print_endline (Markdown.preview "$$\n\\frac{a}{b}\n$$\n\nmore");
   print_endline (Markdown.preview "Area $\\pi r^2$ here");
-  [%expect {|
+  [%expect
+    {|
     \frac{a}{b}
     Area \pi r^2 here
     |}]

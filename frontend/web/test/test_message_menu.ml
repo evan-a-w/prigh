@@ -379,7 +379,8 @@ let%expect_test "Copy: a reply with math copies its TeX as written" =
   H.show h ~selector:".msg.assistant .markdown";
   right_click h 1;
   H.click h ~selector:".context-menu [data-item=copy_message]";
-  [%expect {|
+  [%expect
+    {|
     <div class="markdown">
       <div class="md-part">
         <p dir="auto">

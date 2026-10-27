@@ -16,7 +16,10 @@ type t =
   }
 
 let create ~css ~scripts = { css; scripts; state = Not_loaded; linked = false }
-let add_to_head (el : #Dom.node Js.t) = Dom.appendChild Dom_html.document##.head el
+
+let add_to_head (el : #Dom.node Js.t) =
+  Dom.appendChild Dom_html.document##.head el
+;;
 
 let script src ~k =
   let el = Dom_html.createScript Dom_html.document in
