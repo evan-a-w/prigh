@@ -281,6 +281,7 @@ module Model = struct
     ; spinner : int
     ; activity : Activity.t
     ; verbosity : Verbosity.t
+    ; transcript_filter : Transcript_filter.t
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option (** our host id, from [hello] *)
@@ -390,13 +391,18 @@ let layout m =
 
 let transcript_width m = (layout m).main_width
 
-let focused_transcript m =
+let unfiltered_transcript m =
   match m.focus with
   | `Main -> m.transcript
   | `Agent id ->
     (match Agent_view.find m.agents id with
      | Some agent -> agent.transcript
      | None -> m.transcript)
+;;
+
+(* What the transcript shows: [/filter] leaves out the kinds it hides. *)
+let focused_transcript m =
+  Transcript.filter (unfiltered_transcript m) m.transcript_filter
 ;;
 
 let transcript_line_count m =
@@ -636,6 +642,7 @@ let init =
   ; spinner = 0
   ; activity = Idle
   ; verbosity = Verbosity.Normal
+  ; transcript_filter = Transcript_filter.all
   ; config = None
   ; home = None
   ; client_id = None
@@ -681,12 +688,54 @@ let refill_commands =
 let history_key = "history"
 let history_max = 500
 
+(* [/filter]'s kinds hidden, as [Transcript_filter.to_string]. *)
+let filter_key = "tui.transcript-filter"
+
+let filter_notice filter =
+  match Transcript_filter.summary filter with
+  | None -> "filter: everything shown"
+  | Some summary -> sprintf "filter: %s — /filter all shows everything" summary
+;;
+
+let set_filter m filter =
+  ( follow (notice { m with transcript_filter = filter } (filter_notice filter))
+  , [ rpc
+        "set_prefs"
+        ~params:
+          (P.Prefs.set_params
+             [ { key = filter_key
+               ; value =
+                   (if Transcript_filter.is_all filter
+                    then None
+                    else Some (`String (Transcript_filter.to_string filter)))
+               }
+             ])
+        ~tag:Ignore
+    ] )
+;;
+
+(* The backend's copy, at startup and when another TUI changes it. *)
+let filter_of_prefs m (changes : P.Prefs.Change.t list) =
+  match List.find changes ~f:(fun c -> String.equal c.key filter_key) with
+  | None -> m
+  | Some { value = Some (`String s); _ } ->
+    { m with transcript_filter = Transcript_filter.of_string s }
+  | Some _ -> { m with transcript_filter = Transcript_filter.all }
+;;
+
+let filter_of_picker picker =
+  let checked = Picker.checked picker in
+  Transcript_filter.of_hidden
+    (List.filter Transcript_filter.Kind.all ~f:(fun kind ->
+       not (Set.mem checked (Transcript_filter.Kind.name kind))))
+;;
+
 let start_commands =
   refill_commands
   @ [ Command.Load_history
     ; rpc
         "get_prefs"
-        ~params:(P.Prefs.get_params ~keys:[ history_key ])
+        ~params:(P.Prefs.get_params ~keys:[ history_key; filter_key ])
         ~tag:Prefs_history
     ]
 ;;
@@ -863,6 +912,27 @@ let verbosity_picker m =
         (String.capitalize (Verbosity.name verbosity)))
   in
   open_picker m Verbosity (Picker.create ~title:"Transcript verbosity" items)
+;;
+
+let filter_picker m =
+  let items =
+    List.map Transcript_filter.Kind.all ~f:(fun kind ->
+      Picker.Item.create
+        ~id:(Transcript_filter.Kind.name kind)
+        ~detail:(Transcript_filter.Kind.detail kind)
+        (Transcript_filter.Kind.label kind))
+  in
+  let checked =
+    List.filter
+      Transcript_filter.Kind.all
+      ~f:(Transcript_filter.shows m.transcript_filter)
+    |> List.map ~f:Transcript_filter.Kind.name
+    |> String.Set.of_list
+  in
+  open_picker
+    m
+    Transcript_filter
+    (Picker.create ~multi:true ~checked ~title:"Show in the transcript" items)
 ;;
 
 let login_items m =
@@ -3327,6 +3397,11 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "thinking", [] -> thinking_picker m, []
   | "thinking", level :: _ ->
     m, [ rpc "set_thinking" ~params:[ "thinking", str level ] ]
+  | "filter", [] -> filter_picker m, []
+  | "filter", _ ->
+    (match Transcript_filter.parse m.transcript_filter cmd.rest with
+     | Ok filter -> set_filter m filter
+     | Error e -> error m e, [])
   | "verbosity", [] -> verbosity_picker m, []
   | "verbosity", name :: _ ->
     (match
@@ -3788,15 +3863,7 @@ let queue_follow_up m =
 ;;
 
 let last_assistant_text m =
-  let transcript =
-    match m.focus with
-    | `Main -> m.transcript
-    | `Agent id ->
-      (match Agent_view.find m.agents id with
-       | Some a -> a.transcript
-       | None -> m.transcript)
-  in
-  Transcript.items transcript
+  Transcript.items (unfiltered_transcript m)
   |> List.rev
   |> List.find_map ~f:(function
     | Transcript.Item.Assistant { text; _ } -> Some text
@@ -4142,7 +4209,8 @@ let current_top m =
 let jump_user_message m ~direction =
   let lines =
     Transcript.user_message_lines
-      (focused_transcript m)
+      ~filter:m.transcript_filter
+      (unfiltered_transcript m)
       ~width:(transcript_width m)
       ~verbosity:m.verbosity
   in
@@ -4352,7 +4420,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
   | Models _ -> m, [ set_model_command item.id ]
-  | Scoped_models -> m, []
+  | Scoped_models | Transcript_filter -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
   | Modes -> mode_by_name m item.id
   | Verbosity ->
@@ -4680,6 +4748,8 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        in
        { m with mode = Picker { kind = Models { logged_in_only }; picker } }, []
      | _ -> m, [])
+  | Submit when Mode.Picker_kind.equal kind Transcript_filter ->
+    set_filter { m with mode = Editing } (filter_of_picker picker)
   | Submit when Picker.multi picker -> save_scoped_models m picker
   | Force_quit ->
     (match kind with
@@ -5442,6 +5512,7 @@ let event m (e : P.Event.t) =
   | Terminal_close _
   | Terminal_kill _ -> m, []
   | Prefs_changed changes ->
+    let m = filter_of_prefs m changes in
     (match
        List.find changes ~f:(fun c -> String.equal c.key history_key)
        |> Option.bind ~f:(fun c -> history_of_json c.value)
@@ -6196,6 +6267,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (match P.Prefs.of_reply json with
         | Error _ -> m, []
         | Ok changes ->
+          let m = filter_of_prefs m changes in
           (match
              List.find changes ~f:(fun c -> String.equal c.key history_key)
              |> Option.bind ~f:(fun c -> history_of_json c.value)

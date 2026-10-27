@@ -7,6 +7,7 @@ module Picker_kind = struct
     | Scoped_models
     | Thinking
     | Verbosity
+    | Transcript_filter
     | Login
     | Logout
     | Sessions of Session_selection.t

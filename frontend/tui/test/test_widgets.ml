@@ -697,6 +697,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /logout [provider|HOST]            remove a provider's or a git host's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
+    /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
     /confirm [on|off]                  ask before destructive tools (approval mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan]    pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
