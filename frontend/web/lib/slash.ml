@@ -10,6 +10,7 @@ module Argument = struct
     | Directory
     | Backend_directory
     | Verbosity
+    | Filter
     | Theme
     | Accent
     | Confirm
@@ -81,6 +82,12 @@ let every =
       ~args:"[quiet|normal|verbose]"
       "verbosity"
       "how much of tool calls and thinking the transcript shows"
+  ; c
+      ~argument:Filter
+      ~args:"[all|KIND...|-KIND|+KIND]"
+      "filter"
+      "show only some kinds in the transcript (your messages, replies, \
+       thinking, tools, subagents, notes); the model's context is unchanged"
   ; c
       ~argument:Theme
       ~args:"[original|dark|light]"

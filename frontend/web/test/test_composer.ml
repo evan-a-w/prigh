@@ -384,6 +384,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /theme [original|dark|light] pick or set the theme, for you in every browser
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
@@ -423,7 +424,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
-    /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

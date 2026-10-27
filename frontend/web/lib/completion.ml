@@ -150,6 +150,15 @@ let argument_items
       ; "normal", "tool output folded"
       ; "verbose", "everything unfolded"
       ]
+  | Filter ->
+    Picker.Item.create ~id:"all" ~detail:"show everything" "all"
+    :: List.map Transcript_filter.Kind.all ~f:(fun kind ->
+      let name = Transcript_filter.Kind.name kind in
+      Picker.Item.create
+        ~id:name
+        ~detail:
+          ("only " ^ String.uncapitalize (Transcript_filter.Kind.label kind))
+        name)
   | Confirm ->
     simple
       [ ( "on"

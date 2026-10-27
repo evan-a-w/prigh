@@ -205,7 +205,8 @@ let echoes (m : Model.t) =
 (* What is loaded of the transcript, after how much is not. *)
 let transcript (m : Model.t) ~inject =
   Node.fragment
-    ([ Paging.view m.paging ~load:(inject Action.Load_older) ]
+    (Filter_view.note m ~inject
+     @ [ Paging.view m.paging ~load:(inject Action.Load_older) ]
      @ (match Option.bind m.state ~f:(fun s -> s.trim) with
         | Some _ -> [ Trim_view.view m ~inject ]
         | None -> [])
