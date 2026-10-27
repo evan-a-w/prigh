@@ -5,7 +5,9 @@ module Reply = Faux_provider.Reply
 module Gates = Routed_provider.Gates
 
 let one_line s =
-  String.substr_replace_all (String.strip s) ~pattern:"\n" ~with_:" | "
+  if String.length s > 2000
+  then sprintf "<%d chars>" (String.length s)
+  else String.substr_replace_all (String.strip s) ~pattern:"\n" ~with_:" | "
 ;;
 
 let message_line (m : Message.t) =
