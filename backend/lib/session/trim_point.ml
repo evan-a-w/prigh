@@ -4,6 +4,7 @@ open! Import
 type t =
   { before : string
   ; index : int
+  ; role : Message_point.Role.t
   ; text : string
   ; at : float option
   ; messages : int
@@ -12,23 +13,25 @@ type t =
 [@@deriving sexp_of]
 
 let create messages =
-  let items = Array.of_list messages in
-  let tokens_before = Array.create ~len:(Array.length items + 1) 0 in
-  Array.iteri items ~f:(fun i (_, (m : Timed_message.t)) ->
-    tokens_before.(i + 1)
-    <- tokens_before.(i) + Message.estimate_tokens [ m.message ]);
-  List.filter_map (Outline.create messages) ~f:(fun (p : Outline.Point.t) ->
-    match p.kind, fst items.(p.index) with
-    | User, Some before when p.index > 0 ->
-      Some
-        { before
+  let outline =
+    List.filter_map (Outline.create messages) ~f:(fun (p : Outline.Point.t) ->
+      match p.kind with
+      | User -> Some (p.index, p.text)
+      | Compaction | Error -> None)
+    |> Int.Table.of_alist_exn
+  in
+  List.filter_map
+    (Message_point.create messages)
+    ~f:(fun (p : Message_point.t) ->
+      Option.map p.trim_before ~f:(fun (e : Message_point.Effect.t) ->
+        { before = p.message
         ; index = p.index
-        ; text = p.text
+        ; role = p.role
+        ; text = Option.value (Hashtbl.find outline p.index) ~default:p.text
         ; at = p.at
-        ; messages = p.index
-        ; tokens = tokens_before.(p.index)
-        }
-    | (User | Compaction | Error), _ -> None)
+        ; messages = e.messages
+        ; tokens = e.tokens
+        }))
 ;;
 
 let to_json points =
@@ -40,6 +43,7 @@ let to_json points =
              `Object
                ([ "before", `String t.before
                 ; "index", int t.index
+                ; "role", `String (Message_point.Role.name t.role)
                 ; "text", `String t.text
                 ; "messages", int t.messages
                 ; "tokens", int t.tokens

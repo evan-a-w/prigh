@@ -1016,7 +1016,8 @@ let hidden_messages t ~entry =
 let is_trim_point (m : Message.t) =
   match m with
   | User _ -> not (is_summary_message m)
-  | Assistant _ | Tool_result _ -> false
+  | Assistant _ -> true
+  | Tool_result _ -> false
 ;;
 
 let append_trim t ~before =
@@ -1027,7 +1028,7 @@ let append_trim t ~before =
   with
   | None ->
     Or_error.errorf
-      "message %s is not in the model's context: trim before one of your \
+      "message %s is not in the model's context: trim before one of the \
        messages that /trim lists"
       before
   | Some (0, _) ->
@@ -1039,8 +1040,8 @@ let append_trim t ~before =
     if not (is_trim_point m.message)
     then
       Or_error.error_string
-        "the context can only be trimmed before one of your messages, so that \
-         every tool call keeps its result: pick one that /trim lists"
+        "a tool result goes with its call: trim before the reply that made the \
+         call (/trim lists it)"
     else if Message_point.splits_a_call ~dropped ~kept
     then
       Or_error.error_string

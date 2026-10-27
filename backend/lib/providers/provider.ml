@@ -22,7 +22,8 @@ module Request = struct
   ;;
 
   (* Anthropic refuses a conversation that does not start with the user's
-     turn, as one does once its first message is deleted. *)
+     turn, as one does once its first message is deleted, or trimmed before
+     a reply. *)
   let lead_with_user = function
     | ([] | Message.User _ :: _) as messages -> messages
     | messages ->

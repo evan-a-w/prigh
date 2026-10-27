@@ -428,7 +428,9 @@ let%expect_test "rewinds and forks keep what is hidden while its message stays" 
     |}]
 ;;
 
-let%expect_test "message points: what deleting or trimming after each drops" =
+let%expect_test
+    "message points: what trimming before, deleting or trimming after each drops"
+  =
   with_session
   @@ fun ~dir:_ session names ->
   print_result names (Session.append_delete session ~message:(names.id "u3"));
@@ -441,23 +443,24 @@ let%expect_test "message points: what deleting or trimming after each drops" =
           sprintf "%d/~%d" e.messages e.tokens
       in
       printf
-        "%d %s %s %s delete=%s trim_after=%s\n"
+        "%d %s %s %s before=%s delete=%s trim_after=%s\n"
         p.index
         (names.name p.message)
         (Sexp.to_string [%sexp (p.role : Message_point.Role.t)])
-        p.text
+        (String.prefix p.text 12)
+        (effect p.trim_before)
         (effect p.delete)
         (effect p.trim_after));
   [%expect
     {|
     ok: deleted u3: 1 messages, ~1 tokens
-    0 u1 User aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa delete=1/~100 trim_after=6/~5
-    1 a1 Assistant one delete=1/~0 trim_after=5/~5
-    2 u2 User second delete=1/~1 trim_after=4/~4
-    3 a2 Assistant looking delete=2/~3 trim_after=-
-    4 t1 Tool_result bash delete=- trim_after=2/~1
-    5 a2' Assistant two delete=1/~0 trim_after=1/~1
-    6 a3 Assistant three delete=1/~1 trim_after=-
+    0 u1 User aaaaaaaaaaaa before=- delete=1/~100 trim_after=6/~5
+    1 a1 Assistant one before=1/~100 delete=1/~0 trim_after=5/~5
+    2 u2 User second before=2/~100 delete=1/~1 trim_after=4/~4
+    3 a2 Assistant looking before=3/~101 delete=2/~3 trim_after=-
+    4 t1 Tool_result bash before=- delete=- trim_after=2/~1
+    5 a2' Assistant two before=5/~104 delete=1/~0 trim_after=1/~1
+    6 a3 Assistant three before=6/~104 delete=1/~1 trim_after=-
     |}]
 ;;
 
@@ -533,7 +536,7 @@ let%expect_test "the next request leaves out what was deleted or trimmed" =
     {|
     state: messages=6 context_tokens=10 hidden=[]
     state: messages=5 context_tokens=10 hidden=[deleted 1]
-    request: A[c1] T(c1) A(r1) U(q2) A(r2) U(q3)
+    request: U([the convers) A[c1] T(c1) A(r1) U(q2) A(r2) U(q3)
     |}];
   (* The reply with the call goes with its result. *)
   let call =
@@ -628,7 +631,7 @@ let%expect_test "/compact after a deletion: the deleted message is not carried o
     request: U(q1)
     request: U(q1) A(r1) U(q2)
     request: U(q1) A(r1) U(q2) A(r2xxxxxxxxxx) U(q3)
-    summarise: A(r1) U(q2) A(r2xxxxxxxxxx)
+    summarise: U([the convers) A(r1) U(q2) A(r2xxxxxxxxxx)
     (Ok SUMMARY)
     request: U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
     state: messages=7 context_tokens=10 hidden=[]

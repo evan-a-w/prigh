@@ -29,6 +29,7 @@ type t =
   ; role : Role.t
   ; text : string
   ; at : float option
+  ; trim_before : Effect.t option
   ; delete : Effect.t option
   ; trim_after : Effect.t option
   }
@@ -152,6 +153,7 @@ let create context =
   for i = n - 1 downto 0 do
     tokens_after.(i) <- tokens_after.(i + 1) + tokens.(i)
   done;
+  let tokens_before i = tokens_after.(0) - tokens_after.(i) in
   let last_summary =
     Array.foldi items ~init:(-1) ~f:(fun i acc (id, _) ->
       if Option.is_none id then i else acc)
@@ -164,6 +166,14 @@ let create context =
         | User _ -> User
         | Assistant _ -> Assistant
         | Tool_result _ -> Tool_result
+      in
+      let trim_before =
+        match role with
+        | Tool_result -> None
+        | User | Assistant ->
+          if index = 0 || split.(index - 1)
+          then None
+          else Some { Effect.messages = index; tokens = tokens_before index }
       in
       let delete =
         match role with
@@ -196,7 +206,15 @@ let create context =
           Some
             { Effect.messages = n - index - 1; tokens = tokens_after.(index + 1) }
       in
-      { message; index; role; text = text m.message; at = m.at; delete; trim_after }))
+      { message
+      ; index
+      ; role
+      ; text = text m.message
+      ; at = m.at
+      ; trim_before
+      ; delete
+      ; trim_after
+      }))
 ;;
 
 let to_json points =
@@ -217,6 +235,7 @@ let to_json points =
                 ]
                 @ Option.value_map t.at ~default:[] ~f:(fun at ->
                   [ "at", int (Float.iround_nearest_exn (at *. 1000.)) ])
+                @ effect "trim_before" t.trim_before
                 @ effect "delete" t.delete
                 @ effect "trim_after" t.trim_after))) )
     ]
