@@ -628,7 +628,12 @@ let a1_transcript h =
     List.iter (Chat.entries s.chat) ~f:(fun (e : Chat.Entry.t) ->
       print_endline
         (match e with
-         | User u -> "user: " ^ String.prefix (Option.value_map u.origin ~default:u.text ~f:(fun o -> Option.value o.body ~default:u.text)) 40
+         | User u ->
+           "user: "
+           ^ String.prefix
+               (Option.value_map u.origin ~default:u.text ~f:(fun o ->
+                  Option.value o.body ~default:u.text))
+               40
          | Assistant { message; _ } ->
            "assistant: "
            ^ String.concat
@@ -664,7 +669,8 @@ let%expect_test
       ; agent_queues []
       ]);
   a1_transcript h;
-  [%expect {|
+  [%expect
+    {|
     Send
     user: Survey the repository
     assistant:
@@ -681,7 +687,8 @@ let%expect_test
        {|[{"role":"user","text":"survey"},
           {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"Survey the repository\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
           {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"started agent a1 (Survey the repository); its result will be delivered to you when it finishes","is_error":false}]|});
-  [%expect {|
+  [%expect
+    {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     (Rpc (method_ get_subagent) (params ((id s1) (elide true)))
      (tag (Subagent s1)))
@@ -703,7 +710,8 @@ let%expect_test
   print_s
     [%sexp
       (List.map (H.model h).agents.agents ~f:(fun a -> a.id) : string list)];
-  [%expect {|
+  [%expect
+    {|
     user: Survey the repository
     user: use the tests
     assistant: noted
