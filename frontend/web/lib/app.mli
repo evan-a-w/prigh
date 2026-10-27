@@ -767,6 +767,15 @@ module Model : sig
   (** Where the transcript's entries are in the context. *)
   val message_index : t -> Message_index.t
 
+  (** The entry the context starts with, of those loaded: nothing before it
+      to trim. *)
+  val context_start : t -> int
+
+  (** What entry [n]'s context menu offers: the user's messages and the
+      replies that are messages of the context (not deliveries, notes or a
+      reply still streaming). *)
+  val message_menu : t -> int -> Context_menu.Message.t option
+
   (** What the panels' sizes depend on. *)
   val shown : t -> Resize.Shown.t
 

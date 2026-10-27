@@ -764,6 +764,21 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
     in
     Worktree { session = attr "data-owner"; path = attr "data-worktree" }
   | Some el
+    when Js.Opt.test (el##getAttribute (Js.string "tabindex"))
+         && Js.Opt.test
+              (el##getAttribute
+                 (Js.string Prigh_web.Chat_view.message_attribute)) ->
+    (match
+       Int.of_string_opt
+         (Js.to_string
+            (Js.Opt.get
+               (el##getAttribute
+                  (Js.string Prigh_web.Chat_view.message_attribute))
+               (fun () -> Js.string "")))
+     with
+     | Some n -> Message n
+     | None -> Page)
+  | Some el
     when Js.Opt.test (el##getAttribute (Js.string "data-session")) ->
     Session
       (Js.to_string

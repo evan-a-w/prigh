@@ -1,11 +1,12 @@
 open! Core
 open! Import
 
-(** The sidebar's context menus: right-click (or Shift+F10, the context
-    menu key, a long press, the row's ⋯ button) on a session or one of its
-    worktrees. Each item does what a slash command or a key does elsewhere,
-    which its detail names. Shown as a [Picker] dialog ([Dialog.Picker_kind.Menu])
-    floating at the pointer or under the row. *)
+(** Context menus: right-click (or Shift+F10, the context menu key, a long
+    press, the ⋯ button) on a session or one of its worktrees in the
+    sidebar, or on a message of the transcript. Each item does what a slash
+    command or a key does elsewhere, which its detail names. Shown as a
+    [Picker] dialog ([Dialog.Picker_kind.Menu]) floating at the pointer or
+    under the row. *)
 
 module Target : sig
   type t =
@@ -14,6 +15,9 @@ module Target : sig
         { session : string (** the path of the session it is under *)
         ; path : string
         }
+    | Message of int
+    (** a message of the transcript, by its entry: a tool call's is its
+        reply's *)
   [@@deriving sexp_of, equal]
 end
 
@@ -54,6 +58,9 @@ module Item : sig
     | Unarchive
     | Delete
     | Remove (** the worktree *)
+    | Copy_message (** its text (a reply's markdown) *)
+    | Trim_before
+    | Trim_after
   [@@deriving sexp_of, equal, enumerate]
 
   val id : t -> string
@@ -74,11 +81,32 @@ val picker
   -> current:bool
   -> Picker.t
 
+(** What a message's menu offers ({!message_picker}). *)
+module Message : sig
+  type t =
+    { reply : bool
+    ; calls : int (** a reply's tool calls, deleted with it *)
+    ; text : string (** what Copy copies *)
+    ; first : bool (** the context starts with it: nothing before to trim *)
+    ; newest : bool (** nothing after it to trim *)
+    ; running : bool (** a run is in progress: it cannot change *)
+    }
+  [@@deriving sexp_of, equal]
+
+  (** "Your message" or "Reply", with its tool calls. *)
+  val title : t -> string
+end
+
+(** Copy; Trim everything before this, Trim everything after this; Delete.
+    Those that do not apply are [dimmed]: disabled, their detail says why
+    (otherwise it is the slash command that does the same). *)
+val message_picker : Message.t -> Picker.t
+
 (** The worktree's path, for a worktree's menu. *)
 val worktree : t -> string option
 
-(** The session's path. *)
-val session : t -> string
+(** The session's path, for a session's or worktree's menu. *)
+val session : t -> string option
 
 (** The DOM id of a worktree's row under a session (by their ids). *)
 val worktree_dom_id : session:string -> string -> string

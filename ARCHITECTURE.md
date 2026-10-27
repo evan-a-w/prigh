@@ -2464,14 +2464,19 @@ terminal frontend and `web/` prigh-web, the browser one.
       dimmed and read-only above it. A user message is matched to its
       `get_trim_points` entry by counting from the newest end
       (`Jump.from_end`), checked by its time, for the jump list's Delete.
-      Every message of the context has one row of actions (`Chat_view`'s
-      `.msg-actions`, shown on hover, or on a phone when a tap focuses the
-      message): ✂ Trim before (`data-trim-entry`, opening
-      `Dialog.Trim_confirm`, as `/trim`'s picker does), ✂ Trim after and ✕
-      Delete, buttons handled by a page-level click listener, like folds.
+      Every message of the context has a context menu
+      (`Context_menu.Target.Message`, `App.Model.message_menu`): Copy,
+      Trim before (opening `Dialog.Trim_confirm`, as `/trim`'s picker
+      does), Trim after and Delete, disabled with the reason where they do
+      not apply; it opens like the sidebar's (below) from a right-click on
+      the message (`Chat_listeners`; with text selected in it, or on a
+      link or image, the browser's), its ⋯ (`Chat_view.more_id`), a long
+      press or Shift+F10 / ContextMenu on it (`Keys.Target.Message`), and
+      `Chat_view` marks the open one's ⋯ with the highlighted item's
+      preview (a dashed cut line, a delete's fade).
       `Message_index` maps the loaded entries to their context positions,
-      for the row's trim before, ✕ Delete (a tool call's deletes its reply)
-      and ✂ Trim after (`Dialog.Trim_after_confirm`), checked against
+      for the menu's trim before, Delete (a tool call's deletes its reply)
+      and Trim after (`Dialog.Trim_after_confirm`), checked against
       `get_message_points`, and for placing each `State.hidden` trim after's
       divider; a deletion hides its entry at once and shows a toast with
       Undo (`Restore`); a changed `hidden` reloads the newest page. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
@@ -2640,7 +2645,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
       worktrees changing, a worktree made or removed); `Model.folded`
       (session ids, kept in the `web.sidebar-folded` preference) folds a
-      session's worktrees. Context menus (`Context_menu`, drawn by
+      session's worktrees. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
       `Menu_listeners` put it at the pointer or under the row and keep it

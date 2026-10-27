@@ -8,6 +8,9 @@ open! Core
 val place : Prigh_web.Context_menu.Anchor.t -> unit
 
 (** A long press (a touch held still for half a second) on a session or
-    worktree row is a right-click there (Safari has none of its own); the
+    worktree row, or a message with a menu, is a right-click there (Safari
+    has none of its own), with [long_press_field] set on the event; the
     click that follows the press is swallowed. *)
 val install : unit -> unit
+
+val long_press_field : string

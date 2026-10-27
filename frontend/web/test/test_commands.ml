@@ -198,6 +198,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
+    Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click, a long press or its ⋯; with text selected, right-click is the browser's, to copy it)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
@@ -443,24 +444,16 @@ let%expect_test "/verbosity and Ctrl+O" =
       <div class="entries">
         <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
           <div dir="auto" class="bubble"> fix the build </div>
-          <div class="msg-actions">
-            <button type="button"
-                    title="Trim everything after this message from the model's context"
-                    aria-label="Trim everything after this"
-                    data-trim-after-entry="0"
-                    class="trim-after">
-              <span aria-hidden="true" class="glyph"> ✂ </span>
-              Trim after
-            </button>
-            <button type="button"
-                    title="Delete this message from the transcript and the model's context"
-                    aria-label="Delete"
-                    data-delete-entry="0"
-                    class="msg-delete">
-              <span aria-hidden="true" class="glyph"> ✕ </span>
-              Delete
-            </button>
-          </div>
+          <button type="button"
+                  id="msg-more-0"
+                  data-message-menu="0"
+                  title="More (right-click, Shift+F10)"
+                  aria-label="More for this message"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  class="msg-more">
+            <icon class="more"> </icon>
+          </button>
         </div>
         <div data-message-entry="1" tabindex="-1" class="assistant msg">
           <div class="markdown">
@@ -477,24 +470,16 @@ let%expect_test "/verbosity and Ctrl+O" =
             <span> 10 in </span>
             <span> 5 out </span>
           </div>
-          <div class="msg-actions">
-            <button type="button"
-                    title="Trim everything before this reply from the model's context"
-                    aria-label="Trim everything before this"
-                    data-trim-entry="1"
-                    class="trim-before">
-              <span aria-hidden="true" class="glyph"> ✂ </span>
-              Trim before
-            </button>
-            <button type="button"
-                    title="Delete this reply from the transcript and the model's context"
-                    aria-label="Delete"
-                    data-delete-entry="1"
-                    class="msg-delete">
-              <span aria-hidden="true" class="glyph"> ✕ </span>
-              Delete
-            </button>
-          </div>
+          <button type="button"
+                  id="msg-more-1"
+                  data-message-menu="1"
+                  title="More (right-click, Shift+F10)"
+                  aria-label="More for this message"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  class="msg-more">
+            <icon class="more"> </icon>
+          </button>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
