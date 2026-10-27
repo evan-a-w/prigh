@@ -94,6 +94,19 @@ let print_result names result =
   | Error e -> print_endline ("error: " ^ Error.to_string_hum e)
 ;;
 
+let untrim session =
+  Result.map (Session.append_untrim session) ~f:(fun (h : Session.Hidden.t) ->
+    { Session.Trim.before =
+        (match h.kind with
+         | Trim_before { before } -> before
+         | Trim_after { after; _ } -> after
+         | Deleted { message } -> message)
+    ; messages = h.messages
+    ; tokens = h.tokens
+    ; at = h.at
+    })
+;;
+
 let with_session f =
   with_sandbox
   @@ fun t ->
@@ -140,11 +153,11 @@ let%expect_test "a trim drops what comes before its message from the context" =
     U(aaaaaaaaaaaa) A(one) U(second) A[c1] T(c1) A(two)
     396
     |}];
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   print_trim names session;
   print_s [%sexp (Session.context_tokens session : int)];
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   [%expect
     {|
     ok: before u3: 6 messages, ~104 tokens
@@ -191,7 +204,7 @@ let%expect_test "trims stack: undo cancels the latest" =
   print_result names (Session.append_trim session ~before:(names.id "u3"));
   print_context session;
   print_trim names session;
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   print_trim names session;
   [%expect
@@ -213,7 +226,7 @@ let%expect_test "a trim persists, and loads again" =
   let reloaded = Or_error.ok_exn (Session.load (Session.path session)) in
   print_context reloaded;
   print_trim names reloaded;
-  print_result names (Session.append_untrim reloaded);
+  print_result names (untrim reloaded);
   let reloaded = Or_error.ok_exn (Session.load (Session.path session)) in
   print_context reloaded;
   [%expect
@@ -238,7 +251,7 @@ let%expect_test "a compaction after a trim summarises only what is after it" =
   print_context session;
   print_trim names session;
   (* Undoing the trim puts u1 a1 back ahead of the summary. *)
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   [%expect
     {|
@@ -268,7 +281,7 @@ let%expect_test "a trim after a compaction cuts into its kept part" =
     (shapes
        (List.map (Session.trimmed_messages session) ~f:(fun (_, m) ->
           m.Timed_message.message)));
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   print_context session;
   [%expect
     {|
@@ -309,7 +322,7 @@ let%expect_test "rewinds keep the trim while its message stays" =
   Or_error.ok_exn (Session.rewind session ~to_:(names.id "a3"));
   print_result names (Session.append_trim session ~before:(names.id "u2"));
   let after_trim = Option.value_exn (Session.head session) in
-  print_result names (Session.append_untrim session);
+  print_result names (untrim session);
   let (_ : Session.Entry.t) =
     Session.append_message session (Message.user "five")
   in
@@ -484,7 +497,7 @@ let%expect_test "trimming is refused while a run is in progress" =
     [%sexp
       (Agent.trim agent ~before:(user_entry agent "q2")
        : Session.Trim.t Or_error.t)];
-  print_s [%sexp (Agent.untrim agent : Session.Trim.t Or_error.t)];
+  print_s [%sexp (Agent.untrim agent : Session.Hidden.t Or_error.t)];
   Agent.wait_idle agent;
   [%expect
     {|
@@ -531,7 +544,7 @@ let%expect_test "/compact after a trim summarises only what is after it" =
     |}];
   (* Undoing the trim puts q1 back ahead of the carried-over q2 and the
      summary. *)
-  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
   run agent "q5";
   [%expect
     {| request: U(q1) A(r1) U(q2) S(SUMMARY) U(q3) A(r3) U(q4) A(r4) U(q5) |}]
@@ -591,7 +604,7 @@ let%expect_test "a trim after a compaction: its carried-over messages" =
        |> Result.map ~f:(fun t -> t.messages, t.tokens)
        : (int * int) Or_error.t)];
   run agent "q5";
-  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Trim.t);
+  ignore (Or_error.ok_exn (Agent.untrim agent) : Session.Hidden.t);
   (* One in the compaction's kept part drops them all, and the summary. *)
   print_s
     [%sexp
