@@ -657,7 +657,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the loop there, with its own cancellation, and returns `started agent
   a<n> (...)`; deeper calls (no jobs) block and return the report.
   `subagent_status`/`subagent_cancel`/`subagent_message` act on the jobs
-  and are dropped below depth 0. A background subagent gets a
+  and are dropped below depth 0 (`subagent_continue`, like `subagent`,
+  below depth 1). A background subagent gets a
   `Subagent_inbox`: its loop's `steer` takes the inbox's steers (with
   finished jobs' reports) at each step boundary, and its `wake` takes
   everything queued when it ends its turn, so a follow-up makes it carry on
@@ -677,6 +678,33 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   which `Agent.broadcast` records in the session (`add_agent_worktree`),
   and the report ends with `Agent_worktree.report_line` (where the branch
   is, how to review, merge or remove it).
+  With `fork` the child starts from its caller's conversation:
+  `Agent_loop` puts a `Conversation.t` (model, thinking, system prompt and
+  the messages up to the assistant message making the call) in every
+  call's `Tool.Context.conversation`, and `Subagent_fork.context` gives
+  each call of that last message a result (its own: that it is the fork;
+  the others: that the caller runs them), then `Subagent_fork.prompt`
+  frames the task (the caller carries on separately; with a worktree, that
+  the inherited paths are the caller's; the tools it may not use). With
+  the caller's model and no `tools` subset the fork is `shared`: it sends
+  the caller's system prompt, cache key and tool specs unchanged, so the
+  provider's prompt cache covers the inherited prefix, and
+  `Subagent_fork.shared_tools` replaces the tools it may not use at its
+  depth (`Tools.unavailable`) by stubs that refuse with the reason;
+  otherwise it has its own system prompt and tools, like any subagent.
+  `Subagent_start.forked` says so. A run that stops at its turn limit
+  keeps its `State.t` (prepared args, config, worktree, messages as the
+  loop left them through `on_context`, and totals): a background one's is
+  parked in `Background_tasks` (`park`), a synchronous one's in its
+  caller's own tasks; the report says to use `subagent_continue` (id,
+  `max_turns`, `message`), which `Background_tasks.continue_` restarts
+  under the same id (`Restarted`: running again, undelivered, its inbox
+  reopened) or hands back to run in the calling (synchronous) agent
+  (`Run_here`). The continued run emits `Subagent_start {continued =
+  true}` with the same ids and a `Subagent_end` with totals over its runs;
+  frontends reopen the card, row and transcript they have.
+  `subagent_cancel` and `cancel_all`/`forget_finished` (session reset)
+  drop parked state.
 - `Tool_worktree` — the model's `worktree` tool (`action` create, list or
   remove; `branch`, `base`, `path`, `force`, `cwd`), made in `bin/main.ml`
   with closures for the agent's `worktrees_dir` and session. It runs
@@ -938,7 +966,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   deliveries (so headless `run` does too); `State.subagents` and
   `State.jobs` list the running and undelivered ones; `Subagent_log`
   records every subagent's status, activity and transcript (nested ones as
-  `<parent>/<call id>`) from the agent's own events, for `subagents`/
+  `<parent>/<call id>`; a continued one's `Subagent_start` reopens its
+  entry, saved as a `continue` line) from the agent's own events, for `subagents`/
   `subagent` (`list_subagents`, `get_subagent {id}` by agent or tool call
   id). No subagent stays "running" once nothing runs it: `Tool_subagent`
   emits a `Subagent_end` even when its loop raises (`subagent failed: …`,
