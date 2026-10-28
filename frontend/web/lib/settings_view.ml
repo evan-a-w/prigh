@@ -166,6 +166,141 @@ let confirm (m : App.Model.t) ~inject =
     ]
 ;;
 
+module Compaction_command = Prigh_ui.Compaction_command
+
+let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
+  let off = Option.exists config ~f:(fun c -> c.compact_at_tokens <= 0) in
+  let error = Compact_at.error m.compact_at in
+  let value =
+    match Compact_at.draft m.compact_at, config with
+    | Some draft, _ -> draft
+    | None, Some c when c.compact_at_tokens > 0 ->
+      Compaction_command.tokens c.compact_at_tokens
+    | None, _ -> ""
+  in
+  let disabled = Option.is_none config in
+  row
+    ~cls:"compact-at"
+    ~name:"Compact at"
+    ~about:
+      "Also summarise once the context passes this many tokens (default 200k), \
+       not only at 80% of the model's window."
+    ?note:
+      (match error, config with
+       | Some e, _ -> Some ("warm", e)
+       | None, None -> Some ("muted", "Waiting for the backend's settings…")
+       | None, Some _ when off ->
+         Some
+           ("muted", "Off: only at 80% of the window. Type a number to set one.")
+       | None, Some _ -> None)
+    [ Node.div
+        ~attrs:
+          [ Attr.class_ "segmented"
+          ; Attr.role "group"
+          ; Attr.create "aria-label" "Compact at"
+          ]
+        [ Node.label
+            ~attrs:
+              [ classes [ "segment"; "compact-at-field" ] [ "on", not off ] ]
+            [ Node.input
+                ~attrs:
+                  [ Attr.id "compact-at"
+                  ; Attr.class_ "compact-at-input"
+                  ; Attr.type_ "text"
+                  ; Attr.value value
+                  ; Attr.placeholder (if off then "150k" else "200k")
+                  ; Attr.title "/compaction at TOKENS, e.g. 150k or 200000"
+                  ; Attr.create "aria-label" "Compact at, in tokens"
+                  ; Attr.create
+                      "aria-invalid"
+                      (Bool.to_string (Option.is_some error))
+                  ; Attr.create "autocomplete" "off"
+                  ; Attr.create "spellcheck" "false"
+                  ; (if disabled then Attr.disabled else Attr.empty)
+                  ; Attr.on_input (fun _ text ->
+                      inject (Action.Compact_at_input text))
+                  ; Attr.on_change (fun _ _ -> inject Action.Compact_at_commit)
+                  ]
+                ()
+            ; span ~cls:"compact-at-unit" "tokens"
+            ]
+        ; Node.button
+            ~attrs:
+              [ classes [ "segment" ] [ "on", off ]
+              ; Attr.type_ "button"
+              ; Attr.create "aria-pressed" (Bool.to_string off)
+              ; Attr.title
+                  "Only at 80% of the model's window (/compaction at off)"
+              ; (if disabled
+                 then Attr.disabled
+                 else
+                   Attr.on_click (fun _ ->
+                     inject (Action.Run "/compaction at off")))
+              ]
+            [ Node.text "Off" ]
+        ]
+    ]
+;;
+
+let summary_model (m : App.Model.t) (config : Config.t option) ~inject =
+  let current =
+    match Option.bind config ~f:(fun c -> c.compaction_model) with
+    | None -> "The conversation's model"
+    | Some key ->
+      (match
+         List.find m.models ~f:(fun (model : Llm.t) ->
+           String.equal model.key key)
+       with
+       | Some model -> model.name
+       | None -> key)
+  in
+  row
+    ~cls:"summary-model"
+    ~name:"Summary model"
+    ~about:
+      "The model that writes the summaries: a cheaper one costs less, but \
+       cannot reuse the conversation's prompt cache."
+    [ button
+        ~cls:"small summary-model-choice"
+        ~title:"Choose the model (/compaction model)"
+        ~label:("Summary model: " ^ current)
+        ~disabled:(Option.is_none config)
+        ~on_click:(inject (Action.Run "/compaction model"))
+        [ Node.text current ]
+    ]
+;;
+
+let mask (config : Config.t option) ~inject =
+  let on = Option.exists config ~f:(fun c -> c.mask_observations) in
+  row
+    ~cls:"mask"
+    ~name:"Mask old tool outputs"
+    ~about:
+      "Replace tool outputs older than the last 10 turns with placeholders \
+       first, which often saves summarising."
+    [ switch
+        ~disabled:(Option.is_none config)
+        ~label:"Mask old tool outputs"
+        ~title:
+          (if on
+           then "Keep old tool outputs (/compaction mask off)"
+           else "Mask old tool outputs (/compaction mask on)")
+        ~on
+        ~on_click:
+          (inject
+             (Action.Run
+                (if on then "/compaction mask off" else "/compaction mask on")))
+        ()
+    ]
+;;
+
+let compaction (m : App.Model.t) ~inject =
+  [ compact_at m m.config ~inject
+  ; summary_model m m.config ~inject
+  ; mask m.config ~inject
+  ]
+;;
+
 let providers (m : App.Model.t) ~inject =
   let logged_in =
     List.filter_map m.auth ~f:(fun (s : Auth_status.t) ->
@@ -465,6 +600,7 @@ let view (m : App.Model.t) ~inject =
         [ notifications m ~inject; tabs m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
+    ; section "Compaction" (compaction m ~inject)
     ; (if App.superuser m
        then section "Nix store" (nix_store m ~inject)
        else Node.none)

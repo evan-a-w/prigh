@@ -103,6 +103,7 @@ let%expect_test "/compaction shows, sets only its own field, and refusals" =
      (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((compaction_model null)))))
      (tag Compaction_saved))
+    (Rpc (method_ get_config) (params ()) (tag Config))
     Couldn't set compaction: cannot save /home/u/.prigh/config.json: Permission denied (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/compaction at lots") (max 500)))

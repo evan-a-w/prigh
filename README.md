@@ -1923,7 +1923,11 @@ holds what is summarised. It is sent the same request as the
 conversation's model would be (its messages, system prompt and tools,
 thinking only if it supports it, else a transcript when that does not
 fit), but, being another model, it does not reuse the conversation's
-prompt cache. `/compaction` alone shows all three settings. The system prompt also suggests handing
+prompt cache. `/compaction` alone shows all three settings, and
+`/compaction model` alone picks the model from a list. prigh-web's
+settings page has them too, under Compaction: the threshold (or Off), the
+summary model (a picker) and the masking switch, saved and kept in step
+with `/compaction` like the rest. The system prompt also suggests handing
 wide exploration to subagents, so the main context stays small.
 
 #### Trimming the context
@@ -2059,7 +2063,7 @@ it.
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
-| `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`) |
+| `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`); also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
