@@ -659,6 +659,92 @@ kbd {
 .session-bar > .status { flex-shrink: 0; margin-left: auto; }
 .session-bar > .settings-toggle { color: var(--faint); }
 .session-bar > .settings-toggle:hover { color: var(--chalk); }
+
+/* Session tabs (/tabs on): the open sessions over the chat. The current one
+   is cut from the chat's own ground with the sidebar's sodium edge; the
+   others sit back on the slate. A lamp or a mark says how each stands. */
+.session-tabs {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  min-width: 0;
+  height: 36px;
+  padding: 0 6px;
+  background: var(--slate);
+  border-bottom: 1px solid var(--rule);
+}
+.session-tabs-list {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.session-tabs-list::-webkit-scrollbar { display: none; }
+.session-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  width: 200px;
+  min-width: 96px;
+  height: 30px;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--r-control) var(--r-control) 0 0;
+  color: var(--muted);
+}
+.session-tab + .session-tab::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  border-left: 1px solid var(--rule);
+}
+.session-tab:hover { background: var(--slate-2); color: var(--chalk); }
+.session-tab.active {
+  background: var(--bg);
+  border-color: var(--rule);
+  color: var(--chalk);
+  box-shadow: inset 0 2px 0 var(--sodium);
+  height: 31px;
+}
+.session-tab.active::before, .session-tab.active + .session-tab::before,
+.session-tab:hover::before, .session-tab:hover + .session-tab::before { display: none; }
+.session-tab.dragging { opacity: 0.45; }
+.session-tabs.dragging .session-tab:not(.dragging):hover { box-shadow: inset 2px 0 0 var(--sodium); }
+.session-tab-open {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 11px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: default;
+}
+.session-tab.active .session-tab-open { font-weight: 600; }
+.session-tab-open:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; border-radius: var(--r-control); }
+.session-tab-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-tab .mark { --mark-size: 12px; }
+.session-tab.waiting .session-tab-title { color: var(--sodium); }
+.btn.icon.session-tab-close { width: 22px; height: 22px; margin-right: 4px; flex-shrink: 0; color: var(--faint); opacity: 0; }
+.btn.icon.session-tab-close .icon { width: 13px; height: 13px; }
+.session-tab:hover .session-tab-close, .session-tab.active .session-tab-close, .session-tab-close:focus-visible { opacity: 1; }
+.btn.icon.session-tab-close:hover { color: var(--chalk); background: var(--slate-2); }
+.session-tabs-end { flex: 1 0 auto; display: flex; align-items: center; height: 100%; padding-left: 4px; }
+.btn.icon.session-tabs-new { width: 26px; height: 26px; color: var(--faint); }
+.btn.icon.session-tabs-new:hover { color: var(--chalk); }
+@media (hover: none) { .btn.icon.session-tab-close { opacity: 1; } }
 .session-name {
   display: inline-flex;
   align-items: center;

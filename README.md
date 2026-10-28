@@ -813,10 +813,27 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session: the theme and accent, notifications (on or off, and
 what to do when the browser has not been asked, blocks them or cannot show
-them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),
+them), session tabs (`/tabs`), transcript detail (`/verbosity`), tool
+confirmation (`/confirm`),
 the providers (`/auth`), who you are signed in (and acting) as with Switch
 account and Sign out, and the keyboard shortcuts. Esc closes it; its
 controls keep it open.
+
+Session tabs (off by default; the settings page's Tabs switch or `/tabs
+on|off`, saved for your account, so they follow you to other browsers and
+devices) put the open sessions in a strip over the chat, like a browser's
+tabs. Opening a session (the sidebar, the palette, `/resume`, a new one)
+opens or focuses its tab. Each says the session's title and how it stands:
+the lamp while it runs, a warning when it waits for you (a confirmation or
+a question), a red cross when its last reply failed, a green tick when it
+finished while you were in another. A click switches to it; its ×, a middle
+click or Alt+W closes it (closing the current one moves to its neighbour,
+the last one to the empty state); drag a tab to move it; Alt+Shift+] and
+Alt+Shift+[ step through them and Alt+Shift+1…9 picks the Nth. Which tabs
+are open, and their order, are kept with the setting; archiving or deleting
+a session closes its tab. On a phone there are no tabs (the sidebar's
+sessions are a tap away); switching through tabs is switching sessions as
+ever, so nothing of the session you leave stays behind.
 
 Themes: `original` (graphite with the warm sodium accent, the default),
 `dark` (neutral greys: the accent is the only colour but diffs' and
@@ -2049,6 +2066,7 @@ it.
 | `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
+| `/tabs [on\|off]` (prigh-web) | show the open sessions as tabs over the chat, saved for your account; alone, says whether they are on |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |

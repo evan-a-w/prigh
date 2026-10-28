@@ -766,6 +766,8 @@ Preferences
 Notifications
 Tell you when a turn ends or something waits for you while this tab is hidden.
 The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+Tabs
+Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
 Transcript detail
 How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
 Quiet
@@ -1109,6 +1111,42 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 === chromium: themes: back ===
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
+none
+=== chromium: tabs: off by default ===
+(no tabs)
+switch: false
+=== chromium: tabs: on ===
+* New session
+=== chromium: tabs: three sessions ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files (Waiting for you: a confirmation or a question)
+=== chromium: tabs: another browser ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+  List the files (Waiting for you: a confirmation or a question)
+* New session
+=== chromium: tabs: switched from the keyboard ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files
+=== chromium: tabs: dragged ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+saved: web.tabs=true web.open-tabs=3
+=== chromium: tabs: reloaded ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+=== chromium: tabs: closed ===
+* Read the README
+sidebar: 3 sessions
+=== chromium: tabs: phone ===
+(no tabs)
+=== chromium: tabs: off ===
+(no tabs); saved: web.tabs=undefined web.open-tabs=1
+=== chromium: tabs: errors ===
 none
 === chromium: worktrees: a session's menu ===
 Tidy the docs in a worktree — prigh — main
