@@ -2167,8 +2167,11 @@ Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
 user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
 Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
 === firefox: filter: another session ===
-user 1, replies 1, thinking 0, tools 0, subagents 0, stopped 0
-note: Hiding thinking, tool calls, subagents · 1 item hidden | Show all
+user 1, replies 1, thinking 1, tools 0, subagents 0, stopped 0
+note: none
+=== firefox: filter: back ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+note: Hiding thinking, tool calls, subagents · 3 items hidden | Show all
 === firefox: filter: your messages hidden ===
 user 0, replies 3, thinking 0, tools 0, subagents 0, stopped 1
 rail: 2 marks
