@@ -1550,13 +1550,16 @@ let trace_command =
          if Sys_unix.file_exists_exn key
          then (
            match
-             List.find_map [ ".trace.old.jsonl"; ".trace.jsonl" ] ~f:(fun suffix ->
-               String.chop_suffix key ~suffix)
+             List.find_map
+               [ ".trace.old.jsonl"; ".trace.jsonl" ]
+               ~f:(fun suffix -> String.chop_suffix key ~suffix)
            with
            | Some base -> base ^ ".jsonl"
            | None -> key)
          else (
-           match Session.find_summary (Session.list ~dir:(sessions_dir ())) key with
+           match
+             Session.find_summary (Session.list ~dir:(sessions_dir ())) key
+           with
            | Ok summary -> summary.path
            | Error e ->
              eprintf
@@ -1572,7 +1575,8 @@ let trace_command =
            file
            ~data:(Jsonaf.to_string (Trace_report.perfetto spans));
          printf
-           "\nWrote %s: open it at https://ui.perfetto.dev or chrome://tracing\n"
+           "\n\
+            Wrote %s: open it at https://ui.perfetto.dev or chrome://tracing\n"
            file))
 ;;
 

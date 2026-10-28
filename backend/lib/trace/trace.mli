@@ -132,7 +132,11 @@ val start
   -> Open.t option
 
 (** Ends [span] (and its current phase), adding [attrs]; a span ends once. *)
-val finish : ?status:Status.t -> ?attrs:(string * Value.t) list -> Open.t option -> unit
+val finish
+  :  ?status:Status.t
+  -> ?attrs:(string * Value.t) list
+  -> Open.t option
+  -> unit
 
 (** Runs [f] with [span] as the current span. An exception ends the span
     [Cancelled] ([Eio.Cancel.Cancelled]) or [Error]. *)

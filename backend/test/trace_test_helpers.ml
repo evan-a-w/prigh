@@ -40,7 +40,11 @@ let work_tool clock =
 ;;
 
 let work ?(id = "w1") seconds =
-  Reply.tool_call ~id ~name:"work" ~arguments:(sprintf {|{"seconds":%d}|} seconds) ()
+  Reply.tool_call
+    ~id
+    ~name:"work"
+    ~arguments:(sprintf {|{"seconds":%d}|} seconds)
+    ()
 ;;
 
 let shown =
@@ -72,4 +76,3 @@ let print_tracks spans =
   |> List.iter ~f:(fun group ->
     printf "track %S: %d spans\n" (List.hd_exn group) (List.length group))
 ;;
-

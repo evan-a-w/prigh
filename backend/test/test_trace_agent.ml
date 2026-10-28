@@ -75,7 +75,8 @@ let with_agent
       ~cwd:t.dir
       ~trace_clock:(Virtual_clock.trace_clock clock)
       ?backend_host
-      ?session:(Option.map session ~f:(fun path -> Or_error.ok_exn (Session.load path)))
+      ?session:
+        (Option.map session ~f:(fun path -> Or_error.ok_exn (Session.load path)))
       ()
   in
   let result = f t clock agent in
@@ -93,23 +94,24 @@ let on_request ~sw agent f =
 
 let%expect_test "an approval's wait is its own span under the tool" =
   (with_agent
-    ~main:
-      [ Reply.tool_call ~id:"d1" ~name:"danger" ~arguments:"{}" ()
-      ; Reply.text "done"
-      ]
-    []
-  @@ fun _t clock agent ->
-  Agent.set_mode agent ~approval:Ask;
-  Eio.Switch.run
-  @@ fun sw ->
-  on_request ~sw agent (function
-    | Tool_confirm { call_id; agent_id; _ } ->
-      Virtual_clock.sleep clock 4.;
-      Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id Allow)
-    | _ -> ());
-  Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.wait_idle agent);
-  [%expect {|
+     ~main:
+       [ Reply.tool_call ~id:"d1" ~name:"danger" ~arguments:"{}" ()
+       ; Reply.text "done"
+       ]
+     []
+   @@ fun _t clock agent ->
+   Agent.set_mode agent ~approval:Ask;
+   Eio.Switch.run
+   @@ fun sw ->
+   on_request ~sw agent (function
+     | Tool_confirm { call_id; agent_id; _ } ->
+       Virtual_clock.sleep clock 4.;
+       Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id Allow)
+     | _ -> ());
+   Or_error.ok_exn (Agent.prompt agent "go");
+   Agent.wait_idle agent);
+  [%expect
+    {|
     prompt 5.3s
       turn 1 4.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -137,18 +139,19 @@ let ask_user id =
 
 let%expect_test "waiting for an answer to ask_user is its own span" =
   (with_agent ~main:[ ask_user "q1"; Reply.text "went with A" ] []
-  @@ fun _t clock agent ->
-  Eio.Switch.run
-  @@ fun sw ->
-  on_request ~sw agent (function
-    | Ask_user { call_id; _ } ->
-      Virtual_clock.sleep clock 7.;
-      Or_error.ok_exn
-        (Agent.answer_question agent ~call_id (Answered [ [ "A" ] ]))
-    | _ -> ());
-  Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.wait_idle agent);
-  [%expect {|
+   @@ fun _t clock agent ->
+   Eio.Switch.run
+   @@ fun sw ->
+   on_request ~sw agent (function
+     | Ask_user { call_id; _ } ->
+       Virtual_clock.sleep clock 7.;
+       Or_error.ok_exn
+         (Agent.answer_question agent ~call_id (Answered [ [ "A" ] ]))
+     | _ -> ());
+   Or_error.ok_exn (Agent.prompt agent "go");
+   Agent.wait_idle agent);
+  [%expect
+    {|
     prompt 8.3s
       turn 1 7.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -220,7 +223,8 @@ let%expect_test "background subagents run side by side on their own tracks" =
   in
   print_outline spans;
   print_tracks spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 1.5s
       turn 1 900ms
         model_request deepseek/deepseek-flash 900ms  stop=tool_use
@@ -276,7 +280,8 @@ let%expect_test "background subagents run side by side on their own tracks" =
     |}]
 ;;
 
-let%expect_test "a forked subagent, and one continued after running out of turns"
+let%expect_test
+    "a forked subagent, and one continued after running out of turns"
   =
   let spans =
     with_agent
@@ -308,7 +313,8 @@ let%expect_test "a forked subagent, and one continued after running out of turns
   in
   print_outline spans;
   print_tracks spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 1.3s
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -409,7 +415,8 @@ let%expect_test "a background job outlives the turn that started it" =
    Virtual_clock.sleep clock 10.;
    write t "go" "";
    runs 2);
-  [%expect {|
+  [%expect
+    {|
     prompt 1.3s
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -437,7 +444,11 @@ let%expect_test "a call forwarded to a tool host times its round trip" =
      ~backend_host:false
      ~tools:(fun _ -> Tools.all)
      ~main:
-       [ Reply.tool_call ~id:"r1" ~name:"read" ~arguments:{|{"path":"notes.txt"}|} ()
+       [ Reply.tool_call
+           ~id:"r1"
+           ~name:"read"
+           ~arguments:{|{"path":"notes.txt"}|}
+           ()
        ; Reply.text "read it"
        ]
      []
@@ -477,7 +488,8 @@ let%expect_test "a call forwarded to a tool host times its round trip" =
      ];
    Or_error.ok_exn (Agent.prompt agent "go");
    Agent.wait_idle agent);
-  [%expect {|
+  [%expect
+    {|
     prompt 3.3s
       turn 1 2.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -501,7 +513,8 @@ let%expect_test "aborting mid-tool ends the prompt cancelled" =
    Virtual_clock.sleep clock 3.;
    print_s [%sexp (Agent.abort agent : string list)];
    Agent.wait_idle agent);
-  [%expect {|
+  [%expect
+    {|
     ()
     prompt 3.0s [cancelled]
       turn 1 3.0s [cancelled]
@@ -545,7 +558,8 @@ let%expect_test "the trace survives reloading the session, and goes with it" =
   print_s [%sexp (files () : string list)];
   Session.delete_files path;
   print_s [%sexp (files () : string list)];
-  [%expect {|
+  [%expect
+    {|
     prompt 2.3s
       turn 1 1.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -600,7 +614,8 @@ let%expect_test "the summary and the Perfetto export of a session" =
         ; Reply.tool_call
             ~id:"b1"
             ~name:"bash"
-            ~arguments:{|{"command":"while [ ! -e go ]; do sleep 0.01; done","background":true}|}
+            ~arguments:
+              {|{"command":"while [ ! -e go ]; do sleep 0.01; done","background":true}|}
             ()
         ; Reply.text "waiting"
         ; Reply.text "child back"
@@ -628,7 +643,8 @@ let%expect_test "the summary and the Perfetto export of a session" =
     trace agent
   in
   print_string (Trace_report.summary ~slowest:6 spans);
-  [%expect {|
+  [%expect
+    {|
     2 prompts, 8 turns, 8 model requests, 7 tool calls (54 spans)
 
     Wall time 22.4s (the main agent, prompt to idle):
@@ -662,7 +678,8 @@ let%expect_test "the summary and the Perfetto export of a session" =
       4.0s  tool bash (while [ ! -e go ]; do sleep 0.01; done)  in prompt > turn 4
     |}];
   print_perfetto spans;
-  [%expect {|
+  [%expect
+    {|
     displayTimeUnit: "ms"
     traceEvents:
       {"name":"process_name","ph":"M","pid":1,"args":{"name":"prigh"}}

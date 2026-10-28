@@ -8,7 +8,11 @@ let delta_kind : Assistant_event.t -> string = function
   | Server_tool_use _ | Server_tool_result _ -> "server_tool"
 ;;
 
-let stream (provider : Provider.t) (request : Provider.Request.t) ~cancel ~on_event
+let stream
+      (provider : Provider.t)
+      (request : Provider.Request.t)
+      ~cancel
+      ~on_event
   =
   match
     Trace.start
@@ -59,7 +63,8 @@ let stream (provider : Provider.t) (request : Provider.Request.t) ~cancel ~on_ev
        let usage = reply.usage in
        let status, stop =
          match reply.stop_reason with
-         | End_turn -> Trace.Status.Ok, [ "stop", Trace.Value.String "end_turn" ]
+         | End_turn ->
+           Trace.Status.Ok, [ "stop", Trace.Value.String "end_turn" ]
          | Tool_use -> Ok, [ "stop", String "tool_use" ]
          | Length -> Ok, [ "stop", String "length" ]
          | Aborted -> Cancelled, [ "stop", String "aborted" ]

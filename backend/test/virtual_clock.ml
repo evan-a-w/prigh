@@ -18,7 +18,9 @@ let sleep t seconds =
 ;;
 
 let trace_clock t =
-  { Trace.Clock.mono = (fun () -> t.now); wall = (fun () -> 1_800_000_000. +. t.now) }
+  { Trace.Clock.mono = (fun () -> t.now)
+  ; wall = (fun () -> 1_800_000_000. +. t.now)
+  }
 ;;
 
 (* Enough yields for every runnable fiber to reach its next wait, and a

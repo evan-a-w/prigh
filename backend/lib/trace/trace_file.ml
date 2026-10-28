@@ -4,7 +4,11 @@ open! Import
 let default_max_bytes = 2 * 1024 * 1024
 let suffix = ".trace.jsonl"
 let old_suffix = ".trace.old.jsonl"
-let base session_path = String.chop_suffix_if_exists session_path ~suffix:".jsonl"
+
+let base session_path =
+  String.chop_suffix_if_exists session_path ~suffix:".jsonl"
+;;
+
 let current ~session_path = base session_path ^ suffix
 let old ~session_path = base session_path ^ old_suffix
 let paths ~session_path = [ old ~session_path; current ~session_path ]
@@ -21,7 +25,7 @@ type t =
   ; session_path : unit -> string option
   ; pending : string Queue.t
   ; mutable checked : string option
-  (** the file whose end was checked for a line cut short by a crash *)
+    (** the file whose end was checked for a line cut short by a crash *)
   }
 
 let create ?(max_bytes = default_max_bytes) ~session_path () =
@@ -35,15 +39,16 @@ let size path =
 ;;
 
 let ends_with_newline path =
-  match In_channel.with_file path ~f:(fun ic ->
-    let len = In_channel.length ic in
-    if Int64.(len = 0L)
-    then true
-    else (
-      In_channel.seek ic Int64.(len - 1L);
-      match In_channel.input_char ic with
-      | Some '\n' | None -> true
-      | Some _ -> false))
+  match
+    In_channel.with_file path ~f:(fun ic ->
+      let len = In_channel.length ic in
+      if Int64.(len = 0L)
+      then true
+      else (
+        In_channel.seek ic Int64.(len - 1L);
+        match In_channel.input_char ic with
+        | Some '\n' | None -> true
+        | Some _ -> false))
   with
   | b -> b
   | exception _ -> true

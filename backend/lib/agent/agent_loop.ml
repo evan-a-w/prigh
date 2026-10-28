@@ -398,7 +398,8 @@ let run
              Trace.span
                "retry_wait"
                ~attrs:[ "attempt", Int (n + 1); "delay", Float delay ]
-               (fun () -> Cancellation.protect cancel ~f:(fun () -> sleep delay))
+               (fun () ->
+                  Cancellation.protect cancel ~f:(fun () -> sleep delay))
            with
            | Some () -> attempt (n + 1) ~overflows
            | None -> { assistant with stop_reason = Aborted })

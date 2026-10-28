@@ -859,9 +859,7 @@ let set_config t (config : Config.t) =
     not (Approval_mode.equal config.approval_mode t.config.approval_mode)
   in
   t.config <- config;
-  Trace.set_level
-    t.tracer
-    (Trace.Level.effective ~configured:config.trace);
+  Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
   broadcast t (Config_changed config);
   (* [/confirm on|off] changes the default and the session at once. *)
   if mode_changed then set_approval_mode t config.approval_mode
