@@ -370,7 +370,8 @@ let%expect_test "agents with the pull_request tool are told to use it, not gh" =
   in
   show (Tools.all @ [ pull_request ]);
   show Tools.all;
-  [%expect {|
+  [%expect
+    {|
     - For pull requests (listing, reading, opening, checking out), use the pull_request tool, not gh: it signs in to the git host as the user.
     (no pull request guidance)
     |}]

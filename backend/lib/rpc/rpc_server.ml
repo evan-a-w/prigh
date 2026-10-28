@@ -1680,7 +1680,8 @@ let pull_requests t (client : Client.t) ~meth ~params =
   | "pr_view" ->
     let%bind number = number_param params "number" in
     Forges.view_pull t.forges ~git number >>| Forges.Pull.to_json
-  | "pr_defaults" -> Forges.pull_defaults t.forges ~git >>| Forges.Defaults.to_json
+  | "pr_defaults" ->
+    Forges.pull_defaults t.forges ~git >>| Forges.Defaults.to_json
   | _ ->
     let%bind title = string_param params "title" in
     let%bind body = string_param_opt params "body" in

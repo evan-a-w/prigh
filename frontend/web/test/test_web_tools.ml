@@ -512,5 +512,10 @@ let%expect_test "pull_request: the action and what it acts on" =
            ~arguments:{|{"action":"create","title":"Add x","draft":true}|}
            "opened #13 Add x"
        ]);
-  [%expect {||}]
+  [%expect
+    {|
+    ✓ pull_request list closed
+    ✓ pull_request view #12
+    ✓ pull_request create "Add x" (draft)
+    |}]
 ;;

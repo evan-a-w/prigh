@@ -138,12 +138,7 @@ let github (r : Forge_http.Request.t) =
            ~title:"From a contributor"
            ~head_owner:"fork"
            ())
-        (pr_json
-           ~host:"github.com"
-           ~number:5
-           ~title:"Old one"
-           ~draft:true
-           ()) )
+        (pr_json ~host:"github.com" ~number:5 ~title:"Old one" ~draft:true ()) )
   | Get, "/repos/o/r/pulls/7"
     when String.equal accept "application/vnd.github.diff" ->
     ( 200
@@ -170,7 +165,6 @@ let github (r : Forge_http.Request.t) =
   | Post, "/repos/o/r/pulls" -> !create_reply
   | _ -> 404, {|{"message":"Not Found"}|}
 ;;
-
 
 let git_out dir args =
   let ic =
