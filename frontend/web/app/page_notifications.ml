@@ -48,21 +48,29 @@ let show (n : Prigh_ui.Notify.t) =
         [| "body", Js.Unsafe.inject (Js.string n.body)
          ; "tag", Js.Unsafe.inject (Js.string "prigh")
          ; "renotify", Js.Unsafe.inject Js._true
+         ; ( "data"
+           , Js.Unsafe.inject
+               (Js.Unsafe.obj
+                  [| "url", Js.Unsafe.inject Dom_html.window##.location##.href
+                  |]) )
         |]
     in
-    let notification =
-      Js.Unsafe.new_obj
-        (notification_class ())
-        [| Js.Unsafe.inject (Js.string n.title); Js.Unsafe.inject options |]
-    in
-    (* Clicking it brings the tab back. *)
-    Js.Unsafe.set
-      notification
-      "onclick"
-      (Js.wrap_callback (fun () ->
-         ignore
-           (Js.Unsafe.meth_call Dom_html.window "focus" [||] : Js.Unsafe.any);
-         ignore (Js.Unsafe.meth_call notification "close" [||] : Js.Unsafe.any))))
+    if not (Service_worker.show_notification ~title:n.title options)
+    then (
+      let notification =
+        Js.Unsafe.new_obj
+          (notification_class ())
+          [| Js.Unsafe.inject (Js.string n.title); Js.Unsafe.inject options |]
+      in
+      (* Clicking it brings the tab back. *)
+      Js.Unsafe.set
+        notification
+        "onclick"
+        (Js.wrap_callback (fun () ->
+           ignore
+             (Js.Unsafe.meth_call Dom_html.window "focus" [||] : Js.Unsafe.any);
+           ignore
+             (Js.Unsafe.meth_call notification "close" [||] : Js.Unsafe.any)))))
 ;;
 
 let hidden () = Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")

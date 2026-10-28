@@ -310,6 +310,7 @@ module Command = struct
         session or not *)
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying this *)
+    | Apply_update
   [@@deriving sexp_of, equal]
 end
 
@@ -458,6 +459,9 @@ module Action = struct
         ; error : bool
         }
     | Dismiss_toast of int
+    | Update_ready
+    | Apply_update
+    | Dismiss_update
     | Sign_out
     | Set_accounts of
         { accounts : Accounts.Account.t list
@@ -559,6 +563,7 @@ module Model = struct
     ; cancelled_login : string option
     ; toasts : Toast.t list
     ; next_toast : int
+    ; update_ready : bool
     ; sidebar_open : bool
     ; review_drawer : bool
     ; scrolled_up : bool
@@ -787,6 +792,7 @@ let init =
   ; cancelled_login = None
   ; toasts = []
   ; next_toast = 0
+  ; update_ready = false
   ; sidebar_open = true
   ; review_drawer = false
   ; scrolled_up = false
@@ -8559,6 +8565,9 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Show_toast { text; error } -> toast m ~error text
   | Dismiss_toast id ->
     { m with toasts = List.filter m.toasts ~f:(fun t -> t.id <> id) }, []
+  | Update_ready -> { m with update_ready = true }, []
+  | Apply_update -> { m with update_ready = false }, [ Command.Apply_update ]
+  | Dismiss_update -> { m with update_ready = false }, []
   | Sign_out -> m, [ Command.Sign_out ]
   | Set_accounts { accounts; current } ->
     { m with accounts; account = current }, []

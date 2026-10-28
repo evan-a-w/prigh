@@ -48,7 +48,8 @@ let act t action =
      | Probe_connection
      | Drop_connection
      | Reload_page _
-     | Auth_failed _ -> ());
+     | Auth_failed _
+     | Apply_update -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
