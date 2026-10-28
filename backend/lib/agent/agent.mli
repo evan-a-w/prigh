@@ -394,6 +394,19 @@ val subagent_queues : t -> Subagent_inbox.Listing.t list
     dropped. *)
 val cancel_background : ?discard:bool -> t -> unit
 
+(** Background subagents still running when the backend stopped are
+    reported to the agent when its session is loaded again, like finished
+    ones but [[subagent <id> interrupted]]: this starts the run that
+    reports them, if there are any and the agent is idle with no automatic
+    resume pending (otherwise the next run does). Switching to a session
+    does it too. *)
+val report_interrupted_subagents : t -> unit
+
+(** For a backend that is stopping: cancels the run and the background work
+    without reporting it, leaving the session's background subagents to be
+    reported as interrupted when it is loaded again. *)
+val shutdown : t -> unit
+
 (** Every job of this agent, oldest first. *)
 val jobs : t -> Background_tasks.Task.t list
 

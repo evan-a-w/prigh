@@ -987,7 +987,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   skipping lines that do not parse. Memory stays the source of truth for
   reads. Subagents saved as running load as failed (`[interrupted] the
   backend stopped before it finished`, ended at their last saved
-  activity), and the background task ids skip the reloaded ones
+  activity); those ends are written only once reported. The main
+  agent's background ones among them are reported to it, like finished
+  tasks (`[subagent <id> interrupted]`, with their last assistant text):
+  `Agent.deliveries` takes them (`Subagent_log.take_interrupted`) into
+  the next run's report message, and `Agent.report_interrupted_subagents`
+  (when the RPC server registers a loaded agent, and after
+  `replace_session`) starts that run when the agent is idle with no
+  automatic resume pending. `Agent.shutdown` (the stdio server's
+  `Rpc_server.shutdown`) detaches the log before cancelling, so a stop
+  loads like a kill rather than as cancelled. The background task ids
+  skip the reloaded ones
   (`Background_tasks.avoid_subagent_ids`), so a rewound conversation does
   not reuse `a<n>`.
   `queued_texts` and `pending_confirms` back `get_pending`; the in-place

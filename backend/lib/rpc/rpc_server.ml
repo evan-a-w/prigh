@@ -523,6 +523,7 @@ let register t agent =
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
   Agent.subscribe agent ~f:(route t agent);
+  Agent.report_interrupted_subagents agent;
   agent
 ;;
 
@@ -874,9 +875,7 @@ let disconnect t (client : Client.t) =
 (* Finishing runs evict idle sessions, so iterate over a snapshot. *)
 let shutdown t =
   let agents = Hashtbl.data t.agents in
-  List.iter agents ~f:(fun agent ->
-    Agent.cancel_background ~discard:true agent;
-    ignore (Agent.abort agent : string list));
+  List.iter agents ~f:Agent.shutdown;
   Login_manager.cancel t.login;
   List.iter agents ~f:Agent.wait_idle;
   Login_manager.wait t.login

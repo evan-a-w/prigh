@@ -113,6 +113,8 @@ type t =
   ; by_id : Entry.t String.Table.t
   ; mutable runs : int
   ; mutable dir : unit -> string option
+  ; mutable interrupted : Entry.t list
+    (** ended by [load], oldest first, their ends not written yet *)
   }
 
 let create () =
@@ -120,6 +122,7 @@ let create () =
   ; by_id = String.Table.create ()
   ; runs = 0
   ; dir = (fun () -> None)
+  ; interrupted = []
   }
 ;;
 
@@ -173,6 +176,22 @@ let end_ t (e : Entry.t) ~at ~result =
   e.current_tool <- None
 ;;
 
+let write_end t (e : Entry.t) =
+  match e.ended, e.result with
+  | Some (at, run), Some result ->
+    write
+      t
+      (End
+         { id = e.id
+         ; at
+         ; run
+         ; turns = e.turns
+         ; tool_calls = e.tool_calls
+         ; result = Line.Result.of_tool_result result
+         })
+  | _ -> ()
+;;
+
 let rec record_in t ~now ~parent (event : Agent_event.t) =
   let touch id f =
     Option.iter (Hashtbl.find t.by_id id) ~f:(fun (e : Entry.t) ->
@@ -199,16 +218,7 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
   | Subagent_end { agent_id; result; _ } ->
     touch agent_id (fun e ->
       end_ t e ~at:now ~result;
-      write
-        t
-        (End
-           { id = e.id
-           ; at = now
-           ; run = t.runs
-           ; turns = e.turns
-           ; tool_calls = e.tool_calls
-           ; result = Line.Result.of_tool_result result
-           }))
+      write_end t e)
   | Subagent { agent_id; event = inner; call_id = _ } ->
     (match inner with
      | Subagent_start _ | Subagent_end _ | Subagent _ ->
@@ -284,6 +294,7 @@ let load t ~dir =
   Hashtbl.clear t.by_id;
   t.runs <- 0;
   t.dir <- dir;
+  t.interrupted <- [];
   Option.iter (dir ()) ~f:(fun dir ->
     let path = Filename.concat dir file_name in
     if Sys_unix.file_exists_exn path
@@ -291,12 +302,25 @@ let load t ~dir =
       (match File_cache.find_or_read lines path ~read:read_lines with
        | Ok lines -> List.iter lines ~f:(replay t)
        | Error _ -> ());
-      Queue.iter t.entries ~f:(fun e ->
-        if Option.is_none e.result
-        then
-          (* Not written, so that a later load finds the same end. *)
-          end_ t e ~at:e.updated_at ~result:(Tool_result.error interrupted))))
+      t.interrupted
+      <- Queue.filter t.entries ~f:(fun (e : Entry.t) ->
+           Option.is_none e.result)
+         |> Queue.to_list;
+      (* Not written until reported, so that a later load finds the same
+         end and reports it if this one did not. *)
+      List.iter t.interrupted ~f:(fun e ->
+        end_ t e ~at:e.updated_at ~result:(Tool_result.error interrupted))))
 ;;
+
+let detach t = t.dir <- (fun () -> None)
+
+(* A background subagent of the main agent: the synchronous ones are named
+   after their call, and their caller's call is interrupted too. *)
+let reportable (e : Entry.t) =
+  Option.is_none e.parent && not (String.equal e.id e.call_id)
+;;
+
+let has_interrupted t = List.exists t.interrupted ~f:reportable
 
 let summary t (e : Entry.t) =
   { Summary.id = e.id
@@ -355,6 +379,14 @@ let orphan_ends t ~alive ~why =
         (List.fold ancestors ~init:end_ ~f:(fun event (parent : Entry.t) ->
            Agent_event.Subagent
              { call_id = parent.call_id; agent_id = parent.id; event }))))
+;;
+
+let take_interrupted t =
+  let entries = t.interrupted in
+  t.interrupted <- [];
+  List.iter entries ~f:(write_end t);
+  List.filter_map entries ~f:(fun e ->
+    Option.some_if (reportable e) (summary t e, Queue.to_list e.messages))
 ;;
 
 let find t key =
