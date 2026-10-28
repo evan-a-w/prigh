@@ -182,6 +182,9 @@ val has_undelivered : t -> bool
 (** One user message carrying the reports of [tasks]. *)
 val delivery_message : Task.t list -> Message.t
 
+(** One user message carrying [reports], each like {!Task.report}'s. *)
+val reports_message : string list -> Message.t
+
 (** [take_undelivered], but when nothing is undelivered and tasks are
     running, it first blocks until one of them finishes (or [cancel], or
     [interrupt] returns). [[]] when nothing is running, on [cancel] or on
