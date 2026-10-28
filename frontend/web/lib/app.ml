@@ -428,6 +428,12 @@ module Action = struct
     | Set_recipient of Recipient.t
     | Remove_reminder of string
     | Toggle_folded of string
+    | Set_tabs of bool
+    | Close_tab of string option
+    | Step_tab of int
+    | Nth_tab of int
+    | Drag_tab of string option
+    | Drop_tab of string option
     | New_session_in of string
     | New_worktree
     | New_worktree_input of
@@ -584,6 +590,7 @@ module Model = struct
     ; worktrees : Worktrees.t
     ; repo_worktrees : Repo_listings.t
     ; folded : String.Set.t
+    ; tabs : Session_tabs.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
@@ -813,6 +820,7 @@ let init =
   ; worktrees = Worktrees.empty
   ; repo_worktrees = Repo_listings.empty
   ; folded = String.Set.empty
+  ; tabs = Session_tabs.init
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
@@ -2016,6 +2024,20 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
       | _ -> String.Set.empty
     in
     { m with folded })
+  else if String.equal key Key.tabs
+  then
+    { m with
+      tabs =
+        Session_tabs.set_enabled
+          m.tabs
+          (Option.exists value ~f:(Json.equal `True))
+    }
+  else if String.equal key Key.open_tabs
+  then
+    if startup || not m.tabs.loaded
+    then
+      { m with tabs = Session_tabs.restore m.tabs (Session_tabs.of_json value) }
+    else m
   else if String.equal key Key.review
   then { m with review_memory = Review_memory.of_json value }
   else if String.equal key Key.terminal_open
@@ -2051,6 +2073,7 @@ let prefs_loaded (m : Model.t) changes =
   let startup = Pref_sync.Remote.equal m.prefs.remote Unknown in
   let prefs, applied, upload = Pref_sync.loaded m.prefs changes in
   let m = apply_prefs { m with prefs } ~startup applied in
+  let m = { m with tabs = Session_tabs.load m.tabs } in
   (* The page may show another account's, from the browser's cache. *)
   ( m
   , Command.Apply_theme (Model.look m)
@@ -3470,6 +3493,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; session_gone = None
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
+    ; tabs = Session_tabs.reset m.tabs
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
@@ -4356,6 +4380,99 @@ let worktree_command (m : Model.t) rest =
     list_worktrees m (Target { command; action })
 ;;
 
+(* ---- session tabs (Session_tabs) *)
+
+let current_session (m : Model.t) =
+  Option.map m.state ~f:(fun s -> s.session_id)
+;;
+
+let shown_tabs (m : Model.t) =
+  Session_tabs.shown m.tabs m.sessions ~current:(current_session m)
+;;
+
+let new_session (m : Model.t) =
+  ( { (starting m) with
+      sidebar_open = m.sidebar_open && not m.narrow
+    ; review_drawer = false
+    }
+  , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
+;;
+
+let switch_tab (m : Model.t) id =
+  match List.find (shown_tabs m) ~f:(fun (id', _) -> String.equal id id') with
+  | Some (_, Some s) -> switch_session m s.path
+  | Some (_, None) | None -> m, []
+;;
+
+let set_tabs (m : Model.t) enabled =
+  let m = { m with tabs = Session_tabs.set_enabled m.tabs enabled } in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then
+         "Session tabs on: opening a session opens its tab (Alt+Shift+] [ \
+          switch, Alt+W closes; /tabs off)"
+       else "Session tabs off: /tabs on turns them on")
+  in
+  m, save_pref m Key.tabs (Option.some_if enabled `True) @ cmds
+;;
+
+let close_tab (m : Model.t) id =
+  let current = current_session m in
+  let id = Option.first_some id current in
+  match id with
+  | None -> m, []
+  | Some id ->
+    let ids = List.map (shown_tabs m) ~f:fst in
+    let next = Session_tabs.neighbour ids id in
+    let m = { m with tabs = Session_tabs.close m.tabs id ~current } in
+    if not (Option.exists current ~f:(String.equal id))
+    then m, []
+    else (
+      match next with
+      | Some next -> switch_tab m next
+      | None -> new_session m)
+;;
+
+let step_tab (m : Model.t) by =
+  let ids = List.map (shown_tabs m) ~f:fst in
+  match Session_tabs.step ids ~from:(current_session m) ~by with
+  | Some id -> switch_tab m id
+  | None -> m, []
+;;
+
+let nth_tab (m : Model.t) n =
+  match Session_tabs.nth (List.map (shown_tabs m) ~f:fst) n with
+  | Some id -> switch_tab m id
+  | None -> m, []
+;;
+
+let drop_tab (m : Model.t) before =
+  match m.tabs.dragging with
+  | None -> m, []
+  | Some id ->
+    let tabs = Session_tabs.move m.tabs id ~before in
+    { m with tabs = { tabs with dragging = None } }, []
+;;
+
+(* Opening a session opens or focuses its tab. *)
+let follow_tabs (before : Model.t) ((m : Model.t), cmds) =
+  if not m.tabs.enabled
+  then m, cmds
+  else (
+    let current = current_session m in
+    let tabs =
+      Session_tabs.follow m.tabs ~previous:(current_session before) ~current
+    in
+    let m = { m with tabs } in
+    match Session_tabs.to_save tabs with
+    | Some ids when Option.is_none (acting_as m) ->
+      ( { m with tabs = Session_tabs.saved tabs }
+      , cmds @ save_pref m Key.open_tabs (Some (Session_tabs.to_json ids)) )
+    | Some _ | None -> m, cmds)
+;;
+
 (* The sidebar's listing follows the session, its directory and host, and
    the sessions' directories. *)
 let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
@@ -5167,6 +5284,21 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       (sprintf
          "Unknown /notify argument “%s”: /notify on or /notify off (/notify \
           alone says what is on)"
+         other)
+  | "tabs", "" ->
+    toast
+      m
+      (if m.tabs.enabled
+       then "Session tabs are on: /tabs off hides them"
+       else "Session tabs are off: /tabs on shows the open sessions as tabs")
+  | "tabs", "on" -> set_tabs m true
+  | "tabs", "off" -> set_tabs m false
+  | "tabs", other ->
+    error
+      m
+      (sprintf
+         "Unknown /tabs argument “%s”: /tabs on or /tabs off (/tabs alone says \
+          which)"
          other)
   | "name", "" -> open_rename m
   | "name", name ->
@@ -6544,7 +6676,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Worktree_removed { target; force }, Error e ->
     worktree_remove_failed m ~target ~force e
   (* A backend that keeps none: this browser keeps them. *)
-  | Prefs, Error _ -> { m with prefs = { m.prefs with remote = Local } }, []
+  | Prefs, Error _ ->
+    ( { m with
+        prefs = { m.prefs with remote = Local }
+      ; tabs = Session_tabs.load m.tabs
+      }
+    , [] )
   | Skills { place; purpose = Complete }, Error _ ->
     (* Complete nothing rather than ask again at every key. *)
     if Option.equal String.equal (Skills.place m.state) (Some place)
@@ -6967,6 +7104,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       ( { m with
           sessions
         ; marks = Session_marks.prune m.marks ~paths
+        ; tabs =
+            Session_tabs.listed m.tabs sessions ~current:(current_session m)
         ; chat_cache =
             Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
         }
@@ -8288,12 +8427,7 @@ let update_connected (m : Model.t) (action : Action.t) =
        let c = Completion.move c (i - Completion.selected c) in
        accept_completion { m with completion = Some c } ~run:true)
   | Complete_close -> { m with completion = None }, []
-  | New_session ->
-    ( { (starting m) with
-        sidebar_open = m.sidebar_open && not m.narrow
-      ; review_drawer = false
-      }
-    , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
+  | New_session -> new_session m
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
     if Set.mem m.marks.marked path
@@ -8474,6 +8608,12 @@ let update_connected (m : Model.t) (action : Action.t) =
          else
            Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
     )
+  | Set_tabs enabled -> set_tabs m enabled
+  | Close_tab id -> close_tab m id
+  | Step_tab by -> step_tab m by
+  | Nth_tab n -> nth_tab m n
+  | Drag_tab id -> { m with tabs = { m.tabs with dragging = id } }, []
+  | Drop_tab before -> drop_tab m before
   | New_session_in path -> new_session_in m path
   | Generate Commit_message -> git_action m Draft
   | Generate target -> start_generate m target
@@ -8721,6 +8861,7 @@ let update (m : Model.t) (action : Action.t) =
     else m'
   in
   let m', cmds = follow_worktrees m (m', cmds) in
+  let m', cmds = follow_tabs m (m', cmds) in
   let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
