@@ -400,6 +400,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
+    /trace where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
     /sessions search the saved sessions
     /switch [path] switch to a saved session
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
@@ -423,7 +424,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
-    /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

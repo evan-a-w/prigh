@@ -417,6 +417,21 @@ let run_once
   let p = state.prepared in
   let call_id = context.call_id in
   let agent_id = state.agent_id in
+  (* Only a background run has an inbox. It goes under the turn that started
+     (or continued) it, which may be over by the time the run ends. *)
+  let background = Option.is_some inbox in
+  Trace.span
+    "subagent"
+    ?under:(Option.some_if background "turn")
+    ~track:("subagent " ^ agent_id)
+    ~attrs:
+      [ "agent_id", String agent_id
+      ; "model", String (Model.key p.model)
+      ; "background", Bool background
+      ; "forked", Bool (Option.is_some p.fork)
+      ; "continued", Bool continued
+      ]
+  @@ fun () ->
   context.emit
     (Agent_event.Subagent_start
        { call_id

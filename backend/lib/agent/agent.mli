@@ -230,6 +230,8 @@ val create
        (** waits until a time (seconds since the epoch): for {!resume_now}'s
            automatic counterpart and for an [ask_user] question's timeout;
            default: the clock *)
+  -> ?trace_clock:Trace.Clock.t
+       (** times the session's trace ({!Trace_file}); default: the clocks *)
   -> cwd:string
   -> unit
   -> t
@@ -801,6 +803,9 @@ val export
 val import_session : t -> path:string -> string Or_error.t
 
 val session_stats : t -> Session_stats.t
+
+(** This session's trace ({!Trace_file}) and its summary, for [/trace]. *)
+val trace_report : t -> Trace_report.Report.t
 
 (** {2 Tool hosts}
 

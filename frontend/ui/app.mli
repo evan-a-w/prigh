@@ -39,6 +39,7 @@ module Reply_tag : sig
     | Sessions_picker
     | Sessions_cache
     | Session_stats
+    | Trace
     | Entries_for_fork
     | Entries_for_rewind
     | Entries_for_tree
