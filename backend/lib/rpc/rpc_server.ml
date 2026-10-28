@@ -1659,31 +1659,28 @@ let number_param params name =
 ;;
 
 (* The repository is the client's session's, on its active tool host. *)
-let pull_requests t (client : Client.t) ~meth ~params =
-  let open Or_error.Let_syntax in
-  let%bind dir = string_param_opt params "dir" in
+let session_git (client : Client.t) params =
+  let%map.Or_error dir = string_param_opt params "dir" in
   let dir = Option.filter dir ~f:(fun d -> not (String.is_empty d)) in
-  let git request =
+  fun request ->
     Agent.host_call
       client.agent
       ~name:Git_forge.op
       (Git_forge.in_dir dir (Git_forge.Request.to_json request))
-  in
+;;
+
+let pull_requests t (client : Client.t) ~meth ~params =
+  let open Or_error.Let_syntax in
+  let%bind git = session_git client params in
   match meth with
   | "pr_list" ->
     let%bind state = string_param_opt params "state" in
     Forges.list_pulls t.forges ~git ~state:(Option.value state ~default:"open")
+    >>| Forges.Pulls.to_json
   | "pr_view" ->
     let%bind number = number_param params "number" in
-    Forges.view_pull t.forges ~git number
-  | "pr_defaults" -> Forges.pull_defaults t.forges ~git
-  | "pr_checkout" ->
-    let%bind number = number_param params "number" in
-    Forges.checkout_pull
-      t.forges
-      ~git
-      ~worktrees_dir:(Agent.config client.agent).worktrees_dir
-      number
+    Forges.view_pull t.forges ~git number >>| Forges.Pull.to_json
+  | "pr_defaults" -> Forges.pull_defaults t.forges ~git >>| Forges.Defaults.to_json
   | _ ->
     let%bind title = string_param params "title" in
     let%bind body = string_param_opt params "body" in
@@ -1703,6 +1700,7 @@ let pull_requests t (client : Client.t) ~meth ~params =
       ~head:(blank head)
       ~draft
       ~push
+    >>| Forges.Pull.to_json
 ;;
 
 let request_params request =
@@ -1796,17 +1794,23 @@ let create_worktree t (client : Client.t) params =
     ]
 ;;
 
-(* [/pr checkout]'s worktree, in the repository the session works in. *)
-let record_checkout t (client : Client.t) ~params json =
+(* [/pr checkout]: the worktree is recorded in the repository the session
+   works in. *)
+let checkout_pull t (client : Client.t) params =
   let open Or_error.Let_syntax in
+  let%bind git = session_git client params in
   let%bind number = number_param params "number" in
+  let%map checkout =
+    Forges.checkout_pull
+      t.forges
+      ~git
+      ~worktrees_dir:(Agent.config client.agent).worktrees_dir
+      number
+  in
   let root =
     match Session.repo (Agent.session client.agent) with
     | Some (Some l) -> l.root
     | Some None | None -> (Agent.state client.agent).cwd
-  in
-  let%map checkout =
-    Or_error.try_with (fun () -> [%of_jsonaf: Git_forge.Checkout.t] json)
   in
   record_worktree
     t
@@ -1815,7 +1819,8 @@ let record_checkout t (client : Client.t) ~params json =
     ; branch = Some checkout.branch
     ; root
     ; source = Pull_request { number }
-    }
+    };
+  [%jsonaf_of: Git_forge.Checkout.t] checkout
 ;;
 
 (* The sessions (saved or live) whose worktrees include [path] forget it. *)
@@ -2205,11 +2210,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
         Or_error.map (Forges.logout t.forges instance.host) ~f:(fun () ->
           Login_manager.forge_logged_out t.login instance.host;
           `Object [])))
-  | "pr_checkout" ->
-    Some
-      (Or_error.bind (pull_requests t client ~meth ~params) ~f:(fun json ->
-         Or_error.map (record_checkout t client ~params json) ~f:(fun () ->
-           json)))
+  | "pr_checkout" -> Some (checkout_pull t client params)
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->

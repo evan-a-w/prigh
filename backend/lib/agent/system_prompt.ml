@@ -106,6 +106,13 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
             )
           ]
         else [])
+     @ (if has "pull_request"
+        then
+          [ "- For pull requests (listing, reading, opening, checking out), use \
+             the pull_request tool, not gh: it signs in to the git host as the \
+             user."
+          ]
+        else [])
      @ (if Role.equal role Main && has "subagent"
         then
           [ "- You are the orchestrator: for substantial work (implementing a \

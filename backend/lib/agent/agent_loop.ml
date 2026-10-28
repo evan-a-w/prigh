@@ -66,6 +66,20 @@ let tool_summary ~name (args : Json.t) =
          | _ -> []
        in
        String.concat ~sep:" " (text "action" @ text "branch" @ text "path")
+     | _ when String.equal name "pull_request" ->
+       let text key =
+         match find key with
+         | Some (`String s) -> [ s ]
+         | _ -> []
+       in
+       let number =
+         match Option.bind (find "number") ~f:Json.int with
+         | Some n -> [ sprintf "#%d" n ]
+         | None -> []
+       in
+       String.concat
+         ~sep:" "
+         (text "action" @ text "state" @ number @ text "title")
      | Some (`String s), _, _ -> s
      | _, Some (`String s), _ -> s
      | _, _, Some (`String patch) when String.equal name "apply_patch" ->

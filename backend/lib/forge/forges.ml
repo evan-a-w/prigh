@@ -159,7 +159,8 @@ let logout t host =
 
 let not_signed_in (instance : Forge_instance.t) =
   Or_error.errorf
-    "not signed in to %s: /login %s signs in"
+    "not signed in to %s: sign in under Settings → Git hosting in \
+     prigh-web, or with /login %s"
     instance.host
     (Forge_instance.login_arg instance)
 ;;
@@ -261,18 +262,72 @@ let repo t ~git =
     , info )
 ;;
 
-let pr_json ?checks ?(diff = "", false) repo pr =
-  let diff, truncated = diff in
-  `Object
-    ([ "repo", Forge_repo.to_json repo; "pr", Pull_request.to_json pr ]
-     @ (match checks with
-        | None -> []
-        | Some c ->
-          [ "checks", Option.value_map c ~default:`Null ~f:Pr_checks.to_json ])
-     @ [ "diff", `String diff
-       ; ("truncated", if truncated then `True else `False)
-       ])
-;;
+module Pulls = struct
+  type t =
+    { repo : Forge_repo.t
+    ; prs : Pull_request.t list
+    }
+  [@@deriving sexp_of]
+
+  let to_json { repo; prs } =
+    `Object
+      [ "repo", Forge_repo.to_json repo
+      ; "prs", `Array (List.map prs ~f:Pull_request.to_json)
+      ]
+  ;;
+end
+
+module Pull = struct
+  type t =
+    { repo : Forge_repo.t
+    ; pr : Pull_request.t
+    ; checks : Pr_checks.t Or_error.t option
+    ; diff : (string * bool) option
+    }
+  [@@deriving sexp_of]
+
+  let to_json { repo; pr; checks; diff } =
+    let diff, truncated = Option.value diff ~default:("", false) in
+    `Object
+      ([ "repo", Forge_repo.to_json repo; "pr", Pull_request.to_json pr ]
+       @ (match checks with
+          | None -> []
+          | Some c ->
+            [ ( "checks"
+              , match c with
+                | Ok c -> Pr_checks.to_json c
+                | Error _ -> `Null )
+            ])
+       @ [ "diff", `String diff
+         ; ("truncated", if truncated then `True else `False)
+         ])
+  ;;
+end
+
+module Defaults = struct
+  type t =
+    { repo : Forge_repo.t
+    ; head : string
+    ; base : string
+    ; title : string
+    ; body : string
+    ; commits : string list
+    ; pushed : bool
+    }
+  [@@deriving sexp_of]
+
+  let to_json { repo; head; base; title; body; commits; pushed } =
+    `Object
+      [ "repo", Forge_repo.to_json repo
+      ; "head", `String head
+      ; "base", `String base
+      ; "title", `String title
+      ; "body", `String body
+      ; "commits", `Array (List.map commits ~f:(fun s -> `String s))
+      ; ("pushed", if pushed then `True else `False)
+      ]
+  ;;
+end
 
 let with_api t ~git ~f =
   let open Or_error.Let_syntax in
@@ -289,23 +344,24 @@ let list_pulls t ~git ~state =
   in
   with_api t ~git ~f:(fun api repo _ ->
     Or_error.map (Forge_api.list_pulls api repo ~state) ~f:(fun prs ->
-      `Object
-        [ "repo", Forge_repo.to_json repo
-        ; "prs", `Array (List.map prs ~f:Pull_request.to_json)
-        ]))
+      { Pulls.repo; prs }))
 ;;
 
-let view_pull t ~git number =
+let view_pull t ~git ?(diff = true) number =
   with_api t ~git ~f:(fun api repo _ ->
     let open Or_error.Let_syntax in
     let%bind pr = Forge_api.get_pull api repo number in
-    let%map diff = Forge_api.pull_diff api repo number in
+    let%map diff =
+      if diff
+      then Forge_api.pull_diff api repo number >>| Option.some
+      else Ok None
+    in
     let checks =
       if String.is_empty pr.head_sha
       then None
-      else Result.ok (Forge_api.checks api repo ~sha:pr.head_sha)
+      else Some (Forge_api.checks api repo ~sha:pr.head_sha)
     in
-    pr_json ~checks ~diff repo pr)
+    { Pull.repo; pr; checks; diff })
 ;;
 
 let humanize_branch branch =
@@ -363,15 +419,14 @@ let pull_defaults t ~git =
             ~sep:"\n"
             (List.map commits ~f:(fun (subject, _) -> "- " ^ subject)) )
     in
-    `Object
-      [ "repo", Forge_repo.to_json repo
-      ; "head", `String head
-      ; "base", `String base
-      ; "title", `String title
-      ; "body", `String body
-      ; "commits", `Array (List.map log.commits ~f:(fun (s, _) -> `String s))
-      ; ("pushed", if log.pushed then `True else `False)
-      ])
+    { Defaults.repo
+    ; head
+    ; base
+    ; title
+    ; body
+    ; commits = List.map log.commits ~f:fst
+    ; pushed = log.pushed
+    })
 ;;
 
 let create_pull t ~git ~title ~body ~base ~head ~draft ~push =
@@ -400,6 +455,25 @@ let create_pull t ~git ~title ~body ~base ~head ~draft ~push =
                   (Git_forge.Request.Push
                      { remote = repo.remote; branch = head }))
                ~of_json:Fn.id)
+        else if [%equal: string option] info.branch (Some head)
+        then (
+          let%bind log =
+            host_result
+              (git
+                 (Git_forge.Request.Log
+                    { remote = repo.remote; base; branch = head }))
+              ~of_json:[%of_jsonaf: Git_forge.Log.t]
+          in
+          if log.pushed
+          then Ok ()
+          else
+            Or_error.errorf
+              "%s does not have %s with all its commits: push it first (the \
+               push option, or git push -u %s %s)"
+              repo.remote
+              head
+              repo.remote
+              head)
         else Ok ()
       in
       let%map pr =
@@ -412,18 +486,14 @@ let create_pull t ~git ~title ~body ~base ~head ~draft ~push =
           ~base
           ~draft
       in
-      pr_json repo pr)
+      { Pull.repo; pr; checks = None; diff = None })
 ;;
 
 let checkout_pull t ~git ~worktrees_dir number =
-  let open Or_error.Let_syntax in
-  let%bind repo, _ = repo t ~git in
-  let%map checkout =
-    host_result
-      (git
-         (Git_forge.Request.Checkout
-            { remote = repo.remote; number; worktrees_dir }))
-      ~of_json:[%of_jsonaf: Git_forge.Checkout.t]
-  in
-  [%jsonaf_of: Git_forge.Checkout.t] checkout
+  let%bind.Or_error repo, _ = repo t ~git in
+  host_result
+    (git
+       (Git_forge.Request.Checkout
+          { remote = repo.remote; number; worktrees_dir }))
+    ~of_json:[%of_jsonaf: Git_forge.Checkout.t]
 ;;

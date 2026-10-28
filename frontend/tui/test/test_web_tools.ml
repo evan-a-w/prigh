@@ -723,3 +723,14 @@ let%expect_test "worktree: the action and its branch or path" =
         }
     |}]
 ;;
+
+let%expect_test "pull_request: the action and what it acts on" =
+  show_item
+    (tool
+       "pull_request"
+       {|{"action":"create","title":"Add x","body":"Because.","draft":true}|}
+       ~result:(false, "opened #13 Add x (open, draft) in o/r on github.com"));
+  show_item (tool "pull_request" {|{"action":"checkout","number":7}|});
+  show_item (tool "pull_request" {|{"action":"list"}|});
+  [%expect {||}]
+;;

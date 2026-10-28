@@ -341,3 +341,34 @@ let%expect_test "agents with the worktree tool are told to use it" =
     (no worktree guidance)
     |}]
 ;;
+
+let%expect_test "agents with the pull_request tool are told to use it, not gh" =
+  let pull_request =
+    Tool_pull_request.create
+      ~forges:
+        (Forges.create
+           ~http:(fun ?cancel:_ _ -> Or_error.error_string "offline")
+           ~sleep:ignore
+           ~store:(Auth_store.create ~path:"/nonexistent/auth.json")
+           ())
+      ()
+  in
+  let show tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role:Main
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"pull request")
+    |> function
+    | [] -> print_endline "(no pull request guidance)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show (Tools.all @ [ pull_request ]);
+  show Tools.all;
+  [%expect {||}]
+;;
