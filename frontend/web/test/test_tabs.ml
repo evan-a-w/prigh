@@ -213,6 +213,22 @@ let%expect_test "switching from the keyboard" =
     [tab] button "Beta"
     [tab] button "Gamma"
     |}];
+  (* Pressed twice before the switch lands: each moves on (Gamma, then
+     round to Alpha). *)
+  H.key h ~alt:true ~shift:true ~code:"BracketRight" "}";
+  H.key h ~alt:true ~shift:true ~code:"BracketRight" "}";
+  [%expect {|
+    (Step_tab 1)
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Step_tab 1)
+    (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    |}];
+  H.quiet h (fun () -> H.reply h "switch_session" "{}");
+  arrive h "s1";
   (* Beyond the last tab: nothing. *)
   H.key h ~alt:true ~shift:true ~code:"Digit9" "(";
   [%expect {| (Nth_tab 9) |}];
