@@ -18,10 +18,17 @@ const index = new URL("index.html", scope).href;
 const pages = new Set([scope.href, index]);
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache =>
-      // Past the HTTP cache: these are this build's files.
-      cache.addAll([...shellUrls].map(url => new Request(url, { cache: "reload" })))));
+  // Past the HTTP cache: these are this build's files. A redirect (a proxy's
+  // sign-in, its session expired) fails the install, to be tried again on
+  // the next visit, rather than keeping a login page as the shell.
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await Promise.all([...shellUrls].map(async url => {
+      const response = await fetch(new Request(url, { cache: "reload", redirect: "error" }));
+      if (!response.ok) throw new Error(`${url}: ${response.status}`);
+      await cache.put(url, response);
+    }));
+  })());
 });
 
 self.addEventListener("activate", event => {
