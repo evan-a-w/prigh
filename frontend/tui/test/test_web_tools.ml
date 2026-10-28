@@ -547,7 +547,8 @@ let%expect_test "streamed: a search whose message ended without a result" =
   H.event h search_use;
   H.event h (Message_end (assistant ""));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -718,6 +719,52 @@ let%expect_test "worktree: the action and its branch or path" =
     … worktree list
     == verbose ==
     … worktree list
+        {
+          action: "list"
+        }
+    |}]
+;;
+
+let%expect_test "pull_request: the action and what it acts on" =
+  show_item
+    (tool
+       "pull_request"
+       {|{"action":"create","title":"Add x","body":"Because.","draft":true}|}
+       ~result:(false, "opened #13 Add x (open, draft) in o/r on github.com"));
+  show_item (tool "pull_request" {|{"action":"checkout","number":7}|});
+  show_item (tool "pull_request" {|{"action":"list"}|});
+  [%expect
+    {|
+    == quiet ==
+    ✓ pull_request create "Add x" (draft)  1 line
+    == normal ==
+    ✓ pull_request create "Add x" (draft)
+        opened #13 Add x (open, draft) in o/r on github.com
+    == verbose ==
+    ✓ pull_request create "Add x" (draft)
+        {
+          action: "create"
+          title: "Add x"
+          body: "Because."
+          draft: true
+        }
+        opened #13 Add x (open, draft) in o/r on github.com
+    == quiet ==
+    … pull_request checkout #7
+    == normal ==
+    … pull_request checkout #7
+    == verbose ==
+    … pull_request checkout #7
+        {
+          action: "checkout"
+          number: 7
+        }
+    == quiet ==
+    … pull_request list
+    == normal ==
+    … pull_request list
+    == verbose ==
+    … pull_request list
         {
           action: "list"
         }

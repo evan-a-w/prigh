@@ -492,3 +492,30 @@ let%expect_test "worktree: the action and its branch or path" =
     ✓ worktree list
     |}]
 ;;
+
+let%expect_test "pull_request: the action and what it acts on" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_end
+           ~name:"pull_request"
+           ~arguments:{|{"action":"list","state":"closed"}|}
+           "closed pull requests in o/r on github.com:"
+       ; tool_end
+           ~id:"c2"
+           ~name:"pull_request"
+           ~arguments:{|{"action":"view","number":12}|}
+           "#12 Add x (open)"
+       ; tool_end
+           ~id:"c3"
+           ~name:"pull_request"
+           ~arguments:{|{"action":"create","title":"Add x","draft":true}|}
+           "opened #13 Add x"
+       ]);
+  [%expect
+    {|
+    ✓ pull_request list closed
+    ✓ pull_request view #12
+    ✓ pull_request create "Add x" (draft)
+    |}]
+;;
