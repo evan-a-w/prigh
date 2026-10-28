@@ -217,7 +217,7 @@ let%expect_test
   let h = H.create () in
   H.text h ~selector:".status";
   H.text h ~selector:".status-extras";
-  [%expect {| (0%) ↑0 ↓0 $0.0000 Ready |}];
+  [%expect {| (0%) ↑0 ↓0 $0.00 Ready |}];
   H.act
     h
     (Hello
@@ -241,9 +241,9 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (75%) ↑123k ↓7.9k $1.2345 Working
+    (75%) ↑123k ↓7.9k $1.23 Working
     (3 queued)
-    (laptop) (main)
+    (main) (laptop)
     |}];
   H.show h ~selector:".context";
   [%expect

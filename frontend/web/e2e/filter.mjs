@@ -1,8 +1,8 @@
 // The transcript filter (/filter): its button left of the files', its menu
 // (arrows, Space, Enter, Esc, Show all), what it hides and the line saying
-// so, the button's count, the filter kept across a reload and another
-// session, the jump rail with the user's messages hidden, the image viewer
-// over the button, and all of it on a phone.
+// so, the button's count, the filter kept across a reload and per session
+// (another has its own), the jump rail with the user's messages hidden, the
+// image viewer over the button, and all of it on a phone.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected).
 //
@@ -240,7 +240,8 @@ try {
   console.log(await shown());
   console.log(await button());
 
-  // 6. Kept across a reload (the backend keeps it) and another session.
+  // 6. Kept across a reload (the session keeps it); another session has its
+  // own (none here), and coming back brings this one's back.
   await page.reload();
   await page.locator(".composer textarea").waitFor();
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Adding it"));
@@ -253,6 +254,10 @@ try {
   console.log(await shown());
   console.log(`note: ${await note()}`);
   await openSession(id, "Adding it");
+  await page.locator(".filter-note").waitFor();
+  section("back");
+  console.log(await shown());
+  console.log(`note: ${await note()}`);
 
   // 7. Your messages hidden: the rail still lists them and jumps to them.
   await openMenu();

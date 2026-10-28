@@ -5,7 +5,8 @@ open! Import
     cost, and what the agent is doing, in a slot of its own width so that
     nothing moves as it changes. The sidebar's session card stacks them; the
     header over the chat (sidebar closed, or a phone) keeps them on one
-    line, the context and the activity when narrow. *)
+    line, the context and the activity when narrow. The cost is to the cent;
+    its title has it exactly. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What applies: goal, reminders, resume, queued messages to take back,
@@ -18,10 +19,11 @@ val extras
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
 
-(** Where tools run, opening the host picker ([/host]); unless [always],
-    only when that is not the backend. *)
+(** Where tools run, opening the host picker ([/host]): any other host, and
+    the backend too when [if_choice] and there is another to choose; [None]
+    when that leaves nothing to say. *)
 val host
   :  App.Model.t
-  -> always:bool
+  -> if_choice:bool
   -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t
+  -> Node.t option

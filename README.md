@@ -747,13 +747,17 @@ quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
 the account, under the tree of projects. The tree marks which session it
 is (its row has the cwd as it is now, relative to its project or worktree,
-and a rename button). The card has whatever applies at
-the top — the goal, reminders, a scheduled resume, queued messages to take
-back, background agents and jobs, transfers, the verbosity, the plan chip
-`plan 2/5: step` that runs `/todos` — then the status on a grid: what the
-agent is doing, with where tools run (click for the `/host` picker) and the
-branch across from it (click for the pull requests, `/pr`); the context across the card (click for
-`/session`'s details); the tokens and the cost (or the budget). Each part
+and a rename button). The card is two quiet lines on a grid: what the agent
+is doing, with whatever applies across from it (the goal, reminders, a
+scheduled resume, queued messages to take back, background agents and
+jobs, transfers, the verbosity when not the default, the plan chip `plan
+2/5: step` that runs `/todos`); then the context's meter (click for
+`/session`'s details), the tokens and the cost to the cent (its tooltip
+has it exactly; or the budget). The verbosity is muted, and while the
+agent works its background agents are too, without a lamp, so that one
+thing at a time is lit. Under them, when there is something to say, the branch
+(click for the pull requests, `/pr`) and where tools run, when there is
+another host to choose (click for the `/host` picker). Each part
 keeps its place, so nothing moves as a turn starts and ends. Your account
 is under it, with the settings gear; the account menu also has Settings
 and Commands and keys (`/help`). With the sidebar closed, and always on a

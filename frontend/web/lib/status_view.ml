@@ -94,7 +94,10 @@ let level_class : Prigh_ui.Loop_status.Level.t -> string = function
 let cost (state : State.t) ~inject =
   match Prigh_ui.Loop_status.budget_part state with
   | None ->
-    item ~cls:"cost" ~title:"Session cost" [ Node.textf "$%.4f" state.cost_usd ]
+    item
+      ~cls:"cost"
+      ~title:(sprintf "Session cost: $%.4f (/session)" state.cost_usd)
+      [ Node.textf "$%.2f" state.cost_usd ]
   | Some (text, level) ->
     chip
       ~cls:("cost budget " ^ level_class level)
@@ -196,37 +199,35 @@ let transfers (m : App.Model.t) =
     item ~cls:"transfers" ~title:text [ Html.lamp (); Node.text text ]
 ;;
 
-let host (m : App.Model.t) ~always ~inject =
+let host (m : App.Model.t) ~if_choice ~inject =
   match m.state with
-  | None -> Node.none
-  | Some state
-    when (not always) && String.equal state.active_host Host.backend_id ->
-    Node.none
+  | None -> None
   | Some state ->
+    let others =
+      List.exists state.hosts ~f:(fun h ->
+        not (String.equal h.id Host.backend_id))
+    in
+    let chip ?(cls = "host") ~title text =
+      Some
+        (chip ~cls ~title ~command:"/host" ~inject [ icon Server; text_ text ])
+    in
     (match
        List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
      with
+     | _
+       when String.equal state.active_host Host.backend_id
+            && not (if_choice && others) -> None
      | Some h ->
        chip
-         ~cls:"host"
          ~title:(sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd)
-         ~command:"/host"
-         ~inject
-         [ icon Server; text_ h.name ]
+         h.name
      | None when String.equal state.active_host Host.backend_id ->
-       chip
-         ~cls:"host"
-         ~title:"Tools run on the backend (/host switches)"
-         ~command:"/host"
-         ~inject
-         [ icon Server; text_ "backend" ]
+       chip ~title:"Tools run on the backend (/host switches)" "backend"
      | None ->
        chip
          ~cls:"host warm"
          ~title:"No host runs the tools: /host picks one"
-         ~command:"/host"
-         ~inject
-         [ icon Server; text_ "No host" ])
+         "No host")
 ;;
 
 (* Settings that change what you see, and the model's plan; the approval
@@ -359,7 +360,9 @@ let extras (m : App.Model.t) ~host:with_host ~inject =
       ; background m ~inject
       ; nix_gc m ~inject
       ; transfers m
-      ; (if with_host then host m ~always:false ~inject else Node.none)
+      ; (if with_host
+         then Option.value (host m ~if_choice:false ~inject) ~default:Node.none
+         else Node.none)
       ; Node.fragment (modes m ~inject)
       ]
   | _ -> div ~cls:"status-extras" []
