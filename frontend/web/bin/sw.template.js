@@ -20,14 +20,17 @@ const pages = new Set([scope.href, index]);
 self.addEventListener("install", event => {
   // Past the HTTP cache: these are this build's files. A redirect (a proxy's
   // sign-in, its session expired) fails the install, to be tried again on
-  // the next visit, rather than keeping a login page as the shell.
+  // the next visit, rather than keeping a login page as the shell. One at a
+  // time: on a first visit the page is still loading what it needs (its
+  // fonts), and over HTTP/1.1 all at once would take every connection the
+  // browser allows the host and queue the page's requests behind these.
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await Promise.all([...shellUrls].map(async url => {
+    for (const url of shellUrls) {
       const response = await fetch(new Request(url, { cache: "reload", redirect: "error" }));
       if (!response.ok) throw new Error(`${url}: ${response.status}`);
       await cache.put(url, response);
-    }));
+    }
   })());
 });
 
