@@ -23,7 +23,7 @@ let () =
       |> sprintf "[%s]"
     in
     In_channel.read_all template
-    |> String.substr_replace_all ~pattern:"%%VERSION%%" ~with_:version
-    |> String.substr_replace_all ~pattern:"%%SHELL%%" ~with_:shell
+    |> String.substr_replace_all ~pattern:"@@VERSION@@" ~with_:version
+    |> String.substr_replace_all ~pattern:"@@SHELL@@" ~with_:shell
     |> print_string
 ;;
