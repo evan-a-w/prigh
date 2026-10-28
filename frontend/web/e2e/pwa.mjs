@@ -88,9 +88,8 @@ const screenshot = async label => {
 };
 
 const composer = () => page.locator(".composer textarea");
-// textContent, not innerText: Chromium's headless shell fails to load the web
-// fonts from a service worker and then leaves the text out of innerText (not
-// so in Chrome).
+// textContent, not innerText: a headless Chromium without fonts (no
+// FONTCONFIG_FILE) renders no text, and innerText is only what is rendered.
 const bodyHas = text => page.waitForFunction(t => document.body.textContent.includes(t), text);
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 // The caches the page's origin has: their names (the build hash normalised)
@@ -161,6 +160,19 @@ try {
   console.log(`cached the shell: ${JSON.stringify(cached[0].paths) === JSON.stringify(expected)}`);
   for (const name of ["index.html", "main.bc.js", "theme.css", "recursive-sans.woff2", "katex.min.js", "KaTeX_Main-Regular.woff2", "xterm.js", "icon-192.png", "manifest.webmanifest"])
     console.log(`  ${name}: ${cached[0].paths.includes(`/${name}`)}`);
+
+  // The title bar follows the theme.
+  const themeColor = () => page.evaluate(() =>
+    `${document.querySelector("meta[name=theme-color]").content} (page ${getComputedStyle(document.body).backgroundColor})`);
+  console.log(`theme-color: ${await themeColor()}`);
+  await composer().fill("/theme light");
+  await composer().press("Enter");
+  await page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "light"
+    && document.querySelector("meta[name=theme-color]").content === getComputedStyle(document.body).backgroundColor);
+  console.log(`theme-color, light: ${await themeColor()}`);
+  await composer().fill("/theme original");
+  await composer().press("Enter");
+  await page.waitForFunction(() => document.querySelector("meta[name=theme-color]").content === "rgb(27, 30, 35)");
 
   // 3. The RPC (a WebSocket) works under it, and nothing it or the other
   //    endpoints answer is kept.
