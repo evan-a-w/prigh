@@ -188,6 +188,7 @@ module Reply_tag : sig
     | Compaction_saved (** the new config; its settings are shown *)
     | Default_saved
     | Session_stats
+    | Trace (** [trace]: its summary in a dialog *)
     | Entries of Entries_purpose.t
     | Reload_messages (** the head moved: fetch state and messages *)
     | Exported
@@ -371,6 +372,9 @@ module Command : sig
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying
         this, keeping the session to return to *)
+    | Apply_update
+    (** the new build's service worker takes over, and the page reloads into
+        it *)
   [@@deriving sexp_of, equal]
 end
 
@@ -540,6 +544,11 @@ module Action : sig
         ; error : bool
         }
     | Dismiss_toast of int
+    | Update_ready
+    (** from the page: a new build's service worker is installed, waiting for
+        the page to reload into it *)
+    | Apply_update (** the update notice's Reload *)
+    | Dismiss_update (** the update notice's close: until the next page load *)
     | Sign_out
     | Set_accounts of
         { accounts : Accounts.Account.t list
@@ -683,6 +692,9 @@ module Model : sig
       (** the provider whose login we cancelled: its failure is expected *)
     ; toasts : Toast.t list
     ; next_toast : int
+    ; update_ready : bool
+      (** a new build is waiting ([Update_ready]): the notice offering to
+          reload into it *)
     ; sidebar_open : bool
       (** the sessions sidebar beside the chat (a drawer on a phone); while
           reviewing it is hidden, and [review_drawer] shows it *)

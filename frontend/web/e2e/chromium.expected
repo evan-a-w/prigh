@@ -2267,3 +2267,62 @@ fits
 row 1: survey the project | icon | icon | 0% | icon
 lamps: 0; accented: nothing; 44px high
 fits
+=== chromium: pwa: manifest ===
+{"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
+status: 200
+content-type: application/manifest+json
+name: prigh
+short_name: prigh
+id: ./
+start_url: ./
+scope: ./
+display: standalone
+theme_color: #1b1e23
+background_color: #1b1e23
+page background: rgb(27, 30, 35)
+icon icon.svg any any: 200 image/svg+xml
+icon icon-192.png 192x192 any: 200 image/png 192x192
+icon icon-512.png 512x512 any: 200 image/png 512x512
+icon icon-maskable-512.png 512x512 maskable: 200 image/png 512x512
+icon icon-maskable.svg any maskable: 200 image/svg+xml
+apple-touch-icon: 200 image/png
+=== chromium: pwa: service worker ===
+controls the page: true
+script: /sw.js
+scope: /
+caches: prigh-web-<BUILD>
+cached the shell: true
+  index.html: true
+  main.bc.js: true
+  theme.css: true
+  recursive-sans.woff2: true
+  katex.min.js: true
+  KaTeX_Main-Regular.woff2: true
+  xterm.js: true
+  icon-192.png: true
+  manifest.webmanifest: true
+theme-color: rgb(27, 30, 35) (page rgb(27, 30, 35))
+theme-color, light: rgb(244, 245, 247) (page rgb(244, 245, 247))
+=== chromium: pwa: not cached ===
+a turn over the RPC: true
+file download: 410
+sign-in link: 405
+unknown path: 404
+only the shell cached: true
+=== chromium: pwa: reloaded with the backend stopped ===
+banner: Connection lost: reconnecting…
+sign-in page: false
+composer: 1
+file download: failed (TypeError)
+sign-in link: failed (TypeError)
+main.bc.js: 200
+=== chromium: pwa: a new build ===
+notice before it: 0
+notice: A new version of prigh-web is ready.
+buttons: Reload (Reload the page into it, in this session), Dismiss (Later (the next page load uses it))
+a worker waiting: true
+caches: prigh-web-<BUILD>-next
+notice after: 0
+draft: a draft
+=== chromium: pwa: errors ===
+none

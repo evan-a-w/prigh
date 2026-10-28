@@ -27,6 +27,7 @@ function M.new(ui)
     caps = {},
     waiting = {}, -- callbacks waiting for a ready session
     permissions = {}, -- pending permission entries, oldest first
+    withdrawable = {}, -- requests awaiting the user, by id: what $/cancel_request runs
   }, A)
   self.session = session_mod.new(self.cwd)
   return self
@@ -130,8 +131,8 @@ function A:_start(on_ready)
     cmd = config.options.cmd,
     cwd = self.cwd,
     env = config.options.env,
-    on_request = function(method, params, respond)
-      self:_on_request(method, params, respond)
+    on_request = function(method, params, respond, id)
+      self:_on_request(method, params, respond, id)
     end,
     on_notification = function(method, params)
       self:_on_notification(method, params)
@@ -188,6 +189,8 @@ function A:_on_exit(code, signal, stopping)
   local was_running = self.session.running
   self.session.running = false
   self:_cancel_permissions()
+  self.withdrawable = {}
+  self.cancelling = false
   self.waiting = {}
   if stopping then
     self:_set_conn_state("stopped")
@@ -249,6 +252,8 @@ end
 
 function A:_reset_session(id)
   self:_cancel_permissions()
+  self.withdrawable = {}
+  self.cancelling = false
   if id ~= self.session.id then
     fs.reset()
   end
@@ -359,6 +364,7 @@ function A:_send_prompt(blocks, display)
     end
     s:close_streams()
     s.running = false
+    self.cancelling = false
     if err then
       if err.code ~= acp.errors.disconnected then
         self:_notice("error", "prompt failed: " .. tostring(err.message), ":PrighLog shows the agent's output")
@@ -407,6 +413,8 @@ function A:cancel()
   s.queue = {}
   self:_cancel_permissions()
   if s.running and self.conn then
+    -- Until the turn ends, what the agent still asks is answered cancelled.
+    self.cancelling = true
     self.conn:notify("session/cancel", { sessionId = s.id })
   end
   s:emit("status")
@@ -474,6 +482,17 @@ function A:_on_notification(method, params)
       return
     end
     self.session:set_prigh_state(params.state or params)
+  elseif method == "_prigh/notice" then
+    if params.sessionId and params.sessionId ~= self.session.id then
+      return
+    end
+    self:_notice("info", params.text or "")
+  elseif method == "$/cancel_request" then
+    local withdraw = params.requestId ~= nil and self.withdrawable[vim.json.encode(params.requestId)]
+    if withdraw then
+      self.withdrawable[vim.json.encode(params.requestId)] = nil
+      withdraw()
+    end
   elseif method == "elicitation/complete" then
     return
   else
@@ -481,19 +500,33 @@ function A:_on_notification(method, params)
   end
 end
 
-function A:_on_request(method, params, respond)
+function A:_on_request(method, params, respond, id)
+  if id ~= nil then
+    local key = vim.json.encode(id)
+    local inner = respond
+    respond = function(...)
+      self.withdrawable[key] = nil
+      inner(...)
+    end
+  end
   if method == "fs/read_text_file" then
     respond(fs.read(params))
   elseif method == "fs/write_text_file" then
     respond(fs.write(params))
   elseif method == "session/request_permission" then
-    self:_permission(params, respond)
+    self:_permission(params, respond, id)
   elseif method == "elicitation/create" then
     if params.mode ~= "form" then
       return respond(nil, { code = acp.errors.invalid_params, message = "prigh.nvim only supports form elicitation" })
     end
-    if not self.ui.elicit then
+    if not self.ui.elicit or self.cancelling then
       return respond({ action = "cancel" })
+    end
+    if id ~= nil then
+      self.withdrawable[vim.json.encode(id)] = function()
+        respond(nil, { code = acp.errors.request_cancelled, message = "withdrawn by the agent" })
+        self:_notice("info", "the agent withdrew its question (answered elsewhere or no longer needed): your answer will not be sent")
+      end
     end
     self.ui.elicit(params, respond)
   else
@@ -503,7 +536,10 @@ end
 
 -- Permissions ----------------------------------------------------------------
 
-function A:_permission(params, respond)
+function A:_permission(params, respond, id)
+  if self.cancelling then
+    return respond({ outcome = { outcome = "cancelled" } })
+  end
   local s = self.session
   local tc = params.toolCall or {}
   local existing = tc.toolCallId and s.tools[tc.toolCallId]
@@ -522,6 +558,11 @@ function A:_permission(params, respond)
     diff_lines = diff_lines,
     respond = respond,
   })
+  if id ~= nil then
+    self.withdrawable[vim.json.encode(id)] = function()
+      self:_withdraw_permission(entry)
+    end
+  end
   table.insert(self.permissions, entry)
   self.pending_permission = self.permissions[1]
   s:emit("status")
@@ -548,6 +589,20 @@ function A:answer_permission(entry, option_id)
     entry.status = "cancelled"
     entry.respond({ outcome = { outcome = "cancelled" } })
   end
+  self:_settled(entry)
+end
+
+--- The agent withdrew the request (answered elsewhere, or no longer needed).
+function A:_withdraw_permission(entry)
+  if entry.status ~= "pending" then
+    return
+  end
+  entry.status = "withdrawn"
+  entry.respond(nil, { code = acp.errors.request_cancelled, message = "withdrawn by the agent" })
+  self:_settled(entry)
+end
+
+function A:_settled(entry)
   for i, e in ipairs(self.permissions) do
     if e == entry then
       table.remove(self.permissions, i)

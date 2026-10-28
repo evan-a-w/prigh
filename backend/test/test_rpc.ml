@@ -607,6 +607,74 @@ let%expect_test "session stats" =
     |}]
 ;;
 
+let%expect_test "trace: the session's summary, and its Perfetto export" =
+  with_agent
+    [ Reply.tool_call ~id:"c1" ~name:"ls" ~arguments:"{}" ()
+    ; Reply.text "Empty."
+    ]
+  @@ fun t agent h ->
+  let trace params =
+    let request =
+      Json.of_string
+        (sprintf {|{"id": "r1", "method": "trace", "params": %s}|} params)
+    in
+    match Rpc_server.handle h.server h.client request with
+    | `Object fields ->
+      (match List.Assoc.find fields ~equal:String.equal "result" with
+       | Some (`Object result) ->
+         List.iter result ~f:(fun (key, value) ->
+           match key, value with
+           | "summary", `String s ->
+             (* Durations come from the real clock. *)
+             List.iter (String.split_lines s) ~f:(fun line ->
+               if
+                 String.is_suffix line ~suffix:"(12 spans)"
+                 || String.is_prefix line ~prefix:"For a timeline"
+               then print_endline (mask t line))
+           | "perfetto", `Object p ->
+             (match List.Assoc.find p ~equal:String.equal "traceEvents" with
+              | Some (`Array events) ->
+                printf
+                  "perfetto: %s\n"
+                  (String.concat
+                     ~sep:" "
+                     (List.filter_map events ~f:(function
+                        | `Object e ->
+                          (match
+                             List.Assoc.find e ~equal:String.equal "cat"
+                           with
+                           | Some (`String cat) -> Some cat
+                           | _ -> None)
+                        | _ -> None)))
+              | _ -> print_endline "perfetto: no traceEvents")
+           | key, value -> printf "%s: %s\n" key (Json.to_string value))
+       | _ -> print_endline (Json.to_string (`Object fields)))
+    | json -> print_endline (Json.to_string json)
+  in
+  Or_error.ok_exn (Agent.prompt agent "what is here?");
+  Agent.wait_idle agent;
+  trace "{}";
+  [%expect
+    {|
+    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
+    For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
+    level: "default"
+    spans: 12
+    |}];
+  trace {|{"perfetto": true}|};
+  [%expect
+    {|
+    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
+    For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
+    level: "default"
+    spans: 12
+    perfetto: prompt turn model_request connect first_token stream tool turn model_request connect first_token stream
+    |}];
+  trace {|{"perfetto": 1}|};
+  [%expect
+    {| {"type":"response","id":"r1","ok":false,"error":"param \"perfetto\" must be a boolean"} |}]
+;;
+
 let%expect_test "import, set_session_name, export, clone, set_cwd" =
   with_agent [ Reply.text "unused" ]
   @@ fun t _agent h ->
@@ -666,11 +734,11 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     state: approval_mode=ask
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -962,7 +1030,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
     default client saw tool_exec: false
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
@@ -1130,11 +1198,11 @@ let%expect_test "remote tool host: attached to another session" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c2-1","call_id":"c2","name":"bash","arguments":{"command":"y","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c2-1","call_id":"c2","name":"bash","arguments":{"command":"y","timeout":2592000},"cwd":"/home/me/proj"}
     {"type":"response","id":"r2","ok":true,"result":{}}
     ((main ("ran bash")) (side ("ran bash")))
     |}];
@@ -1221,7 +1289,7 @@ let%expect_test "list_paths: on the backend, then routed to a remote host" =
           : Json.t));
   [%expect
     {|
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_paths-0","call_id":"list_paths","name":"$list_paths","arguments":{"prefix":"ma"},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/list_paths-0","call_id":"list_paths","name":"$list_paths","arguments":{"prefix":"ma"},"cwd":"/home/me/proj"}
     {"type":"response","id":"r1","ok":true,"result":["main.ml","src/main.ml"]}
     |}]
 ;;
@@ -1343,7 +1411,7 @@ let%expect_test "list_dirs: on the active host, or a named one" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":["beta/"]}
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_dirs-0","call_id":"list_dirs","name":"$list_dirs","arguments":{"prefix":"~/de"},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/list_dirs-0","call_id":"list_dirs","name":"$list_dirs","arguments":{"prefix":"~/de"},"cwd":"/home/me/proj"}
     {"type":"response","id":"r1","ok":true,"result":["~/dev/"]}
     |}]
 ;;
@@ -1365,9 +1433,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1474,8 +1542,8 @@ let%expect_test "set_config: omitted fields keep their values" =
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
     |}]
 ;;
@@ -1516,13 +1584,13 @@ let%expect_test
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     (config_changed
      (snippets (((name review) (text  "Review the diff.\
                                      \nBe brief.")))))
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":false,"error":"config.snippets[0].name \"two words\" must be one word: non-empty, without spaces"}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"compact_at_tokens":200000,"compaction_model":null,"trace":"default"}}
     (Ok
      ((((name review) (text  "Review the diff.\
                             \nBe brief.")))

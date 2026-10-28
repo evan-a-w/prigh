@@ -331,7 +331,9 @@ let summarise
       Some text, files
   in
   let files = Compaction_files.add_calls ?cwd files (files_of older) in
-  let stream request = provider.stream request ~cancel ~on_event:ignore in
+  let stream request =
+    Model_trace.stream provider request ~cancel ~on_event:ignore
+  in
   let transcript () =
     stream (transcript_request model ~previous ?instructions older)
   in
@@ -372,6 +374,28 @@ let summarise
       }
 ;;
 
+(* A [compaction] span around [f], from [messages] to what [after] counts
+   of its result. *)
+let traced ~overflowed messages ~after f =
+  let span =
+    Trace.start
+      "compaction"
+      ~attrs:
+        [ "tokens_before", Int (Message.estimate_tokens messages)
+        ; "overflowed", Bool overflowed
+        ]
+  in
+  let result = Trace.within span f in
+  (match result with
+   | Ok x -> Trace.finish span ~attrs:[ "tokens_after", Int (after x) ]
+   | Error e ->
+     Trace.finish
+       span
+       ~status:Error
+       ~attrs:[ "error", Trace.short (Error.to_string_hum e) ]);
+  result
+;;
+
 let compact_messages
       ~provider
       ~model
@@ -384,6 +408,9 @@ let compact_messages
       ?unmasked
       messages
   =
+  traced ~overflowed messages ~after:(fun (messages, _) ->
+    Message.estimate_tokens messages)
+  @@ fun () ->
   match plan ~keep_recent_tokens messages with
   | None -> Or_error.error_string nothing_to_compact
   | Some { kept_from; pinned } ->
@@ -435,6 +462,9 @@ let compact
   let unmasked =
     List.map (Session.timed_messages session) ~f:(fun m -> m.message)
   in
+  traced ~overflowed messages ~after:(fun _ ->
+    Message.estimate_tokens (Session.messages session))
+  @@ fun () ->
   match plan ~keep_recent_tokens messages with
   | None -> Or_error.error_string nothing_to_compact
   | Some { kept_from; pinned } ->

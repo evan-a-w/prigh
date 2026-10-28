@@ -18,17 +18,17 @@ let spec =
   }
 ;;
 
-let read context path =
+let read (context : Tool.Context.t) path =
   let path = Tool.resolve_path context path in
   match Sys_unix.is_file path with
-  | `Yes -> Some (In_channel.read_all path)
+  | `Yes -> Some (File_access.read context.files path)
   | `No | `Unknown -> None
 ;;
 
-let write context path data =
+let write (context : Tool.Context.t) path data =
   let path = Tool.resolve_path context path in
   Core_unix.mkdir_p (Filename.dirname path);
-  Out_channel.write_all path ~data
+  File_access.write context.files path ~data
 ;;
 
 (* The file a path names however it is written: [a.txt], [./a.txt],
@@ -49,7 +49,7 @@ let display (context : Tool.Context.t) path =
 
 (* [*** Add File:] over an existing file, or a move onto one, replaces it:
    only when the agent has seen its current contents. *)
-let check_overwrites context seen operations =
+let check_overwrites (context : Tool.Context.t) seen operations =
   let retry = "send the patch again (or change it with *** Update File)" in
   let check path ~what =
     let resolved = Tool.resolve_path context path in
@@ -58,7 +58,7 @@ let check_overwrites context seen operations =
       Seen_files.check_overwrite
         seen
         ~path:resolved
-        ~current:(In_channel.read_all resolved)
+        ~current:(File_access.read context.files resolved)
         ~what:(what resolved)
         ~retry
     | `No | `Unknown -> Ok ()

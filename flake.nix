@@ -123,7 +123,7 @@
             pkgs.brotli
           ];
           postInstall = (oa.postInstall or "") + ''
-            for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt}; do
+            for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt,webmanifest}; do
               [ -f "$f" ] || continue
               zopfli "$f"
               brotli --keep --best "$f"
@@ -143,7 +143,9 @@
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
         # with prigh-web, the browser frontend, instead (`prigh serve -web
         # 127.0.0.1:7790 -open ...`); with -connect or -remote, prigh-web for
-        # a backend elsewhere (`prigh web -open ...`).
+        # a backend elsewhere (`prigh web -open ...`). The backend's
+        # subcommands (`prigh acp`, `prigh login ...`) go to the backend; a
+        # directory with one of their names opens with `prigh ./NAME`.
         prighWebRoot = "${prighFrontend}/share/prigh_frontend/web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
@@ -158,6 +160,10 @@
               done
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
+            case "''${1:-}" in
+              acp | run | serve | tool-host | web | sessions | login | logout | auth | models | trace)
+                exec "$PRIGH_BACKEND" "$@" ;;
+            esac
             exec ${prighFrontend}/bin/prigh-tui "$@"
           '';
         };
@@ -260,13 +266,15 @@
           touch "$out"
         '';
 
-        # prigh.nvim's headless tests (a fake ACP agent, no network).
+        # prigh.nvim's headless tests: against a fake ACP agent, and against
+        # the built `prigh acp -faux-script` (the real_* cases). No network.
         checks.nvim-plugin =
           pkgs.runCommand "prigh-nvim-test" { nativeBuildInputs = [ pkgs.neovim-unwrapped pkgs.git ]; } ''
             cp -r ${./editors/nvim} nvim
             chmod -R u+w nvim
             export HOME="$PWD/home"
             mkdir -p "$HOME"
+            export PRIGH_BIN=${prighBackend}/bin/prigh
             NVIM=nvim ${pkgs.runtimeShell} nvim/test/run.sh
             mkdir "$out"
           '';

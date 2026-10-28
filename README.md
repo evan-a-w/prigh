@@ -42,7 +42,12 @@ Without Nix, an OxCaml opam switch with the same packages works too
 ## Running under Nix
 
 The flake builds both executables. The default package/app is a small wrapper
-that points the TUI at the Nix-built backend.
+that points the TUI at the Nix-built backend: `prigh [DIR]` runs the TUI,
+`prigh -web` prigh-web, and the backend's subcommands (`acp`, `run`, `serve`,
+`tool-host`, `web`, `sessions`, `login`, `logout`, `auth`, `models`) run the
+backend, so `prigh login anthropic` and `prigh acp` work from the installed
+wrapper (`nix profile install github:evan-a-w/prigh`). A directory named like
+one of them opens with `prigh ./NAME`.
 
 ```
 source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh   # if nix is not on PATH
@@ -309,6 +314,40 @@ connections, so one port serves browsers and terminals on the same sessions
 (`-listen` is only needed for a TCP-only port). Plain `ws://` with a shared
 token: bind to localhost and use an SSH tunnel or a TLS-terminating proxy
 on untrusted networks.
+
+prigh-web installs as an app ("Install app" in Chrome and Edge, "Add to
+Home Screen" on a phone, "Add to Dock" in Safari): it opens in its own
+window, with prigh's icon, from `/` of the site (the start URL carries no
+credentials: the app signs in with what the browser remembered, or asks
+once). A service worker keeps the app shell (the page, its script,
+stylesheets, fonts, KaTeX, the terminal's xterm.js and the icons), so the
+app opens with the backend down or the network gone and shows the
+reconnecting banner until it is back; the RPC, the terminal, file
+transfers and everything else always go to the backend. The page is
+fetched from the network first, so a new build arrives on the next load;
+one that arrives while the page is open waits, and a notice over the
+composer says "A new version of prigh-web is ready" with Reload (the same
+session and draft, on the new build) or × (it applies at the next load).
+
+Browsers only allow installing (and service workers) on `https://` or
+`http://localhost`/`127.0.0.1`: `./prigh -web` locally, and `./prigh -web
+-connect` to a remote backend (its site is served on localhost), are
+installable as they are (an app belongs to its origin: keep the same
+port, `-listen` or `$PRIGH_WEB_LISTEN`). For a backend reached directly, put it behind
+HTTPS: `tailscale serve --bg 7790` (then
+`https://HOST.TAILNET.ts.net/`), a reverse proxy such as Caddy
+(`reverse_proxy 127.0.0.1:7790`; see [DOCKER.md](DOCKER.md#behind-a-reverse-proxy)
+for the WebSocket paths), or an SSH tunnel to a localhost port
+(`ssh -L 7790:localhost:7790 server`). On plain `http://` elsewhere the
+page works as before, without installing or the offline shell.
+
+On iPhone and iPad (iOS/iPadOS 16.4 and later), "Add to Home Screen" from
+Safari's share menu makes a standalone app, with its own storage (sign in
+once in it) and, unlike Safari's tabs, notifications: `/notify on` there
+asks for permission, and notifications go through the service worker.
+But iOS suspends a home-screen app soon after it leaves the screen, and
+prigh-web has no push server to wake it, so there they only come in the
+moments before that (on a desktop or Android, whenever the page is open).
 
 Tool output folds to a few lines: a running command's last lines (under
 how many came before), a finished one's first six (an error's last six,
@@ -1051,9 +1090,153 @@ editing your buffers (unsaved text included), and `:PrighReview` to accept or
 reject its changes hunk by hunk.
 
 ```lua
-vim.opt.rtp:append("~/src/prigh/editors/nvim")
+vim.pack.add({ "https://github.com/evan-a-w/prigh" })
+-- the plugin is the repository's editors/nvim, not its root:
+vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site/pack/core/opt/prigh/editors/nvim")
 require("prigh").setup({ cmd = { "prigh", "acp" } })   -- then :Prigh
 ```
+
+Then `:helptags ALL` for `:help prigh`, and `:checkhealth prigh`. Other
+plugin managers and troubleshooting: [its Install](editors/nvim/README.md#install).
+
+## Editors (ACP)
+
+`prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
+on stdin/stdout (only protocol JSON goes to stdout; logs go to stderr), so
+any ACP editor can use prigh as its agent. By default it runs its own
+backend in the process; `-connect HOST:PORT -token T [-user U]` makes it a
+client of a running `prigh serve -listen` (or `-web`) instead, so the
+editor's sessions are ordinary prigh sessions shared with the TUI and
+prigh-web. Either way the adapter is the tool host for this machine
+(`-no-tool-host` with `-connect` leaves tools where the backend runs
+them). It takes the usual `-model`, `-thinking`, `-cwd`, `-no-tools`,
+`-max-budget-usd`, `-auth-file`, `-faux`/`-faux-script` flags, plus `-name`
+and `-host-id` (as `prigh tool-host`). Log in first with `prigh login`
+(or `/login` in the TUI): an editor gets an "authentication required" error
+saying so otherwise.
+
+What the editor gets:
+
+- sessions: `session/new`, `session/load` (the history replayed),
+  `session/resume`, `session/list`, `session/close`; MCP servers sent by the
+  editor are ignored (prigh reads its own, see [MCP servers](#mcp-servers));
+- prompts with text, `@`-file links (attached as prigh attachments),
+  embedded files (inlined), selections (`#L<start>-L<end>` URIs, mentioned
+  as line ranges) and images; `session/cancel` aborts the run;
+- streamed text and thinking, tool calls with their kind, locations, output
+  and diffs of edited files, the plan (`update_plan`, or the active
+  `/goal`), usage and cost, the session title, notices;
+- permission requests for tool confirmations (allow once, always: the
+  rule prigh offers, reject); `ask_user` questions as forms when the editor
+  supports elicitation, as a permission request for a single choice, else
+  the model is told the user cannot be asked;
+- modes `ask`, `auto-edit`, `auto` (the approval modes) and `plan` (plan
+  mode), and config options for the mode, the model (of the providers you
+  are logged in to) and the thinking level;
+- the slash commands `/compact`, `/goal`, `/remind`, `/budget`, `/model`,
+  `/thinking`, `/plan`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
+  your skills (any other `/text` goes to the model).
+
+When the editor offers `fs/read_text_file` and `fs/write_text_file`, the
+file tools (`read`, `edit`, `write`, `apply_patch`) and `@`-attachments
+read and write through the editor, so unsaved buffers are what the model
+sees and its edits land in them. `bash`, `grep`, `find` and `ls` still use
+the disk, as do binary files, images, deletes and moves, and whether a
+file exists.
+
+Clients that set `clientCapabilities._meta.prigh.state` (prigh.nvim does)
+also get the `_prigh/state` notification whenever prigh's status line
+changes — `{sessionId, model, thinking, running, context_tokens,
+context_window, cost_usd, budget_usd, approval_mode, plan_mode, queued:
+{steer, follow_up}, subagents: [{id, label, running}], jobs, goal,
+reminders, active_host}` (`jobs` and `reminders` are counts, `goal` the
+active goal's text) — and `_prigh/notice` `{sessionId, text}` for prigh's
+notices; `initialize`'s result advertises them in `_meta.prigh`
+(`{"version": 1, "extensions": ["_prigh/state", "_prigh/notice"]}`).
+
+Zed (`settings.json`):
+
+```json
+{
+  "agent_servers": {
+    "prigh": { "type": "custom", "command": "prigh", "args": ["acp"], "env": {} }
+  }
+}
+```
+
+avante.nvim (`:AvanteSwitchProvider prigh`):
+
+```lua
+require("avante").setup({
+  provider = "prigh",
+  acp_providers = { ["prigh"] = { command = "prigh", args = { "acp" }, env = {} } },
+})
+```
+
+agentic.nvim:
+
+```lua
+require("agentic").setup({
+  provider = "prigh",
+  acp_providers = { ["prigh"] = { name = "prigh", command = "prigh", args = { "acp" } } },
+})
+```
+
+CodeCompanion.nvim (`:CodeCompanionChat adapter=prigh`):
+
+```lua
+require("codecompanion").setup({
+  adapters = {
+    acp = {
+      prigh = function()
+        local helpers = require("codecompanion.adapters.acp.helpers")
+        return {
+          name = "prigh",
+          formatted_name = "prigh",
+          type = "acp",
+          roles = { llm = "assistant", user = "user" },
+          commands = { default = { "prigh", "acp" } },
+          defaults = { mcpServers = {}, timeout = 20000 },
+          parameters = {
+            protocolVersion = 1,
+            clientCapabilities = { fs = { readTextFile = true, writeTextFile = true } },
+            clientInfo = { name = "CodeCompanion.nvim", version = "1.0.0" },
+          },
+          handlers = {
+            lifecycle = {
+              setup = function(self) return true end,
+              auth = function(self) return true end,
+            },
+            request = { build_messages = helpers.build_messages },
+          },
+        }
+      end,
+    },
+  },
+  interactions = { chat = { adapter = "prigh" } },
+})
+```
+
+agent-shell (Emacs; `M-x agent-shell`, then pick prigh):
+
+```elisp
+(defun my/prigh-agent-config ()
+  (agent-shell-make-agent-config
+   :identifier 'prigh
+   :mode-line-name "prigh"
+   :buffer-name "prigh"
+   :shell-prompt "prigh> "
+   :shell-prompt-regexp "prigh> "
+   :client-maker (lambda (buffer)
+                   (agent-shell--make-acp-client
+                    :command "prigh"
+                    :command-params '("acp")
+                    :context-buffer buffer))))
+(add-to-list 'agent-shell-agent-configs #'my/prigh-agent-config)
+```
+
+For a shared backend, add `-connect HOST:PORT -token SECRET` to the
+arguments (or set `PRIGH_TOKEN` in the editor's environment for the agent).
 
 ## Use
 
@@ -1069,6 +1252,8 @@ nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
 nix run .#backend -- login custom           # an OpenAI-compatible endpoint (below)
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
+
+With the wrapper installed, the same is `prigh login anthropic`, `prigh auth`.
 
 To share pi's logins instead, symlink the file: `ln -s ~/.pi/agent/auth.json
 ~/.config/prigh/auth.json`. Don't copy it: Anthropic rotates the refresh
@@ -1641,6 +1826,31 @@ than silently ignored: invalid JSON or a setting of the wrong type (prigh
 then ignores the file's settings), an unknown setting (with the closest
 known one), and a `default_model` that names no known model.
 
+### Tracing: where the time went
+
+Every session records a trace next to its file,
+`<session>.trace.jsonl`: one line per finished span (a prompt, its turns,
+each model request split into connecting, waiting for the first token,
+thinking and streaming, each tool call with its waits for your approval
+or answer and its tool-host round trip, retries, compaction, masking,
+subagents and background jobs). It holds names, sizes, ids and timings,
+never what was said or what tools read. Past 2 MB it moves to
+`.trace.old.jsonl` (replacing the one before) and starts afresh, so it
+keeps the newest 2–4 MB; it goes with the session when that is deleted.
+
+`/trace` (TUI and prigh-web) and `prigh trace SESSION` (an id, a prefix
+or a path) summarise it: the wall time split into model, tools, waiting
+on you, retries, compaction and other; time to first token by model;
+time per tool; and the slowest spans with where they sat. `prigh trace
+SESSION -perfetto out.json` writes a timeline for
+[Perfetto](https://ui.perfetto.dev) or `chrome://tracing`, an agent or a
+job per track; `-tree` prints every span.
+
+`"trace": "detailed"` in the config (or `PRIGH_TRACE=detailed`) adds
+finer spans for work on prigh itself: the request's encoding and send,
+SSE parsing, and each streamed delta's wait and handling.
+`PRIGH_TRACE=off` (or `"trace": "off"`) records nothing.
+
 ### Long runs: compaction, budget, goals, usage limits
 
 Context never runs out mid-task. The first, cheap tier is observation
@@ -1846,6 +2056,7 @@ it.
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
+| `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |
 | `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
@@ -2065,7 +2276,10 @@ turns them off (kept with your preferences on the backend); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
 named with what to do in the settings page, whose switch shows whether
-notifications are on and turns them on or off.
+notifications are on and turns them on or off. With the service worker
+(an `https://` or localhost page) they are shown through it, as Android's
+Chrome and an installed app on iOS require (iOS offers notifications only
+to a home-screen app); clicking one brings the page back.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new

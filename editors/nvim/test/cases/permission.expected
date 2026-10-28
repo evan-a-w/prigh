@@ -4,6 +4,7 @@
 │ ## You
 │ edit it
 │ 
+│ ## prigh
 │ 🔐 Permission needed: Edit a.txt
 │   ↳ a.txt
 │   ```diff
@@ -21,7 +22,7 @@
 └
 winbar: prigh · claude-sonnet · thinking medium · mode Default · ● running · permission needed
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
-focus in chat: true cursor row: 13
+focus in chat: true cursor row: 14
 notify (warn): prigh: answer the permission request first: a/A/r/R (or 1-9) choose · <CR> option under cursor · d full diff · <Esc> cancel
 agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
 agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
@@ -43,6 +44,7 @@ agent got: {"id":1003,"result":{"outcome":{"outcome":"cancelled"}}}
 │ ## You
 │ edit it
 │ 
+│ ## prigh
 │ 🔐 Permission: Edit a.txt → Allow once
 │ 
 │ 🔐 Permission: Write b → Always allow
@@ -74,6 +76,7 @@ agent got: {"id":1004,"result":{"outcome":{"optionId":"reject","outcome":"select
 │ ## You
 │ edit it
 │ 
+│ ## prigh
 │ 🔐 Permission: Edit a.txt → Allow once
 │ 
 │ 🔐 Permission: Write b → Always allow

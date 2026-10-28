@@ -35,6 +35,7 @@ module Reply_tag = struct
     | Sessions_picker
     | Sessions_cache
     | Session_stats
+    | Trace
     | Entries_for_fork
     | Entries_for_rewind
     | Entries_for_tree
@@ -3745,6 +3746,7 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "session named")
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
+  | "trace", _ -> m, [ rpc "trace" ~tag:Trace ]
   | "agents", _ -> agents_command m cmd.rest
   | "jobs", [ "kill"; id ] -> kill_job m id
   | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
@@ -6228,6 +6230,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
          output m ~title:"Session" (format_stats stats), [])
+     | Trace ->
+       decode json ~f:P.Trace_report.of_json (fun report ->
+         output m ~title:"Trace" (Content.lines report.summary), [])
      | Entries_for_fork ->
        decode json ~f:decode_entries (fun (_head, entries) ->
          fork_picker m entries, [])

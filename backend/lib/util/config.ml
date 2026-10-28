@@ -45,6 +45,7 @@ type t =
   ; mask_observations : bool
   ; compact_at_tokens : int
   ; compaction_model : string option
+  ; trace : Trace.Level.t
   }
 [@@deriving sexp_of]
 
@@ -71,6 +72,7 @@ let default =
   ; mask_observations = true
   ; compact_at_tokens = 200_000
   ; compaction_model = None
+  ; trace = Default
   }
 ;;
 
@@ -127,6 +129,7 @@ let to_json t =
     ; ("mask_observations", if t.mask_observations then `True else `False)
     ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
+    ; "trace", `String (Trace.Level.to_string t.trace)
     ]
 ;;
 
@@ -315,6 +318,15 @@ let of_json json =
         Or_error.error_string
           "config.notify must be \"off\", \"bell\" or \"desktop\""
     in
+    let%bind trace =
+      match find "trace" with
+      | None | Some `Null -> Ok default.trace
+      | Some (`String s) ->
+        Trace.Level.of_string s |> Or_error.tag ~tag:"config.trace"
+      | Some _ ->
+        Or_error.error_string
+          "config.trace must be \"off\", \"default\" or \"detailed\""
+    in
     let%map default_thinking =
       match find "default_thinking" with
       | None | Some `Null -> Ok None
@@ -344,6 +356,7 @@ let of_json json =
     ; mask_observations
     ; compact_at_tokens
     ; compaction_model
+    ; trace
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

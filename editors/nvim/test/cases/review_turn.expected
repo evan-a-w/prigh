@@ -34,6 +34,6 @@ notify: prigh: the agent has not changed any files since the last review
 agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
 agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
 agent got: {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"change things","type":"text"}],"sessionId":"s1"}}
-agent got: {"id":1000,"result":null}
-agent got: {"id":1001,"result":null}
-agent got: {"id":1002,"result":null}
+agent got: {"id":1000,"result":{}}
+agent got: {"id":1001,"result":{}}
+agent got: {"id":1002,"result":{}}
