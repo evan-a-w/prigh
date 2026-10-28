@@ -48,8 +48,9 @@ let help =
        background job)" )
   ; "Ctrl+L", "switch model: the model chip's menu"
   ; ( "↑ ↓ / Enter / Esc (a chip's menu)"
-    , "move / choose / close it; type to filter the models" )
-  ; "← → / Tab (a chip's menu)", "the next chip's menu (model, thinking, mode)"
+    , "move / choose / close it; type to filter the models or hosts" )
+  ; ( "← → / Tab (a chip's menu)"
+    , "the next chip's menu (model, thinking, mode, host)" )
   ; "Ctrl+P / Alt+P", "next / previous scoped model (/scoped-models)"
   ; "Alt+T", "cycle the thinking level"
   ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"

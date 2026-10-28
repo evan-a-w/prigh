@@ -150,10 +150,12 @@ data:image/png;base64, 24x16
 model: under .lightbox
 thinking: under .lightbox
 mode: under .lightbox
+host: under .lightbox
 === chromium: a chip's menu open: the chips ===
 model: the chip, on top
 thinking: the chip, on top
 mode: the chip, on top
+host: the chip, on top
 === chromium: attached in the composer ===
 data:image/png;base64, 20x10
 data:image/png;base64, 12x30
@@ -377,6 +379,7 @@ DeepSeek V4.1 Flash
 Thinking
 on
 Auto: never asks
+<HOSTNAME>
 === chromium: the host picker ===
 Where tools run
 <HOSTNAME>
@@ -421,6 +424,7 @@ DeepSeek V4.1 Flash
 Thinking
 high
 Asks: edits & commands
+<HOSTNAME>
 === chromium: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -465,6 +469,7 @@ DeepSeek V4.1 Flash
 Thinking
 high
 Plan mode
+<HOSTNAME>
 === chromium: plan mode: the status line ===
 0%
 ↑0 ↓0
@@ -486,6 +491,7 @@ DeepSeek V4.1 Flash
 Thinking
 high
 Auto: never asks
+<HOSTNAME>
 === chromium: the plan approved: the status line ===
 0%
 ↑0 ↓0
@@ -537,6 +543,7 @@ Done waiting.
 model: under .sidebar, .scrim
 thinking: under .sidebar, .scrim
 mode: under .sidebar, .scrim
+host: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
 thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
@@ -737,17 +744,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
@@ -804,18 +811,19 @@ Done
 model: under .modal-backdrop
 thinking: under .modal-backdrop
 mode: under .modal-backdrop
+host: under .modal-backdrop
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
+chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
 .composer: fits
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
+chat 600; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
 .composer: fits
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
 .composer: fits
 === chromium: errors ===
@@ -2245,28 +2253,32 @@ row 2: [meter] 0% | ↑0 ↓0 | $<COST>
 row 3: feature/a-rather-long-branch-for-the-sidebar-card
 lamps: 0; accented: nothing; 88px high
 fits
+=== chromium: card: the composer's chips ===
+chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | <HOSTNAME>
+chip problems: none
 === chromium: card: another host to choose ===
-row 1: Ready | 1 agent | verbose
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card | <HOSTNAME>
-lamps: 0; accented: nothing; 88px high
-fits
+✓ <HOSTNAME>
+build-runner-eu-west-a-long-hostname (in <SESSION>)
 === chromium: card: on a host with a long name ===
 row 1: Ready | 1 agent | verbose
 row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card | build-runner-eu-west-a-long-hostname
+row 3: feature/a-rather-long-branch-for-the-sidebar-card
 lamps: 0; accented: nothing; 88px high
 fits
+chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | build-runner-eu-west-a-long-hostname
+chip problems: none (host name truncated)
 === chromium: card: the context opens the session's details ===
 Session
 === chromium: card: the sidebar closed ===
-row 1: survey the project | 1 agent | build-runner-eu-west-a-long-hostname | verbose | [meter] 0% | ↑0 ↓0 | $<COST> | Ready
+row 1: survey the project | 1 agent | verbose | [meter] 0% | ↑0 ↓0 | $<COST> | Ready
 lamps: 0; accented: verbose; 44px high
 fits
 === chromium: card: a phone ===
-row 1: survey the project | icon | icon | 0% | icon
+row 1: survey the project | icon | 0% | icon
 lamps: 0; accented: nothing; 44px high
 fits
+chips 1: DeepSeek V4.1 Flash | on | icon | build-runner-eu-west-a-long-hostname
+chip problems: none (host name truncated)
 === chromium: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200

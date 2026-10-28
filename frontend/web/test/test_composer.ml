@@ -14,6 +14,7 @@ let%expect_test
     (Claude Opus 5.5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.show h ~selector:".send";

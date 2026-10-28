@@ -199,37 +199,6 @@ let transfers (m : App.Model.t) =
     item ~cls:"transfers" ~title:text [ Html.lamp (); Node.text text ]
 ;;
 
-let host (m : App.Model.t) ~if_choice ~inject =
-  match m.state with
-  | None -> None
-  | Some state ->
-    let others =
-      List.exists state.hosts ~f:(fun h ->
-        not (String.equal h.id Host.backend_id))
-    in
-    let chip ?(cls = "host") ~title text =
-      Some
-        (chip ~cls ~title ~command:"/host" ~inject [ icon Server; text_ text ])
-    in
-    (match
-       List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
-     with
-     | _
-       when String.equal state.active_host Host.backend_id
-            && not (if_choice && others) -> None
-     | Some h ->
-       chip
-         ~title:(sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd)
-         h.name
-     | None when String.equal state.active_host Host.backend_id ->
-       chip ~title:"Tools run on the backend (/host switches)" "backend"
-     | None ->
-       chip
-         ~cls:"host warm"
-         ~title:"No host runs the tools: /host picks one"
-         "No host")
-;;
-
 (* Settings that change what you see, and the model's plan; the approval
    mode is in the composer. *)
 let modes (m : App.Model.t) ~inject =
@@ -331,7 +300,7 @@ let view (m : App.Model.t) ~inject =
       ]
 ;;
 
-let extras (m : App.Model.t) ~host:with_host ~inject =
+let extras (m : App.Model.t) ~inject =
   match m.state, m.connection with
   | Some state, Connected ->
     let queued, whose =
@@ -360,9 +329,6 @@ let extras (m : App.Model.t) ~host:with_host ~inject =
       ; background m ~inject
       ; nix_gc m ~inject
       ; transfers m
-      ; (if with_host
-         then Option.value (host m ~if_choice:false ~inject) ~default:Node.none
-         else Node.none)
       ; Node.fragment (modes m ~inject)
       ]
   | _ -> div ~cls:"status-extras" []

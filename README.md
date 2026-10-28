@@ -767,20 +767,26 @@ The composer is one box: the editor on top and, along its bottom edge in
 the box's own quiet text, the model, the thinking level ("Thinking high",
 "No thinking" for a model without levels) and the approval mode ("Asks:
 edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
-lit), each lit with a chevron when pointed at, then attach, stop and send
+lit) and where tools run (a server icon and the tool host's name, always
+shown, lit as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
 on the right. A chip opens a small menu standing on it, above the composer
 (below it only when there is no room above), with its command's choices
-(`/model`, `/thinking`, `/mode`), the current one checked: the models under
-their providers with their context windows and a filter field to type in
-(the list scrolls; filtered, best match first), the thinking levels with
-how hard each thinks, the modes with what each asks first. ↑↓ move, Enter
+(`/model`, `/thinking`, `/mode`, `/host`), the current one checked: the
+models under their providers with their context windows and a filter field
+to type in (the list scrolls; filtered, best match first), the thinking
+levels with how hard each thinks, the modes with what each asks first, the
+hosts with their directories and a filter too (choosing one asks for the
+directory there, as `/host` does; with only one host, or none, it says how
+to add one: `prigh tool-host -connect SERVER`, or a TUI). The hosts' menu
+follows hosts as they connect and leave. ↑↓ move, Enter
 or a click takes the choice, Esc or a click beside the menu closes it
 unchanged and gives the editor back the focus; ← →, Tab and a click on
 another chip open the next chip's menu, one at a time. On a phone the menu
 is as wide as the composer. The commands themselves open the larger
 picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
 other two; in a narrow composer the labels get short
-(`high`, `ask`, `plan`, after an icon). There is no bar over the chat
+(`high`, `ask`, `plan`, after an icon), and the model's and the host's
+names are cut short with an ellipsis, the host's first. There is no bar over the chat
 while the sidebar is open: the files, terminal and agents buttons sit
 quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
@@ -794,15 +800,15 @@ jobs, transfers, the verbosity when not the default, the plan chip `plan
 `/session`'s details), the tokens and the cost to the cent (its tooltip
 has it exactly; or the budget). The verbosity is muted, and while the
 agent works its background agents are too, without a lamp, so that one
-thing at a time is lit. Under them, when there is something to say, the branch
-(click for the pull requests, `/pr`) and where tools run, when there is
-another host to choose (click for the `/host` picker). Each part
+thing at a time is lit. Under them, in a git repository, the branch
+(click for the pull requests, `/pr`); where tools run is the composer's
+chip. Each part
 keeps its place, so nothing moves as a turn starts and ends. Your account
 is under it, with the settings gear; the account menu also has Settings
 and Commands and keys (`/help`). With the sidebar closed, and always on a
 phone (where the sidebar is a drawer), a slim bar over the chat keeps the
-essentials on one line: the sidebar's button and the title, what applies
-(with the tool host when it is not the backend), the status, the panel
+essentials on one line: the sidebar's button and the title, what applies,
+the status, the panel
 toggles and the settings gear. What applies comes before the status, and
 the activity has a slot of its own width, so that nothing moves the
 status; a narrower chat column drops the tokens and cost, then says what

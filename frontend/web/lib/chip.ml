@@ -4,6 +4,7 @@ type t =
   | Model
   | Thinking
   | Mode
+  | Host
 [@@deriving sexp_of, equal, enumerate]
 
 let step t delta ~skip =

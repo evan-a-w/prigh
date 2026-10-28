@@ -2808,23 +2808,25 @@ terminal frontend and `web/` prigh-web, the browser one.
       then the account and the settings gear), `Session_view` (the
       current session in one place at a time, by `Model.docked`: with the
       sidebar open beside the chat, its `card` in the sidebar —
-      `Status_view.extras`, then `Status_view` on a grid with the tool host
-      (opening `/host`) and the branch beside the activity, the context
+      `Status_view.extras`, then `Status_view` on a grid with the branch
+      under the activity, the context
       across, tokens and cost, each in its own cell so that nothing moves
       it — and its `tools`, the panel toggles floating in the chat's top
       right corner; otherwise its `bar`, a slim line over the chat with
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
       steps are container queries on the bar in `style.css`),
-      `Composer_view` (one box: the editor, then the model, thinking and
-      approval mode chips, plain text until pointed at, and attach, stop
+      `Composer_view` (one box: the editor, then the model, thinking,
+      approval mode and tool host chips, plain text until pointed at, and attach, stop
       and send along its bottom; the composer's container queries shorten
       the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
       opens `Dialog.Popover`: its command's `Picker` (the same items as
-      `/model`, `/thinking`, `/mode`), drawn by `Chip_popover_view` inside
-      the chip's anchor rather than as a `Modal` — the models under their
-      providers, filtered in its own field; the thinking levels with a
-      meter. It is a dialog like the others (it owns the keys, Esc closes
+      `/model`, `/thinking`, `/mode`, `/host`), drawn by `Chip_popover_view`
+      inside the chip's anchor rather than as a `Modal` — the models under
+      their providers, filtered in its own field; the thinking levels with a
+      meter; the hosts (`hosts_list`, the `/host` picker's items, rebuilt by
+      `set_state` when the hosts change, keeping the filter), filtered too,
+      with how to add one when there is no other. It is a dialog like the others (it owns the keys, Esc closes
       it, choosing goes through `picker_accept`), except that the composer
       keeps its chips live (the rest of it inert), so that a click on
       another chip, or ← → and Tab (`Chip_step`), opens that one's; a
@@ -2859,8 +2861,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       the activity, on a grid in the card and on one line in the bar, where
       the activity has a slot of fixed width; its `extras`, kept out of
       the status so that they never move it: the plan chip, queued
-      messages, the transfers in progress from `Files.transfers`…; and
-      `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
+      messages, the transfers in progress from `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
       gear beside the account, the account menu, `/settings` or Ctrl+,:
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
       providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
