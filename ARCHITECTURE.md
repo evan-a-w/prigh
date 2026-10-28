@@ -1613,8 +1613,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   backend's host that recorded none, `Git_location.find` on the backend's
   files, cached per cwd in `t.repos`), `worktrees` (`{path, branch, root,
   source}`, `source` one of `created`, `entered`, `pull_request` with
-  `pr`, `agent` with `agent` and `task`), `bytes`, `live`
-  (with `clients` when live), `running` (a
+  `pr`, `agent` with `agent` and `task`), `bytes`, `failed` (its last
+  reply ended in an error), `live` (with `clients` and `waiting`, its
+  confirmations and questions waiting for the user, when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
   current `config.json`, reread per call). `set_archived {path, archived}`
@@ -1633,9 +1634,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
-  `background`, persisted, name, description, repository or subagents'
-  worktrees (`Listed`, compared per live session
-  on its state changes and message ends, so never per delta), and after
+  `background`, `waiting`, persisted, name, description, repository or
+  subagents' worktrees (`Listed`, compared per live session on its state
+  changes, message ends, confirmations and questions, so never per delta), and after
   archiving, deleting, importing, forking and cloning; frontends refetch
   the list. A session with running background subagents or jobs
   is not evicted (it delivers their reports into its own session even with
