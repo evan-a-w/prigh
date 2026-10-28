@@ -9,20 +9,22 @@ let glue : Js.Unsafe.any Lazy.t =
   const sw = window.isSecureContext && navigator.serviceWorker;
   let registration = null;
   let updating = false;
+  let onUpdateReady = null;
+  let told = false;
+  const tell = () => {
+    if (onUpdateReady && !told && registration.waiting && sw.controller) {
+      told = true;
+      onUpdateReady();
+    }
+  };
   return {
-    register: function (onUpdateReady) {
+    register: function () {
       if (!sw) return;
-      let told = false;
-      const tell = () => {
-        if (!told && registration.waiting && sw.controller) {
-          told = true;
-          onUpdateReady();
-        }
-      };
       sw.addEventListener("controllerchange", () => {
         if (updating) window.location.reload();
       });
       sw.register("sw.js").then(r => {
+        if (!r) return;
         registration = r;
         tell();
         r.addEventListener("updatefound", () => {
@@ -38,6 +40,10 @@ let glue : Js.Unsafe.any Lazy.t =
           if (!document.hidden) check();
         });
       }).catch(e => console.warn("prigh-web: no service worker:", e));
+    },
+    onUpdateReady: function (f) {
+      onUpdateReady = f;
+      if (registration) tell();
     },
     applyUpdate: function () {
       const waiting = registration && registration.waiting;
@@ -55,12 +61,16 @@ let glue : Js.Unsafe.any Lazy.t =
 })()|})
 ;;
 
-let register ~on_update_ready =
+let register () =
+  ignore (Js.Unsafe.meth_call (Lazy.force glue) "register" [||] : Js.Unsafe.any)
+;;
+
+let on_update_ready f =
   ignore
     (Js.Unsafe.meth_call
        (Lazy.force glue)
-       "register"
-       [| Js.Unsafe.inject (Js.wrap_callback on_update_ready) |]
+       "onUpdateReady"
+       [| Js.Unsafe.inject (Js.wrap_callback f) |]
      : Js.Unsafe.any)
 ;;
 

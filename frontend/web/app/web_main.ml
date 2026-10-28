@@ -1305,7 +1305,7 @@ let run_app (settings : Settings.t) =
         in
         schedule (App.Action.Restore_prefs { prefs; legacy }));
        Page_notifications.set_title "prigh";
-       Service_worker.register ~on_update_ready:(fun () ->
+       Service_worker.on_update_ready (fun () ->
          schedule App.Action.Update_ready);
        Page_notifications.on_visibility_change (fun hidden ->
          schedule (App.Action.Page_hidden hidden));
@@ -1405,6 +1405,7 @@ let sign_in_from_link code ~f =
 
 let run () =
   Async_js.init ();
+  Service_worker.register ();
   match Signin_link.code_of_hash (Browser.hash ()) with
   | Some code ->
     Browser.clear_hash ();
