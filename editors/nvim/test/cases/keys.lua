@@ -57,7 +57,7 @@ require("prigh").setup({ cmd = { "prigh-does-not-exist", "acp" } })
 local doc_dir = vim.fs.dirname(vim.api.nvim_get_runtime_file("doc/prigh.txt", false)[1])
 for _, k in ipairs({ "start", "ok", "warn", "error", "info" }) do
   vim.health[k] = function(msg, advice)
-    msg = msg:gsub("Neovim %S+", "Neovim <version>")
+    msg = msg:gsub("Neovim %S+", "Neovim <version>"):gsub("/%S*/(prigh%-[%w%-]+)", "<bin>/%1")
     T.out(string.format("%-5s %s", k, msg))
     for _, a in ipairs(type(advice) == "table" and advice or advice and { advice } or {}) do
       T.out("      advice: " .. a:gsub(vim.pesc(doc_dir), "<plugin>/doc"))
@@ -88,3 +88,33 @@ end
 require("prigh.health").check()
 vim.api.nvim_get_runtime_file = get_runtime_file
 vim.fn.filereadable = filereadable
+T.section(":checkhealth prigh, whether cmd has prigh's acp")
+local bin_dir = vim.fn.tempname()
+vim.fn.mkdir(bin_dir, "p")
+local function script(name, body)
+  local path = vim.fs.joinpath(bin_dir, name)
+  vim.fn.writefile({ "#!/bin/sh", body }, path)
+  vim.fn.setfperm(path, "rwxr-xr-x")
+  return path
+end
+local fakes = {
+  { "prigh-backend", "echo 'Serve the Agent Client Protocol on stdin/stdout, for editors'" },
+  { "prigh-old-wrapper", "echo \"no such directory: $1\" >&2; exit 2" },
+  { "prigh-old-backend", "echo 'Error parsing command line: unknown subcommand acp' >&2; exit 1" },
+}
+for _, fake in ipairs(fakes) do
+  local path = script(fake[1], fake[2])
+  require("prigh").setup({ cmd = { path, "acp" } })
+  local start = vim.health.start
+  vim.health.start = function() end
+  local ok = vim.health.ok
+  vim.health.ok = function(msg, advice)
+    if msg:find("^agent: ") then
+      return
+    end
+    ok(msg, advice)
+  end
+  require("prigh.health").check_acp(path)
+  vim.health.start, vim.health.ok = start, ok
+end
+vim.fn.delete(bin_dir, "rf")
