@@ -380,3 +380,67 @@ let%expect_test
         body: "<html>HI</html>"
     |}]
 ;;
+
+let%expect_test "static site: content types" =
+  List.iter
+    [ "index.html"
+    ; "main.bc.js"
+    ; "theme.css"
+    ; "manifest.webmanifest"
+    ; "icon.svg"
+    ; "icon-192.png"
+    ; "KaTeX_Main-Regular.woff2"
+    ; "main.bc.map"
+    ; "recursive-OFL.txt"
+    ]
+    ~f:(fun name ->
+      printf "%-26s %s\n" name (Static_site.For_testing.content_type name));
+  [%expect
+    {|
+    index.html                 text/html; charset=utf-8
+    main.bc.js                 text/javascript; charset=utf-8
+    theme.css                  text/css; charset=utf-8
+    manifest.webmanifest       application/manifest+json
+    icon.svg                   image/svg+xml
+    icon-192.png               image/png
+    KaTeX_Main-Regular.woff2   font/woff2
+    main.bc.map                application/json
+    recursive-OFL.txt          application/octet-stream
+    |}]
+;;
+
+let%expect_test "static site: the web app manifest, precompressed" =
+  let root = site () in
+  let write name data =
+    let file = Filename.concat root name in
+    Out_channel.write_all file ~data;
+    Core_unix.utimes file ~access:t0 ~modif:t0
+  in
+  write "manifest.webmanifest" {|{"name":"prigh"}|};
+  write "manifest.webmanifest.br" "BR";
+  show root "/manifest.webmanifest";
+  show
+    root
+    "/manifest.webmanifest"
+    ~headers:[ "Accept-Encoding", "gzip, deflate, br" ];
+  [%expect
+    {|
+    GET /manifest.webmanifest
+      200 OK
+        Content-Type: application/manifest+json
+        ETag: "5cc883bec9fd80842bfca9dc"
+        Last-Modified: Tue, 14 Nov 2023 22:13:20 GMT
+        Vary: Accept-Encoding
+        Content-Length: 16
+        body: "{\"name\":\"prigh\"}"
+    GET /manifest.webmanifest [Accept-Encoding: gzip, deflate, br]
+      200 OK
+        Content-Type: application/manifest+json
+        Content-Encoding: br
+        ETag: "bbaf8352442730e92c16c5ea"
+        Last-Modified: Tue, 14 Nov 2023 22:13:20 GMT
+        Vary: Accept-Encoding
+        Content-Length: 2
+        body: "BR"
+    |}]
+;;
