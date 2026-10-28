@@ -38,11 +38,14 @@ let spec =
         [ "action", `String, "list, view, checks, diff, create or checkout"
         ; "state", `String, "list: open (default), closed or all"
         ; "number", `Integer, "view, checks, diff, checkout: the pull request"
-        ; "title", `String, "create: its title"
+        ; ( "title"
+          , `String
+          , "create: its title (default: from the branch's commits: the \
+             subject of a single one, else the branch name)" )
         ; ( "body"
           , `String
           , "create: its description (Markdown): what changed, why, how it was \
-             tested" )
+             tested (when the title is left out too: from the commits)" )
         ; ( "base"
           , `String
           , "create: the branch to merge into (default: the repository's \
@@ -267,13 +270,57 @@ let checkout context ~forges ~cwd ~git ~worktrees_dir number =
 ;;
 
 (* {!Forges}' errors point users at slash commands; the model has this
-   tool's actions instead. *)
+   tool's actions instead, and only the user can sign in. *)
 let for_the_model error =
   List.fold
-    [ "/pr lists", "action=list lists"; "/cd into one", "cwd names one" ]
+    [ "/pr lists", "action=list lists"
+    ; "/cd into one", "cwd names one"
+    ; ": sign in under", ": ask the user to sign in under"
+    ; ": sign in again with", ": ask the user to sign in again with"
+    ]
     ~init:error
     ~f:(fun error (pattern, with_) ->
       String.substr_replace_all error ~pattern ~with_)
+;;
+
+(* When [number] fails and is not one of the repository's pull requests, the
+   nearest numbers that are. *)
+let closest forges ~git number =
+  match Forges.list_pulls forges ~git ~state:"all" with
+  | Error _ -> None
+  | Ok { prs; _ } ->
+    if List.exists prs ~f:(fun (pr : Pull_request.t) -> pr.number = number)
+    then None
+    else (
+      match
+        List.sort prs ~compare:(fun (a : Pull_request.t) (b : Pull_request.t) ->
+          Comparable.lexicographic
+            [ (fun a b -> Int.compare (abs (a - number)) (abs (b - number)))
+            ; Int.compare
+            ]
+            a.number
+            b.number)
+      with
+      | [] -> Some "the repository has no pull requests"
+      | prs ->
+        Some
+          (sprintf
+             "the closest: %s"
+             (String.concat
+                ~sep:", "
+                (List.map (List.take prs 3) ~f:(fun (pr : Pull_request.t) ->
+                   sprintf "#%d %s (%s)" pr.number pr.title (flags pr))))))
+;;
+
+(* What [create] fills in from the branch's commits when the model leaves the
+   title (and body) out. *)
+let with_defaults forges ~git ~title ~body =
+  match title with
+  | Some title when not (String.is_empty (String.strip title)) ->
+    Ok (title, Option.value body ~default:"")
+  | Some _ | None ->
+    let%map.Or_error d = Forges.pull_defaults forges ~git in
+    d.title, Option.value body ~default:d.body
 ;;
 
 let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
@@ -310,11 +357,18 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
         Forges.view_pull forges ~git (number args) |> Or_error.map ~f:diff_text
       | "create" ->
         let push = Option.value (Tool_args.bool_opt args "push") ~default:true in
+        let%bind.Or_error title, body =
+          with_defaults
+            forges
+            ~git
+            ~title:(Tool_args.string_opt args "title")
+            ~body:(Tool_args.string_opt args "body")
+        in
         Forges.create_pull
           forges
           ~git
-          ~title:(Option.value (Tool_args.string_opt args "title") ~default:"")
-          ~body:(Option.value (Tool_args.string_opt args "body") ~default:"")
+          ~title
+          ~body
           ~base:(Tool_args.string_opt args "base")
           ~head:(Tool_args.string_opt args "head")
           ~draft:(Option.value (Tool_args.bool_opt args "draft") ~default:false)
@@ -339,8 +393,19 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
     match result with
     | Ok text -> Tool.Result.ok text
     | Error e ->
+      let hint =
+        if List.mem [ "view"; "checks"; "diff"; "checkout" ] action ~equal:String.equal
+        then
+          Option.value_map (closest forges ~git (number args)) ~default:"" ~f:(fun c ->
+            "; " ^ c)
+        else ""
+      in
       Tool.Result.error
-        (sprintf "pull_request %s: %s" action (for_the_model (Error.to_string_hum e)))
+        (sprintf
+           "pull_request %s: %s%s"
+           action
+           (for_the_model (Error.to_string_hum e))
+           hint)
   in
   { Tool.spec; run }
 ;;
