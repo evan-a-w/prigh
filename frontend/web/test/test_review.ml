@@ -268,7 +268,7 @@ let%expect_test
   [%expect
     {|
     (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];

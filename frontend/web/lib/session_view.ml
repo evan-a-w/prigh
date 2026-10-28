@@ -76,23 +76,31 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
+(* Two quiet lines, and where when it says something: what the agent is
+   doing with what applies across from it, the counters, then the branch and
+   the tool host. A grid, so that each keeps its place as they change. *)
 let card (m : App.Model.t) ~inject =
   Node.section
     ~attrs:
       [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
-    [ Status_view.extras m ~host:false ~inject
-    ; div
+    [ div
         ~cls:"card-status"
-        [ Status_view.view m ~inject
-        ; (match m.state with
-           | None -> Node.none
-           | Some state ->
-             div
-               ~cls:"card-where"
-               [ Status_view.host m ~always:true ~inject
-               ; branch state ~inject
-               ])
-        ]
+        ([ Status_view.view m ~inject
+         ; Status_view.extras m ~host:false ~inject
+         ]
+         @
+         match m.state with
+         | None -> []
+         | Some state ->
+           (match
+              state.git_branch, Status_view.host m ~if_choice:true ~inject
+            with
+            | None, None -> []
+            | _, host ->
+              [ div
+                  ~cls:"card-where"
+                  [ branch state ~inject; Option.value host ~default:Node.none ]
+              ]))
     ]
 ;;
 
