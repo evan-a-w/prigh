@@ -767,6 +767,8 @@ Notifications
 Tell you when a turn ends or something waits for you while this tab is hidden.
 The browser has not been asked yet: Allow asks it.
 Allow
+Tabs
+Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
 Transcript detail
 How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
 Quiet

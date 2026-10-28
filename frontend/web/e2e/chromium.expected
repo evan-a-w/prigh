@@ -766,6 +766,8 @@ Preferences
 Notifications
 Tell you when a turn ends or something waits for you while this tab is hidden.
 The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+Tabs
+Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
 Transcript detail
 How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
 Quiet
