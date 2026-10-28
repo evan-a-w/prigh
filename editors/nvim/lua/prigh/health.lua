@@ -18,6 +18,16 @@ function M.check()
       "install prigh (see its README) or set require('prigh').setup{ cmd = { '/path/to/prigh', 'acp' } }",
     })
   end
+  local doc = vim.api.nvim_get_runtime_file("doc/prigh.txt", false)[1]
+  if not doc then
+    h.warn("doc/prigh.txt is not on the runtimepath: the plugin directory was not added", {
+      'vim.opt.rtp:append("<the prigh repository>/editors/nvim") (see the README\'s Install)',
+    })
+  elseif vim.fn.filereadable(vim.fs.joinpath(vim.fs.dirname(doc), "tags")) == 1 then
+    h.ok("help: :help prigh")
+  else
+    h.warn("no help tags: :help prigh fails", { ":helptags " .. vim.fs.dirname(doc) })
+  end
   if pcall(vim.treesitter.language.inspect, "markdown") then
     h.ok("markdown treesitter parser: the chat is highlighted")
   else
