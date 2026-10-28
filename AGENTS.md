@@ -46,7 +46,9 @@ while iterating.
   `PLAYWRIGHT_MODULE` at the playwright package's `index.mjs` and
   `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store: `nix
   build --no-link --print-out-paths --inputs-from . nixpkgs#playwright-test
-  nixpkgs#playwright-driver.browsers`), and look at the screenshots
+  nixpkgs#playwright-driver.browsers`) and `FONTCONFIG_FILE` at a
+  fontconfig file (without one Chromium renders no text; `./test` writes one,
+  as the flake's check does), and look at the screenshots
   (`SHOTS=dir`) as well as the text diff. Its scripts all run at once, each
   with its own backend, browser and directory, and print what they see;
   `ENGINE.expected` is each browser's output. Wait for a condition, not a

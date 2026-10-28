@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>prigh</title>
+  <!-- Installable (sw.js, manifest.webmanifest). The manifest is fetched
+       with credentials, for a proxy that signs users in in front of it. -->
+  <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+  <meta name="theme-color" content="#1b1e23">
+  <link id="favicon" rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="prigh">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <script>
     // The theme the page last showed, before the first paint
     // (app/pref_cache.ml); the backend's arrives later.

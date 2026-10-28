@@ -1,0 +1,6 @@
+; Fills in sw.template.js: the app shell's files and a hash of them, so that
+; each build that changes the shell is a new service worker (../site/dune).
+
+(executable
+ (name sw_gen)
+ (libraries core))

@@ -123,7 +123,7 @@
             pkgs.brotli
           ];
           postInstall = (oa.postInstall or "") + ''
-            for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt}; do
+            for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt,webmanifest}; do
               [ -f "$f" ] || continue
               zopfli "$f"
               brotli --keep --best "$f"

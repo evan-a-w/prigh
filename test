@@ -46,6 +46,24 @@ export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT
 
 logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
+
+# The fonts the flake's web-e2e check gives the browsers: without a fontconfig
+# configuration, Chromium's headless shell fails to load prigh-web's web fonts
+# (from the network the first time, from the service worker every time) and
+# renders no text.
+if [ -z "${FONTCONFIG_FILE:-}" ]; then
+	dejavu="$(nix build --accept-flake-config --no-link --print-out-paths \
+		--inputs-from "$root" nixpkgs#dejavu_fonts)"
+	cat >"$logs/fonts.conf" <<EOF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>$dejavu/share/fonts</dir>
+  <cachedir>$logs/font-cache</cachedir>
+</fontconfig>
+EOF
+	export FONTCONFIG_FILE="$logs/fonts.conf"
+fi
 start=$EPOCHREALTIME
 elapsed() { awk "BEGIN { printf \"%.0fs\", $EPOCHREALTIME - $1 }"; }
 failed=""
