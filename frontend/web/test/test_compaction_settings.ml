@@ -182,7 +182,8 @@ let%expect_test "summary model: the model picker, then back to settings" =
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".setting.summary-model";
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus dialog)
     (Rpc (method_ set_config)
@@ -192,15 +193,13 @@ let%expect_test "summary model: the model picker, then back to settings" =
     (Claude Sonnet 5)
     true
     |}];
-  H.reply
-    h
-    "set_config"
-    (config ~model:"anthropic/claude-sonnet-5" ());
+  H.reply h "set_config" (config ~model:"anthropic/claude-sonnet-5" ());
   (* Back to the conversation's model, from the same picker. *)
   H.quiet h (fun () -> H.click h ~selector:".summary-model-choice");
   H.text h ~selector:".picker-item[aria-selected=true]";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Expire_toast (id 0) (after_ms 6000))
     (Run "/compaction model")
     Claude Sonnet 5 anthropic, 200k ctx ✓
@@ -217,7 +216,8 @@ let%expect_test "summary model: the model picker, then back to settings" =
   H.quiet h (fun () -> H.act h (Picker_query "conversation"));
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".setting.summary-model";
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus dialog)
     (Rpc (method_ set_config) (params ((config ((compaction_model null)))))
@@ -233,7 +233,8 @@ let%expect_test "mask: the switch" =
   H.elements h ~selector:".setting.mask .switch";
   H.reply h "set_config" (config ~mask:false ());
   H.names h ~selector:".setting.mask .switch";
-  [%expect {|
+  [%expect
+    {|
     (Run "/compaction mask off")
     (Rpc (method_ set_config) (params ((config ((mask_observations false)))))
      (tag Compaction_saved))
@@ -243,7 +244,9 @@ let%expect_test "mask: the switch" =
     |}]
 ;;
 
-let%expect_test "in sync with /compaction here and elsewhere; reset with the user" =
+let%expect_test
+    "in sync with /compaction here and elsewhere; reset with the user"
+  =
   let h = settings () in
   (* Another frontend's /compaction. *)
   H.event
@@ -252,7 +255,8 @@ let%expect_test "in sync with /compaction here and elsewhere; reset with the use
        {|{"type":"event","event":"config_changed","config":%s}|}
        (config ~at:90_000 ~model:"openai/gpt-6" ~mask:false ()));
   section h;
-  [%expect {|
+  [%expect
+    {|
     Compaction
     Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [90k] tokens
@@ -267,7 +271,8 @@ let%expect_test "in sync with /compaction here and elsewhere; reset with the use
     H.type_ h "/compaction at 250k";
     H.act h Send);
   H.text h ~selector:".setting.compact-at .setting-control";
-  [%expect {|
+  [%expect
+    {|
     [250k] tokens
     (Off)
     |}];
@@ -276,7 +281,8 @@ let%expect_test "in sync with /compaction here and elsewhere; reset with the use
   H.key h "Escape" ~target:Field;
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".setting.compact-at .setting-control";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     [250k] tokens
@@ -297,7 +303,8 @@ let%expect_test "in sync with /compaction here and elsewhere; reset with the use
   section h;
   H.reply h "get_config" (config ());
   section h;
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     Compaction
     Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Waiting for the backend's settings…
@@ -323,7 +330,8 @@ let%expect_test "the picker: Esc goes back to settings; from the composer too" =
   H.quiet h (fun () -> H.click h ~selector:".summary-model-choice");
   H.key h "Escape" ~target:Field;
   H.elements h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Run "/compaction model")
     Close_dialog
     (Focus dialog)
@@ -335,7 +343,8 @@ let%expect_test "the picker: Esc goes back to settings; from the composer too" =
   H.quiet h (fun () -> H.act h (Picker_query "gpt"));
   H.key h "Enter" ~target:Field;
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/compaction model") (max 500))) (tag Ignore))
     (Focus picker-input)

@@ -933,9 +933,7 @@ let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | ( true
     , Some
-        ( Login _
-        | Forge_host _
-        | Nix_gc_confirm _
+        ( Login _ | Forge_host _ | Nix_gc_confirm _
         | Picker { kind = Compaction_models; _ } ) ) ->
     ( { m with
         dialog = Some Settings
@@ -1325,11 +1323,11 @@ let compact_tokens n =
 
 (* Those that can be used first, each provider's together. *)
 let models_picker
-  ?(query = "")
-  ?(title = "Switch model")
-  ?(leading = [])
-  ?current
-  (m : Model.t)
+      ?(query = "")
+      ?(title = "Switch model")
+      ?(leading = [])
+      ?current
+      (m : Model.t)
   =
   let current =
     match current with
@@ -8717,9 +8715,7 @@ let update_connected (m : Model.t) (action : Action.t) =
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
         | ( Some Settings
           , Some
-              ( Login _
-              | Forge_host _
-              | Nix_gc_confirm _
+              ( Login _ | Forge_host _ | Nix_gc_confirm _
               | Picker { kind = Compaction_models; _ } ) ) ->
           { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)

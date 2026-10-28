@@ -1857,7 +1857,7 @@ kbd {
    other segment Off. */
 .compact-at-field { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 8px 0 2px; cursor: text; }
 .compact-at-input {
-  width: 8ch; padding: 3px 0 3px 6px; border: 0; outline: none; background: none;
+  width: 9ch; padding: 3px 0 3px 6px; border: 0; outline: none; background: none;
   color: inherit; font: 12.5px var(--mono); text-align: right;
 }
 .compact-at-input::placeholder { color: var(--faint); }
