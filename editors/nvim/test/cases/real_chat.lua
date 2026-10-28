@@ -3,9 +3,9 @@
 -- from _prigh/state, prigh's notices.
 local T = require("helpers")
 local agent, chat = T.start_prigh({
-  { thinking = "The user says hi.", text = "Hello from prigh, streamed in pieces.", chunks = 4, usage = { input = 120000, output = 3000 } },
+  { thinking = "The user says hi.", text = "Hello from prigh, streamed in pieces.", chunks = 4, usage = { input = 60000, output = 3000 } },
   { text = "Running it.", tool_calls = { { id = "c1", name = "bash", arguments = { command = "printf 'one\\ntwo\\nthree\\n'" } } } },
-  { text = "Three lines.", usage = { input = 240000, output = 1000 } },
+  { text = "Three lines.", usage = { input = 90000, output = 1000 } },
   { text = "On it.", tool_calls = { { id = "g1", name = "goal_complete", arguments = { summary = "said hello" } } } },
   { text = "Goal met." },
 })

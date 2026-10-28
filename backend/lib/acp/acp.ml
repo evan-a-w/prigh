@@ -1598,6 +1598,11 @@ let prompt t params =
   | Call { method_; params; turn = false; ack } ->
     (match call s method_ params with
      | Ok result ->
+       (* What the command changed (e.g. /name's title) reaches the editor
+          before the answer, not whenever the state event comes. *)
+       Result.iter (call s "get_state" []) ~f:(fun state ->
+         s.state <- state;
+         send_derived t s);
        message_chunk t s (ack result);
        stopped `End_turn
      | Error e -> Error (turn_error (Core.Error.to_string_hum e)))

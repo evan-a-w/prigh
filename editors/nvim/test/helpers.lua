@@ -410,12 +410,18 @@ function T.mask(s)
 end
 
 --- Messages exchanged with the agent since the last call, filtered by
---- `pred(dir, msg)` (default: all but session/update chunks).
+--- `pred(dir, msg)` (default: all but session/update chunks and a running
+--- tool's output so far, which arrives in as many pieces as the process's
+--- output was read in).
 function T.traffic(pred)
   pred = pred
     or function(_, msg)
       local u = type(msg) == "table" and msg.params and msg.params.update
-      return not (u and (u.sessionUpdate or ""):match("_chunk$"))
+      if not u then
+        return true
+      end
+      local streamed = u.sessionUpdate == "tool_call_update" and u.content and not u.status
+      return not ((u.sessionUpdate or ""):match("_chunk$") or streamed)
     end
   for i = wire_seen + 1, #T.wire do
     local w = T.wire[i]
