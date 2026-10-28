@@ -1,0 +1,80 @@
+
+== foo.txt open with an unsaved change
+modified: true disk: "alpha\nbeta\ngamma\ndelta\nepsilon\n"
+
+== the turn: the agent reads the buffer, writes it
+← {"id":0,"method":"fs/read_text_file","params":{"path":"<tmp>/foo.txt","sessionId":"<session 1>"}}
+→ {"id":0,"result":{"content":"ALPHA (unsaved)\nbeta\ngamma\ndelta\nepsilon\n"}}
+← {"id":1,"method":"fs/write_text_file","params":{"content":"ALPHA (unsaved)\nBETA\ngamma\ndelta\nepsilon\nzeta\n","path":"<tmp>/foo.txt","sessionId":"<session 1>"}}
+→ {"id":1,"result":{}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":[{"newText":"ALPHA (unsaved)\nBETA\ngamma\ndelta\nepsilon\nzeta\n","oldText":"ALPHA (unsaved)\nbeta\ngamma\ndelta\nepsilon\n","path":"<tmp>/foo.txt","type":"diff"}],"sessionUpdate":"tool_call_update","status":"completed","toolCallId":"e1"}}}
+← {"id":2,"method":"fs/write_text_file","params":{"content":"fresh\n","path":"<tmp>/new.txt","sessionId":"<session 1>"}}
+→ {"id":2,"result":{}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":[{"newText":"fresh\n","path":"<tmp>/new.txt","type":"diff"}],"sessionUpdate":"tool_call_update","status":"completed","toolCallId":"w1"}}}
+┌ chat
+│ ## You
+│ edit foo
+│ 
+│ ## prigh
+│ Editing.
+│ 
+│ ✓ Edit foo.txt · edit · completed
+│   ↳ foo.txt
+│   ```diff
+│   +++ foo.txt
+│   @@ -1,5 +1,6 @@
+│    ALPHA (unsaved)
+│   -beta
+│   +BETA
+│    gamma
+│    delta
+│    epsilon
+│   +zeta
+│   ```
+│ 
+│ And a new file.
+│ 
+│ ✓ Write new.txt · edit · completed
+│   ↳ new.txt
+│   ```diff
+│   +++ new file new.txt
+│   @@ -0,0 +1 @@
+│   +fresh
+│   ```
+│ 
+│ Edited.
+│ 
+│ ℹ 2 files changed: foo.txt, new.txt — :PrighReview (<leader>pr) reviews the changes hunk by hunk
+│ 
+└
+buffer: { "ALPHA (unsaved)", "BETA", "gamma", "delta", "epsilon", "zeta" }
+modified: false disk: "ALPHA (unsaved)\nBETA\ngamma\ndelta\nepsilon\nzeta\n"
+new.txt: "fresh\n"
+
+== :PrighReview: the picker, foo.txt's hunks
+select: prigh: review changes
+  foo.txt  +2 −1
+  new.txt  +1 −0 (new)
+  -> foo.txt  +2 −1
+reviewing <tmp>/foo.txt
+      ┆ review foo.txt: 2 hunks, 0 accepted, 0 rejected, 2 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1   ALPHA (unsaved)
+      ┆ beta  [PrighReviewDelete]
+  2 + BETA  [PrighReviewAdd]  ⟨hunk 1/2: ga accept · gr reject⟩
+  3   gamma
+  4   delta
+  5   epsilon
+  6 + zeta  [PrighReviewAdd]  ⟨hunk 2/2: ga accept · gr reject⟩
+
+== keep the first hunk (ga), revert the second (gr)
+notify: prigh: foo.txt: kept 1 hunk, reverted 1
+buffer: { "ALPHA (unsaved)", "BETA", "gamma", "delta", "epsilon" }
+modified: false disk: "ALPHA (unsaved)\nBETA\ngamma\ndelta\nepsilon\n"
+
+== then new.txt: reject it all
+reviewing <tmp>/new.txt
+      ┆ review new.txt: 1 hunk, 0 accepted, 0 rejected, 1 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1 + fresh  [PrighReviewAdd]  ⟨hunk 1/1: ga accept · gr reject⟩
+notify: prigh: new.txt: rejected the new file, deleted it
+new.txt: "(missing)" buffer loaded: false
+notify: prigh: the agent has not changed any files since the last review

@@ -99,6 +99,12 @@ local function diff_block(out, lines, max, expanded, indent)
   end
 end
 
+-- Agents often fence command output for markdown clients; the chat fences it itself.
+local function unfence(text)
+  local _, inner = text:match("^(```+)[%w_%-]*\n(.*)\n%1$")
+  return inner or text
+end
+
 local function tool_content(out, e, opts)
   local text_lines = {}
   for _, c in ipairs(e.content or {}) do
@@ -107,7 +113,7 @@ local function tool_content(out, e, opts)
     elseif c.type == "terminal" then
       out:line("  [terminal " .. tostring(c.terminalId) .. "]", "PrighMuted")
     elseif c.type == "content" and c.content then
-      local t = trim_trailing_blank(require("prigh.session").block_text(c.content))
+      local t = trim_trailing_blank(unfence(trim_trailing_blank(require("prigh.session").block_text(c.content))))
       if t ~= "" then
         vim.list_extend(text_lines, vim.split(t, "\n", { plain = true }))
       end
@@ -203,7 +209,9 @@ end
 local function permission(out, e, opts)
   local title = e.title or "tool call"
   if e.status ~= "pending" then
-    local outcome = e.status == "cancelled" and "cancelled" or (e.selected_name or e.selected or "?")
+    local outcome = (e.status == "cancelled" and "cancelled")
+      or (e.status == "withdrawn" and "withdrawn by the agent (answered elsewhere or no longer needed)")
+      or (e.selected_name or e.selected or "?")
     out:line(string.format("🔐 Permission: %s → %s", title, outcome), "PrighPermissionDone")
     return
   end
@@ -225,25 +233,45 @@ local function permission(out, e, opts)
   out:line("  [Esc] cancel · <CR> option under cursor · j/k move", "PrighMuted")
 end
 
---- Render entry `e`; `prev` is the entry before it (for headings).
-function M.entry(e, prev, opts)
+-- What the agent says or does: the first of a reply has the heading.
+local replies = { agent = true, thought = true, tool = true, permission = true }
+
+--- Whether entry `idx` starts the agent's reply (gets the "## prigh" heading).
+function M.starts_reply(entries, idx)
+  if not replies[entries[idx].kind] then
+    return false
+  end
+  for j = idx - 1, 1, -1 do
+    local k = entries[j].kind
+    if k == "user" then
+      return true
+    elseif replies[k] then
+      return false
+    end
+  end
+  return true
+end
+
+--- Render entry `e`; `heading`: it starts the agent's reply.
+function M.entry(e, heading, opts)
   local out = new_out()
+  if heading then
+    out:line("## prigh", "PrighAgentHeading")
+  end
   if e.kind == "user" then
     out:line("## You", "PrighUserHeading")
     out:text(trim_trailing_blank(e.text or ""))
   elseif e.kind == "agent" then
-    if not prev or prev.kind == "user" then
-      out:line("## prigh", "PrighAgentHeading")
-    end
     out:text(trim_trailing_blank(e.text or ""))
   elseif e.kind == "thought" then
-    if not prev or prev.kind == "user" then
-      out:line("## prigh", "PrighAgentHeading")
-    end
     thought(out, e, opts)
   elseif e.kind == "tool" then
     tool(out, e, opts)
   elseif e.kind == "plan" then
+    -- An empty plan (prigh's goal met, the plan done) is not shown.
+    if #(e.items or {}) == 0 then
+      return out
+    end
     plan(out, e)
   elseif e.kind == "notice" then
     local icon = severity_icon[e.severity] or "•"

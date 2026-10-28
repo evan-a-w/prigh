@@ -643,7 +643,9 @@ let stream
         ~cancel
         ~url
         ~headers:(headers ~auth ~thinking_on @ extra_headers)
-        ~body:(Json.to_string (request_body ~oauth request))
+        ~body:
+          (Trace.span ~detailed:true "request_build" (fun () ->
+             Json.to_string (request_body ~oauth request)))
         ~on_event:(fun event ->
           List.iter (parse_event ~tools:request.tools state event) ~f:(fun e ->
             Assistant_builder.apply builder e;

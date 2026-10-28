@@ -511,7 +511,8 @@ val list_with
     [<stamp>_<id>.jsonl], for per-session data (it may not exist). *)
 val data_dir : string -> string
 
-(** The session file [path] and its {!data_dir}, those that exist. *)
+(** The session file [path], its {!data_dir} and its trace
+    ({!Trace_file.paths}), those that exist. *)
 val files : string -> string list
 
 (** Bytes used by {!files}. *)

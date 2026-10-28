@@ -23,6 +23,8 @@ code. Put a new module in the group it belongs to:
 - `mcp/` — MCP client, config, hub and tools
 - `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces and access,
   `Web_server`, `Websocket`, static and file HTTP
+- `acp/` — `prigh acp`, the Agent Client Protocol for editors: `Acp`
+  and its `Acp_*` helpers, on `Json_rpc` and `Rpc_client`
 - `nix/` — the Nix store for superusers: `Nix_store` (status, one garbage
   collection at a time), `Nix_store_ops` (nix as the backend's user, or the
   container's root helper), what Nix prints and the reports

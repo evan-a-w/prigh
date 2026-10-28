@@ -12,6 +12,7 @@ tools of MCP servers.
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
  browser ─── prigh-web (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ┘  (`-web`: Web_server serves the page and /ws)
                 │   (or `prigh web`: the site served locally, /ws relayed)  │
+ editor ──── `prigh acp` (Acp: ACP on stdio) ── prigh's RPC, in process or over TCP ┘
                 └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
                                                                        ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
                                                                        │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
@@ -206,6 +207,40 @@ The layers below cut across those groups.
   `"HTTP <status>: <message>"`, the shape `Agent_loop` retries on; a model's
   stream that is silent for 5 minutes, not even a ping, is given up as
   stalled and retried).
+
+### Tracing (`trace/`)
+
+- `Trace` — spans (id, parent, name, track, a wall-clock start, monotonic
+  start and stop, status, attributes). The current span lives in an Eio
+  fiber-local binding, inherited by forked fibers, so parallel tool calls
+  and subagents nest under whoever started them without a tracer being
+  passed around; with no binding (or level `Off`) every call is a no-op.
+  `Trace.run tracer` installs a tracer; `start ~root`/`~under`/`~track`
+  open spans elsewhere in the tree (a background run under the turn that
+  started it, on its own track); phased spans (`model_request`) split into
+  consecutive children (`connect`, `first_token`, `thinking`, `stream`) as
+  `Trace.phase` is called. Spans are written when they end; an exception
+  ends one `Cancelled` or `Error`. The level (`Off`/`Default`/`Detailed`)
+  is `PRIGH_TRACE`, else the config's `trace`; `~detailed:true` spans
+  are recorded only at `Detailed`.
+- `Trace_file` — appends spans to `<session>.trace.jsonl`, buffering until
+  the session has a file and dropping them once it is deleted; past
+  `max_bytes` it rotates to `.trace.old.jsonl`.
+- `Model_trace` — wraps a provider's `stream`: the `model_request` span
+  with model, thinking, tokens, cost and stop reason, its phases, and with
+  `Detailed` each delta's wait and handling.
+- `Trace_report` — the summary text, an indented outline (tests, `-tree`)
+  and the Chrome trace event export (one thread per track, extra threads
+  for spans that overlap without nesting).
+
+Where spans come from: `Agent.start_run` (`prompt`), `Agent_loop` (`turn`,
+`model_request` via `Model_trace`, `retry_wait`, `tool`, `compaction`,
+`mask`), `Agent` (`approval_wait`, `ask_user_wait`, `host_roundtrip`,
+auto-compaction and masking), `Tool_subagent` (`subagent`, on track
+`subagent <id>`; background runs and `subagent_continue` runs root under
+the turn that launched them), `Background_tasks` (`job`, on track
+`job <id>`), and with `Detailed` `Http_client` (`http_send`),
+`Sse_request` (`sse_parse`) and the providers (`request_build`).
 
 ### Model layer
 
@@ -497,8 +532,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the loop runs every call; the default runs in-process and `Agent`
   installs one that forwards `on_host` tools to the session's active host.
   The context also carries `approve` (checks a model's call before it
-  runs: `Some result` refuses it with that result) and `ask_user` (how the
-  `ask_user` tool reaches the user); `Agent_loop` puts the ones it is given
+  runs: `Some result` refuses it with that result), `ask_user` (how the
+  `ask_user` tool reaches the user) and `files` (a `File_access`: where
+  `read`, `edit`, `write`, `apply_patch` and `Host_ops`' `$read_file`, so
+  attachments, read and write text contents; the disk by default, the
+  editor's buffers for an ACP session, see `Acp`. Existence checks,
+  directories, binary files and images always use the disk); `Agent_loop` puts the ones it is given
   into every call's context and `Tool_subagent` hands `approve` down to its
   nested loop, so subagents are checked too.
   `Tool_args` gives typed accessors and builds the JSON schema; `Truncate`
@@ -1622,7 +1661,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
   `get_message_points`,
-  `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
+  `session_stats`, `trace` (`{perfetto?}` → `{summary, level, spans,
+  perfetto?}`: `Agent.trace_report`), `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
   `set_mode` (`{approval_mode?, plan_mode?}`, answered with the state),
@@ -1806,7 +1846,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
   by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
   an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
-  `304`; a precompressed `file.br`/`file.gz` no older than the file is
+  `304`; `.webmanifest` is `application/manifest+json`; a precompressed `file.br`/`file.gz` no older than the file is
   sent with `Content-Encoding` when `Accept-Encoding` allows it (`Vary:
   Accept-Encoding`). The Nix build adds those siblings to the installed
   sites (zopfli, brotli); local dune builds stay uncompressed. Upgraded sockets set `TCP_NODELAY`, so that a
@@ -1915,6 +1955,41 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   client as its only client, so when the backend dies (even by SIGKILL) the
   client sees EOF, exits, and tmux destroys the shell.
 
+- `Json_rpc` / `Rpc_client` / `Acp` — `prigh acp`, the Agent Client
+  Protocol for editors. `Json_rpc` is a JSON-RPC 2.0 peer over
+  newline-delimited JSON (both sides send requests; every incoming request
+  runs in its own fiber; `flush` waits for the answers in flight).
+  `Rpc_client` is one client connection to prigh's RPC, in process
+  (`Rpc_server.connect`/`handle`) or over TCP. `Acp` is an ordinary set of
+  prigh clients: one per ACP session, attached to it, plus one that is this
+  machine's tool host (a `Tool_host.Worker` whose `files` hook, given
+  `tool_exec`'s `session_id` and `call_id`, routes the file tools of the
+  editor's sessions through `fs/read_text_file`/`fs/write_text_file` when the
+  editor has them, recording each write's before/after text for the call's
+  diff) and, when needed, a control client (session lists, models,
+  `auth_status`). New sessions are made through the host client so they start
+  on it; `session/load` switches the host client to the session first so
+  that it runs here. prigh events become `session/update`s:
+  `message_update` deltas as message/thought chunks, `tool_start`/
+  `tool_output`/`tool_end` as `tool_call`/`tool_call_update` (`Acp_tool_call`:
+  kind, title, locations, fenced output, diffs, from the recorded writes or
+  else the call's arguments), user messages the editor did not send (other
+  frontends, reminders, goal continuations) as `user_message_chunk`, and
+  each `state` event diffed against what was last sent into
+  `current_mode_update`, `config_option_update`, `plan`, `usage_update`,
+  `session_info_update` and `_prigh/state`. `tool_confirm` becomes
+  `session/request_permission` (`tool_confirm_respond`, `always` for
+  allow_always, deny when cancelled); `ask_user` an `elicitation/create`
+  form, a permission request for a single choice, or `ask_user_respond`
+  with `unavailable` (`Acp_question`); `*_done` events withdraw the request
+  with `$/cancel_request`. `session/prompt` (content via `Acp_prompt`) sends
+  `prompt` (or `follow_up` when another frontend's run is going) and
+  answers once the session stops running (a sentinel queued after the call
+  ends it when no run started), with the last assistant message's stop
+  reason; slash commands (`Acp_commands`) call the RPC methods the TUI
+  uses. Session modes are the approval modes plus `plan`; config options are
+  mode, model and thinking.
+
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
@@ -1931,7 +2006,11 @@ listens on `-listen`, `$PRIGH_WEB_LISTEN` or the first free port from
 127.0.0.1:7790), `run <prompt>`
 (headless, streams to stdout; it denies confirmations and answers
 `ask_user` as unavailable, since nobody is there), `sessions`, `login <provider> [-method]`,
-`logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
+`logout <provider>`, `auth`, `trace SESSION [-perfetto FILE] [-tree]
+[-slowest N]` (`Trace_report` over the session's trace file), `acp` (the Agent Client Protocol on stdio,
+for editors: a backend in the process without a backend host, the adapter
+being the tool host, or `-connect HOST:PORT` to a running one; fd 1 is
+pointed at stderr so that only protocol lines reach stdout). All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
 `-session` takes a saved session's id, a unique prefix of it, or its file;
@@ -3038,9 +3117,17 @@ terminal frontend and `web/` prigh-web, the browser one.
       enabled and granted, and `Set_title` keeps the count in the title.
       `/notify on` (or the account menu) emits
       `Request_notification_permission` from the user's action. `app/`'s
-      `Page_notifications` does the browser side: the Notification API,
-      `visibilitychange` and the favicon with a sodium dot while something
-      is unseen; whether they are on is a preference (`web.notify`).
+      `Page_notifications` does the browser side: the Notification API
+      (through the service worker's `showNotification` when there is one,
+      as Android and iOS require), `visibilitychange` and the favicon with
+      a sodium dot while something is unseen; whether they are on is a
+      preference (`web.notify`).
+    - Installing: `Model.update_ready` is the update notice (one, over
+      the toasts, until answered): `Update_ready` raises it, `Apply_update`
+      emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s
+      `Service_worker` registers `sw.js` in a secure context, reports a
+      new build's worker waiting (`Update_ready`) and, on `Apply_update`,
+      tells it to take over and reloads once it has.
   - `app/` (`prigh_web_app`) — the page. `Ws_transport` (a browser
     WebSocket as a `Transport.t`), `Browser` (localStorage, the query
     string, the clipboard, the visual viewport, and `after_render`: work
@@ -3121,8 +3208,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     only for the backend and user it belongs to) and `prigh-web.theme`,
     the document's theme attributes and variables, which `index.html`'s
     inline script puts back before the first paint (also before signing
-    in); `Page_theme` applies `Apply_theme` to `<html>`, that cache and the
-    terminal.
+    in); `Page_theme` applies `Apply_theme` to `<html>`, that cache, the
+    terminal and `<meta name=theme-color>` (the page's background, for an
+    installed app's title bar).
   - `bin/` — `main.bc.js` plus `index.html`, `theme.css` (every colour,
     as variables: the original theme on `:root`, `[data-theme=dark]` and
     `[data-theme=light]` overriding them, the accent presets
@@ -3139,12 +3227,28 @@ terminal frontend and `web/` prigh-web, the browser one.
     vendored xterm.js and KaTeX (`bin/vendor/README.md`: its script,
     stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
     `.gz`, and 260 KB of fonts, of which a page fetches those its math
-    uses; none of it until a reply has math), assembled under
+    uses; none of it until a reply has math, but the service worker
+    keeps it all), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
     `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`).
+    Installing it: `manifest.webmanifest` (`start_url` and `scope` `./`,
+    no credentials: the installed app signs in from localStorage like a
+    tab), the icons (`icon.svg`, the favicon `Page_notifications` draws;
+    `icon-maskable.svg` with the mark in the safe zone; the PNGs are
+    rendered from them with resvg and committed, as is
+    `apple-touch-icon.png`), and `sw.js`, which `bin/sw_gen/` makes from
+    `sw.template.js` with the shell's file names and `VERSION`, a hash of
+    their contents, so each build that changes the shell is a new worker
+    with a cache of its own (`prigh-web-VERSION`; activating deletes the
+    others). It answers the shell's files from that cache and navigations
+    to the page from the network first (the cached `index.html` when the
+    backend cannot be reached, so the app opens offline and reconnects);
+    nothing else (the RPC and terminal WebSockets, `/files/*`,
+    `/signin-handoff`, any query string) is intercepted. A new worker
+    waits until the page's update notice reloads into it.
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
@@ -3203,6 +3307,11 @@ re-records); the flake check `nvim-plugin` runs them.
   (the `Subagent_log`: `["Start",{id,call_id,parent,task,model,at,run}]`,
   `["Message",{id,at,turns,tool_calls,message}]`,
   `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
+- `~/.prigh/sessions/<stamp>_<id>.trace.jsonl` (and `.trace.old.jsonl`,
+  the previous 2 MB once it fills) — the session's trace (`Trace_file`):
+  one `Trace.Span.t` per line, `{id, parent, name, track, wall, start,
+  stop, status, attrs}`; listed with the session's `files`, so deleted and
+  counted with it; not copied by fork, clone or import.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — the TUI's prompt history on its machine (one JSON
   string per line, last 500).

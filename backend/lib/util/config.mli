@@ -66,6 +66,9 @@ type t =
   ; compaction_model : string option
     (** the model that writes compaction summaries; [None]: the
         conversation's *)
+  ; trace : Trace.Level.t
+    (** what sessions record in their trace ({!Trace_file}; default
+        [Default]); [PRIGH_TRACE] overrides it *)
   }
 [@@deriving sexp_of]
 

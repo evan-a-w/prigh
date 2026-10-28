@@ -266,7 +266,7 @@ end
 function C:_render_entry(idx)
   local entries = self.agent.session.entries
   local e = entries[idx]
-  local out = render.entry(e, entries[idx - 1], self:_opts())
+  local out = render.entry(e, render.starts_reply(entries, idx), self:_opts())
   local start = self:_start_row(idx)
   local old = self.blocks[idx] or 0
   self:_put(start, old, out)

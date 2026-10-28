@@ -167,6 +167,7 @@ module Reply_tag = struct
     | Compaction_saved
     | Default_saved
     | Session_stats
+    | Trace
     | Entries of Entries_purpose.t
     | Reload_messages
     | Exported
@@ -309,6 +310,7 @@ module Command = struct
         session or not *)
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying this *)
+    | Apply_update
   [@@deriving sexp_of, equal]
 end
 
@@ -457,6 +459,9 @@ module Action = struct
         ; error : bool
         }
     | Dismiss_toast of int
+    | Update_ready
+    | Apply_update
+    | Dismiss_update
     | Sign_out
     | Set_accounts of
         { accounts : Accounts.Account.t list
@@ -558,6 +563,7 @@ module Model = struct
     ; cancelled_login : string option
     ; toasts : Toast.t list
     ; next_toast : int
+    ; update_ready : bool
     ; sidebar_open : bool
     ; review_drawer : bool
     ; scrolled_up : bool
@@ -786,6 +792,7 @@ let init =
   ; cancelled_login = None
   ; toasts = []
   ; next_toast = 0
+  ; update_ready = false
   ; sidebar_open = true
   ; review_drawer = false
   ; scrolled_up = false
@@ -5166,6 +5173,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
   | "session", _ ->
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
+  | "trace", _ -> loading m "Trace" [ rpc "trace" [] ~tag:Trace ]
   | "sessions", _ | "switch", "" -> open_sessions m
   | (("archive" | "unarchive") as name), key ->
     let archived = String.equal name "archive" in
@@ -7083,6 +7091,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Session_stats, Ok json ->
     decode m json Session_stats.of_json ~f:(fun stats ->
       open_dialog m (Session stats))
+  | Trace, Ok json ->
+    decode m json Trace_report.of_json ~f:(fun report ->
+      open_dialog m (Text { title = "Trace"; text = report.summary }))
   | Entries purpose, Ok json -> entries_picker m purpose json
   | Reload_messages, Ok _ ->
     let m, fetch =
@@ -7240,7 +7251,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
 (* The replies that a [loading] dialog waits for. *)
 let loads : Reply_tag.t -> bool = function
   | Auth_status (Login_picker | Logout_picker | Show)
-  | Session_stats | Entries _
+  | Session_stats | Trace | Entries _
   | Users Picker
   | Skills { purpose = Picker _; _ }
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }
@@ -8554,6 +8565,9 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Show_toast { text; error } -> toast m ~error text
   | Dismiss_toast id ->
     { m with toasts = List.filter m.toasts ~f:(fun t -> t.id <> id) }, []
+  | Update_ready -> { m with update_ready = true }, []
+  | Apply_update -> { m with update_ready = false }, [ Command.Apply_update ]
+  | Dismiss_update -> { m with update_ready = false }, []
   | Sign_out -> m, [ Command.Sign_out ]
   | Set_accounts { accounts; current } ->
     { m with accounts; account = current }, []

@@ -2,7 +2,7 @@
 == open
 agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
 agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
-winbar: prigh · claude-sonnet · thinking medium · mode Default · approve ask · ctx 1k/200k (1%) · $0.01
+winbar: prigh · claude-sonnet · thinking medium · mode Default · ctx 1k/200k (1%) · $0.01
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 
 == send a prompt
@@ -37,9 +37,9 @@ agent got: {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"fix th
 │ Done.
 │ 
 └
-winbar: Fix the bug · claude-sonnet · thinking medium · mode Default · approve ask · plan mode · ctx 52k/200k (26%) · $0.50 · agents 2 · jobs 1 · reminders 1 · goal fix the bug
+winbar: Fix the bug · claude-sonnet · thinking medium · mode Default · ctx 52k/200k (26%) · $0.50 · queued 3 · agents 2 · jobs 1 · reminders 1 · goal fix the bug
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
-statusline: claude-sonnet · thinking medium · mode Default · approve ask · plan mode · ctx 52k/200k (26%) · $0.50 · agents 2 · jobs 1 · reminders 1 · goal fix the bug
+statusline: claude-sonnet · thinking medium · mode Default · ctx 52k/200k (26%) · $0.50 · queued 3 · agents 2 · jobs 1 · reminders 1 · goal fix the bug
 
 == expand the thought and the tool output
 ┌ chat

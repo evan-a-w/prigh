@@ -1074,6 +1074,7 @@ kbd {
 .toast .btn.icon.toast-close { width: 22px; height: 22px; margin: -1px -6px -1px 0; flex-shrink: 0; color: var(--faint); }
 .toast-close .icon { width: 13px; height: 13px; }
 .toast:hover .toast-close, .toast-close:focus-visible { color: var(--chalk); }
+.toast.update-notice { cursor: default; box-shadow: inset 2px 0 0 var(--sodium), var(--float-shadow); }
 .toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
 /* Right of the jump-to-the-end button, in the middle, not over it (on a
    phone, above it). */
