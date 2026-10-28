@@ -1966,10 +1966,50 @@ let load_subagent_log t =
     (List.map (Subagent_log.summaries t.subagent_log) ~f:(fun s -> s.id))
 ;;
 
+(* A background subagent the backend stopped while it ran (see
+   [Subagent_log.load]), reported like a finished one, with what it last
+   said. *)
+let interrupted_report
+      ((s : Subagent_log.Summary.t), (transcript : Timed_message.t list))
+  =
+  let count n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s") in
+  let last_said =
+    List.rev transcript
+    |> List.find_map ~f:(fun (m : Timed_message.t) ->
+      match m.message with
+      | Assistant a ->
+        Option.some_if
+          (not (String.is_empty (String.strip (Message.Assistant.text a))))
+          (Message.Assistant.text a)
+      | User _ | Tool_result _ -> None)
+  in
+  sprintf
+    "[subagent %s interrupted] %s\n\
+     The backend stopped while it ran (%s, %s), so it never finished: its work \
+     may be partly done. Start a new subagent if the task still needs doing.%s"
+    s.id
+    (Background_tasks.short_task s.task)
+    (count s.turns "turn")
+    (count s.tool_calls "tool call")
+    (match last_said with
+     | None -> ""
+     | Some text -> "\nIts last message:\n" ^ text)
+;;
+
 let deliveries t =
-  match Background_tasks.take_undelivered t.background with
+  let interrupted =
+    List.map
+      (Subagent_log.take_interrupted t.subagent_log)
+      ~f:interrupted_report
+  in
+  match
+    interrupted
+    @ List.map
+        (Background_tasks.take_undelivered t.background)
+        ~f:Background_tasks.Task.report
+  with
   | [] -> []
-  | tasks -> [ Background_tasks.delivery_message tasks ]
+  | reports -> [ Background_tasks.reports_message reports ]
 ;;
 
 (* The system prompt names the tools of the model it was built for. *)
@@ -2897,6 +2937,20 @@ let cancel_background ?discard t =
   Background_tasks.cancel_all ?discard t.background
 ;;
 
+let report_interrupted_subagents t =
+  if
+    (not (is_running t))
+    && Option.is_none t.resume
+    && Subagent_log.has_interrupted t.subagent_log
+  then start_run t []
+;;
+
+let shutdown t =
+  Subagent_log.detach t.subagent_log;
+  cancel_background ~discard:true t;
+  ignore (abort t : string list)
+;;
+
 let jobs t = Background_tasks.tasks t.background ~kind:Job
 let kill_job t ~job_id = Background_tasks.cancel t.background ~kind:Job job_id
 
@@ -3567,7 +3621,8 @@ let replace_session t session ~keep_host =
      activate_host t host ~cwd:host.cwd ~pinned:false
    | Some _ | None -> ());
   restore_resume t;
-  state_changed t
+  state_changed t;
+  report_interrupted_subagents t
 ;;
 
 let new_session t =

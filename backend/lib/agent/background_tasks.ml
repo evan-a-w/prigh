@@ -445,8 +445,7 @@ let take_undelivered t =
   tasks
 ;;
 
-let delivery_message tasks =
-  let reports = List.map tasks ~f:Task.report in
+let reports_message reports =
   Message.user
     ~origin:
       { Injected.empty with
@@ -462,6 +461,8 @@ let delivery_message tasks =
       }
     (String.concat ~sep:"\n\n" reports)
 ;;
+
+let delivery_message tasks = reports_message (List.map tasks ~f:Task.report)
 
 let find t ~kind id =
   let candidates = tasks t ~kind in
