@@ -77,6 +77,24 @@ let to_save t =
 
 let saved t = { t with saved = t.ids }
 
+let kept_out t id =
+  match t.out with
+  | Leaving b | Last b | Blank b -> String.equal b id
+  | Nothing -> false
+;;
+
+(* The current session gets a tab once it is listed (it has a message): a
+   browser opening on a new session saves nothing. *)
+let add_current t ~current =
+  match current with
+  | Some id
+    when (not (mem t.ids id))
+         && (not (kept_out t id))
+         && Option.exists t.known ~f:(fun known -> Set.mem known id) ->
+    { t with ids = t.ids @ [ id ] }
+  | Some _ | None -> t
+;;
+
 let follow t ~previous ~current =
   match current with
   | None -> t
@@ -88,16 +106,9 @@ let follow t ~previous ~current =
       | Last b when changed && not (String.equal b id) -> Blank id
       | out -> out
     in
-    let kept_out =
-      match out with
-      | Leaving b | Last b | Blank b -> String.equal b id
-      | Nothing -> false
-    in
-    { t with
-      out
-    ; ids = (if kept_out || mem t.ids id then t.ids else t.ids @ [ id ])
-    ; finished = Set.remove t.finished id
-    }
+    add_current
+      { t with out; finished = Set.remove t.finished id }
+      ~current
 ;;
 
 let listed t (sessions : Session_summary.t list) ~current =
@@ -124,15 +135,22 @@ let listed t (sessions : Session_summary.t list) ~current =
     | Blank b when Set.mem known b -> Nothing
     | out -> out
   in
-  { t with ids; known = Some known; running; finished; out }
+  add_current { t with ids; known = Some known; running; finished; out } ~current
 ;;
 
 let shown t (sessions : Session_summary.t list) ~current =
-  List.filter_map t.ids ~f:(fun id ->
-    match List.find sessions ~f:(fun s -> String.equal s.id id) with
-    | Some s when not s.archived -> Some (id, Some s)
-    | s when Option.exists current ~f:(String.equal id) -> Some (id, s)
-    | Some _ | None -> None)
+  let summary id = List.find sessions ~f:(fun s -> String.equal s.id id) in
+  let tabs =
+    List.filter_map t.ids ~f:(fun id ->
+      match summary id with
+      | Some s when not s.archived -> Some (id, Some s)
+      | s when Option.exists current ~f:(String.equal id) -> Some (id, s)
+      | Some _ | None -> None)
+  in
+  match current with
+  | Some id when (not (mem t.ids id)) && not (kept_out t id) ->
+    tabs @ [ id, summary id ]
+  | Some _ | None -> tabs
 ;;
 
 let index ids id =

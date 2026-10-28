@@ -3123,6 +3123,25 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
+    - Session tabs: `Session_tabs` (pure) holds whether they are on (the
+      `web.tabs` preference, `/tabs on|off` and the settings' switch) and
+      the open sessions' ids in order (`web.open-tabs`), restored from the
+      browser's cache and then the backend's preferences, and saved
+      (`to_save`) only once those arrived (`load`), so a page that has not
+      heard them yet never overwrites another browser's. `update` keeps
+      the tabs in step (`follow_tabs`): the current session gains a tab
+      when it changes, except a new session started by closing the last
+      tab (`Blank`), which stays out, showing the empty state, until it is
+      listed; `list_sessions` (`listed`) closes the tabs of sessions
+      deleted or archived and, from its `running`, `waiting` and `failed`,
+      marks those whose work finished while out of sight (`finished`, cleared
+      when seen). Closing, `Step_tab`, `Nth_tab` and dropping a dragged
+      tab (`Drag_tab`, `Drop_tab`: HTML drag and drop, the page's
+      `dragover` already allows drops) only switch sessions through
+      `switch_session`/`New_session`, so switching still resets everything
+      of the old session; steps count from the session being switched to,
+      so keys pressed in a row each move on. `Session_tabs_view` renders
+      the strip (none when off or narrow: a phone keeps its slim bar).
     - Installing: `Model.update_ready` is the update notice (one, over
       the toasts, until answered): `Update_ready` raises it, `Apply_update`
       emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s

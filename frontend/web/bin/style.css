@@ -686,7 +686,8 @@ kbd {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 200px;
+  flex: 0 1 auto;
+  width: 200px;
   min-width: 96px;
   height: 30px;
   margin-bottom: -1px;

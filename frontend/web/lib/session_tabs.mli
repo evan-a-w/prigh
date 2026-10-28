@@ -68,17 +68,18 @@ val to_save : t -> string list option
 
 val saved : t -> t
 
-(** The current session (which may have just changed from [previous]) has
-    a tab, unless it is [out], and is seen. *)
+(** The current session (which may have just changed from [previous]) is
+    seen, and has a tab once listed, unless it is [out]. *)
 val follow : t -> previous:string option -> current:string option -> t
 
 (** The session list arrived: tabs of sessions gone or archived close
-    (unless current), and those whose work ended out of sight are
-    [finished]. *)
+    (unless current), those whose work ended out of sight are [finished],
+    and the current session, listed, gets its tab. *)
 val listed : t -> Session_summary.t list -> current:string option -> t
 
 (** The tabs shown, in order: those of listed sessions, not archived, with
-    their summaries, and the current one. *)
+    their summaries, and the current one (at the end until it is listed,
+    unless it is [out]). *)
 val shown
   :  t
   -> Session_summary.t list

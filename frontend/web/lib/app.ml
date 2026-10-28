@@ -4435,9 +4435,18 @@ let close_tab (m : Model.t) id =
       | None -> new_session m)
 ;;
 
+(* From the tab being switched to, so that keys pressed in a row each move
+   on before the switch lands. *)
 let step_tab (m : Model.t) by =
   let ids = List.map (shown_tabs m) ~f:fst in
-  match Session_tabs.step ids ~from:(current_session m) ~by with
+  let from =
+    match m.pending.session with
+    | Some (Switching path) ->
+      List.find_map m.sessions ~f:(fun s ->
+        Option.some_if (String.equal s.path path) s.id)
+    | Some _ | None -> current_session m
+  in
+  match Session_tabs.step ids ~from ~by with
   | Some id -> switch_tab m id
   | None -> m, []
 ;;

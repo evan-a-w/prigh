@@ -1111,6 +1111,42 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === firefox: themes: errors ===
 none
+=== firefox: tabs: off by default ===
+(no tabs)
+switch: false
+=== firefox: tabs: on ===
+* New session
+=== firefox: tabs: three sessions ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files (Waiting for you: a confirmation or a question)
+=== firefox: tabs: another browser ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+  List the files (Waiting for you: a confirmation or a question)
+* New session
+=== firefox: tabs: switched from the keyboard ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files
+=== firefox: tabs: dragged ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+saved: web.tabs=true web.open-tabs=3
+=== firefox: tabs: reloaded ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+=== firefox: tabs: closed ===
+* Read the README
+sidebar: 3 sessions
+=== firefox: tabs: phone ===
+(no tabs)
+=== firefox: tabs: off ===
+(no tabs); saved: web.tabs=undefined web.open-tabs=1
+=== firefox: tabs: errors ===
+none
 === firefox: worktrees: a session's menu ===
 Tidy the docs in a worktree — prigh — main
 ▸ Open in new tab
