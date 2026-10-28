@@ -93,6 +93,11 @@ type t =
       ; tools : string list
       ; worktree : Agent_worktree.t option
         (** a worktree made for it, which it works in *)
+      ; forked : bool (** it started from its caller's conversation *)
+      ; continued : bool
+        (** it ran out of turns and runs again under the same ids
+            ([subagent_continue]): it ends again, with totals over all its
+            runs *)
       }
   | Subagent of
       { call_id : string
@@ -234,12 +239,15 @@ let rec of_json j =
     let%bind task = Json.string_field j "task" in
     let%bind model = Json.string_field j "model" in
     let%bind tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
-    let%map worktree =
+    let%bind worktree =
       match Json.field j "worktree" with
       | None -> Ok None
       | Some w -> Agent_worktree.of_json w >>| Option.some
     in
-    Subagent_start { call_id; agent_id; task; model; tools; worktree }
+    let%bind forked = Json.bool_default_field j "forked" ~default:false in
+    let%map continued = Json.bool_default_field j "continued" ~default:false in
+    Subagent_start
+      { call_id; agent_id; task; model; tools; worktree; forked; continued }
   | "subagent" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in

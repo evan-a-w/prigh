@@ -16,18 +16,18 @@ let subagent_header line =
   let open Option.Let_syntax in
   let%bind rest = String.chop_prefix line ~prefix:"[subagent " in
   let%bind id, rest = String.lsplit2 rest ~on:' ' in
-  let%bind ok, task =
-    match String.chop_prefix rest ~prefix:"finished]" with
-    | Some task -> Some (true, task)
-    | None ->
-      String.chop_prefix rest ~prefix:"failed]"
-      |> Option.map ~f:(fun task -> false, task)
+  let%bind status, ok, task =
+    List.find_map
+      [ "finished", true; "failed", false; "out of turns", false ]
+      ~f:(fun (status, ok) ->
+        String.chop_prefix rest ~prefix:(status ^ "]")
+        |> Option.map ~f:(fun task -> status, ok, task))
   in
   Some
     { Section.kind = "subagent"
     ; id
     ; ok
-    ; status = (if ok then "finished" else "failed")
+    ; status
     ; task = String.strip task
     ; body = []
     }

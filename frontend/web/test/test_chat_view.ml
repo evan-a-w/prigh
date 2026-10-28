@@ -559,3 +559,12 @@ let%expect_test "re-rendering reuses the entries that did not change" =
   compare chat'' ended;
   [%expect {| (same same rendered same same) |}]
 ;;
+
+let%expect_test "delivery of a subagent that ran out of turns" =
+  Chat_harness.text
+    (Chat_harness.chat
+       [ {|{"type":"event","event":"message_start","message":{"role":"user","text":"[subagent a1 out of turns] Fix the parser\nsubagent hit the 1-turn limit without finishing\n[subagent: 1 turns, 20 in / 8 out tokens, $0.0000]\n[out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it]","origin":{"source":{"kind":"delivery","title":"Reports"}}}}|}
+       ]);
+  [%expect
+    {| ↩ subagent a1 out of turns Fix the parser Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
+;;

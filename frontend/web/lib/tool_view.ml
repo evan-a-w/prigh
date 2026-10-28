@@ -522,6 +522,10 @@ let present
     ; chips =
         List.filter_opt
           [ Option.map started ~f:(fun id -> chip ~cls:"job" ("agent " ^ id))
+          ; Option.some_if
+              (Option.exists subagent ~f:(fun s -> s.forked)
+               || Option.value (Tool_args.bool args "fork") ~default:false)
+              (chip "forked")
           ; Option.map model ~f:(chip ~cls:"model")
           ; Option.bind subagent ~f:(fun s ->
               Option.some_if (s.turns > 0) (chip (plural s.turns "turn")))

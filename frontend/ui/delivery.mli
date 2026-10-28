@@ -2,7 +2,8 @@ open! Core
 
 (** The backend hands finished background subagents and shell jobs to the main
     agent as a user message of reports, each starting
-    [\[subagent <id> finished\] <task>] (or [failed]) or
+    [\[subagent <id> finished\] <task>] (or [failed], or [out of turns]:
+    it can be continued) or
     [\[job <id> <status>\] <command>] (status [exited N], [killed], ...). *)
 
 module Section : sig
