@@ -2301,6 +2301,8 @@ cached the shell: true
   xterm.js: true
   icon-192.png: true
   manifest.webmanifest: true
+theme-color: rgb(27, 30, 35) (page rgb(27, 30, 35))
+theme-color, light: rgb(244, 245, 247) (page rgb(244, 245, 247))
 === chromium: pwa: not cached ===
 a turn over the RPC: true
 file download: 410
