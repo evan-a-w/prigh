@@ -81,6 +81,7 @@ let methods =
   ; "delete"
   ; "undelete"
   ; "session_stats"
+  ; "trace"
   ; "set_cwd"
   ; "worktree_back"
   ; "list_paths"
@@ -2496,6 +2497,9 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     Or_error.bind (string_param_opt params "entry") ~f:(fun entry ->
       Or_error.map (Agent.undelete ?entry agent) ~f:Rpc_json.hidden)
   | "session_stats" -> ok (Rpc_json.session_stats (Agent.session_stats agent))
+  | "trace" ->
+    Or_error.map (bool_param params "perfetto" ~default:false) ~f:(fun perfetto ->
+      Rpc_json.trace_report (Agent.trace_report agent) ~perfetto)
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
       Or_error.bind (if_missing_param params) ~f:(fun if_missing ->

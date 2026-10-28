@@ -247,7 +247,23 @@ type t =
   ; mutable past_resets : int
     (** usage limits in a row whose reset time had already passed *)
   ; sleep_until : float -> unit
+  ; trace_clock : Trace.Clock.t
+  ; mutable tracer : Trace.t (** the session's: replaced with it *)
   }
+
+let tracer_for ~clock ~(config : Config.t) session =
+  let file =
+    Trace_file.create
+      ~session_path:(fun () ->
+        if Session.persisted session then Some (Session.path session) else None)
+      ()
+  in
+  Trace.create
+    ~clock
+    ~level:(Trace.Level.effective ~configured:config.trace)
+    ~write:(Trace_file.write file)
+    ()
+;;
 
 let path_messages session =
   List.filter_map (Session.active_path session) ~f:(fun (e : Session.Entry.t) ->
@@ -599,7 +615,8 @@ let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
       };
   broadcast t (Loop (Tool_confirm { call_id; agent_id; name; summary; rules }));
   let answer =
-    Cancellation.protect context.cancel ~f:(fun () -> Promise.await promise)
+    Trace.span "approval_wait" (fun () ->
+      Cancellation.protect context.cancel ~f:(fun () -> Promise.await promise))
   in
   Hashtbl.remove t.pending_confirms key;
   broadcast t (Loop (Tool_confirm_done { call_id; agent_id }));
@@ -715,7 +732,12 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
     | _ -> answered
   in
   let reply =
-    match Cancellation.protect cancel ~f:wait with
+    match
+      Trace.span
+        "ask_user_wait"
+        ~attrs:[ "questions", Int (List.length questions) ]
+        (fun () -> Cancellation.protect cancel ~f:wait)
+    with
     | None -> User_question.Reply.Cancelled
     | Some reply -> reply
   in
@@ -837,6 +859,9 @@ let set_config t (config : Config.t) =
     not (Approval_mode.equal config.approval_mode t.config.approval_mode)
   in
   t.config <- config;
+  Trace.set_level
+    t.tracer
+    (Trace.Level.effective ~configured:config.trace);
   broadcast t (Config_changed config);
   (* [/confirm on|off] changes the default and the session at once. *)
   if mode_changed then set_approval_mode t config.approval_mode
@@ -1462,7 +1487,10 @@ let executor t : Tool.executor =
         (not tool.spec.on_host)
         || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
       then execute ()
-      else
+      else (
+        Trace.add_attrs ~under:"tool" [ "where", String "tool_host" ];
+        Trace.span "host_roundtrip" ~attrs:[ "host", String t.active_host ]
+        @@ fun () ->
         active_host_exec
           t
           ?stdin:context.stdin
@@ -1472,7 +1500,7 @@ let executor t : Tool.executor =
           ~cwd:context.cwd
           ~name:(Tool.name tool)
           ~arguments
-          ()
+          ())
     in
     if bash
     then
@@ -2111,6 +2139,16 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
     ~what:"a run"
     ~on_error:(run_failed t ~resolve)
     (fun () ->
+       Trace.run t.tracer
+       @@ fun () ->
+       let prompt_span =
+         Trace.start
+           ~root:true
+           "prompt"
+           ~attrs:[ "model", String (Model.key t.model) ]
+       in
+       Trace.within prompt_span
+       @@ fun () ->
        (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
        let prompts = prompts @ then_ () in
@@ -2349,6 +2387,9 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        carries on: the run's next state says [running] again, with no idle
        moment in between (in which the server would evict a session without
        clients). *)
+       Trace.finish
+         prompt_span
+         ~status:(if Cancellation.is_cancelled cancel then Cancelled else Ok);
        finish ~idle:(Option.is_none next);
        Option.iter next ~f:(function
          | `Handover prompts -> start_run ~tried t prompts
@@ -2490,7 +2531,16 @@ and auto_compact t =
     with
     | None -> tokens
     | Some plan ->
-      (match mask_session t.session ~through:plan.through with
+      (match
+         Trace.span
+           "mask"
+           ~attrs:
+             [ "tokens_before", Int tokens
+             ; "tokens_saved", Int plan.tokens_saved
+             ; "masked", Int plan.masked
+             ]
+           (fun () -> mask_session t.session ~through:plan.through)
+       with
        | Error _ -> tokens
        | Ok _ ->
          broadcast
@@ -2612,9 +2662,14 @@ let create
       ?(use_default_cwd = true)
       ?max_budget_usd
       ?sleep_until
+      ?trace_clock
       ~cwd
       ()
   =
+  let trace_clock =
+    Option.value_or_thunk trace_clock ~default:(fun () ->
+      Trace.Clock.of_env env)
+  in
   let sleep_until =
     match sleep_until with
     | Some f -> f
@@ -2710,6 +2765,8 @@ let create
     ; resume = None
     ; past_resets = 0
     ; sleep_until
+    ; trace_clock
+    ; tracer = tracer_for ~clock:trace_clock ~config session
     }
   in
   restore_settings t;
@@ -2978,13 +3035,14 @@ let compact ?instructions t =
   then Or_error.error_string "cannot compact while a run is in progress"
   else (
     let model = summary_model t in
-    Compaction.compact
-      ~env:t.env
-      ~provider:t.provider
-      ~model
-      ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
-      ?instructions
-      t.session
+    Trace.run t.tracer (fun () ->
+      Compaction.compact
+        ~env:t.env
+        ~provider:t.provider
+        ~model
+        ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
+        ?instructions
+        t.session)
     |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
       compacted t ~model outcome;
       state_changed t;
@@ -3495,6 +3553,7 @@ let replace_session t session ~keep_host =
   wait_idle t;
   Background_tasks.forget_finished t.background;
   t.session <- session;
+  t.tracer <- tracer_for ~clock:t.trace_clock ~config:t.config session;
   Reminder.Tracker.reset t.reminder_tracker;
   load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
@@ -3788,6 +3847,31 @@ let import_session t ~path =
   Or_error.map (Session.import ~dir:t.sessions_dir path) ~f:(fun session ->
     replace_session t session ~keep_host:false;
     Session.path session)
+;;
+
+let trace_report t =
+  let spans, bad =
+    if Session.persisted t.session
+    then Trace_file.load ~session_path:(Session.path t.session)
+    else [], 0
+  in
+  let off =
+    match Trace.level t.tracer with
+    | Off ->
+      "Tracing is off: unset PRIGH_TRACE or set trace to \"default\" in the \
+       config to record spans.\n\n"
+    | Default | Detailed -> ""
+  in
+  let footer =
+    sprintf
+      "\nSpans still open (a running prompt) are not included. Export it for \
+       Perfetto with: prigh trace %s --perfetto trace.json\n"
+      (Session.id t.session)
+  in
+  { Trace_report.Report.summary = off ^ Trace_report.summary ~bad spans ^ footer
+  ; level = Trace.level t.tracer
+  ; spans
+  }
 ;;
 
 let session_stats t =

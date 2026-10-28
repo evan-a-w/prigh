@@ -494,6 +494,16 @@ let session_summary (s : Session.Summary.t) =
   |> fun fields -> `Object fields
 ;;
 
+(* The Perfetto export only when asked: it can be large. *)
+let trace_report (r : Trace_report.Report.t) ~perfetto : Json.t =
+  `Object
+    ([ "summary", `String r.summary
+     ; "level", `String (Trace.Level.to_string r.level)
+     ; "spans", `Number (Int.to_string (List.length r.spans))
+     ]
+     @ if perfetto then [ "perfetto", Trace_report.perfetto r.spans ] else [])
+;;
+
 let session_stats (s : Agent.Session_stats.t) =
   `Object
     [ "message_count", int s.message_count

@@ -558,7 +558,9 @@ let stream
       ~cancel
       ~url:(Endpoint.url endpoint ~base_url)
       ~headers:(Endpoint.headers endpoint)
-      ~body:(Json.to_string (request_body ~endpoint request))
+      ~body:
+        (Trace.span ~detailed:true "request_build" (fun () ->
+           Json.to_string (request_body ~endpoint request)))
       ~on_event:(fun event ->
         List.iter (parse_event state event) ~f:(fun e ->
           Assistant_builder.apply builder e;

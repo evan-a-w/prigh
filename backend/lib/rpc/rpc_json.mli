@@ -57,6 +57,10 @@ val job : now:float -> Background_tasks.Task.t -> Json.t
 val session_summary : Session.Summary.t -> Json.t
 
 val session_stats : Agent.Session_stats.t -> Json.t
+
+(** [{summary; level; spans}] (the span count), and [perfetto] (the Chrome
+    trace event format) when asked. *)
+val trace_report : Trace_report.Report.t -> perfetto:bool -> Json.t
 val entry : Session.Entry.t -> Json.t
 val thinking : Thinking.t -> Json.t
 val thinking_of_string : string -> Thinking.t Or_error.t

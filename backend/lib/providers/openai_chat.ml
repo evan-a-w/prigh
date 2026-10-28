@@ -382,7 +382,9 @@ let stream
       ~cancel
       ~url
       ~headers
-      ~body:(Json.to_string (request_body ~quirks request))
+      ~body:
+        (Trace.span ~detailed:true "request_build" (fun () ->
+           Json.to_string (request_body ~quirks request)))
       ~on_event:handle_event
       ()
   in

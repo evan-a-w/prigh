@@ -19,6 +19,7 @@
   re
   eio
   eio.unix
+  mtime
   cohttp-eio
   tls-eio
   ca-certs

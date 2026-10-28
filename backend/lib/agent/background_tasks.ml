@@ -235,6 +235,33 @@ let finish_on_switch_exit t task resolve =
   Promise.resolve resolve ()
 ;;
 
+(* A background job's span: under the turn that launched it, on a track of
+   its own, from [at] (default now) until [finish_job]. Subagents trace
+   their own runs. *)
+let start_job ?at (task : Task.t) =
+  match task.kind with
+  | Subagent -> None
+  | Job ->
+    Trace.start
+      "job"
+      ~under:"turn"
+      ~track:("job " ^ task.id)
+      ?at
+      ~attrs:[ "job_id", String task.id; "label", Trace.short task.label ]
+;;
+
+let finish_job span (outcome : Outcome.t) =
+  Trace.finish
+    span
+    ~status:
+      (if String.equal outcome.status "cancelled"
+       then Cancelled
+       else if outcome.is_error
+       then Error
+       else Ok)
+    ~attrs:[ "outcome", String outcome.status ]
+;;
+
 (* Runs [task] in the tasks' switch until [run] returns its outcome. *)
 let run_task t (task : Task.t) resolve ~run =
   let close_inbox () =
@@ -247,14 +274,16 @@ let run_task t (task : Task.t) resolve ~run =
     Option.iter (activity event) ~f:(fun a -> task.activity <- a);
     t.emit event
   in
+  let job = start_job task in
   Fiber.fork ~sw:t.sw (fun () ->
     let outcome =
       match
-        run
-          ~id:task.id
-          ~cancel:task.cancel
-          ~emit
-          ~on_output:(Output_tail.add task.output)
+        Trace.within job (fun () ->
+          run
+            ~id:task.id
+            ~cancel:task.cancel
+            ~emit
+            ~on_output:(Output_tail.add task.output))
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
@@ -263,6 +292,7 @@ let run_task t (task : Task.t) resolve ~run =
         raise exn
       | exception exn -> failed_outcome task.kind exn
     in
+    finish_job job outcome;
     (* Before it counts as finished, so no message is accepted that nothing
        would take. *)
     close_inbox ();
@@ -298,6 +328,7 @@ end
 let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
   =
   let started_at = now t in
+  let started_mono = Trace.now () in
   let work_cancel = Cancellation.create () in
   let output = Output_tail.create () in
   let moved = ref None in
@@ -316,10 +347,11 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
     in
     match !moved, ran with
     | None, _ -> Promise.resolve resolve_result ran
-    | Some (task, resolve), Error (Eio.Cancel.Cancelled _ as exn) ->
+    | Some (task, job, resolve), Error (Eio.Cancel.Cancelled _ as exn) ->
+      Trace.finish job ~status:Cancelled;
       finish_on_switch_exit t task resolve;
       raise exn
-    | Some ((task : Task.t), resolve), ran ->
+    | Some ((task : Task.t), job, resolve), ran ->
       let outcome =
         match ran with
         | Ok value ->
@@ -327,6 +359,7 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
            | exn -> failed_outcome kind exn)
         | Error exn -> failed_outcome kind exn
       in
+      finish_job job outcome;
       finish t task outcome;
       Guarded.run ~what:"a background task's report" (fun () -> t.on_change ());
       Promise.resolve resolve ());
@@ -360,7 +393,8 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
          make_task ?input ~output t ~kind ~label ~started_at ~cancel:work_cancel
        in
        task.activity <- "running";
-       moved := Some (task, resolve);
+       (* Moved: from its start, it outlives the call. *)
+       moved := Some (task, start_job ?at:started_mono task, resolve);
        t.on_change ();
        Moved task)
 ;;
