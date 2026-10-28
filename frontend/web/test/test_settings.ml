@@ -42,6 +42,14 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Use a token) (Connect)
     Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
+    Compaction
+    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+    [200k] tokens
+    (Off)
+    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+    (The conversation's model)
+    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+    (Keep old tool outputs (/compaction mask off))
     Account
     No sign-in This backend lets anyone in: there is no account to switch or sign out of.
     (Keyboard shortcuts) (Done)
@@ -185,8 +193,12 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
+    label "tokens"
+    button "Off" -- Only at 80% of the model's window (/compaction at off)
     <button class="segment">
     <button class="on segment">
+    <button class="segment">
+    <label class="compact-at-field on segment">
     <button class="segment">
     (Run "/verbosity quiet")
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
@@ -195,6 +207,8 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     (Expire_toast (id 0) (after_ms 4660))
     <button class="on segment">
     <button class="segment">
+    <button class="segment">
+    <label class="compact-at-field on segment">
     <button class="segment">
     Quiet
     |}];
@@ -278,6 +292,9 @@ let%expect_test "the names of the settings' controls" =
     button "Connect Forgejo (codeberg.org) with a token" -- /login forgejo codeberg.org token
     button "Connect Forgejo (codeberg.org)" -- /login forgejo codeberg.org
     button "Add host\226\128\166" -- /login forgejo HOST
+    button "Off" -- Only at 80% of the model's window (/compaction at off)
+    button "Summary model: The conversation's model" -- Choose the model (/compaction model)
+    [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     button "Keyboard shortcuts" -- /hotkeys
     button "Done"
     [radiogroup] div "Theme"
@@ -295,6 +312,8 @@ let%expect_test "the names of the settings' controls" =
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     [group] div "Transcript detail"
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    [group] div "Compact at"
+    [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     |}]
 ;;
 
