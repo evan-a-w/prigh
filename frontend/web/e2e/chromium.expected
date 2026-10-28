@@ -578,14 +578,14 @@ count some lines
 <SIZE>
 Cancel
 Delete 2
-session files before: 3
+session files before: 3, traces: 3
 === chromium: deleted ===
 Deleted 2 sessions (<SIZE>)
 one more
 <AGE>
 cwd
 main
-session files after: 1
+session files after: 1, traces: 1
 === chromium: /cd: the directory popup ===
 Directories
 ↑↓ Tab Enter Esc Ctrl+Enter as typed
