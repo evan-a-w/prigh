@@ -235,11 +235,18 @@ let provider_param login params =
   Or_error.bind (string_param params "provider") ~f:(provider_of_string login)
 ;;
 
+(* Confirmations and questions waiting for the user. *)
+let waiting agent =
+  List.length (Agent.pending_confirms agent)
+  + List.length (Agent.pending_questions agent)
+;;
+
 (* What [list_sessions] shows of a live session that changes as it runs. *)
 module Listed = struct
   type t =
     { running : bool
     ; background : int
+    ; waiting : int
     ; persisted : bool
     ; name : string option
     ; description : string option
@@ -253,6 +260,7 @@ module Listed = struct
     let session = Agent.session agent in
     { running = Agent.is_running agent
     ; background = Agent.running_background agent
+    ; waiting = waiting agent
     ; persisted = Session.persisted session
     ; name = Session.name session
     ; description = Session.description session
@@ -505,7 +513,9 @@ let route t agent (event : Agent.Event.t) =
     | _ -> false
   in
   (match event with
-   | State_changed _ -> note_listed t agent
+   | State_changed _
+   | Loop (Tool_confirm _ | Tool_confirm_done _ | Ask_user _ | Ask_user_done _)
+     -> note_listed t agent
    | Loop e when message_end e -> note_listed t agent
    | _ -> ());
   match event with
@@ -1389,7 +1399,10 @@ let list_sessions t client =
        let live =
          match l.agent with
          | Some agent ->
-           [ "live", `True; "clients", int (List.length (clients_of t agent)) ]
+           [ "live", `True
+           ; "clients", int (List.length (clients_of t agent))
+           ; "waiting", int (waiting agent)
+           ]
          | None -> [ "live", `False ]
        in
        match Rpc_json.session_summary (with_repo t l.summary) with
