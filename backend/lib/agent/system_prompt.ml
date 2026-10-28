@@ -118,6 +118,14 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
              many files, long investigations) to subagents too, asking for a \
              concise report: only the report enters your context, which stays \
              small and sharp."
+          ; "- Fork (subagent with fork: true) for work that builds on what \
+             you have explored, such as implementing what you investigated: \
+             the subagent starts from your conversation so far, so it needs \
+             little exploration and a short task. Do not fork when your \
+             conversation holds nothing useful for it, or when it should be \
+             independent of your thinking (a reviewer, a second opinion, a \
+             fresh investigation): then it sees only the task, so include \
+             everything it needs."
           ]
         else [])
      @ [ "" ]
@@ -149,9 +157,10 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
              else [])
           @ [ "- Each finished job or subagent reports automatically, in a \
                message starting with \"[job <id> exited <code>]\" (or killed, \
-               failed) or \"[subagent <id> finished]\" (or failed), sent by \
-               prigh, not typed by the user. You are woken by it even after \
-               you end your turn."
+               failed) or \"[subagent <id> finished]\" (or failed, or out of \
+               turns: subagent_continue gives it more turns), sent by prigh, \
+               not typed by the user. You are woken by it even after you end \
+               your turn."
             ; "- So while they run, keep working on whatever does not depend \
                on them, or end your turn. Never sleep or poll to pass the \
                time."

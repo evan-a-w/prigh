@@ -742,8 +742,17 @@ let rec event ?now (e : Agent.Event.t) =
       ; "call", tool_call call
       ; "result", tool_result result
       ]
-    | Loop (Subagent_start { call_id; agent_id; task; model; tools; worktree })
-      ->
+    | Loop
+        (Subagent_start
+           { call_id
+           ; agent_id
+           ; task
+           ; model
+           ; tools
+           ; worktree
+           ; forked
+           ; continued
+           }) ->
       [ "event", str "subagent_start"
       ; "call_id", str call_id
       ; "agent_id", str agent_id
@@ -753,6 +762,8 @@ let rec event ?now (e : Agent.Event.t) =
       ]
       @ Option.value_map worktree ~default:[] ~f:(fun w ->
         [ "worktree", agent_worktree w ])
+      @ (if forked then [ "forked", `True ] else [])
+      @ if continued then [ "continued", `True ] else []
     | Loop (Subagent { call_id; agent_id; event = inner }) ->
       [ "event", str "subagent"
       ; "call_id", str call_id

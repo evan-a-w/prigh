@@ -32,6 +32,7 @@ and subagent =
   { agent_id : string
   ; task : string
   ; model : string
+  ; forked : bool
   ; chat : t
   ; turns : int
   ; cost_usd : float option
@@ -50,6 +51,7 @@ module Subagent = struct
     { agent_id : string
     ; task : string
     ; model : string
+    ; forked : bool
     ; chat : t
     ; turns : int
     ; cost_usd : float option
@@ -355,19 +357,25 @@ let rec apply t (event : Event.t) =
   | Tool_output { call_id; chunk } ->
     update_tool t call_id ~f:(fun tool -> append_output tool chunk)
   | Tool_end { call = _; result } -> set_result t result
-  | Subagent_start { call_id; agent_id; task; model; _ } ->
+  | Subagent_start { call_id; agent_id; task; model; forked; continued; _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
         subagent =
-          Some
-            { agent_id
-            ; task
-            ; model
-            ; chat = empty
-            ; turns = 0
-            ; cost_usd = None
-            ; result = None
-            }
+          (match tool.subagent with
+           | Some s when continued && String.equal s.agent_id agent_id ->
+             (* Continued after running out of turns: it carries on. *)
+             Some { s with result = None; cost_usd = None }
+           | Some _ | None ->
+             Some
+               { agent_id
+               ; task
+               ; model
+               ; forked
+               ; chat = empty
+               ; turns = 0
+               ; cost_usd = None
+               ; result = None
+               })
       })
   | Subagent { call_id; agent_id = _; event } ->
     update_subagent t call_id ~f:(fun s ->

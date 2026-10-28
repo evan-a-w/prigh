@@ -57,6 +57,20 @@ module Task : sig
   val report : t -> string
 end
 
+(** Runs a parked subagent again: [max_turns] more turns (default: its
+    limit), after [message], from its caller, when given. [call_id] is the
+    call it now runs for ([None]: the one that started it). *)
+module Resume : sig
+  type t =
+    max_turns:int option
+    -> message:string option
+    -> inbox:Subagent_inbox.t option
+    -> call_id:string option
+    -> cancel:Cancellation.t
+    -> emit:(Agent_event.t -> unit)
+    -> Outcome.t
+end
+
 (** What clients are told about tasks that are running or not yet delivered. *)
 module Summary : sig
   type t =
@@ -194,8 +208,30 @@ val send
 (** The subagents with queued messages, oldest first. *)
 val queues : t -> Subagent_inbox.Listing.t list
 
+(** {2 Subagents out of turns}
+
+    A subagent that stopped at its turn limit is parked with what it needs
+    to carry on: [subagent_continue] runs it again. A background one keeps
+    its task (and id), which runs again and reports again; a synchronous
+    one (a subagent's own, parked in its caller's tasks) is run by its
+    caller. Cancelling it, {!cancel_all} and {!forget_finished} free it. *)
+
+val park : t -> string -> Resume.t -> unit
+val is_parked : t -> string -> bool
+
+(** Unparks [id]: a background subagent's task runs it again ([`Restarted]:
+    it is running, and reports again when it finishes); one without a task
+    is returned to run ([`Run_here]). The error says why it cannot be
+    continued, and which can. *)
+val continue_
+  :  t
+  -> string
+  -> max_turns:int option
+  -> message:string option
+  -> [ `Restarted | `Run_here of Resume.t ] Or_error.t
+
 (** Requests cancellation; the task still finishes and is delivered as
-    usual. *)
+    usual. A parked subagent is freed. *)
 val cancel : t -> kind:Kind.t -> string -> unit Or_error.t
 
 (** Cancels [id], waits for it to finish and marks it delivered. *)

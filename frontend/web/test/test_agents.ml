@@ -808,3 +808,71 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
     (Show in chat) Done 30s deepseek-flash  2 turns  1 tool call
     |}]
 ;;
+
+(* A forked subagent says so on its card; one that ran out of turns and is
+   continued ([subagent_continue]) runs again in the same card and panel row,
+   then ends with the totals over both runs. *)
+let%expect_test "a forked subagent runs out of turns and is continued" =
+  let h = H.create () in
+  let args = {|{"task":"Fix the parser","fork":true}|} in
+  events
+    h
+    [ {|{"event":"agent_start"}|}
+    ; call ~id:"s1" ~name:"subagent" args
+    ; tool_start ~id:"s1" ~name:"subagent" args
+    ; start ~forked:true ~call:"s1" ~agent:"a1" "Fix the parser"
+    ; in_a1 {|{"event":"turn_start"}|}
+    ; tool_end ~id:"s1" ~name:"subagent" "started agent a1 (Fix the parser)"
+    ; end_
+        ~error:true
+        ~call:"s1"
+        ~agent:"a1"
+        ~turns:1
+        "subagent hit the 1-turn limit without finishing\n\
+         [out of turns: call subagent_continue with id a1 to give it more \
+         turns]"
+    ; {|{"event":"agent_end","messages":[]}|}
+    ];
+  let card () = H.text h ~selector:".tool-subagent > .tool-head" in
+  let row () = H.text h ~selector:".agents-section > .agents-tree" in
+  H.act h (Open_subagents None);
+  card ();
+  row ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    ✕ subagent Fix the parser agent a1 forked deepseek-flash 1 turn $0.01 (Open ›)
+    (✕ Failed Fix the parser subagent hit the 1-turn limit without finishing)
+    |}];
+  events
+    h
+    [ start ~continued:true ~call:"s1" ~agent:"a1" "Fix the parser"
+    ; in_a1 {|{"event":"turn_start"}|}
+    ; in_a1 (call ~id:"b1" ~name:"bash" {|{"command":"make test"}|})
+    ; in_a1 (tool_start ~id:"b1" ~name:"bash" {|{"command":"make test"}|})
+    ];
+  card ();
+  row ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    subagent Fix the parser agent a1 forked deepseek-flash 2 turns (Open ›)
+    (Running Fix the parser 0s bash make test a1  deepseek-flash  2 turns  1 tool call)
+    |}];
+  events
+    h
+    [ in_a1 (tool_end ~id:"b1" ~name:"bash" "ok")
+    ; end_ ~call:"s1" ~agent:"a1" ~turns:2 "Parser fixed."
+    ];
+  card ();
+  row ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    ✓ subagent Fix the parser agent a1 forked deepseek-flash 2 turns $0.01 (Open ›)
+    (✓ Done Fix the parser Parser fixed.)
+    |}]
+;;

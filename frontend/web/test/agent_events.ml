@@ -40,12 +40,14 @@ let inner ~call ~agent json =
     json
 ;;
 
-let start ~call ~agent task =
+let start ?(forked = false) ?(continued = false) ~call ~agent task =
   sprintf
-    {|{"event":"subagent_start","call_id":"%s","agent_id":"%s","task":"%s","model":"deepseek-flash","tools":["bash"]}|}
+    {|{"event":"subagent_start","call_id":"%s","agent_id":"%s","task":"%s","model":"deepseek-flash","tools":["bash"]%s%s}|}
     call
     agent
     task
+    (if forked then {|,"forked":true|} else "")
+    (if continued then {|,"continued":true|} else "")
 ;;
 
 let end_ ?(error = false) ~call ~agent ~turns text =

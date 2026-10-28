@@ -17,6 +17,7 @@ module Subagent = struct
     { agent_id : string
     ; task : string
     ; model : string
+    ; forked : bool
     ; status : Status.t
     ; turns : int
     ; report : string option
@@ -410,16 +411,32 @@ let rec update_subagent (s : Subagent.t) (event : P.Event.t) =
     if String.is_empty (String.strip text)
     then s
     else { s with report = Some text }
-  | P.Event.Subagent_start { task; _ } ->
-    let line = "subagent " ^ one_line task in
+  | P.Event.Subagent_start { task; forked; continued; _ } ->
+    let line =
+      (if continued
+       then "subagent_continue "
+       else if forked
+       then "subagent (forked) "
+       else "subagent ")
+      ^ one_line task
+    in
     { s with last_tool = Some line; nested = s.nested @ [ line ] }
   | P.Event.Subagent { event; _ } -> update_subagent s event
   | _ -> s
 ;;
 
-let mark_subagent t ~call_id ~agent_id ~task ~model =
+(* A subagent continued after running out of turns keeps what it showed. *)
+let mark_subagent t ~call_id ~agent_id ~task ~model ~forked ~continued =
   let rec go acc = function
     | [] -> List.rev acc
+    | Item.Tool ({ subagent = Some s; _ } as tool) :: rest
+      when continued
+           && String.equal tool.call.id call_id
+           && String.equal s.agent_id agent_id ->
+      List.rev_append
+        acc
+        (Item.Tool { tool with subagent = Some { s with status = Running } }
+         :: rest)
     | Item.Tool tool :: rest when String.equal tool.call.id call_id ->
       List.rev_append
         acc
@@ -430,6 +447,7 @@ let mark_subagent t ~call_id ~agent_id ~task ~model =
                  { Subagent.agent_id
                  ; task
                  ; model
+                 ; forked
                  ; status = Running
                  ; turns = 0
                  ; report = None
@@ -477,6 +495,7 @@ let finish_subagent
             { Subagent.agent_id
             ; task = ""
             ; model = ""
+            ; forked = false
             ; status
             ; turns
             ; report = Some result.text
@@ -536,8 +555,9 @@ let apply t (event : P.Event.t) =
   | P.Event.Notice text -> notice t text
   | P.Event.Masked { masked; tokens_saved } ->
     notice t (P.Event.masked_notice ~masked ~tokens_saved)
-  | P.Event.Subagent_start { call_id; agent_id; task; model; _ } ->
-    mark_subagent t ~call_id ~agent_id ~task ~model
+  | P.Event.Subagent_start
+      { call_id; agent_id; task; model; forked; continued; _ } ->
+    mark_subagent t ~call_id ~agent_id ~task ~model ~forked ~continued
   | P.Event.Subagent { call_id; event = inner; _ } ->
     update_tool_subagent t ~call_id ~f:(fun current ->
       match current with
@@ -610,6 +630,7 @@ let render_subagent ~verbosity ~width (s : Subagent.t) =
     | Failed message when cancelled message -> Interrupted, [ chip "cancelled" ]
     | Failed _ -> Failed, [ chip ~style:red "failed" ]
   in
+  let chips = if s.forked then chip "forked" :: chips else chips in
   let header =
     Tool_render.header
       ~width

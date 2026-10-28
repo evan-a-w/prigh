@@ -57,6 +57,10 @@ val tool_summary : name:string -> Json.t -> string
     [ask_user] is how the [ask_user] tool reaches the user. Both are passed
     on to the tools' contexts, so [subagent] can hand [approve] down.
 
+    Each tool call's context carries the {!Conversation.t} up to the
+    assistant message that made it. [on_context] gets the context the run
+    ends with (as compaction and masking left it), before [Agent_end].
+
     A transient provider error ({!is_retryable_error}) is retried up to
     [config.retries] times, emitting [Retry] and then waiting with [sleep]
     (default: the clock; cancellation ends the wait). *)
@@ -89,6 +93,7 @@ val run
         -> (Message.t list * Compaction.Outcome.t) Or_error.t)
   -> ?mask:(through:int -> Message.t list -> Message.t list Or_error.t)
   -> ?halt:(unit -> string option)
+  -> ?on_context:(Message.t list -> unit)
   -> context:Message.t list
   -> prompts:Message.t list
   -> unit

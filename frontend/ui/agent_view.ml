@@ -42,11 +42,13 @@ let replace agents id f =
   List.map agents ~f:(fun a -> if String.equal a.id id then f a else a)
 ;;
 
-(* An agent already listed (from the state, before its start event) keeps
-   its place. *)
+(* An agent already listed (from the state, before its start event, or one
+   continued after running out of turns) keeps its place and transcript. *)
 let start agents ~call_id ~agent_id ~task ~model =
   match find agents agent_id with
-  | Some _ -> replace agents agent_id (fun a -> { a with call_id; task; model })
+  | Some _ ->
+    replace agents agent_id (fun a ->
+      { a with call_id; task; model; status = Running })
   | None -> agents @ [ create ~call_id ~agent_id ~task ~model ]
 ;;
 
@@ -80,12 +82,11 @@ let rec apply (t : t) (event : P.Event.t) : t =
     else t
   | P.Event.Subagent_start { call_id; agent_id; task; model; _ } ->
     if is_descendant t agent_id
-    then (
-      let child = create ~call_id ~agent_id ~task ~model in
+    then
       { t with
-        children = t.children @ [ child ]
+        children = start t.children ~call_id ~agent_id ~task ~model
       ; transcript = Transcript.apply t.transcript event
-      })
+      }
     else t
   | P.Event.Subagent_end { agent_id; turns; cost_usd; result; _ } ->
     if is_descendant t agent_id

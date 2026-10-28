@@ -519,8 +519,8 @@ let%expect_test
          .parameters);
   [%expect
     {|
-    (bash read write edit ls grep find web_fetch web_search subagent job_status
-     job_output job_input job_kill)
+    (bash read write edit ls grep find web_fetch web_search subagent
+     subagent_continue job_status job_output job_input job_kill)
     {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."},"background":{"type":"boolean","description":"Start it as a background job and return at once with the job id, to run commands side by side or keep a server running while you work. Its report arrives when it exits, even after you end your turn; job_output, job_input and job_kill act on it meanwhile. You finish only once your jobs have exited: kill the ones you no longer need."},"stdin":{"type":"boolean","description":"With background: keep its stdin open (a pipe, not a terminal) for input you send with job_input. Otherwise it reads end of input at once, like a foreground command."}},"required":["command"],"additionalProperties":false}
     |}]
 ;;

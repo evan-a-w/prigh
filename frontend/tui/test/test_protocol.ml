@@ -522,7 +522,9 @@ let%expect_test "subagent events are decoded recursively" =
       (task     go)
       (model    m)
       (tools (read ls))
-      (worktree ())))
+      (worktree ())
+      (forked    false)
+      (continued false)))
     (Event (
       Subagent_end
       (call_id  p)
