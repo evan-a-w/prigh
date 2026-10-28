@@ -4,8 +4,7 @@ open Chat_html
 
 let image_src = Image_view.src
 let message_attribute = "data-message-entry"
-let menu_attribute = "data-message-menu"
-let more_id n = sprintf "msg-more-%d" n
+let message_id n = sprintf "msg-%d" n
 let hidden_attribute = "data-hidden"
 let hidden_action_attribute = "data-hidden-action"
 
@@ -112,38 +111,22 @@ let margin_note ?at times (n : Origin.Note.t) =
   note ?at times ~kind:n.kind ~title:n.title n.text
 ;;
 
-(* The ⋯ in a message's corner, shown on hover or focus: its menu, which
-   the page's click listener opens. The item highlighted in the open menu
-   previews on the message what it would do. *)
-let more_button n (more : More.t) =
-  let preview =
-    match more with
-    | Open (Some Trim_before) -> [ "preview-trim-before" ]
-    | Open (Some Trim_after) -> [ "preview-trim-after" ]
-    | Open (Some Delete) -> [ "preview-delete" ]
-    | Open _ | Closed -> []
-  in
-  let open_ =
-    match more with
-    | Open _ -> true
-    | Closed -> false
-  in
-  Node.button
-    ~attrs:
-      [ Attr.classes
-          ([ "msg-more" ] @ (if open_ then [ "open" ] else []) @ preview)
-      ; Attr.type_ "button"
-      ; Attr.id (more_id n)
-      ; Attr.create menu_attribute (Int.to_string n)
-      ; Attr.title "More (right-click, Shift+F10)"
-      ; Attr.create "aria-label" "More for this message"
-      ; Attr.create "aria-haspopup" "menu"
-      ; Attr.create "aria-expanded" (Bool.to_string open_)
-      ]
-    [ Html.icon More ]
+(* The open menu's highlighted item previews on its message what it would
+   do. *)
+let menu_classes (more : More.t) =
+  match more with
+  | Closed -> []
+  | Open highlighted ->
+    "menu-open"
+    ::
+    (match highlighted with
+     | Some Trim_before -> [ "preview-trim-before" ]
+     | Some Trim_after -> [ "preview-trim-after" ]
+     | Some Delete -> [ "preview-delete" ]
+     | Some _ | None -> [])
 ;;
 
-let user ?skill ?(more = Node.none) times (u : Message.User.t) =
+let user ?skill times (u : Message.User.t) =
   let notes, attachments =
     match u.origin with
     | None -> [], []
@@ -176,7 +159,6 @@ let user ?skill ?(more = Node.none) times (u : Message.User.t) =
                   ~attrs:[ Attr.class_ "attachment"; Attr.title "Attached file" ]
                   [ Node.text ("@" ^ path) ])))
       ; Option.value_map u.at ~default:Node.none ~f:(time times)
-      ; more
       ]
   in
   match notes with
@@ -365,14 +347,7 @@ let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 let rec nested ~fold times (s : Chat.Subagent.t) =
   view ~fold:(Fold.scoped fold s.agent_id) times s.chat
 
-and assistant
-      ?(more = Node.none)
-      ~fold
-      times
-      chat
-      (message : Message.Assistant.t)
-      ~streaming
-  =
+and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
   let count = List.length message.content in
   let blocks =
     List.mapi message.content ~f:(fun i content ->
@@ -439,10 +414,9 @@ and assistant
                    && not (Transcript_filter.is_all (Fold.filter fold)))
             then Node.none
             else footer times message)
-         ; more
          ])
 
-and render_entry ?more ~fold times chat (entry : Chat.Entry.t) =
+and render_entry ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u when not (Fold.shows fold (user_kind u)) -> Node.none
   | Shell _ when not (Fold.shows fold Tools) -> Node.none
@@ -471,8 +445,7 @@ and render_entry ?more ~fold times chat (entry : Chat.Entry.t) =
             (String.chop_prefix u.text ~prefix:summary_prefix)
             ~default:u.text)
      | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
-     | None ->
-       user ?skill:(Skill_message.parse (Message.User.body u)) ?more times u)
+     | None -> user ?skill:(Skill_message.parse (Message.User.body u)) times u)
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
@@ -489,7 +462,7 @@ and render_entry ?more ~fold times chat (entry : Chat.Entry.t) =
       ]
   | Compaction summary -> compaction summary
   | Assistant { message; streaming } ->
-    assistant ?more ~fold times chat message ~streaming
+    assistant ~fold times chat message ~streaming
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
@@ -550,14 +523,7 @@ and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
       }
     ~equal:Deps.equal
     ~f:(fun () ->
-      let node =
-        render_entry
-          ?more:(Option.map more ~f:(more_button n))
-          ~fold
-          times
-          chat
-          entry
-      in
+      let node = render_entry ~fold times chat entry in
       let places =
         (if Jump.landmark entry
          then [ Attr.create "data-entry" (Int.to_string n) ]
@@ -570,9 +536,15 @@ and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
       let attrs =
         places
         @
-        (* Focusable, so that a tap on a phone, which has no hover, shows
-           its ⋯, and the keyboard can open its menu. *)
-        if Option.is_some more then [ Attr.tabindex (-1) ] else []
+        (* Focusable, so that the keyboard can open its menu. *)
+        match more with
+        | None -> []
+        | Some more ->
+          [ Attr.id (message_id n); Attr.tabindex (-1) ]
+          @
+          (match menu_classes more with
+           | [] -> []
+           | classes -> [ Attr.classes classes ])
       in
       match node with
       | Element e when not (List.is_empty attrs) ->

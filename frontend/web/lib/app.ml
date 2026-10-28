@@ -926,6 +926,10 @@ let close_dialog (m : Model.t) =
            | Since _ when m.review.open_ -> "review-since-button"
            | Since _ -> "files-since-button")
       ] )
+  | _, Some (Picker { kind = Menu { target = Message n; _ }; _ })
+    when Option.is_some (Model.message_menu m n) ->
+    ( { m with dialog = None; return_to_settings = false; theme_preview = None }
+    , [ Command.Focus (Chat_view.message_id n) ] )
   | _ ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
     , [ focus_editor ] )

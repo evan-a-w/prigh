@@ -28,13 +28,14 @@ end
     when they were sent (replies: when they ended) and a separator marks
     where the day changes. Tool outputs fold as [fold] (default
     [Fold.default]) says. With [index], the user's messages and the replies
-    of the context have a context menu: they are focusable and have a ⋯
-    button ([more_id], with [menu_attribute]: the entry's number); [menu] is
-    the open one. The entries in [deleting] are left out; [dividers] go
-    after their entries, whatever the filter. What [Fold.filter] hides is
-    left out, in subagents' transcripts too; a landmark of [Jump] or a
-    message of the context left out keeps an empty [.filtered] with its
-    attributes in its place (no menu). *)
+    of the context have a context menu: they are focusable, with the id
+    [message_id]; [menu] is the open one, its message marked [menu-open] and
+    with the preview of its highlighted item ([preview-trim-before],
+    [preview-trim-after], [preview-delete]). The entries in [deleting] are
+    left out; [dividers] go after their entries, whatever the filter. What
+    [Fold.filter] hides is left out, in subagents' transcripts too; a
+    landmark of [Jump] or a message of the context left out keeps an empty
+    [.filtered] with its attributes in its place (no menu). *)
 val view
   :  ?fold:Fold.t
   -> ?menu:Menu.t
@@ -53,12 +54,9 @@ val hidden : ?deleting:Int.Set.t -> fold:Fold.t -> Chat.t -> int
 (** On every entry that is a message of the context: its number. *)
 val message_attribute : string
 
-(** On a message's ⋯ button: its entry's number. *)
-val menu_attribute : string
-
-(** The DOM id of entry [n]'s ⋯ button, which its menu opens under from the
-    keyboard. *)
-val more_id : int -> string
+(** The DOM id of entry [n]'s message, if it has a menu, which opens under
+    it from the keyboard. *)
+val message_id : int -> string
 
 (** On a divider ({!Divider}) and its buttons: the range's {!Hidden.entry};
     the buttons also have [hidden_action_attribute]: [show], [hide] or

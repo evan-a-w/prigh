@@ -83,7 +83,6 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     Survey the repository
-    (More (right-click, Shift+F10))
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -91,14 +90,10 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     Looking
     ■ Interrupted
-    (More (right-click, Shift+F10))
     |}]
 ;;
 
@@ -161,17 +156,13 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     Looking
     ■ Interrupted
-    (More (right-click, Shift+F10))
     == without assistant
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding replies (/filter)
     Hiding replies · 2 items hidden (Show all)
     Survey the repository
-    (More (right-click, Shift+F10))
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -179,69 +170,50 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     ■ Interrupted
-    (More (right-click, Shift+F10))
     == without thinking
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
     Hiding thinking · 1 item hidden (Show all)
     Survey the repository
-    (More (right-click, Shift+F10))
     ✓ bash ls
     README.md
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     Looking
     ■ Interrupted
-    (More (right-click, Shift+F10))
     == without tools
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding tool calls (/filter)
     Hiding tool calls · 1 item hidden (Show all)
     Survey the repository
-    (More (right-click, Shift+F10))
     Thought Let me look first.
     Let me look first.
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     Looking
     ■ Interrupted
-    (More (right-click, Shift+F10))
     == without subagents
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding subagents (/filter)
     Hiding subagents · 1 item hidden (Show all)
     Survey the repository
-    (More (right-click, Shift+F10))
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
     README.md
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     Looking
     ■ Interrupted
-    (More (right-click, Shift+F10))
     == without notes
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
     Hiding notices · 1 item hidden (Show all)
     Survey the repository
-    (More (right-click, Shift+F10))
     Thought Let me look first.
     Let me look first.
     ✓ bash ls
@@ -249,13 +221,9 @@ let%expect_test "each kind toggled from the menu, alone" =
     ✓ subagent Count the modules
     Report 12 modules
     12 modules
-    (More (right-click, Shift+F10))
     Twelve modules and a README.
-    (More (right-click, Shift+F10))
     And the tests?
-    (More (right-click, Shift+F10))
     Looking
-    (More (right-click, Shift+F10))
     |}]
 ;;
 

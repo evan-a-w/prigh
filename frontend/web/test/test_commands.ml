@@ -198,7 +198,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
-    Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click, a long press or its ⋯; with text selected, right-click is the browser's, to copy it)
+    Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
@@ -442,20 +442,10 @@ let%expect_test "/verbosity and Ctrl+O" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
+        <div data-entry="0" data-message-entry="0" id="msg-0" tabindex="-1" class="msg user">
           <div dir="auto" class="bubble"> fix the build </div>
-          <button type="button"
-                  id="msg-more-0"
-                  data-message-menu="0"
-                  title="More (right-click, Shift+F10)"
-                  aria-label="More for this message"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  class="msg-more">
-            <icon class="more"> </icon>
-          </button>
         </div>
-        <div data-message-entry="1" tabindex="-1" class="assistant msg">
+        <div data-message-entry="1" id="msg-1" tabindex="-1" class="assistant msg">
           <div class="markdown">
             <div class="md-part">
               <p dir="auto">
@@ -470,16 +460,6 @@ let%expect_test "/verbosity and Ctrl+O" =
             <span> 10 in </span>
             <span> 5 out </span>
           </div>
-          <button type="button"
-                  id="msg-more-1"
-                  data-message-menu="1"
-                  title="More (right-click, Shift+F10)"
-                  aria-label="More for this message"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  class="msg-more">
-            <icon class="more"> </icon>
-          </button>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>

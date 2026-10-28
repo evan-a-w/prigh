@@ -82,8 +82,8 @@ let help =
        its ⋯)" )
   ; ( "Shift+F10 / ContextMenu (on a message)"
     , "its menu: copy, trim everything before or after it, delete it (also \
-       right-click, a long press or its ⋯; with text selected, right-click is \
-       the browser's, to copy it)" )
+       right-click or a long press, at the pointer; with text selected, \
+       right-click is the browser's, to copy it)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -576,7 +576,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Message n when menu_key t ->
           Some
             (Open_menu
-               { target = Message n; anchor = Element (Chat_view.more_id n) })
+               { target = Message n; anchor = Element (Chat_view.message_id n) })
         | None, (Page | Message _) when m.review.open_ -> review_key m t
         | None, Review -> review_key m t
         | None, Resize h ->

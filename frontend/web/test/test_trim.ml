@@ -143,52 +143,22 @@ let dialog h = H.text h ~selector:".modal"
 let toasts h = H.text h ~selector:".toast"
 let divider h = H.text h ~selector:".trim-divider"
 
-let%expect_test "every message has its ⋯ (its menu: test_message_menu.ml)" =
+let%expect_test "every message has a menu (test_message_menu.ml)" =
   let h = session () in
   H.show h ~selector:".msg.user";
   [%expect
     {|
-    <div data-entry="0" data-message-entry="0" tabindex="-1" class="msg user">
+    <div data-entry="0" data-message-entry="0" id="msg-0" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 1 </div>
       <time title="Monday 5 October 2026, 10:01:00" datetime="2026-10-05T10:01:00Z" class="time"> 10:01 </time>
-      <button type="button"
-              id="msg-more-0"
-              data-message-menu="0"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              class="msg-more">
-        <icon class="more"> </icon>
-      </button>
     </div>
-    <div data-entry="2" data-message-entry="2" tabindex="-1" class="msg user">
+    <div data-entry="2" data-message-entry="2" id="msg-2" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
-      <button type="button"
-              id="msg-more-2"
-              data-message-menu="2"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              class="msg-more">
-        <icon class="more"> </icon>
-      </button>
     </div>
-    <div data-entry="4" data-message-entry="4" tabindex="-1" class="msg user">
+    <div data-entry="4" data-message-entry="4" id="msg-4" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> question 3 </div>
       <time title="Monday 5 October 2026, 10:03:00" datetime="2026-10-05T10:03:00Z" class="time"> 10:03 </time>
-      <button type="button"
-              id="msg-more-4"
-              data-message-menu="4"
-              title="More (right-click, Shift+F10)"
-              aria-label="More for this message"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              class="msg-more">
-        <icon class="more"> </icon>
-      </button>
     </div>
     |}]
 ;;
@@ -267,13 +237,11 @@ let%expect_test
     Scroll_to_trimmed
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     |}];
   (* The new first message has nothing before it to trim. *)
   H.act h (Ask_trim (Entry 0));
@@ -329,13 +297,11 @@ let%expect_test
     answer 1
     ✂ 2 messages trimmed · ~19k tokens (Hide) · (Undo)
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     |}];
   (* Read-only: no actions, no landmarks of the transcript. *)
   H.show h ~selector:".trimmed-messages .msg.user";
@@ -398,17 +364,14 @@ let%expect_test
     {|
     Scroll_to_bottom
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     Back in the context: 2 messages (~19k tokens)
     |}];
   (* Nothing trimmed: Undo says so. *)
@@ -719,11 +682,9 @@ let%expect_test
     Scroll_to_trimmed
     ✂ 3 messages trimmed · ~29k tokens (Show) · (Undo)
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     Trimmed 3 messages (~29k tokens): Undo is on the divider
     |}];
   jump_list h;
