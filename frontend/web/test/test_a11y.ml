@@ -29,7 +29,6 @@ let%expect_test "the names of the controls" =
     button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archived 1" -- Show the archived sessions
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
-    button "backend" -- Tools run on the backend (/host switches)
     button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
@@ -59,7 +58,6 @@ let%expect_test "the names of the controls" =
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
-    button "backend" -- Tools run on the backend (/host switches)
     button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)

@@ -153,7 +153,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     |}];
   (* The status line leaves the mode to the chip. *)
   status h;
-  [%expect {| (0%) ↑0 ↓0 $0.0000 Ready |}]
+  [%expect {| (0%) ↑0 ↓0 $0.00 Ready |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
@@ -263,7 +263,7 @@ let%expect_test "the plan: its chip, /todos" =
   status h;
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (plan 1/3: change it)
     |}];
   H.click h ~selector:".status-extras .plan";
@@ -296,7 +296,7 @@ let%expect_test "the plan: its chip, /todos" =
   [%expect
     {|
     (Focus editor)
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
      (tag Ignore))
     (Focus dialog)
@@ -986,7 +986,7 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (1 queued)
     |}];
   (* Already shown ones are not added twice. *)

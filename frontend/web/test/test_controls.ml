@@ -274,18 +274,6 @@ let%expect_test
   [%expect
     {|
     <section aria-label="This session" class="session-card">
-      <div class="status-extras">
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
       <div class="card-status">
         <div class="status">
           <button type="button"
@@ -299,20 +287,25 @@ let%expect_test
             <span class="percent"> 0% </span>
           </button>
           <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
-          <span title="Session cost" class="cost status-item"> $0.0000 </span>
+          <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
           <span role="status" aria-atomic="true" class="activity idle status-item">
             <span class="idle-dot"> </span>
             <span class="label"> Ready </span>
           </span>
         </div>
+        <div class="status-extras">
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
         <div class="card-where">
-          <button type="button"
-                  title="Tools run on desktop, in /home/ada/projects/prigh/tui (/host switches)"
-                  class="host link status-item"
-                  @on_click>
-            <icon class="server"> </icon>
-            <span class="status-text"> desktop </span>
-          </button>
           <button type="button"
                   title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
                   aria-haspopup="dialog"
@@ -321,6 +314,7 @@ let%expect_test
             <icon class="branch"> </icon>
             <span class="branch-name"> feature/narrow-top-bar </span>
           </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
     </section>
@@ -328,8 +322,8 @@ let%expect_test
   H.text h ~selector:".session-card";
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.0000 Ready
-    (desktop) (feature/narrow-top-bar)
+    (0%) ↑0 ↓0 $0.00 Ready
+    (feature/narrow-top-bar)
     |}]
 ;;
 
@@ -394,13 +388,13 @@ let%expect_test "the host opens the host picker, as /host does" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (laptop) (main)
+    (main) (laptop)
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
-    (No host) (main)
+    (main) (No host)
     <button class="host link status-item warm">
     |}]
 ;;
@@ -467,7 +461,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
           <span class="percent"> 0% </span>
         </button>
         <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
-        <span title="Session cost" class="cost status-item"> $0.0000 </span>
+        <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
         <span role="status" aria-atomic="true" class="activity idle status-item">
           <span class="idle-dot"> </span>
           <span class="label"> Ready </span>
@@ -516,7 +510,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   [%expect
     {|
     (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -978,7 +972,7 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     H.text h ~selector:".session-card .status-extras"
   in
   status ();
-  [%expect {| (65%) ↑120k ↓9.0k $0.4200 Ready |}];
+  [%expect {| (65%) ↑120k ↓9.0k $0.42 Ready |}];
   H.event
     h
     (sprintf
@@ -1004,7 +998,7 @@ let%expect_test "the status in the card: idle, running, and what applies" =
   H.show h ~selector:".session-card .status > .activity";
   [%expect
     {|
-    (90%) ↑0 ↓0 $0.0000 Working
+    (90%) ↑0 ↓0 $0.00 Working
     (Goal 2/20) (1 queued)
     <button class="context hot link status-item">
     <span class="status-item tokens">

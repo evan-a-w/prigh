@@ -958,11 +958,13 @@ try {
   await bodyLacks("Connection lost");
   // The thinking level and the mode sit beside the model, each a picker.
   await show("the model, thinking and mode controls", ".composer-controls");
-  // Where tools run, in the session's card, opens the host picker.
-  await page.locator(".session-card .host").click();
+  // /host opens the host picker (the session's card names the host only
+  // when there is another to choose).
+  await composer().fill("/host");
+  await composer().press("Control+Enter");
   await page.locator(".modal .picker-item").first().waitFor();
   await page.waitForTimeout(300); // its fade in
-  await show("the host picker, from the session's card", ".modal");
+  await show("the host picker", ".modal");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".modal", { state: "detached" });
   // Quiet until pointed at: then lit, with a chevron.
