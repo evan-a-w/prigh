@@ -2505,12 +2505,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Context_menu.Target.Message`, `App.Model.message_menu`): Copy,
       Trim before (opening `Dialog.Trim_confirm`, as `/trim`'s picker
       does), Trim after and Delete, disabled with the reason where they do
-      not apply; it opens like the sidebar's (below) from a right-click on
-      the message (`Chat_listeners`; with text selected in it, or on a
-      link or image, the browser's), its ⋯ (`Chat_view.more_id`), a long
-      press or Shift+F10 / ContextMenu on it (`Keys.Target.Message`), and
-      `Chat_view` marks the open one's ⋯ with the highlighted item's
-      preview (a dashed cut line, a delete's fade).
+      not apply; it opens like the sidebar's (below) from a right-click or
+      a long press on the message (`Chat_listeners`; with text selected in
+      it, or on a link or image, the browser's), at the pointer, or
+      Shift+F10 / ContextMenu on it (`Keys.Target.Message`), under it
+      (`Chat_view.message_id`); messages have no ⋯ of their own, and
+      `Chat_view` marks the open one's message (`menu-open`) with the
+      highlighted item's preview (a dashed cut line, a delete's fade);
+      closing it focuses the message again (`App.close_dialog`).
       `Message_index` maps the loaded entries to their context positions,
       for the menu's trim before, Delete (a tool call's deletes its reply)
       and Trim after (`Dialog.Trim_after_confirm`), checked against

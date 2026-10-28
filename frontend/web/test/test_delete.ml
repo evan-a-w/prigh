@@ -168,12 +168,13 @@ let tool_session () =
   h
 ;;
 
-(* A message's menu, as its ⋯ opens it. *)
+(* A message's menu, as Shift+F10 opens it. *)
 let menu h n =
   H.quiet h (fun () ->
     H.act
       h
-      (Open_menu { target = Message n; anchor = Element (Chat_view.more_id n) }));
+      (Open_menu
+         { target = Message n; anchor = Element (Chat_view.message_id n) }));
   H.text h ~selector:".context-menu";
   H.quiet h (fun () -> H.act h Close_dialog)
 ;;
@@ -216,13 +217,11 @@ let%expect_test
     Trim everything after this Nothing after it: the newest message
     Delete /delete
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     Listing.
     ✓ bash ls
     a b
-    (More (right-click, Shift+F10))
     done
-    (More (right-click, Shift+F10))
     |}]
 ;;
 
@@ -238,15 +237,12 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
      (tag
       (Message_points (Delete (entry 2) (index 2) (at ("2026-10-05 10:02:00Z"))))))
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     question 3 2 of 2  10:03 (Trim before)
     question 1 1 of 2  10:01
     |}];
@@ -283,15 +279,12 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
     Scroll_to_bottom
     (Scroll_to_message 1)
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     question 3 2 of 2  10:03 (Trim before)
     question 1 1 of 2  10:01
     |}];
@@ -317,17 +310,14 @@ let%expect_test "Delete: gone at once, acknowledged, out of the jump list; Undo"
      (tag (Page (path /sessions/s1.jsonl) (before ()))))
     Scroll_to_bottom
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     Back in the context: 1 message (~500 tokens)
     |}]
 ;;
@@ -341,9 +331,8 @@ let%expect_test "Delete on a tool call deletes its reply" =
     (Rpc (method_ get_message_points) (params ())
      (tag (Message_points (Delete (entry 1) (index 1) (at ())))))
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     done
-    (More (right-click, Shift+F10))
     |}];
   H.reply
     h
@@ -442,17 +431,14 @@ let%expect_test "a failed or stale delete shows the message again" =
   [%expect
     {|
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     Cannot delete a message while a run is in progress: wait for the run to end or abort it (Esc) (Dismiss)
     |}];
   (* The backend has other messages there. *)
@@ -464,17 +450,14 @@ let%expect_test "a failed or stale delete shows the message again" =
   [%expect
     {|
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     That message is not in the model's context any more: /delete lists those you can delete. (Dismiss)
     |}]
 ;;
@@ -586,11 +569,10 @@ let%expect_test
     Scroll_to_bottom
     (Scroll_to_hidden t1)
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 2 2 of 2  10:02 (Trim before)
     question 1 1 of 2  10:01
@@ -616,16 +598,14 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
   [%expect
     {|
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 4
-    10:04 (More (right-click, Shift+F10))
+    10:04
     answer 4
-    (More (right-click, Shift+F10))
     question 4 3 of 3  10:04 (Trim before)
     question 2 2 of 3  10:02 (Trim before)
     question 1 1 of 3  10:01
@@ -648,15 +628,14 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
        {|{"messages":%s}|}
        (messages [ assistant "answer 2"; user 3; assistant "answer 3" ]));
   chat h;
-  H.elements h ~selector:".trimmed-messages .msg-more";
+  H.elements h ~selector:".trimmed-messages [tabindex]";
   [%expect
     {|
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     ✂ 3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
     Not in the model's context Kept in the transcript only; the model no longer sees them.
     answer 2
@@ -664,9 +643,8 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     10:03
     answer 3
     question 4
-    10:04 (More (right-click, Shift+F10))
+    10:04
     answer 4
-    (More (right-click, Shift+F10))
     |}];
   H.act h (Show_hidden { entry = "t1"; show = false });
   H.text h ~selector:".hidden-range";
@@ -693,17 +671,14 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
      (tag (Page (path /sessions/s1.jsonl) (before ()))))
     Scroll_to_bottom
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     answer 3
-    (More (right-click, Shift+F10))
     Back in the context: 3 messages (~3.0k tokens)
     |}]
 ;;
@@ -738,14 +713,13 @@ let%expect_test "with a trim before: two dividers, each Undo its own" =
     {|
     ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     question 3
-    10:03 (More (right-click, Shift+F10))
+    10:03
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 5
-    10:05 (More (right-click, Shift+F10))
+    10:05
     |}];
   (* The first divider's Undo: the trim before, though the trim after is
      newer. *)
@@ -797,15 +771,12 @@ let%expect_test "/delete: a picker, newest first; /delete undo" =
     (Focus editor)
     (Rpc (method_ delete) (params ((message u3))) (tag (Deleted (entry (4)))))
     question 1
-    10:01 (More (right-click, Shift+F10))
+    10:01
     answer 1
-    (More (right-click, Shift+F10))
     question 2
-    10:02 (More (right-click, Shift+F10))
+    10:02
     answer 2
-    (More (right-click, Shift+F10))
     answer 3
-    (More (right-click, Shift+F10))
     |}];
   (* Nothing deleted: undo says what to do. *)
   H.type_ h "/delete undo";
@@ -937,10 +908,8 @@ let%expect_test
     {|
     Hiding your messages · 3 items hidden (Show all)
     answer 1
-    (More (right-click, Shift+F10))
     ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     answer 4
-    (More (right-click, Shift+F10))
     <div class="filtered">
     <div class="filtered">
     <div class="filtered">

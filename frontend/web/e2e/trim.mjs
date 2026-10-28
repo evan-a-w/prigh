@@ -1,5 +1,6 @@
-// A message's context menu (a right-click, its ⋯ on hover, Shift+F10 on the
-// focused message, a long press on a phone): copying it, trimming the context before it (the user's message or a reply), the
+// A message's context menu (a right-click or a long press on a phone, at the
+// pointer; Shift+F10 on the focused message, under it; no ⋯ button): copying
+// it, trimming the context before it (the user's message or a reply), the
 // confirmation saying what it frees, the transcript then starting at the
 // divider (Show unfolds the trimmed messages read-only above it), the
 // rail's mark for it, and Undo bringing the messages back, its toast
@@ -138,15 +139,6 @@ const transcript = () => page.evaluate(() =>
     const t = el.innerText;
     return t.match(/Step \d+|Module \d+|Noted after the trim/)?.[0] ?? null;
   }).filter(x => x).join(", "));
-const more = el => el.locator(":scope > .msg-more");
-// Hovers [el] and waits until its ⋯ shows.
-const hoverMore = async el => {
-  await el.hover({ position: { x: 40, y: 8 } });
-  await more(el).evaluate(b => new Promise(resolve => {
-    const check = () => getComputedStyle(b).opacity === "1" ? resolve() : requestAnimationFrame(check);
-    check();
-  }));
-};
 // The open menu, placed, once its fade in is over.
 const menu = async () => {
   const m = page.locator(".context-menu.placed");
@@ -163,10 +155,10 @@ const rightClick = async el => {
   await el.click({ button: "right", position: { x: 40, y: 8 } });
   await menu();
 };
-const viaMore = async el => {
-  await hoverMore(el);
-  await more(el).click();
-  await menu();
+// Where the open menu's corner is: from the point [x], [y].
+const placed = async (x, y) => {
+  const r = await (await menu()).boundingBox();
+  return `${Math.round(r.x - x)},${Math.round(r.y - y)}`;
 };
 const viaKeyboard = async el => {
   // Away from where the menu opens, which a still pointer would highlight.
@@ -187,19 +179,6 @@ const items = async el => {
   await closed();
   return text;
 };
-// Whether [el]'s ⋯ covers any of its text.
-const overlapsText = el => el.evaluate(msg => {
-  const row = msg.querySelector(":scope > .msg-more").getBoundingClientRect();
-  const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-  const range = document.createRange();
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (n.parentElement.closest(".msg-more") || !n.textContent.trim()) continue;
-    range.selectNodeContents(n);
-    for (const r of range.getClientRects())
-      if (r.right > row.left && r.left < row.right && r.bottom > row.top && r.top < row.bottom) return true;
-  }
-  return false;
-});
 const signIn = async () => {
   await page.goto(url);
   await page.waitForSelector("form input[type=password]");
@@ -238,34 +217,36 @@ const contextToasts = () => page.evaluate(() => {
 try {
   await signIn();
 
-  // 1. Every message has a menu, the same everywhere, by a right-click; its
-  // ⋯ shows on hover, not over its text. What does not apply is disabled,
-  // saying why.
+  // 1. Every message has a menu, the same everywhere, by a right-click at
+  // the pointer; no ⋯ on them, even hovered or focused. What does not apply
+  // is disabled, saying why.
   section("opened");
   console.log(`steps: ${await steps()}`);
-  console.log(`⋯: ${await page.locator("#chat .msg-more").count()}`);
-  console.log(`opacity before hover: ${await more(step(3)).evaluate(el => getComputedStyle(el).opacity)}`);
-  await hoverMore(step(3));
-  console.log(`over its text: ${await overlapsText(step(3))}`);
-  await hoverMore(reply(3));
-  console.log(`over a reply's text: ${await overlapsText(reply(3))}`);
-  await screenshot("hover reply");
+  console.log(`focusable: ${await page.locator("#chat > .entries > .msg[tabindex]").count()}`);
+  await step(3).hover({ position: { x: 40, y: 8 } });
+  await step(3).focus();
+  console.log(`⋯: ${await page.locator("#chat .msg-more, #chat .msg button[aria-haspopup]").count()}`);
+  await screenshot("hover message");
   section("the first message's menu");
   console.log(await items(step(1)));
   section("a reply's menu");
   console.log(await items(reply(3)));
-  // Highlighting a trim draws where it cuts.
+  // At the pointer; the message is marked, and highlighting a trim draws
+  // where it cuts.
   await rightClick(step(3));
   section("a message's menu");
   console.log(await menuText());
+  const at = await step(3).boundingBox();
+  console.log(`at the pointer: ${await placed(at.x + 40, at.y + 8)}`);
+  console.log(`marked: ${await step(3).evaluate(el => el.classList.contains("menu-open"))}`);
   await page.locator(".context-menu.placed [data-item=trim_before]").hover();
-  await page.locator(".msg-more.preview-trim-before").waitFor();
+  await page.locator("#chat .msg.preview-trim-before").waitFor();
   console.log(`cut line: ${await step(3).evaluate(el => getComputedStyle(el, "::after").borderTopStyle)}`);
   await screenshot("menu trim before hover");
   // Esc closes it, nothing else.
   await page.keyboard.press("Escape");
   await closed();
-  console.log(`after Esc: ${await steps()}; preview: ${await page.locator(".msg-more[class*=preview]").count()}`);
+  console.log(`after Esc: ${await steps()}; preview: ${await page.locator("#chat .msg[class*=preview], #chat .msg.menu-open").count()}`);
 
   // A right-click on text selected in the message is the browser's, to
   // copy it.
@@ -294,10 +275,8 @@ try {
   console.log(`toast: ${clean(await page.locator(".toast", { hasText: "Copied" }).first().innerText())}`);
   console.log(`copied: ${clean(await page.evaluate(() => window.copied))}`);
 
-  // 2. The ⋯ opens it under itself; the confirmation says what a trim
-  // frees; Esc cancels.
-  await viaMore(step(3));
-  await screenshot("menu by the more button");
+  // 2. The confirmation says what a trim frees; Esc cancels.
+  await rightClick(step(3));
   await choose("trim_before");
   await page.locator(".trim-confirm").waitFor();
   await page.locator(".trim-confirm .rewind-quote").waitFor();
@@ -313,8 +292,10 @@ try {
   await viaKeyboard(step(3));
   await page.keyboard.press("ArrowDown");
   await page.locator(".context-menu.placed [data-item=trim_before].selected").waitFor();
-  await page.locator(".msg-more.preview-trim-before").waitFor();
+  await page.locator("#chat .msg.preview-trim-before").waitFor();
   section("keyboard");
+  const msg = await step(3).boundingBox();
+  console.log(`under the message: ${await placed(msg.x, msg.y + msg.height)}`);
   console.log(`highlighted: ${await page.locator(".context-menu.placed .menu-item.selected .menu-label").innerText()}`);
   await screenshot("menu by the keyboard");
   await page.keyboard.press("Enter");
@@ -327,7 +308,7 @@ try {
   section("trimmed");
   console.log(`divider: ${clean(await page.locator(".trim-divider").innerText())}`);
   console.log(`steps: ${await steps()}`);
-  console.log(`⋯: ${await page.locator("#chat > .entries .msg-more").count()}`);
+  console.log(`focusable: ${await page.locator("#chat > .entries > .msg[tabindex]").count()}`);
   console.log(`divider in view: ${await page.locator(".trim-divider").isVisible()}`);
   console.log(`toast: ${clean(await page.locator(".toast", { hasText: "Trimmed" }).innerText())}`);
   await page.mouse.move(640, 790);
@@ -351,7 +332,7 @@ try {
   console.log(`head: ${clean(await page.locator(".trimmed-head").innerText())}`);
   console.log(`trimmed: ${await page.evaluate(() =>
     [...document.querySelectorAll(".trimmed-messages .msg.user")].map(el => el.innerText.match(/Step \d+/)?.[0]).join(", "))}`);
-  console.log(`⋯ on them: ${await page.locator(".trimmed-messages .msg-more").count()}`);
+  console.log(`menus on them: ${await page.locator(".trimmed-messages .msg[tabindex]").count()}`);
   console.log(`dimmed: ${await page.locator(".trimmed-messages > .entries").evaluate(el => Number(getComputedStyle(el).opacity) < 1)}`);
   console.log(`divider: ${clean(await page.locator(".trim-divider").innerText())}`);
   await page.evaluate(() => { document.getElementById("chat").scrollTop = 0; });
@@ -411,7 +392,7 @@ try {
   await page.locator(".context-menu.placed [data-item=delete]").hover();
   // What would go is dimmed.
   await page.waitForFunction(() =>
-    getComputedStyle(document.querySelector("#chat .msg-more.preview-delete").closest(".msg").querySelector(".markdown")).opacity < 0.5);
+    getComputedStyle(document.querySelector("#chat .msg.preview-delete > .markdown")).opacity < 0.5);
   await screenshot("delete hover");
   await choose("delete");
   await page.locator(".toast", { hasText: "Message deleted" }).waitFor();
@@ -421,7 +402,7 @@ try {
   console.log(`dividers: ${await page.locator(".trim-divider").count()}`);
   await page.mouse.move(640, 790);
   await screenshot("deleted");
-  await viaMore(step(2));
+  await rightClick(step(2));
   await choose("delete");
   await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Step 2:"));
   await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 4);
@@ -435,9 +416,9 @@ try {
   console.log(`undone: ${await transcript()}`);
 
   // 8. Trim after: confirmed; then a divider, Show and Undo.
-  await viaMore(step(3));
+  await rightClick(step(3));
   await page.locator(".context-menu.placed [data-item=trim_after]").hover();
-  await page.locator(".msg-more.preview-trim-after").waitFor();
+  await page.locator("#chat .msg.preview-trim-after").waitFor();
   await screenshot("trim after hover");
   await choose("trim_after");
   await page.locator(".trim-confirm .rewind-quote").waitFor();
@@ -469,7 +450,7 @@ try {
   await page.locator(".hidden-range .trimmed-messages").waitFor();
   console.log(`shown: ${await page.evaluate(() =>
     [...document.querySelectorAll(".hidden-range .trimmed-messages .msg")].map(el => el.innerText.match(/Step \d+|Module \d+/)?.[0]).join(", "))}`);
-  console.log(`⋯ on them: ${await page.locator(".hidden-range .trimmed-messages .msg-more").count()}`);
+  console.log(`menus on them: ${await page.locator(".hidden-range .trimmed-messages .msg[tabindex]").count()}`);
   console.log(`dimmed: ${await page.locator(".hidden-range .trimmed-messages > .entries").evaluate(el => Number(getComputedStyle(el).opacity) < 1)}`);
   await page.locator(".trim-divider.after").evaluate(el => el.scrollIntoView({ block: "start" }));
   await page.mouse.move(640, 790);
