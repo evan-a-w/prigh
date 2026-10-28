@@ -78,6 +78,29 @@ start prigh.nvim
 ok    Neovim <version>
 error prigh-does-not-exist not found on PATH
       advice: install prigh (see its README) or set require('prigh').setup{ cmd = { '/path/to/prigh', 'acp' } }
+warn  no help tags: :help prigh fails
+      advice: :helptags <plugin>/doc
+ok    markdown treesitter parser: the chat is highlighted
+ok    git: @ completion lists the project's files
+info  state: stopped
+
+== :checkhealth prigh, help tags built
+start prigh.nvim
+ok    Neovim <version>
+error prigh-does-not-exist not found on PATH
+      advice: install prigh (see its README) or set require('prigh').setup{ cmd = { '/path/to/prigh', 'acp' } }
+ok    help: :help prigh
+ok    markdown treesitter parser: the chat is highlighted
+ok    git: @ completion lists the project's files
+info  state: stopped
+
+== :checkhealth prigh, plugin directory not on the runtimepath
+start prigh.nvim
+ok    Neovim <version>
+error prigh-does-not-exist not found on PATH
+      advice: install prigh (see its README) or set require('prigh').setup{ cmd = { '/path/to/prigh', 'acp' } }
+warn  doc/prigh.txt is not on the runtimepath: the plugin directory was not added
+      advice: vim.opt.rtp:append("<the prigh repository>/editors/nvim") (see the README's Install)
 ok    markdown treesitter parser: the chat is highlighted
 ok    git: @ completion lists the project's files
 info  state: stopped

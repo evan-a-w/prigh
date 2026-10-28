@@ -1051,9 +1051,14 @@ editing your buffers (unsaved text included), and `:PrighReview` to accept or
 reject its changes hunk by hunk.
 
 ```lua
-vim.opt.rtp:append("~/src/prigh/editors/nvim")
+vim.pack.add({ "https://github.com/evan-a-w/prigh" })
+-- the plugin is the repository's editors/nvim, not its root:
+vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site/pack/core/opt/prigh/editors/nvim")
 require("prigh").setup({ cmd = { "prigh", "acp" } })   -- then :Prigh
 ```
+
+Then `:helptags ALL` for `:help prigh`, and `:checkhealth prigh`. Other
+plugin managers and troubleshooting: [its Install](editors/nvim/README.md#install).
 
 ## Use
 

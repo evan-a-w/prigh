@@ -54,13 +54,37 @@ for _, b in ipairs({ { "chat", chat.buf }, { "input", chat.input } }) do
 end
 T.section(":checkhealth prigh")
 require("prigh").setup({ cmd = { "prigh-does-not-exist", "acp" } })
+local doc_dir = vim.fs.dirname(vim.api.nvim_get_runtime_file("doc/prigh.txt", false)[1])
 for _, k in ipairs({ "start", "ok", "warn", "error", "info" }) do
   vim.health[k] = function(msg, advice)
     msg = msg:gsub("Neovim %S+", "Neovim <version>")
     T.out(string.format("%-5s %s", k, msg))
     for _, a in ipairs(type(advice) == "table" and advice or advice and { advice } or {}) do
-      T.out("      advice: " .. a)
+      T.out("      advice: " .. a:gsub(vim.pesc(doc_dir), "<plugin>/doc"))
     end
   end
 end
+-- doc/tags is generated (and ignored by git): pretend each way.
+local filereadable = vim.fn.filereadable
+local tags_built = false
+vim.fn.filereadable = function(path)
+  if path == vim.fs.joinpath(doc_dir, "tags") then
+    return tags_built and 1 or 0
+  end
+  return filereadable(path)
+end
 require("prigh.health").check()
+T.section(":checkhealth prigh, help tags built")
+tags_built = true
+require("prigh.health").check()
+T.section(":checkhealth prigh, plugin directory not on the runtimepath")
+local get_runtime_file = vim.api.nvim_get_runtime_file
+vim.api.nvim_get_runtime_file = function(name, all)
+  if name == "doc/prigh.txt" then
+    return {}
+  end
+  return get_runtime_file(name, all)
+end
+require("prigh.health").check()
+vim.api.nvim_get_runtime_file = get_runtime_file
+vim.fn.filereadable = filereadable
