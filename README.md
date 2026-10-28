@@ -2154,6 +2154,27 @@ Sign-ins are stored with the model credentials, in `auth.json` under
 needed; a failed refresh says to sign in again. Tokens never appear in
 errors or logs.
 
+**The model's `pull_request` tool.** Agents (the main one and subagents)
+work with pull requests the same way, through your sign-ins in the
+backend, so the machine or container they run in needs no `gh` and no git
+credentials for the API. `action` is `list` (`state` open, closed or
+all), `view` (a `number`: branches, author, description, CI checks, URL),
+`checks` (only the CI checks), `diff`, `create` or `checkout`. `create`
+opens one from `head` (default: the current branch) into `base` (default:
+the repository's default branch), pushing the branch first unless `push`
+is false (without pushing, a branch the remote does not have with all its
+commits is refused); `draft` makes a draft, and a missing title and body
+are filled in from the branch's commits as `/pr new` does. `checkout` is
+`/pr checkout`, and the worktree is recorded on the session. `cwd` names
+another repository or worktree. `create` and `checkout` ask in `ask` and
+`auto-edit` mode, like `git push` in bash; `list`, `view`, `checks` and
+`diff` never ask. Each user's agents reach
+only that user's sign-ins (with token namespaces, the namespace's). The
+tool's errors tell the model what to do next: an unknown number lists the
+closest pull requests, a missing sign-in says to ask you to sign in
+(Settings → Git hosting, or `/login github`). The system prompt tells the
+model to use it rather than `gh`.
+
 `/pr` works on the repository of the session's directory on its tool host
 (found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
 picker of pull requests (`#24 Git hosting · lloyd · feat/x → main · draft`);
@@ -2171,7 +2192,7 @@ remote on a known host; pull requests from forks are listed as
 `owner:branch`, but `/pr new` opens one from the current branch of that
 remote's repository. "Push first" runs `git push -u REMOTE HEAD:BRANCH` on
 the tool host with its own git credentials (never prompting). On Forgejo a
-draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
+draft is a `WIP:` title. Errors say what to do (`sign in under Settings → Git hosting in prigh-web, or with /login github`,
 `git remote add origin URL`, ...). The worktree context menu's "Create pull
 request…" and the review page's Create PR open it for that worktree's
 branch.
@@ -2334,10 +2355,12 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  `worktree`'s `create` and `remove` (not `list`), and MCP tools that are
-  not read-only) wait for your answer.
+  `worktree`'s `create` and `remove` (not `list`), `pull_request`'s
+  `create` and `checkout`, and MCP tools that are not read-only) wait for
+  your answer.
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
-  `worktree create`/`remove` and MCP tools still ask.
+  `worktree create`/`remove`, `pull_request create`/`checkout` and MCP
+  tools still ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its
