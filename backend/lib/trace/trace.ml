@@ -181,6 +181,9 @@ end
 
 type t =
   { clock : Clock.t
+  ; wall_minus_mono : float
+    (** spans' wall-clock starts follow the monotonic clock, so spans that
+        start together in it do in the export *)
   ; id_prefix : string
   ; mutable level : Level.t
   ; mutable next_id : int
@@ -199,6 +202,7 @@ let fresh_prefix (clock : Clock.t) =
 
 let create ?id_prefix ~clock ~level ~write () =
   { clock
+  ; wall_minus_mono = clock.wall () -. clock.mono ()
   ; id_prefix = Option.value_or_thunk id_prefix ~default:(fun () -> fresh_prefix clock)
   ; level
   ; next_id = 1
@@ -279,7 +283,7 @@ let open_span (tracer : t) ~parent ~track ~at ~phased ~attrs name =
   ; parent
   ; name
   ; track
-  ; wall = tracer.clock.wall () -. (now -. start)
+  ; wall = tracer.wall_minus_mono +. start
   ; start
   ; attrs = List.rev attrs
   ; phased

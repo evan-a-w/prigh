@@ -84,11 +84,9 @@ let tool_attrs (call : Content.Tool_call.t) : (string * Trace.Value.t) list =
     | Ok args -> tool_summary ~name:call.name args
     | Error _ -> ""
   in
-  [ "tool", String call.name
-  ; "call_id", String call.id
-  ; "summary", Trace.short summary
-  ; "where", String "local"
-  ]
+  [ "tool", Trace.Value.String call.name; "call_id", String call.id ]
+  @ (if String.is_empty summary then [] else [ "summary", Trace.short summary ])
+  @ [ "where", String "local" ]
 ;;
 
 let execute_tool

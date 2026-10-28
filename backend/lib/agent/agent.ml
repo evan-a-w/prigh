@@ -3863,10 +3863,12 @@ let trace_report t =
     | Default | Detailed -> ""
   in
   let footer =
-    sprintf
-      "\nSpans still open (a running prompt) are not included. Export it for \
-       Perfetto with: prigh trace %s --perfetto trace.json\n"
-      (Session.id t.session)
+    (if is_running t
+     then "\nThe running prompt is not included until it ends.\n"
+     else "")
+    ^ sprintf
+        "\nFor a timeline (Perfetto): prigh trace %s -perfetto trace.json\n"
+        (Session.id t.session)
   in
   { Trace_report.Report.summary = off ^ Trace_report.summary ~bad spans ^ footer
   ; level = Trace.level t.tracer

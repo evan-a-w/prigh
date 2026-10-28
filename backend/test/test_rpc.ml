@@ -607,6 +607,66 @@ let%expect_test "session stats" =
     |}]
 ;;
 
+let%expect_test "trace: the session's summary, and its Perfetto export" =
+  with_agent
+    [ Reply.tool_call ~id:"c1" ~name:"ls" ~arguments:"{}" (); Reply.text "Empty." ]
+  @@ fun t agent h ->
+  let trace params =
+    let request =
+      Json.of_string
+        (sprintf {|{"id": "r1", "method": "trace", "params": %s}|} params)
+    in
+    match Rpc_server.handle h.server h.client request with
+    | `Object fields ->
+      (match List.Assoc.find fields ~equal:String.equal "result" with
+       | Some (`Object result) ->
+         List.iter result ~f:(fun (key, value) ->
+           match key, value with
+           | "summary", `String s ->
+             (* Durations come from the real clock. *)
+             List.iter (String.split_lines s) ~f:(fun line ->
+               if String.is_suffix line ~suffix:"(12 spans)"
+                  || String.is_prefix line ~prefix:"For a timeline"
+               then print_endline (mask t line))
+           | "perfetto", `Object p ->
+             (match List.Assoc.find p ~equal:String.equal "traceEvents" with
+              | Some (`Array events) ->
+                printf
+                  "perfetto: %s\n"
+                  (String.concat
+                     ~sep:" "
+                     (List.filter_map events ~f:(function
+                        | `Object e ->
+                          (match List.Assoc.find e ~equal:String.equal "cat" with
+                           | Some (`String cat) -> Some cat
+                           | _ -> None)
+                        | _ -> None)))
+              | _ -> print_endline "perfetto: no traceEvents")
+           | key, value -> printf "%s: %s\n" key (Json.to_string value))
+       | _ -> print_endline (Json.to_string (`Object fields)))
+    | json -> print_endline (Json.to_string json)
+  in
+  Or_error.ok_exn (Agent.prompt agent "what is here?");
+  Agent.wait_idle agent;
+  trace "{}";
+  [%expect {|
+    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
+    For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
+    level: "default"
+    spans: 12
+    |}];
+  trace {|{"perfetto": true}|};
+  [%expect {|
+    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
+    For a timeline (Perfetto): prigh trace <id> -perfetto trace.json
+    level: "default"
+    spans: 12
+    perfetto: prompt turn model_request connect first_token stream tool turn model_request connect first_token stream
+    |}];
+  trace {|{"perfetto": 1}|};
+  [%expect {| {"type":"response","id":"r1","ok":false,"error":"param \"perfetto\" must be a boolean"} |}]
+;;
+
 let%expect_test "import, set_session_name, export, clone, set_cwd" =
   with_agent [ Reply.text "unused" ]
   @@ fun t _agent h ->
