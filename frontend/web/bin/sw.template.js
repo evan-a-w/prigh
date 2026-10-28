@@ -6,8 +6,8 @@
 // to). Only the shell's files are answered here; everything else (the RPC
 // and terminal WebSockets, file transfers, the sign-in link, anything
 // unknown) goes to the network untouched.
-const VERSION = "%%VERSION%%";
-const SHELL = %%SHELL%%;
+const VERSION = "@@VERSION@@";
+const SHELL = @@SHELL@@;
 
 const PREFIX = "prigh-web-";
 const CACHE = PREFIX + VERSION;
