@@ -1,4 +1,5 @@
 open! Core
+open Prigh_web
 module H = Harness
 
 (* The review: the page in the chat's place, the changed files' approvals,
@@ -178,10 +179,238 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     5 let e = 5
     |}];
   H.elements h ~selector:".app";
-  [%expect {| <div class="app reviewing sidebar-open"> |}];
+  [%expect {| <div class="app reviewing"> |}];
   (* The chat is still there, beside it. *)
   H.elements h ~selector:".main .composer";
   [%expect {| <footer class="composer"> |}]
+;;
+
+(* The page's layout: what [.app] and the desk (the chat, the terminal and
+   the review page) hold, the sizes and the handles. *)
+let layout h =
+  let m = H.model h in
+  let shown = App.Model.shown m in
+  H.elements h ~selector:".app";
+  H.elements h ~selector:".app > [class]:not(.file-pickers)";
+  print_endline "-- the desk:";
+  H.elements h ~selector:".desk > [class]";
+  print_endline "-- the chat column:";
+  H.elements h ~selector:".main > [class]";
+  print_endline
+    (String.concat
+       ~sep:" "
+       (List.filter_map (Resize.vars m.layout shown) ~f:(fun (var, value) ->
+          Option.some_if
+            (List.mem
+               [ "--sidebar-width"
+               ; "--files-width"
+               ; "--agents-width"
+               ; "--review-chat-width"
+               ]
+               var
+               ~equal:String.equal)
+            (sprintf "%s=%s" (String.chop_prefix_exn var ~prefix:"--") value))));
+  H.elements h ~selector:".resizer"
+;;
+
+let%expect_test
+    "reviewing focuses on the review and the chat: the sidebar goes, the \
+     panels open beside them, the terminal under both"
+  =
+  let h = H.create ~state:(state ()) () in
+  H.quiet h (fun () ->
+    H.act h (Resize (Viewport { width = 1440; height = 900 })));
+  layout h;
+  [%expect
+    {|
+    <div class="app sidebar-open">
+    <aside class="sidebar">
+    <div class="resizer resizer-sidebar">
+    <div class="desk">
+    -- the desk:
+    <main class="main">
+    -- the chat column:
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <footer class="composer">
+    sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
+    <div class="resizer resizer-sidebar">
+    |}];
+  H.quiet h (fun () ->
+    H.reply h "get_review" {|{"comments":[],"approvals":[]}|};
+    H.key h ~alt:true ~code:"KeyR" "r";
+    H.reply h "git_diff" (diff_json (main_ml_diff ^ util_diff));
+    H.reply h "fs_preview" (preview_json "/home/me/proj/src/main.ml" main_ml));
+  layout h;
+  [%expect
+    {|
+    (Review Toggle)
+    <div class="app reviewing">
+    <aside class="sidebar">
+    <div class="desk">
+    -- the desk:
+    <section class="review-page">
+    <div class="resizer resizer-review-chat">
+    <main class="main">
+    -- the chat column:
+    <header class="session-bar">
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <footer class="composer">
+    sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
+    <div class="resizer resizer-review-files">
+    <div class="resizer resizer-review-chat">
+    |}];
+  (* The session's status, which the docked sidebar's card showed, is over
+     the chat. *)
+  H.text h ~selector:".session-bar";
+  H.elements h ~selector:".session-card";
+  [%expect
+    {|
+    (Sessions (Ctrl+B)) (New session)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    (Settings (Ctrl+, or /settings))
+    |}];
+  (* The terminal, the file browser and the agents panel open as usual. *)
+  H.quiet h (fun () ->
+    H.act h Toggle_terminal;
+    H.act h (Files Toggle);
+    H.act h Toggle_subagents);
+  layout h;
+  [%expect
+    {|
+    <div class="agents-open app files-open reviewing terminal-open">
+    <aside class="sidebar">
+    <div class="desk">
+    <aside class="files-panel">
+    <aside class="agents-panel">
+    -- the desk:
+    <section class="review-page">
+    <div class="resizer resizer-review-chat">
+    <main class="main">
+    <section class="terminal-panel">
+    -- the chat column:
+    <header class="session-bar">
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <footer class="composer">
+    sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
+    <div class="resizer resizer-review-files">
+    <div class="resizer resizer-review-chat">
+    <div class="resizer resizer-terminal">
+    <div class="resizer resizer-files">
+    <div class="resizer resizer-agents">
+    |}];
+  (* Ctrl+B shows the sessions as a drawer over the page, Esc hides it. *)
+  H.key h ~ctrl:true "b";
+  layout h;
+  print_endline "-- inert:";
+  H.elements h ~selector:".app > [inert]";
+  H.elements h ~selector:".desk > [inert]";
+  H.elements h ~selector:".main > [inert]";
+  [%expect
+    {|
+    Toggle_sidebar
+    <div class="agents-open app files-open reviewing sidebar-drawer sidebar-open terminal-open">
+    <aside class="sidebar">
+    <div class="scrim">
+    <div class="desk">
+    <aside class="files-panel">
+    <aside class="agents-panel">
+    -- the desk:
+    <section class="review-page">
+    <div class="resizer resizer-review-chat">
+    <main class="main">
+    <section class="terminal-panel">
+    -- the chat column:
+    <header class="session-bar">
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <footer class="composer">
+    sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
+    <div class="resizer resizer-review-files">
+    <div class="resizer resizer-review-chat">
+    <div class="resizer resizer-terminal">
+    <div class="resizer resizer-files">
+    <div class="resizer resizer-agents">
+    -- inert:
+    <aside class="files-panel">
+    <aside class="agents-panel">
+    <section class="review-page">
+    <section class="terminal-panel">
+    <header class="session-bar">
+    <div class="chat-frame">
+    <footer class="composer">
+    |}];
+  H.key h "Escape";
+  H.elements h ~selector:".app";
+  [%expect
+    {|
+    Toggle_sidebar
+    <div class="agents-open app files-open reviewing terminal-open">
+    |}];
+  (* Closing the review brings the sidebar back as it was, the panels
+     staying open. *)
+  H.quiet h (fun () -> H.key h ~ctrl:true "b");
+  H.quiet h (fun () -> H.key h ~alt:true ~code:"KeyR" "r");
+  layout h;
+  [%expect
+    {|
+    Toggle_sidebar
+    (Review Toggle)
+    <div class="agents-open app files-open sidebar-open terminal-open">
+    <aside class="sidebar">
+    <div class="resizer resizer-sidebar">
+    <div class="desk">
+    <aside class="files-panel">
+    <aside class="agents-panel">
+    -- the desk:
+    <main class="main">
+    <section class="terminal-panel">
+    -- the chat column:
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <footer class="composer">
+    sidebar-width=265px files-width=377px agents-width=397px review-chat-width=400px
+    <div class="resizer resizer-sidebar">
+    <div class="resizer resizer-terminal">
+    <div class="resizer resizer-files">
+    <div class="resizer resizer-agents">
+    |}];
+  (* Hidden before the review, the sidebar stays hidden after it. *)
+  H.quiet h (fun () ->
+    H.key h ~ctrl:true "b";
+    H.key h ~alt:true ~code:"KeyR" "r";
+    H.key h ~alt:true ~code:"KeyR" "r");
+  H.elements h ~selector:".app";
+  [%expect
+    {|
+    Toggle_sidebar
+    (Review Toggle)
+    (Review Toggle)
+    <div class="agents-open app files-open terminal-open">
+    |}]
+;;
+
+let%expect_test "on a phone the review is a sheet, the sidebar its drawer" =
+  let h = opened () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.elements h ~selector:".app";
+  H.elements h ~selector:".app > [class]:not(.file-pickers)";
+  H.elements h ~selector:".desk > [class]";
+  [%expect
+    {|
+    (Complete_accept (run true))
+    <div class="app narrow reviewing">
+    <aside class="sidebar">
+    <div class="desk">
+    <section class="review-page">
+    <main class="main">
+    |}];
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.elements h ~selector:".app";
+  [%expect {| <div class="app narrow reviewing sidebar-drawer sidebar-open"> |}]
 ;;
 
 let%expect_test
@@ -242,7 +471,8 @@ let%expect_test
   H.event
     h
     {|{"type":"event","event":"tool_end","call":{"id":"e1","name":"edit","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"e1","tool_name":"edit","text":"ok","is_error":false}}|};
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     |}];
@@ -444,7 +674,8 @@ let%expect_test
          [ {|{"author":"agent","text":"Or:","at_ms":1791194460000,"delivered":true,
               "proposal":{"edits":[{"old_text":"3 * 2","new_text":"3"}],"state":"accepted"}}|}
          ]);
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     |}];

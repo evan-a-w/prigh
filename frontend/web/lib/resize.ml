@@ -168,10 +168,7 @@ let docked_sides t (shown : Shown.t) =
     List.filter [ Handle.Sidebar; Review_chat; Files; Agents ] ~f:(function
       | Sidebar -> shown.sidebar
       | Review_chat -> shown.reviewing
-      | Files ->
-        shown.files
-        && (not shown.reviewing)
-        && t.viewport.width >= files_floats_below
+      | Files -> shown.files && t.viewport.width >= files_floats_below
       | Agents -> shown.agents && t.viewport.width >= agents_floats_below
       | _ -> false)
 ;;

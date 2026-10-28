@@ -31,6 +31,8 @@
   flex: none;
   margin: 0 -5px 0 -4px;
 }
+/* Between the review page and the chat: in a column of no width. */
+.resizer.resizer-review-chat { grid-area: handle; width: 9px; margin: 0 0 0 -4px; }
 .resizer:is(.resizer-files, .resizer-files-preview, .resizer-agents, .resizer-review-margin) { left: -5px; }
 .resizer-terminal { top: -5px; }
 

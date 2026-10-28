@@ -238,7 +238,6 @@ let%expect_test
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
     <footer class="composer">
-    <Vdom.Node.none-widget class="">
     <div class="chat-tools">
       <div class="panel-toggles">
         <button type="button"
@@ -432,7 +431,6 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
     <footer class="composer">
-    <Vdom.Node.none-widget class="">
     <header class="session-bar">
       <button type="button"
               title="Sessions (Ctrl+B)"

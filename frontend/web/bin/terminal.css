@@ -1,5 +1,6 @@
-/* The terminal panel: a shell docked under the chat and the composer (a
-   sheet over the page on phones). Its height is --terminal-height, set by
+/* The terminal panel: a shell docked under the chat and the composer, and
+   under the review page too while reviewing (a sheet over the page on
+   phones). Its height is --terminal-height, set by
    dragging its top edge (resize.css). xterm.css comes with xterm.js, on first use. */
 
 .terminal-panel {
@@ -9,7 +10,7 @@
   flex-direction: column;
   height: var(--terminal-height, 38%);
   min-height: 120px;
-  max-height: calc(100% - 160px);
+  max-height: calc(100dvh - 160px);
   background: var(--well);
   border-top: 1px solid var(--rule);
   animation: terminal-in 0.16s ease-out;

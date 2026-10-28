@@ -1326,11 +1326,11 @@ Generate
 Amend
 Commit
 chat still shown: true
+file browser beside the review: true
 === firefox: review: page: resized ===
-the chat 400 -> 520 (aria 520), the files 260 -> 320 (aria 320), the page keeps 640
+the chat 400 -> 520 (aria 520), the files 260 -> 340 (aria 340), the page keeps 920
 the chat as wide as it goes: the page keeps 480
 double-clicked: the chat 400, the files 260
-file browser hidden: true
 === firefox: review: page: a second comment, not sent yet ===
 src/util.mlnew
 Approve
@@ -1867,6 +1867,47 @@ old.ml
 edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
 === firefox: review: compare: checked out ===
 Reviewing feat/old (<HOME>/.prigh/worktrees/repo/feat-old) against main (merge base <SHA>)
+=== firefox: review: focus: reviewing ===
+sidebar: hidden
+session bar over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+files beside: true
+=== firefox: review: focus: the terminal, the agents and the files open ===
+sidebar: hidden
+session bar over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+terminal from the review's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+=== firefox: review: focus: a wider window ===
+sidebar: hidden
+session bar over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+terminal from the review's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+=== firefox: review: focus: the review closed ===
+sidebar: shown
+session bar over the chat: false
+terminal from the chat's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+the same terminal: true
+=== firefox: review: focus: reviewing again ===
+the same terminal: true
+=== firefox: review: focus: the sessions drawer ===
+over the review: true
+the page behind is inert: true
+Esc closed the drawer, the review open: true
 === firefox: review: phone ===
 sheet: fixed
 Alt+R closed it
