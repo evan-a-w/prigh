@@ -1649,8 +1649,9 @@ each model request split into connecting, waiting for the first token,
 thinking and streaming, each tool call with its waits for your approval
 or answer and its tool-host round trip, retries, compaction, masking,
 subagents and background jobs). It holds names, sizes, ids and timings,
-never what was said or what tools read; it is capped at 4 MB (the older
-half is dropped) and goes with the session when it is deleted.
+never what was said or what tools read. Past 2 MB it moves to
+`.trace.old.jsonl` (replacing the one before) and starts afresh, so it
+keeps the newest 2–4 MB; it goes with the session when that is deleted.
 
 `/trace` (TUI and prigh-web) and `prigh trace SESSION` (an id, a prefix
 or a path) summarise it: the wall time split into model, tools, waiting

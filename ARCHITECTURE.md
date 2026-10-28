@@ -3240,7 +3240,7 @@ re-records); the flake check `nvim-plugin` runs them.
   `["Message",{id,at,turns,tool_calls,message}]`,
   `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
 - `~/.prigh/sessions/<stamp>_<id>.trace.jsonl` (and `.trace.old.jsonl`,
-  the previous 4 MB once it fills) — the session's trace (`Trace_file`):
+  the previous 2 MB once it fills) — the session's trace (`Trace_file`):
   one `Trace.Span.t` per line, `{id, parent, name, track, wall, start,
   stop, status, attrs}`; listed with the session's `files`, so deleted and
   counted with it; not copied by fork, clone or import.
