@@ -80,7 +80,7 @@ let%expect_test "not signed in: says where to sign in, asks nothing of the host"
   @@ fun _ ~repo:_ ~fake ~store:_ ~tool:_ ~run ->
   run {|{"action":"list"}|};
   Fake_forge.print_requests fake;
-  [%expect {| ERROR: pull_request list: not signed in to github.com: sign in under Settings → Git hosting in prigh-web, or with /login github |}]
+  [%expect {| ERROR: pull_request list: not signed in to github.com: ask the user to sign in under Settings → Git hosting in prigh-web, or with /login github |}]
 ;;
 
 let%expect_test "list, view, checks and diff" =
@@ -120,7 +120,7 @@ let%expect_test "list, view, checks and diff" =
     @@ -0,0 +1 @@
     +b
 
-    ERROR: pull_request view: github.com: pull request #99 of o/r not found (HTTP 404): action=list lists the open ones
+    ERROR: pull_request view: github.com: pull request #99 of o/r not found (HTTP 404): action=list lists the open ones; the closest: #7 From a contributor (open), #5 Old one (open, draft)
     ERROR: invalid arguments: missing "number": the pull request's number (action=list shows them)
     ERROR: invalid arguments: unknown action "merge": use list, view, checks, diff, create or checkout
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
@@ -147,6 +147,8 @@ let%expect_test "list, view, checks and diff" =
     GET https://api.github.com/repos/o/r/commits/abc123/status
       Authorization: Bearer ghp_mine
     GET https://api.github.com/repos/o/r/pulls/99
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls?state=all&per_page=100&sort=updated&direction=desc
       Authorization: Bearer ghp_mine
     |}]
 ;;
@@ -179,6 +181,8 @@ let%expect_test "create: pushes the branch first, or refuses an unpushed one" =
   run {|{"action":"create","title":"Again","push":false,"base":"main"}|};
   Fake_forge.sh repo "echo e > e && git add e && git commit -qm 'Add e'";
   run {|{"action":"create","title":"Again","push":false}|};
+  (* Without a title: the branch's name, and the commits' subjects. *)
+  reply ~number:10 "Add things";
   run {|{"action":"create","title":" "}|};
   Fake_forge.print_requests fake;
   [%expect {|
@@ -194,7 +198,9 @@ let%expect_test "create: pushes the branch first, or refuses an unpushed one" =
     https://github.com/o/r/pull/9
     alice wants to merge feat/add-things into main
     ERROR: pull_request create: origin does not have feat/add-things with all its commits: push it first (the push option, or git push -u origin feat/add-things)
-    ERROR: pull_request create: a pull request needs a title
+    pushed feat/add-things to origin, then opened #10 Add things (open) in o/r on github.com
+    https://github.com/o/r/pull/10
+    alice wants to merge feat/add-things into main
     GET https://api.github.com/repos/o/r
       Authorization: Bearer ghp_mine
     GET https://api.github.com/repos/o/r
@@ -207,6 +213,13 @@ let%expect_test "create: pushes the branch first, or refuses an unpushed one" =
       {"title":"Again","body":"","head":"feat/add-things","base":"main","draft":false}
     GET https://api.github.com/repos/o/r
       Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r
+      Authorization: Bearer ghp_mine
+    POST https://api.github.com/repos/o/r/pulls
+      Authorization: Bearer ghp_mine
+      {"title":"Add things","body":"- Add c\n- Add d\n- Add e","head":"feat/add-things","base":"main","draft":false}
     |}]
 ;;
 
@@ -243,13 +256,15 @@ let%expect_test "checkout: into a worktree the session records; cwd picks the \
      ())
     checked #7 out in $DIR/worktrees/r/pr-7, on the branch pr-7 (its worktree already, fast-forwarded)
     Work there: cd '$DIR/worktrees/r/pr-7' in bash commands, paths under it in file tools, or pass it as a subagent's cwd. Remove it with the worktree tool when it is done with.
-    ERROR: pull_request checkout: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? action=list lists them): fatal: couldn't find remote ref refs/pull/3/head
+    ERROR: pull_request checkout: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? action=list lists them): fatal: couldn't find remote ref refs/pull/3/head; the closest: #5 Old one (open, draft), #7 From a contributor (open)
     open pull requests in o/r on github.com:
     #7 From a contributor (open; alice, fork:feat/x -> main) https://github.com/o/r/pull/7
     #5 Old one (open, draft; alice, feat/x -> main) https://github.com/o/r/pull/5
     ERROR: pull_request list: not a git repository: $DIR (cwd names one)
     ERROR: pull_request list: no GitHub or Forgejo remote in $DIR/r (git remote -v lists upstream /srv/x.git): add one with git remote add origin URL
     ERROR: pull_request create: no GitHub or Forgejo remote in $DIR/r (git remote -v lists upstream /srv/x.git): add one with git remote add origin URL
+    GET https://api.github.com/repos/o/r/pulls?state=all&per_page=100&sort=updated&direction=desc
+      Authorization: Bearer ghp_mine
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
       Authorization: Bearer ghp_mine
     |}]
@@ -290,7 +305,7 @@ let%expect_test "namespaces: each tool uses only its own world's sign-in" =
   Fake_forge.print_requests fake;
   [%expect {|
     alice: open pull requests in o/r on github.com:
-    bob: ERROR: pull_request list: not signed in to github.com: sign in under Settings → Git hosting in prigh-web, or with /login github
+    bob: ERROR: pull_request list: not signed in to github.com: ask the user to sign in under Settings → Git hosting in prigh-web, or with /login github
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
       Authorization: Bearer ghp_alice
     |}]

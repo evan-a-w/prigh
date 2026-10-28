@@ -200,6 +200,7 @@ let common_params =
         ~http:(Forge_http.real ~env)
         ~sleep:(Eio.Time.sleep (Eio.Stdenv.clock env))
         ~listen:(Forge_login.Listen.real ~env)
+        ~getenv
         ~home
         ~store
         ()
@@ -1309,7 +1310,7 @@ let acp_command =
          | Some (host, port) ->
            None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
          | None ->
-           let { Setup.session; cwd; new_agent; world; models } =
+           let { Setup.session; cwd; new_agent; world; models; forges } =
              make_agent ~env ~sw ~backend_host:false ()
            in
            if Option.is_some session
@@ -1333,6 +1334,7 @@ let acp_command =
                ~backend_host:false
                ~home:world.home
                ~login
+               ~forges
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent
