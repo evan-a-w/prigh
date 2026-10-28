@@ -1113,11 +1113,8 @@ try {
   //     shift-click takes the range, across the divider) and deleting them
   //     asks first with their count and size, then removes their files.
   const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
-  const sessionFiles = () => {
-    const files = readdirSync(join(home, ".prigh", "sessions"));
-    const traces = files.filter(f => f.endsWith(".trace.jsonl")).length;
-    return `${files.filter(f => f.endsWith(".jsonl")).length - traces}, traces: ${traces}`;
-  };
+  const sessionFiles = () =>
+    readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl") && !f.includes(".trace.")).length;
   await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();
   await page.locator(".chat .empty").waitFor();
   await send("one more");
