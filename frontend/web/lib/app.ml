@@ -167,6 +167,7 @@ module Reply_tag = struct
     | Compaction_saved
     | Default_saved
     | Session_stats
+    | Trace
     | Entries of Entries_purpose.t
     | Reload_messages
     | Exported
@@ -5166,6 +5167,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
   | "session", _ ->
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
+  | "trace", _ -> loading m "Trace" [ rpc "trace" [] ~tag:Trace ]
   | "sessions", _ | "switch", "" -> open_sessions m
   | (("archive" | "unarchive") as name), key ->
     let archived = String.equal name "archive" in
@@ -7083,6 +7085,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Session_stats, Ok json ->
     decode m json Session_stats.of_json ~f:(fun stats ->
       open_dialog m (Session stats))
+  | Trace, Ok json ->
+    decode m json Trace_report.of_json ~f:(fun report ->
+      open_dialog m (Text { title = "Trace"; text = report.summary }))
   | Entries purpose, Ok json -> entries_picker m purpose json
   | Reload_messages, Ok _ ->
     let m, fetch =
@@ -7240,7 +7245,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
 (* The replies that a [loading] dialog waits for. *)
 let loads : Reply_tag.t -> bool = function
   | Auth_status (Login_picker | Logout_picker | Show)
-  | Session_stats | Entries _
+  | Session_stats | Trace | Entries _
   | Users Picker
   | Skills { purpose = Picker _; _ }
   | Worktrees { purpose = Picker | Target _ | Review_target _; _ }

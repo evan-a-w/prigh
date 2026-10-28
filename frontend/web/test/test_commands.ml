@@ -96,6 +96,7 @@ let%expect_test "every command does something (none is unknown)" =
     /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
+    /trace                     loading Trace: rpc push_pref, rpc trace
     /sessions                  sidebar
     /switch                    sidebar
     /archive                   toast: This session isn't saved yet: send a message first.
@@ -596,6 +597,32 @@ let%expect_test "/session" =
     |}];
   H.act h (Run "/name");
   [%expect {| (Focus dialog-input) |}]
+;;
+
+let%expect_test "/trace shows the trace's summary" =
+  let h = H.create () in
+  run h "/trace";
+  H.reply
+    h
+    "trace"
+    {|{"summary":"1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)\n\nWall time 3.3s (the main agent, prompt to idle):\n  model  1.3s  39%\n  tools  2.0s  61%\n  other   0ms   0%\n","level":"default","spans":12}|};
+  H.text h ~selector:".modal";
+  [%expect {|
+    (Rpc (method_ push_pref) (params ((key history) (value /trace) (max 500)))
+     (tag Ignore))
+    (Focus dialog)
+    (Rpc (method_ trace) (params ()) (tag Trace))
+    (Focus dialog)
+    Trace
+    (Close (Esc))
+    1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)
+
+    Wall time 3.3s (the main agent, prompt to idle):
+      model  1.3s  39%
+      tools  2.0s  61%
+      other   0ms   0%
+    (Done)
+    |}]
 ;;
 
 let%expect_test "/switch" =
