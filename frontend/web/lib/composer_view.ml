@@ -210,8 +210,29 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       ]
 ;;
 
-(* The model, the thinking level and the approval mode, along the bottom of
-   the box, each opening its menu over itself (the command's choices). *)
+(* Where tools run, always named; a missing host is lit. *)
+let host_chip (m : App.Model.t) (state : State.t) ~inject =
+  let cls, title, label =
+    match
+      List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
+    with
+    | Some h ->
+      "", sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd, h.name
+    | None when String.equal state.active_host Host.backend_id ->
+      "", "Tools run on the backend (/host switches)", "backend"
+    | None -> " warm", "No host runs the tools: /host picks one", "No host"
+  in
+  button
+    ~cls:("chip-button host-chip" ^ cls)
+    ~title
+    ~attrs:(menu_attrs m Host)
+    ~on_click:(inject (Action.Open_chip Host))
+    [ icon Server; span ~cls:"chip-label" label; icon ~cls:"chevron" Chevron ]
+;;
+
+(* The model, the thinking level, the approval mode and the tool host, along
+   the bottom of the box, each opening its menu over itself (the command's
+   choices). *)
 let controls (m : App.Model.t) ~inject =
   match m.state with
   | None -> div ~cls:"composer-controls" []
@@ -226,10 +247,14 @@ let controls (m : App.Model.t) ~inject =
                 | _ -> false )
             ]
         ; Attr.role "group"
-        ; Attr.create "aria-label" "Model, thinking and mode"
+        ; Attr.create "aria-label" "Model, thinking, mode and host"
         ]
       (List.map
-         [ Chip.Model, model_chip; Thinking, thinking_chip; Mode, mode_chip ]
+         [ Chip.Model, model_chip
+         ; Thinking, thinking_chip
+         ; Mode, mode_chip
+         ; Host, host_chip
+         ]
          ~f:(fun (chip, view) ->
            let menu =
              match m.dialog with
@@ -245,7 +270,8 @@ let controls (m : App.Model.t) ~inject =
                    ; (match chip with
                       | Model -> "model"
                       | Thinking -> "thinking"
-                      | Mode -> "mode")
+                      | Mode -> "mode"
+                      | Host -> "host")
                    ]
                    [ "open", Option.is_some menu ]
                ]

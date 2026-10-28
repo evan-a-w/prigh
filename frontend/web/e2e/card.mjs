@@ -106,6 +106,38 @@ const screenshot = async (label, selector) => {
 const clean = text =>
   text.split("\n").map(line => line.replaceAll(hostname(), "<HOSTNAME>").replace(/\$\d+\.\d+/g, "$<COST>").replace(/\s+/g, " ").trim()).join("\n");
 
+// The composer's chips, by row (they wrap rather than spill), with anything
+// outside the composer or cut off without an ellipsis.
+const chips = () => page.evaluate(() => {
+  const root = document.querySelector(".composer-controls");
+  if (!root) return "(no chips)";
+  const box = document.querySelector(".composer").getBoundingClientRect();
+  const rows = [];
+  for (const e of root.querySelectorAll(".chip-button")) {
+    const r = e.getBoundingClientRect();
+    if (r.width === 0) continue;
+    let row = rows.find(row => Math.abs(row.top - r.top) < 6);
+    if (!row) rows.push((row = { top: r.top, items: [] }));
+    row.items.push({ left: r.left, text: e.innerText.trim().replace(/\s+/g, " ") || "icon" });
+  }
+  rows.sort((a, b) => a.top - b.top);
+  const problems = [...root.querySelectorAll("*")].flatMap(e => {
+    const r = e.getBoundingClientRect();
+    if (r.width === 0) return [];
+    const out = r.left < box.left - 1 || r.right > box.right + 1 ? ["outside"] : [];
+    const cs = getComputedStyle(e);
+    const cut = e.children.length === 0 && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== "ellipsis"
+      && cs.overflow !== "visible" ? ["cut off"] : [];
+    return [...out, ...cut].map(p => `${e.className || e.tagName}: ${p}`);
+  });
+  const host = root.querySelector(".host-chip .chip-label");
+  const truncated = host && host.scrollWidth > host.clientWidth + 1 ? " (host name truncated)" : "";
+  return [
+    ...rows.map((row, i) => `chips ${i + 1}: ${row.items.sort((a, b) => a.left - b.left).map(i => i.text).join(" | ")}`),
+    `chip problems: ${problems.join(", ") || "none"}${truncated}`,
+  ].join("\n");
+});
+
 // The card's rows, top to bottom: the items on each line (the context's
 // meter as [meter]), then the lamps lit, what is in the accent colour, and
 // anything outside the card or cut off without an ellipsis.
@@ -193,12 +225,20 @@ try {
   // All done, and a mode on (the transcript's verbosity).
   open("sub-go");
   await page.waitForFunction(() => !document.querySelector(".session-card .status-item.background.active"));
+  // The agent answers its subagent's report: wait for that turn to end.
+  await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
+  await page.locator(".session-card .activity.idle").waitFor();
   await page.keyboard.press("Control+o");
   await page.locator(".session-card .status-item.mode").waitFor();
   await both("idle, a mode on");
 
-  // Another host, with a long name, joins: the card names where tools run
-  // (there is a choice now), and then that host, once picked.
+  // The composer's chip names where tools run, the backend's machine.
+  section("the composer's chips");
+  console.log(clean(await chips()));
+
+  // Another host, with a long name, joins: the chip's menu lists it, a
+  // filter finds it and, once picked, the chip names it; the card never
+  // does.
   toolHost = spawn(
     backend,
     ["tool-host", "-connect", new URL(url).host, "-token", token, "-cwd", cwd,
@@ -208,15 +248,22 @@ try {
   let hostErr = "";
   toolHost.stderr.on("data", d => { hostErr += d; });
   toolHost.on("exit", code => errors.push(`tool host exited (${code}): ${hostErr}`));
-  await page.locator(".session-card .host").waitFor();
+  await page.locator(".host-chip").click();
+  await page.locator("#chip-popover[data-chip=host] .popover-item", { hasText: longHost }).waitFor();
   section("another host to choose");
-  console.log(clean(await card()));
-  await command(`/host ${longHost}`);
+  console.log(clean((await page.locator("#chip-popover[data-chip=host] .popover-item").evaluateAll(items =>
+    items.map(e => `${e.classList.contains("marked") ? "✓ " : ""}${e.querySelector(".menu-label").innerText}`)))
+    .join("\n").replace(/\(in [0-9a-f]+\)/g, "(in <SESSION>)")));
+  await screenshot("the host chip's menu");
+  await page.locator("#popover-filter").fill("euwest");
+  await page.waitForFunction(() => document.querySelectorAll("#chip-popover[data-chip=host] .popover-item").length === 1);
+  await page.keyboard.press("Enter");
   // It asks in which directory, the session's at first.
   await page.locator(".modal input").waitFor();
   await page.locator(".modal input").press("Enter");
-  await page.locator(".session-card .host", { hasText: longHost }).waitFor();
+  await page.locator(".host-chip", { hasText: longHost }).waitFor();
   await both("on a host with a long name");
+  console.log(clean(await chips()));
 
   // The context opens the session's details.
   await page.locator(".session-card .context").click();
@@ -240,6 +287,7 @@ try {
   await page.locator(".session-bar").waitFor();
   section("a phone");
   console.log(clean(await card()));
+  console.log(clean(await chips()));
   await screenshot("a phone");
 
   if (errors.length) {

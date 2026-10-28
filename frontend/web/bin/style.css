@@ -624,10 +624,6 @@ kbd {
 .card-status:has(.activity.running) .background .lamp { display: none; }
 .card-where { grid-area: where; display: flex; align-items: center; gap: 12px; min-width: 0; font: 11.5px var(--mono); }
 .card-where > .branch { flex: 0 1 auto; }
-.card-where > .status-item.host { flex: 0 1 auto; min-width: 6ch; margin-left: auto; color: var(--muted); font: inherit; }
-.card-where > .status-item.host.warm { color: var(--sodium); }
-.card-where > .host .status-text { overflow: hidden; text-overflow: ellipsis; }
-.card-where > .host .icon { color: var(--faint); }
 
 .chat-tools {
   position: absolute;
@@ -838,6 +834,11 @@ kbd {
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
 .chip-anchor.model .chip-label { min-width: 4ch; }
+/* Where tools run: its server icon always, the name cut before the model's. */
+.composer-controls .host-chip > .icon:first-child { display: inline-block; }
+.chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
+.chip-anchor.host .chip-label { max-width: 180px; }
+.composer-controls .host-chip.warm, .composer-box:focus-within .host-chip.warm:not(:hover) { color: var(--sodium); }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -952,7 +953,6 @@ kbd {
 .status-item.background.active { color: var(--sodium); gap: 7px; }
 .status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
-.status-item.host { color: var(--chalk); }
 .status-item.cost.budget { font: 11.5px var(--mono); }
 .status-item.warm { color: var(--sodium); }
 .status-item.hot { color: var(--brick); }
@@ -1806,6 +1806,8 @@ kbd {
 .popover-check { --mark-size: 14px; width: 16px; }
 .popover-aside { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .popover-empty { padding: 14px 12px; color: var(--muted); font-size: 12.5px; }
+.popover-hint { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 12px; line-height: 1.45; }
+.popover-hint code { font: 11.5px var(--mono); color: var(--chalk); }
 .chip-popover > .menu-keys { flex-shrink: 0; padding: 6px 12px 7px; }
 /* Thinking's effort, as rising bars: lit up to the level. */
 .thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }

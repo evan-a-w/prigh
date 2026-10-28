@@ -7,12 +7,14 @@ let title : Chip.t -> string = function
   | Model -> "Model"
   | Thinking -> "Thinking"
   | Mode -> "When tools ask first"
+  | Host -> "Where tools run"
 ;;
 
 let shortcut : Chip.t -> string = function
   | Model -> "Ctrl+L"
   | Thinking -> "Alt+T cycles"
   | Mode -> "Alt+M cycles"
+  | Host -> "/host"
 ;;
 
 let option_id i = sprintf "popover-option-%d" i
@@ -47,7 +49,7 @@ let row
   let model =
     match (chip : Chip.t) with
     | Model -> List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    | Thinking | Mode -> None
+    | Thinking | Mode | Host -> None
   in
   let detail =
     match model with
@@ -94,7 +96,7 @@ let row
            ~attrs:[ Attr.title "Context window, in tokens" ]
            (App.compact_tokens l.context_window)
        | Thinking, _ -> meter item.id
-       | (Model | Mode), _ -> Node.none)
+       | (Model | Mode | Host), _ -> Node.none)
     ]
 ;;
 
@@ -139,6 +141,26 @@ let rows (m : App.Model.t) ~chip (p : Picker.t) ~inject =
   | _ -> List.mapi (Picker.visible p) ~f:row
 ;;
 
+(* With nowhere else for tools to run, how to add somewhere. *)
+let host_note (m : App.Model.t) =
+  match m.state with
+  | Some state when List.length state.hosts <= 1 ->
+    Some
+      (div
+         ~cls:"popover-hint"
+         [ Node.text
+             (if List.is_empty state.hosts
+              then "No tool host is connected: "
+              else "The only host: ")
+         ; Node.text "run "
+         ; Node.code [ Node.text "prigh tool-host -connect SERVER" ]
+         ; Node.text
+             " on a machine, or a prigh TUI connected to this backend, to add \
+              one."
+         ])
+  | _ -> None
+;;
+
 let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   let visible = Picker.visible p in
   let active =
@@ -148,6 +170,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   in
   let list =
     match visible with
+    | [] when String.is_empty (Picker.query p) -> Node.none
     | [] ->
       div
         ~cls:"popover-empty"
@@ -167,7 +190,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            ]
            @
            match chip with
-           | Model -> []
+           | Model | Host -> []
            | Thinking | Mode -> [ Attr.tabindex 0; active ])
         (rows m ~chip p ~inject)
   in
@@ -180,46 +203,57 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           (match chip with
            | Model -> "model"
            | Thinking -> "thinking"
-           | Mode -> "mode")
+           | Mode -> "mode"
+           | Host -> "host")
       ; Attr.role "dialog"
       ; Attr.create "aria-label" (title chip)
       ]
-    [ (match chip with
-       | Model ->
-         div
-           ~cls:"popover-search"
-           [ icon Search
-           ; Node.input
-               ~attrs:
-                 [ Attr.id "popover-filter"
-                 ; Attr.type_ "text"
-                 ; Attr.create "aria-label" "Filter models"
-                 ; Attr.role "combobox"
-                 ; Attr.create "aria-controls" "popover-list"
-                 ; Attr.create "aria-expanded" "true"
-                 ; Attr.create "aria-autocomplete" "list"
-                 ; active
-                 ; Attr.placeholder "Filter models…"
-                 ; Attr.value (Picker.query p)
-                 ; Attr.create "autocomplete" "off"
-                 ; Attr.create "spellcheck" "false"
-                 ; Attr.on_input (fun _ text ->
-                     inject (Action.Picker_query text))
-                 ]
-               ()
-           ; span ~cls:"popover-shortcut" (shortcut chip)
-           ]
-       | Thinking | Mode ->
-         div
-           ~cls:"popover-head"
-           [ span ~cls:"popover-title" (title chip)
-           ; span ~cls:"popover-shortcut" (shortcut chip)
-           ])
-    ; list
-    ; div
-        ~cls:"menu-keys"
-        [ Node.text "Enter chooses, ← → the next setting, Esc closes" ]
-    ]
+    ([ (match chip with
+        | Model | Host ->
+          let what =
+            match chip with
+            | Host -> "hosts"
+            | Model | Thinking | Mode -> "models"
+          in
+          div
+            ~cls:"popover-search"
+            [ icon Search
+            ; Node.input
+                ~attrs:
+                  [ Attr.id "popover-filter"
+                  ; Attr.type_ "text"
+                  ; Attr.create "aria-label" ("Filter " ^ what)
+                  ; Attr.role "combobox"
+                  ; Attr.create "aria-controls" "popover-list"
+                  ; Attr.create "aria-expanded" "true"
+                  ; Attr.create "aria-autocomplete" "list"
+                  ; active
+                  ; Attr.placeholder (sprintf "Filter %s…" what)
+                  ; Attr.value (Picker.query p)
+                  ; Attr.create "autocomplete" "off"
+                  ; Attr.create "spellcheck" "false"
+                  ; Attr.on_input (fun _ text ->
+                      inject (Action.Picker_query text))
+                  ]
+                ()
+            ; span ~cls:"popover-shortcut" (shortcut chip)
+            ]
+        | Thinking | Mode ->
+          div
+            ~cls:"popover-head"
+            [ span ~cls:"popover-title" (title chip)
+            ; span ~cls:"popover-shortcut" (shortcut chip)
+            ])
+     ; list
+     ]
+     @ Option.to_list
+         (match chip with
+          | Host -> host_note m
+          | Model | Thinking | Mode -> None)
+     @ [ div
+           ~cls:"menu-keys"
+           [ Node.text "Enter chooses, ← → the next setting, Esc closes" ]
+       ])
 ;;
 
 (* Over the page, under the composer's chips: a click elsewhere closes the

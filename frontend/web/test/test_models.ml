@@ -11,6 +11,7 @@ let%expect_test
     (Claude Opus 5.5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   H.act h (Run "/model");
   H.text h ~selector:".modal";
@@ -173,6 +174,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
     (DeepSeek Chat)
     (No thinking)
     (Auto: never asks)
+    (backend)
     |}];
   H.type_ h "/thinking high";
   H.act h Send;
@@ -243,7 +245,7 @@ let%expect_test
                             \n/work") (purpose (Sidebar 2)))))
     (75%) ↑123k ↓7.9k $1.23 Working
     (3 queued)
-    (main) (laptop)
+    (main)
     |}];
   H.show h ~selector:".context";
   [%expect
