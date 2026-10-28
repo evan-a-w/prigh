@@ -5451,6 +5451,7 @@ let subagent_of_json json =
     ( { Chat.Subagent.agent_id = d.id
       ; task = d.task
       ; model = d.model
+      ; forked = false
       ; chat = Chat.of_messages ~running:(Option.is_none d.result) d.messages
       ; turns = d.turns
       ; cost_usd = None

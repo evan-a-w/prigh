@@ -158,6 +158,8 @@ let start ~call_id agent_id : Agent_event.t =
     ; model = "faux"
     ; tools = []
     ; worktree = None
+    ; forked = false
+    ; continued = false
     }
 ;;
 

@@ -51,7 +51,7 @@ let rec show_event (e : Agent_event.t) =
       "tool_end %s%S"
       (if result.is_error then "ERROR " else "")
       result.text
-  | Subagent_start { call_id; agent_id; task; model; tools; worktree = _ } ->
+  | Subagent_start { call_id; agent_id; task; model; tools; _ } ->
     sprintf
       "subagent_start %s/%s task=%S model=%s tools=[%s]"
       call_id

@@ -4,20 +4,34 @@ open! Prigh
 (* A scripted provider with one script per agent, so concurrent background
    subagents do not steal each other's replies: requests whose system prompt
    is a subagent's go to the script named by their task (the first user
-   message), everything else to [main]. [before ~key] runs before each reply,
-   e.g. to hold a subagent until the test releases it. *)
+   message), a fork's (which may have its caller's system prompt) to the one
+   named by the task its framing ends with, everything else to [main].
+   [before ~key] runs before each reply, e.g. to hold a subagent until the
+   test releases it. *)
+
+let fork_task (request : Provider.Request.t) =
+  List.find_map request.messages ~f:(function
+    | Message.User { text; _ }
+      when String.is_prefix text ~prefix:"[You are now a subagent forked" ->
+      Option.map (String.substr_index text ~pattern:"Your task:\n") ~f:(fun i ->
+        String.drop_prefix text (i + String.length "Your task:\n"))
+    | _ -> None)
+;;
 
 let key_of (request : Provider.Request.t) =
-  let is_subagent =
-    Option.exists request.system ~f:(fun s ->
-      String.is_substring s ~substring:"You are a subagent")
-  in
-  if not is_subagent
-  then "main"
-  else (
-    match request.messages with
-    | Message.User { text; _ } :: _ -> text
-    | _ -> "?")
+  match fork_task request with
+  | Some task -> task
+  | None ->
+    let is_subagent =
+      Option.exists request.system ~f:(fun s ->
+        String.is_substring s ~substring:"You are a subagent")
+    in
+    if not is_subagent
+    then "main"
+    else (
+      match request.messages with
+      | Message.User { text; _ } :: _ -> text
+      | _ -> "?")
 ;;
 
 let create

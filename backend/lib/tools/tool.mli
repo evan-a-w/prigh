@@ -20,6 +20,9 @@ and context =
   ; agent_id : string option
   ; call_id : string
   ; tools : t list (** tools available to this agent *)
+  ; conversation : Conversation.t option
+    (** the calling agent's conversation up to this call ([Agent_loop]
+        fills it in), for [subagent]'s [fork] *)
   ; emit : Agent_event.t -> unit
   ; background : Background_tasks.t option
     (** where [subagent] and [bash] with [background] start background work;
@@ -65,6 +68,7 @@ module Context : sig
     -> ?agent_id:string
     -> ?call_id:string
     -> ?tools:t list
+    -> ?conversation:Conversation.t
     -> ?emit:(Agent_event.t -> unit)
     -> ?background:Background_tasks.t
     -> ?cache_key:string

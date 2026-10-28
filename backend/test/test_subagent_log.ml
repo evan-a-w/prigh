@@ -11,6 +11,8 @@ let start ?(call_id = "p1") agent_id task : Agent_event.t =
     ; model = "faux"
     ; tools = [ "ls" ]
     ; worktree = None
+    ; forked = false
+    ; continued = false
     }
 ;;
 
@@ -185,4 +187,57 @@ let%expect_test "orphan_ends: subagents whose top-level ancestor is gone" =
        |> List.length
        : int)];
   [%expect {| 2 |}]
+;;
+
+(* A subagent continued after running out of turns ([continued]) runs again
+   in its entry, which ends again; a reloaded log replays the same. *)
+let%expect_test "a continued subagent reopens its entry, also when reloaded" =
+  let dir = Filename_unix.temp_dir "subagent-log" "" in
+  let log = Subagent_log.create () in
+  Subagent_log.load log ~dir:(fun () -> Some dir);
+  let now = ref 0. in
+  let record event =
+    now := !now +. 1.;
+    Subagent_log.record log ~now:!now event
+  in
+  let continued : Agent_event.t =
+    Subagent_start
+      { call_id = "p1"
+      ; agent_id = "a1"
+      ; task = "fix it"
+      ; model = "faux"
+      ; tools = [ "ls" ]
+      ; worktree = None
+      ; forked = true
+      ; continued = true
+      }
+  in
+  let states () =
+    List.iter (Subagent_log.summaries log) ~f:(fun s ->
+      print_s
+        [%sexp
+          (s.id : string)
+        , (s.state : Subagent_log.State.t)
+        , (s.result : Tool_result.t option)])
+  in
+  record (start "a1" "fix it");
+  record (inside "a1" (Message_end (Message.user "fix it")));
+  record (finish ~is_error:true "a1" "subagent hit the 1-turn limit");
+  states ();
+  record continued;
+  states ();
+  record (finish "a1" "fixed");
+  states ();
+  [%expect
+    {|
+    (a1 Failed (((text "subagent hit the 1-turn limit") (is_error true))))
+    (a1 Running ())
+    (a1 Complete (((text fixed) (is_error false))))
+    |}];
+  let reloaded = Subagent_log.create () in
+  Subagent_log.load reloaded ~dir:(fun () -> Some dir);
+  List.iter (Subagent_log.summaries reloaded) ~f:(fun s ->
+    print_s [%sexp (s.id : string), (s.state : Subagent_log.State.t)]);
+  [%expect {| (a1 Complete) |}];
+  ignore (Sys_unix.command (sprintf "rm -rf %s" (Filename.quote dir)) : int)
 ;;

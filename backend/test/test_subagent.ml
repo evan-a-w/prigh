@@ -275,7 +275,7 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
   [%expect
     {|
     (a1 "look around" deepseek-flash
-     (bash read write edit ls grep find web_fetch subagent))
+     (bash read write edit ls grep find web_fetch subagent subagent_continue))
     (a1 ((input 10) (output 5) (cache_read 0)) 1 9E-06)
     (((input 50) (output 23) (cache_read 5)) 4.113E-05)
     |}]
@@ -306,6 +306,8 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       ; model = "m"
       ; tools = [ "read"; "ls" ]
       ; worktree = None
+      ; forked = false
+      ; continued = false
       }
   in
   print_endline (Json.to_string (Rpc_json.event (Agent.Event.Loop start)));
@@ -349,6 +351,8 @@ let%expect_test
        ; model = "m"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   Subagent_log.record log ~now:1791210730.25 message_end;
   print_endline

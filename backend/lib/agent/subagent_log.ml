@@ -85,6 +85,11 @@ module Line = struct
         ; at : float
         ; run : int
         }
+    | Continue of
+        { id : string
+        ; at : float
+        ; run : int
+        }
     | Message of
         { id : string
         ; at : float
@@ -130,7 +135,7 @@ let write t (line : Line.t) =
     in
     match line with
     | Run _ -> if Sys_unix.file_exists_exn path then append ()
-    | Start _ | Message _ | End _ ->
+    | Start _ | Continue _ | Message _ | End _ ->
       Core_unix.mkdir_p dir;
       append ())
 ;;
@@ -156,6 +161,12 @@ let start t ~id ~call_id ~parent ~task ~model ~at =
   Queue.enqueue t.entries entry
 ;;
 
+let reopen (e : Entry.t) ~at =
+  e.result <- None;
+  e.ended <- None;
+  e.updated_at <- at
+;;
+
 let end_ t (e : Entry.t) ~at ~result =
   e.result <- Some result;
   e.ended <- Some (at, t.runs);
@@ -174,8 +185,12 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
     then (
       t.runs <- t.runs + 1;
       write t (Run { run = t.runs }))
-  | Subagent_start { call_id; agent_id; task; model; tools = _; worktree = _ }
-    ->
+  | Subagent_start { agent_id; continued = true; _ }
+    when Hashtbl.mem t.by_id agent_id ->
+    touch agent_id (fun e ->
+      reopen e ~at:now;
+      write t (Continue { id = agent_id; at = now; run = t.runs }))
+  | Subagent_start { call_id; agent_id; task; model; _ } ->
     start t ~id:agent_id ~call_id ~parent ~task ~model ~at:now;
     write
       t
@@ -229,6 +244,9 @@ let replay t (line : Line.t) =
   | Start { id; call_id; parent; task; model; at; run } ->
     t.runs <- Int.max t.runs run;
     start t ~id ~call_id ~parent ~task ~model ~at
+  | Continue { id; at; run } ->
+    t.runs <- Int.max t.runs run;
+    with_entry id (reopen ~at)
   | Message { id; at; turns; tool_calls; message } ->
     with_entry id (fun e ->
       e.updated_at <- at;

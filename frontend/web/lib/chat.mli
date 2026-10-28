@@ -14,6 +14,7 @@ module Subagent : sig
     { agent_id : string
     ; task : string
     ; model : string
+    ; forked : bool (** it started from its caller's conversation *)
     ; chat : chat (** its own transcript, from its events *)
     ; turns : int
     ; cost_usd : float option (** once it has finished *)

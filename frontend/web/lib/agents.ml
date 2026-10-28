@@ -165,9 +165,20 @@ let update_agent t id ~f =
 
 let rec record_in t ~now ~parent (event : Event.t) =
   match event with
-  | Subagent_start { call_id; agent_id; task; model; _ } ->
+  | Subagent_start { call_id; agent_id; task; model; continued; _ } ->
     if Option.is_some (find_agent t agent_id)
-    then t
+    then
+      if continued
+      then
+        (* It ran out of turns and runs again: its totals carry on. *)
+        update_agent t agent_id ~f:(fun a ->
+          { a with
+            status = Running
+          ; ended_at = None
+          ; result = None
+          ; current_tool = None
+          })
+      else t
     else
       { t with
         agents =

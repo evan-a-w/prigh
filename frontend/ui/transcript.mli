@@ -19,6 +19,7 @@ module Subagent : sig
     { agent_id : string
     ; task : string
     ; model : string
+    ; forked : bool (** it started from its caller's conversation *)
     ; status : Status.t
     ; turns : int
     ; report : string option
@@ -46,8 +47,7 @@ module Item : sig
         { tool : P.Content.Server_tool.t
         ; ended : bool
           (** its message ended: without output, it was interrupted *)
-        }
-    (** a tool the provider ran (web search), among the reply's text *)
+        } (** a tool the provider ran (web search), among the reply's text *)
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string

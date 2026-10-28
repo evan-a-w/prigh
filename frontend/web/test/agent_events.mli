@@ -12,7 +12,15 @@ val tool_end : id:string -> name:string -> string -> string
 (** [json], an event of the subagent [agent] that the call [call] started. *)
 val inner : call:string -> agent:string -> string -> string
 
-val start : call:string -> agent:string -> string -> string
+(** [forked]: it started from its caller's conversation; [continued]: it
+    ran out of turns and runs again ([subagent_continue]). *)
+val start
+  :  ?forked:bool
+  -> ?continued:bool
+  -> call:string
+  -> agent:string
+  -> string
+  -> string
 
 val end_
   :  ?error:bool
