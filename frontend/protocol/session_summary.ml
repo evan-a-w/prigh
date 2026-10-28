@@ -15,6 +15,8 @@ type t =
   ; running : bool (** its turn, or background subagents or jobs *)
   ; background : int (** running background subagents and jobs *)
   ; clients : int (** frontends attached to it *)
+  ; waiting : int (** confirmations and questions waiting for the user *)
+  ; failed : bool (** its last reply ended in an error *)
   ; archived : bool
   ; bytes : int (** on disk *)
   ; host : string option (** the tool host its cwd is on, when recorded *)
@@ -68,6 +70,8 @@ let of_json j =
   ; running = opt_bool "running"
   ; background = opt_int "background"
   ; clients = opt_int "clients"
+  ; waiting = opt_int "waiting"
+  ; failed = opt_bool "failed"
   ; archived = opt_bool "archived"
   ; bytes = opt_int "bytes"
   ; host

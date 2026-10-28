@@ -85,6 +85,26 @@ let notifications (m : App.Model.t) ~inject =
     ]
 ;;
 
+let tabs (m : App.Model.t) ~inject =
+  let on = m.tabs.enabled in
+  row
+    ~cls:"tabs"
+    ~name:"Tabs"
+    ~about:
+      "Show the open sessions as tabs over the chat (not on a phone). Saved \
+       for your account."
+    [ switch
+        ~label:"Tabs"
+        ~title:
+          (if on
+           then "Turn session tabs off (/tabs off)"
+           else "Turn session tabs on (/tabs on)")
+        ~on
+        ~on_click:(inject (Action.Run (if on then "/tabs off" else "/tabs on")))
+        ()
+    ]
+;;
+
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
@@ -281,7 +301,9 @@ let keep_days (n : Nix_gc.t) =
 let nix_store (m : App.Model.t) ~inject =
   let run command = inject (Action.Run command) in
   let n = m.nix_gc in
-  let about = "The packages agents fetch with Nix, on the shared /nix volume." in
+  let about =
+    "The packages agents fetch with Nix, on the shared /nix volume."
+  in
   let refresh label =
     button
       ~cls:"small ghost"
@@ -333,8 +355,8 @@ let nix_store (m : App.Model.t) ~inject =
       ~name:"Collect garbage"
       ~about:
         "Delete the store paths no profile or GC root uses. Deleting users' \
-         old profile generations first frees more, but they can no longer \
-         roll back to them."
+         old profile generations first frees more, but they can no longer roll \
+         back to them."
       ?note:
         (match n.collecting, n.outcome with
          | Some p, _ ->
@@ -438,7 +460,9 @@ let view (m : App.Model.t) ~inject =
           [ Node.text "Done" ]
       ]
     [ section "Appearance" (Theme_view.rows m ~inject)
-    ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
+    ; section
+        "Preferences"
+        [ notifications m ~inject; tabs m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
     ; (if App.superuser m
