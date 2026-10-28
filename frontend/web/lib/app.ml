@@ -399,6 +399,8 @@ module Action = struct
     | Open_snippets of int option
     | Open_help
     | Open_settings
+    | Compact_at_input of string
+    | Compact_at_commit
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -601,6 +603,7 @@ module Model = struct
           transcript stays on show, read-only *)
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
+    ; compact_at : Compact_at.t
     ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
@@ -828,6 +831,7 @@ let init =
   ; session_gone = None
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
+  ; compact_at = Compact_at.empty
   ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
@@ -927,7 +931,12 @@ let field json name =
 
 let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
-  | true, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
+  | ( true
+    , Some
+        ( Login _
+        | Forge_host _
+        | Nix_gc_confirm _
+        | Picker { kind = Compaction_models; _ } ) ) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -1315,8 +1324,18 @@ let compact_tokens n =
 ;;
 
 (* Those that can be used first, each provider's together. *)
-let models_picker ?(query = "") (m : Model.t) =
-  let current = Option.map m.state ~f:(fun s -> s.model.key) in
+let models_picker
+  ?(query = "")
+  ?(title = "Switch model")
+  ?(leading = [])
+  ?current
+  (m : Model.t)
+  =
+  let current =
+    match current with
+    | Some current -> current
+    | None -> Option.map m.state ~f:(fun (s : State.t) -> s.model.key)
+  in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
   let first (model : Llm.t) =
@@ -1345,7 +1364,7 @@ let models_picker ?(query = "") (m : Model.t) =
         ~dimmed:(not (usable model))
         model.name)
   in
-  Picker.create ~query ~title:"Switch model" items
+  Picker.create ~query ~title (leading @ items)
 ;;
 
 let model_picker ?query m =
@@ -1478,7 +1497,7 @@ let fetch_nix_status (m : Model.t) ~open_settings =
 
 (* Superusers see the Nix store there, as it is now. *)
 let open_settings ?(fetch = true) (m : Model.t) =
-  let m, cmds = open_dialog m Settings in
+  let m, cmds = open_dialog { m with compact_at = Compact_at.empty } Settings in
   if fetch && superuser m
   then (
     let m, fetch = fetch_nix_status m ~open_settings:false in
@@ -3024,19 +3043,58 @@ let compaction_summary config =
 
 (* The backend resolves the model as /model does, and says which models
    come closest to one it doesn't know. *)
+let set_compaction (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Compaction_command.apply action config in
+    let compact_at =
+      match action with
+      | Set_at _ -> Compact_at.empty
+      | Show | Set_model _ | Set_mask _ | Error _ -> m.compact_at
+    in
+    ( { m with config = Some config; compact_at }
+    , [ set_config
+          config
+          ~fields:(List.map (Prigh_ui.Compaction_command.fields action) ~f:fst)
+          ~tag:Compaction_saved
+      ] ))
+;;
+
+let compaction_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    open_picker
+      m
+      (Picker
+         { kind = Compaction_models
+         ; picker =
+             models_picker
+               m
+               ~title:"Summary model"
+               ~current:config.compaction_model
+               ~leading:
+                 [ Picker.Item.create
+                     ~id:"off"
+                     ~detail:"whichever model the conversation uses"
+                     ~search:"off conversation session"
+                     ~marked:(Option.is_none config.compaction_model)
+                     "The conversation's model"
+                 ]
+         }))
+;;
+
 let compaction_command (m : Model.t) rest =
-  match Prigh_ui.Compaction_command.parse rest with
-  | Show -> with_config m ~f:(fun c -> toast m (compaction_summary c))
-  | Error e -> error m (String.capitalize e)
-  | (Set_at _ | Set_model _ | Set_mask _) as action ->
-    with_config m ~f:(fun config ->
-      ( m
-      , [ set_config
-            (Prigh_ui.Compaction_command.apply action config)
-            ~fields:
-              (List.map (Prigh_ui.Compaction_command.fields action) ~f:fst)
-            ~tag:Compaction_saved
-        ] ))
+  if String.equal (String.strip rest) "model"
+  then compaction_models_picker m
+  else (
+    match Prigh_ui.Compaction_command.parse rest with
+    | Show -> with_config m ~f:(fun c -> toast m (compaction_summary c))
+    | Error e -> error m (String.capitalize e)
+    | (Set_at _ | Set_model _ | Set_mask _) as action -> set_compaction m action)
+;;
+
+let commit_compact_at (m : Model.t) =
+  match Compact_at.commit m.compact_at with
+  | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
+  | compact_at, None -> { m with compact_at }, []
 ;;
 
 let last_reply (m : Model.t) =
@@ -3473,6 +3531,8 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
+    ; config = None
+    ; compact_at = Compact_at.empty
     }
   in
   let m, cmds =
@@ -6569,7 +6629,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
   | Compaction_saved, Error e ->
-    error m (sprintf "Couldn't set compaction: %s" e)
+    (* The change shown at once did not happen: show the backend's. *)
+    let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
@@ -7877,6 +7939,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     | Confirm_tools -> set_confirm m (String.equal item.id "on")
     | Themes -> theme_named m item.id
     | Accents -> accent_named m item.id
+    | Compaction_models ->
+      let m, cmds =
+        set_compaction
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
     | Modes -> mode_by_name m item.id
     | Fork entries ->
       let m =
@@ -8070,6 +8143,8 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
+  | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
+    commit_compact_at m
   | Some
       ( Help
       | Hotkeys
@@ -8345,6 +8420,9 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
+  | Compact_at_input text ->
+    { m with compact_at = Compact_at.input m.compact_at text }, []
+  | Compact_at_commit -> commit_compact_at m
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -8637,7 +8715,12 @@ let update_connected (m : Model.t) (action : Action.t) =
        (* A setting changed from the settings page leaves it open. *)
        (match m.dialog, m'.dialog with
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
-        | Some Settings, Some (Login _ | Forge_host _ | Nix_gc_confirm _) ->
+        | ( Some Settings
+          , Some
+              ( Login _
+              | Forge_host _
+              | Nix_gc_confirm _
+              | Picker { kind = Compaction_models; _ } ) ) ->
           { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
