@@ -779,7 +779,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 68
+      ↕ 1–8 of 69
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -796,7 +796,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 68
+      ↕ 1–8 of 69
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -813,7 +813,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 68
+      ↕ 1–8 of 69
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1330,6 +1330,32 @@ let%expect_test "/session prints the stats table" =
     │ context        1.5%                                      │
     │ model changes  1                                         │
     └─────────── 1–7 of 10 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
+    |}]
+;;
+
+let%expect_test "/trace shows the trace's summary" =
+  let h = connected () in
+  H.keys h "/trace";
+  H.enter h;
+  [%expect {| (Rpc (method_ trace) (params ()) (tag Trace)) |}];
+  H.reply
+    h
+    Trace
+    {|{"summary":"1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)\n\nWall time 3.3s (the main agent, prompt to idle):\n  model  1.3s  39%\n  tools  2.0s  61%\n  other   0ms   0%\n","level":"default","spans":12}|};
+  H.show h;
+  [%expect {|
+    ┌─ Trace ──────────────────────────────────────────────────┐
+    │ 1 prompts, 2 turns, 2 model requests, 1 tool calls (12   │
+    │ spans)                                                   │
+    │                                                          │
+    │ Wall time 3.3s (the main agent, prompt to idle):         │
+    │   model  1.3s  39%                                       │
+    │   tools  2.0s  61%                                       │
+    │   other   0ms   0%                                       │
+    └──────────── 1–7 of 8 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -2829,7 +2855,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 301 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 305 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -8342,7 +8368,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 68
+      ↕ 1–8 of 69
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8359,7 +8385,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 68
+      ↕ 1–8 of 69
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8642,7 +8668,7 @@ let%expect_test
                                 │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
                                 │   /default-dir [off|path]            show or set the directory new sessions start in
                                 │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 68
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 69
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

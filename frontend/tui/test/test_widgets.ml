@@ -722,6 +722,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /new                               start a new session
     /name [text]                       set the session name
     /session                           show session statistics
+    /trace                             where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
     /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D deletes all archived, Ctrl+N named)
     /archive [session]                 archive a session (the current one without an argument)
     /unarchive [session]               unarchive a session (the current one without an argument)
