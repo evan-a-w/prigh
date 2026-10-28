@@ -792,6 +792,16 @@ Connect
 Another Forgejo host
 A self-hosted Forgejo or Gitea, by its host name.
 Add host…
+Compaction
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Summary model
+The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+The conversation's model
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 Account
 T
 Signed in as token
@@ -863,6 +873,7 @@ Appearance
 Preferences
 On the backend
 Git hosting
+Compaction
 Account
 === chromium: accounts: bob's commands ===
 /setus offers: /setusr [user]
