@@ -12,6 +12,7 @@ tools of MCP servers.
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
  browser ─── prigh-web (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ┘  (`-web`: Web_server serves the page and /ws)
                 │   (or `prigh web`: the site served locally, /ws relayed)  │
+ editor ──── `prigh acp` (Acp: ACP on stdio) ── prigh's RPC, in process or over TCP ┘
                 └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
                                                                        ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
                                                                        │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
@@ -497,8 +498,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the loop runs every call; the default runs in-process and `Agent`
   installs one that forwards `on_host` tools to the session's active host.
   The context also carries `approve` (checks a model's call before it
-  runs: `Some result` refuses it with that result) and `ask_user` (how the
-  `ask_user` tool reaches the user); `Agent_loop` puts the ones it is given
+  runs: `Some result` refuses it with that result), `ask_user` (how the
+  `ask_user` tool reaches the user) and `files` (a `File_access`: where
+  `read`, `edit`, `write`, `apply_patch` and `Host_ops`' `$read_file`, so
+  attachments, read and write text contents; the disk by default, the
+  editor's buffers for an ACP session, see `Acp`. Existence checks,
+  directories, binary files and images always use the disk); `Agent_loop` puts the ones it is given
   into every call's context and `Tool_subagent` hands `approve` down to its
   nested loop, so subagents are checked too.
   `Tool_args` gives typed accessors and builds the JSON schema; `Truncate`
@@ -1915,6 +1920,41 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   client as its only client, so when the backend dies (even by SIGKILL) the
   client sees EOF, exits, and tmux destroys the shell.
 
+- `Json_rpc` / `Rpc_client` / `Acp` — `prigh acp`, the Agent Client
+  Protocol for editors. `Json_rpc` is a JSON-RPC 2.0 peer over
+  newline-delimited JSON (both sides send requests; every incoming request
+  runs in its own fiber; `flush` waits for the answers in flight).
+  `Rpc_client` is one client connection to prigh's RPC, in process
+  (`Rpc_server.connect`/`handle`) or over TCP. `Acp` is an ordinary set of
+  prigh clients: one per ACP session, attached to it, plus one that is this
+  machine's tool host (a `Tool_host.Worker` whose `files` hook, given
+  `tool_exec`'s `session_id` and `call_id`, routes the file tools of the
+  editor's sessions through `fs/read_text_file`/`fs/write_text_file` when the
+  editor has them, recording each write's before/after text for the call's
+  diff) and, when needed, a control client (session lists, models,
+  `auth_status`). New sessions are made through the host client so they start
+  on it; `session/load` switches the host client to the session first so
+  that it runs here. prigh events become `session/update`s:
+  `message_update` deltas as message/thought chunks, `tool_start`/
+  `tool_output`/`tool_end` as `tool_call`/`tool_call_update` (`Acp_tool_call`:
+  kind, title, locations, fenced output, diffs, from the recorded writes or
+  else the call's arguments), user messages the editor did not send (other
+  frontends, reminders, goal continuations) as `user_message_chunk`, and
+  each `state` event diffed against what was last sent into
+  `current_mode_update`, `config_option_update`, `plan`, `usage_update`,
+  `session_info_update` and `_prigh/state`. `tool_confirm` becomes
+  `session/request_permission` (`tool_confirm_respond`, `always` for
+  allow_always, deny when cancelled); `ask_user` an `elicitation/create`
+  form, a permission request for a single choice, or `ask_user_respond`
+  with `unavailable` (`Acp_question`); `*_done` events withdraw the request
+  with `$/cancel_request`. `session/prompt` (content via `Acp_prompt`) sends
+  `prompt` (or `follow_up` when another frontend's run is going) and
+  answers once the session stops running (a sentinel queued after the call
+  ends it when no run started), with the last assistant message's stop
+  reason; slash commands (`Acp_commands`) call the RPC methods the TUI
+  uses. Session modes are the approval modes plus `plan`; config options are
+  mode, model and thinking.
+
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
@@ -1931,7 +1971,10 @@ listens on `-listen`, `$PRIGH_WEB_LISTEN` or the first free port from
 127.0.0.1:7790), `run <prompt>`
 (headless, streams to stdout; it denies confirmations and answers
 `ask_user` as unavailable, since nobody is there), `sessions`, `login <provider> [-method]`,
-`logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
+`logout <provider>`, `auth`, `acp` (the Agent Client Protocol on stdio,
+for editors: a backend in the process without a backend host, the adapter
+being the tool host, or `-connect HOST:PORT` to a running one; fd 1 is
+pointed at stderr so that only protocol lines reach stdout). All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
 `-session` takes a saved session's id, a unique prefix of it, or its file;

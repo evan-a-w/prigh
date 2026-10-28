@@ -1,0 +1,280 @@
+
+== a: allow
+← {"id":0,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow bash(echo:*)","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 1>","toolCall":{"kind":"execute","rawInput":{"command":"echo first"},"status":"pending","title":"echo first","toolCallId":"c1"}}}
+┌ chat
+│ ## You
+│ first
+│ 
+│ ## prigh
+│ One.
+│ 
+│ ◐ echo first · execute · in progress
+│ 
+│ 🔐 Permission needed: echo first
+│   [a] Allow
+│   [A] Always allow bash(echo:*)
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+focus in chat: true
+→ {"id":0,"result":{"outcome":{"optionId":"allow","outcome":"selected"}}}
+┌ chat
+│ ## You
+│ first
+│ 
+│ ## prigh
+│ One.
+│ 
+│ ✓ echo first · execute · completed
+│   ▸ 1 line of output · <Tab> expand
+│ 
+│ 🔐 Permission: echo first → Allow
+│ 
+│ first done
+│ 
+└
+
+== r: reject
+← {"id":1,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow bash(echo:*)","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 2>","toolCall":{"kind":"execute","rawInput":{"command":"echo second"},"status":"pending","title":"echo second","toolCallId":"c2"}}}
+┌ chat
+│ ## You
+│ second
+│ 
+│ ## prigh
+│ Two.
+│ 
+│ ◐ echo second · execute · in progress
+│ 
+│ 🔐 Permission needed: echo second
+│   [a] Allow
+│   [A] Always allow bash(echo:*)
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+→ {"id":1,"result":{"outcome":{"optionId":"reject","outcome":"selected"}}}
+┌ chat
+│ ## You
+│ second
+│ 
+│ ## prigh
+│ Two.
+│ 
+│ ✗ echo second · execute · failed
+│   ▸ 1 line of output · <Tab> expand
+│ 
+│ 🔐 Permission: echo second → Reject
+│ 
+│ second done
+│ 
+└
+
+== A: always
+← {"id":2,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow bash(echo:*)","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 3>","toolCall":{"kind":"execute","rawInput":{"command":"echo third"},"status":"pending","title":"echo third","toolCallId":"c3"}}}
+┌ chat
+│ ## You
+│ third
+│ 
+│ ## prigh
+│ Three.
+│ 
+│ ◐ echo third · execute · in progress
+│ 
+│ 🔐 Permission needed: echo third
+│   [a] Allow
+│   [A] Always allow bash(echo:*)
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+→ {"id":2,"result":{"outcome":{"optionId":"always","outcome":"selected"}}}
+┌ chat
+│ ## You
+│ third
+│ 
+│ ## prigh
+│ Three.
+│ 
+│ ✓ echo third · execute · completed
+│   ▸ 1 line of output · <Tab> expand
+│ 
+│ 🔐 Permission: echo third → Always allow bash(echo:*)
+│ 
+│ third done
+│ 
+└
+
+== switching to Auto answers the card: prigh withdraws it
+← {"id":3,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow bash(touch:*)","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 4>","toolCall":{"kind":"execute","rawInput":{"command":"touch fourth"},"status":"pending","title":"touch fourth","toolCallId":"c4"}}}
+┌ chat
+│ ## You
+│ fourth
+│ 
+│ ## prigh
+│ Four.
+│ 
+│ ◐ touch fourth · execute · in progress
+│ 
+│ 🔐 Permission needed: touch fourth
+│   [a] Allow
+│   [A] Always allow bash(touch:*)
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+select: Mode
+  ● Ask — ask before every tool that changes something
+    Auto-edit — edit files without asking; ask before commands
+    Auto — run every tool without asking
+    Plan — investigate and plan, changing no files, until you approve the plan
+  ->   Auto — run every tool without asking
+→ {"id":9,"method":"session/set_config_option","params":{"configId":"mode","sessionId":"<session 4>","value":"auto"}}
+← {"method":"$/cancel_request","params":{"requestId":3}}
+→ {"error":{"code":-32800,"message":"withdrawn by the agent"},"id":3}
+┌ chat
+│ ## You
+│ fourth
+│ 
+│ ## prigh
+│ Four.
+│ 
+│ ✓ touch fourth · execute · completed
+│ 
+│ 🔐 Permission: touch fourth → withdrawn by the agent (answered elsewhere or no longer needed)
+│ 
+│ fourth done
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 0/1.0M (0%) · $0.00
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+keys back: prigh: write a prompt
+
+== ask_user: an elicitation form
+notify: prigh asks: 1. Storage
+2. Anything else?
+select: Which database? (optional)
+  Postgres: what prod uses
+  SQLite
+  -> Postgres: what prod uses
+input: Or your own answer (optional):  [default ""] -> ""
+input: Anything else? (optional):  [default ""] -> "nothing"
+select: 1. Storage
+        2. Anything else?
+          q1: Postgres
+          q1_other: (empty)
+          q2: nothing
+  Submit
+  Edit again
+  Decline
+  Cancel
+  -> Submit
+← {"id":4,"method":"elicitation/create","params":{"message":"1. Storage\n2. Anything else?","mode":"form","requestedSchema":{"properties":{"q1":{"oneOf":[{"const":"Postgres","title":"Postgres: what prod uses"},{"const":"SQLite","title":"SQLite"}],"title":"Which database?","type":"string"},"q1_other":{"title":"Or your own answer","type":"string"},"q2":{"title":"Anything else?","type":"string"}},"required":[],"type":"object"},"sessionId":"<session 4>","toolCallId":"q1"}}
+→ {"id":4,"result":{"action":"accept","content":{"q1":"Postgres","q2":"nothing"}}}
+┌ chat
+│ ## You
+│ fourth
+│ 
+│ ## prigh
+│ Four.
+│ 
+│ ✓ touch fourth · execute · completed
+│ 
+│ 🔐 Permission: touch fourth → withdrawn by the agent (answered elsewhere or no longer needed)
+│ 
+│ fourth done
+│ 
+│ ## You
+│ ask
+│ 
+│ ## prigh
+│ Asking.
+│ 
+│ ✓ Question for you · other · completed
+│   ▸ 5 lines of output · <Tab> expand
+│ 
+│ Thanks.
+│ 
+└
+
+== a write in Ask: the card shows the diff, allowed
+select: Mode
+    Ask — ask before every tool that changes something
+    Auto-edit — edit files without asking; ask before commands
+  ● Auto — run every tool without asking
+    Plan — investigate and plan, changing no files, until you approve the plan
+  ->   Ask — ask before every tool that changes something
+← {"id":6,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow edit","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 5>","toolCall":{"content":[{"newText":"one\nTWO\n","oldText":"one\ntwo\n","path":"<tmp>/notes.txt","type":"diff"}],"kind":"edit","locations":[{"path":"<tmp>/notes.txt"}],"rawInput":{"content":"one\nTWO\n","path":"notes.txt"},"status":"pending","title":"Write notes.txt","toolCallId":"w1"}}}
+┌ chat
+│ ## You
+│ rewrite notes
+│ 
+│ ## prigh
+│ Reading.
+│ 
+│ ✓ Read notes.txt · read · completed
+│   ↳ notes.txt
+│   ▸ 2 lines of output · <Tab> expand
+│ 
+│ Rewriting.
+│ 
+│ ◐ Write notes.txt · edit · in progress
+│   ↳ notes.txt
+│ 
+│ 🔐 Permission needed: Write notes.txt
+│   ↳ notes.txt
+│   ```diff
+│   +++ notes.txt
+│   @@ -1,2 +1,2 @@
+│    one
+│   -two
+│   +TWO
+│   ```
+│   [a] Allow
+│   [A] Always allow edit
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+→ {"id":6,"result":{"outcome":{"optionId":"allow","outcome":"selected"}}}
+┌ chat
+│ ## You
+│ rewrite notes
+│ 
+│ ## prigh
+│ Reading.
+│ 
+│ ✓ Read notes.txt · read · completed
+│   ↳ notes.txt
+│   ▸ 2 lines of output · <Tab> expand
+│ 
+│ Rewriting.
+│ 
+│ ✓ Write notes.txt · edit · completed
+│   ↳ notes.txt
+│   ```diff
+│   +++ notes.txt
+│   @@ -1,2 +1,2 @@
+│    one
+│   -two
+│   +TWO
+│   ```
+│ 
+│ 🔐 Permission: Write notes.txt → Allow
+│ 
+│ Rewritten.
+│ 
+│ ℹ 1 file changed: notes.txt — :PrighReview (<leader>pr) reviews the changes hunk by hunk
+│ 
+└
+notes.txt: "one\nTWO\n"

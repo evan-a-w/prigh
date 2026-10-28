@@ -51,15 +51,17 @@ function M.segments(agent)
   if thinking then
     add("thinking " .. tostring(thinking))
   end
+  -- prigh's mode is its approval mode or plan mode: shown once.
   local mode = s:current_mode_name()
   if mode then
-    add("mode " .. mode)
-  end
-  if p.approval_mode then
-    add("approve " .. tostring(p.approval_mode))
-  end
-  if p.plan_mode then
-    add("plan mode", "PrighWarning")
+    add("mode " .. mode, p.plan_mode and "PrighWarning" or nil)
+  else
+    if p.approval_mode then
+      add("approve " .. tostring(p.approval_mode))
+    end
+    if p.plan_mode then
+      add("plan mode", "PrighWarning")
+    end
   end
   local used = p.context_tokens or (s.usage and s.usage.used)
   local size = p.context_window or (s.usage and s.usage.size)
@@ -69,7 +71,7 @@ function M.segments(agent)
   end
   local cost = p.cost_usd
   if cost then
-    add(string.format("$%.2f", cost))
+    add(string.format("$%.2f", cost) .. (p.budget_usd and string.format("/$%.2f", p.budget_usd) or ""))
   elseif s.usage and s.usage.cost and s.usage.cost.amount then
     local c = s.usage.cost
     add(string.format(c.currency == "USD" and "$%.2f" or ("%.2f " .. tostring(c.currency)), c.amount))
@@ -77,12 +79,21 @@ function M.segments(agent)
   if s.running then
     add("● running", "PrighRunning")
   end
-  local queued = #s.queue + (tonumber(p.queued) or 0)
+  -- Ours waiting for the turn, and the agent's (steering and follow-ups
+  -- sent from another frontend).
+  local q = type(p.queued) == "table" and p.queued or {}
+  local queued = #s.queue + (tonumber(q.steer) or 0) + (tonumber(q.follow_up) or 0)
   if queued > 0 then
     add(string.format("queued %d", queued), "PrighWarning")
   end
-  if p.subagents and tonumber(p.subagents) and p.subagents > 0 then
-    add(string.format("agents %d", p.subagents))
+  local running_agents = 0
+  for _, a in ipairs(type(p.subagents) == "table" and p.subagents or {}) do
+    if a.running then
+      running_agents = running_agents + 1
+    end
+  end
+  if running_agents > 0 then
+    add(string.format("agents %d", running_agents))
   end
   if p.jobs and tonumber(p.jobs) and p.jobs > 0 then
     add(string.format("jobs %d", p.jobs))

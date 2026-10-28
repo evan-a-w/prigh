@@ -11,7 +11,7 @@ vim.cmd.cd(T.tmp)
 
 local function scrub(s)
   s = s:gsub(vim.pesc(T.tmp), "<tmp>")
-  return s
+  return T.mask(s)
 end
 
 function T.out(...)
@@ -346,6 +346,156 @@ end
 
 vim.notify = function(msg, level)
   T.out(string.format("notify%s: %s", level and level >= vim.log.levels.WARN and " (warn)" or "", msg))
+end
+
+-- The real prigh ---------------------------------------------------------------
+
+--- The prigh binary: $PRIGH_BIN, else the backend's build.
+function T.prigh_bin()
+  local bin = os.getenv("PRIGH_BIN")
+  if not bin or bin == "" then
+    bin = vim.fs.normalize(T.root .. "/../../backend/_build/default/bin/main.exe")
+  end
+  return bin
+end
+
+-- What went over the wire, for traffic(): { dir = "send"|"recv", msg }.
+T.wire = {}
+local wire_seen = 0
+
+local function tap()
+  local acp = require("prigh.acp")
+  if acp._tapped then
+    return
+  end
+  acp._tapped = true
+  local start = acp.start
+  acp.start = function(opts)
+    local conn, err = start(opts)
+    if conn then
+      local send, on_line = conn._send, conn._on_line
+      conn._send = function(self, msg)
+        table.insert(T.wire, { dir = "send", msg = vim.deepcopy(msg) })
+        return send(self, msg)
+      end
+      conn._on_line = function(self, line)
+        local ok, msg = pcall(vim.json.decode, line, { luanil = { object = true, array = true } })
+        table.insert(T.wire, { dir = "recv", msg = ok and msg or line })
+        return on_line(self, line)
+      end
+    end
+    return conn, err
+  end
+end
+
+T.ids = {}
+
+local session_count = 0
+
+--- Masks what changes from run to run: session ids (prigh's are 16 hex
+--- digits, named in order of appearance) and, against the real prigh, times.
+function T.mask(s)
+  s = s:gsub("%f[%x]" .. ("%x"):rep(16) .. "%f[^%x]", function(id)
+    if not T.ids[id] then
+      session_count = session_count + 1
+      T.ids[id] = string.format("<session %d>", session_count)
+    end
+    return T.ids[id]
+  end)
+  if T.real then
+    s = s:gsub("%d%d%d%d%-%d%d%-%d%dT[%d:%.]+Z?", "<time>")
+    s = s:gsub("%d%d%d%d%-%d%d%-%d%d %d%d:%d%d", "<time>")
+  end
+  return s
+end
+
+--- Messages exchanged with the agent since the last call, filtered by
+--- `pred(dir, msg)` (default: all but session/update chunks).
+function T.traffic(pred)
+  pred = pred
+    or function(_, msg)
+      local u = type(msg) == "table" and msg.params and msg.params.update
+      return not (u and (u.sessionUpdate or ""):match("_chunk$"))
+    end
+  for i = wire_seen + 1, #T.wire do
+    local w = T.wire[i]
+    if pred(w.dir, w.msg) then
+      local msg = vim.deepcopy(w.msg)
+      if type(msg) == "table" then
+        msg.jsonrpc = nil
+        if type(msg.result) == "table" and msg.result.agentInfo then
+          msg.result.agentInfo.version = "<version>"
+        end
+      end
+      T.out((w.dir == "send" and "→ " or "← ") .. T.json(msg))
+    end
+  end
+  wire_seen = #T.wire
+end
+
+--- Skip what was exchanged so far.
+function T.traffic_skip()
+  wire_seen = #T.wire
+end
+
+--- Configure prigh.nvim against the real `prigh acp -faux-script`: the
+--- model replies `replies` (Faux_provider's script: text, thinking,
+--- tool_calls...), HOME a fresh directory with `opts.prigh_config` as
+--- ~/.prigh/config.json and `opts.auth` as the credentials (fake keys: the
+--- faux provider answers everything). No network.
+function T.start_prigh(replies, opts)
+  opts = opts or {}
+  local bin = T.prigh_bin()
+  if vim.fn.executable(bin) ~= 1 then
+    T.out("no prigh binary at " .. bin .. ": build the backend (cd backend && dune build) or set PRIGH_BIN")
+    error("no prigh binary")
+  end
+  tap()
+  T.real = true
+  local home = T.tmp .. "/home"
+  vim.fn.mkdir(home .. "/.prigh", "p")
+  if opts.prigh_config then
+    local f = assert(io.open(home .. "/.prigh/config.json", "w"))
+    f:write(vim.json.encode(opts.prigh_config))
+    f:close()
+  end
+  if opts.auth then
+    vim.fn.mkdir(home .. "/.config/prigh", "p")
+    local af = assert(io.open(home .. "/.config/prigh/auth.json", "w"))
+    af:write(vim.json.encode(opts.auth))
+    af:close()
+  end
+  local script_path = T.tmp .. "/.faux.json"
+  local f = assert(io.open(script_path, "w"))
+  f:write(vim.json.encode(replies))
+  f:close()
+  local setup = vim.tbl_deep_extend("force", {
+    cmd = { bin, "acp", "-faux-script", script_path, "-name", "testhost" },
+    env = { HOME = home, XDG_CONFIG_HOME = home .. "/.config", TZ = "UTC" },
+    cwd = T.tmp,
+    resume_last = false,
+  }, opts.setup or {})
+  require("prigh").setup(setup)
+  return require("prigh").get()
+end
+
+--- Open the chat on a new session of the real prigh and wait for it.
+function T.open_prigh()
+  local agent, chat = require("prigh").get()
+  vim.cmd("Prigh")
+  T.wait(function()
+    return agent.session.id ~= nil and agent.session.prigh ~= nil and #agent.session.commands > 0
+  end, "a session", 15000)
+  T.mask(agent.session.id)
+  return agent, chat
+end
+
+--- Wait for the running turn to end.
+function T.turn_end(what)
+  local agent = require("prigh").get()
+  T.wait(function()
+    return not agent.session.running
+  end, what or "turn end", 15000)
 end
 
 return T
