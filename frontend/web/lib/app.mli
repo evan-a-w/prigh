@@ -473,6 +473,8 @@ module Action : sig
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
+    | Compact_at_input of string (** the settings page's "Compact at" *)
+    | Compact_at_commit (** applies it (leaving the field; Enter accepts) *)
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -755,6 +757,7 @@ module Model : sig
         transcript stays on show, read-only, until another is chosen *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
+    ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; return_to_settings : bool
     (** the login dialog showing was opened from the settings page: closing
         it goes back there *)

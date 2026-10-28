@@ -67,6 +67,7 @@ let%expect_test "Settings shows superusers the store; others do not see it" =
     Preferences
     On the backend
     Git hosting
+    Compaction
     Account
     |}]
 ;;

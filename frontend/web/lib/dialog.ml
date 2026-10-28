@@ -27,6 +27,7 @@ module Picker_kind = struct
     | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
+    | Compaction_models
     | Menu of Context_menu.t
   [@@deriving sexp_of, equal]
 end
@@ -160,7 +161,8 @@ let per_session = function
           | Users
           | Accounts
           | Themes
-          | Accents )
+          | Accents
+          | Compaction_models )
       ; _
       }
   | Help
