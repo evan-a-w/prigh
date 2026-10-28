@@ -426,7 +426,7 @@ let%expect_test
     {"type":"response","id":"r","ok":true,"result":{}}
     ((active_host host-tui) (cwd /home/me/proj)
      (hosts (backend=$DIR host-tui=/home/me/proj)))
-    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"/home/me/proj","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"parent":null,"host":"host-tui","worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"/home/me/proj","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"failed":false,"parent":null,"host":"host-tui","worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
     tui hello: client_id=client-3 host_id=host-tui
     reloaded: true
     ((active_host host-tui) (cwd /home/me/proj)

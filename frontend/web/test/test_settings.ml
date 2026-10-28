@@ -26,6 +26,8 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     Preferences
     Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
     (Allow) (Turn notifications off (/notify off))
+    Tabs Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+    (Turn session tabs on (/tabs on))
     Transcript detail How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
     (Quiet) (Normal) (Verbose)
     On the backend
@@ -282,6 +284,7 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Yellow" -- Yellow (/accent yellow)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
+    [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
@@ -310,6 +313,7 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
+    [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
     [group] div "Compact at"

@@ -469,6 +469,7 @@ module Summary : sig
     ; updated_at : string
     ; first_prompt : string option
     ; message_count : int
+    ; failed : bool (** its last reply ended in an error *)
     ; parent : string option
     ; archived : bool option
       (** the last [Archived] entry, when it comes after the last message *)

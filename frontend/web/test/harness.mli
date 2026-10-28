@@ -101,6 +101,8 @@ val session_json
   -> ?running:bool
   -> ?background:int
   -> ?clients:int
+  -> ?waiting:int (** confirmations and questions waiting for the user *)
+  -> ?failed:bool (** its last reply ended in an error *)
   -> ?archived:bool
   -> ?bytes:int
   -> ?repo:string * string * string option

@@ -15,6 +15,8 @@ type t =
   ; running : bool (** its turn, or background subagents or jobs *)
   ; background : int (** running background subagents and jobs *)
   ; clients : int (** frontends attached to it *)
+  ; waiting : int (** confirmations and questions waiting for the user *)
+  ; failed : bool (** its last reply ended in an error *)
   ; archived : bool
   ; bytes : int (** on disk *)
   ; host : string option (** the tool host its cwd is on, when recorded *)

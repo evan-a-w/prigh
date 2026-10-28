@@ -520,9 +520,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - `Forges` — the per-user service the RPC server holds: `accounts`
   (github.com, codeberg.org, configured and signed-in hosts), `login`,
   `logout`, `api` (refreshing an expiring token under the store lock,
-  re-checked there like `Provider_auth.resolve`), and the `pr_*` replies:
-  the repository is the current branch's remote, else `origin`, else the
-  first remote on a known host.
+  re-checked there like `Provider_auth.resolve`), and pull requests
+  (`list_pulls`, `view_pull` with its checks and optionally its diff,
+  `pull_defaults`, `create_pull`, which pushes first or refuses a branch the
+  remote lacks, `checkout_pull`) as typed values (`Pulls`, `Pull`,
+  `Defaults`, `Git_forge.Checkout`) that the `pr_*` methods turn into JSON
+  and `Tool_pull_request` into text. The repository is the current branch's
+  remote, else `origin`, else the first remote on a known host; git runs
+  through a [git] closure, on the session's tool host. `bin/main.ml` makes
+  one per world (user or namespace) and hands it to both the RPC server
+  (`Rpc_server.create ~forges`, `prigh acp` too) and that world's agents'
+  `pull_request` tool, so a sign-in is seen by both and never by another
+  user.
 
 ### Tools
 
@@ -759,6 +768,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {agent; task}` (the task from `Subagent_log`), removed paths append
   `Worktree_removed`. `Rpc_server` re-lists a session on every
   `Message_end`, a subagent's too, so the sidebar follows.
+- `Tool_pull_request` — the model's `pull_request` tool (`action` list,
+  view, checks, diff, create or checkout; `number`, `state`, `title`,
+  `body`, `base`, `head`, `draft`, `push`, `cwd`) on the world's `Forges`.
+  It runs in the backend (`on_host = false`, where the sign-ins are) and
+  sends its git through `Tool.execute_via` with `Git_forge`/`Git_location`
+  pseudo-tools, so git runs on the session's tool host. `create` and
+  `checkout` are `destructive` (`Depends` on `action`). A failure names
+  the next step for the model: `Forges`' slash-command hints are rewritten
+  (`/login` → ask the user to sign in), and a number that is not one of the
+  repository's pull requests gets the closest ones. A checkout's worktree
+  goes out as `Worktrees_changed`, like `Tool_worktree`'s.
 - `Worktree_watch` — the safety net for `git worktree add`/`remove`/`move`/
   `prune` run in `bash`: `Agent.executor` wraps the call that actually runs
   a matching command (not the backend-side wrapper of a job) in
@@ -902,7 +922,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   turn, and that it finishes only once its jobs have exited (so kill
   servers first). Either role, given the `worktree` tool, is told to make
   worktrees with it (or `subagent`'s `worktree` option) rather than `git
-  worktree add`, and to work there by the worktree's path.
+  worktree add`, and to work there by the worktree's path; given
+  `pull_request`, to use it for pull requests rather than `gh`.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -1613,8 +1634,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   backend's host that recorded none, `Git_location.find` on the backend's
   files, cached per cwd in `t.repos`), `worktrees` (`{path, branch, root,
   source}`, `source` one of `created`, `entered`, `pull_request` with
-  `pr`, `agent` with `agent` and `task`), `bytes`, `live`
-  (with `clients` when live), `running` (a
+  `pr`, `agent` with `agent` and `task`), `bytes`, `failed` (its last
+  reply ended in an error), `live` (with `clients` and `waiting`, its
+  confirmations and questions waiting for the user, when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
   current `config.json`, reread per call). `set_archived {path, archived}`
@@ -1633,9 +1655,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
-  `background`, persisted, name, description, repository or subagents'
-  worktrees (`Listed`, compared per live session
-  on its state changes and message ends, so never per delta), and after
+  `background`, `waiting`, persisted, name, description, repository or
+  subagents' worktrees (`Listed`, compared per live session on its state
+  changes, message ends, confirmations and questions, so never per delta), and after
   archiving, deleting, importing, forking and cloning; frontends refetch
   the list. A session with running background subagents or jobs
   is not evicted (it delivers their reports into its own session even with
@@ -3122,6 +3144,25 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
+    - Session tabs: `Session_tabs` (pure) holds whether they are on (the
+      `web.tabs` preference, `/tabs on|off` and the settings' switch) and
+      the open sessions' ids in order (`web.open-tabs`), restored from the
+      browser's cache and then the backend's preferences, and saved
+      (`to_save`) only once those arrived (`load`), so a page that has not
+      heard them yet never overwrites another browser's. `update` keeps
+      the tabs in step (`follow_tabs`): the current session gains a tab
+      when it changes, except a new session started by closing the last
+      tab (`Blank`), which stays out, showing the empty state, until it is
+      listed; `list_sessions` (`listed`) closes the tabs of sessions
+      deleted or archived and, from its `running`, `waiting` and `failed`,
+      marks those whose work finished while out of sight (`finished`, cleared
+      when seen). Closing, `Step_tab`, `Nth_tab` and dropping a dragged
+      tab (`Drag_tab`, `Drop_tab`: HTML drag and drop, the page's
+      `dragover` already allows drops) only switch sessions through
+      `switch_session`/`New_session`, so switching still resets everything
+      of the old session; steps count from the session being switched to,
+      so keys pressed in a row each move on. `Session_tabs_view` renders
+      the strip (none when off or narrow: a phone keeps its slim bar).
     - Installing: `Model.update_ready` is the update notice (one, over
       the toasts, until answered): `Update_ready` raises it, `Apply_update`
       emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s

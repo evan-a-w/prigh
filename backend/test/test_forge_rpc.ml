@@ -3,105 +3,15 @@ open! Prigh
 open Tool_test_helpers
 module Json = Jsonaf
 
-(* The git hosting methods end to end: a real repository on the backend's
-   tool host whose origin is a GitHub URL rewritten (insteadOf) to a local
-   bare repository, so fetches and pushes stay on disk, and a fake GitHub
-   answering the API. *)
-
-let sh dir script =
-  let command =
-    sprintf
-      "cd %s && export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-       GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t \
-       GIT_COMMITTER_EMAIL=t@t && (%s) > /dev/null 2>&1"
-      (Filename.quote dir)
-      script
-  in
-  match Sys_unix.command command with
-  | 0 -> ()
-  | n -> raise_s [%message "setup failed" (script : string) (n : int)]
-;;
-
-let set_up_repos (t : Tool_test_helpers.t) =
-  let bare = Filename.concat t.dir "bare.git" in
-  let repo = Filename.concat t.dir "r" in
-  Core_unix.mkdir_p repo;
-  sh t.dir "git init -q --bare -b main bare.git";
-  sh
-    repo
-    (sprintf
-       "git init -q -b main && git config url.%s.insteadOf \
-        https://github.com/o/r.git && git remote add origin \
-        https://github.com/o/r.git && echo a > a && git add a && git commit \
-        -qm Initial && git push -q origin main && git checkout -qb pr-src && \
-        echo b > b && git add b && git commit -qm 'From a contributor' && git \
-        push -q origin HEAD:refs/pull/7/head && git checkout -q main && git \
-        branch -qD pr-src && git checkout -qb feat/add-things && echo c > c && \
-        git add c && git commit -qm 'Add c' -m 'Because c.' && echo d > d && \
-        git add d && git commit -qm 'Add d'"
-       (Filename.quote bare));
-  repo
-;;
-
-let create_reply = ref (201, "")
-
-let github (r : Forge_http.Request.t) =
-  let accept =
-    List.Assoc.find r.headers ~equal:String.Caseless.equal "Accept"
-    |> Option.value ~default:""
-  in
-  match r.meth, Fake_forge.path_of r.url with
-  | Get, "/user" -> 200, {|{"login":"octocat"}|}
-  | Get, "/repos/o/r" -> 200, {|{"full_name":"o/r","default_branch":"main"}|}
-  | Get, "/repos/o/r/pulls" ->
-    ( 200
-    , sprintf
-        "[%s,%s]"
-        (Fake_forge.pr_json
-           ~host:"github.com"
-           ~number:7
-           ~title:"From a contributor"
-           ~head_owner:"fork"
-           ())
-        (Fake_forge.pr_json
-           ~host:"github.com"
-           ~number:5
-           ~title:"Old one"
-           ~draft:true
-           ()) )
-  | Get, "/repos/o/r/pulls/7"
-    when String.equal accept "application/vnd.github.diff" ->
-    ( 200
-    , "diff --git a/b b/b\n\
-       new file mode 100644\n\
-       --- /dev/null\n\
-       +++ b/b\n\
-       @@ -0,0 +1 @@\n\
-       +b\n" )
-  | Get, "/repos/o/r/pulls/7" ->
-    ( 200
-    , Fake_forge.pr_json
-        ~host:"github.com"
-        ~number:7
-        ~title:"From a contributor"
-        ~head_owner:"fork"
-        () )
-  | Get, "/repos/o/r/commits/abc123/check-runs" ->
-    ( 200
-    , {|{"check_runs":[{"name":"build","status":"completed","conclusion":"success","html_url":"https://ci/1"}]}|}
-    )
-  | Get, "/repos/o/r/commits/abc123/status" ->
-    200, {|{"state":"pending","statuses":[]}|}
-  | Post, "/repos/o/r/pulls" -> !create_reply
-  | _ -> 404, {|{"message":"Not Found"}|}
-;;
+(* The git hosting methods end to end, on {!Fake_forge.set_up_repos}'s
+   repository and {!Fake_forge.github}. *)
 
 let with_server f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
-  let repo = set_up_repos t in
+  let repo = Fake_forge.set_up_repos t in
   write
     t
     ".prigh/config.json"
@@ -110,7 +20,7 @@ let with_server f =
   let login =
     Login_manager.create ~env:t.env ~sw ~getenv:(fun _ -> None) ~store ()
   in
-  let fake = Fake_forge.create github in
+  let fake = Fake_forge.create Fake_forge.github in
   let forges =
     Forges.create
       ~http:(Fake_forge.http fake)
@@ -189,19 +99,6 @@ let rec wait_for ?(n = 2000) sent ~kind =
     wait_for ~n:(n - 1) sent ~kind
 ;;
 
-let git_out dir args =
-  let ic =
-    Core_unix.open_process_in
-      (sprintf
-         "GIT_CONFIG_GLOBAL=/dev/null git -C %s %s 2>&1"
-         (Filename.quote dir)
-         args)
-  in
-  let out = In_channel.input_all ic in
-  ignore (Core_unix.close_process_in ic : Core_unix.Exit_or_signal.t);
-  String.strip out
-;;
-
 let%expect_test
     "sign in, list, view, prefill, create (pushing first) and check out pull \
      requests"
@@ -225,7 +122,7 @@ let%expect_test
   Fake_forge.print_requests fake;
   [%expect
     {|
-    error: not signed in to github.com: /login github signs in
+    error: not signed in to github.com: sign in under Settings → Git hosting in prigh-web, or with /login github
     {"accounts":[{"host":"github.com","kind":"github","label":"GitHub","user":null,"method":null,"expires_ms":null,"oauth":false,"oauth_note":"no OAuth app for github.com: set forges.\"github.com\".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token"},{"host":"codeberg.org","kind":"forgejo","label":"Forgejo","user":null,"method":null,"expires_ms":null,"oauth":true,"oauth_note":"signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges.\"codeberg.org\".client_id sets your own"}]}
     {}
     {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Paste a GitHub personal access token for github.com: create one at https://github.com/settings/tokens/new?scopes=repo&description=prigh (classic, scope repo; or a fine-grained token with Contents and Pull requests: read and write)"}
@@ -263,23 +160,23 @@ let%expect_test
       Authorization: Bearer ghp_pasted
     |}];
   call "pr_defaults";
-  create_reply
+  Fake_forge.create_reply
   := 201, Fake_forge.pr_json ~host:"github.com" ~number:8 ~title:"Add things" ();
   call
     "pr_create"
     ~params:
       {|{"title": " Add things ", "body": "- Add c\n- Add d", "draft": true, "push": true}|};
   print_endline
-    (git_out
+    (Fake_forge.git_out
        (Filename.concat t.dir "bare.git")
        "log --format=%s feat/add-things");
   call "pr_defaults";
-  create_reply
+  Fake_forge.create_reply
   := ( 422
      , {|{"message":"Validation Failed","errors":[{"resource":"PullRequest","code":"custom","message":"A pull request already exists for o:feat/add-things."}]}|}
      );
   call "pr_create" ~params:{|{"title": "Again"}|};
-  create_reply
+  Fake_forge.create_reply
   := ( 422
      , {|{"message":"Validation Failed","errors":[{"resource":"PullRequest","field":"head","code":"invalid"}]}|}
      );
@@ -319,7 +216,7 @@ let%expect_test
     |}];
   call "pr_checkout" ~params:{|{"number": 7}|};
   let worktree = Filename.concat t.dir "worktrees/r/pr-7" in
-  print_endline (git_out worktree "log --format=%s -1");
+  print_endline (Fake_forge.git_out worktree "log --format=%s -1");
   call "pr_checkout" ~params:{|{"number": 7}|};
   call "pr_checkout" ~params:{|{"number": 3}|};
   [%expect
@@ -335,11 +232,13 @@ let%expect_test
   [%expect
     {|
     {}
-    [{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":"reviewing","description":null,"cwd":"$DIR/r","created_at":"<time>","updated_at":"<time>","first_prompt":null,"message_count":0,"parent":null,"host":null,"repo":{"root":"$DIR/r","worktree":"$DIR/r","branch":"feat/add-things","main":true},"worktrees":[{"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","root":"$DIR/r","source":"pull_request","pr":7}],"bytes":<n>,"live":true,"clients":1,"running":false,"background":0,"archived":false}]
+    [{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":"reviewing","description":null,"cwd":"$DIR/r","created_at":"<time>","updated_at":"<time>","first_prompt":null,"message_count":0,"failed":false,"parent":null,"host":null,"repo":{"root":"$DIR/r","worktree":"$DIR/r","branch":"feat/add-things","main":true},"worktrees":[{"path":"$DIR/worktrees/r/pr-7","branch":"pr-7","root":"$DIR/r","source":"pull_request","pr":7}],"bytes":<n>,"live":true,"clients":1,"waiting":0,"running":false,"background":0,"archived":false}]
     |}];
-  sh repo "git checkout -q --detach";
+  Fake_forge.sh repo "git checkout -q --detach";
   call "pr_defaults";
-  sh repo "git remote remove origin && git remote add upstream /srv/x.git";
+  Fake_forge.sh
+    repo
+    "git remote remove origin && git remote add upstream /srv/x.git";
   call "pr_list";
   call "set_cwd" ~params:(sprintf {|{"path": %S}|} t.dir);
   call "pr_list";

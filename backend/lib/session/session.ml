@@ -1581,6 +1581,7 @@ module Summary = struct
     ; updated_at : string
     ; first_prompt : string option
     ; message_count : int
+    ; failed : bool
     ; parent : string option
     ; archived : bool option
     ; last_activity : float
@@ -1716,6 +1717,15 @@ let summarise t ~path ~mtime =
             (Skill.as_typed body)
         | _ -> None)
   ; message_count = List.length messages
+  ; failed =
+      List.find_map (List.rev messages) ~f:(function
+        | Message.Assistant { stop_reason; _ } ->
+          Some
+            (match stop_reason with
+             | Error _ -> true
+             | End_turn | Tool_use | Length | Aborted -> false)
+        | User _ | Tool_result _ -> None)
+      |> Option.value ~default:false
   ; parent = t.parent
   ; archived
   ; last_activity

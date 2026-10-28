@@ -143,8 +143,12 @@ commit or push to `main` directly. Work on a branch (`feat/...`,
 does not collide: make it with the `subagent` tool's `worktree` option
 (delegated work) or the `worktree` tool, never `git worktree add` by hand,
 so that it lives under `worktrees_dir` (`~/.prigh/worktrees/<project>/...`)
-and the session shows it. Push it and open a PR with `gh pr create` (`nix run
-nixpkgs#gh -- pr create` if `gh` is not installed). One PR per coherent
+and the session shows it. Open, read and check out PRs (and their CI
+checks) with the `pull_request` tool, which pushes the branch first and
+uses the user's GitHub sign-in in prigh; only without that tool fall back
+to `gh pr create` (`nix run nixpkgs#gh -- pr create` if `gh` is not
+installed). If it says you are not signed in, ask the user to sign in
+(Settings → Git hosting in prigh-web, or `/login github`). One PR per coherent
 change; its description says what changed and why, how it was tested
 (which suites ran and passed), and anything left for later. Keep PRs
 up to date with `main` (rebase or merge) and the suites passing; only

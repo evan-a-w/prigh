@@ -511,6 +511,15 @@ module Action : sig
     | Toggle_folded of string
     (** fold or unfold the worktrees under a session of the sidebar (by its
         id) *)
+    | Set_tabs of bool (** [/tabs on|off], the settings' switch *)
+    | Close_tab of string option
+    (** a session's tab, by id, or the current one's; closing the current
+        one moves to its neighbour, the last one to a new session *)
+    | Step_tab of int (** the next (1) or previous (-1) tab *)
+    | Nth_tab of int (** the [n]th tab (1-based) *)
+    | Drag_tab of string option (** a tab picked up, or put down *)
+    | Drop_tab of string option
+    (** the dragged tab dropped before this one's, or at the end *)
     | New_session_in of string
     (** a new session working in this directory (a worktree) *)
     | New_worktree (** its dialog: the session moves into the worktree *)
@@ -727,6 +736,7 @@ module Model : sig
     ; folded : String.Set.t
       (** the sidebar's sessions whose worktrees are folded away, by id (a
           preference) *)
+    ; tabs : Session_tabs.t (** the session tabs ([/tabs]) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t

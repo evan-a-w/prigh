@@ -85,6 +85,26 @@ let notifications (m : App.Model.t) ~inject =
     ]
 ;;
 
+let tabs (m : App.Model.t) ~inject =
+  let on = m.tabs.enabled in
+  row
+    ~cls:"tabs"
+    ~name:"Tabs"
+    ~about:
+      "Show the open sessions as tabs over the chat (not on a phone). Saved \
+       for your account."
+    [ switch
+        ~label:"Tabs"
+        ~title:
+          (if on
+           then "Turn session tabs off (/tabs off)"
+           else "Turn session tabs on (/tabs on)")
+        ~on
+        ~on_click:(inject (Action.Run (if on then "/tabs off" else "/tabs on")))
+        ()
+    ]
+;;
+
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
@@ -575,7 +595,9 @@ let view (m : App.Model.t) ~inject =
           [ Node.text "Done" ]
       ]
     [ section "Appearance" (Theme_view.rows m ~inject)
-    ; section "Preferences" [ notifications m ~inject; verbosity m ~inject ]
+    ; section
+        "Preferences"
+        [ notifications m ~inject; tabs m ~inject; verbosity m ~inject ]
     ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
     ; section "Git hosting" (git_hosts m ~inject)
     ; section "Compaction" (compaction m ~inject)
