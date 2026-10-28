@@ -2597,30 +2597,32 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     let open Or_error.Let_syntax in
     let%bind call_id = string_param params "call_id" in
     let%bind decline = bool_param params "decline" ~default:false in
+    let%bind unavailable = string_param_opt params "unavailable" in
     let%bind reply =
-      if decline
-      then Ok User_question.Reply.Declined
-      else (
-        match param params "answers" with
-        | Some (`Array answers) ->
-          Or_error.all
-            (List.map answers ~f:(function
-               | `Array items ->
-                 Or_error.all
-                   (List.map items ~f:(function
-                      | `String s -> Ok s
-                      | _ ->
-                        Or_error.error_string
-                          "param \"answers\" must be an array of arrays of \
-                           strings"))
-               | _ ->
-                 Or_error.error_string
-                   "param \"answers\" must be an array of arrays of strings"))
-          |> Or_error.map ~f:(fun answers ->
-            User_question.Reply.Answered answers)
-        | _ ->
-          Or_error.error_string
-            "missing param \"answers\" (or \"decline\": true)")
+      match unavailable with
+      | Some why -> Ok (User_question.Reply.Unavailable why)
+      | None when decline -> Ok User_question.Reply.Declined
+      | None ->
+        (match param params "answers" with
+         | Some (`Array answers) ->
+           Or_error.all
+             (List.map answers ~f:(function
+                | `Array items ->
+                  Or_error.all
+                    (List.map items ~f:(function
+                       | `String s -> Ok s
+                       | _ ->
+                         Or_error.error_string
+                           "param \"answers\" must be an array of arrays of \
+                            strings"))
+                | _ ->
+                  Or_error.error_string
+                    "param \"answers\" must be an array of arrays of strings"))
+           |> Or_error.map ~f:(fun answers ->
+             User_question.Reply.Answered answers)
+         | _ ->
+           Or_error.error_string
+             "missing param \"answers\" (or \"decline\": true)")
     in
     unit_result (Agent.answer_question agent ~call_id reply)
   | "auth_status" ->

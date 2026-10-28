@@ -48,6 +48,7 @@ let read_for_context
       ~env
       ?(cancel = Cancellation.never)
       ?seen
+      ?(files = File_access.local)
       ?(offset = 1)
       ?limit
       ~cwd
@@ -61,12 +62,19 @@ let read_for_context
      | false -> Tool.Result.error (sprintf "file not found: %s" path)
      | true ->
        let content = In_channel.read_all path in
-       Option.iter seen ~f:(Seen_files.record ~path ~contents:content);
        if Option.is_some (Image.sniff content)
-       then read_image ~env ~cancel ~path content
+       then (
+         Option.iter seen ~f:(Seen_files.record ~path ~contents:content);
+         read_image ~env ~cancel ~path content)
        else if looks_binary content
        then Tool.Result.error (sprintf "%s looks like a binary file" path)
        else (
+         let content =
+           if File_access.is_local files
+           then content
+           else File_access.read files path
+         in
+         Option.iter seen ~f:(Seen_files.record ~path ~contents:content);
          let lines = String.split_lines content in
          let total = List.length lines in
          let selected = List.drop lines (offset - 1) in
@@ -101,6 +109,7 @@ let run (context : Tool.Context.t) args =
     ~env:context.env
     ~cancel:context.cancel
     ?seen:(Seen_files.of_args args)
+    ~files:context.files
     ~offset
     ?limit
     ~cwd:context.cwd

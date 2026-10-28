@@ -1,5 +1,7 @@
 *prigh.txt*  A Neovim client for prigh over the Agent Client Protocol
 
+                                                                       *prigh*
+
 ==============================================================================
 CONTENTS                                                      *prigh-contents*
 
@@ -26,6 +28,18 @@ land in them. Requires Neovim 0.10 or newer; no other plugins.
 
 ==============================================================================
 2. SETUP                                                         *prigh-setup*
+
+The plugin is the `editors/nvim` directory of the prigh repository, so add
+that directory to the 'runtimepath' after installing the repository. With
+|vim.pack|:
+>lua
+    vim.pack.add({ "https://github.com/evan-a-w/prigh" })
+    vim.opt.rtp:append(vim.fn.stdpath("data")
+      .. "/site/pack/core/opt/prigh/editors/nvim")
+<
+lazy.nvim: `vim.opt.rtp:append(plugin.dir .. "/editors/nvim")` in `config`;
+packer: `rtp = "editors/nvim"`. Then run |:helptags| ALL (after the append,
+and after updates) so that this help is found.
 
 >lua
     require("prigh").setup({

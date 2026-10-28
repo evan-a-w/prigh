@@ -153,13 +153,13 @@ let run (context : Tool.Context.t) args =
   if not (Sys_unix.file_exists_exn path)
   then Tool.Result.error (sprintf "file not found: %s" path)
   else (
-    let content = In_channel.read_all path in
+    let content = File_access.read context.files path in
     let seen = Seen_files.of_args args in
     match locate content edits with
     | Error msg -> Tool.Result.error msg
     | Ok (located, lenient) ->
       let updated = apply content located in
-      Out_channel.write_all path ~data:updated;
+      File_access.write context.files path ~data:updated;
       let changed = Seen_files.changed_note seen ~path ~current:content in
       Option.iter seen ~f:(Seen_files.record ~path ~contents:updated);
       let changed =

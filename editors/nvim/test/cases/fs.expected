@@ -5,9 +5,9 @@ agent got: {"id":1000,"result":{"content":"one\ntwo (unsaved)\nthree\nfour\n"}}
 agent got: {"id":1001,"result":{"content":"two (unsaved)\nthree\n"}}
 agent got: {"id":1002,"result":{"content":"d3\n"}}
 agent got: {"error":{"code":-32002,"message":"file not found: <tmp>/nope.txt"},"id":1003}
-agent got: {"id":1004,"result":null}
-agent got: {"id":1005,"result":null}
-agent got: {"id":1006,"result":null}
+agent got: {"id":1004,"result":{}}
+agent got: {"id":1005,"result":{}}
+agent got: {"id":1006,"result":{}}
 
 == after the writes
 open.txt buffer: { "ONE", "two (unsaved)", "three", "FOUR", "five" }
