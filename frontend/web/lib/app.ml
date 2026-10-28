@@ -559,6 +559,7 @@ module Model = struct
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
+    ; review_drawer : bool
     ; scrolled_up : bool
     ; session_query : string
     ; archived_open : bool
@@ -628,8 +629,17 @@ module Model = struct
     | _ -> Option.value t.theme_preview ~default:t.theme
   ;;
 
+  let focused t = t.review.open_ && not t.narrow
+  let docked t = t.sidebar_open && not (t.narrow || focused t)
+
+  let drawer t =
+    if focused t then t.review_drawer else t.narrow && t.sidebar_open
+  ;;
+
+  let sidebar_shown t = docked t || drawer t
+
   let shown t =
-    { Resize.Shown.sidebar = t.sidebar_open
+    { Resize.Shown.sidebar = docked t
     ; files = t.files.open_
     ; preview = Option.is_some t.files.preview
     ; agents = t.agents.open_
@@ -644,7 +654,6 @@ module Model = struct
     | None -> false
   ;;
 
-  let docked t = t.sidebar_open && not t.narrow
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
   let active t =
@@ -778,6 +787,7 @@ let init =
   ; toasts = []
   ; next_toast = 0
   ; sidebar_open = true
+  ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
   ; archived_open = false
@@ -1742,11 +1752,19 @@ let edit_at_caret m ~cursor text =
 ;;
 
 let open_sessions (m : Model.t) =
-  { m with sidebar_open = true }, [ Command.Focus "session-search" ]
+  ( (if Model.focused m
+     then { m with review_drawer = true }
+     else { m with sidebar_open = true })
+  , [ Command.Focus "session-search" ] )
 ;;
 
 let switch_session (m : Model.t) path =
-  let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
+  let m =
+    { m with
+      sidebar_open = m.sidebar_open && not m.narrow
+    ; review_drawer = false
+    }
+  in
   let current = Option.map m.state ~f:(fun s -> s.session_path) in
   if Option.equal String.equal current (Some path)
   then m, [ focus_editor ]
@@ -2144,6 +2162,7 @@ let open_terminal (m : Model.t) =
   ( { m with
       terminal = { m.terminal with open_ = true }
     ; sidebar_open = m.sidebar_open && not m.narrow
+    ; review_drawer = false
     }
   , (if m.terminal.open_ then [] else save_pref m Key.terminal_open (Some `True))
     @ [ Command.Focus_terminal ] )
@@ -3741,7 +3760,10 @@ let open_worktree (m : Model.t) (w : Worktree.t) ~new_session =
     let m = with_entering m (Some w.path) in
     if new_session
     then
-      ( { (starting m) with sidebar_open = m.sidebar_open && not m.narrow }
+      ( { (starting m) with
+          sidebar_open = m.sidebar_open && not m.narrow
+        ; review_drawer = false
+        }
       , [ rpc
             "new_session"
             []
@@ -3839,6 +3861,7 @@ let ask_remove_session_worktree (m : Model.t) path =
 let new_session_in (m : Model.t) path =
   ( { (starting (with_entering m (Some path))) with
       sidebar_open = m.sidebar_open && not m.narrow
+    ; review_drawer = false
     }
   , [ rpc
         "new_session"
@@ -6164,6 +6187,7 @@ let run_plan (m : Model.t) (plan : Context_menu.Plan.t) =
     ( { m with
         pending = { m.pending with session = Some (Switching path) }
       ; sidebar_open = m.sidebar_open && not m.narrow
+      ; review_drawer = false
       }
     , rpc "switch_session" [ "path", str path ] ~tag:(Plan_switched plan)
       :: fetch )
@@ -8225,7 +8249,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
     then m, []
-    else { m with narrow; sidebar_open = not narrow }, []
+    else { m with narrow; sidebar_open = not narrow; review_drawer = false }, []
   | Set_draft draft -> edit m draft
   | Edit { text; cursor } -> edit m ~cursor text
   | Send -> sent_to_bottom (send m ~follow_up:false)
@@ -8254,7 +8278,10 @@ let update_connected (m : Model.t) (action : Action.t) =
        accept_completion { m with completion = Some c } ~run:true)
   | Complete_close -> { m with completion = None }, []
   | New_session ->
-    ( { (starting m) with sidebar_open = m.sidebar_open && not m.narrow }
+    ( { (starting m) with
+        sidebar_open = m.sidebar_open && not m.narrow
+      ; review_drawer = false
+      }
     , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
@@ -8293,7 +8320,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | [] -> m, []
      | first :: _ -> switch_session m first.path)
   | Leave_sidebar ->
-    { m with sidebar_open = m.sidebar_open && not m.narrow }, [ focus_editor ]
+    ( { m with
+        sidebar_open = m.sidebar_open && not m.narrow
+      ; review_drawer = false
+      }
+    , [ focus_editor ] )
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_chip chip -> open_chip m chip
@@ -8487,6 +8518,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        in
        m, cmds @ [ Command.Place_menu menu.anchor ])
   | Remove_queued (recipient, q) -> unqueue m recipient q ~tag:(Unqueued q.text)
+  | Toggle_sidebar when Model.focused m ->
+    { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
@@ -8667,6 +8700,12 @@ let settle (m : Model.t) cmds =
 
 let update (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
+  (* The drawer over the review goes with it. *)
+  let m' =
+    if m'.review_drawer && not m'.review.open_
+    then { m' with review_drawer = false }
+    else m'
+  in
   let m', cmds = follow_worktrees m (m', cmds) in
   let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = settle m' cmds in

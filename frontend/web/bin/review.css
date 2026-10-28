@@ -4,15 +4,40 @@
    the lines they are about. Sage says approved, sodium says it needs you
    (changed since approval, comments not sent yet, the selection). */
 
-.app.reviewing .main {
-  flex: 0 0 var(--review-chat-width, 400px);
-  border-left: 1px solid var(--rule);
-  min-width: 0;
+/* Focused: the review and the chat, the sessions sidebar hidden (Ctrl+B
+   shows it as a drawer over the page, as on a phone); the terminal spans
+   both, the file browser and the agents panel open beside them. */
+.app.reviewing:not(.narrow) .desk {
+  grid-template-columns: minmax(0, 1fr) 0 var(--review-chat-width, 400px);
+  grid-template-areas: "review handle main" "terminal terminal terminal";
 }
-.app.reviewing .files-panel { display: none; }
+.app.reviewing .main { border-left: 1px solid var(--rule); }
+.app.reviewing:not(.narrow) .resizer-sidebar { display: none; }
+.app.reviewing:not(.narrow):not(.sidebar-drawer) .sidebar { display: none; }
+.app.reviewing.sidebar-drawer:not(.narrow) .sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  max-width: 86vw;
+  z-index: var(--z-drawer);
+  box-shadow: var(--float-shadow);
+  animation: drawer-in 0.16s ease-out;
+}
+@keyframes drawer-in { from { transform: translateX(-24px); opacity: 0; } }
+.app.reviewing.sidebar-drawer:not(.narrow) .scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: var(--z-scrim);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app.reviewing.sidebar-drawer .sidebar { animation: none; }
+}
 
 .review-page {
-  flex: 1 1 auto;
+  grid-area: review;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -61,7 +86,7 @@
   flex-direction: column;
   min-height: 0;
 }
-.review-files ul { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+.review-files ul { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; min-height: 72px; }
 .review-file {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto auto;
@@ -501,7 +526,6 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 /* Phones: a full-screen sheet; Esc or the close button goes back to the
    chat. */
 .app.narrow .review-page { position: fixed; inset: 0; z-index: var(--z-sheet); }
-.app.narrow.reviewing .main { flex-basis: auto; }
 .app.narrow .review-body { flex-direction: column; }
 .app.narrow .review-files { width: auto; max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rule); }
 .app.narrow .review-controls { margin-left: 0; }
@@ -638,11 +662,17 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .git-commit {
   display: flex;
   flex-direction: column;
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-y: auto;
   gap: 6px;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--rule);
 }
 .git-commit .field-label { white-space: nowrap; }
+/* A narrow file list (the panels beside take their share): Generate goes
+   under the label rather than over the code. */
+.git-commit .field-head { flex-wrap: wrap; row-gap: 2px; }
 .git-message { resize: vertical; min-height: 84px; font: 12.5px/1.45 var(--mono); }
 .git-commit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .git-failure, .git-notice { flex-basis: 100%; font: 12px/1.4 var(--sans); overflow-wrap: anywhere; }

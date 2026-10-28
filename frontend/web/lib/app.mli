@@ -684,6 +684,11 @@ module Model : sig
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
+      (** the sessions sidebar beside the chat (a drawer on a phone); while
+          reviewing it is hidden, and [review_drawer] shows it *)
+    ; review_drawer : bool
+      (** while reviewing on a wide page, the sessions sidebar shows as a
+          drawer over the page (Ctrl+B); it goes when the review closes *)
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_query : string
     ; archived_open : bool (** the sidebar shows the archived sessions *)
@@ -743,9 +748,20 @@ module Model : sig
   (** The session's turn runs. *)
   val running : t -> bool
 
-  (** The sidebar is open beside the chat (not a phone's drawer): it shows
-      the session's status, which the header over the chat shows otherwise. *)
+  (** The review is open on a wide page: focused on it and the chat beside
+      it, without the sessions sidebar (Ctrl+B shows it as a drawer). *)
+  val focused : t -> bool
+
+  (** The sidebar is open beside the chat (not a drawer): it shows the
+      session's status, which the header over the chat shows otherwise. *)
   val docked : t -> bool
+
+  (** The sidebar is open as a drawer over the page: on a phone, or while
+      [focused]. *)
+  val drawer : t -> bool
+
+  (** The sidebar is on screen, docked or as a drawer. *)
+  val sidebar_shown : t -> bool
 
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)

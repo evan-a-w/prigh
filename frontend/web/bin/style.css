@@ -17,8 +17,8 @@
   --z-float: 5;   /* anchored in the page: banner, popup, jump, drop zone */
   --z-handle: 6;  /* resize handles */
   --z-panel: 20;  /* a side panel over the chat in a narrower window */
-  --z-scrim: 25;  /* behind a phone's drawer */
-  --z-drawer: 30; /* a phone's sidebar */
+  --z-scrim: 25;  /* behind the sidebar's drawer */
+  --z-drawer: 30; /* the sidebar as a drawer: a phone's, or over the review */
   --z-sheet: 40;  /* a phone's full-screen sheet: files, agents, review */
   --z-menu: 50;   /* a menu's backdrop: account, context, chip, picker */
   --z-menu-anchor: 51;  /* live over that backdrop: the chips, only while
@@ -207,8 +207,21 @@ kbd {
 
 .app { display: flex; height: 100%; height: 100dvh; overflow: hidden; overflow: clip; }
 
+/* The desk: the chat over the terminal; while reviewing (review.css), the
+   review page beside the chat, the terminal under both. */
+.desk {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "main" "terminal";
+}
+.desk > .terminal-panel { grid-area: terminal; }
+
 .main {
-  flex: 1;
+  grid-area: main;
   display: flex;
   flex-direction: column;
   min-width: 0;

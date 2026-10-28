@@ -67,7 +67,7 @@ module Shown : sig
       page), and whether the page is phone-sized (no handles: the panels are
       sheets). *)
   type t =
-    { sidebar : bool
+    { sidebar : bool (** docked beside the chat, not a drawer *)
     ; files : bool
     ; preview : bool
     ; agents : bool
