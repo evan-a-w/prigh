@@ -486,6 +486,17 @@ an SSH tunnel to the published port.
 The proxy's certificate must be one the clients' system CAs trust (e.g.
 Let's Encrypt); `$SSL_CERT_FILE` points prigh-tui at another bundle.
 
+Over HTTPS, prigh-web can be installed as an app (see "In a browser" in
+the README): browsers only allow that, and its offline shell, on `https://`
+or localhost. On a tailnet, `tailscale serve --bg 7790` on the Docker host
+is the shortest way there (`https://HOST.TAILNET.ts.net/`, with a
+certificate and WebSockets handled). Behind a proxy that signs users in,
+the page's files, `manifest.webmanifest` and `sw.js` can all stay behind
+the sign-in (the manifest is fetched with credentials); an installed app
+whose sign-in expired gets the proxy's login page when it starts, as a
+tab would. Keep the site at the root of its host: the service worker's
+scope is the directory it is served from.
+
 ## Data
 
 | Path | Volume | Contents |

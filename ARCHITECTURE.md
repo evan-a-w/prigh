@@ -1806,7 +1806,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
   by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
   an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
-  `304`; a precompressed `file.br`/`file.gz` no older than the file is
+  `304`; `.webmanifest` is `application/manifest+json`; a precompressed `file.br`/`file.gz` no older than the file is
   sent with `Content-Encoding` when `Accept-Encoding` allows it (`Vary:
   Accept-Encoding`). The Nix build adds those siblings to the installed
   sites (zopfli, brotli); local dune builds stay uncompressed. Upgraded sockets set `TCP_NODELAY`, so that a
@@ -3038,9 +3038,17 @@ terminal frontend and `web/` prigh-web, the browser one.
       enabled and granted, and `Set_title` keeps the count in the title.
       `/notify on` (or the account menu) emits
       `Request_notification_permission` from the user's action. `app/`'s
-      `Page_notifications` does the browser side: the Notification API,
-      `visibilitychange` and the favicon with a sodium dot while something
-      is unseen; whether they are on is a preference (`web.notify`).
+      `Page_notifications` does the browser side: the Notification API
+      (through the service worker's `showNotification` when there is one,
+      as Android and iOS require), `visibilitychange` and the favicon with
+      a sodium dot while something is unseen; whether they are on is a
+      preference (`web.notify`).
+    - Installing: `Model.update_ready` is the update notice (one, over
+      the toasts, until answered): `Update_ready` raises it, `Apply_update`
+      emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s
+      `Service_worker` registers `sw.js` in a secure context, reports a
+      new build's worker waiting (`Update_ready`) and, on `Apply_update`,
+      tells it to take over and reloads once it has.
   - `app/` (`prigh_web_app`) — the page. `Ws_transport` (a browser
     WebSocket as a `Transport.t`), `Browser` (localStorage, the query
     string, the clipboard, the visual viewport, and `after_render`: work
@@ -3121,8 +3129,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     only for the backend and user it belongs to) and `prigh-web.theme`,
     the document's theme attributes and variables, which `index.html`'s
     inline script puts back before the first paint (also before signing
-    in); `Page_theme` applies `Apply_theme` to `<html>`, that cache and the
-    terminal.
+    in); `Page_theme` applies `Apply_theme` to `<html>`, that cache, the
+    terminal and `<meta name=theme-color>` (the page's background, for an
+    installed app's title bar).
   - `bin/` — `main.bc.js` plus `index.html`, `theme.css` (every colour,
     as variables: the original theme on `:root`, `[data-theme=dark]` and
     `[data-theme=light]` overriding them, the accent presets
@@ -3139,12 +3148,28 @@ terminal frontend and `web/` prigh-web, the browser one.
     vendored xterm.js and KaTeX (`bin/vendor/README.md`: its script,
     stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
     `.gz`, and 260 KB of fonts, of which a page fetches those its math
-    uses; none of it until a reply has math), assembled under
+    uses; none of it until a reply has math, but the service worker
+    keeps it all), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
     `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`).
+    Installing it: `manifest.webmanifest` (`start_url` and `scope` `./`,
+    no credentials: the installed app signs in from localStorage like a
+    tab), the icons (`icon.svg`, the favicon `Page_notifications` draws;
+    `icon-maskable.svg` with the mark in the safe zone; the PNGs are
+    rendered from them with resvg and committed, as is
+    `apple-touch-icon.png`), and `sw.js`, which `bin/sw_gen/` makes from
+    `sw.template.js` with the shell's file names and `VERSION`, a hash of
+    their contents, so each build that changes the shell is a new worker
+    with a cache of its own (`prigh-web-VERSION`; activating deletes the
+    others). It answers the shell's files from that cache and navigations
+    to the page from the network first (the cached `index.html` when the
+    backend cannot be reached, so the app opens offline and reconnects);
+    nothing else (the RPC and terminal WebSockets, `/files/*`,
+    `/signin-handoff`, any query string) is intercepted. A new worker
+    waits until the page's update notice reloads into it.
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
