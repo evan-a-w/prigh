@@ -188,6 +188,7 @@ module Reply_tag : sig
     | Compaction_saved (** the new config; its settings are shown *)
     | Default_saved
     | Session_stats
+    | Trace (** [trace]: its summary in a dialog *)
     | Entries of Entries_purpose.t
     | Reload_messages (** the head moved: fetch state and messages *)
     | Exported

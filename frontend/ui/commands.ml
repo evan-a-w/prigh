@@ -228,6 +228,11 @@ let every =
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
   ; c
+      "trace"
+      ""
+      "where the session's time went: model, tools, waiting on you, the \
+       slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)"
+  ; c
       "sessions"
       ""
       "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D \

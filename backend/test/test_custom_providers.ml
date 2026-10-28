@@ -329,7 +329,8 @@ let%expect_test
       "generate_model": null,
       "mask_observations": true,
       "compact_at_tokens": 200000,
-      "compaction_model": null
+      "compaction_model": null,
+      "trace": "default"
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))

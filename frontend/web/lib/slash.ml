@@ -157,6 +157,10 @@ let every =
   ; c "init" "write or improve the project's AGENTS.md"
   ; c ~args:"[name]" "name" "rename the session"
   ; c "session" "show the session's details and statistics"
+  ; c
+      "trace"
+      "where the session's time went: model, tools, waiting on you, the \
+       slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)"
   ; c "sessions" "search the saved sessions"
   ; c ~argument:Session ~args:"[path]" "switch" "switch to a saved session"
   ; c

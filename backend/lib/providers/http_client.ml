@@ -136,6 +136,8 @@ let stream
     let headers = Http.Header.of_list headers in
     let uri = with_default_port (Uri.of_string url) in
     match
+      Trace.span ~detailed:true "http_send"
+      @@ fun () ->
       idle (fun () ->
         match body with
         | None -> Cohttp_eio.Client.get client ~sw ~headers uri
