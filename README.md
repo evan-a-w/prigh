@@ -1347,6 +1347,32 @@ is no tool to block on a subagent, since its report wakes the main agent
 anyway. Subagents started by a subagent stay synchronous (and cannot
 delegate further).
 
+With `fork: true` a subagent starts from its caller's conversation so far
+instead of a blank one, so it needs little exploration: the model is told to
+fork for work that builds on what it explored (implementing what it
+investigated) and not for independent work (a review, a second opinion, a
+fresh investigation). The fork gets a result for every call of the
+caller's last message (for its own call: that it is the fork; for parallel
+calls: that the caller runs them) and its task, framed as a forked subagent's
+whose caller carries on separately. When it uses its caller's model and all
+its tools, it is sent the caller's system prompt and tool list unchanged, so
+the provider's prompt cache covers the whole shared conversation; the tools
+it may not use at its depth (a subagent's background controls, `subagent`
+for a subagent's subagent, the main agent's plan and questions) refuse with
+the reason. With another model or a `tools` subset it has its own system
+prompt and tools. In a `worktree`, it is told that the paths it inherited
+are its caller's. Its card says `forked`.
+
+A subagent that runs out of turns (`max_turns`, 50 by default) keeps its
+context: its report (`[subagent a1 out of turns]`) says to call
+`subagent_continue` with its id, optionally `max_turns` (default: its
+previous limit) and a `message` from its caller, to have it carry on where
+it stopped under the same id, with a fresh turn budget; its card, row and
+transcript run again, its next report arrives as usual and its turns and
+cost add up over its runs. Cancelling it (`subagent_cancel`) or resetting
+the session forgets it. A synchronous subagent's caller can continue its own
+in the same way (it blocks until the subagent reports).
+
 A subagent can work in a git worktree of its own, when the model (or you,
 asking it) sets the `subagent` tool's `worktree` option: a branch name, or
 `auto` for one named after the task (`agent/fix-the-parser-bug`, `-2` when
