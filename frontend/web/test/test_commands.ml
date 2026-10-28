@@ -464,7 +464,7 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (quiet)
     |}];
   H.key h "o" ~ctrl:true;
@@ -492,7 +492,7 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 $0.00 Ready
     (verbose)
     |}]
 ;;

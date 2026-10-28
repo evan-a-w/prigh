@@ -13,7 +13,8 @@
 # subagent whose call is in a page not loaded, then trim.mjs, trimming the
 # context before a message and undoing it, then filter.mjs, the transcript
 # filter's button, menu and note, on a desktop and a phone, then math.mjs,
-# TeX math drawn by KaTeX in the themes and on a phone) in each
+# TeX math drawn by KaTeX in the themes and on a phone, then card.mjs, the
+# session's card in the sidebar in each state, and the bar) in each
 # browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected). The scripts all run at once (JOBS at a time, default:
 # the number of CPUs), each with its own backend, browser and directory;
@@ -45,7 +46,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote steer subagent_paged trim filter math"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote steer subagent_paged trim filter math card"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

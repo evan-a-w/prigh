@@ -16,7 +16,6 @@ No sessions yet: send a message to start one.
 ↑0 ↓0
 $<COST>
 Ready
-<HOSTNAME>
 T
 token
 === firefox: signed in: chat ===
@@ -32,7 +31,6 @@ Ctrl+K find a session
 ↑0 ↓0
 $<COST>
 Ready
-<HOSTNAME>
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -119,7 +117,6 @@ three lines
 ↑0 ↓0
 $<COST>
 Ready
-<HOSTNAME>
 === firefox: a budget in the status line ===
 0%
 ↑0 ↓0
@@ -183,7 +180,6 @@ count some lines
 ↑0 ↓0
 $<COST>
 Ready
-<HOSTNAME>
 T
 token
 === firefox: new session ===
@@ -215,7 +211,6 @@ count some lines
 ↑0 ↓0
 $<COST>
 Ready
-<HOSTNAME>
 T
 token
 === firefox: switching ===
@@ -382,7 +377,7 @@ DeepSeek V4.1 Flash
 Thinking
 on
 Auto: never asks
-=== firefox: the host picker, from the session's card ===
+=== firefox: the host picker ===
 Where tools run
 <HOSTNAME>
 <CWD>/sub
@@ -492,11 +487,11 @@ Thinking
 high
 Auto: never asks
 === firefox: the plan approved: the status line ===
-plan 0/2: Write the schema
 0%
 ↑0 ↓0
 $<COST>
 Ready
+plan 0/2: Write the schema
 === firefox: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -742,17 +737,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready, <HOSTNAME>; 89px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
@@ -2224,3 +2219,49 @@ math math-display: \sqrt{2} \approx 1.414
 markdown fits: true; page fits: true; scrolling display math: 1, auto
 === firefox: math: errors ===
 none
+=== firefox: card: idle ===
+row 1: Ready
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 88px high
+fits
+=== firefox: card: working, a subagent running ===
+row 1: Running tools | 1 agent running
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: Running tools; 88px high
+fits
+=== firefox: card: ready, a subagent running ===
+row 1: Ready | 1 agent running
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: 1 agent running; 88px high
+fits
+=== firefox: card: idle, a mode on ===
+row 1: Ready | 1 agent | verbose
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 88px high
+fits
+=== firefox: card: another host to choose ===
+row 1: Ready | 1 agent | verbose
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card | <HOSTNAME>
+lamps: 0; accented: nothing; 88px high
+fits
+=== firefox: card: on a host with a long name ===
+row 1: Ready | 1 agent | verbose
+row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 3: feature/a-rather-long-branch-for-the-sidebar-card | build-runner-eu-west-a-long-hostname
+lamps: 0; accented: nothing; 88px high
+fits
+=== firefox: card: the context opens the session's details ===
+Session
+=== firefox: card: the sidebar closed ===
+row 1: survey the project | 1 agent | build-runner-eu-west-a-long-hostname | verbose | [meter] 0% | ↑0 ↓0 | $<COST> | Ready
+lamps: 0; accented: verbose; 44px high
+fits
+=== firefox: card: a phone ===
+row 1: survey the project | icon | icon | 0% | icon
+lamps: 0; accented: nothing; 44px high
+fits
