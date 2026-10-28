@@ -4,11 +4,13 @@ open! Core
     app shell for an installed app's offline launches. Browsers only allow one
     in a secure context (https, or localhost): elsewhere these do nothing. *)
 
-(** Registers [sw.js] (or picks up the registration there is), calling
-    [on_update_ready] once a new build's worker is installed and waiting for
-    the page to reload into it. Checks for a new build hourly and when the page
-    is shown again. *)
-val register : on_update_ready:(unit -> unit) -> unit
+(** Registers [sw.js] (or picks up the registration there is), and checks for
+    a new build hourly and when the page is shown again. *)
+val register : unit -> unit
+
+(** Calls [f] once a new build's worker is installed and waiting for the page
+    to reload into it (now, if one is). *)
+val on_update_ready : (unit -> unit) -> unit
 
 (** Lets the waiting worker take over and reloads the page once it has (at
     once when none is waiting). *)
