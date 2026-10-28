@@ -43,10 +43,10 @@ select: Thinking
 == :PrighSessions loads another session (all pages)
 select: prigh sessions in <tmp>
   + new session
-  ● Earlier work · 2026-10-01T10:00:00Z · old
-    Older work · 2026-09-01T10:00:00Z · older
-    (untitled) · 2026-08-01T10:00:00Z · oldest
-  ->   Older work · 2026-09-01T10:00:00Z · older
+  ● Earlier work · 2026-10-01 10:00 · old
+    Older work · 2026-09-01 10:00 · older
+    (untitled) · 2026-08-01 10:00 · oldest
+  ->   Older work · 2026-09-01 10:00 · older
 ┌ chat
 │ ## You
 │ older question

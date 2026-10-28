@@ -143,7 +143,7 @@ function M.write(params)
         return nil, { code = -32603, message = string.format("wrote the buffer but :write failed: %s", err) }
       end
     end
-    return vim.NIL
+    return vim.empty_dict()
   end
   local old = read_disk(path)
   record(path, old and split_text(old) or nil)
@@ -154,7 +154,7 @@ function M.write(params)
   end
   f:write(content)
   f:close()
-  return vim.NIL
+  return vim.empty_dict()
 end
 
 --- Changed files in the order they were first written.

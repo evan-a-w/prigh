@@ -1,0 +1,190 @@
+
+== open: initialize, session/new, commands, _prigh/state
+→ {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+← {"id":0,"result":{"_meta":{"prigh":{"extensions":["_prigh/state","_prigh/notice"],"version":1}},"agentCapabilities":{"_meta":{"prigh":{"extensions":["_prigh/state","_prigh/notice"],"version":1}},"loadSession":true,"mcpCapabilities":{"http":false,"sse":false},"promptCapabilities":{"audio":false,"embeddedContext":true,"image":true},"sessionCapabilities":{"close":{},"list":{},"resume":{}}},"agentInfo":{"name":"prigh","title":"prigh","version":"<version>"},"authMethods":[{"description":"Log in to a model provider: run `prigh login` in a terminal (or /login in the prigh TUI), then try again","id":"prigh-login","name":"prigh login"}],"protocolVersion":1}}
+→ {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
+← {"id":1,"result":{"configOptions":[{"category":"mode","currentValue":"auto","id":"mode","name":"Mode","options":[{"description":"ask before every tool that changes something","name":"Ask","value":"ask"},{"description":"edit files without asking; ask before commands","name":"Auto-edit","value":"auto-edit"},{"description":"run every tool without asking","name":"Auto","value":"auto"},{"description":"investigate and plan, changing no files, until you approve the plan","name":"Plan","value":"plan"}],"type":"select"},{"category":"model","currentValue":"deepseek/deepseek-flash","id":"model","name":"Model","options":[{"description":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","value":"deepseek/deepseek-flash"}],"type":"select"},{"category":"thought_level","currentValue":"on","id":"thinking","name":"Thinking","options":[{"name":"off","value":"off"},{"name":"on","value":"on"},{"name":"low","value":"low"},{"name":"high","value":"high"},{"name":"max","value":"max"}],"type":"select"}],"modes":{"availableModes":[{"description":"ask before every tool that changes something","id":"ask","name":"Ask"},{"description":"edit files without asking; ask before commands","id":"auto-edit","name":"Auto-edit"},{"description":"run every tool without asking","id":"auto","name":"Auto"},{"description":"investigate and plan, changing no files, until you approve the plan","id":"plan","name":"Plan"}],"currentModeId":"auto"},"sessionId":"<session 1>"}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"availableCommands":[{"description":"summarise older messages to free context","input":{"hint":"[instructions]"},"name":"compact"},{"description":"set a goal the agent keeps working toward until it is met; show, clear or resume it","input":{"hint":"[text|off|resume]"},"name":"goal"},{"description":"remind the agent when it ends its turn (stop) or every N turns; list or remove reminders","input":{"hint":"[stop [N] TEXT | every N TEXT | rm NAME | off]"},"name":"remind"},{"description":"show or set the session's cost budget: no turn starts once it is spent","input":{"hint":"[dollars|off]"},"name":"budget"},{"description":"show or set the model (id, name or prefix)","input":{"hint":"[model]"},"name":"model"},{"description":"show or set the thinking level","input":{"hint":"[off|on|low|high|max]"},"name":"thinking"},{"description":"toggle plan mode: the model investigates and plans, changing no files","input":{"hint":"[on|off]"},"name":"plan"},{"description":"review the uncommitted changes, or those against a base branch","input":{"hint":"[base] [instructions]"},"name":"review"},{"description":"write or improve the project's AGENTS.md","name":"init"},{"description":"ask a side question without adding it to the session","input":{"hint":"question"},"name":"btw"},{"description":"set the session name","input":{"hint":"text"},"name":"name"},{"description":"show the uncommitted changes (git diff)","input":{"hint":"[path]"},"name":"diff"}],"sessionUpdate":"available_commands_update"}}}
+← {"method":"_prigh/state","params":{"active_host":"testhost","approval_mode":"auto","context_tokens":0,"context_window":1000000,"cost_usd":0,"jobs":0,"model":"deepseek/deepseek-flash","plan_mode":false,"queued":{"follow_up":0,"steer":0},"reminders":0,"running":false,"sessionId":"<session 1>","subagents":[],"thinking":"on"}}
+┌ chat
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 0/1.0M (0%) · $0.00
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== a streamed reply
+→ {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"hi","type":"text"}],"sessionId":"<session 1>"}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":{"text":"Hello from","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":{"text":" prigh, s","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":{"text":"treamed i","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":{"text":"n pieces.","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+← {"id":2,"result":{"stopReason":"end_turn"}}
+┌ chat
+│ ## You
+│ hi
+│ 
+│ ## prigh
+│ ▸ Thinking: The user says hi. (1 line · <Tab> expand)
+│ 
+│ Hello from prigh, streamed in pieces.
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 120k/1.0M (12%) · $0.04
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== a bash card, expanded with <Tab>
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"kind":"execute","sessionUpdate":"tool_call","status":"pending","title":"bash","toolCallId":"c1"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"kind":"execute","rawInput":{"command":"printf 'one\\ntwo\\nthree\\n'"},"sessionUpdate":"tool_call_update","status":"in_progress","title":"printf 'one\\ntwo\\nthree\\n'","toolCallId":"c1"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":[{"content":{"text":"```\none\ntwo\nthree\n```","type":"text"},"type":"content"}],"sessionUpdate":"tool_call_update","toolCallId":"c1"}}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"content":[{"content":{"text":"```\none\ntwo\nthree\n```","type":"text"},"type":"content"}],"sessionUpdate":"tool_call_update","status":"completed","toolCallId":"c1"}}}
+┌ chat
+│ ## You
+│ hi
+│ 
+│ ## prigh
+│ ▸ Thinking: The user says hi. (1 line · <Tab> expand)
+│ 
+│ Hello from prigh, streamed in pieces.
+│ 
+│ ## You
+│ count
+│ 
+│ ## prigh
+│ Running it.
+│ 
+│ ✓ printf 'one\ntwo\nthree\n' · execute · completed
+│   ▸ 3 lines of output · <Tab> expand
+│ 
+│ Three lines.
+│ 
+└
+┌ chat
+│ ## You
+│ hi
+│ 
+│ ## prigh
+│ ▸ Thinking: The user says hi. (1 line · <Tab> expand)
+│ 
+│ Hello from prigh, streamed in pieces.
+│ 
+│ ## You
+│ count
+│ 
+│ ## prigh
+│ Running it.
+│ 
+│ ✓ printf 'one\ntwo\nthree\n' · execute · completed
+│   ```
+│   one
+│   two
+│   three
+│   ```
+│ 
+│ Three lines.
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== /name and /budget: the title and the budget in the winbar
+→ {"id":4,"method":"session/prompt","params":{"prompt":[{"text":"/name greetings","type":"text"}],"sessionId":"<session 1>"}}
+← {"id":4,"result":{"stopReason":"end_turn"}}
+← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"sessionUpdate":"session_info_update","title":"greetings"}}}
+→ {"id":5,"method":"session/prompt","params":{"prompt":[{"text":"/budget 5","type":"text"}],"sessionId":"<session 1>"}}
+← {"id":5,"result":{"stopReason":"end_turn"}}
+┌ chat
+│ ## You
+│ hi
+│ 
+│ ## prigh
+│ ▸ Thinking: The user says hi. (1 line · <Tab> expand)
+│ 
+│ Hello from prigh, streamed in pieces.
+│ 
+│ ## You
+│ count
+│ 
+│ ## prigh
+│ Running it.
+│ 
+│ ✓ printf 'one\ntwo\nthree\n' · execute · completed
+│   ```
+│   one
+│   two
+│   three
+│   ```
+│ 
+│ Three lines.
+│ 
+│ ## You
+│ /name greetings
+│ 
+│ ## prigh
+│ session named greetings
+│ 
+│ ## You
+│ /budget 5
+│ 
+│ ## prigh
+│ budget set to $5.00
+│ 
+└
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11/$5.00
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== /goal: the goal in the winbar, prigh's notice when it is met
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11/$5.00 · ● running · goal say hello
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+← {"method":"_prigh/notice","params":{"sessionId":"<session 1>","text":"goal complete: said hello"}}
+┌ chat
+│ ## You
+│ hi
+│ 
+│ ## prigh
+│ ▸ Thinking: The user says hi. (1 line · <Tab> expand)
+│ 
+│ Hello from prigh, streamed in pieces.
+│ 
+│ ## You
+│ count
+│ 
+│ ## prigh
+│ Running it.
+│ 
+│ ✓ printf 'one\ntwo\nthree\n' · execute · completed
+│   ```
+│   one
+│   two
+│   three
+│   ```
+│ 
+│ Three lines.
+│ 
+│ ## You
+│ /name greetings
+│ 
+│ ## prigh
+│ session named greetings
+│ 
+│ ## You
+│ /budget 5
+│ 
+│ ## prigh
+│ budget set to $5.00
+│ 
+│ ## You
+│ /goal say hello
+│ 
+│ ## prigh
+│ On it.
+│ 
+│ ✓ goal_complete · other · completed
+│   ▸ 1 line of output · <Tab> expand
+│ 
+│ ℹ goal complete: said hello
+│ 
+│ Goal met.
+│ 
+└
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 0/1.0M (0%) · $0.11/$5.00
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys

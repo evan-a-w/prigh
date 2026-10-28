@@ -1060,6 +1060,145 @@ require("prigh").setup({ cmd = { "prigh", "acp" } })   -- then :Prigh
 Then `:helptags ALL` for `:help prigh`, and `:checkhealth prigh`. Other
 plugin managers and troubleshooting: [its Install](editors/nvim/README.md#install).
 
+## Editors (ACP)
+
+`prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
+on stdin/stdout (only protocol JSON goes to stdout; logs go to stderr), so
+any ACP editor can use prigh as its agent. By default it runs its own
+backend in the process; `-connect HOST:PORT -token T [-user U]` makes it a
+client of a running `prigh serve -listen` (or `-web`) instead, so the
+editor's sessions are ordinary prigh sessions shared with the TUI and
+prigh-web. Either way the adapter is the tool host for this machine
+(`-no-tool-host` with `-connect` leaves tools where the backend runs
+them). It takes the usual `-model`, `-thinking`, `-cwd`, `-no-tools`,
+`-max-budget-usd`, `-auth-file`, `-faux`/`-faux-script` flags, plus `-name`
+and `-host-id` (as `prigh tool-host`). Log in first with `prigh login`
+(or `/login` in the TUI): an editor gets an "authentication required" error
+saying so otherwise.
+
+What the editor gets:
+
+- sessions: `session/new`, `session/load` (the history replayed),
+  `session/resume`, `session/list`, `session/close`; MCP servers sent by the
+  editor are ignored (prigh reads its own, see [MCP servers](#mcp-servers));
+- prompts with text, `@`-file links (attached as prigh attachments),
+  embedded files (inlined), selections (`#L<start>-L<end>` URIs, mentioned
+  as line ranges) and images; `session/cancel` aborts the run;
+- streamed text and thinking, tool calls with their kind, locations, output
+  and diffs of edited files, the plan (`update_plan`, or the active
+  `/goal`), usage and cost, the session title, notices;
+- permission requests for tool confirmations (allow once, always: the
+  rule prigh offers, reject); `ask_user` questions as forms when the editor
+  supports elicitation, as a permission request for a single choice, else
+  the model is told the user cannot be asked;
+- modes `ask`, `auto-edit`, `auto` (the approval modes) and `plan` (plan
+  mode), and config options for the mode, the model (of the providers you
+  are logged in to) and the thinking level;
+- the slash commands `/compact`, `/goal`, `/remind`, `/budget`, `/model`,
+  `/thinking`, `/plan`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
+  your skills (any other `/text` goes to the model).
+
+When the editor offers `fs/read_text_file` and `fs/write_text_file`, the
+file tools (`read`, `edit`, `write`, `apply_patch`) and `@`-attachments
+read and write through the editor, so unsaved buffers are what the model
+sees and its edits land in them. `bash`, `grep`, `find` and `ls` still use
+the disk, as do binary files, images, deletes and moves, and whether a
+file exists.
+
+Clients that set `clientCapabilities._meta.prigh.state` (prigh.nvim does)
+also get the `_prigh/state` notification whenever prigh's status line
+changes — `{sessionId, model, thinking, running, context_tokens,
+context_window, cost_usd, budget_usd, approval_mode, plan_mode, queued:
+{steer, follow_up}, subagents: [{id, label, running}], jobs, goal,
+reminders, active_host}` (`jobs` and `reminders` are counts, `goal` the
+active goal's text) — and `_prigh/notice` `{sessionId, text}` for prigh's
+notices; `initialize`'s result advertises them in `_meta.prigh`
+(`{"version": 1, "extensions": ["_prigh/state", "_prigh/notice"]}`).
+
+Zed (`settings.json`):
+
+```json
+{
+  "agent_servers": {
+    "prigh": { "type": "custom", "command": "prigh", "args": ["acp"], "env": {} }
+  }
+}
+```
+
+avante.nvim (`:AvanteSwitchProvider prigh`):
+
+```lua
+require("avante").setup({
+  provider = "prigh",
+  acp_providers = { ["prigh"] = { command = "prigh", args = { "acp" }, env = {} } },
+})
+```
+
+agentic.nvim:
+
+```lua
+require("agentic").setup({
+  provider = "prigh",
+  acp_providers = { ["prigh"] = { name = "prigh", command = "prigh", args = { "acp" } } },
+})
+```
+
+CodeCompanion.nvim (`:CodeCompanionChat adapter=prigh`):
+
+```lua
+require("codecompanion").setup({
+  adapters = {
+    acp = {
+      prigh = function()
+        local helpers = require("codecompanion.adapters.acp.helpers")
+        return {
+          name = "prigh",
+          formatted_name = "prigh",
+          type = "acp",
+          roles = { llm = "assistant", user = "user" },
+          commands = { default = { "prigh", "acp" } },
+          defaults = { mcpServers = {}, timeout = 20000 },
+          parameters = {
+            protocolVersion = 1,
+            clientCapabilities = { fs = { readTextFile = true, writeTextFile = true } },
+            clientInfo = { name = "CodeCompanion.nvim", version = "1.0.0" },
+          },
+          handlers = {
+            lifecycle = {
+              setup = function(self) return true end,
+              auth = function(self) return true end,
+            },
+            request = { build_messages = helpers.build_messages },
+          },
+        }
+      end,
+    },
+  },
+  interactions = { chat = { adapter = "prigh" } },
+})
+```
+
+agent-shell (Emacs; `M-x agent-shell`, then pick prigh):
+
+```elisp
+(defun my/prigh-agent-config ()
+  (agent-shell-make-agent-config
+   :identifier 'prigh
+   :mode-line-name "prigh"
+   :buffer-name "prigh"
+   :shell-prompt "prigh> "
+   :shell-prompt-regexp "prigh> "
+   :client-maker (lambda (buffer)
+                   (agent-shell--make-acp-client
+                    :command "prigh"
+                    :command-params '("acp")
+                    :context-buffer buffer))))
+(add-to-list 'agent-shell-agent-configs #'my/prigh-agent-config)
+```
+
+For a shared backend, add `-connect HOST:PORT -token SECRET` to the
+arguments (or set `PRIGH_TOKEN` in the editor's environment for the agent).
+
 ## Use
 
 Log in to at least one provider (credentials go to

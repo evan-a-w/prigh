@@ -261,7 +261,7 @@ let%expect_test "job_input on a client tool host" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/j1-1","call_id":"j1","name":"bash","arguments":{"command":"cat","timeout":2592000},"cwd":"$DIR","stdin":true}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/j1-1","call_id":"j1","name":"bash","arguments":{"command":"cat","timeout":2592000},"cwd":"$DIR","stdin":true}
     {"type":"event","event":"tool_exec_input","host":"client-2","exec_id":"<id>/j1-1","data":"one\n","close":false}
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"event","event":"tool_exec_input","host":"client-2","exec_id":"<id>/j1-1","data":"","close":true}
@@ -284,7 +284,7 @@ let%expect_test "job_input on a tool host that predates it" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/j1-1","call_id":"j1","name":"bash","arguments":{"command":"cat","timeout":2592000},"cwd":"$DIR"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/j1-1","call_id":"j1","name":"bash","arguments":{"command":"cat","timeout":2592000},"cwd":"$DIR"}
     (no input reached the host)
     {"type":"response","id":"r2","ok":true,"result":{}}
     user: go
