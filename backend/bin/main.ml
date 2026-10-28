@@ -1186,6 +1186,167 @@ let web_command =
        Eio.Fiber.await_cancel ())
 ;;
 
+let acp_command =
+  Command.basic
+    ~summary:
+      "Serve the Agent Client Protocol on stdin/stdout, for editors (Zed, \
+       Neovim, Emacs...): with its own backend in this process, or with \
+       -connect a client of a running prigh serve"
+    (let%map_open.Command make_agent = common_params
+     and connect =
+       flag
+         "-connect"
+         (optional string)
+         ~doc:
+           "HOST:PORT use the backend at this JSON-lines port (prigh serve \
+            -listen or -web) instead of one in this process: its sessions are \
+            shared with the TUI and prigh-web"
+     and token =
+       flag
+         "-token"
+         (optional string)
+         ~doc:
+           "SECRET with -connect: the backend's token (default: $PRIGH_TOKEN)"
+     and user =
+       flag
+         "-user"
+         (optional string)
+         ~doc:
+           "NAME with -connect: the user (namespace) to log in as, with -token \
+            as its password (default: $PRIGH_USER)"
+     and name =
+       flag
+         "-name"
+         (optional string)
+         ~doc:
+           "NAME how this machine is shown as a tool host (default: the \
+            hostname)"
+     and host_id =
+       flag
+         "-host-id"
+         (optional string)
+         ~doc:
+           "ID what sessions know this machine by as a tool host (default: the \
+            machine's, kept in ~/.prigh/host-id)"
+     and no_tool_host =
+       flag
+         "-no-tool-host"
+         no_arg
+         ~doc:
+           " with -connect: do not run tools here, leave them where the \
+            backend runs them (the editor then does not see file reads and \
+            writes)"
+     in
+     fun () ->
+       let fail fmt =
+         ksprintf
+           (fun s ->
+              eprintf "prigh acp: %s\n" s;
+              exit 2)
+           fmt
+       in
+       let connect =
+         Option.map connect ~f:(fun spec ->
+           match String.rsplit2 spec ~on:':' with
+           | Some (host, port)
+             when (not (String.is_empty host))
+                  && Option.is_some (Int.of_string_opt port) ->
+             host, Int.of_string port
+           | _ ->
+             fail
+               "-connect must be HOST:PORT (the backend's -listen or -web \
+                address), got %S"
+               spec)
+       in
+       if Option.is_none connect
+       then (
+         if Option.is_some token || Option.is_some user
+         then fail "-token and -user need -connect";
+         if no_tool_host then fail "-no-tool-host needs -connect");
+       let token = Option.first_some token (Sys.getenv "PRIGH_TOKEN") in
+       let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
+       List.iter [ "PRIGH_TOKEN"; "PRIGH_USER" ] ~f:Core_unix.unsetenv;
+       (* Only protocol messages go to stdout: anything else printed there
+          goes to stderr. *)
+       let protocol_out =
+         Core_unix.out_channel_of_descr (Core_unix.dup Core_unix.stdout)
+       in
+       Core_unix.dup2 ~src:Core_unix.stderr ~dst:Core_unix.stdout ();
+       Eio_main.run
+       @@ fun env ->
+       Eio.Switch.run
+       @@ fun sw ->
+       let cwd = Core_unix.getcwd () in
+       let tool_host =
+         if no_tool_host
+         then None
+         else
+           Some
+             { Acp.Tool_host_config.host_id =
+                 Host_id.choose
+                   ?given:host_id
+                   ~home:(home ())
+                   ~warn:(eprintf "prigh acp: %s\n%!")
+                   ()
+             ; name = Option.value name ~default:(Core_unix.gethostname ())
+             ; cwd
+             }
+       in
+       let in_process, connector =
+         match connect with
+         | Some (host, port) ->
+           None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
+         | None ->
+           let { Setup.session; cwd; new_agent; world; models } =
+             make_agent ~env ~sw ~backend_host:false ()
+           in
+           if Option.is_some session
+           then
+             fail
+               "-session does not apply: the editor opens sessions \
+                (session/load, session/list)";
+           let login =
+             Login_manager.create
+               ~env
+               ~sw
+               ~getenv:world.getenv
+               ~models
+               ~store:world.store
+               ()
+           in
+           let server =
+             Rpc_server.create
+               ~env
+               ~sw
+               ~backend_host:false
+               ~home:world.home
+               ~login
+               ~sessions_dir:world.sessions_dir
+               ~cwd
+               ~new_agent
+               ()
+           in
+           Some server, Rpc_client.Connector.in_process server
+       in
+       let stdin =
+         Eio.Buf_read.of_flow (Eio.Stdenv.stdin env) ~max_size:Int.max_value
+       in
+       Acp.serve
+         ~env
+         { connector; token; user; tool_host }
+         ~read_line:(fun () ->
+           match Eio.Buf_read.line stdin with
+           | line -> Some line
+           | exception End_of_file -> None)
+         ~write_line:(fun line ->
+           Eio_unix.run_in_systhread (fun () ->
+             Out_channel.output_string protocol_out line;
+             Out_channel.output_char protocol_out '\n';
+             Out_channel.flush protocol_out));
+       Option.iter in_process ~f:Rpc_server.shutdown;
+       exit 0)
+;;
+
 (* The CLI's view of the legacy (non-namespace) world. *)
 let with_registry ~store f =
   Eio_main.run
@@ -1835,6 +1996,7 @@ let () =
        [ "run", run_command
        ; "serve", serve_command
        ; "tool-host", tool_host_command
+       ; "acp", acp_command
        ; "web", web_command
        ; "sessions", sessions_command
        ; "login", login_command

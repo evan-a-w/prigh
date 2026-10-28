@@ -141,6 +141,7 @@ module Event = struct
     | Subagent_queues of Subagent_inbox.Listing.t list
     | Tool_exec of
         { host : string
+        ; session_id : string (** the session whose tool call it is *)
         ; exec_id : string
         ; call_id : string
         ; name : string
@@ -946,6 +947,7 @@ let host_exec_with_stdin
       t
       (Tool_exec
          { host = host.id
+         ; session_id = Session.id t.session
          ; exec_id
          ; call_id
          ; name

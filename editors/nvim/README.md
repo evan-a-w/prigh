@@ -10,6 +10,19 @@ Neovim 0.10+ (tested on 0.12), no other plugins.
 
 ## Install
 
+The plugin lives in `editors/nvim` of the prigh repository, not at its
+root, so every plugin manager needs that directory added to the
+`runtimepath`: installing the repository alone gives "module 'prigh' not
+found" and `E149: No help for prigh`.
+
+`vim.pack` (Neovim 0.12+):
+
+```lua
+vim.pack.add({ "https://github.com/evan-a-w/prigh" })
+vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site/pack/core/opt/prigh/editors/nvim")
+require("prigh").setup({})
+```
+
 lazy.nvim:
 
 ```lua
@@ -32,10 +45,25 @@ use({
 })
 ```
 
-Or from a checkout: `vim.opt.rtp:append("~/src/prigh/editors/nvim")`. Run
-`:helptags ALL` once for `:help prigh`, and `:checkhealth prigh`.
+Or from a checkout: `vim.opt.rtp:append("~/src/prigh/editors/nvim")`.
 
-`prigh` must be on `PATH` (or set `cmd`). To use a remote backend (see the
+Then, once (and after each update, for new help):
+
+- `:helptags ALL` builds the help tags; it only sees directories already
+  on the `runtimepath`, so run it after the `rtp:append` has taken effect.
+  `:help prigh` then opens the help.
+- `:checkhealth prigh` checks Neovim's version, the `prigh` binary and that
+  it has `prigh acp`, the help tags and the optional parts.
+
+If `:Prigh` is not a command or `:help prigh` fails, check the directory is
+on the `runtimepath`: `:echo globpath(&rtp, 'doc/prigh.txt')` must print a
+path ending in `editors/nvim/doc/prigh.txt`.
+
+`prigh` must be on `PATH` (or set `cmd`), with its `acp` command:
+`nix profile install github:evan-a-w/prigh` installs one (the `prigh`
+wrapper passes `acp`, `login`, `auth` and the backend's other subcommands to
+the backend). An error like "no such directory: acp" in `:PrighLog` means an
+older prigh: update it. To use a remote backend (see the
 root README's "Remote backend"):
 
 ```lua
