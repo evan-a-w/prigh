@@ -7,6 +7,7 @@ type t =
   | Model
   | Thinking
   | Mode
+  | Host
 [@@deriving sexp_of, equal, enumerate]
 
 (** The chip [delta] places along, wrapping round; [skip] passes over those

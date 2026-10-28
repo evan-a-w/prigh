@@ -507,6 +507,7 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
     (GPT-6)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     (Expire_toast (id 0) (after_ms 5260))
     fix the build
     ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5
@@ -515,6 +516,7 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
     (Claude Opus 5.5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   run h "/fallback";
   H.text h ~selector:".toast:last-child";

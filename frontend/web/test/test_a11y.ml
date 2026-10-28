@@ -38,6 +38,7 @@ let%expect_test "the names of the controls" =
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
     input "Search sessions"
@@ -45,7 +46,7 @@ let%expect_test "the names of the controls" =
     [status] span "Ready"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
-    [group] div "Model, thinking and mode"
+    [group] div "Model, thinking, mode and host"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -143,10 +144,11 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
     textarea "Message"
-    [group] div "Model, thinking and mode"
+    [group] div "Model, thinking, mode and host"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

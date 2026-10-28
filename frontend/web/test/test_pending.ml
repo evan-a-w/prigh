@@ -160,6 +160,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (Claude Sonnet 5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   H.elements h ~selector:".chip-button.awaiting";
   [%expect {| |}];
@@ -176,6 +177,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (Claude Sonnet 5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     No such level (Dismiss)
     |}]
 ;;

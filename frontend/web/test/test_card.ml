@@ -4,8 +4,8 @@ open Agent_events
 
 (* The session's card at the foot of the docked sidebar: two quiet lines,
    what the agent is doing with what applies across from it, then the
-   counters; and where (the branch, the tool host when there is a choice)
-   when there is something to say. Each [card] prints the lines as the user
+   counters; and the branch, when there is one (the tool host is a chip on
+   the composer). Each [card] prints the lines as the user
    reads them, then what is lit: the lamps, and what is in the accent colour
    (by its class; style.css mutes the background agents and the modes in
    the card while the agent works). *)
@@ -173,25 +173,20 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     |}]
 ;;
 
-let%expect_test "where: the branch, and the host when there is a choice" =
+let%expect_test "where: the branch; the tool host is the composer's chip" =
   let others =
     {|[{"id":"backend","name":"container","cwd":"/work"},{"id":"c7","name":"build-runner-eu-west-a-long-hostname","cwd":"/srv/work"}]|}
   in
   let branch = "feature/a-rather-long-branch-for-the-sidebar-card" in
   let h = H.create ~state:(H.state_json ~fields:(fields ~branch ()) ()) () in
-  (* A branch, the backend alone: the branch only. *)
-  H.text h ~selector:".session-card .card-where";
-  [%expect {| (feature/a-rather-long-branch-for-the-sidebar-card) |}];
-  (* Another host to choose: it says which, the backend. *)
-  state h ~branch ~hosts:others ();
-  H.text h ~selector:".session-card .card-where";
-  [%expect
-    {| (feature/a-rather-long-branch-for-the-sidebar-card) (container) |}];
-  (* On the other host, with a long name. *)
+  (* A branch: the branch only, whatever the hosts. *)
+  H.names h ~selector:".session-card .card-where > *";
   state h ~branch ~hosts:others ~active_host:"c7" ();
   H.names h ~selector:".session-card .card-where > *";
+  H.names h ~selector:".composer .host-chip";
   [%expect
     {|
+    button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
@@ -199,19 +194,12 @@ let%expect_test "where: the branch, and the host when there is a choice" =
     button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
     button "build-runner-eu-west-a-long-hostname" -- Tools run on build-runner-eu-west-a-long-hostname, in /srv/work (/host switches)
     |}];
-  H.click h ~selector:".card-where .host";
-  [%expect
-    {|
-    (Run /host)
-    (Focus picker-input)
-    |}];
-  H.quiet h (fun () -> H.key h "Escape" ~target:Field);
-  (* No host at all: the card says so, lit. *)
+  (* No host at all: the chip says so, lit, and the card has nothing lit. *)
   state h ~hosts:"[]" ~active_host:"" ();
   card h;
+  H.elements h ~selector:".composer .warm";
   [%expect
     {|
-    Close_dialog
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\
@@ -223,11 +211,10 @@ let%expect_test "where: the branch, and the host when there is a choice" =
     ↑1.6M ↓21k
     $1.30
     where:
-    (No host)
     lit:
-    <button class="host link status-item warm">
+    <button class="btn chip-button host-chip warm">
     |}];
-  (* Out of git on the backend alone: no third line. *)
+  (* Out of git: no third line. *)
   state h ();
   H.elements h ~selector:".session-card .card-status > *";
   [%expect
@@ -239,8 +226,8 @@ let%expect_test "where: the branch, and the host when there is a choice" =
     <div class="status">
     <div class="status-extras">
     |}];
-  (* Without the sidebar the bar keeps it all on one line, the host when it
-     is not the backend. *)
+  (* Without the sidebar the bar keeps the rest on one line, without the
+     host. *)
   state h ~branch ~hosts:others ~active_host:"c7" ();
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.text h ~selector:".session-bar";
@@ -251,7 +238,6 @@ let%expect_test "where: the branch, and the host when there is a choice" =
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B)) (New session)
-    (build-runner-eu-west-a-long-hostname)
     (5%) ↑1.6M ↓21k $1.30 Ready
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
