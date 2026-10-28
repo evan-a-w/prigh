@@ -19,6 +19,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Claude Opus 5.5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
             aria-haspopup="dialog"
@@ -99,6 +100,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Claude Opus 5.5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   (* Alt+T: the next level shows at once, waiting on the backend. *)
   H.key h "t" ~alt:true;
@@ -112,6 +114,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Claude Opus 5.5)
     (Thinking high)
     (Auto: never asks)
+    (backend)
     <button class="awaiting btn chip-button thinking-chip">
     |}];
   H.text h ~selector:".thinking-chip .chip-label";
@@ -128,6 +131,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Claude Opus 5.5)
     (Thinking high)
     (Auto: never asks)
+    (backend)
     |}]
 ;;
 
@@ -155,6 +159,7 @@ let%expect_test "a model without thinking says so, and the chip tells why" =
     (DeepSeek Chat)
     (No thinking)
     (Auto: never asks)
+    (backend)
     |}];
   H.click h ~selector:".thinking-chip";
   H.elements h ~selector:".modal";
@@ -303,7 +308,6 @@ let%expect_test
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <div class="card-where">
           <button type="button"
@@ -314,7 +318,6 @@ let%expect_test
             <icon class="branch"> </icon>
             <span class="branch-name"> feature/narrow-top-bar </span>
           </button>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
     </section>
@@ -327,38 +330,96 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "the host opens the host picker, as /host does" =
+let%expect_test
+    "the host's chip names where tools run and opens a filterable host picker"
+  =
   let hosts =
-    {|[{"id":"backend","name":"desktop","cwd":"/work"},{"id":"c7","name":"laptop","cwd":"/home/ann/work","session_id":"s1","session_name":null}]|}
+    {|[{"id":"backend","name":"desktop","cwd":"/work"},{"id":"c7","name":"laptop","cwd":"/home/ann/work","session_id":"s1","session_name":null},{"id":"c9","name":"build-runner","cwd":"/srv"}]|}
   in
   let h =
     H.create
       ~state:(H.state_json ~fields:[ "hosts", Jsonaf.of_string hosts ] ())
       ()
   in
-  H.click h ~selector:".card-where .host";
-  let clicked = (H.model h).dialog in
-  H.text h ~selector:".modal";
-  H.key h "Escape" ~target:Field;
-  H.quiet h (fun () -> H.act h (Run "/host"));
-  print_s [%sexp (Option.equal Dialog.equal clicked (H.model h).dialog : bool)];
+  H.show h ~selector:".host-chip";
   [%expect
     {|
-    (Run /host)
-    (Focus picker-input)
-    Where tools run
-    (Close (Esc))
-    []
-    desktop /work ✓
-    laptop /home/ann/work
-    ↑↓ to move, Enter to choose, Esc to close
-    Close_dialog
-    (Focus editor)
-    true
+    <button type="button"
+            title="Tools run on desktop, in /work (/host switches)"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            class="btn chip-button host-chip"
+            @on_click>
+      <icon class="server"> </icon>
+      <span class="chip-label"> desktop </span>
+      <icon class="chevron"> </icon>
+    </button>
     |}];
-  (* Elsewhere than the backend, the header says so too; with no host at
-     all, the card says that. *)
+  (* Its menu: the hosts, the current one checked, with /host's choices and
+     a filter to type in. *)
+  H.click h ~selector:".host-chip";
+  H.text h ~selector:"#chip-popover";
+  H.elements h ~selector:".popover-hint";
+  let clicked = (H.model h).dialog in
+  H.quiet h (fun () -> H.key h "Escape" ~target:Field);
+  H.quiet h (fun () -> H.act h (Run "/host"));
+  let items = function
+    | Some (Dialog.Picker { picker; _ } | Popover { picker; _ }) ->
+      Some (List.map (Picker.visible picker) ~f:(fun i -> i.id))
+    | _ -> None
+  in
+  print_s
+    [%sexp
+      ([%equal: string list option] (items clicked) (items (H.model h).dialog)
+       : bool)];
+  H.quiet h (fun () -> H.key h "Escape" ~target:Field);
+  [%expect
+    {|
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    [] /host
+    ✓ desktop /work
+    laptop /home/ann/work
+    build-runner /srv
+    Enter chooses, ← → the next setting, Esc closes
+    Close_dialog
+    true
+    Close_dialog
+    |}];
+  (* Typing filters, fuzzily; Enter asks in which directory, at once. *)
+  H.click h ~selector:".host-chip";
+  H.input h ~selector:"#popover-filter" "bldr";
+  H.text h ~selector:".popover-items";
+  H.input h ~selector:"#popover-filter" "zzz";
+  H.text h ~selector:".chip-popover";
+  H.input h ~selector:"#popover-filter" "lap";
+  H.key h "Enter" ~target:Field;
+  H.elements h ~selector:"#chip-popover";
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    (Picker_query bldr)
+    build-runner /srv
+    (Picker_query zzz)
+    [zzz] /host
+    Nothing matches “zzz”: Backspace widens the search.
+    Enter chooses, ← → the next setting, Esc closes
+    (Picker_query lap)
+    Dialog_accept
+    (Focus dialog-input)
+    (Rpc (method_ list_dirs) (params ((prefix /work) (host c7)))
+     (tag (Prompt_paths /work)))
+    Run tools on laptop
+    (Close (Esc))
+    Working directory there [/work]
+    Tab completes, ↑↓ choose (Cancel) (Switch)
+    |}];
   H.key h "Escape" ~target:Field;
+  (* On another host the chip names it; a host that has gone is lit. *)
   H.event
     h
     (sprintf
@@ -367,10 +428,7 @@ let%expect_test "the host opens the host picker, as /host does" =
           ~fields:
             [ "hosts", Jsonaf.of_string hosts; "active_host", `String "c7" ]
           ()));
-  H.text h ~selector:".card-where";
-  H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.names h ~selector:".session-bar .host";
-  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.names h ~selector:".host-chip";
   H.event
     h
     (sprintf
@@ -378,8 +436,8 @@ let%expect_test "the host opens the host picker, as /host does" =
        (H.state_json
           ~fields:[ "hosts", `Array []; "active_host", `String "" ]
           ()));
-  H.text h ~selector:".card-where";
-  H.elements h ~selector:".card-where .host";
+  H.names h ~selector:".host-chip";
+  H.elements h ~selector:".host-chip";
   [%expect
     {|
     Close_dialog
@@ -388,14 +446,108 @@ let%expect_test "the host opens the host picker, as /host does" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (main) (laptop)
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
-    (main) (No host)
-    <button class="host link status-item warm">
+    button "No host" -- No host runs the tools: /host picks one
+    <button class="btn chip-button host-chip warm">
+    |}];
+  (* No host at all: the menu says how to add one. *)
+  H.click h ~selector:".host-chip";
+  H.text h ~selector:"#chip-popover";
+  [%expect
+    {|
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    [] /host
+    No tool host is connected: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
+    Enter chooses, ← → the next setting, Esc closes
+    |}]
+;;
+
+let%expect_test "with one host the chip still names it, and says how to add one"
+  =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ ( "hosts"
+               , Jsonaf.of_string
+                   {|[{"id":"backend","name":"container","cwd":"/work"}]|} )
+             ]
+           ())
+      ()
+  in
+  controls h;
+  H.click h ~selector:".host-chip";
+  H.text h ~selector:"#chip-popover";
+  H.key h "Enter" ~target:Field;
+  [%expect
+    {|
+    (Claude Opus 5.5)
+    (Thinking on)
+    (Auto: never asks)
+    (container)
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    [] /host
+    ✓ container /work
+    The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
+    Enter chooses, ← → the next setting, Esc closes
+    Dialog_accept
+    (Focus dialog-input)
+    (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
+     (tag (Prompt_paths /work)))
+    |}];
+  (* Another host joins while the menu is open: the menu lists it, keeping
+     what is typed, and has nothing more to say about adding one. *)
+  H.key h "Escape" ~target:Field;
+  H.click h ~selector:".host-chip";
+  H.input h ~selector:"#popover-filter" "build";
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ ( "hosts"
+              , Jsonaf.of_string
+                  {|[{"id":"backend","name":"container","cwd":"/work"},{"id":"c9","name":"build-runner","cwd":"/srv"}]|}
+              )
+            ]
+          ()));
+  H.text h ~selector:"#chip-popover";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    (Picker_query build)
+    [build] /host
+    build-runner /srv
+    Enter chooses, ← → the next setting, Esc closes
+    |}];
+  (* The card and the bar no longer name it: the chip does. *)
+  H.key h "Escape" ~target:Field;
+  H.elements h ~selector:".session-card .host";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.elements h ~selector:".session-bar .host";
+  H.text h ~selector:".session-bar";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Sessions (Ctrl+B)) (New session)
+    (0%) ↑0 ↓0 $0.00 Ready
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    (Settings (Ctrl+, or /settings))
     |}]
 ;;
 
@@ -438,7 +590,6 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
         <icon class="pencil"> </icon>
       </button>
       <div class="status-extras">
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -561,6 +712,7 @@ let%expect_test
     <button class="btn chip-button model-chip">
     <button class="btn chip-button thinking-chip">
     <button class="btn chip-button mode-chip">
+    <button class="btn chip-button host-chip">
     <button class="attach btn ghost icon">
     <button class="btn primary send">
     |}];
@@ -613,6 +765,7 @@ let%expect_test
     [ ".model-chip", "/model"
     ; ".thinking-chip", "/thinking"
     ; ".mode-chip", "/mode"
+    ; ".host-chip", "/host"
     ]
     ~f:(fun (chip, command) ->
       H.quiet h (fun () -> H.click h ~selector:chip);
@@ -650,6 +803,10 @@ let%expect_test
     Close_dialog
     .mode-chip: Mode's menu, the same choices as /mode: true
     Close_dialog
+    (Open_chip Host)
+    Close_dialog
+    .host-chip: Host's menu, the same choices as /host: true
+    Close_dialog
     |}];
   (* Typing filters the models (fuzzily), Enter takes the choice, Esc leaves
      it as it was. *)
@@ -673,6 +830,7 @@ let%expect_test
     (Claude Sonnet 5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   H.click h ~selector:".mode-chip";
   H.key h "ArrowDown" ~target:Page;
@@ -692,6 +850,7 @@ let%expect_test
     (Claude Sonnet 5)
     (Thinking on)
     (Auto: never asks)
+    (backend)
     |}];
   (* Clicking a choice takes it. *)
   H.click h ~selector:".thinking-chip";
@@ -708,6 +867,7 @@ let%expect_test
     (Claude Sonnet 5)
     (Thinking high)
     (Auto: never asks)
+    (backend)
     |}]
 ;;
 
@@ -807,6 +967,9 @@ let%expect_test
   shown ();
   H.key h "Tab" ~shift:true ~target:Page;
   shown ();
+  H.key h "Tab" ~target:Page;
+  H.key h "Tab" ~target:Page;
+  shown ();
   [%expect
     {|
     (Open_chip Model)
@@ -823,7 +986,7 @@ let%expect_test
     (Chip_step 1)
     (Focus popover-filter)
     Place_popover
-    Model
+    Host
     (Chip_step -1)
     (Focus popover-list)
     Place_popover
@@ -831,26 +994,25 @@ let%expect_test
     (Chip_step 1)
     (Focus popover-filter)
     Place_popover
-    Model
+    Host
     (Chip_step -1)
     (Focus popover-list)
     Place_popover
     Mode
+    (Chip_step 1)
+    (Focus popover-filter)
+    Place_popover
+    (Chip_step 1)
+    (Focus popover-filter)
+    Place_popover
+    Model
     |}];
   (* In the model's filter, once something is typed, ← → move the caret. *)
   H.click h ~selector:".model-chip";
   H.input h ~selector:"#popover-filter" "gp";
   H.key h "ArrowLeft" ~target:Field;
   shown ();
-  [%expect
-    {|
-    (Open_chip Model)
-    (Focus popover-filter)
-    Place_popover
-    (Picker_query gp)
-    (browser default)
-    Model
-    |}];
+  [%expect.unreachable];
   (* Only the open chip says so; the other chips stay live, the rest of the
      composer is inert, under the menu. The chips are lifted over the
      menu's backdrop (menu-open) only while it is open: the rest of the
@@ -859,16 +1021,7 @@ let%expect_test
   H.elements h ~selector:".composer [inert]";
   H.elements h ~selector:".composer-controls";
   H.elements h ~selector:".chip-anchor";
-  [%expect
-    {|
-    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    <textarea class="editor">
-    <div class="composer-buttons">
-    <div class="composer-controls menu-open">
-    <div class="chip-anchor model open">
-    <div class="chip-anchor thinking">
-    <div class="chip-anchor mode">
-    |}];
+  [%expect.unreachable];
   H.click h ~selector:".mode-chip";
   shown ();
   H.click h ~selector:".mode-chip";
@@ -877,23 +1030,7 @@ let%expect_test
   H.click h ~selector:".popover-backdrop";
   shown ();
   H.elements h ~selector:".composer-controls";
-  [%expect
-    {|
-    (Open_chip Mode)
-    (Focus popover-list)
-    Place_popover
-    Mode
-    (Open_chip Mode)
-    (Focus editor)
-    closed
-    (Open_chip Thinking)
-    (Focus popover-list)
-    Place_popover
-    Close_dialog
-    (Focus editor)
-    closed
-    <div class="composer-controls">
-    |}];
+  [%expect.unreachable];
   (* A model without thinking levels: ← → pass over its chip. *)
   H.event
     h
@@ -915,12 +1052,15 @@ let%expect_test
   H.quiet h (fun () -> H.click h ~selector:".model-chip");
   H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
   shown ();
-  [%expect
-    {|
-    (Open_chip Model)
-    (Chip_step 1)
-    Mode
-    |}]
+  [%expect.unreachable]
+[@@expect.uncaught_exn
+  {|
+  ("nothing matches" #popover-filter (nth 0))
+  Trailing output
+  ---------------
+  (Open_chip Model)
+  (Focus editor)
+  |}]
 ;;
 
 (* A phone: the menu is as wide as the composer (style.css); what it shows

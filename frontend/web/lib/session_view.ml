@@ -77,30 +77,20 @@ let branch (state : State.t) ~inject =
 ;;
 
 (* Two quiet lines, and where when it says something: what the agent is
-   doing with what applies across from it, the counters, then the branch and
-   the tool host. A grid, so that each keeps its place as they change. *)
+   doing with what applies across from it, the counters, then the branch. A
+   grid, so that each keeps its place as they change. *)
 let card (m : App.Model.t) ~inject =
   Node.section
     ~attrs:
       [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
     [ div
         ~cls:"card-status"
-        ([ Status_view.view m ~inject
-         ; Status_view.extras m ~host:false ~inject
-         ]
+        ([ Status_view.view m ~inject; Status_view.extras m ~inject ]
          @
          match m.state with
-         | None -> []
-         | Some state ->
-           (match
-              state.git_branch, Status_view.host m ~if_choice:true ~inject
-            with
-            | None, None -> []
-            | _, host ->
-              [ div
-                  ~cls:"card-where"
-                  [ branch state ~inject; Option.value host ~default:Node.none ]
-              ]))
+         | Some ({ git_branch = Some _; _ } as state) ->
+           [ div ~cls:"card-where" [ branch state ~inject ] ]
+         | Some { git_branch = None; _ } | None -> [])
     ]
 ;;
 
@@ -118,14 +108,14 @@ let bar (m : App.Model.t) ~inject =
     (match m.state with
      | None ->
        [ toggle
-       ; Status_view.extras m ~host:true ~inject
+       ; Status_view.extras m ~inject
        ; Status_view.view m ~inject
        ; Sidebar_view.settings ~inject
        ]
      | Some state ->
        [ toggle
        ; rename m state ~inject
-       ; Status_view.extras m ~host:true ~inject
+       ; Status_view.extras m ~inject
        ; Status_view.view m ~inject
        ; panel_toggles m ~inject
        ; Sidebar_view.settings ~inject

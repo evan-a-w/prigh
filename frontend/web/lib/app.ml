@@ -1299,8 +1299,54 @@ let set_state_without_files (m : Model.t) (state : State.t) =
     { m with chat = Chat.set_running m.chat state.running }, background_changed
 ;;
 
+let host_label (m : Model.t) (h : Host.t) =
+  let here =
+    Option.exists m.hello ~f:(fun (hello : Hello_reply.t) ->
+      String.equal hello.client_id h.id)
+  in
+  if here
+  then h.name ^ " (this browser)"
+  else (
+    let ours = Option.map m.state ~f:(fun s -> s.session_id) in
+    match h.session_id with
+    | Some id when not (Option.equal String.equal ours (Some id)) ->
+      sprintf "%s (in %s)" h.name (Option.value h.session_name ~default:id)
+    | _ -> h.name)
+;;
+
+let hosts_list (m : Model.t) (state : State.t) =
+  Picker.create
+    ~title:"Where tools run"
+    (List.map state.hosts ~f:(fun h ->
+       Picker.Item.create
+         ~id:h.id
+         ~detail:h.cwd
+         ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
+         ~marked:(String.equal h.id state.active_host)
+         (host_label m h)))
+;;
+
+(* The hosts' menu follows hosts coming and going, keeping what is typed. *)
+let refresh_hosts (m : Model.t) =
+  match m.dialog, m.state with
+  | Some (Popover { chip = Host; picker }), Some state ->
+    let picker = Picker.set_query (hosts_list m state) (Picker.query picker) in
+    { m with dialog = Some (Popover { chip = Host; picker }) }
+  | Some (Picker { kind = Hosts; picker }), Some state ->
+    let picker = Picker.set_query (hosts_list m state) (Picker.query picker) in
+    { m with dialog = Some (Picker { kind = Hosts; picker }) }
+  | _ -> m
+;;
+
 let set_state (m : Model.t) (state : State.t) =
+  let hosts_changed =
+    Option.for_all m.state ~f:(fun (old : State.t) ->
+      not
+        ([%equal: Host.t list] old.hosts state.hosts
+         && String.equal old.active_host state.active_host))
+  in
   let m, cmds = set_state_without_files m state in
+  let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
   let m, review =
     with_review
@@ -2772,15 +2818,21 @@ let mode_picker (m : Model.t) =
     open_picker m (Dialog.Picker { kind = Modes; picker = modes_picker s }))
 ;;
 
+let hosts_picker (m : Model.t) =
+  current_state m ~f:(fun state ->
+    open_picker m (Picker { kind = Hosts; picker = hosts_list m state }))
+;;
+
 let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Model -> Models
   | Thinking -> Thinking
   | Mode -> Modes
+  | Host -> Hosts
 ;;
 
 let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
   | Thinking -> not state.model.supports_thinking
-  | Model | Mode -> false
+  | Model | Mode | Host -> false
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
@@ -2798,13 +2850,14 @@ let open_chip (m : Model.t) (chip : Chip.t) =
           | Model -> models_picker m
           | Thinking -> thinking_levels_picker m
           | Mode -> modes_picker state
+          | Host -> hosts_list m state
         in
         let m, cmds =
           open_dialog
             m
             ~focus:
               (match chip with
-               | Model -> "popover-filter"
+               | Model | Host -> "popover-filter"
                | Thinking | Mode -> "popover-list")
             (Popover { chip; picker })
         in
@@ -3159,40 +3212,6 @@ let update_btw (m : Model.t) id ~f =
   match m.btw with
   | Some btw when String.equal btw.id id -> { m with btw = Some (f btw) }
   | _ -> m
-;;
-
-let host_label (m : Model.t) (h : Host.t) =
-  let here =
-    Option.exists m.hello ~f:(fun (hello : Hello_reply.t) ->
-      String.equal hello.client_id h.id)
-  in
-  if here
-  then h.name ^ " (this browser)"
-  else (
-    let ours = Option.map m.state ~f:(fun s -> s.session_id) in
-    match h.session_id with
-    | Some id when not (Option.equal String.equal ours (Some id)) ->
-      sprintf "%s (in %s)" h.name (Option.value h.session_name ~default:id)
-    | _ -> h.name)
-;;
-
-let hosts_picker (m : Model.t) =
-  current_state m ~f:(fun state ->
-    open_picker
-      m
-      (Picker
-         { kind = Hosts
-         ; picker =
-             Picker.create
-               ~title:"Where tools run"
-               (List.map state.hosts ~f:(fun h ->
-                  Picker.Item.create
-                    ~id:h.id
-                    ~detail:h.cwd
-                    ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
-                    ~marked:(String.equal h.id state.active_host)
-                    (host_label m h)))
-         }))
 ;;
 
 let open_prompt (m : Model.t) prompt =

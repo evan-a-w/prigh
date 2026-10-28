@@ -1493,14 +1493,14 @@ try {
     const where = await page.evaluate(() => {
       const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-where) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);
       const titleFits = !title ? "none" : title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
       return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
+    console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
     for (const s of [".session-card, .session-bar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
