@@ -587,8 +587,10 @@ scenario_switch_pending() {
 	type_text "/sessions"
 	keys Enter
 	wait_for "Sessions"
-	# The confirmation arrives behind the picker.
+	# The confirmation arrives behind the picker, and the list follows
+	# (sessions_changed: the session now waits for the user).
 	wait_for "to answer:1"
+	wait_for "4 msgs"
 	keys Down
 	settle
 	capture switch_pending "the picker, a confirmation waiting behind it"

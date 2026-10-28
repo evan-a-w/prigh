@@ -5,7 +5,8 @@
 # session loaded a page at a time, then resilience.mjs, a long session on a
 # connection that cannot keep up, then stability.mjs, nothing redrawn or
 # shifted that did not change, then themes.mjs, the themes and the user's
-# preferences on the backend, then worktrees.mjs, the sidebar's worktrees and
+# preferences on the backend, then tabs.mjs, session tabs (on for the
+# account, kept across a reload and in another browser), then worktrees.mjs, the sidebar's worktrees and
 # /worktree in a git repository, then review.mjs, the review page and the
 # file browser's diffs and comments, then remote.mjs, the page `prigh web
 # -connect` serves for a backend elsewhere, then steer.mjs, steering a
@@ -46,7 +47,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote steer subagent_paged trim filter math card pwa"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote steer subagent_paged trim filter math card pwa"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

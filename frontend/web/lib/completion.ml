@@ -186,6 +186,11 @@ let argument_items
       [ "on", "notify when the tab is hidden"
       ; "off", "no browser notifications"
       ]
+  | Tabs ->
+    simple
+      [ "on", "the open sessions as tabs over the chat"
+      ; "off", "no tabs: switch from the sidebar"
+      ]
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create

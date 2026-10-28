@@ -481,6 +481,7 @@ let session_summary (s : Session.Summary.t) =
   ; "updated_at", str s.updated_at
   ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
   ; "message_count", int s.message_count
+  ; ("failed", if s.failed then `True else `False)
   ; "parent", Option.value_map s.parent ~default:`Null ~f:str
   ; "host", Option.value_map s.host ~default:`Null ~f:str
   ]

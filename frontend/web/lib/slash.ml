@@ -17,6 +17,7 @@ module Argument = struct
     | Mode
     | Plan
     | Notify
+    | Tabs
     | Session
     | Path
     | Host
@@ -129,6 +130,11 @@ let every =
       "tell you when a turn ends or something waits for you while the tab is \
        hidden"
   ; c
+      ~argument:Tabs
+      ~args:"[on|off]"
+      "tabs"
+      "show the open sessions as tabs over the chat (saved for your account)"
+  ; c
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
@@ -180,8 +186,7 @@ let every =
       "delete"
       "delete a message from the transcript and the model's context (a reply \
        with its tool calls' results): pick it, newest first; undo brings the \
-       latest deletion back; with sessions, deletes them after a \
-       confirmation"
+       latest deletion back; with sessions, deletes them after a confirmation"
   ; c "delete-archived" "delete every archived session, after a confirmation"
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"

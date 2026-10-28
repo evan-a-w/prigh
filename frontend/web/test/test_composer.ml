@@ -393,6 +393,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
+    /tabs [on|off] show the open sessions as tabs over the chat (saved for your account)
     /compact [instructions] summarise older messages to free context
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
@@ -423,7 +424,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
-    /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
