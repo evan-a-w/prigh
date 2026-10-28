@@ -423,7 +423,7 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
-    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"host":null,"repo":null,"worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"failed":false,"parent":null,"host":null,"repo":null,"worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r1","ok":false,"error":"no session \"/nowhere.jsonl\""}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
@@ -1343,7 +1343,7 @@ let%expect_test "each client starts in its own, unsaved session" =
   Rpc_server.disconnect h.server h.client;
   call t h "list_sessions";
   [%expect
-    {| {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"parent":null,"host":null,"repo":null,"worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]} |}]
+    {| {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"failed":false,"parent":null,"host":null,"repo":null,"worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]} |}]
 ;;
 
 let%expect_test "list_dirs: on the active host, or a named one" =
@@ -1842,6 +1842,57 @@ let%expect_test "a session left to run a queued follow-up stays live" =
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":20,"output":10,"cache_read":0},"cost_usd":1.8e-05,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     ("reopened anew" true)
     ("another client joins the live agent" true)
+    |}]
+;;
+
+let%expect_test "list_sessions: what waits for the user, and a failed reply" =
+  with_agent
+    [ Reply.tool_call ~id:"c1" ~name:"bash" ~arguments:{|{"command":"true"}|} ()
+    ; Reply.error "HTTP 400: bad request"
+    ]
+  @@ fun t agent h ->
+  let id = Session.id (Agent.session agent) in
+  let listed () =
+    let reply =
+      Rpc_server.handle
+        h.server
+        h.client
+        (Json.of_string {|{"id": "l", "method": "list_sessions"}|})
+    in
+    match Json.member "result" reply with
+    | Some (`Array sessions) ->
+      List.find_map sessions ~f:(fun s ->
+        match Json.member "id" s with
+        | Some (`String i) when String.equal i id ->
+          Some
+            (List.map [ "waiting"; "failed" ] ~f:(fun key ->
+               key
+               ^ "="
+               ^ Option.value_map
+                   (Json.member key s)
+                   ~default:"absent"
+                   ~f:Json.to_string)
+             |> String.concat ~sep:" ")
+        | _ -> None)
+      |> Option.value ~default:"not listed"
+    | _ -> Json.to_string reply
+  in
+  Agent.set_mode agent ~approval:Ask;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; _ }) ->
+      printf "confirming: %s\n" (listed ());
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | Loop (Tool_confirm_done _) -> printf "confirmed: %s\n" (listed ())
+    | _ -> ());
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  Agent.wait_idle agent;
+  printf "after: %s\n" (listed ());
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    confirming: waiting=1 failed=false
+    confirmed: waiting=0 failed=false
+    after: waiting=0 failed=true
     |}]
 ;;
 

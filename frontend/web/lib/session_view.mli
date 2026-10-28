@@ -20,3 +20,7 @@ val tools : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
     the sidebar's toggle and the title, then what applies, the status, the
     panels' toggles and the settings. *)
 val bar : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+
+(** The session's name, else its description or first prompt, else
+    ["New session"]. *)
+val session_title : App.Model.t -> State.t -> string

@@ -813,10 +813,27 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session: the theme and accent, notifications (on or off, and
 what to do when the browser has not been asked, blocks them or cannot show
-them), transcript detail (`/verbosity`), tool confirmation (`/confirm`),
+them), session tabs (`/tabs`), transcript detail (`/verbosity`), tool
+confirmation (`/confirm`),
 the providers (`/auth`), who you are signed in (and acting) as with Switch
 account and Sign out, and the keyboard shortcuts. Esc closes it; its
 controls keep it open.
+
+Session tabs (off by default; the settings page's Tabs switch or `/tabs
+on|off`, saved for your account, so they follow you to other browsers and
+devices) put the open sessions in a strip over the chat, like a browser's
+tabs. Opening a session (the sidebar, the palette, `/resume`, a new one)
+opens or focuses its tab. Each says the session's title and how it stands:
+the lamp while it runs, a warning when it waits for you (a confirmation or
+a question), a red cross when its last reply failed, a green tick when it
+finished while you were in another. A click switches to it; its ×, a middle
+click or Alt+W closes it (closing the current one moves to its neighbour,
+the last one to the empty state); drag a tab to move it; Alt+Shift+] and
+Alt+Shift+[ step through them and Alt+Shift+1…9 picks the Nth. Which tabs
+are open, and their order, are kept with the setting; archiving or deleting
+a session closes its tab. On a phone there are no tabs (the sidebar's
+sessions are a tap away); switching through tabs is switching sessions as
+ever, so nothing of the session you leave stays behind.
 
 Themes: `original` (graphite with the warm sodium accent, the default),
 `dark` (neutral greys: the accent is the only colour but diffs' and
@@ -2053,6 +2070,7 @@ it.
 | `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
+| `/tabs [on\|off]` (prigh-web) | show the open sessions as tabs over the chat, saved for your account; alone, says whether they are on |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
@@ -2158,6 +2176,27 @@ Sign-ins are stored with the model credentials, in `auth.json` under
 needed; a failed refresh says to sign in again. Tokens never appear in
 errors or logs.
 
+**The model's `pull_request` tool.** Agents (the main one and subagents)
+work with pull requests the same way, through your sign-ins in the
+backend, so the machine or container they run in needs no `gh` and no git
+credentials for the API. `action` is `list` (`state` open, closed or
+all), `view` (a `number`: branches, author, description, CI checks, URL),
+`checks` (only the CI checks), `diff`, `create` or `checkout`. `create`
+opens one from `head` (default: the current branch) into `base` (default:
+the repository's default branch), pushing the branch first unless `push`
+is false (without pushing, a branch the remote does not have with all its
+commits is refused); `draft` makes a draft, and a missing title and body
+are filled in from the branch's commits as `/pr new` does. `checkout` is
+`/pr checkout`, and the worktree is recorded on the session. `cwd` names
+another repository or worktree. `create` and `checkout` ask in `ask` and
+`auto-edit` mode, like `git push` in bash; `list`, `view`, `checks` and
+`diff` never ask. Each user's agents reach
+only that user's sign-ins (with token namespaces, the namespace's). The
+tool's errors tell the model what to do next: an unknown number lists the
+closest pull requests, a missing sign-in says to ask you to sign in
+(Settings → Git hosting, or `/login github`). The system prompt tells the
+model to use it rather than `gh`.
+
 `/pr` works on the repository of the session's directory on its tool host
 (found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
 picker of pull requests (`#24 Git hosting · lloyd · feat/x → main · draft`);
@@ -2175,7 +2214,7 @@ remote on a known host; pull requests from forks are listed as
 `owner:branch`, but `/pr new` opens one from the current branch of that
 remote's repository. "Push first" runs `git push -u REMOTE HEAD:BRANCH` on
 the tool host with its own git credentials (never prompting). On Forgejo a
-draft is a `WIP:` title. Errors say what to do (`/login github signs in`,
+draft is a `WIP:` title. Errors say what to do (`sign in under Settings → Git hosting in prigh-web, or with /login github`,
 `git remote add origin URL`, ...). The worktree context menu's "Create pull
 request…" and the review page's Create PR open it for that worktree's
 branch.
@@ -2338,10 +2377,12 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  `worktree`'s `create` and `remove` (not `list`), and MCP tools that are
-  not read-only) wait for your answer.
+  `worktree`'s `create` and `remove` (not `list`), `pull_request`'s
+  `create` and `checkout`, and MCP tools that are not read-only) wait for
+  your answer.
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
-  `worktree create`/`remove` and MCP tools still ask.
+  `worktree create`/`remove`, `pull_request create`/`checkout` and MCP
+  tools still ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its

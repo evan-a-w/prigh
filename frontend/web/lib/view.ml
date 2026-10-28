@@ -380,36 +380,37 @@ let view (m : Model.t) ~inject ~terminal =
             ~attrs:[ Attr.class_ "main" ]
             (List.map
                ~f:under_drawer
-               [ (if Model.docked m
-                  then Node.none
-                  else Session_view.bar m ~inject)
-               ; banner m ~inject
-               ; div
-                   ~cls:"chat-frame"
-                   [ (if Model.docked m
-                      then Session_view.tools m ~inject
-                      else Node.none)
-                   ; Node.div
-                       ~attrs:
-                         [ Attr.classes
-                             [ "chat"
-                             ; "verbosity-"
-                               ^ Prigh_ui.Verbosity.name m.verbosity
-                             ]
-                         ; Attr.id "chat"
-                         ; Attr.role "region"
-                         ; Attr.create "aria-label" "Transcript"
-                         ; Attr.tabindex 0
-                         ; (if Option.is_some (loading m)
-                            then Attr.create "aria-busy" "true"
-                            else Attr.empty)
-                         ]
-                       [ chat; jump_to_bottom m ~inject ]
-                   ; (match loading m with
-                      | Some _ -> Node.none
-                      | None -> Jump_view.view m ~inject)
-                   ]
-               ]
+               (Option.to_list (Session_tabs_view.view m ~inject)
+                @ [ (if Model.docked m
+                     then Node.none
+                     else Session_view.bar m ~inject)
+                  ; banner m ~inject
+                  ; div
+                      ~cls:"chat-frame"
+                      [ (if Model.docked m
+                         then Session_view.tools m ~inject
+                         else Node.none)
+                      ; Node.div
+                          ~attrs:
+                            [ Attr.classes
+                                [ "chat"
+                                ; "verbosity-"
+                                  ^ Prigh_ui.Verbosity.name m.verbosity
+                                ]
+                            ; Attr.id "chat"
+                            ; Attr.role "region"
+                            ; Attr.create "aria-label" "Transcript"
+                            ; Attr.tabindex 0
+                            ; (if Option.is_some (loading m)
+                               then Attr.create "aria-busy" "true"
+                               else Attr.empty)
+                            ]
+                          [ chat; jump_to_bottom m ~inject ]
+                      ; (match loading m with
+                         | Some _ -> Node.none
+                         | None -> Jump_view.view m ~inject)
+                      ]
+                  ])
              @ [ toasts m ~inject ]
              @ [ under_drawer (Btw_view.view m ~inject)
                ; layered behind_composer (Composer_view.view m ~inject)

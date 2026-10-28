@@ -96,6 +96,9 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
+  ; ( "Alt+Shift+] Alt+Shift+[ / Alt+Shift+1…9 / Alt+W (session tabs)"
+    , "the next or previous tab, the Nth, close this one (/tabs on; also its \
+       ×, a middle click; drag a tab to move it)" )
   ; ( "Enter / Alt+Enter (steering a subagent)"
     , "send it a message: at its next step / when it ends its turn (its Steer \
        button in the agents panel; /agents steer N TEXT sends one)" )
@@ -303,6 +306,27 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "PageUp", None when plain t -> Some (Scroll_chat (-1))
   | "PageDown", None when plain t -> Some (Scroll_chat 1)
   | _ -> None
+;;
+
+(* The session tabs' keys (not on a phone, which shows none): Alt+Shift+]
+   [ and Alt+Shift+1…9 by the keys' positions, beside the agents panel's Alt
+   ones. *)
+let tabs_key (m : App.Model.t) t : App.Action.t option =
+  let alt_shift = t.alt && t.shift && not (t.ctrl || t.meta) in
+  if (not m.tabs.enabled) || m.narrow
+  then None
+  else (
+    match t.code with
+    | "BracketRight" when alt_shift -> Some (Step_tab 1)
+    | "BracketLeft" when alt_shift -> Some (Step_tab (-1))
+    | code when alt_shift && String.is_prefix code ~prefix:"Digit" ->
+      (match
+         Int.of_string_opt (String.chop_prefix_exn code ~prefix:"Digit")
+       with
+       | Some n when n >= 1 -> Some (Nth_tab n)
+       | Some _ | None -> None)
+    | _ when alt_letter t "w" -> Some (Close_tab None)
+    | _ -> None)
 ;;
 
 (* The agents panel's keys: the TUI's Alt+digit, but not its Shift+Tab (the
@@ -564,7 +588,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      (* Code selected in the review or a preview: comment on it. *)
      | "c" when plain t && commenting m t -> Some (Review Start_comment)
      | _ ->
-       (match agents_key m t, t.target with
+       (match Option.first_some (tabs_key m t) (agents_key m t), t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
         | None, Session_search -> session_search_key t

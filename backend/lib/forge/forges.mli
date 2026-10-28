@@ -62,11 +62,56 @@ type git = Git_forge.Request.t -> Tool_result.t
     [origin], else the first remote on a known host. *)
 val repo : t -> git:git -> (Forge_repo.t * Git_forge.Info.t) Or_error.t
 
-(** The [pr_*] methods' replies. *)
-val list_pulls : t -> git:git -> state:string -> Json.t Or_error.t
+module Pulls : sig
+  type t =
+    { repo : Forge_repo.t
+    ; prs : Pull_request.t list
+    }
+  [@@deriving sexp_of]
 
-val view_pull : t -> git:git -> int -> Json.t Or_error.t
-val pull_defaults : t -> git:git -> Json.t Or_error.t
+  (** [pr_list]'s reply: [{repo, prs}]. *)
+  val to_json : t -> Json.t
+end
+
+module Pull : sig
+  type t =
+    { repo : Forge_repo.t
+    ; pr : Pull_request.t
+    ; checks : Pr_checks.t Or_error.t option
+      (** [None]: not looked up (no head commit, or a new one) *)
+    ; diff : (string * bool) option
+      (** the unified diff, and whether it was cut; [None]: not fetched *)
+    }
+  [@@deriving sexp_of]
+
+  (** [pr_view]'s and [pr_create]'s reply: [{repo, pr, checks?, diff,
+      truncated}] ([checks] is [null] when they could not be had). *)
+  val to_json : t -> Json.t
+end
+
+module Defaults : sig
+  (** What a new pull request from the current branch would be. *)
+  type t =
+    { repo : Forge_repo.t
+    ; head : string
+    ; base : string
+    ; title : string
+    ; body : string
+    ; commits : string list (** subjects, oldest first *)
+    ; pushed : bool (** the remote has the branch with all its commits *)
+    }
+  [@@deriving sexp_of]
+
+  val to_json : t -> Json.t
+end
+
+(** [state]: [open], [closed] or [all]. *)
+val list_pulls : t -> git:git -> state:string -> Pulls.t Or_error.t
+
+(** With its checks and (unless [diff] is [false]) its diff. *)
+val view_pull : t -> git:git -> ?diff:bool -> int -> Pull.t Or_error.t
+
+val pull_defaults : t -> git:git -> Defaults.t Or_error.t
 
 val create_pull
   :  t
@@ -77,11 +122,11 @@ val create_pull
   -> head:string option
   -> draft:bool
   -> push:bool
-  -> Json.t Or_error.t
+  -> Pull.t Or_error.t
 
 val checkout_pull
   :  t
   -> git:git
   -> worktrees_dir:string
   -> int
-  -> Json.t Or_error.t
+  -> Git_forge.Checkout.t Or_error.t

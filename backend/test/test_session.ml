@@ -1009,6 +1009,7 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; updated_at = ""
     ; first_prompt = None
     ; message_count = 0
+    ; failed = false
     ; parent = None
     ; archived = None
     ; last_activity = 0.

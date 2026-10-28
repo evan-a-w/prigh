@@ -481,7 +481,7 @@ let%expect_test
       client_id=a4792ccc-144e-407e-86c9-5e7d8d9c3269&grant_type=refresh_token&refresh_token=rt-1
     codeberg.org: Authorization Bearer jwt-2
     ghe.corp: Authorization Bearer ghp
-    github.com: not signed in to github.com: /login github signs in
+    github.com: not signed in to github.com: sign in under Settings → Git hosting in prigh-web, or with /login github
     codeberg.org: codeberg.org did not refresh the sign-in (invalid_grant (refresh token expired)): sign in again with /login forgejo codeberg.org
     {"host":"github.com","kind":"github","label":"GitHub","user":null,"method":null,"expires_ms":null,"oauth":false,"oauth_note":"no OAuth app for github.com: set forges.\"github.com\".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token"}
     {"host":"codeberg.org","kind":"forgejo","label":"Forgejo","user":"lloyd","method":"oauth","expires_ms":4600000,"oauth":true,"oauth_note":"signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges.\"codeberg.org\".client_id sets your own"}

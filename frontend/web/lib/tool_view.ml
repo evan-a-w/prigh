@@ -26,6 +26,8 @@ let summary (call : Tool_call.t) =
     |> Option.value_map ~default:"" ~f:Prigh_ui.Patch.File.name
   else if String.equal call.name "worktree"
   then Option.value (Tool_summary.worktree args) ~default:""
+  else if String.equal call.name "pull_request"
+  then Option.value (Tool_summary.pull_request args) ~default:""
   else
     List.find_map
       [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
