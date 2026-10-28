@@ -310,6 +310,40 @@ connections, so one port serves browsers and terminals on the same sessions
 token: bind to localhost and use an SSH tunnel or a TLS-terminating proxy
 on untrusted networks.
 
+prigh-web installs as an app ("Install app" in Chrome and Edge, "Add to
+Home Screen" on a phone, "Add to Dock" in Safari): it opens in its own
+window, with prigh's icon, from `/` of the site (the start URL carries no
+credentials: the app signs in with what the browser remembered, or asks
+once). A service worker keeps the app shell (the page, its script,
+stylesheets, fonts, KaTeX, the terminal's xterm.js and the icons), so the
+app opens with the backend down or the network gone and shows the
+reconnecting banner until it is back; the RPC, the terminal, file
+transfers and everything else always go to the backend. The page is
+fetched from the network first, so a new build arrives on the next load;
+one that arrives while the page is open waits, and a notice over the
+composer says "A new version of prigh-web is ready" with Reload (the same
+session and draft, on the new build) or × (it applies at the next load).
+
+Browsers only allow installing (and service workers) on `https://` or
+`http://localhost`/`127.0.0.1`: `./prigh -web` locally, and `./prigh -web
+-connect` to a remote backend (its site is served on localhost), are
+installable as they are (an app belongs to its origin: keep the same
+port, `-listen` or `$PRIGH_WEB_LISTEN`). For a backend reached directly, put it behind
+HTTPS: `tailscale serve --bg 7790` (then
+`https://HOST.TAILNET.ts.net/`), a reverse proxy such as Caddy
+(`reverse_proxy 127.0.0.1:7790`; see [DOCKER.md](DOCKER.md#behind-a-reverse-proxy)
+for the WebSocket paths), or an SSH tunnel to a localhost port
+(`ssh -L 7790:localhost:7790 server`). On plain `http://` elsewhere the
+page works as before, without installing or the offline shell.
+
+On iPhone and iPad (iOS/iPadOS 16.4 and later), "Add to Home Screen" from
+Safari's share menu makes a standalone app, with its own storage (sign in
+once in it) and, unlike Safari's tabs, notifications: `/notify on` there
+asks for permission, and notifications go through the service worker.
+But iOS suspends a home-screen app soon after it leaves the screen, and
+prigh-web has no push server to wake it, so there they only come in the
+moments before that (on a desktop or Android, whenever the page is open).
+
 Tool output folds to a few lines: a running command's last lines (under
 how many came before), a finished one's first six (an error's last six,
 where the error is), a file read or written, a listing or a diff cut
@@ -2065,7 +2099,10 @@ turns them off (kept with your preferences on the backend); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
 named with what to do in the settings page, whose switch shows whether
-notifications are on and turns them on or off.
+notifications are on and turns them on or off. With the service worker
+(an `https://` or localhost page) they are shown through it, as Android's
+Chrome and an installed app on iOS require (iOS offers notifications only
+to a home-screen app); clicking one brings the page back.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new
