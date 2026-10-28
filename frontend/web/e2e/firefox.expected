@@ -2327,3 +2327,66 @@ notice after: 0
 draft: a draft
 === firefox: pwa: errors ===
 none
+=== firefox: compaction: default ===
+Compaction
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Summary model
+The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+The conversation's model
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "200k" (placeholder 200k); Off pressed: false; mask: true
+=== firefox: compaction: refused ===
+“lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
+still open: 1
+=== firefox: compaction: set ===
+Compaction
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Summary model
+The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+The conversation's model
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); Off pressed: false; mask: false
+compact_at_tokens=150000 compaction_model=null mask_observations=false
+=== firefox: compaction: picker ===
+Summary model; first: The conversation's model whichever model the conversation uses
+chosen: a Haiku; compact_at_tokens=150000 compaction_model=anthropic/(a haiku) mask_observations=false
+=== firefox: compaction: reloaded ===
+Compaction
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Summary model
+The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+The conversation's model
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); Off pressed: false; mask: false
+=== firefox: compaction: /compaction ===
+Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
+=== firefox: compaction: off by /compaction ===
+Compaction
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+Off: only at 80% of the window. Type a number to set one.
+tokens
+Off
+Summary model
+The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+The conversation's model
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "" (placeholder 150k); Off pressed: true; mask: false
+compact_at_tokens=0 compaction_model=null mask_observations=false
+=== firefox: compaction: phone ===
+fits: true
+=== firefox: compaction: errors ===
+(none)

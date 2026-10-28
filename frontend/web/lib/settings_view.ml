@@ -163,14 +163,15 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
     ~cls:"compact-at"
     ~name:"Compact at"
     ~about:
-      "Also summarise once the context passes this many tokens (default \
-       200k), not only at 80% of the model's window."
+      "Also summarise once the context passes this many tokens (default 200k), \
+       not only at 80% of the model's window."
     ?note:
       (match error, config with
        | Some e, _ -> Some ("warm", e)
        | None, None -> Some ("muted", "Waiting for the backend's settings…")
        | None, Some _ when off ->
-         Some ("muted", "Off: only at 80% of the window. Type a number to set one.")
+         Some
+           ("muted", "Off: only at 80% of the window. Type a number to set one.")
        | None, Some _ -> None)
     [ Node.div
         ~attrs:
@@ -179,21 +180,25 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
           ; Attr.create "aria-label" "Compact at"
           ]
         [ Node.label
-            ~attrs:[ classes [ "segment"; "compact-at-field" ] [ "on", not off ] ]
+            ~attrs:
+              [ classes [ "segment"; "compact-at-field" ] [ "on", not off ] ]
             [ Node.input
                 ~attrs:
                   [ Attr.id "compact-at"
                   ; Attr.class_ "compact-at-input"
                   ; Attr.type_ "text"
                   ; Attr.value value
-                  ; Attr.placeholder (if off then "e.g. 150k" else "200k")
+                  ; Attr.placeholder (if off then "150k" else "200k")
                   ; Attr.title "/compaction at TOKENS, e.g. 150k or 200000"
                   ; Attr.create "aria-label" "Compact at, in tokens"
-                  ; Attr.create "aria-invalid" (Bool.to_string (Option.is_some error))
+                  ; Attr.create
+                      "aria-invalid"
+                      (Bool.to_string (Option.is_some error))
                   ; Attr.create "autocomplete" "off"
                   ; Attr.create "spellcheck" "false"
                   ; (if disabled then Attr.disabled else Attr.empty)
-                  ; Attr.on_input (fun _ text -> inject (Action.Compact_at_input text))
+                  ; Attr.on_input (fun _ text ->
+                      inject (Action.Compact_at_input text))
                   ; Attr.on_change (fun _ _ -> inject Action.Compact_at_commit)
                   ]
                 ()
@@ -204,10 +209,13 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
               [ classes [ "segment" ] [ "on", off ]
               ; Attr.type_ "button"
               ; Attr.create "aria-pressed" (Bool.to_string off)
-              ; Attr.title "Only at 80% of the model's window (/compaction at off)"
+              ; Attr.title
+                  "Only at 80% of the model's window (/compaction at off)"
               ; (if disabled
                  then Attr.disabled
-                 else Attr.on_click (fun _ -> inject (Action.Run "/compaction at off")))
+                 else
+                   Attr.on_click (fun _ ->
+                     inject (Action.Run "/compaction at off")))
               ]
             [ Node.text "Off" ]
         ]
@@ -219,7 +227,10 @@ let summary_model (m : App.Model.t) (config : Config.t option) ~inject =
     match Option.bind config ~f:(fun c -> c.compaction_model) with
     | None -> "The conversation's model"
     | Some key ->
-      (match List.find m.models ~f:(fun (model : Llm.t) -> String.equal model.key key) with
+      (match
+         List.find m.models ~f:(fun (model : Llm.t) ->
+           String.equal model.key key)
+       with
        | Some model -> model.name
        | None -> key)
   in
@@ -405,7 +416,9 @@ let keep_days (n : Nix_gc.t) =
 let nix_store (m : App.Model.t) ~inject =
   let run command = inject (Action.Run command) in
   let n = m.nix_gc in
-  let about = "The packages agents fetch with Nix, on the shared /nix volume." in
+  let about =
+    "The packages agents fetch with Nix, on the shared /nix volume."
+  in
   let refresh label =
     button
       ~cls:"small ghost"
@@ -457,8 +470,8 @@ let nix_store (m : App.Model.t) ~inject =
       ~name:"Collect garbage"
       ~about:
         "Delete the store paths no profile or GC root uses. Deleting users' \
-         old profile generations first frees more, but they can no longer \
-         roll back to them."
+         old profile generations first frees more, but they can no longer roll \
+         back to them."
       ?note:
         (match n.collecting, n.outcome with
          | Some p, _ ->
