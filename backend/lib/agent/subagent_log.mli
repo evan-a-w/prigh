@@ -78,5 +78,20 @@ val orphan_ends
     asked on every write, [None] meaning not to write. Subagents saved as
     running are not running any more (whatever ran them is gone): they load
     as failed with an [[interrupted]] result, ended at their last recorded
-    activity. *)
+    activity. Their ends are only written once {!take_interrupted} has
+    them reported. *)
 val load : t -> dir:(unit -> string option) -> unit
+
+(** Whether {!load} ended background subagents of the main agent (not
+    nested ones, nor synchronous ones, whose caller's call is interrupted
+    too) that {!take_interrupted} has not taken yet. *)
+val has_interrupted : t -> bool
+
+(** Those background subagents, with their transcripts, oldest first; the
+    ends of everything {!load} ended are written, so that later loads do not
+    report them again. *)
+val take_interrupted : t -> (Summary.t * Timed_message.t list) list
+
+(** Stops writing (the backend is stopping): the subagents still running
+    load as interrupted next time, rather than as cancelled by the stop. *)
+val detach : t -> unit
