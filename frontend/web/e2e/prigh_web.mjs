@@ -1114,7 +1114,7 @@ try {
   //     asks first with their count and size, then removes their files.
   const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
   const sessionFiles = () =>
-    readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl") && !f.endsWith(".trace.jsonl")).length;
+    readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl") && !f.includes(".trace.")).length;
   await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();
   await page.locator(".chat .empty").waitFor();
   await send("one more");
