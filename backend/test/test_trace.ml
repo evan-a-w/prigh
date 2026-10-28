@@ -5,7 +5,10 @@ open Trace_test_helpers
 module Reply = Faux_provider.Reply
 module Gates = Routed_provider.Gates
 
-let loop_config ?(retries = 0) ?(compaction = Compaction_settings.window_only) tools
+let loop_config
+      ?(retries = 0)
+      ?(compaction = Compaction_settings.window_only)
+      tools
   =
   { Agent_loop.Config.model = Model.default
   ; thinking = Off
@@ -43,7 +46,8 @@ let run_loop
       ()
   in
   let provider = timed ~connect clock (Faux_provider.create replies) in
-  Virtual_clock.run clock @@ fun () ->
+  Virtual_clock.run clock
+  @@ fun () ->
   Trace.run tracer (fun () ->
     Trace.span ~root:true "prompt" (fun () ->
       ignore
@@ -68,7 +72,8 @@ let%expect_test "a turn with a tool: the model's phases and the tool" =
       [ work 2; Reply.text "done" ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 3.3s
       turn 1 2.7s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -94,7 +99,8 @@ let%expect_test "parallel tool calls overlap under their turn" =
       ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 4.5s
       turn 1 3.9s
         model_request deepseek/deepseek-flash 900ms  stop=tool_use
@@ -118,7 +124,8 @@ let%expect_test "a failed attempt, the wait and the retry are siblings" =
       [ Reply.error "HTTP 529 overloaded_error"; Reply.text "done" ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 2.1s
       turn 1 2.1s
         model_request deepseek/deepseek-flash 500ms [error]  stop=error error=HTTP 529 overloaded_error
@@ -136,9 +143,14 @@ let%expect_test "compaction between turns, and its summarising request" =
   let spans =
     run_loop
       ~tools:(fun _ -> [ filler ])
-      ~compaction:{ Compaction_settings.window_only with mask_observations = false }
+      ~compaction:
+        { Compaction_settings.window_only with mask_observations = false }
       [ Reply.tool_call ~id:"c1" ~name:"filler" ~arguments:{|{"size":40000}|} ()
-      ; { (Reply.tool_call ~id:"c2" ~name:"filler" ~arguments:{|{"size":100}|} ())
+      ; { (Reply.tool_call
+             ~id:"c2"
+             ~name:"filler"
+             ~arguments:{|{"size":100}|}
+             ())
           with
           usage = { input = 900_000; output = 10; cache_read = 0 }
         }
@@ -147,7 +159,8 @@ let%expect_test "compaction between turns, and its summarising request" =
       ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 2.6s
       turn 1 700ms
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -184,7 +197,8 @@ let%expect_test "the detailed level adds each delta's wait and handling" =
       ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 800ms
       turn 1 800ms
         model_request deepseek/deepseek-flash 800ms  stop=end_turn
@@ -242,7 +256,8 @@ let%expect_test "cancelled mid-tool: every span still ends, marked cancelled" =
       ]
   in
   print_outline spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 700ms
       turn 1 700ms [cancelled]
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -280,7 +295,8 @@ let%expect_test "a synchronous subagent's turns nest in its tool call" =
   in
   print_outline spans;
   print_tracks spans;
-  [%expect {|
+  [%expect
+    {|
     prompt 3.6s
       turn 1 3.0s
         model_request deepseek/deepseek-flash 700ms  stop=tool_use
@@ -361,7 +377,8 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
   [%expect {| (((.trace.old.jsonl -) (.trace.jsonl 402)) (a b c) (bad 0)) |}];
   List.iter (List.init 30 ~f:(sprintf "span%02d")) ~f:span;
   show ();
-  [%expect {|
+  [%expect
+    {|
     (((.trace.old.jsonl 980) (.trace.jsonl 700))
      (span18 span19 span20 span21 span22 span23 span24 span25 span26 span27
       span28 span29)
@@ -376,7 +393,8 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
   tracer := make_tracer ();
   span "after_crash";
   show ();
-  [%expect {|
+  [%expect
+    {|
     (((.trace.old.jsonl 980) (.trace.jsonl 855))
      (span18 span19 span20 span21 span22 span23 span24 span25 span26 span27
       span28 span29 after_crash)

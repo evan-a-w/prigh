@@ -203,7 +203,8 @@ let fresh_prefix (clock : Clock.t) =
 let create ?id_prefix ~clock ~level ~write () =
   { clock
   ; wall_minus_mono = clock.wall () -. clock.mono ()
-  ; id_prefix = Option.value_or_thunk id_prefix ~default:(fun () -> fresh_prefix clock)
+  ; id_prefix =
+      Option.value_or_thunk id_prefix ~default:(fun () -> fresh_prefix clock)
   ; level
   ; next_id = 1
   ; write
@@ -366,9 +367,7 @@ let start
         | _, None -> None
         | None, Some current -> Some (Open.container current)
         | Some under, Some current ->
-          (match
-             Open.find current ~f:(fun o -> String.equal o.name under)
-           with
+          (match Open.find current ~f:(fun o -> String.equal o.name under) with
            | Some o -> Some o
            | None -> Some (Open.container current)))
     in

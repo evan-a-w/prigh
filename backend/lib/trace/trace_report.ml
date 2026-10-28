@@ -106,7 +106,9 @@ module Tree = struct
     Hashtbl.find t.children span.id |> Option.value ~default:[]
   ;;
 
-  let parent t (span : Trace.Span.t) = Option.bind span.parent ~f:(Hashtbl.find t.by_id)
+  let parent t (span : Trace.Span.t) =
+    Option.bind span.parent ~f:(Hashtbl.find t.by_id)
+  ;;
 
   let rec ancestors t span =
     match parent t span with
@@ -121,7 +123,9 @@ end
 
 let attrs_hum ?(attrs = Fn.const true) (span : Trace.Span.t) =
   List.filter_map span.attrs ~f:(fun (k, v) ->
-    if attrs k then Some (sprintf "%s=%s" k (Trace.Value.to_string_hum v)) else None)
+    if attrs k
+    then Some (sprintf "%s=%s" k (Trace.Value.to_string_hum v))
+    else None)
   |> String.concat ~sep:" "
 ;;
 
@@ -159,7 +163,9 @@ let table rows =
   let widths =
     List.fold rows ~init:[] ~f:(fun widths row ->
       List.mapi row ~f:(fun i cell ->
-        Int.max (String.length cell) (Option.value (List.nth widths i) ~default:0)))
+        Int.max
+          (String.length cell)
+          (Option.value (List.nth widths i) ~default:0)))
   in
   List.map rows ~f:(fun row ->
     List.mapi row ~f:(fun i cell ->
@@ -181,7 +187,9 @@ let breakdown tree (root : Trace.Span.t) =
         if String.equal s.track root.track
         then (
           let category =
-            if phys_equal s root then Some Category.Other else Category.of_span s
+            if phys_equal s root
+            then Some Category.Other
+            else Category.of_span s
           in
           Option.map category ~f:(fun c -> clip s.start, clip s.stop, c))
         else None)
@@ -191,12 +199,15 @@ let breakdown tree (root : Trace.Span.t) =
   in
   let counts = Array.create ~len:(List.length Category.all) 0 in
   let top () =
-    let rec go i = if i < 0 then None else if counts.(i) > 0 then Some i else go (i - 1) in
+    let rec go i =
+      if i < 0 then None else if counts.(i) > 0 then Some i else go (i - 1)
+    in
     go (Array.length counts - 1)
   in
   ignore
     (List.fold events ~init:root.start ~f:(fun last (at, delta, c) ->
-       Option.iter (top ()) ~f:(fun i -> totals.(i) <- totals.(i) +. (at -. last));
+       Option.iter (top ()) ~f:(fun i ->
+         totals.(i) <- totals.(i) +. (at -. last));
        counts.(c) <- counts.(c) + delta;
        at)
      : float);
@@ -211,7 +222,9 @@ let percentile sorted p =
 
 let summary ?(slowest = 10) ?(bad = 0) spans =
   let tree = Tree.create spans in
-  let named name = List.filter tree.spans ~f:(fun s -> String.equal s.name name) in
+  let named name =
+    List.filter tree.spans ~f:(fun s -> String.equal s.name name)
+  in
   let lines = Queue.create () in
   let add s = Queue.enqueue lines s in
   let section title rows =
@@ -238,26 +251,28 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
          (List.length spans));
     let totals = Array.create ~len:(List.length Category.all) 0. in
     List.iter tree.roots ~f:(fun root ->
-      Array.iteri (breakdown tree root) ~f:(fun i x -> totals.(i) <- totals.(i) +. x));
+      Array.iteri (breakdown tree root) ~f:(fun i x ->
+        totals.(i) <- totals.(i) +. x));
     let wall = Array.sum (module Float) totals ~f:Fn.id in
     add "";
-    add (sprintf "Wall time %s (the main agent, prompt to idle):" (duration_hum wall));
+    add
+      (sprintf
+         "Wall time %s (the main agent, prompt to idle):"
+         (duration_hum wall));
     List.iter
       (table
-         (List.filter_map
-            (List.rev Category.all)
-            ~f:(fun c ->
-              let x = totals.(Category.index c) in
-              if Float.(x <= 0.) && not ([%compare.equal: Category.t] c Other)
-              then None
-              else
-                Some
-                  [ Category.to_string c
-                  ; duration_hum x
-                  ; (if Float.(wall > 0.)
-                     then sprintf "%.0f%%" (100. *. x /. wall)
-                     else "-")
-                  ])))
+         (List.filter_map (List.rev Category.all) ~f:(fun c ->
+            let x = totals.(Category.index c) in
+            if Float.(x <= 0.) && not ([%compare.equal: Category.t] c Other)
+            then None
+            else
+              Some
+                [ Category.to_string c
+                ; duration_hum x
+                ; (if Float.(wall > 0.)
+                   then sprintf "%.0f%%" (100. *. x /. wall)
+                   else "-")
+                ])))
       ~f:add;
     let ttft =
       List.filter_map (named "model_request") ~f:(fun request ->
@@ -277,7 +292,9 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
        else
          [ "model"; "requests"; "median"; "p90" ]
          :: List.map ttft ~f:(fun (model, times) ->
-           let sorted = Array.of_list (List.sort times ~compare:Float.compare) in
+           let sorted =
+             Array.of_list (List.sort times ~compare:Float.compare)
+           in
            [ model
            ; Int.to_string (Array.length sorted)
            ; duration_hum (percentile sorted 0.5)
@@ -289,7 +306,8 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
       |> List.map ~f:(fun (name, calls) ->
         let total = List.sum (module Float) calls ~f:Trace.Span.duration in
         let max =
-          List.fold calls ~init:0. ~f:(fun m s -> Float.max m (Trace.Span.duration s))
+          List.fold calls ~init:0. ~f:(fun m s ->
+            Float.max m (Trace.Span.duration s))
         in
         let errors =
           List.count calls ~f:(fun s ->
@@ -298,7 +316,8 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
             | Ok | Cancelled -> false)
         in
         name, List.length calls, total, max, errors)
-      |> List.sort ~compare:(fun (_, _, a, _, _) (_, _, b, _, _) -> Float.compare b a)
+      |> List.sort ~compare:(fun (_, _, a, _, _) (_, _, b, _, _) ->
+        Float.compare b a)
     in
     section
       "Tools (by total time, waits for approval and answers included):"
@@ -314,15 +333,19 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
            ; Int.to_string errors
            ]));
     let background_run (s : Trace.Span.t) =
-      Option.equal Trace.Value.equal (Trace.Span.attr s "background") (Some (Bool true))
+      Option.equal
+        Trace.Value.equal
+        (Trace.Span.attr s "background")
+        (Some (Bool true))
     in
     let background =
       List.filter_map
         [ ( "background subagent runs"
-          , fun (s : Trace.Span.t) -> String.equal s.name "subagent" && background_run s )
+          , fun (s : Trace.Span.t) ->
+              String.equal s.name "subagent" && background_run s )
         ; ( "sync subagent runs"
           , fun s -> String.equal s.name "subagent" && not (background_run s) )
-        ; "background jobs", fun s -> String.equal s.name "job"
+        ; ("background jobs", fun s -> String.equal s.name "job")
         ]
         ~f:(fun (what, f) ->
           match List.filter tree.spans ~f with
@@ -331,7 +354,8 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
             Some
               [ what
               ; Int.to_string (List.length runs)
-              ; duration_hum (List.sum (module Float) runs ~f:Trace.Span.duration)
+              ; duration_hum
+                  (List.sum (module Float) runs ~f:Trace.Span.duration)
               ])
     in
     section "Subagents and jobs (alongside the main agent):" background;
@@ -339,7 +363,13 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
       List.filter tree.spans ~f:(fun s ->
         not
           (List.mem
-             [ "prompt"; "turn"; "connect"; "first_token"; "thinking"; "stream" ]
+             [ "prompt"
+             ; "turn"
+             ; "connect"
+             ; "first_token"
+             ; "thinking"
+             ; "stream"
+             ]
              s.name
              ~equal:String.equal))
       |> List.sort ~compare:(fun a b ->
@@ -349,7 +379,8 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
     let rows =
       List.map candidates ~f:(fun s ->
         let path =
-          List.rev_map (Tree.ancestors tree s) ~f:label |> String.concat ~sep:" > "
+          List.rev_map (Tree.ancestors tree s) ~f:label
+          |> String.concat ~sep:" > "
         in
         let status =
           match s.status with
@@ -357,7 +388,8 @@ let summary ?(slowest = 10) ?(bad = 0) spans =
           | status -> sprintf " [%s]" (Trace.Status.to_string status)
         in
         ( duration_hum (Trace.Span.duration s)
-        , label s ^ status ^ if String.is_empty path then "" else "  in " ^ path ))
+        , label s ^ status ^ if String.is_empty path then "" else "  in " ^ path
+        ))
     in
     let width =
       List.fold rows ~init:0 ~f:(fun w (d, _) -> Int.max w (String.length d))
@@ -413,7 +445,9 @@ let perfetto spans =
           Queue.enqueue track_order s.track;
           ref [])
       in
-      let ancestors = Tree.ancestors tree s |> List.map ~f:(fun (a : Trace.Span.t) -> a.id) in
+      let ancestors =
+        Tree.ancestors tree s |> List.map ~f:(fun (a : Trace.Span.t) -> a.id)
+      in
       let fits (lane : Lane.t) =
         lane.open_ <- List.drop_while lane.open_ ~f:(fun (_, e) -> e <= ts);
         match lane.open_ with
@@ -455,7 +489,8 @@ let perfetto spans =
         ; ( "args"
           , `Object
               (("status", `String (Trace.Status.to_string s.status))
-               :: List.map s.attrs ~f:(fun (k, v) -> k, Trace.Value.to_json v)) )
+               :: List.map s.attrs ~f:(fun (k, v) -> k, Trace.Value.to_json v))
+          )
         ])
   in
   let metadata =
@@ -480,7 +515,9 @@ let perfetto spans =
       ])
   in
   `Object
-    [ "displayTimeUnit", `String "ms"; "traceEvents", `Array (metadata @ events) ]
+    [ "displayTimeUnit", `String "ms"
+    ; "traceEvents", `Array (metadata @ events)
+    ]
 ;;
 
 module Report = struct
