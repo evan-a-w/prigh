@@ -42,7 +42,12 @@ Without Nix, an OxCaml opam switch with the same packages works too
 ## Running under Nix
 
 The flake builds both executables. The default package/app is a small wrapper
-that points the TUI at the Nix-built backend.
+that points the TUI at the Nix-built backend: `prigh [DIR]` runs the TUI,
+`prigh -web` prigh-web, and the backend's subcommands (`acp`, `run`, `serve`,
+`tool-host`, `web`, `sessions`, `login`, `logout`, `auth`, `models`) run the
+backend, so `prigh login anthropic` and `prigh acp` work from the installed
+wrapper (`nix profile install github:evan-a-w/prigh`). A directory named like
+one of them opens with `prigh ./NAME`.
 
 ```
 source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh   # if nix is not on PATH
@@ -1213,6 +1218,8 @@ nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
 nix run .#backend -- login custom           # an OpenAI-compatible endpoint (below)
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
+
+With the wrapper installed, the same is `prigh login anthropic`, `prigh auth`.
 
 To share pi's logins instead, symlink the file: `ln -s ~/.pi/agent/auth.json
 ~/.config/prigh/auth.json`. Don't copy it: Anthropic rotates the refresh

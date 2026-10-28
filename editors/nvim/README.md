@@ -52,14 +52,18 @@ Then, once (and after each update, for new help):
 - `:helptags ALL` builds the help tags; it only sees directories already
   on the `runtimepath`, so run it after the `rtp:append` has taken effect.
   `:help prigh` then opens the help.
-- `:checkhealth prigh` checks Neovim's version, the `prigh` binary, the help
-  tags and the optional parts.
+- `:checkhealth prigh` checks Neovim's version, the `prigh` binary and that
+  it has `prigh acp`, the help tags and the optional parts.
 
 If `:Prigh` is not a command or `:help prigh` fails, check the directory is
 on the `runtimepath`: `:echo globpath(&rtp, 'doc/prigh.txt')` must print a
 path ending in `editors/nvim/doc/prigh.txt`.
 
-`prigh` must be on `PATH` (or set `cmd`). To use a remote backend (see the
+`prigh` must be on `PATH` (or set `cmd`), with its `acp` command:
+`nix profile install github:evan-a-w/prigh` installs one (the `prigh`
+wrapper passes `acp`, `login`, `auth` and the backend's other subcommands to
+the backend). An error like "no such directory: acp" in `:PrighLog` means an
+older prigh: update it. To use a remote backend (see the
 root README's "Remote backend"):
 
 ```lua
