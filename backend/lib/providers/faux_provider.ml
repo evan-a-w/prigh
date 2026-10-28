@@ -270,6 +270,7 @@ let create
         ~stop_reason:(Error "faux provider: no scripted reply")
         ~usage:Usage.zero
     | Some reply ->
+      Trace.phase "first_token";
       let aborted = ref false in
       List.iter reply.events ~f:(fun event ->
         if not !aborted

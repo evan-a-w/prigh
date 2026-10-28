@@ -78,6 +78,19 @@ let tool_summary ~name (args : Json.t) =
   | _ -> ""
 ;;
 
+let tool_attrs (call : Content.Tool_call.t) : (string * Trace.Value.t) list =
+  let summary =
+    match Content.Tool_call.parse_arguments call with
+    | Ok args -> tool_summary ~name:call.name args
+    | Error _ -> ""
+  in
+  [ "tool", String call.name
+  ; "call_id", String call.id
+  ; "summary", Trace.short summary
+  ; "where", String "local"
+  ]
+;;
+
 let execute_tool
       ~env
       ~(config : Config.t)
@@ -252,7 +265,16 @@ let run
                ~input_tokens
                ~overflowed
                plan ->
-        (match mask ~through:plan.through !messages with
+        (match
+           Trace.span
+             "mask"
+             ~attrs:
+               [ "tokens_before", Int input_tokens
+               ; "tokens_saved", Int plan.tokens_saved
+               ; "masked", Int plan.masked
+               ]
+             (fun () -> mask ~through:plan.through !messages)
+         with
          | Error _ -> None
          | Ok context ->
            messages := context;
@@ -302,6 +324,9 @@ let run
     | None ->
       incr turns;
       emit Turn_start;
+      let turn_span = Trace.start "turn" ~attrs:[ "turn", Int !turns ] in
+      Trace.within turn_span
+      @@ fun () ->
       let stream () =
         let request =
           { Provider.Request.model = config.model
@@ -315,7 +340,7 @@ let run
         in
         let builder = Assistant_builder.create ~model:config.model.id in
         emit (Message_start (Assistant (Assistant_builder.snapshot builder)));
-        provider.stream request ~cancel ~on_event:(fun delta ->
+        Model_trace.stream provider request ~cancel ~on_event:(fun delta ->
           Assistant_builder.apply builder delta;
           emit
             (Message_update
@@ -371,7 +396,12 @@ let run
                ; error = message
                ; delay
                });
-          (match Cancellation.protect cancel ~f:(fun () -> sleep delay) with
+          (match
+             Trace.span
+               "retry_wait"
+               ~attrs:[ "attempt", Int (n + 1); "delay", Float delay ]
+               (fun () -> Cancellation.protect cancel ~f:(fun () -> sleep delay))
+           with
            | Some () -> attempt (n + 1) ~overflows
            | None -> { assistant with stop_reason = Aborted })
         | _ -> assistant
@@ -400,23 +430,37 @@ let run
         then cancelled_result call
         else (
           emit (Tool_start call);
+          let span = Trace.start "tool" ~attrs:(tool_attrs call) in
           let result =
-            execute_tool
-              ~env
-              ~config
-              ~cwd
-              ~cancel
-              ~emit
-              ~depth
-              ~agent_id
-              ~halt
-              ?approve
-              ?ask_user
-              ?execute
-              ?background
-              ~conversation
-              call
+            Trace.within span (fun () ->
+              execute_tool
+                ~env
+                ~config
+                ~cwd
+                ~cancel
+                ~emit
+                ~depth
+                ~agent_id
+                ~halt
+                ?approve
+                ?ask_user
+                ?execute
+                ?background
+                ~conversation
+                call)
           in
+          Trace.finish
+            span
+            ~status:
+              (if Cancellation.is_cancelled cancel
+               then Cancelled
+               else if result.is_error
+               then Error
+               else Ok)
+            ~attrs:
+              [ "result_bytes", Int (String.length result.text)
+              ; "is_error", Bool result.is_error
+              ];
           emit (Tool_end { call; result });
           result)
       in
@@ -452,6 +496,15 @@ let run
               result)
       in
       emit (Turn_end { assistant; tool_results });
+      Trace.finish
+        turn_span
+        ~status:
+          (match assistant.stop_reason with
+           | _ when Cancellation.is_cancelled cancel -> Cancelled
+           | Aborted -> Cancelled
+           | Error _ -> Error
+           | End_turn | Tool_use | Length -> Ok)
+        ~attrs:[ "tool_calls", Int (List.length calls) ];
       let over_limit =
         match config.max_turns with
         | Some n -> !turns >= n

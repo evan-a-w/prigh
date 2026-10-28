@@ -1614,7 +1614,9 @@ let is_directory path =
 ;;
 
 let files path =
-  List.filter [ path; data_dir path ] ~f:(fun p -> Sys_unix.file_exists_exn p)
+  List.filter
+    ([ path; data_dir path ] @ Trace_file.paths ~session_path:path)
+    ~f:(fun p -> Sys_unix.file_exists_exn p)
 ;;
 
 let rec usage path =
@@ -1761,13 +1763,17 @@ let cached_summary ~live ~load path =
     Option.map summary ~f:(fun s -> mtime, { s with bytes = disk_usage path })
 ;;
 
+let is_session_file name =
+  String.is_suffix name ~suffix:".jsonl" && not (Trace_file.is_trace_file name)
+;;
+
 let list_with ~live ~load ~dir =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> []
   | `Yes ->
     let paths =
       Sys_unix.ls_dir dir
-      |> List.filter ~f:(String.is_suffix ~suffix:".jsonl")
+      |> List.filter ~f:is_session_file
       |> List.sort ~compare:String.compare
       |> List.map ~f:(Filename.concat dir)
     in
@@ -1809,7 +1815,7 @@ let has_id ~dir id =
   | `No | `Unknown -> false
   | `Yes ->
     Sys_unix.ls_dir dir
-    |> List.filter ~f:(String.is_suffix ~suffix:".jsonl")
+    |> List.filter ~f:is_session_file
     |> List.exists ~f:(fun name ->
       match
         In_channel.with_file (Filename.concat dir name) ~f:In_channel.input_line

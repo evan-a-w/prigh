@@ -18,7 +18,8 @@ let%expect_test "a missing file yields the default" =
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
-      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())))
+      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
+      (trace Default)))
     |}]
 ;;
 
@@ -47,6 +48,7 @@ let%expect_test "save then load round trips" =
     ; mask_observations = true
     ; compact_at_tokens = 150_000
     ; compaction_model = Some "anthropic/claude-haiku-4-5"
+    ; trace = Detailed
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -82,7 +84,8 @@ let%expect_test "save then load round trips" =
       "generate_model": null,
       "mask_observations": true,
       "compact_at_tokens": 150000,
-      "compaction_model": "anthropic/claude-haiku-4-5"
+      "compaction_model": "anthropic/claude-haiku-4-5",
+      "trace": "detailed"
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
@@ -96,7 +99,8 @@ let%expect_test "save then load round trips" =
        (((name review) (text  "Review the diff for bugs.\
                              \nBe brief."))))
       (auto_background_seconds 30) (generate_model ()) (mask_observations true)
-      (compact_at_tokens 150000) (compaction_model (anthropic/claude-haiku-4-5))))
+      (compact_at_tokens 150000) (compaction_model (anthropic/claude-haiku-4-5))
+      (trace Detailed)))
     |}]
 ;;
 
@@ -118,7 +122,8 @@ let%expect_test "unknown fields are ignored" =
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
-      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())))
+      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
+      (trace Default)))
     |}]
 ;;
 
@@ -171,7 +176,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, compact_at_tokens, compaction_model)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, compact_at_tokens, compaction_model, trace)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -209,7 +214,8 @@ let%expect_test "null defaults are unset" =
       (goal_max_continuations 20) (resume_on_limit_reset true)
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
-      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())))
+      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
+      (trace Default)))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
@@ -219,7 +225,7 @@ let%expect_test "null defaults are unset" =
       (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
       (archive_after_days 7) (notify Bell) (snippets ())
       (auto_background_seconds 30) (generate_model ()) (mask_observations true)
-      (compact_at_tokens 200000) (compaction_model ())))
+      (compact_at_tokens 200000) (compaction_model ()) (trace Default)))
     |}]
 ;;
 
@@ -271,7 +277,7 @@ let%expect_test "a leftover reminders setting says where reminders went" =
      fallback_models default_cwd worktrees_dir max_budget_usd
      goal_max_continuations resume_on_limit_reset ask_user_timeout_seconds
      archive_after_days snippets auto_background_seconds generate_model
-     mask_observations compact_at_tokens compaction_model)
+     mask_observations compact_at_tokens compaction_model trace)
     |}]
 ;;
 

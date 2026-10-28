@@ -1519,6 +1519,63 @@ let sessions_command =
     ]
 ;;
 
+let trace_command =
+  Command.basic
+    ~summary:"Where the time went in a session: its trace, summarised"
+    ~readme:(fun () ->
+      "Reads the session's trace (<session>.trace.jsonl next to its file) and \
+       prints the main agent's wall time split into model, tools, waiting on \
+       you, retries, compaction and other; time to first token by model; \
+       per-tool totals; and the slowest spans with their path. SESSION is a \
+       session id (or a unique prefix) from `prigh sessions list`, or the path \
+       of a session or trace file. PRIGH_TRACE=detailed (or trace = \
+       \"detailed\" in the config) records finer spans; PRIGH_TRACE=off none.")
+    (let%map_open.Command key = anon ("SESSION" %: string)
+     and perfetto =
+       flag
+         "perfetto"
+         (optional string)
+         ~doc:
+           "FILE also write it in the Chrome trace event format, for \
+            ui.perfetto.dev or chrome://tracing"
+     and tree = flag "tree" no_arg ~doc:" print every span as an indented tree"
+     and slowest =
+       flag
+         "slowest"
+         (optional_with_default 10 int)
+         ~doc:"N how many of the slowest spans to list (default 10)"
+     in
+     fun () ->
+       let session_path =
+         if Sys_unix.file_exists_exn key
+         then (
+           match
+             List.find_map [ ".trace.old.jsonl"; ".trace.jsonl" ] ~f:(fun suffix ->
+               String.chop_suffix key ~suffix)
+           with
+           | Some base -> base ^ ".jsonl"
+           | None -> key)
+         else (
+           match Session.find_summary (Session.list ~dir:(sessions_dir ())) key with
+           | Ok summary -> summary.path
+           | Error e ->
+             eprintf
+               "%s\nprigh sessions list shows the saved sessions\n"
+               (Error.to_string_hum e);
+             exit 1)
+       in
+       let spans, bad = Trace_file.load ~session_path in
+       if tree then print_string (Trace_report.outline spans);
+       print_string (Trace_report.summary ~slowest ~bad spans);
+       Option.iter perfetto ~f:(fun file ->
+         Out_channel.write_all
+           file
+           ~data:(Jsonaf.to_string (Trace_report.perfetto spans));
+         printf
+           "\nWrote %s: open it at https://ui.perfetto.dev or chrome://tracing\n"
+           file))
+;;
+
 (* What the built-in tools' specifications add to each request, as
    [Compaction_eval] counts tokens. *)
 let tools_overhead_tokens () =
@@ -1837,6 +1894,7 @@ let () =
        ; "tool-host", tool_host_command
        ; "web", web_command
        ; "sessions", sessions_command
+       ; "trace", trace_command
        ; "login", login_command
        ; "logout", logout_command
        ; "auth", auth_command
