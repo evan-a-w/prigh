@@ -159,8 +159,8 @@ let logout t host =
 
 let not_signed_in (instance : Forge_instance.t) =
   Or_error.errorf
-    "not signed in to %s: sign in under Settings → Git hosting in \
-     prigh-web, or with /login %s"
+    "not signed in to %s: sign in under Settings → Git hosting in prigh-web, \
+     or with /login %s"
     instance.host
     (Forge_instance.login_arg instance)
 ;;

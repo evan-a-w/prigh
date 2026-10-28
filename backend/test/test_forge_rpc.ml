@@ -99,7 +99,6 @@ let rec wait_for ?(n = 2000) sent ~kind =
     wait_for ~n:(n - 1) sent ~kind
 ;;
 
-
 let%expect_test
     "sign in, list, view, prefill, create (pushing first) and check out pull \
      requests"
@@ -237,7 +236,9 @@ let%expect_test
     |}];
   Fake_forge.sh repo "git checkout -q --detach";
   call "pr_defaults";
-  Fake_forge.sh repo "git remote remove origin && git remote add upstream /srv/x.git";
+  Fake_forge.sh
+    repo
+    "git remote remove origin && git remote add upstream /srv/x.git";
   call "pr_list";
   call "set_cwd" ~params:(sprintf {|{"path": %S}|} t.dir);
   call "pr_list";

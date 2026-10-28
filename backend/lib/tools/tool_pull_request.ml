@@ -27,11 +27,10 @@ let spec =
        description, CI checks and URL; checks shows only its CI checks; diff \
        its unified diff. create opens one from head (default: the current \
        branch) into base (default: the repository's default branch), pushing \
-       the branch first unless push is false; draft marks it a draft. \
-       checkout fetches one into the branch pr-N in a worktree at the \
-       standard location and records it on the session: work there by giving \
-       its path (cd <path> in bash, paths under it in file tools, a \
-       subagent's cwd)."
+       the branch first unless push is false; draft marks it a draft. checkout \
+       fetches one into the branch pr-N in a worktree at the standard location \
+       and records it on the session: work there by giving its path (cd <path> \
+       in bash, paths under it in file tools, a subagent's cwd)."
   ; parameters =
       Tool_args.schema
         ~required:[ "action" ]
@@ -225,7 +224,8 @@ let diff_text (pull : Forges.Pull.t) =
 let create_text ~push (pull : Forges.Pull.t) =
   sprintf
     "%s %s\n%s"
-    (if push then sprintf "pushed %s to %s, then opened" pull.pr.head pull.repo.remote
+    (if push
+     then sprintf "pushed %s to %s, then opened" pull.pr.head pull.repo.remote
      else "opened")
     (header pull)
     (if pull.pr.draft then "It is a draft." else "")
@@ -340,7 +340,8 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
         let state =
           Option.value (Tool_args.string_opt args "state") ~default:"open"
         in
-        Forges.list_pulls forges ~git ~state |> Or_error.map ~f:(list_text ~state)
+        Forges.list_pulls forges ~git ~state
+        |> Or_error.map ~f:(list_text ~state)
       | "view" ->
         Forges.view_pull forges ~git ~diff:false (number args)
         |> Or_error.map ~f:view_text
@@ -356,7 +357,9 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
       | "diff" ->
         Forges.view_pull forges ~git (number args) |> Or_error.map ~f:diff_text
       | "create" ->
-        let push = Option.value (Tool_args.bool_opt args "push") ~default:true in
+        let push =
+          Option.value (Tool_args.bool_opt args "push") ~default:true
+        in
         let%bind.Or_error title, body =
           with_defaults
             forges
@@ -394,10 +397,16 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
     | Ok text -> Tool.Result.ok text
     | Error e ->
       let hint =
-        if List.mem [ "view"; "checks"; "diff"; "checkout" ] action ~equal:String.equal
+        if
+          List.mem
+            [ "view"; "checks"; "diff"; "checkout" ]
+            action
+            ~equal:String.equal
         then
-          Option.value_map (closest forges ~git (number args)) ~default:"" ~f:(fun c ->
-            "; " ^ c)
+          Option.value_map
+            (closest forges ~git (number args))
+            ~default:""
+            ~f:(fun c -> "; " ^ c)
         else ""
       in
       Tool.Result.error

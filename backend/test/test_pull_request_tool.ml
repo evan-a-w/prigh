@@ -61,8 +61,8 @@ let with_repo f =
                  t
                  [%sexp
                    "worktrees_changed"
-                   , (added : Session_worktree.t list)
-                   , (removed : string list)])
+                 , (added : Session_worktree.t list)
+                 , (removed : string list)])
           | _ -> ())
         ()
     in
@@ -75,12 +75,14 @@ let with_repo f =
   f t ~repo ~fake ~store ~tool ~run
 ;;
 
-let%expect_test "not signed in: says where to sign in, asks nothing of the host" =
+let%expect_test "not signed in: says where to sign in, asks nothing of the host"
+  =
   with_repo
   @@ fun _ ~repo:_ ~fake ~store:_ ~tool:_ ~run ->
   run {|{"action":"list"}|};
   Fake_forge.print_requests fake;
-  [%expect {| ERROR: pull_request list: not signed in to github.com: ask the user to sign in under Settings → Git hosting in prigh-web, or with /login github |}]
+  [%expect
+    {| ERROR: pull_request list: not signed in to github.com: ask the user to sign in under Settings → Git hosting in prigh-web, or with /login github |}]
 ;;
 
 let%expect_test "list, view, checks and diff" =
@@ -96,7 +98,8 @@ let%expect_test "list, view, checks and diff" =
   run {|{"action":"view"}|};
   run {|{"action":"merge","number":7}|};
   Fake_forge.print_requests fake;
-  [%expect {|
+  [%expect
+    {|
     open pull requests in o/r on github.com:
     #7 From a contributor (open; alice, fork:feat/x -> main) https://github.com/o/r/pull/7
     #5 Old one (open, draft; alice, feat/x -> main) https://github.com/o/r/pull/5
@@ -185,7 +188,8 @@ let%expect_test "create: pushes the branch first, or refuses an unpushed one" =
   reply ~number:10 "Add things";
   run {|{"action":"create","title":" "}|};
   Fake_forge.print_requests fake;
-  [%expect {|
+  [%expect
+    {|
     ERROR: pull_request create: origin does not have feat/add-things with all its commits: push it first (the push option, or git push -u origin feat/add-things)
     pushed feat/add-things to origin, then opened #8 Add things (open, draft) in o/r on github.com
     https://github.com/o/r/pull/8
@@ -223,8 +227,8 @@ let%expect_test "create: pushes the branch first, or refuses an unpushed one" =
     |}]
 ;;
 
-let%expect_test "checkout: into a worktree the session records; cwd picks the \
-                 repository"
+let%expect_test
+    "checkout: into a worktree the session records; cwd picks the repository"
   =
   with_repo
   @@ fun t ~repo ~fake ~store ~tool:_ ~run ->
@@ -237,12 +241,15 @@ let%expect_test "checkout: into a worktree the session records; cwd picks the \
   (* From another directory, naming the worktree. *)
   run ~cwd:t.dir (sprintf {|{"action":"list","cwd":%S}|} worktree);
   run ~cwd:t.dir {|{"action":"list"}|};
-  Fake_forge.sh repo "git remote remove origin && git remote add upstream /srv/x.git";
+  Fake_forge.sh
+    repo
+    "git remote remove origin && git remote add upstream /srv/x.git";
   run {|{"action":"list"}|};
   Fake_forge.sh repo "git checkout -q --detach";
   run {|{"action":"create","title":"Detached"}|};
   Fake_forge.print_requests fake;
-  [%expect {|
+  [%expect
+    {|
     (worktrees_changed
      (((path $DIR/worktrees/r/pr-7) (branch (pr-7)) (root $DIR/r)
        (source (Pull_request (number 7)))))
@@ -282,7 +289,10 @@ let%expect_test "namespaces: each tool uses only its own world's sign-in" =
         ~home:t.dir
         ~legacy_auth_file:(Filename.concat t.dir "auth.json")
     in
-    world, Tool_pull_request.create ~forges:(forges ~fake ~home:world.home world.store) ()
+    ( world
+    , Tool_pull_request.create
+        ~forges:(forges ~fake ~home:world.home world.store)
+        () )
   in
   let alice_world, alice = tool "alice" in
   let _, bob = tool "bob" in
@@ -303,7 +313,8 @@ let%expect_test "namespaces: each tool uses only its own world's sign-in" =
   run "alice" alice;
   run "bob" bob;
   Fake_forge.print_requests fake;
-  [%expect {|
+  [%expect
+    {|
     alice: open pull requests in o/r on github.com:
     bob: ERROR: pull_request list: not signed in to github.com: ask the user to sign in under Settings → Git hosting in prigh-web, or with /login github
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
@@ -350,7 +361,8 @@ let with_agent ~answer replies ~sub_replies f =
            ?agent_id
            agent
            ~call_id
-           (answer { Agent.Pending_confirm.call_id; agent_id; name; summary; rules }))
+           (answer
+              { Agent.Pending_confirm.call_id; agent_id; name; summary; rules }))
     | Loop (Tool_end { call; result }) ->
       printf
         "%s %s -> %s%s\n"
@@ -411,7 +423,8 @@ let%expect_test "an agent lists without asking; create asks in ask mode" =
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
   Fake_forge.print_requests fake;
-  [%expect {|
+  [%expect
+    {|
     pull_request {"action":"list"} -> open pull requests in o/r on github.com:
     #7 From a contributor (open; alice, fork:feat/x -> main) https://github.com/o/r/pull/7
     #5 Old one (open, draft; alice, feat/x -> main) https://github.com/o/r/pull/5
@@ -457,7 +470,8 @@ let%expect_test "auto mode creates without asking" =
   Agent.set_mode agent ~approval:Auto;
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     pull_request {"action":"create","title":"Add things"} -> pushed feat/add-things to origin, then opened #8 Add things (open) in o/r on github.com
     https://github.com/o/r/pull/8
     alice wants to merge feat/add-things into main
