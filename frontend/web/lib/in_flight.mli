@@ -4,7 +4,7 @@ open! Import
 (** What we asked the backend for and are waiting on, so that the page shows
     every action at once: the session being opened, its transcript loading,
     prompts sent but not yet in the transcript, the model, thinking level or
-    mode chosen but not yet confirmed. *)
+    mode chosen but not yet confirmed, the transcript filter being saved. *)
 
 module Session : sig
   type t =
@@ -43,6 +43,9 @@ type t =
   ; model : string option (** a model key, until the backend confirms it *)
   ; thinking : string option
   ; mode : Session_mode.t option (** approval mode and plan mode *)
+  ; filters : int
+    (** [set_transcript_filter]s not yet answered: until then, states
+        echo older filters *)
   }
 [@@deriving sexp_of]
 

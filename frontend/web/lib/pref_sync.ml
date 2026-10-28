@@ -6,7 +6,6 @@ module Key = struct
   let accent = "web.accent"
   let notify = "web.notify"
   let verbosity = "web.verbosity"
-  let transcript_filter = "web.transcript-filter"
   let terminal_open = "web.terminal-open"
   let folded = "web.sidebar-folded"
   let review = "web.review"
@@ -18,7 +17,6 @@ module Key = struct
     ; accent
     ; notify
     ; verbosity
-    ; transcript_filter
     ; terminal_open
     ; folded
     ; review

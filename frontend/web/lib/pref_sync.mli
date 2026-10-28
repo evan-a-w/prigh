@@ -4,11 +4,11 @@ open! Import
 (** The user's preferences and data that prigh-web keeps on the backend
     ([get_prefs], [set_prefs], [push_pref], [prefs_changed]), so that they
     follow the user from browser to browser and change live in the others:
-    the theme and accent, notifications, the transcript's verbosity and
-    filter, the prompt history (shared with the TUI), the panels' sizes, whether the terminal is
-    open and which of the sidebar's projects are folded. The browser
-    caches them ([Command.Cache_prefs]) for the first paint and for backends
-    that keep none.
+    the theme and accent, notifications, the transcript's verbosity, the
+    prompt history (shared with the TUI), the panels' sizes, whether the
+    terminal is open and which of the sidebar's projects are folded. The
+    browser caches them ([Command.Cache_prefs]) for the first paint and for
+    backends that keep none.
 
     What stays in the browser only: the sign-ins (needed before there is a
     user to ask), the notes a reload passes to the next page load (adding an
@@ -20,10 +20,6 @@ module Key : sig
   val accent : string
   val notify : string
   val verbosity : string
-
-  (** [/filter]: the kinds hidden ([Transcript_filter.to_string]). *)
-  val transcript_filter : string
-
   val terminal_open : string
 
   (** The sidebar's sessions whose worktrees are folded away: their ids. *)

@@ -69,7 +69,6 @@ let%expect_test "the cache first, then the backend's, which win" =
     (Cache_prefs
      (((key web.theme) (value (light))) ((key web.accent) (value (#3366ff)))
       ((key web.notify) (value ())) ((key web.verbosity) (value (quiet)))
-      ((key web.transcript-filter) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
@@ -105,7 +104,6 @@ let%expect_test "a page from before uploads the browser's once" =
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value (false))) ((key web.verbosity) (value ()))
-      ((key web.transcript-filter) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
@@ -136,7 +134,6 @@ let%expect_test "a page from before uploads the browser's once" =
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.notify) (value ())) ((key web.verbosity) (value ()))
-      ((key web.transcript-filter) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.review) (value ())) ((key history) (value ()))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
@@ -270,11 +267,11 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.transcript-filter
-         web.terminal-open web.sidebar-folded web.review history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];

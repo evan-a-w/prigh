@@ -41,7 +41,7 @@ type t =
   ; context_tokens : int
   ; active_host : string (** [Host.id]; "backend" or a client id *)
   ; hosts : Host.t list
-  (** backend first, then connected tool-capable clients *)
+    (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
   ; budget_usd : float option (** no turn starts once [cost_usd] reaches it *)
@@ -58,6 +58,10 @@ type t =
   ; hidden : Hidden.t list
     (** what trims and deletions keep out of the model's context, oldest
         first *)
+  ; transcript_filter : string option
+    (** what prigh-web shows of the session's transcript
+        ([Transcript_filter.to_string]); [None]: everything, also from
+        backends without it *)
   }
 [@@deriving sexp_of, equal]
 

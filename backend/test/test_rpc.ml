@@ -1596,6 +1596,56 @@ let%expect_test "budget, goal and resume: methods, state fields and events" =
     |}]
 ;;
 
+let%expect_test "set_transcript_filter: kept in the session, in its state" =
+  with_agent []
+  @@ fun t agent h ->
+  let state_field () =
+    match Rpc_json.state (Agent.state agent) with
+    | `Object fields ->
+      print_endline
+        (Option.value_map
+           (List.Assoc.find fields ~equal:String.equal "transcript_filter")
+           ~default:"(absent)"
+           ~f:Json.to_string)
+    | _ -> ()
+  in
+  let states () =
+    let n =
+      Queue.count h.sent ~f:(fun json ->
+        match Json.member "event" json with
+        | Some (`String "state") -> true
+        | _ -> false)
+    in
+    Queue.clear h.sent;
+    printf "state events: %d\n" n
+  in
+  state_field ();
+  call t h ~params:{|{"filter": "thinking,tools"}|} "set_transcript_filter";
+  state_field ();
+  states ();
+  call t h ~params:{|{"filter": 3}|} "set_transcript_filter";
+  state_field ();
+  call t h ~params:{|{"filter": null}|} "set_transcript_filter";
+  state_field ();
+  call t h ~params:{|{"filter": "user"}|} "set_transcript_filter";
+  call t h "set_transcript_filter";
+  state_field ();
+  [%expect
+    {|
+    (absent)
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    "thinking,tools"
+    state events: 1
+    {"type":"response","id":"r1","ok":false,"error":"param \"filter\" must be a string"}
+    "thinking,tools"
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (absent)
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (absent)
+    |}]
+;;
+
 let%expect_test
     "a compaction inside a subagent reaches frontends as a nested event"
   =
