@@ -67,21 +67,7 @@ let run
   let sse = Sse.create () in
   let status = ref 0 in
   let error_body = Buffer.create 256 in
-  let last_chunk = ref None in
-  let chunk_gap chunk =
-    if Trace.enabled ~detailed:true ()
-    then (
-      Option.iter !last_chunk ~f:(fun at ->
-        Trace.finish
-          (Trace.start
-             ~detailed:true
-             ~at
-             "chunk_gap"
-             ~attrs:[ "bytes", Int (String.length chunk) ]));
-      last_chunk := Trace.now ())
-  in
   let on_chunk chunk =
-    chunk_gap chunk;
     if !status / 100 = 2
     then
       List.iter
@@ -109,7 +95,6 @@ let run
       ~body
       ~on_response:(fun r ->
         status := r.status;
-        last_chunk := Trace.now ();
         Trace.add_attrs ~under:"model_request" [ "http_status", Int r.status ];
         Trace.phase "first_token")
       ~on_chunk
