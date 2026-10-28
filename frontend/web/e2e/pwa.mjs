@@ -149,7 +149,9 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await composer().waitFor();
-  await page.waitForFunction(() => navigator.serviceWorker.controller?.state === "activated");
+  // Installing fetches the whole shell: the dev build's main.bc.js is ~50 MB.
+  await page.waitForFunction(() => navigator.serviceWorker.controller?.state === "activated",
+    null, { timeout: 90000 });
   console.log(`controls the page: ${await page.evaluate(() => !!navigator.serviceWorker.controller)}`);
   console.log(`script: ${await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).pathname)}`);
   console.log(`scope: ${await page.evaluate(async () => new URL((await navigator.serviceWorker.ready).scope).pathname)}`);
@@ -215,7 +217,7 @@ try {
   section("a new build");
   console.log(`notice before it: ${await page.locator(".update-notice").count()}`);
   await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-  await page.locator(".update-notice").waitFor();
+  await page.locator(".update-notice").waitFor({ timeout: 90000 });
   console.log(`notice: ${await page.locator(".update-notice span").first().textContent()}`);
   console.log(`buttons: ${(await page.locator(".update-notice button").evaluateAll(bs => bs.map(b => `${b.textContent || b.getAttribute("aria-label")} (${b.title})`))).join(", ")}`);
   console.log(`a worker waiting: ${await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting)}`);
