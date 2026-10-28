@@ -136,6 +136,91 @@
 (copy_files
  (files ../vendor/katex/*))
 
+; Installing it as an app (README.md, "In a browser"): the manifest, its icons
+; and the service worker, which keeps the shell for offline launches.
+
+(rule
+ (target manifest.webmanifest)
+ (deps ../manifest.webmanifest)
+ (action
+  (copy ../manifest.webmanifest manifest.webmanifest)))
+
+(rule
+ (target icon.svg)
+ (deps ../icon.svg)
+ (action
+  (copy ../icon.svg icon.svg)))
+
+(rule
+ (target icon-maskable.svg)
+ (deps ../icon-maskable.svg)
+ (action
+  (copy ../icon-maskable.svg icon-maskable.svg)))
+
+(rule
+ (target icon-192.png)
+ (deps ../icon-192.png)
+ (action
+  (copy ../icon-192.png icon-192.png)))
+
+(rule
+ (target icon-512.png)
+ (deps ../icon-512.png)
+ (action
+  (copy ../icon-512.png icon-512.png)))
+
+(rule
+ (target icon-maskable-512.png)
+ (deps ../icon-maskable-512.png)
+ (action
+  (copy ../icon-maskable-512.png icon-maskable-512.png)))
+
+(rule
+ (target apple-touch-icon.png)
+ (deps ../apple-touch-icon.png)
+ (action
+  (copy ../apple-touch-icon.png apple-touch-icon.png)))
+
+(rule
+ (target sw.js)
+ (deps
+  ../sw.template.js
+  index.html
+  main.bc.js
+  theme.css
+  style.css
+  chat.css
+  agents.css
+  terminal.css
+  files.css
+  review.css
+  highlight.css
+  resize.css
+  paging.css
+  jump.css
+  forge.css
+  recursive-sans.woff2
+  recursive-mono.woff2
+  terminal.js
+  xterm.js
+  xterm.css
+  addon-fit.js
+  katex.min.js
+  katex.min.css
+  copy-tex.min.js
+  manifest.webmanifest
+  icon.svg
+  icon-maskable.svg
+  icon-192.png
+  icon-512.png
+  icon-maskable-512.png
+  apple-touch-icon.png
+  (glob_files KaTeX_*.woff2))
+ (action
+  (with-stdout-to
+   sw.js
+   (run %{exe:../sw_gen/sw_gen.exe} %{deps}))))
+
 (install
  (section share)
  (package prigh_frontend)
@@ -165,5 +250,13 @@
   (katex.min.css as web/katex.min.css)
   (copy-tex.min.js as web/copy-tex.min.js)
   (LICENSE-katex as web/LICENSE-katex)
+  (manifest.webmanifest as web/manifest.webmanifest)
+  (icon.svg as web/icon.svg)
+  (icon-maskable.svg as web/icon-maskable.svg)
+  (icon-192.png as web/icon-192.png)
+  (icon-512.png as web/icon-512.png)
+  (icon-maskable-512.png as web/icon-maskable-512.png)
+  (apple-touch-icon.png as web/apple-touch-icon.png)
+  (sw.js as web/sw.js)
   (glob_files
    (KaTeX_*.woff2 with_prefix web))))

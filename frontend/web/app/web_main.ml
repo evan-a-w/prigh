@@ -500,6 +500,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
            else Browser.reload_without_query_param "session")
         ()
     | Auth_failed message -> Effect.of_sync_fun auth_failed message
+    | Apply_update -> Effect.of_sync_fun Service_worker.apply_update ()
     | Set_url_session session ->
       Effect.of_sync_fun
         (fun () ->
@@ -1304,6 +1305,8 @@ let run_app (settings : Settings.t) =
         in
         schedule (App.Action.Restore_prefs { prefs; legacy }));
        Page_notifications.set_title "prigh";
+       Service_worker.register ~on_update_ready:(fun () ->
+         schedule App.Action.Update_ready);
        Page_notifications.on_visibility_change (fun hidden ->
          schedule (App.Action.Page_hidden hidden));
        Option.iter (Tab_memory.saved_draft ()) ~f:(fun draft ->
