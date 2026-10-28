@@ -65,6 +65,7 @@ module Setup = struct
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
     ; world : Namespace.World.t
     ; models : Model_registry.t
+    ; forges : Forges.t (** the world's git-host sign-ins *)
     }
 end
 
@@ -194,6 +195,16 @@ let common_params =
           exit 2)
     in
     let mcp = if no_tools then None else Some (Mcp_hub.create ~env ~sw ()) in
+    let forges =
+      Forges.create
+        ~http:(Forge_http.real ~env)
+        ~sleep:(Eio.Time.sleep (Eio.Stdenv.clock env))
+        ~listen:(Forge_login.Listen.real ~env)
+        ~getenv
+        ~home
+        ~store
+        ()
+    in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -237,6 +248,7 @@ let common_params =
                      ~worktrees_dir
                      ~session:(fun () -> Option.map !agent_ref ~f:Agent.session)
                      ()
+                 ; Tool_pull_request.create ~forges ~worktrees_dir ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)
@@ -258,7 +270,7 @@ let common_params =
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models }
+    { Setup.session; cwd; new_agent; world; models; forges }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -682,7 +694,7 @@ let serve_command =
             | None -> Nix_store_ops.local ~env)
        in
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world; models } =
+         let { Setup.session; cwd; new_agent; world; models; forges } =
            make_agent ~env ~sw ~backend_host ?world ()
          in
          let login =
@@ -712,6 +724,7 @@ let serve_command =
              ~home:world.home
              ~nix_store
              ~login
+             ~forges
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -1297,7 +1310,7 @@ let acp_command =
          | Some (host, port) ->
            None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
          | None ->
-           let { Setup.session; cwd; new_agent; world; models } =
+           let { Setup.session; cwd; new_agent; world; models; forges } =
              make_agent ~env ~sw ~backend_host:false ()
            in
            if Option.is_some session
@@ -1321,6 +1334,7 @@ let acp_command =
                ~backend_host:false
                ~home:world.home
                ~login
+               ~forges
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent

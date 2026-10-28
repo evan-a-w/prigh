@@ -520,9 +520,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - `Forges` — the per-user service the RPC server holds: `accounts`
   (github.com, codeberg.org, configured and signed-in hosts), `login`,
   `logout`, `api` (refreshing an expiring token under the store lock,
-  re-checked there like `Provider_auth.resolve`), and the `pr_*` replies:
-  the repository is the current branch's remote, else `origin`, else the
-  first remote on a known host.
+  re-checked there like `Provider_auth.resolve`), and pull requests
+  (`list_pulls`, `view_pull` with its checks and optionally its diff,
+  `pull_defaults`, `create_pull`, which pushes first or refuses a branch the
+  remote lacks, `checkout_pull`) as typed values (`Pulls`, `Pull`,
+  `Defaults`, `Git_forge.Checkout`) that the `pr_*` methods turn into JSON
+  and `Tool_pull_request` into text. The repository is the current branch's
+  remote, else `origin`, else the first remote on a known host; git runs
+  through a [git] closure, on the session's tool host. `bin/main.ml` makes
+  one per world (user or namespace) and hands it to both the RPC server
+  (`Rpc_server.create ~forges`, `prigh acp` too) and that world's agents'
+  `pull_request` tool, so a sign-in is seen by both and never by another
+  user.
 
 ### Tools
 
@@ -759,6 +768,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {agent; task}` (the task from `Subagent_log`), removed paths append
   `Worktree_removed`. `Rpc_server` re-lists a session on every
   `Message_end`, a subagent's too, so the sidebar follows.
+- `Tool_pull_request` — the model's `pull_request` tool (`action` list,
+  view, checks, diff, create or checkout; `number`, `state`, `title`,
+  `body`, `base`, `head`, `draft`, `push`, `cwd`) on the world's `Forges`.
+  It runs in the backend (`on_host = false`, where the sign-ins are) and
+  sends its git through `Tool.execute_via` with `Git_forge`/`Git_location`
+  pseudo-tools, so git runs on the session's tool host. `create` and
+  `checkout` are `destructive` (`Depends` on `action`). A failure names
+  the next step for the model: `Forges`' slash-command hints are rewritten
+  (`/login` → ask the user to sign in), and a number that is not one of the
+  repository's pull requests gets the closest ones. A checkout's worktree
+  goes out as `Worktrees_changed`, like `Tool_worktree`'s.
 - `Worktree_watch` — the safety net for `git worktree add`/`remove`/`move`/
   `prune` run in `bash`: `Agent.executor` wraps the call that actually runs
   a matching command (not the backend-side wrapper of a job) in
@@ -902,7 +922,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   turn, and that it finishes only once its jobs have exited (so kill
   servers first). Either role, given the `worktree` tool, is told to make
   worktrees with it (or `subagent`'s `worktree` option) rather than `git
-  worktree add`, and to work there by the worktree's path.
+  worktree add`, and to work there by the worktree's path; given
+  `pull_request`, to use it for pull requests rather than `gh`.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
