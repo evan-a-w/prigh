@@ -29,7 +29,7 @@ input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 │ Hello from prigh, streamed in pieces.
 │ 
 └
-winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 120k/1.0M (12%) · $0.04
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 60k/1.0M (6%) · $0.02
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 
 == a bash card, expanded with <Tab>
@@ -83,13 +83,13 @@ input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 │ Three lines.
 │ 
 └
-winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Auto · ctx 90k/1.0M (9%) · $0.05
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 
 == /name and /budget: the title and the budget in the winbar
 → {"id":4,"method":"session/prompt","params":{"prompt":[{"text":"/name greetings","type":"text"}],"sessionId":"<session 1>"}}
-← {"id":4,"result":{"stopReason":"end_turn"}}
 ← {"method":"session/update","params":{"sessionId":"<session 1>","update":{"sessionUpdate":"session_info_update","title":"greetings"}}}
+← {"id":4,"result":{"stopReason":"end_turn"}}
 → {"id":5,"method":"session/prompt","params":{"prompt":[{"text":"/budget 5","type":"text"}],"sessionId":"<session 1>"}}
 ← {"id":5,"result":{"stopReason":"end_turn"}}
 ┌ chat
@@ -129,11 +129,11 @@ input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 │ budget set to $5.00
 │ 
 └
-winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11/$5.00
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 90k/1.0M (9%) · $0.05/$5.00
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 
 == /goal: the goal in the winbar, prigh's notice when it is met
-winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 240k/1.0M (24%) · $0.11/$5.00 · ● running · goal say hello
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 90k/1.0M (9%) · $0.05/$5.00 · ● running · goal say hello
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 ← {"method":"_prigh/notice","params":{"sessionId":"<session 1>","text":"goal complete: said hello"}}
 ┌ chat
@@ -186,5 +186,5 @@ input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
 │ Goal met.
 │ 
 └
-winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 0/1.0M (0%) · $0.11/$5.00
+winbar: greetings · deepseek/deepseek-flash · thinking on · mode Auto · ctx 0/1.0M (0%) · $0.05/$5.00
 input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
