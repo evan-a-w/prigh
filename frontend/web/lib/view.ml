@@ -277,13 +277,18 @@ let view (m : Model.t) ~inject ~terminal =
      keyboard while open. *)
   let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
   (* So is the drawer, over the page. *)
-  let drawer = m.narrow && m.sidebar_open in
+  let drawer = Model.drawer m in
   let layered behind =
     let under_sheet = if sheet then Fn.compose inert behind else behind in
     if drawer then Fn.compose inert under_sheet else under_sheet
   in
   let under_sheet = if sheet then Fn.compose inert behind else behind in
   let under_drawer = layered behind in
+  (* The panels beside the review are under its drawer; a phone's sheets
+     are over its drawer. *)
+  let panel =
+    if Model.focused m && drawer then Fn.compose inert behind else behind
+  in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with
     | Some text, _, _ -> placeholder text
@@ -296,7 +301,8 @@ let view (m : Model.t) ~inject ~terminal =
     ~attrs:
       [ classes
           [ "app" ]
-          [ "sidebar-open", m.sidebar_open
+          [ "sidebar-open", Model.sidebar_shown m
+          ; "sidebar-drawer", drawer
           ; "narrow", m.narrow
           ; "agents-open", m.agents.open_
           ; "terminal-open", m.terminal.open_
@@ -309,17 +315,19 @@ let view (m : Model.t) ~inject ~terminal =
           ]
       ; Resize_view.vars m
       ]
-    [ (* A phone's closed drawer is only out of sight. *)
-      (if m.narrow && not m.sidebar_open then inert else under_sheet)
+    [ (* A closed drawer is only out of sight. *)
+      (if (m.narrow || Model.focused m) && not (Model.sidebar_shown m)
+       then inert
+       else under_sheet)
         (Sidebar_view.view
            m
            ~inject
            ~session:
              (if Model.docked m then Session_view.card m ~inject else Node.none))
-    ; (if m.sidebar_open
+    ; (if Model.docked m
        then Resize_view.handle m ~inject Sidebar
        else Node.none)
-    ; (if m.narrow && m.sidebar_open
+    ; (if drawer
        then
          Node.div
            ~attrs:
@@ -328,54 +336,63 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
-    ; (* Its pickers are on the page, which keeps them live (the page makes
-         the rest of itself inert). *)
-      (match m.dialog with
-       | Some (Review_pick _) when not (Model.waiting m || Files.asking m.files)
-         -> layered Fn.id
-       | _ -> under_drawer)
-        (Review_page_view.view m ~inject)
-    ; (if m.review.open_
-       then Resize_view.handle m ~inject Review_chat
-       else Node.none)
-    ; Node.main
-        ~attrs:[ Attr.class_ "main" ]
-        (List.map
-           ~f:under_drawer
-           [ (if Model.docked m then Node.none else Session_view.bar m ~inject)
-           ; banner m ~inject
-           ; div
-               ~cls:"chat-frame"
+    ; (* The review page, the chat and the terminal: a grid that the review
+         rearranges (review.css), each keeping its place in the tree, so that
+         the terminal's widget stays mounted. *)
+      div
+        ~cls:"desk"
+        [ (* Its pickers are on the page, which keeps them live (the page
+             makes the rest of itself inert). *)
+          (match m.dialog with
+           | Some (Review_pick _)
+             when not (Model.waiting m || Files.asking m.files) -> layered Fn.id
+           | _ -> under_drawer)
+            (Review_page_view.view m ~inject)
+        ; (if m.review.open_
+           then Resize_view.handle m ~inject Review_chat
+           else Node.none)
+        ; Node.main
+            ~attrs:[ Attr.class_ "main" ]
+            (List.map
+               ~f:under_drawer
                [ (if Model.docked m
-                  then Session_view.tools m ~inject
-                  else Node.none)
-               ; Node.div
-                   ~attrs:
-                     [ Attr.classes
-                         [ "chat"
-                         ; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity
+                  then Node.none
+                  else Session_view.bar m ~inject)
+               ; banner m ~inject
+               ; div
+                   ~cls:"chat-frame"
+                   [ (if Model.docked m
+                      then Session_view.tools m ~inject
+                      else Node.none)
+                   ; Node.div
+                       ~attrs:
+                         [ Attr.classes
+                             [ "chat"
+                             ; "verbosity-"
+                               ^ Prigh_ui.Verbosity.name m.verbosity
+                             ]
+                         ; Attr.id "chat"
+                         ; Attr.role "region"
+                         ; Attr.create "aria-label" "Transcript"
+                         ; Attr.tabindex 0
+                         ; (if Option.is_some (loading m)
+                            then Attr.create "aria-busy" "true"
+                            else Attr.empty)
                          ]
-                     ; Attr.id "chat"
-                     ; Attr.role "region"
-                     ; Attr.create "aria-label" "Transcript"
-                     ; Attr.tabindex 0
-                     ; (if Option.is_some (loading m)
-                        then Attr.create "aria-busy" "true"
-                        else Attr.empty)
-                     ]
-                   [ chat; jump_to_bottom m ~inject ]
-               ; (match loading m with
-                  | Some _ -> Node.none
-                  | None -> Jump_view.view m ~inject)
+                       [ chat; jump_to_bottom m ~inject ]
+                   ; (match loading m with
+                      | Some _ -> Node.none
+                      | None -> Jump_view.view m ~inject)
+                   ]
                ]
-           ]
-         @ [ toasts m ~inject ]
-         @ [ under_drawer (Btw_view.view m ~inject)
-           ; layered behind_composer (Composer_view.view m ~inject)
-           ; under_drawer (Terminal_view.view m ~inject ~widget:terminal)
-           ])
-    ; behind (Files_view.view m ~inject)
-    ; behind (Agents_view.view m ~inject)
+             @ [ toasts m ~inject ]
+             @ [ under_drawer (Btw_view.view m ~inject)
+               ; layered behind_composer (Composer_view.view m ~inject)
+               ])
+        ; under_drawer (Terminal_view.view m ~inject ~widget:terminal)
+        ]
+    ; panel (Files_view.view m ~inject)
+    ; panel (Agents_view.view m ~inject)
     ; Dialog_view.view m ~inject
     ; Files_view.dialog m ~inject
     ; Files_view.pickers

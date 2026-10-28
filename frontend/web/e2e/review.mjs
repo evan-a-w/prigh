@@ -86,7 +86,9 @@ const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-token", token, "-cwd", cwd],
-  { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+  // The terminal's tmux server is ours, its shell /bin/sh.
+  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" },
+    stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -223,6 +225,11 @@ try {
   section("page: the files");
   console.log(clean(await page.locator(".review-files").innerText()));
   console.log(`chat still shown: ${await page.locator(".main .composer").isVisible()}`);
+  // The file browser stays open beside them; closed, the review has its room.
+  console.log(`file browser beside the review: ${await page.locator(".files-panel").isVisible()}`);
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("Control+Shift+F");
+  await page.waitForSelector(".files-panel", { state: "detached" });
   // The chat's edge and the file list's edge resize them, kept.
   {
     const width = s => page.evaluate(s => Math.round(document.querySelector(s).getBoundingClientRect().width), s);
@@ -255,7 +262,6 @@ try {
     await page.waitForFunction(() => document.querySelector(".resizer[data-resize=review-files]").getAttribute("aria-valuenow") === "260");
     console.log(`double-clicked: the chat ${await width(".main")}, the files ${await width(".review-files")}`);
   }
-  console.log(`file browser hidden: ${!(await page.locator(".files-panel").isVisible())}`);
 
   // 4. Keys: ] and [ go through the files; c comments on a word selected in
   //    the new file.
@@ -574,12 +580,10 @@ try {
     ].join("\n");
   }));
   await page.setViewportSize({ width: 1440, height: 900 });
-  // The file browser's preview has the view too (the review closed, as it
-  // takes the browser's place).
+  // The file browser's preview has the view too (the review closed).
   await page.locator(".review-page").focus();
   await page.keyboard.press("Escape");
   await page.waitForSelector(".review-page", { state: "detached" });
-  // (It may still be open from before, behind the review.)
   if (!(await page.locator(".files-panel").isVisible())) await page.keyboard.press("Control+Shift+F");
   await page.locator('.files-row[data-name="util.ml"], .files-row[data-name="src"]').first().waitFor();
   if (await page.locator('.files-row[data-name="src"]').count()) await page.locator('.files-row[data-name="src"]').click();
@@ -657,6 +661,107 @@ try {
   await page.locator(".composer textarea").fill("/review");
   await page.locator(".composer textarea").press("Enter");
   await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
+
+  // 9e. Focused: the review and the chat beside it, without the sessions
+  //     sidebar; the agents panel, the file browser and the terminal open
+  //     beside and under them, the terminal across both. Closing the review
+  //     brings the sidebar back and keeps the terminal's shell and screen.
+  const box = selector => page.evaluate(s => {
+    const e = document.querySelector(s);
+    if (!e || !e.getClientRects().length) return null;
+    const r = e.getBoundingClientRect();
+    return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+  }, selector);
+  const layout = async () => {
+    const [sidebar, review, main, terminal, files, agents, bar] = await Promise.all(
+      [".sidebar", ".review-page", ".main", ".terminal-panel", ".files-panel", ".agents-panel", ".session-bar"].map(box));
+    const lines = [
+      `sidebar: ${sidebar ? "shown" : "hidden"}`,
+      `session bar over the chat: ${!!bar && !!main && bar.left >= main.left && bar.right <= main.right && bar.top <= main.top + 1}`,
+    ];
+    if (review && main) {
+      lines.push(`review from the left edge: ${review.left === 0}`);
+      lines.push(`chat beside the review: ${Math.abs(main.left - review.right) <= 1}, at least 300px: ${main.right - main.left >= 300}`);
+      lines.push(`review at least 480px: ${review.right - review.left >= 480}`);
+    }
+    if (terminal) {
+      const from = review ?? main;
+      lines.push(`terminal from ${review ? "the review's" : "the chat's"} left to the chat's right: ${terminal.left === from.left && terminal.right === main.right}`);
+      lines.push(`terminal under them: ${terminal.top >= main.bottom - 1 && (!review || terminal.top >= review.bottom - 1)}`);
+    }
+    if (files) lines.push(`files beside: ${files.left >= main.right - 1 && files.top === 0}`);
+    if (agents) lines.push(`agents beside: ${agents.left >= main.right - 1 && agents.top === 0}`);
+    return lines.join("\n");
+  };
+  section("focus: reviewing");
+  console.log(await layout());
+  await page.locator(".composer textarea").fill("/agents");
+  await page.locator(".composer textarea").press("Enter");
+  await page.locator(".agents-panel").waitFor();
+  await page.locator(".review-page").focus();
+  if (!(await page.locator(".files-panel").isVisible())) await page.keyboard.press("Control+Shift+F");
+  await page.locator(".files-panel").waitFor();
+  await page.keyboard.press("Control+Backquote");
+  await page.waitForFunction(() =>
+    document.activeElement?.closest(".terminal-panel")
+    && document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim());
+  await page.keyboard.type("echo focus-marker");
+  await page.keyboard.press("Enter");
+  const terminalHas = text => page.waitForFunction(
+    t => document.querySelector(".terminal-panel .xterm-rows")?.textContent.includes(t), text);
+  await terminalHas("focus-marker");
+  // The same xterm (not one mounted again) after the layout changes.
+  await page.evaluate(() => { document.querySelector(".terminal-panel .xterm").dataset.kept = "yes"; });
+  const kept = () => page.evaluate(() => document.querySelector(".terminal-panel .xterm")?.dataset.kept === "yes");
+  section("focus: the terminal, the agents and the files open");
+  console.log(await layout());
+  await page.waitForTimeout(200);
+  await screenshot("focus: the terminal, the agents and the files open");
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await page.waitForTimeout(200);
+  section("focus: a wider window");
+  console.log(await layout());
+  await screenshot("focus: a wider window");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("Alt+r");
+  await page.waitForSelector(".review-page", { state: "detached" });
+  section("focus: the review closed");
+  console.log(await layout());
+  console.log(`the same terminal: ${await kept()}`);
+  await screenshot("focus: the review closed");
+  await page.locator(".composer textarea").focus();
+  await page.keyboard.press("Alt+r");
+  await page.locator(".review-page").waitFor();
+  await page.locator('.review-file[data-path="src/main.ml"]').waitFor();
+  section("focus: reviewing again");
+  console.log(`the same terminal: ${await kept()}`);
+  await terminalHas("focus-marker");
+  // Ctrl+B: the sessions sidebar as a drawer over the review; Esc closes it.
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("Control+b");
+  await page.locator(".app.sidebar-drawer .scrim").waitFor();
+  section("focus: the sessions drawer");
+  console.log(await page.evaluate(() => {
+    const sidebar = document.querySelector(".sidebar");
+    const review = document.querySelector(".review-page").getBoundingClientRect();
+    return [
+      `over the review: ${getComputedStyle(sidebar).position === "fixed" && review.left === 0}`,
+      `the page behind is inert: ${document.querySelector(".review-page").closest("[inert]") !== null}`,
+    ].join("\n");
+  }));
+  await page.waitForTimeout(250);
+  await screenshot("focus: the sessions drawer");
+  await page.keyboard.press("Escape");
+  await page.locator(".scrim").waitFor({ state: "detached" });
+  console.log(`Esc closed the drawer, the review open: ${await page.locator(".review-page").isVisible()}`);
+  await page.locator(".terminal-close").click();
+  await page.waitForSelector(".terminal-panel", { state: "detached" });
+  await page.locator(".agents-close").click();
+  await page.waitForSelector(".agents-panel", { state: "detached" });
+  await page.locator(".review-page").focus();
+  await page.keyboard.press("Control+Shift+F");
+  await page.waitForSelector(".files-panel", { state: "detached" });
 
   // 10. A phone: a sheet over the chat.
   await page.setViewportSize({ width: 390, height: 800 });

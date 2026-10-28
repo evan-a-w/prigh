@@ -143,7 +143,7 @@ let%expect_test "the arrow keys on a handle resize its panel and keep the size" 
   sizes h;
   [%expect
     {|
-    sidebar-width=280px files-width=352px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=260px review-margin-width=240px
+    sidebar-width=280px files-width=352px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=161px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     sidebar 280 [200, 520]
@@ -152,7 +152,7 @@ let%expect_test "the arrow keys on a handle resize its panel and keep the size" 
     agents 420 [300, 1200]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 260 [160, 440]
+    review-files 161 [160, 161]
     review-margin 240 [240, 240]
     |}]
 ;;
@@ -220,7 +220,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
   sizes h;
   [%expect
     {|
-    sidebar-width=256px files-width=504px files-preview-width=480px agents-width=440px terminal-height=342px review-chat-width=400px review-files-width=161px review-margin-width=240px
+    sidebar-width=256px files-width=504px files-preview-width=480px agents-width=440px terminal-height=342px review-chat-width=400px review-files-width=162px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     <div class="resizer resizer-agents">
@@ -230,7 +230,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
     agents 440 [300, 440]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 161 [160, 161]
+    review-files 162 [160, 162]
     review-margin 240 [240, 240]
     |}];
   (* Narrower: the side panels give up width in proportion, down to their
@@ -239,7 +239,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
   sizes h;
   [%expect
     {|
-    sidebar-width=216px files-width=344px files-preview-width=480px agents-width=340px terminal-height=342px review-chat-width=400px review-files-width=161px review-margin-width=240px
+    sidebar-width=216px files-width=344px files-preview-width=480px agents-width=340px terminal-height=342px review-chat-width=400px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     <div class="resizer resizer-agents">
@@ -249,7 +249,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
     agents 340 [300, 340]
     terminal 342 [120, 640]
     review-chat 400 [300, 1118]
-    review-files 161 [160, 161]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
   (* The agents panel floats over the chat below 1180px, the file browser
@@ -258,7 +258,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
   sizes h;
   [%expect
     {|
-    sidebar-width=254px files-width=496px files-preview-width=480px agents-width=500px terminal-height=266px review-chat-width=400px review-files-width=161px review-margin-width=240px
+    sidebar-width=254px files-width=496px files-preview-width=480px agents-width=500px terminal-height=266px review-chat-width=400px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     <div class="resizer resizer-agents">
@@ -268,7 +268,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
     agents 500 [300, 989]
     terminal 266 [120, 440]
     review-chat 400 [300, 989]
-    review-files 161 [160, 161]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
   (* Wide again: back to what was chosen. *)
@@ -276,7 +276,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
   sizes h;
   [%expect
     {|
-    sidebar-width=256px files-width=504px files-preview-width=480px agents-width=440px terminal-height=342px review-chat-width=400px review-files-width=161px review-margin-width=240px
+    sidebar-width=256px files-width=504px files-preview-width=480px agents-width=440px terminal-height=342px review-chat-width=400px review-files-width=162px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     <div class="resizer resizer-agents">
@@ -286,7 +286,7 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
     agents 440 [300, 440]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 161 [160, 161]
+    review-files 162 [160, 162]
     review-margin 240 [240, 240]
     |}]
 ;;
@@ -371,7 +371,7 @@ let%expect_test
   sizes h;
   [%expect
     {|
-    sidebar-width=280px files-width=400px files-preview-width=360px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=260px review-margin-width=240px
+    sidebar-width=280px files-width=400px files-preview-width=360px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files-preview">
     <div class="resizer resizer-files">
@@ -381,7 +381,7 @@ let%expect_test
     agents 420 [300, 1200]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 260 [160, 440]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
   (* Closed, the list is alone again; open again, the preview has its
@@ -406,7 +406,7 @@ let%expect_test
     (Cache_prefs (((key web.files-width) (value (400)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 400)))))
      (tag Show_error))
-    sidebar-width=280px files-width=400px files-preview-width=360px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=260px review-margin-width=240px
+    sidebar-width=280px files-width=400px files-preview-width=360px agents-width=420px terminal-height=342px review-chat-width=400px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files-preview">
     <div class="resizer resizer-files">
@@ -416,7 +416,7 @@ let%expect_test
     agents 420 [300, 1200]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 260 [160, 440]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}]
 ;;
@@ -446,7 +446,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
     (Cache_prefs (((key web.files-width) (value (378)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.files-width 378)))))
      (tag Show_error))
-    sidebar-width=269px files-width=365px files-preview-width=480px agents-width=404px terminal-height=342px review-chat-width=400px review-files-width=161px review-margin-width=240px
+    sidebar-width=269px files-width=365px files-preview-width=480px agents-width=404px terminal-height=342px review-chat-width=400px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-files">
     <div class="resizer resizer-agents">
@@ -456,7 +456,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
     agents 404 [300, 406]
     terminal 342 [120, 640]
     review-chat 400 [300, 1200]
-    review-files 161 [160, 161]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
   H.click h ~selector:".files-back";
@@ -582,7 +582,6 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   [%expect
     {|
     (Complete_accept (run true))
-    <div class="resizer resizer-sidebar">
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     <div role="separator"
@@ -591,17 +590,18 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
          aria-orientation="vertical"
          aria-valuenow="400"
          aria-valuemin="300"
-         aria-valuemax="680"
+         aria-valuemax="960"
          title="Drag to resize, double-click for the default size"
          data-resize="review-chat"
          data-resize-var="--review-chat-width"
          data-resize-grows="-1"
-         data-resize-target="main.main"
+         data-resize-target=".desk"
          class="resizer resizer-review-chat"
          @on_dblclick> </div>
     |}];
-  (* The chat takes at most what leaves the review page 480px (1440 - 280
-     for the sidebar - 480), and the file list what leaves the code 320. *)
+  (* The chat takes at most what leaves the review page 480px (1440 - 480:
+     the sidebar steps aside while reviewing), and the file list what leaves
+     the code 320. *)
   H.key h ~target:(Resize Review_chat) "ArrowLeft";
   H.key h ~target:(Resize Review_chat) "End";
   H.key h ~target:(Resize Review_files) "ArrowRight" ~shift:true;
@@ -612,8 +612,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.review-chat-width 416)))))
      (tag Show_error))
     (Resize (Largest Review_chat))
-    (Cache_prefs (((key web.review-chat-width) (value (680)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.review-chat-width 680)))))
+    (Cache_prefs (((key web.review-chat-width) (value (960)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.review-chat-width 960)))))
      (tag Show_error))
     (Resize (Nudge Review_files 4))
     (Cache_prefs (((key web.review-files-width) (value (160)))))
@@ -623,16 +623,15 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   sizes h;
   [%expect
     {|
-    sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=680px review-files-width=160px review-margin-width=240px
-    <div class="resizer resizer-sidebar">
+    sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=960px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
-    sidebar 280 [200, 280]
+    sidebar 280 [200, 520]
     files 400 [280, 1200]
     files-preview 480 [320, 1238]
     agents 420 [300, 1200]
     terminal 342 [120, 640]
-    review-chat 680 [300, 680]
+    review-chat 960 [300, 960]
     review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
@@ -642,17 +641,16 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   sizes h;
   [%expect
     {|
-    sidebar-width=220px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=399px review-files-width=160px review-margin-width=240px
-    <div class="resizer resizer-sidebar">
+    sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=620px review-files-width=160px review-margin-width=240px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
-    sidebar 220 [200, 221]
+    sidebar 280 [200, 520]
     files 400 [280, 946]
     files-preview 480 [320, 946]
     agents 420 [300, 946]
     terminal 342 [120, 640]
-    review-chat 399 [300, 400]
-    review-files 160 [160, 161]
+    review-chat 620 [300, 620]
+    review-files 160 [160, 160]
     review-margin 240 [240, 240]
     |}];
   viewport h 1440 900;
@@ -673,18 +671,17 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
   H.act h (Resize (Set (Review_margin, 5000)));
   [%expect
     {|
-    (Cache_prefs (((key web.review-margin-width) (value (268)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.review-margin-width 268)))))
+    (Cache_prefs (((key web.review-margin-width) (value (308)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.review-margin-width 308)))))
      (tag Show_error))
-    (Cache_prefs (((key web.review-margin-width) (value (300)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.review-margin-width 300)))))
+    (Cache_prefs (((key web.review-margin-width) (value (580)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.review-margin-width 580)))))
      (tag Show_error))
     |}];
   sizes h;
   [%expect
     {|
-    sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=340px review-files-width=200px review-margin-width=300px
-    <div class="resizer resizer-sidebar">
+    sidebar-width=280px files-width=400px files-preview-width=480px agents-width=420px terminal-height=342px review-chat-width=340px review-files-width=200px review-margin-width=580px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     sidebar 280 [200, 520]
@@ -692,9 +689,9 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
     files-preview 480 [320, 1238]
     agents 420 [300, 1200]
     terminal 342 [120, 640]
-    review-chat 340 [300, 680]
-    review-files 200 [160, 500]
-    review-margin 300 [240, 300]
+    review-chat 340 [300, 960]
+    review-files 200 [160, 520]
+    review-margin 580 [240, 580]
     |}];
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.elements h ~selector:".resizer";
