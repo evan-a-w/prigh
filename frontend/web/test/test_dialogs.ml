@@ -166,7 +166,7 @@ let%expect_test "help lists every key and command" =
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
-    Ctrl+B show or hide the sidebar
+    Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Alt+1…9 follow subagent or job N in the agents panel

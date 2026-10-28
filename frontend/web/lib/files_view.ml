@@ -565,8 +565,8 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
          in
          ignore (text : string);
          [ code_review_bar m path ~inject
-         ; (* The review page shows it (and the panel is hidden): one place
-              for its selection and comment box. *)
+         ; (* The review page shows it: one place for its selection and
+              comment box. *)
            (if m.review.open_
             then div ~cls:"files-note" [ Node.text "Shown in the review." ]
             else Review_code_view.view ~place:`Files m ~path ~inject)

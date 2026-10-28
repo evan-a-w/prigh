@@ -8,7 +8,7 @@ let target : Handle.t -> string = function
   | Files | Files_preview -> "#files-panel"
   | Agents -> "#agents-panel"
   | Terminal -> "#terminal-panel"
-  | Review_chat -> "main.main"
+  | Review_chat -> ".desk"
   | Review_files -> ".review-body"
   | Review_margin -> "#review-page"
 ;;

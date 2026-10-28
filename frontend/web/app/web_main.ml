@@ -658,13 +658,14 @@ let component client settings ~current (local_ graph) =
           ( App.Model.running m
           , m.narrow
           , m.agents.open_
-          , m.sidebar_open
+          , App.Model.docked m
+          , m.review.open_
           , Option.is_some m.state )
         in
         if
           not
             (String.equal model.draft model'.draft
-             && [%equal: bool * bool * bool * bool * bool]
+             && [%equal: bool * bool * bool * bool * bool * bool]
                   (layout model)
                   (layout model')
              && App.Connection.equal model.connection model'.connection)

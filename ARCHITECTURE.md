@@ -2935,9 +2935,15 @@ terminal frontend and `web/` prigh-web, the browser one.
       the item above; otherwise (and on a phone) under the row its code ends
       on now. A resolved thread is a mark on its line until unfolded
       (`Code_review.unfolded`); those whose code is gone or not shown are
-      counted in folded lines above the file. `Review_page_view` is the page: in
-      `.app.reviewing` it comes before `.main`, which narrows to a column
-      (`review.css`); its head (the approvals strip, refresh, the mode and
+      counted in folded lines above the file. `Review_page_view` is the page: it
+      shares `.desk` with `.main` and the terminal, a CSS grid whose areas
+      `.app.reviewing` (`review.css`) rearranges, so that the chat and the
+      terminal keep their place in the tree (the xterm widget is not
+      mounted again): the page beside the chat column, the terminal under
+      both. The sessions sidebar is hidden then (`Model.focused`; Ctrl+B
+      shows it as a drawer, `Model.review_drawer`, over the page, which is
+      inert under it) and `Session_view.bar` shows the status over the
+      chat (`Model.docked` is false); its head (the approvals strip, refresh, the mode and
       layout, Send N comments, close), the files with their approval
       marks and open comment counts, and the current file (previous and
       next, Approve / Approved / Approve again, the code or the editor: a

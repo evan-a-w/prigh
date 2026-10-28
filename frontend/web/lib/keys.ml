@@ -87,7 +87,7 @@ let help =
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
-  ; "Ctrl+B", "show or hide the sidebar"
+  ; "Ctrl+B", "show or hide the sidebar (while reviewing, over the review)"
   ; ( "Ctrl+,"
     , "settings: notifications, transcript detail, your account (/settings)" )
   ; ( "← → / ↑ ↓ (on a panel's edge)"
@@ -557,7 +557,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | "ArrowUp" when alt_only t -> Some Dequeue
      | "ArrowUp" when ctrl_only t -> Some (Jump_to_user_message (-1))
      | "ArrowDown" when ctrl_only t -> Some (Jump_to_user_message 1)
-     | "Escape" when m.narrow && m.sidebar_open -> Some Toggle_sidebar
+     | "Escape" when App.Model.drawer m -> Some Toggle_sidebar
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)

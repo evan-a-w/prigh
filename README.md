@@ -636,8 +636,10 @@ it) for the default size. It is a focusable separator: Tab to it, then
 the arrow keys move it (Shift: four times as far), Home and End make the
 panel as small or as large as it goes. The chat always keeps 400px (while
 reviewing, the review page keeps 480px beside the chat, and its code
-320px beside its file list): when the window narrows, the side panels
-beside it shrink in proportion (down to their minimums) and grow back to
+320px beside its file list, and the sessions sidebar steps aside, so the
+file browser and the agents panel share what is left with them; the
+terminal then spans the review and the chat): when the window narrows,
+the side panels beside it shrink in proportion (down to their minimums) and grow back to
 the sizes you chose when it widens again. The sizes are kept with your preferences on the backend (below), so
 every browser you sign in on has them. On a phone the panels are sheets,
 without handles.
@@ -833,7 +835,14 @@ across the reconnect: their results wait for the backend to be back.
 `/review` (or Alt+R, or the Review button of the file browser and of
 `/diff`) opens the review page in the chat's place; the chat narrows to a
 column beside it and keeps working (drag the edge between them to share
-the width differently). Down its left are the changed files,
+the width differently). Reviewing is a focused mode: the sessions sidebar
+steps aside (Ctrl+B shows it as a drawer over the page, Esc or a click
+beside it hides it again) and the session's status moves to the bar over
+the chat. The terminal (Ctrl+`) spans the bottom under both the review
+and the chat, and the file browser and the agents panel open beside them
+as usual. Closing the review brings the sidebar back as it was.
+
+Down the review page's left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
 its hunks or, with Whole file (v), all of it with the changes inline, one
