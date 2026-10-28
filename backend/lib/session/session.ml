@@ -68,6 +68,7 @@ module Entry = struct
       | Worktree of Session_worktree.t
       | Worktree_removed of { path : string }
       | Home of { home : Home.t option }
+      | Transcript_filter of { filter : string option }
       | Trim of { before : string }
       | Untrim
       | Trim_after of
@@ -111,6 +112,7 @@ type t =
   ; repos : Git_location.t option String.Table.t (** by cwd *)
   ; mutable worktrees : Session_worktree.t list (** newest first *)
   ; mutable home : Home.t option
+  ; mutable transcript_filter : string option
   ; created_at : Time_float.t
   ; parent : string option
   ; mutable entries : Entry.t list (* reversed *)
@@ -200,6 +202,7 @@ let worth_saving (line : Line.t) =
           | Worktree _
           | Worktree_removed _
           | Home _
+          | Transcript_filter _
           | Trim _
           | Untrim
           | Trim_after _
@@ -298,6 +301,7 @@ let create ~dir ~cwd ?parent () =
     ; repos = String.Table.create ()
     ; worktrees = []
     ; home = None
+    ; transcript_filter = None
     ; created_at
     ; parent
     ; entries = []
@@ -368,6 +372,7 @@ let add_entry t (entry : Entry.t) =
   | Agent_worktree w -> track_worktree t (Session_worktree.of_agent w)
   | Worktree w -> track_worktree t w
   | Home { home } -> t.home <- home
+  | Transcript_filter { filter } -> t.transcript_filter <- filter
   | Worktree_removed { path } ->
     t.worktrees
     <- List.filter t.worktrees ~f:(fun (o : Session_worktree.t) ->
@@ -443,6 +448,7 @@ let load ?(yield = fun () -> ()) path =
            ; repos = String.Table.create ()
            ; worktrees = []
            ; home = None
+           ; transcript_filter = None
            ; created_at
            ; parent
            ; entries = []
@@ -534,6 +540,8 @@ let add_worktree t worktree = append t (Worktree worktree)
 let worktree_removed t ~path = append t (Worktree_removed { path })
 let home t = t.home
 let set_home t home = append t (Home { home })
+let transcript_filter t = t.transcript_filter
+let set_transcript_filter t filter = append t (Transcript_filter { filter })
 let record_review t change = append t (Review change)
 
 let review t =
@@ -591,6 +599,7 @@ let name t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -624,6 +633,7 @@ let description t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -933,6 +943,7 @@ let fold t path : Folded.t =
       | Worktree _
       | Worktree_removed _
       | Home _
+      | Transcript_filter _
       | Review _ -> acc)
   in
   { Folded.context = List.rev rev_context; hidden; position }
@@ -1202,6 +1213,7 @@ let context_cwds t =
       | Worktree _
       | Worktree_removed _
       | Home _
+      | Transcript_filter _
       | Trim _
       | Untrim
       | Trim_after _
@@ -1273,6 +1285,7 @@ let system_prompt t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -1306,6 +1319,7 @@ let goal t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -1354,6 +1368,7 @@ let budget t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -1387,6 +1402,7 @@ let model t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _
@@ -1522,7 +1538,11 @@ let fork ?at t ~dir =
               in
               if Option.is_some text then Hash_set.add texts md5;
               Some (Review (Snapshot { snapshot = s; text }))
-            | Archived _ | Spend _ | Resume_at _ | Agent_worktree _ -> None
+            | Archived _
+            | Spend _
+            | Resume_at _
+            | Agent_worktree _
+            | Transcript_filter _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -1544,6 +1564,8 @@ let fork ?at t ~dir =
          another branch. *)
       if not (Option.equal Home.equal forked.home t.home)
       then ignore (append forked (Home { home = t.home }) : Entry.t);
+      Option.iter t.transcript_filter ~f:(fun filter ->
+        ignore (set_transcript_filter forked (Some filter) : Entry.t));
       Ok forked)
 ;;
 
@@ -1650,6 +1672,7 @@ let archived_and_activity t ~mtime =
         | Worktree _
         | Worktree_removed _
         | Home _
+        | Transcript_filter _
         | Trim _
         | Untrim
         | Trim_after _
@@ -1941,6 +1964,7 @@ let to_markdown t =
     | Worktree _
     | Worktree_removed _
     | Home _
+    | Transcript_filter _
     | Trim _
     | Untrim
     | Trim_after _

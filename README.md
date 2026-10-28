@@ -689,10 +689,11 @@ files', opens a menu under it that shows or hides whole kinds of the
 transcript (↑↓, Space or a click toggles at once, Enter or a click outside
 keeps, Esc puts back what it was; "Show all" resets): the button is accented
 with how many kinds are hidden, and a line over the transcript says what is
-hidden, how many items, with "Show all". It is a preference
-(`web.transcript-filter`), so it stays across sessions, reloads and
-browsers; the jump rail and Ctrl+J still list your messages when they are
-hidden, and land where they are. A hidden message's menu (copy, trim before or
+hidden, how many items, with "Show all". Each session has its own, kept
+in the session, so switching sessions switches the filter, and it stays
+across reloads, browsers and forks of the session; the jump rail and
+Ctrl+J still list your messages when they are hidden, and land where they
+are. A hidden message's menu (copy, trim before or
 after it, delete) goes with it, the dividers of trims stay, and the count
 leaves out what is being deleted; `/copy` (Ctrl+X with nothing selected) copies
 the last reply. `/skills` is a picker of the skills where the tools run
@@ -1326,8 +1327,8 @@ opens a checklist (Space toggles, Enter applies, Esc leaves it as it was);
 those, `+thinking` shows it again and `/filter all` shows everything. While
 it hides something the status line says what (`filter: −thinking −tools`).
 The TUI keeps it in the backend's preferences (`tui.transcript-filter`), so
-it lasts across runs and sessions; prigh-web keeps its own
-(`web.transcript-filter`, below). `/jump` still lists every message of
+it lasts across runs and sessions; prigh-web keeps one per session, in
+the session (below). `/jump` still lists every message of
 yours, hidden or not.
 
 The terminal does not draw images: each one in a prompt or a tool result shows

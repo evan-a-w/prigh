@@ -53,7 +53,7 @@ type t =
   ; context_tokens : int
   ; active_host : string (** [Host.id]; "backend" or a client id *)
   ; hosts : Host.t list
-  (** backend first, then connected tool-capable clients *)
+    (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
   ; budget_usd : float option
@@ -66,6 +66,7 @@ type t =
   ; session_rules : string list
   ; trim : Trim.t option [@sexp.option]
   ; hidden : Hidden.t list [@sexp.list]
+  ; transcript_filter : string option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
@@ -141,7 +142,8 @@ let of_json j =
     Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
   in
   let%bind trim = Trim.field j in
-  let%map hidden = Hidden.field j in
+  let%bind hidden = Hidden.field j in
+  let%map transcript_filter = Json.string_opt_field j "transcript_filter" in
   { session_id
   ; session_path
   ; session_name
@@ -170,5 +172,6 @@ let of_json j =
   ; session_rules
   ; trim
   ; hidden
+  ; transcript_filter
   }
 ;;

@@ -114,6 +114,7 @@ type t =
 
 let per_session = function
   | Popover _
+  | Filter _
   | Review_pick _
   | Rename _
   | Prompt _
@@ -165,7 +166,6 @@ let per_session = function
   | Help
   | Hotkeys
   | Settings
-  | Filter _
   | Scoped_models _
   | Delete _
   | Login _

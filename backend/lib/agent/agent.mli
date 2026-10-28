@@ -80,6 +80,8 @@ module State : sig
       (** what is trimmed from the model's context ({!Session.trim}) *)
     ; hidden : Session.Hidden.t list
       (** what trims and deletions keep out of it ({!Session.hidden}) *)
+    ; transcript_filter : string option
+      (** what prigh-web shows of the transcript ({!set_transcript_filter}) *)
     }
   [@@deriving sexp_of]
 end
@@ -724,6 +726,11 @@ val undelete : ?entry:string -> t -> Session.Hidden.t Or_error.t
 
 val rewind : t -> to_:string -> unit Or_error.t
 val set_session_name : t -> string -> unit
+
+(** Records which kinds of the transcript a frontend shows for the session
+    ({!Session.transcript_filter}; [None]: everything); the text is the
+    frontend's. Nothing is recorded when it is unchanged. *)
+val set_transcript_filter : t -> string option -> unit
 
 (** The active tool host's home directory, for [~] in paths meant for it
     (asked for once when its [hello] did not say); [None] while it is
