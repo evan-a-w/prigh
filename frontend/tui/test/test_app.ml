@@ -3823,6 +3823,8 @@ let%expect_test "background subagent: runs while main is idle, survives a \
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4186,6 +4188,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
        ; model = "claude-haiku"
        ; tools = [ "read"; "grep" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (Tool_start call2);
   H.event
@@ -4197,6 +4201,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
        ; model = "claude-sonnet"
        ; tools = [ "bash" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
@@ -4405,6 +4411,8 @@ let%expect_test "verbosity applies inside an agent view" =
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   let call = tool_call ~name:"bash" ~arguments:{|{"command":"ls"}|} "t1" in
@@ -4484,6 +4492,8 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
        ; model = "claude-haiku"
        ; tools = [ "read" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4494,6 +4504,8 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
        ; model = "claude-sonnet"
        ; tools = [ "bash" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4557,6 +4569,8 @@ let%expect_test "new user prompt clears finished agents" =
        ; model = "claude-haiku"
        ; tools = [ "read" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4619,6 +4633,8 @@ let%expect_test "session reload drops subagent transcripts and focus" =
        ; model = "m"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4685,6 +4701,8 @@ let%expect_test "nested subagent events recurse into the parent's children" =
        ; model = "m1"
        ; tools = [ "subagent" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -4711,6 +4729,8 @@ let%expect_test "nested subagent events recurse into the parent's children" =
              ; model = "m2"
              ; tools = [ "read" ]
              ; worktree = None
+             ; forked = false
+             ; continued = false
              }
        });
   H.event
@@ -5127,6 +5147,8 @@ let%expect_test "Ctrl+X copies the last assistant message, or the focused \
        ; model = "m"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
@@ -5539,6 +5561,8 @@ let%expect_test
        ; model = "claude-haiku"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -5549,6 +5573,8 @@ let%expect_test
        ; model = "claude-sonnet"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event
     h
@@ -7058,6 +7084,8 @@ let with_agents ~width ~height =
            ; model
            ; tools = [ "bash" ]
            ; worktree = None
+           ; forked = false
+           ; continued = false
            }));
   H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
   H.event
@@ -8669,6 +8697,8 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
        ; model = "m"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (Agent_end []);
   H.next_agent h;
@@ -9666,6 +9696,8 @@ let%expect_test "/agents cancel: errors say what exists" =
        ; model = "m"
        ; tools = []
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.keys h "/agents cancel 3";
   H.enter h;

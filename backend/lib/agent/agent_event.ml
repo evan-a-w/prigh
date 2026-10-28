@@ -72,6 +72,12 @@ type t =
       ; worktree : Agent_worktree.t option
         (** the worktree it works in, made for it ([subagent]'s
             [worktree]) *)
+      ; forked : bool
+        (** it started from its caller's conversation ([subagent]'s
+            [fork]) *)
+      ; continued : bool
+        (** an agent that ran out of turns runs again ([subagent_continue]),
+            under the same ids: it ends again with totals over all its runs *)
       }
   | Subagent of
       { call_id : string

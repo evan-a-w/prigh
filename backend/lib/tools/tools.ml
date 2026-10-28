@@ -79,15 +79,32 @@ let main_agent_only =
   ]
 ;;
 
+(* Why a tool is not available at [depth], if it is not. *)
+let unavailable ~depth name =
+  let mem = List.mem ~equal:String.equal in
+  if depth >= 2 && mem [ "subagent"; "subagent_continue" ] name
+  then
+    Some
+      "you are a subagent's subagent, which cannot delegate further: do the \
+       work yourself"
+  else if depth >= 1 && mem subagent_control name
+  then
+    Some
+      "you are a subagent, and background subagents are the main agent's \
+       (yours run synchronously: subagent returns their report)"
+  else if depth >= 1 && mem main_agent_only name
+  then
+    Some
+      "it is the main agent's (the user's plan, questions and goal), and you \
+       are a subagent: put what you need from the user in your report"
+  else None
+;;
+
 let for_context ~parent ~depth ?only () =
   let available =
     List.filter_map parent ~f:(fun t ->
       let name = Tool.name t in
-      if
-        (depth >= 2 && String.equal name "subagent")
-        || (depth >= 1
-            && (List.mem subagent_control name ~equal:String.equal
-                || List.mem main_agent_only name ~equal:String.equal))
+      if Option.is_some (unavailable ~depth name)
       then None
       else if depth >= 1 && String.equal name "bash"
       then Some Tool_bash.subagent_tool

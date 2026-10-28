@@ -16,6 +16,7 @@ and context =
   ; agent_id : string option
   ; call_id : string
   ; tools : t list
+  ; conversation : Conversation.t option
   ; emit : Agent_event.t -> unit
   ; background : Background_tasks.t option
   ; execute : executor
@@ -60,6 +61,7 @@ module Context = struct
         ?agent_id
         ?(call_id = "")
         ?(tools = [])
+        ?conversation
         ?(emit = ignore)
         ?background
         ?cache_key
@@ -83,6 +85,7 @@ module Context = struct
     ; agent_id
     ; call_id
     ; tools
+    ; conversation
     ; emit
     ; background
     ; execute

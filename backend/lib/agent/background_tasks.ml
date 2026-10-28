@@ -39,11 +39,11 @@ module Task = struct
     ; kind : Kind.t
     ; label : string
     ; started_at : float
-    ; cancel : Cancellation.t
-    ; finished : unit Promise.t
+    ; mutable cancel : Cancellation.t
+    ; mutable finished : unit Promise.t
     ; output : Output_tail.t
     ; input : Stdin_feed.t option
-    ; inbox : Subagent_inbox.t option
+    ; mutable inbox : Subagent_inbox.t option
     ; mutable outcome : Outcome.t option
     ; mutable finished_at : float option
     ; mutable activity : string
@@ -76,6 +76,17 @@ module Task = struct
   ;;
 end
 
+module Resume = struct
+  type t =
+    max_turns:int option
+    -> message:string option
+    -> inbox:Subagent_inbox.t option
+    -> call_id:string option
+    -> cancel:Cancellation.t
+    -> emit:(Agent_event.t -> unit)
+    -> Outcome.t
+end
+
 module Summary = struct
   type t =
     { id : string
@@ -96,6 +107,7 @@ type t =
   ; mutable on_change : unit -> unit
   ; mutable on_queue_change : unit -> unit
   ; mutable auto_background : unit -> float option
+  ; parked : Resume.t String.Table.t
   }
 
 let create ~env ~sw ~first_subagent_id ~first_job_id () =
@@ -108,6 +120,7 @@ let create ~env ~sw ~first_subagent_id ~first_job_id () =
   ; on_change = ignore
   ; on_queue_change = ignore
   ; auto_background = (fun () -> None)
+  ; parked = String.Table.create ()
   }
 ;;
 
@@ -222,19 +235,14 @@ let finish_on_switch_exit t task resolve =
   Promise.resolve resolve ()
 ;;
 
-let spawn ?input ?inbox t ~kind ~label ~run =
-  Option.iter inbox ~f:(fun inbox ->
-    Subagent_inbox.set_on_change inbox (fun () -> t.on_queue_change ()));
-  let task, resolve =
-    make_task
-      ?input
-      ?inbox
-      t
-      ~kind
-      ~label
-      ~started_at:(now t)
-      ~cancel:(Cancellation.create ())
+(* Runs [task] in the tasks' switch until [run] returns its outcome. *)
+let run_task t (task : Task.t) resolve ~run =
+  let close_inbox () =
+    Option.iter task.inbox ~f:(fun inbox ->
+      ignore (Subagent_inbox.close inbox : string list))
   in
+  Option.iter task.inbox ~f:(fun inbox ->
+    Subagent_inbox.set_on_change inbox (fun () -> t.on_queue_change ()));
   let emit event =
     Option.iter (activity event) ~f:(fun a -> task.activity <- a);
     t.emit event
@@ -250,22 +258,34 @@ let spawn ?input ?inbox t ~kind ~label ~run =
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
-        Option.iter inbox ~f:(fun inbox ->
-          ignore (Subagent_inbox.close inbox : string list));
+        close_inbox ();
         finish_on_switch_exit t task resolve;
         raise exn
-      | exception exn -> failed_outcome kind exn
+      | exception exn -> failed_outcome task.kind exn
     in
     (* Before it counts as finished, so no message is accepted that nothing
        would take. *)
-    Option.iter inbox ~f:(fun inbox ->
-      ignore (Subagent_inbox.close inbox : string list));
+    close_inbox ();
     finish t task outcome;
     (* Its report is still delivered (and its waiters woken) when the
        agent's bookkeeping fails; the switch is the server's. *)
     Guarded.run ~what:"a background task's report" (fun () -> t.on_change ());
     Promise.resolve resolve ());
-  t.on_change ();
+  t.on_change ()
+;;
+
+let spawn ?input ?inbox t ~kind ~label ~run =
+  let task, resolve =
+    make_task
+      ?input
+      ?inbox
+      t
+      ~kind
+      ~label
+      ~started_at:(now t)
+      ~cancel:(Cancellation.create ())
+  in
+  run_task t task resolve ~run;
   task.id
 ;;
 
@@ -502,18 +522,88 @@ let rec take_next ?interrupt t ~cancel =
         | Some `Finished -> take_next ?interrupt t ~cancel))
 ;;
 
+let park t id resume = Hashtbl.set t.parked ~key:id ~data:resume
+let unpark t id = Option.is_some (Hashtbl.find_and_remove t.parked id)
+let is_parked t id = Hashtbl.mem t.parked id
+
+let parked_text t =
+  match List.sort (Hashtbl.keys t.parked) ~compare:String.compare with
+  | [] -> "none"
+  | ids -> String.concat ~sep:", " ids
+;;
+
+let not_parked t id ~(task : Task.t option) =
+  let can = sprintf "(those that can: %s)" (parked_text t) in
+  match task with
+  | None ->
+    Or_error.errorf
+      "unknown subagent %S: only a subagent of yours that ran out of turns can \
+       be continued %s"
+      id
+      can
+  | Some task ->
+    (match task.outcome with
+     | None ->
+       Or_error.errorf
+         "%s is still running: use subagent_message to tell it something"
+         id
+     | Some { status = "out of turns"; _ } ->
+       Or_error.errorf
+         "%s ran out of turns but was cancelled since, so it cannot be \
+          continued %s; start a new subagent for more work"
+         id
+         can
+     | Some outcome ->
+       Or_error.errorf
+         "%s %s and cannot be continued: only a subagent that ran out of turns \
+          can %s; start a new subagent for more work"
+         id
+         (if String.equal outcome.status "finished"
+          then "finished"
+          else sprintf "ended (%s)" outcome.status)
+         can)
+;;
+
+let continue_ t id ~max_turns ~message =
+  let task = Result.ok (find t ~kind:Subagent id) in
+  let resume =
+    match task with
+    | Some task when Task.running task -> None
+    | Some _ | None -> Hashtbl.find_and_remove t.parked id
+  in
+  match task, resume with
+  | Some task, Some resume ->
+    let finished, resolve = Promise.create () in
+    let inbox = Option.map task.inbox ~f:(fun _ -> Subagent_inbox.create ()) in
+    task.cancel <- Cancellation.create ();
+    task.finished <- finished;
+    task.inbox <- inbox;
+    task.outcome <- None;
+    task.finished_at <- None;
+    task.delivered <- false;
+    task.activity <- "starting";
+    run_task t task resolve ~run:(fun ~id:_ ~cancel ~emit ~on_output:_ ->
+      resume ~max_turns ~message ~inbox ~call_id:None ~cancel ~emit);
+    Ok `Restarted
+  | None, Some resume -> Ok (`Run_here resume)
+  | task, None -> not_parked t id ~task
+;;
+
 let cancel t ~kind id =
   Or_error.bind (find t ~kind id) ~f:(fun task ->
     if Task.running task
     then (
       Cancellation.cancel task.cancel;
       Ok ())
+    else if unpark t id
+    then Ok ()
     else Or_error.errorf "%s %s already finished" (Kind.word kind) id)
 ;;
 
 let cancel_and_wait t ~kind id ~cancel =
   Or_error.bind (find t ~kind id) ~f:(fun task ->
     Cancellation.cancel task.cancel;
+    ignore (unpark t id : bool);
     match
       Cancellation.protect cancel ~f:(fun () -> Promise.await task.finished)
     with
@@ -525,12 +615,16 @@ let cancel_and_wait t ~kind id ~cancel =
 ;;
 
 let cancel_all ?(discard = false) t =
+  Hashtbl.clear t.parked;
   List.iter t.tasks ~f:(fun task ->
     if Task.running task then Cancellation.cancel task.cancel);
   if discard then mark_delivered t t.tasks
 ;;
 
-let forget_finished t = t.tasks <- List.filter t.tasks ~f:Task.running
+let forget_finished t =
+  Hashtbl.clear t.parked;
+  t.tasks <- List.filter t.tasks ~f:Task.running
+;;
 
 let rec wait_all t =
   match List.filter t.tasks ~f:Task.running with

@@ -341,6 +341,74 @@ let%expect_test "a subagent in a worktree of its own" =
     |}]
 ;;
 
+let%expect_test "a fork in a worktree is told its paths moved" =
+  with_sandbox
+  @@ fun t ->
+  init_repo t;
+  Core_unix.mkdir_p (Filename.concat t.dir "repo/src");
+  sh t "echo x > src/f && git add -A && git commit -q -m src";
+  let trees = Filename.concat t.dir "trees" in
+  let requests = ref [] in
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun r -> requests := r :: !requests)
+      [ Reply.text "fixed it" ]
+  in
+  let subagent = subagent ~provider ~trees in
+  let arguments = {|{"task":"Fix f","fork":true,"worktree":"auto"}|} in
+  let conversation =
+    { Conversation.model = Model.default
+    ; thinking = Off
+    ; system = Some "the caller's system prompt"
+    ; messages =
+        [ Message.user "look at src/f"
+        ; Assistant
+            { content =
+                [ Tool_call { id = "b1"; name = "subagent"; arguments } ]
+            ; stop_reason = Tool_use
+            ; usage = Usage.zero
+            ; model = Model.default.id
+            }
+        ]
+    }
+  in
+  let context =
+    Tool.Context.create
+      ~env:t.env
+      ~call_id:"b1"
+      ~cwd:(Filename.concat t.dir "repo/src")
+      ~tools:(Tools.all @ [ subagent ])
+      ~conversation
+      ()
+  in
+  let result = Tool.execute subagent context (Jsonaf.of_string arguments) in
+  print_endline (show t result.text);
+  List.iter !requests ~f:(fun (r : Provider.Request.t) ->
+    print_endline (show t (Option.value r.system ~default:""));
+    List.iter r.messages ~f:(function
+      | User { text; _ } -> print_endline ("user: " ^ show t text)
+      | Assistant _ -> print_endline "assistant: (its call)"
+      | Tool_result r -> printf "tool_result %s: %s\n" r.tool_call_id r.text));
+  [%expect
+    {|
+    fixed it
+    [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    [worktree: the work is on branch agent/fix-f, checked out in $DIR/trees/repo/agent-fix-f (a worktree of $DIR/repo); review it there, then merge the branch or remove the worktree (/worktree rm $DIR/trees/repo/agent-fix-f)]
+    the caller's system prompt
+    user: look at src/f
+    assistant: (its call)
+    tool_result b1: This call started you: you are the subagent it forked from this conversation. Your task follows.
+    user: [You are now a subagent forked from the conversation above. Your caller carries on separately: you do not see what it does next, and it sees only your final report. Do only the task below (not the rest of the conversation's work), then end with a concise report of what you found or changed and anything your caller must know.]
+
+    You work in a git worktree made for you, $DIR/trees/repo/agent-fix-f, on branch agent/fix-f: paths in the conversation above refer to your caller's working directory, $DIR/repo/src; work on their counterparts in yours, $DIR/trees/repo/agent-fix-f/src.
+
+    Your own subagents run synchronously: subagent blocks until its subagent finishes and returns its report, and they cannot delegate further.
+
+    Your task:
+    Fix f
+    |}]
+;;
+
 (* [list_sessions]' [repo] and [worktrees] fields, as a client sees
    them, by name: sessions made within the same second have no order. *)
 let print_sessions t json =

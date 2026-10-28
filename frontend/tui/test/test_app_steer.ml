@@ -16,6 +16,8 @@ let started ?(height = 14) () =
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
        ; worktree = None
+       ; forked = false
+       ; continued = false
        });
   H.event h (State (state ~subagents:[ "a1", "index the repo", true ] ()));
   h

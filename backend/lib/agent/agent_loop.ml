@@ -91,6 +91,7 @@ let execute_tool
       ?ask_user
       ?execute
       ?background
+      ~conversation
       (call : Content.Tool_call.t)
   =
   let result : Tool.Result.t =
@@ -118,6 +119,7 @@ let execute_tool
              ?cache_key:config.cache_key
              ~halt
              ~tools:config.tools
+             ~conversation
              ?background
              ~env
              ~cwd
@@ -174,6 +176,7 @@ let run
       ?compact
       ?mask
       ?(halt = fun () -> None)
+      ?(on_context = ignore)
       ~context
       ~prompts
       ()
@@ -385,6 +388,13 @@ let run
               ( assistant.usage.input + assistant.usage.output
               , List.length !messages ));
       let calls = Message.Assistant.tool_calls assistant in
+      let conversation =
+        { Conversation.model = config.model
+        ; thinking = config.thinking
+        ; system = config.system
+        ; messages = !messages
+        }
+      in
       let execute call =
         if Cancellation.is_cancelled cancel
         then cancelled_result call
@@ -404,6 +414,7 @@ let run
               ?ask_user
               ?execute
               ?background
+              ~conversation
               call
           in
           emit (Tool_end { call; result });
@@ -458,6 +469,7 @@ let run
         | (End_turn | Tool_use), _ :: _ -> List.iter (steer ()) ~f:append)
   done;
   let added = List.rev !added in
+  on_context !messages;
   emit (Agent_end added);
   added
 ;;
