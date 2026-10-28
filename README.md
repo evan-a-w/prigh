@@ -1641,6 +1641,30 @@ than silently ignored: invalid JSON or a setting of the wrong type (prigh
 then ignores the file's settings), an unknown setting (with the closest
 known one), and a `default_model` that names no known model.
 
+### Tracing: where the time went
+
+Every session records a trace next to its file,
+`<session>.trace.jsonl`: one line per finished span (a prompt, its turns,
+each model request split into connecting, waiting for the first token,
+thinking and streaming, each tool call with its waits for your approval
+or answer and its tool-host round trip, retries, compaction, masking,
+subagents and background jobs). It holds names, sizes, ids and timings,
+never what was said or what tools read; it is capped at 4 MB (the older
+half is dropped) and goes with the session when it is deleted.
+
+`/trace` (TUI and prigh-web) and `prigh trace SESSION` (an id, a prefix
+or a path) summarise it: the wall time split into model, tools, waiting
+on you, retries, compaction and other; time to first token by model;
+time per tool; and the slowest spans with where they sat. `prigh trace
+SESSION -perfetto out.json` writes a timeline for
+[Perfetto](https://ui.perfetto.dev) or `chrome://tracing`, an agent or a
+job per track; `-tree` prints every span.
+
+`"trace": "detailed"` in the config (or `PRIGH_TRACE=detailed`) adds
+finer spans for work on prigh itself: the request's encoding and send,
+SSE parsing, and each streamed delta's wait and handling.
+`PRIGH_TRACE=off` (or `"trace": "off"`) records nothing.
+
 ### Long runs: compaction, budget, goals, usage limits
 
 Context never runs out mid-task. The first, cheap tier is observation
@@ -1846,6 +1870,7 @@ it.
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
+| `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |
 | `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |

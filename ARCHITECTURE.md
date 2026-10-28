@@ -207,6 +207,40 @@ The layers below cut across those groups.
   stream that is silent for 5 minutes, not even a ping, is given up as
   stalled and retried).
 
+### Tracing (`trace/`)
+
+- `Trace` — spans (id, parent, name, track, a wall-clock start, monotonic
+  start and stop, status, attributes). The current span lives in an Eio
+  fiber-local binding, inherited by forked fibers, so parallel tool calls
+  and subagents nest under whoever started them without a tracer being
+  passed around; with no binding (or level `Off`) every call is a no-op.
+  `Trace.run tracer` installs a tracer; `start ~root`/`~under`/`~track`
+  open spans elsewhere in the tree (a background run under the turn that
+  started it, on its own track); phased spans (`model_request`) split into
+  consecutive children (`connect`, `first_token`, `thinking`, `stream`) as
+  `Trace.phase` is called. Spans are written when they end; an exception
+  ends one `Cancelled` or `Error`. The level (`Off`/`Default`/`Detailed`)
+  is `PRIGH_TRACE`, else the config's `trace`; `~detailed:true` spans
+  are recorded only at `Detailed`.
+- `Trace_file` — appends spans to `<session>.trace.jsonl`, buffering until
+  the session has a file and dropping them once it is deleted; past
+  `max_bytes` it rotates to `.trace.old.jsonl`.
+- `Model_trace` — wraps a provider's `stream`: the `model_request` span
+  with model, thinking, tokens, cost and stop reason, its phases, and with
+  `Detailed` each delta's wait and handling.
+- `Trace_report` — the summary text, an indented outline (tests, `-tree`)
+  and the Chrome trace event export (one thread per track, extra threads
+  for spans that overlap without nesting).
+
+Where spans come from: `Agent.start_run` (`prompt`), `Agent_loop` (`turn`,
+`model_request` via `Model_trace`, `retry_wait`, `tool`, `compaction`,
+`mask`), `Agent` (`approval_wait`, `ask_user_wait`, `host_roundtrip`,
+auto-compaction and masking), `Tool_subagent` (`subagent`, on track
+`subagent <id>`; background runs and `subagent_continue` runs root under
+the turn that launched them), `Background_tasks` (`job`, on track
+`job <id>`), and with `Detailed` `Http_client` (`http_send`),
+`Sse_request` (`sse_parse`) and the providers (`request_build`).
+
 ### Model layer
 
 - `Content` — assistant content blocks: `Text`, `Thinking {text;
@@ -1622,7 +1656,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
   `get_message_points`,
-  `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
+  `session_stats`, `trace` (`{perfetto?}` → `{summary, level, spans,
+  perfetto?}`: `Agent.trace_report`), `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
   `set_mode` (`{approval_mode?, plan_mode?}`, answered with the state),
@@ -1931,7 +1966,8 @@ listens on `-listen`, `$PRIGH_WEB_LISTEN` or the first free port from
 127.0.0.1:7790), `run <prompt>`
 (headless, streams to stdout; it denies confirmations and answers
 `ask_user` as unavailable, since nobody is there), `sessions`, `login <provider> [-method]`,
-`logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
+`logout <provider>`, `auth`, `trace SESSION [-perfetto FILE] [-tree]
+[-slowest N]` (`Trace_report` over the session's trace file). All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
 `-session` takes a saved session's id, a unique prefix of it, or its file;
@@ -3203,6 +3239,11 @@ re-records); the flake check `nvim-plugin` runs them.
   (the `Subagent_log`: `["Start",{id,call_id,parent,task,model,at,run}]`,
   `["Message",{id,at,turns,tool_calls,message}]`,
   `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
+- `~/.prigh/sessions/<stamp>_<id>.trace.jsonl` (and `.trace.old.jsonl`,
+  the previous 4 MB once it fills) — the session's trace (`Trace_file`):
+  one `Trace.Span.t` per line, `{id, parent, name, track, wall, start,
+  stop, status, attrs}`; listed with the session's `files`, so deleted and
+  counted with it; not copied by fork, clone or import.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — the TUI's prompt history on its machine (one JSON
   string per line, last 500).
