@@ -199,9 +199,9 @@ let transfers (m : App.Model.t) =
     item ~cls:"transfers" ~title:text [ Html.lamp (); Node.text text ]
 ;;
 
-(* Settings that change what you see, and the model's plan; the approval
-   mode is in the composer. *)
-let modes (m : App.Model.t) ~inject =
+(* Settings that change what you see, and the model's plan (where there is
+   room for it); the approval mode is in the composer. *)
+let modes (m : App.Model.t) ~plan ~inject =
   let chip ?(cls = "") ~title ~command text =
     Node.button
       ~attrs:
@@ -222,13 +222,13 @@ let modes (m : App.Model.t) ~inject =
   ; (match
        Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
      with
-     | Some text ->
+     | Some text when plan ->
        chip
          ~cls:"plan"
          ~title:"The model's plan (/todos)"
          ~command:"/todos"
          text
-     | None -> Node.none)
+     | Some _ | None -> Node.none)
   ]
 ;;
 
@@ -244,63 +244,64 @@ let waiting cls text =
   activity_item ~title:text cls [ Html.lamp (); label text ]
 ;;
 
-let view (m : App.Model.t) ~inject =
+let activity (m : App.Model.t) =
   match m.state, m.connection with
-  | None, Connected -> div ~cls:"status" [ waiting "connecting" "Connecting…" ]
+  | None, Connected -> waiting "connecting" "Connecting…"
   | _, Reconnecting _ when App.Drops.gave_up m.drops ->
-    div
-      ~cls:"status"
-      [ activity_item
-          ~title:"Stopped reconnecting"
-          "offline"
-          [ label "Stopped reconnecting" ]
-      ]
-  | _, Reconnecting _ ->
-    div ~cls:"status" [ waiting "connecting offline" "Reconnecting…" ]
+    activity_item
+      ~title:"Stopped reconnecting"
+      "offline"
+      [ label "Stopped reconnecting" ]
+  | _, Reconnecting _ -> waiting "connecting offline" "Reconnecting…"
   | Some state, Connected ->
-    let doing =
-      if m.pending.sending > 0 && not state.running
-      then waiting "running" "Sending…"
-      else if state.running
-      then (
-        let doing = Chat.activity m.chat in
-        let text =
-          String.capitalize
-            (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
-        in
-        activity_item
-          (match doing with
-           | Retrying _ -> "running retrying"
-           | _ -> "running")
-          ~title:text
-          [ Html.lamp (); label text ])
-      else
-        activity_item
-          "idle"
-          [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; label "Ready" ]
-    in
-    div
-      ~cls:"status"
-      [ context state ~inject
-      ; item
-          ~cls:"tokens"
-          ~title:
-            (sprintf
-               "Tokens: %d in, %d out, %d cache read"
-               state.usage.input
-               state.usage.output
-               state.usage.cache_read)
-          [ Node.textf
-              "↑%s ↓%s"
-              (tokens state.usage.input)
-              (tokens state.usage.output)
-          ]
-      ; cost state ~inject
-      ; doing
-      ]
+    if m.pending.sending > 0 && not state.running
+    then waiting "running" "Sending…"
+    else if state.running
+    then (
+      let doing = Chat.activity m.chat in
+      let text =
+        String.capitalize
+          (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
+      in
+      activity_item
+        (match doing with
+         | Retrying _ -> "running retrying"
+         | _ -> "running")
+        ~title:text
+        [ Html.lamp (); label text ])
+    else
+      activity_item
+        "idle"
+        [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; label "Ready" ]
 ;;
 
-let extras (m : App.Model.t) ~inject =
+let counters (m : App.Model.t) ~inject =
+  match m.state, m.connection with
+  | Some state, Connected ->
+    [ context state ~inject
+    ; item
+        ~cls:"tokens"
+        ~title:
+          (sprintf
+             "Tokens: %d in, %d out, %d cache read"
+             state.usage.input
+             state.usage.output
+             state.usage.cache_read)
+        [ Node.textf
+            "↑%s ↓%s"
+            (tokens state.usage.input)
+            (tokens state.usage.output)
+        ]
+    ; cost state ~inject
+    ]
+  | _ -> []
+;;
+
+let view (m : App.Model.t) ~inject =
+  div ~cls:"status" (counters m ~inject @ [ activity m ])
+;;
+
+let extras (m : App.Model.t) ~plan ~inject =
   match m.state, m.connection with
   | Some state, Connected ->
     let queued, whose =
@@ -329,7 +330,7 @@ let extras (m : App.Model.t) ~inject =
       ; background m ~inject
       ; nix_gc m ~inject
       ; transfers m
-      ; Node.fragment (modes m ~inject)
+      ; Node.fragment (modes m ~plan ~inject)
       ]
   | _ -> div ~cls:"status-extras" []
 ;;
