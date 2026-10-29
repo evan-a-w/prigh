@@ -74,8 +74,12 @@ random per-process id is used, with a warning. A newer connection claiming
 a held id takes it over: the older one is a connection the host gave up on
 (the backend may notice a dropped connection late) or another frontend on
 the same machine (two TUIs share the id), so it falls back to its client id
-(and is told with a notice), and its in-flight calls and relayed terminals
-fail. When the connection holding the id disconnects, the newest other
+(and is told with a notice), and its relayed terminals fail. Its in-flight
+calls carry on there (their results are taken; cancels and input follow
+them, `exec_client`) unless the newcomer's `running_execs` lists any of
+them, which shows it is the same host process on a new connection: then
+the newcomer takes those over and the rest of the old one's fail. New
+calls go to the newcomer. When the connection holding the id disconnects, the newest other
 connection that asked for it takes it back (`hand_over_host_id`), so a
 machine's sessions keep running while any of its frontends is open. The
 TUI's `(here)` is by host id, i.e. this machine. `hello` answers with both
@@ -141,13 +145,24 @@ the same advice appended.
 A host whose connection drops keeps its in-flight calls for `host_grace`
 (60s, `Rpc_server.create`): its next `hello` lists the executions it still
 runs (`running_execs`), which carry on over the new connection; the others
-on that host id fail (`[tool host reconnected]`), ids the backend no longer
-waits for get a `tool_exec_cancel`, and when no hello comes in time they
-fail with `[tool host disconnected]` (`prigh tool-host -connect` and the
+on that host id whose connection is gone fail (`[the tool host restarted
+during this call, ...: run it again if you still need it]`), ids the
+backend no longer waits for get a `tool_exec_cancel`, and when no hello
+comes in time they fail the same way ("disconnected" instead of
+"restarted"; a host known only by its client id cannot come back, so its
+calls fail at once) (`prigh tool-host -connect` and the
 TUI's `Tool_host` keep their worker across connections and hold results
-and up to 1 MiB of output while offline). The session stays on that host: later calls fail with
-"waiting for tool host NAME to reconnect; /host picks another" (the run
-continues and the model sees the error) and the TUI shows `tools:offline`.
+and up to 1 MiB of output while offline). The session stays on that host,
+and the TUI shows `tools:offline`. The model's tool calls (`Agent.executor`
+and jobs) made meanwhile wait for it within the same window
+(`Rpc_server.returning`, the time each host id that dropped is given up on,
+passed to `Agent.set_hosts ~returning`; `set_hosts` and host switches
+resolve `hosts_changed`, which wakes them): the host coming back runs them,
+and the window passing, `set_active_host` or a cancel ends the wait with
+"waiting for tool host NAME to reconnect; /host picks another" (or
+`[cancelled]`; the run continues and the model sees the error). A host not
+seen since the backend started is not waited for, and calls from frontends
+(file reads, path completion, `/cd`) fail at once.
 When the same host id connects again the session resumes on it in the cwd
 it had there (a `Notice` "tools run on NAME again in CWD", a state change,
 and no environment note for the model). Only `set_active_host` moves a
@@ -3472,7 +3487,8 @@ does not read are shut down).
 
 `backend/test/test_host_reconnect.ml` covers tool hosts going away: a
 session stays on its disconnected host (also when another host attaches),
-tool calls say it waits for the host, the host reconnecting with the same
+tool calls wait for the host (and give up after the grace, on `/host` or
+an abort), the host reconnecting with the same
 `host_id` resumes it in the same cwd without an environment note, only
 `set_active_host` moves it, an evicted session resumes on its returning
 host, and a newer connection taking over a held host id. The real
