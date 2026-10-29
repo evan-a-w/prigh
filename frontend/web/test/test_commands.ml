@@ -467,9 +467,9 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready
+    Ready $0.00
     (quiet)
-    (0%) ↑0 ↓0 $0.00
+    (0%)
     (main)
     (quiet)
     |}];
@@ -498,9 +498,9 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    Ready
+    Ready $0.00
     (verbose)
-    (0%) ↑0 ↓0 $0.00
+    (0%)
     (main)
     (verbose)
     |}]
