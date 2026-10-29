@@ -199,8 +199,11 @@ frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
 elsewhere or `tools:offline` when the active host has disconnected. A
-session never leaves its host on its own: while the host is away tool calls
-fail with a message saying it waits for the host to reconnect, and when the
+session never leaves its host on its own: while the host is away the
+model's tool calls (a main agent's, subagents' and jobs') wait up to a
+minute after it left for it to come back, then fail with a message saying
+it waits for the host to reconnect (calls stop waiting at once on `/host`
+or an abort), and when the
 host comes back (a frontend or `prigh tool-host` reconnecting or restarted
 on the same machine, which is the same host) the session carries on there,
 in the same directory; `/host` picks another host meanwhile. This holds
@@ -213,7 +216,10 @@ where the session you were on runs. A fork or clone of a session you moved
 with `/host` stays where you put it. A machine's identity is the id in
 `~/.prigh/host-id` (created on first use; edit it to choose one), shared by
 its TUIs and `prigh tool-host`: with two TUIs open, the newer one runs the
-machine's tools and the older one takes over again if the newer one quits. Several frontends can attach
+machine's tools (the older one finishes the calls it was running) and the
+older one takes over again if the newer one quits. A call the host lost
+(it restarted, or did not come back within the minute) fails telling the
+model to run it again if it still needs it. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. `prigh serve` itself
 speaks plain TCP and HTTP with a shared token (it warns when `-listen` or

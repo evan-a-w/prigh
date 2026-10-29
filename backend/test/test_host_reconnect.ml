@@ -224,7 +224,9 @@ let bash id =
 ;;
 
 let%expect_test "a session waits for its disconnected host and resumes on it" =
+  (* A short grace: the call made while the host is away gives up soon. *)
   Test_rpc.with_agent
+    ~host_grace:0.05
     [ bash "c1"
     ; Reply.text "done"
     ; bash "c2"
@@ -520,7 +522,7 @@ let%expect_test
     laptop hello: client_id=client-4 host_id=host-laptop
     exec: bash
     tool_result: ran on laptop in /home/me
-    tool_result: [tool host reconnected]
+    tool_result: [the tool host restarted during this call, so its result is lost: run it again if you still need it]
     |}]
 ;;
 
@@ -546,7 +548,7 @@ let%expect_test "a host that does not come back in time fails its executions" =
     {|
     laptop hello: client_id=client-2 host_id=host-laptop
     {"type":"response","id":"r1","ok":true,"result":{}}
-    tool_result: [tool host disconnected]
+    tool_result: [the tool host disconnected during this call, so its result is lost: run it again if you still need it]
     |}]
 ;;
 
@@ -593,6 +595,14 @@ let%expect_test "host ids: a newer connection takes the id over; reserved ids" =
       ~host_id:"host-laptop"
       ~cwd:"/home/me"
   in
+  (* The old connection is still open: its call is still its own, and its
+     result is taken. *)
+  let exec =
+    Option.value_exn
+      (Queue.find old.sent ~f:(fun json ->
+         String.equal (member_string json "name") "bash"))
+  in
+  Fake_host.answer_exec h old ~name:"laptop" exec;
   Agent.wait_idle agent;
   List.iter (Agent.messages agent) ~f:(function
     | Tool_result r -> print_endline ("tool_result: " ^ r.text)
@@ -604,7 +614,8 @@ let%expect_test "host ids: a newer connection takes the id over; reserved ids" =
     laptop hello: client_id=client-2 host_id=host-laptop
     {"type":"response","id":"r1","ok":true,"result":{}}
     laptop hello: client_id=client-3 host_id=host-laptop
-    tool_result: [tool host reconnected]
+    laptop ran bash in /home/me
+    tool_result: ran on laptop in /home/me
     ((active_host host-laptop) (cwd /home/me)
      (hosts (backend=$DIR client-2=/home/me host-laptop=/home/me)))
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -803,6 +814,7 @@ let%expect_test
   =
   Test_rpc.with_agent
     ~backend_host:false
+    ~host_grace:0.05
     [ Reply.text "hi"
     ; bash "c1"
     ; Reply.text "waiting"
@@ -1481,5 +1493,140 @@ let%expect_test "backend host: new sessions start where they did" =
     hostless: host-tui in /home/me
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"y","session_description":null,"cwd":"/old","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"/old","session_id":null,"session_name":null,"home":"$HOME"},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":"x"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     main's hostless: backend in /old
+    |}]
+;;
+
+(* Resolved when the main agent's next tool call starts: its executor runs
+   before the fiber waiting for it does. *)
+let tool_started agent =
+  let started, resolve = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_start _) when not (Eio.Promise.is_resolved started) ->
+      Eio.Promise.resolve resolve ()
+    | _ -> ());
+  started
+;;
+
+(* Prompts while the active host is away; [meanwhile] runs once the bash
+   call is waiting for the host. Prints the run's tool results. *)
+let prompt_while_away t (h : Test_rpc.H.t) agent ~meanwhile =
+  let before = List.length (Agent.messages agent) in
+  let started = tool_started agent in
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  Eio.Promise.await started;
+  meanwhile ();
+  Agent.wait_idle agent;
+  List.iter
+    (List.drop (Agent.messages agent) before)
+    ~f:(function
+      | Tool_result r -> print_endline (mask t ("tool_result: " ^ r.text))
+      | _ -> ())
+;;
+
+let%expect_test "a call made while the host is away waits for it to come back" =
+  Test_rpc.with_agent
+    [ bash "c1"
+    ; Reply.text "ran"
+    ; bash "c2"
+    ; Reply.text "moved"
+    ; bash "c3"
+    ; Reply.text "aborted"
+    ]
+  @@ fun t agent h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let connect ?(name = "laptop") ?(host_id = "host-laptop") () =
+    Fake_host.connect ~sw h ~name ~host_id ~cwd:"/home/me" ~session:agent
+  in
+  let laptop = connect () in
+  Fake_host.disconnect h laptop;
+  let laptop = ref laptop in
+  prompt_while_away t h agent ~meanwhile:(fun () ->
+    printf "running: %b\n" (Agent.is_running agent);
+    laptop := connect ());
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    running: true
+    laptop hello: client_id=client-3 host_id=host-laptop
+    laptop ran bash in /home/me
+    tool_result: ran on laptop in /home/me
+    |}];
+  (* Moving the session to another host gives up on the old one. *)
+  let (_ : Fake_host.t) = connect ~name:"desk" ~host_id:"host-desk" () in
+  Fake_host.disconnect h !laptop;
+  prompt_while_away t h agent ~meanwhile:(fun () ->
+    call t h ~params:{|{"host": "host-desk"}|} "set_active_host");
+  [%expect
+    {|
+    desk hello: client_id=client-4 host_id=host-desk
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/home/me","created":false}}
+    tool_result: waiting for tool host "laptop" to reconnect; /host picks another
+    |}];
+  (* So does aborting the run. *)
+  laptop := connect ();
+  call t h ~params:{|{"host": "host-laptop"}|} "set_active_host";
+  Fake_host.disconnect h !laptop;
+  prompt_while_away t h agent ~meanwhile:(fun () -> call t h "abort");
+  [%expect
+    {|
+    laptop hello: client_id=client-5 host_id=host-laptop
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/home/me","created":false}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    tool_result: [cancelled]
+    |}]
+;;
+
+let%expect_test "a call made while the host is away gives up after the grace" =
+  Test_rpc.with_agent ~host_grace:0.05 [ bash "c1"; Reply.text "gave up" ]
+  @@ fun t agent h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let laptop =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"laptop"
+      ~host_id:"host-laptop"
+      ~cwd:"/home/me"
+      ~session:agent
+  in
+  Fake_host.disconnect h laptop;
+  prompt_while_away t h agent ~meanwhile:(fun () -> ());
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    tool_result: waiting for tool host "laptop" to reconnect; /host picks another
+    |}]
+;;
+
+let%expect_test "a host never seen since the backend started is not waited for" =
+  Test_rpc.with_agent [ Reply.text "hi"; bash "c1"; Reply.text "failed" ]
+  @@ fun t agent h ->
+  prompt t h agent "hello";
+  (* The session last ran on a laptop, before the backend restarted. *)
+  ignore
+    (Session.set_cwd
+       (Agent.session agent)
+       ~host:{ Session.Host.id = "host-laptop"; name = "laptop"; pinned = true }
+       ~cwd:"/home/me"
+       ()
+     : Session.Entry.t);
+  print_s
+    [%sexp
+      (Agent.switch_session agent ~path:(Session.path (Agent.session agent))
+       : unit Or_error.t)];
+  prompt t h agent "go";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (Ok ())
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    model told: [Environment: the tool host is now laptop, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+    tool_result: waiting for tool host "laptop" to reconnect; /host picks another
     |}]
 ;;

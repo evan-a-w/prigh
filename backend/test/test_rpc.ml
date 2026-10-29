@@ -1101,7 +1101,7 @@ let%expect_test "remote tool host: disconnect mid-call fails the call" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
     client-2
-    tool_result: "[tool host disconnected]"
+    tool_result: "[the tool host disconnected during this call, so its result is lost: run it again if you still need it]"
     {"type":"response","id":"r1","ok":true,"result":{}}
     tool_result: "waiting for tool host \"laptop\" to reconnect; /host picks another"
     |}]

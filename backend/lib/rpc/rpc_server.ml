@@ -346,7 +346,9 @@ type t =
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
     (** how long the executions of a host that dropped its connection wait
-        for it to come back with them *)
+        for it to come back with them, and new calls for it to come back *)
+  ; returning : float String.Table.t
+    (** host ids whose connection dropped, by when they are given up on *)
   ; sleep : float -> unit
   ; sw : Switch.t
   ; mutable login_owner : string option
@@ -468,11 +470,39 @@ let hosts t =
   |> List.map ~f:host_of
 ;;
 
+let returning t =
+  Hashtbl.filter_keys t.returning ~f:(fun id ->
+    Option.is_none (host_client t id))
+  |> Hashtbl.to_alist
+  |> String.Map.of_alist_exn
+;;
+
 (* Snapshots the agents: setting hosts emits state changes, which may evict. *)
 let publish_hosts t =
   let hosts = hosts t in
+  let returning = returning t in
   List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
-    Agent.set_hosts agent hosts)
+    Agent.set_hosts agent hosts ~returning)
+;;
+
+(* Why an execution failed when its host went away with it. *)
+let host_disconnected =
+  "[the tool host disconnected during this call, so its result is lost: run it \
+   again if you still need it]"
+;;
+
+let host_restarted =
+  "[the tool host restarted during this call, so its result is lost: run it \
+   again if you still need it]"
+;;
+
+(* The connection running an execution: the one it was sent on, which may
+   have handed its host id to a newer one ([claim_host_id]). *)
+let exec_client t ~host exec_id =
+  match Hashtbl.find t.execs exec_id with
+  | Some { holder = Client id; _ } -> Hashtbl.find t.clients id
+  | Some { holder = Away _; _ } -> None
+  | None -> host_client t host
 ;;
 
 (* Hosts are global: every client that advertised tools, whichever session
@@ -501,10 +531,10 @@ let route t agent (event : Agent.Event.t) =
              (Tool.Result.error (Agent.host_unavailable_message agent))
            : unit Or_error.t))
    | Tool_exec_cancel { host; exec_id } ->
-     Hashtbl.remove t.execs exec_id;
-     Option.iter (host_client t host) ~f:(fun c -> c.send json)
-   | Tool_exec_input { host; _ } ->
-     Option.iter (host_client t host) ~f:(fun c -> c.send json)
+     Option.iter (exec_client t ~host exec_id) ~f:(fun c -> c.send json);
+     Hashtbl.remove t.execs exec_id
+   | Tool_exec_input { host; exec_id; _ } ->
+     Option.iter (exec_client t ~host exec_id) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
   (* A subagent's messages too: its tools may have made worktrees. *)
   let rec message_end : Agent_event.t -> bool = function
@@ -530,7 +560,7 @@ let route t agent (event : Agent.Event.t) =
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
-  Agent.set_hosts agent (hosts t);
+  Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
   Agent.subscribe agent ~f:(route t agent);
@@ -584,6 +614,7 @@ let create
     ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
+    ; returning = String.Table.create ()
     ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
     ; sw
     ; login_owner = None
@@ -832,24 +863,28 @@ let release_host_id t (client : Client.t) ~text =
 
 (* A host whose connection dropped may still run what it was given (a TUI
    reconnecting keeps its tool host process): its executions wait
-   [host_grace] for it to come back with them (see [claim_host_id]). *)
+   [host_grace] for it to come back with them (see [claim_host_id]), and so
+   do the sessions' new calls for it (see [Agent.set_hosts]). *)
 let await_host t (client : Client.t) =
   let token = ref () in
   Hashtbl.iter t.execs ~f:(fun (e : Exec.t) ->
     match e.holder with
     | Client id when String.equal id client.id -> e.holder <- Away token
     | Client _ | Away _ -> ());
-  Terminal_relay.host_gone t.terminals ~host:client.host_id;
   Fiber.fork_daemon ~sw:t.sw (fun () ->
     t.sleep t.host_grace;
-    fail_execs
-      t
-      ~host:client.host_id
-      ~text:"[tool host disconnected]"
-      ~f:(fun _ e ->
-        match e.holder with
-        | Away token' -> phys_equal token token'
-        | Client _ -> false);
+    Hashtbl.filter t.execs ~f:(fun (e : Exec.t) ->
+      match e.holder with
+      | Away token' -> phys_equal token token'
+      | Client _ -> false)
+    |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
+      Hashtbl.remove t.execs exec_id;
+      ignore
+        (Agent.tool_exec_result
+           e.agent
+           ~exec_id
+           (Tool.Result.error host_disconnected)
+         : unit Or_error.t));
     `Stop_daemon)
 ;;
 
@@ -866,7 +901,8 @@ let hand_over_host_id t (gone : Client.t) =
       c.tools && Option.equal String.equal c.wanted_host_id (Some gone.host_id))
     |> List.max_elt ~compare:(fun (a : Client.t) b -> Int.compare a.seq b.seq)
     |> Option.iter ~f:(fun (next : Client.t) ->
-      release_host_id t next ~text:"[tool host reconnected]";
+      release_host_id t next ~text:host_disconnected;
+      Hashtbl.remove t.returning gone.host_id;
       next.host_id <- gone.host_id;
       notice next (sprintf "this connection is tool host %S again" next.host_id))
 ;;
@@ -875,9 +911,12 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.iter client.generations ~f:Cancellation.cancel;
+  if client.tools then await_host t client;
   if client.tools && not (String.equal client.host_id client.id)
-  then await_host t client
-  else release_host_id t client ~text:"[tool host disconnected]";
+  then (
+    Hashtbl.set t.returning ~key:client.host_id ~data:(t.now () +. t.host_grace);
+    Terminal_relay.host_gone t.terminals ~host:client.host_id)
+  else release_host_id t client ~text:host_disconnected;
   hand_over_host_id t client;
   if client.tools then publish_hosts t;
   maybe_evict t client.agent
@@ -1181,10 +1220,14 @@ let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
    The newest connection owns the id: an older one still holding it is one
    the host gave up on (the backend may notice a dropped connection late) or
    another frontend on the same machine, so it is demoted to its client id
-   until the newer one goes ([hand_over_host_id]). The host says which
-   executions it still runs ([running]: a TUI that reconnects keeps its tool
-   host process): they carry on over the new connection, the others on the
-   id fail, and those nobody waits for any more are cancelled. *)
+   until the newer one goes ([hand_over_host_id]); new calls go to the newer
+   one. The host says which executions it still runs ([running]: a TUI that
+   reconnects keeps its tool host process): they carry on over the new
+   connection, and those nobody waits for any more are cancelled. Of the
+   others on the id, those of a connection still open carry on there (its
+   results are taken), unless the newcomer took some of that connection's
+   over (so it replaces that connection, which the backend has not noticed
+   is dead); the rest fail. *)
 let claim_host_id t (client : Client.t) host_id ~running =
   if String.equal host_id client.host_id
   then Ok ()
@@ -1194,8 +1237,21 @@ let claim_host_id t (client : Client.t) host_id ~running =
     || String.is_prefix host_id ~prefix:"client-"
   then Or_error.errorf "param \"host_id\": %S is reserved" host_id
   else (
-    let text = "[tool host reconnected]" in
-    release_host_id t client ~text;
+    release_host_id t client ~text:host_restarted;
+    let replaced =
+      Set.to_list running
+      |> List.filter_map ~f:(fun exec_id ->
+        match Hashtbl.find t.execs exec_id with
+        | Some { holder = Client id; host; _ } when String.equal host host_id ->
+          Some id
+        | Some _ | None -> None)
+      |> String.Set.of_list
+    in
+    let held_elsewhere (e : Exec.t) =
+      match e.holder with
+      | Client id -> Hashtbl.mem t.clients id && not (Set.mem replaced id)
+      | Away _ -> false
+    in
     Hashtbl.iter t.clients ~f:(fun (other : Client.t) ->
       if String.equal other.host_id host_id
       then (
@@ -1208,10 +1264,13 @@ let claim_host_id t (client : Client.t) host_id ~running =
               disconnects"
              host_id
              other.id)));
-    fail_execs t ~host:host_id ~text ~f:(fun exec_id _ ->
-      not (Set.mem running exec_id));
-    Hashtbl.iter t.execs ~f:(fun (e : Exec.t) ->
-      if String.equal e.host host_id then e.holder <- Client client.id);
+    fail_execs t ~host:host_id ~text:host_restarted ~f:(fun exec_id e ->
+      (not (Set.mem running exec_id)) && not (held_elsewhere e));
+    Set.iter running ~f:(fun exec_id ->
+      Hashtbl.find t.execs exec_id
+      |> Option.iter ~f:(fun (e : Exec.t) ->
+        if String.equal e.host host_id then e.holder <- Client client.id));
+    Hashtbl.remove t.returning host_id;
     Set.iter running ~f:(fun exec_id ->
       if
         not
