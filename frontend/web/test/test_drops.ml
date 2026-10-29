@@ -77,6 +77,7 @@ let%expect_test
     {|
     Connection lost: reconnecting (attempt 6, next in 4.0s)… (Retry now)
     Reconnecting…
+    (main)
     ((connection (Reconnecting (attempt 5) (generation 6))) (lost 5))
     |}];
   (* Once more: it stops, and says what to do. *)
@@ -86,6 +87,7 @@ let%expect_test
     {|
     The backend keeps dropping the connection while loading this session: open another session, or reload. (Retry now) (Another session) (Reload)
     Stopped reconnecting
+    (main)
     ((connection (Reconnecting (attempt 6) (generation 7))) (lost 6))
     |}];
   (* It does not start again by itself. *)
@@ -118,7 +120,9 @@ let%expect_test
   show h;
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (0%) ↑0 ↓0 $0.00
+    (main)
     Reconnecting now…
     ((connection Connected) (lost 5))
     |}];
@@ -127,7 +131,9 @@ let%expect_test
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 2500))
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (0%) ↑0 ↓0 $0.00
+    (main)
     Reconnecting now…
     Reconnected
     ((connection Connected) (lost 0))
@@ -154,6 +160,7 @@ let%expect_test "failing to connect keeps trying" =
     (Reconnect (generation 1) (delay_ms 30000) (session (s1)))
     Connection lost: reconnecting (attempt 22, next in 30.0s)… (Retry now)
     Reconnecting…
+    (main)
     ((connection (Reconnecting (attempt 21) (generation 1))) (lost 0))
     |}]
 ;;

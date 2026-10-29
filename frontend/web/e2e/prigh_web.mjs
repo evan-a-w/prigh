@@ -225,7 +225,7 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(":is(.session-card, .session-bar) :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+    [...document.querySelectorAll(".session-card .card-line, .session-bar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
@@ -1493,7 +1493,7 @@ try {
     const where = await page.evaluate(() => {
       const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-line) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);

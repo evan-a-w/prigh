@@ -52,6 +52,7 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Reconnecting…
+    (main)
     <footer class="composer offline">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]

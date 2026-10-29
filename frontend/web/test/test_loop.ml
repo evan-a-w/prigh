@@ -58,10 +58,17 @@ let%expect_test
   H.text h ~selector:".status-extras .resume";
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.00 Ready
-    (0%) ↑0 ↓0 ($4.20/$5.00) Ready
+    Ready
+    (0%) ↑0 ↓0 $0.00
+    (main)
+    Ready
+    (0%) ↑0 ↓0 ($4.20/$5.00)
+    (main)
     <button class="budget cost link status-item warm">
-    (0%) ↑0 ↓0 ($5.50/$5.00) Ready
+    Ready
+    (Goal 3/20) (Resumes 14:05)
+    (0%) ↑0 ↓0 ($5.50/$5.00)
+    (main)
     (Goal 3/20) (Resumes 14:05)
     <button class="budget cost hot link status-item">
     <button class="goal link status-item warm">

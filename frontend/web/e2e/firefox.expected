@@ -12,10 +12,10 @@ prigh
 web
 New session
 No sessions yet: send a message to start one.
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
 T
 token
 === firefox: signed in: chat ===
@@ -27,10 +27,10 @@ What are we building?
 Ctrl+L switch model
 Ctrl+K find a session
 === firefox: signed in: the session's card ===
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -113,15 +113,15 @@ three
 three lines
 <TIME>
 === firefox: the session's card after a run ===
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
 === firefox: a budget in the status line ===
+Ready
 0%
 ↑0 ↓0
 $<COST>/$<COST>
-Ready
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -178,10 +178,10 @@ Select
 count some lines
 <AGE>
 <CWD>
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
 T
 token
 === firefox: new session ===
@@ -209,10 +209,10 @@ hello again
 count some lines
 <AGE>
 <CWD>
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
 T
 token
 === firefox: switching ===
@@ -471,10 +471,11 @@ high
 Plan mode
 <HOSTNAME>
 === firefox: plan mode: the status line ===
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
+main
 === firefox: a plan to approve ===
 Plan
 Approve the plan and start implementing?
@@ -493,11 +494,11 @@ high
 Auto: never asks
 <HOSTNAME>
 === firefox: the plan approved: the status line ===
+Ready
 0%
 ↑0 ↓0
 $<COST>
-Ready
-plan 0/2: Write the schema
+main
 === firefox: implementing ===
 ◇
 Plan mode on: the model was told to plan, not change files
@@ -744,17 +745,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: 0%, ↑0 ↓0, $<COST>, Ready; 88px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
