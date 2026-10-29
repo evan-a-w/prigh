@@ -1,23 +1,25 @@
 open! Core
 open! Import
 
-(** The status: the context (opening the session's details), tokens and
+(** The status of the header over the chat (sidebar closed, or a phone),
+    on one line: the context (opening the session's details), tokens and
     cost, and what the agent is doing, in a slot of its own width so that
-    nothing moves as it changes. The sidebar's session card lays out
-    {!activity} and {!counters} itself; the header over the chat (sidebar
-    closed, or a phone) keeps them on one line, the context and the activity
-    when narrow. The cost is to the cent; its title has it exactly. *)
+    nothing moves as it changes; the context and the activity when narrow.
+    The cost is to the cent; its title has it exactly. The sidebar's session
+    card lays out {!activity}, {!cost} and {!meter} itself. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What the agent is doing (or that the backend is out of reach). *)
 val activity : App.Model.t -> Node.t
 
-(** The context (opening the session's details), the tokens and the cost;
-    none while out of reach. *)
-val counters
-  :  App.Model.t
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t list
+(** The session's cost to the cent (its title has it exactly), or spent /
+    budget (opening [/budget]); none while out of reach. *)
+val cost : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+
+(** The context's meter and percent (opening the session's details), its
+    title the tokens in and out; none while out of reach or with no context
+    window. *)
+val meter : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What applies: goal, reminders, resume, queued messages to take back,
     background subagents and jobs, transfers, the verbosity and, with

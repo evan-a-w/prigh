@@ -596,35 +596,44 @@ kbd {
   padding: 12px 14px 12px 18px;
   border-top: 1px solid var(--rule);
 }
-/* Two quiet lines from the left edge, one thing at a time lit: what the
-   agent is doing, then what applies (wrapping under itself); the context's
-   meter, the tokens and the cost. The branch is a third line when there is
-   one. The activity keeps a slot wide enough for its usual words, so that
-   what follows it stays put as the agent starts and stops; while the agent
-   works, its background agents are told quietly, without a lamp. */
-.card-status.status { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; overflow: visible; }
-.card-line {
-  display: flex;
-  align-items: center;
-  gap: 4px 14px;
-  min-width: 0;
+/* One left edge, and the figures on one right edge. The headline is what
+   the agent is doing, with the cost across from it (under it when the
+   sidebar is too narrow for both: the activity keeps a slot of its usual
+   words, so that the cost never moves as the agent starts and stops); then
+   what applies, muted, when anything does; the context's meter across the
+   card, the one thing coloured by how full it is; the branch. Tokens are
+   the meter's title. While the agent works its lamp is the one lit: the
+   background agents are told quietly. */
+.card-status.status {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0;
+  overflow: visible;
   font-size: 12px;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
-.card-doing .status-item.activity { width: auto; min-width: 13ch; max-width: 60%; font-size: 12.5px; }
-.card-doing > .status-extras { flex: 0 1 auto; flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
-.card-counters .context, .card-counters .tokens, .card-counters .cost { font: 11.5px var(--mono); }
-.card-counters .context { gap: 8px; }
-.card-counters .context > .percent { min-width: 3ch; text-align: right; }
-.card-counters .meter { width: 48px; }
+.session-card .card-status.status .status-item { font: inherit; }
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; font-weight: 560; color: var(--chalk); }
+.card-head > .activity { flex: 1 1 0; width: auto; min-width: min(8.5em, 100%); align-self: center; }
+.card-head > .activity:is(.idle, .running) { color: var(--chalk); }
+.card-head > .activity.retrying { color: var(--brick); }
+.card-status .card-head > .cost { margin-left: auto; color: var(--chalk); }
+.card-status .card-head > .cost.warm { color: var(--sodium); }
+.card-status .card-head > .cost.hot { color: var(--brick); }
+.card-status > .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
 .card-status .status-item.mode { color: var(--muted); }
 .card-status .status-item.mode:hover { color: var(--chalk); }
 .card-status:has(.activity.running) .background.active { color: var(--muted); }
 .card-status:has(.activity.running) .background.active:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background .lamp { display: none; }
-.card-where { font: 11.5px var(--mono); }
-.card-where > .branch { flex: 0 1 auto; min-width: 0; }
+.card-status:has(.activity.running) .background .lamp, .card-status .background > .icon { display: none; }
+.card-status > .context { display: flex; gap: 10px; margin-top: 2px; }
+.card-status > .context > .meter { flex: 1; width: auto; height: 3px; border-radius: 2px; background: var(--rule-2); }
+.card-status > .context .meter-fill { background: var(--sodium); border-radius: inherit; }
+.card-status > .context.hot .meter-fill { background: var(--brick); }
+.card-status > .context > .percent { min-width: 4ch; text-align: right; }
+.card-where { display: flex; min-width: 0; color: var(--faint); }
+.card-where > .branch { flex: 0 1 auto; min-width: 0; color: var(--faint); }
 
 .chat-tools {
   position: absolute;

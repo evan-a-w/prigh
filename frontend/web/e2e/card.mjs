@@ -1,7 +1,7 @@
 // The session's card at the foot of the docked sidebar: its rows as they
 // stand idle, while the agent works with a subagent running, with only the
-// subagent left, and with a mode on, in the dark and light themes, on a
-// long branch; then the slim bar that stands in for it with the sidebar
+// subagent left, and with a mode on (then in the narrowest sidebar), in the
+// dark and light themes, on a long branch; then the slim bar that stands in for it with the sidebar
 // closed and on a phone. For each it prints the card's rows (what sits on
 // each line), how many lamps glow and what is in the accent colour, and
 // whether anything spills out. Run by prigh_web.sh; prints normalised
@@ -231,6 +231,19 @@ try {
   await page.keyboard.press("Control+o");
   await page.locator(".session-card .status-item.mode").waitFor();
   await both("idle, a mode on");
+
+  // The sidebar at its narrowest: still one line for the activity and the
+  // cost, and nothing spills. A double click gives it its width back.
+  const resizer = page.locator('.resizer[data-resize="sidebar"]');
+  const box = await resizer.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 200, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('.resizer[data-resize="sidebar"]').getAttribute("aria-valuenow") === "200");
+  await both("the sidebar at its narrowest");
+  await resizer.dblclick();
+  await page.waitForFunction(() => document.querySelector('.resizer[data-resize="sidebar"]').getAttribute("aria-valuenow") === "280");
 
   // The composer's chip names where tools run, the backend's machine.
   section("the composer's chips");
