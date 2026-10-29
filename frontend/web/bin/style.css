@@ -596,34 +596,35 @@ kbd {
   padding: 12px 14px 12px 18px;
   border-top: 1px solid var(--rule);
 }
-/* The status on a grid of two quiet lines: what the agent is doing, with
-   what applies across from it (wrapping under itself, not into the
-   activity); then the context's meter, the tokens and the cost. Where (the
-   branch, and the tool host when there is a choice) is a third line when
-   there is one. Each keeps its place as the others change, and one thing
-   at a time is lit: while the agent works, its background agents are told
-   quietly, without a lamp of their own. */
-.card-status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  grid-template-areas: "activity extras extras extras" "context context tokens cost" "where where where where";
+/* Two quiet lines from the left edge, one thing at a time lit: what the
+   agent is doing, then what applies (wrapping under itself); the context's
+   meter, the tokens and the cost. The branch is a third line when there is
+   one. The activity keeps a slot wide enough for its usual words, so that
+   what follows it stays put as the agent starts and stops; while the agent
+   works, its background agents are told quietly, without a lamp. */
+.card-status.status { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; overflow: visible; }
+.card-line {
+  display: flex;
   align-items: center;
-  gap: 8px 12px;
+  gap: 4px 14px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
-.card-status > .status { display: contents; }
-.card-status .status-item.activity { grid-area: activity; width: auto; min-width: 0; max-width: 100%; font-size: 12.5px; }
-.card-status .context { grid-area: context; gap: 8px; }
-.card-status .context .meter { flex: 1; width: auto; min-width: 24px; }
-.card-status .tokens { grid-area: tokens; }
-.card-status .cost { grid-area: cost; justify-self: end; }
-.card-status > .status-extras { grid-area: extras; justify-content: flex-end; flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
-.card-status .status-item.mode:not(.plan) { color: var(--muted); }
+.card-doing .status-item.activity { width: auto; min-width: 13ch; max-width: 60%; font-size: 12.5px; }
+.card-doing > .status-extras { flex: 0 1 auto; flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
+.card-counters .context, .card-counters .tokens, .card-counters .cost { font: 11.5px var(--mono); }
+.card-counters .context { gap: 8px; }
+.card-counters .context > .percent { min-width: 3ch; text-align: right; }
+.card-counters .meter { width: 48px; }
+.card-status .status-item.mode { color: var(--muted); }
 .card-status .status-item.mode:hover { color: var(--chalk); }
 .card-status:has(.activity.running) .background.active { color: var(--muted); }
 .card-status:has(.activity.running) .background.active:hover { color: var(--chalk); }
 .card-status:has(.activity.running) .background .lamp { display: none; }
-.card-where { grid-area: where; display: flex; align-items: center; gap: 12px; min-width: 0; font: 11.5px var(--mono); }
-.card-where > .branch { flex: 0 1 auto; }
+.card-where { font: 11.5px var(--mono); }
+.card-where > .branch { flex: 0 1 auto; min-width: 0; }
 
 .chat-tools {
   position: absolute;

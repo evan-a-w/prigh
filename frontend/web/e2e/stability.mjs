@@ -111,20 +111,20 @@ await page.addInitScript(() => {
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
       });
-    // Where the status's items are (the activity is the one that is not a
-    // counter).
+    // Where the status's items are (the card has them on lines of their
+    // own, the bar directly).
     const status = document.querySelector(":is(.session-card, .session-bar) .status");
     if (status && window.__status)
       window.__status.push({
-        activity: status.querySelector(":scope > :not(.context, .tokens, .cost)")?.textContent.trim(),
-        at: [...status.children]
+        activity: status.querySelector(".activity")?.textContent.trim(),
+        at: [...status.querySelectorAll(":is(.status, .card-line) > :is(.context, .tokens, .cost, .activity)")]
           .filter(e => getComputedStyle(e).display !== "none")
           .map(e => {
             const r = e.getBoundingClientRect();
             const name = ["context", "tokens", "cost"].find(c => e.classList.contains(c)) ?? "activity";
             return `${name}@${Math.round(r.left)}`;
           })
-          .concat([...status.querySelectorAll(":scope > * > .label")]
+          .concat([...status.querySelectorAll(".activity > .label")]
             .filter(e => e.offsetWidth > 0)
             .map(e => `label@${Math.round(e.getBoundingClientRect().left)}`))
           .join(" "),
