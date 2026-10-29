@@ -28,7 +28,7 @@ let%expect_test "the names of the controls" =
     button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archived 1" -- Show the archived sessions
-    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "Context 0% full" -- 0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)
     button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
@@ -58,7 +58,7 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
-    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "Context 0% full" -- 0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)
     button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)

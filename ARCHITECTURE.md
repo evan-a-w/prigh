@@ -2855,10 +2855,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       then the account and the settings gear), `Session_view` (the
       current session in one place at a time, by `Model.docked`: with the
       sidebar open beside the chat, its `card` in the sidebar —
-      two lines from the left edge, `Status_view.activity` then its
-      `extras` (but the plan), and `Status_view.counters` (the context,
-      tokens and cost), with the branch (opening `/pr`) under them when
-      there is one — and its `tools`, the panel toggles floating in the chat's top
+      `Status_view.activity` with its `cost` across from it, its
+      `extras` (but the plan) under them, and its `meter` (the context
+      across the card, the tokens in its title), with the branch (opening
+      `/pr`) under them when there is one — and its `tools`, the panel toggles floating in the chat's top
       right corner; otherwise its `bar`, a slim line over the chat with
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
