@@ -225,6 +225,11 @@ type t =
   ; mutable active_host : string
   ; mutable active_host_name : string (** as last seen, for when it is gone *)
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
+  ; mutable host_returns : float String.Map.t
+    (** until when calls wait for each host that went away (see
+        [set_hosts]) *)
+  ; mutable hosts_changed : unit Promise.t * unit Promise.u
+    (** resolved, and replaced, when the hosts or the active host change *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
   ; mutable told : Told_environment.t
@@ -879,6 +884,13 @@ let save_as_default t =
 (* ---- tool hosts ------------------------------------------------------- *)
 
 let find_host t id = List.find (hosts t) ~f:(fun h -> String.equal h.id id)
+
+let hosts_changed t =
+  let _, resolver = t.hosts_changed in
+  t.hosts_changed <- Promise.create ();
+  Promise.resolve resolver ()
+;;
+
 let active_host_connected t = Option.is_some (find_host t t.active_host)
 
 (* A tool host predating a tool answers that it does not know it. *)
@@ -1078,6 +1090,7 @@ let refresh_location t =
 (* A session that recorded no host (or the backend's, when it is disabled)
    is where a new one would be. *)
 let restore_host t =
+  hosts_changed t;
   Hashtbl.clear t.host_cwds;
   Map.iteri (Session.host_cwds t.session) ~f:(fun ~key ~data ->
     if String.equal key Host.backend_id
@@ -1109,7 +1122,10 @@ let set_host_cwd t (host : Host.t) ~cwd =
 ;;
 
 let activate_host t (host : Host.t) ~cwd ~pinned =
-  if not (String.equal t.active_host host.id) then environment_changed t;
+  if not (String.equal t.active_host host.id)
+  then (
+    environment_changed t;
+    hosts_changed t);
   t.active_host <- host.id;
   t.active_host_name <- host.name;
   t.host_pinned <- pinned;
@@ -1136,7 +1152,9 @@ let host_unavailable_message t =
    in the same cwd, when it comes back: only [set_active_host] moves it.
    Without the backend host, a session that never had a host adopts the
    first one that connects. *)
-let set_hosts t clients =
+let set_hosts ?(returning = String.Map.empty) t clients =
+  t.host_returns <- returning;
+  hosts_changed t;
   if not (List.equal Host.equal t.hosts clients)
   then (
     let was_connected = active_host_connected t in
@@ -1205,7 +1223,37 @@ let host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
     ()
 ;;
 
+(* The active host; with [wait], one that went away is waited for until it
+   comes back, its [host_returns] time passes, the session moves to another
+   host or [cancel]. *)
+let await_active_host t ~wait ~cancel =
+  let id = t.active_host in
+  let unavailable = host_unavailable_message t in
+  let rec loop () =
+    if not (String.equal t.active_host id)
+    then Error unavailable
+    else (
+      match find_host t id, Map.find t.host_returns id with
+      | Some host, _ -> Ok host
+      | None, Some until
+        when wait && Float.( < ) (Eio.Time.now (Eio.Stdenv.clock t.env)) until
+        ->
+        let changed = fst t.hosts_changed in
+        (match
+           Cancellation.protect cancel ~f:(fun () ->
+             Fiber.first
+               (fun () -> Promise.await changed)
+               (fun () -> t.sleep_until until))
+         with
+         | Some () -> loop ()
+         | None -> Error "[cancelled]")
+      | None, _ -> Error (host_unavailable_message t))
+  in
+  loop ()
+;;
+
 let active_host_exec
+      ?(wait = false)
       t
       ?stdin
       ~cancel
@@ -1216,9 +1264,9 @@ let active_host_exec
       ~arguments
       ()
   =
-  match find_host t t.active_host with
-  | None -> Tool.Result.error (host_unavailable_message t)
-  | Some host ->
+  match await_active_host t ~wait ~cancel with
+  | Error message -> Tool.Result.error message
+  | Ok host ->
     host_exec_with_stdin
       t
       host
@@ -1492,6 +1540,7 @@ let executor t : Tool.executor =
         Trace.span "host_roundtrip" ~attrs:[ "host", String t.active_host ]
         @@ fun () ->
         active_host_exec
+          ~wait:true
           t
           ?stdin:context.stdin
           ~cancel:context.cancel
@@ -2783,6 +2832,8 @@ let create
     ; active_host = (if backend_host then Host.backend_id else "")
     ; active_host_name = ""
     ; host_pinned = false
+    ; host_returns = String.Map.empty
+    ; hosts_changed = Promise.create ()
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
     ; told = { host = ""; cwd; tools = []; plan_mode = false }
@@ -2971,6 +3022,7 @@ let start_job t ~command =
     ~command
     ~run:(fun ~id ~cancel ~stdin ~on_output ->
       active_host_exec
+        ~wait:true
         t
         ~stdin
         ~cancel

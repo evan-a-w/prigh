@@ -831,11 +831,15 @@ val trace_report : t -> Trace_report.Report.t
     whichever session it is attached to). In-flight executions on hosts that
     are gone keep waiting: the host may come back with them still running
     ({!Rpc_server} fails them when it does not). Hosts keep the cwd this session last used on them, also
-    while disconnected. The active host stays active when it goes away (tool
-    calls fail until it comes back, see {!host_unavailable_message}); when it
-    is listed again the session resumes on it in the same cwd. Without the
-    backend host, a session that never had a host adopts the first one. *)
-val set_hosts : t -> Host.t list -> unit
+    while disconnected. The active host stays active when it goes away; when
+    it is listed again the session resumes on it in the same cwd. Meanwhile
+    the model's tool calls (and jobs) wait for it until its time in
+    [returning] (hosts that went away and may come back, by id; default:
+    none), the session moves to another host or the call is cancelled, then
+    fail with {!host_unavailable_message}; other calls fail at once. Without
+    the backend host, a session that never had a host adopts the first
+    one. *)
+val set_hosts : ?returning:float String.Map.t -> t -> Host.t list -> unit
 
 (** Makes [id] the active host (with its own cwd) when the session runs on
     the backend by default (not pinned with {!set_active_host}) or has no
