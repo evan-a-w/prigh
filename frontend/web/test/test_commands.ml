@@ -467,7 +467,10 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (quiet)
+    (0%) ↑0 ↓0 $0.00
+    (main)
     (quiet)
     |}];
   H.key h "o" ~ctrl:true;
@@ -495,7 +498,10 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (verbose)
+    (0%) ↑0 ↓0 $0.00
+    (main)
     (verbose)
     |}]
 ;;
@@ -609,7 +615,8 @@ let%expect_test "/trace shows the trace's summary" =
     "trace"
     {|{"summary":"1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)\n\nWall time 3.3s (the main agent, prompt to idle):\n  model  1.3s  39%\n  tools  2.0s  61%\n  other   0ms   0%\n","level":"default","spans":12}|};
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /trace) (max 500)))
      (tag Ignore))
     (Focus dialog)

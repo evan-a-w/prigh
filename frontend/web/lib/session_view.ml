@@ -76,20 +76,29 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
-(* Two quiet lines, and where when it says something: what the agent is
-   doing with what applies across from it, the counters, then the branch. A
-   grid, so that each keeps its place as they change. *)
+(* Two quiet lines from the left edge: what the agent is doing, then what
+   applies; the context's meter, the tokens and the cost. The branch is a
+   third when there is one. Where tools run is the composer's, and the plan
+   is the bar's and [/todos]': the card has no room to say them calmly. *)
 let card (m : App.Model.t) ~inject =
   Node.section
     ~attrs:
       [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
     [ div
-        ~cls:"card-status"
-        ([ Status_view.view m ~inject; Status_view.extras m ~inject ]
+        ~cls:"card-status status"
+        ([ div
+             ~cls:"card-line card-doing"
+             [ Status_view.activity m
+             ; Status_view.extras m ~plan:false ~inject
+             ]
+         ]
+         @ (match Status_view.counters m ~inject with
+            | [] -> []
+            | counters -> [ div ~cls:"card-line card-counters" counters ])
          @
          match m.state with
          | Some ({ git_branch = Some _; _ } as state) ->
-           [ div ~cls:"card-where" [ branch state ~inject ] ]
+           [ div ~cls:"card-line card-where" [ branch state ~inject ] ]
          | Some { git_branch = None; _ } | None -> [])
     ]
 ;;
@@ -108,14 +117,14 @@ let bar (m : App.Model.t) ~inject =
     (match m.state with
      | None ->
        [ toggle
-       ; Status_view.extras m ~inject
+       ; Status_view.extras m ~plan:true ~inject
        ; Status_view.view m ~inject
        ; Sidebar_view.settings ~inject
        ]
      | Some state ->
        [ toggle
        ; rename m state ~inject
-       ; Status_view.extras m ~inject
+       ; Status_view.extras m ~plan:true ~inject
        ; Status_view.view m ~inject
        ; panel_toggles m ~inject
        ; Sidebar_view.settings ~inject

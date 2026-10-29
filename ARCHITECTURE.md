@@ -2840,10 +2840,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       then the account and the settings gear), `Session_view` (the
       current session in one place at a time, by `Model.docked`: with the
       sidebar open beside the chat, its `card` in the sidebar —
-      `Status_view.extras`, then `Status_view` on a grid with the branch
-      under the activity, the context
-      across, tokens and cost, each in its own cell so that nothing moves
-      it — and its `tools`, the panel toggles floating in the chat's top
+      two lines from the left edge, `Status_view.activity` then its
+      `extras` (but the plan), and `Status_view.counters` (the context,
+      tokens and cost), with the branch (opening `/pr`) under them when
+      there is one — and its `tools`, the panel toggles floating in the chat's top
       right corner; otherwise its `bar`, a slim line over the chat with
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
@@ -2890,9 +2890,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       accounts and actions, the settings and the commands and keys) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
       `Status_view` (the context linking to `/session`, tokens, cost and
-      the activity, on a grid in the card and on one line in the bar, where
+      the activity, apart in the card and on one line in the bar, where
       the activity has a slot of fixed width; its `extras`, kept out of
-      the status so that they never move it: the plan chip, queued
+      the status so that they never move it: the plan chip (the bar's
+      only), queued
       messages, the transfers in progress from `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
       gear beside the account, the account menu, `/settings` or Ctrl+,:
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,

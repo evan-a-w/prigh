@@ -792,24 +792,25 @@ quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
 the account, under the tree of projects. The tree marks which session it
 is (its row has the cwd as it is now, relative to its project or worktree,
-and a rename button). The card is two quiet lines on a grid: what the agent
-is doing, with whatever applies across from it (the goal, reminders, a
-scheduled resume, queued messages to take back, background agents and
-jobs, transfers, the verbosity when not the default, the plan chip `plan
-2/5: step` that runs `/todos`); then the context's meter (click for
+and a rename button). The card is two quiet lines from its left edge:
+what the agent is doing (`● Ready`, `Thinking`…), then whatever applies
+(the goal, reminders, a scheduled resume, queued messages to take back,
+background agents and jobs (click for the agents panel), transfers, the
+verbosity when not the default); then the context's meter (click for
 `/session`'s details), the tokens and the cost to the cent (its tooltip
 has it exactly; or the budget). The verbosity is muted, and while the
 agent works its background agents are too, without a lamp, so that one
 thing at a time is lit. Under them, in a git repository, the branch
-(click for the pull requests, `/pr`); where tools run is the composer's
-chip. Each part
-keeps its place, so nothing moves as a turn starts and ends. Your account
-is under it, with the settings gear; the account menu also has Settings
-and Commands and keys (`/help`). With the sidebar closed, and always on a
-phone (where the sidebar is a drawer), a slim bar over the chat keeps the
-essentials on one line: the sidebar's button and the title, what applies,
-the status, the panel
-toggles and the settings gear. What applies comes before the status, and
+(click for the pull requests, `/pr`). Where tools run is the composer's
+chip, and the model's plan is not on the card: `/todos` shows it, and so
+does the transcript as it changes. The activity keeps a slot wide enough
+for its usual words, so nothing moves as a turn starts and ends. Your
+account is under it, with the settings gear; the account menu also has
+Settings and Commands and keys (`/help`). With the sidebar closed, and
+always on a phone (where the sidebar is a drawer), a slim bar over the
+chat keeps the essentials on one line: the sidebar's button and the
+title, what applies (with the plan chip `plan 2/5: step` that runs
+`/todos`), the status, the panel toggles and the settings gear. What applies comes before the status, and
 the activity has a slot of its own width, so that nothing moves the
 status; a narrower chat column drops the tokens and cost, then says what
 applies with icons alone, then shows the activity as a dot; the bar never

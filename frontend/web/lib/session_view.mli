@@ -4,11 +4,11 @@ open! Import
 (** The current session at a glance, in one place at a time
     ([App.Model.docked] picks which). *)
 
-(** In the docked sidebar, above the account: what applies, then the status
-    ([Status_view]) on a grid: the activity beside where tools run (opening
-    the host picker) and the branch (opening the pull requests), the context
-    across, the tokens and the cost. The session list marks which session it
-    is. *)
+(** In the docked sidebar, above the account, two lines from the left
+    edge ([Status_view]): the activity followed by what applies (but the
+    plan), then the context's meter, the tokens and the cost; the branch
+    (opening the pull requests) under them when there is one. The session
+    list marks which session it is. *)
 val card : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** With the card: the transcript filter's button and the panels' toggles

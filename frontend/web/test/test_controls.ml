@@ -279,8 +279,25 @@ let%expect_test
   [%expect
     {|
     <section aria-label="This session" class="session-card">
-      <div class="card-status">
-        <div class="status">
+      <div class="card-status status">
+        <div class="card-doing card-line">
+          <span role="status" aria-atomic="true" class="activity idle status-item">
+            <span class="idle-dot"> </span>
+            <span class="label"> Ready </span>
+          </span>
+          <div class="status-extras">
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+        </div>
+        <div class="card-counters card-line">
           <button type="button"
                   title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
                   aria-label="Context 0% full"
@@ -293,23 +310,8 @@ let%expect_test
           </button>
           <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
           <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
-          <span role="status" aria-atomic="true" class="activity idle status-item">
-            <span class="idle-dot"> </span>
-            <span class="label"> Ready </span>
-          </span>
         </div>
-        <div class="status-extras">
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-        <div class="card-where">
+        <div class="card-line card-where">
           <button type="button"
                   title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
                   aria-haspopup="dialog"
@@ -325,7 +327,8 @@ let%expect_test
   H.text h ~selector:".session-card";
   [%expect
     {|
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (0%) ↑0 ↓0 $0.00
     (feature/narrow-top-bar)
     |}]
 ;;
@@ -1107,12 +1110,14 @@ let%expect_test "the status in the card: idle, running, and what applies" =
            ())
       ()
   in
-  let status () =
-    H.text h ~selector:".session-card .status";
-    H.text h ~selector:".session-card .status-extras"
-  in
+  let status () = H.text h ~selector:".session-card .card-line" in
   status ();
-  [%expect {| (65%) ↑120k ↓9.0k $0.42 Ready |}];
+  [%expect
+    {|
+    Ready
+    (65%) ↑120k ↓9.0k $0.42
+    (main)
+    |}];
   H.event
     h
     (sprintf
@@ -1131,19 +1136,20 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".session-card .status > .status-item";
+  H.elements h ~selector:".session-card .card-counters > .status-item";
   H.elements h ~selector:".session-card .status-extras > .status-item";
-  (* Last, in a slot of its own width (style.css), saying it all in its
+  (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".session-card .status > .activity";
+  H.show h ~selector:".session-card .card-doing > .activity";
   [%expect
     {|
-    (90%) ↑0 ↓0 $0.00 Working
+    Working
     (Goal 2/20) (1 queued)
+    (90%) ↑0 ↓0 $0.00
+    (main)
     <button class="context hot link status-item">
     <span class="status-item tokens">
     <span class="cost status-item">
-    <span class="activity running status-item">
     <button class="goal link status-item warm">
     <button class="link queued status-item">
     <span title="Working" role="status" aria-atomic="true" class="activity running status-item">

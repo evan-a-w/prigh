@@ -2,13 +2,17 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's card at the foot of the docked sidebar: two quiet lines,
-   what the agent is doing with what applies across from it, then the
-   counters; and the branch, when there is one (the tool host is a chip on
-   the composer). Each [card] prints the lines as the user
-   reads them, then what is lit: the lamps, and what is in the accent colour
+(* The session's card at the foot of the docked sidebar: two quiet lines
+   from its left edge, what the agent is doing followed by what applies,
+   then the counters; and the branch when there is one. Where tools run is
+   the composer's chip, and the plan the bar's. Each [card] prints the lines
+   as the user reads them, then what is lit: the lamps, and what is in the accent colour
    (by its class; style.css mutes the background agents and the modes in
    the card while the agent works). *)
+
+let plan =
+  {|{"steps":[{"step":"Look","status":"completed"},{"step":"Final nix GC","status":"in_progress"}]}|}
+;;
 
 let backend_only = {|[{"id":"backend","name":"container","cwd":"/work"}]|}
 
@@ -16,6 +20,7 @@ let fields
       ?(hosts = backend_only)
       ?(active_host = "backend")
       ?branch
+      ?plan
       ?(running = false)
       ()
   =
@@ -31,15 +36,17 @@ let fields
   @ [ ( "git_branch"
       , Option.value_map branch ~default:`Null ~f:(fun b -> `String b) )
     ]
+  @ Option.value_map plan ~default:[] ~f:(fun p ->
+    [ "plan", Jsonaf.of_string p ])
 ;;
 
-let state h ?hosts ?active_host ?branch ?running () =
+let state h ?hosts ?active_host ?branch ?plan ?running () =
   H.event
     h
     (sprintf
        {|{"type":"event","event":"state","state":%s}|}
        (H.state_json
-          ~fields:(fields ?hosts ?active_host ?branch ?running ())
+          ~fields:(fields ?hosts ?active_host ?branch ?plan ?running ())
           ()))
 ;;
 
@@ -53,10 +60,9 @@ let thinking h =
 (* The card's lines as they stand (the grid puts the activity first). *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".session-card .activity";
-  H.text h ~selector:".session-card .status-extras";
+  H.text h ~selector:".session-card .card-doing";
   print_endline "counters:";
-  H.text h ~selector:".session-card .status > :not(.activity)";
+  H.text h ~selector:".session-card .card-counters";
   print_endline "where:";
   H.text h ~selector:".session-card .card-where";
   print_endline "lit:";
@@ -74,20 +80,19 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     now:
     Ready
     counters:
-    (5%)
-    ↑1.6M ↓21k
-    $1.30
+    (5%) ↑1.6M ↓21k $1.30
     where:
     lit:
     |}];
   (* The cost to the cent; its title has it exactly, the tokens theirs. *)
-  H.names h ~selector:".session-card .status > *";
+  H.names h ~selector:".session-card .card-doing > .activity";
+  H.names h ~selector:".session-card .card-counters > *";
   [%expect
     {|
+    [status] span "Ready"
     button "Context 5% full" -- Context: 10k of 200k tokens (/compact frees some). Click for the session's details (/session)
     span "\226\134\1451.6M \226\134\14721k" -- Tokens: 1600000 in, 21000 out, 0 cache read
     span "$1.30" -- Session cost: $1.3021 (/session)
-    [status] span "Ready"
     |}];
   (* Thinking: the activity is the one thing lit. *)
   state h ~running:true ();
@@ -98,9 +103,7 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     now:
     Thinking
     counters:
-    (5%)
-    ↑1.6M ↓21k
-    $1.30
+    (5%) ↑1.6M ↓21k $1.30
     where:
     lit:
     <span class="lamp">
@@ -126,9 +129,7 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     Running tools
     (1 agent running) (quiet)
     counters:
-    (5%)
-    ↑1.6M ↓21k
-    $1.30
+    (5%) ↑1.6M ↓21k $1.30
     where:
     lit:
     <span class="lamp">
@@ -150,9 +151,7 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     Ready
     (1 agent running) (quiet)
     counters:
-    (5%)
-    ↑1.6M ↓21k
-    $1.30
+    (5%) ↑1.6M ↓21k $1.30
     where:
     lit:
     <span class="lamp">
@@ -173,19 +172,27 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     |}]
 ;;
 
-let%expect_test "where: the branch; the tool host is the composer's chip" =
+let%expect_test "the branch; the host in the composer, the plan in the bar" =
   let others =
     {|[{"id":"backend","name":"container","cwd":"/work"},{"id":"c7","name":"build-runner-eu-west-a-long-hostname","cwd":"/srv/work"}]|}
   in
   let branch = "feature/a-rather-long-branch-for-the-sidebar-card" in
-  let h = H.create ~state:(H.state_json ~fields:(fields ~branch ()) ()) () in
-  (* A branch: the branch only, whatever the hosts. *)
+  let h =
+    H.create ~state:(H.state_json ~fields:(fields ~branch ~plan ()) ()) ()
+  in
+  (* A branch: a third line, the branch only, whatever the hosts; the plan
+     is not on the card. *)
+  H.elements h ~selector:".session-card .card-status > *";
   H.names h ~selector:".session-card .card-where > *";
-  state h ~branch ~hosts:others ~active_host:"c7" ();
+  H.elements h ~selector:".session-card .plan";
+  state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
   H.names h ~selector:".session-card .card-where > *";
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
+    <div class="card-doing card-line">
+    <div class="card-counters card-line">
+    <div class="card-line card-where">
     button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -207,9 +214,7 @@ let%expect_test "where: the branch; the tool host is the composer's chip" =
     now:
     Ready
     counters:
-    (5%)
-    ↑1.6M ↓21k
-    $1.30
+    (5%) ↑1.6M ↓21k $1.30
     where:
     lit:
     <button class="btn chip-button host-chip warm">
@@ -223,14 +228,17 @@ let%expect_test "where: the branch; the tool host is the composer's chip" =
      (tag (Worktrees (place  "s1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 4)))))
-    <div class="status">
-    <div class="status-extras">
+    <div class="card-doing card-line">
+    <div class="card-counters card-line">
     |}];
-  (* Without the sidebar the bar keeps the rest on one line, without the
-     host. *)
-  state h ~branch ~hosts:others ~active_host:"c7" ();
+  (* Without the sidebar the bar keeps the rest on one line, with the plan
+     (opening /todos); the host stays the composer's alone. *)
+  state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.text h ~selector:".session-bar";
+  H.elements h ~selector:".session-bar .host";
+  H.elements h ~selector:".session-bar .host-chip";
+  H.click h ~selector:".session-bar .plan";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -238,8 +246,11 @@ let%expect_test "where: the branch; the tool host is the composer's chip" =
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B)) (New session)
+    (plan 1/2: Final nix GC)
     (5%) ↑1.6M ↓21k $1.30 Ready
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
+    (Run /todos)
+    (Focus dialog)
     |}]
 ;;

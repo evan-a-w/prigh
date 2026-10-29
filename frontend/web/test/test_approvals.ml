@@ -153,7 +153,12 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     |}];
   (* The status line leaves the mode to the chip. *)
   status h;
-  [%expect {| (0%) ↑0 ↓0 $0.00 Ready |}]
+  [%expect
+    {|
+    Ready
+    (0%) ↑0 ↓0 $0.00
+    (main)
+    |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
@@ -248,7 +253,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     |}]
 ;;
 
-let%expect_test "the plan: its chip, /todos" =
+let%expect_test "the plan: its chip in the bar, /todos" =
   let h = H.create () in
   run h "/todos";
   toasts h;
@@ -260,6 +265,11 @@ let%expect_test "the plan: its chip, /todos" =
     No plan: the model has not made one (it makes one with update_plan).
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
+  (* The card has no room for the plan: its chip is the bar's, with the
+     sidebar closed (and always on a phone). *)
+  H.elements h ~selector:".session-card .plan";
+  [%expect {| |}];
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
   status h;
   [%expect
     {|
@@ -986,7 +996,10 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    (0%) ↑0 ↓0 $0.00 Ready
+    Ready
+    (1 queued)
+    (0%) ↑0 ↓0 $0.00
+    (main)
     (1 queued)
     |}];
   (* Already shown ones are not added twice. *)
