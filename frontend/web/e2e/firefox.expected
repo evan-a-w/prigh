@@ -13,9 +13,8 @@ web
 New session
 No sessions yet: send a message to start one.
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === firefox: signed in: chat ===
@@ -28,9 +27,8 @@ Ctrl+L switch model
 Ctrl+K find a session
 === firefox: signed in: the session's card ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -114,14 +112,12 @@ three lines
 <TIME>
 === firefox: the session's card after a run ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 === firefox: a budget in the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>/$<COST>
+0%
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -179,9 +175,8 @@ count some lines
 <AGE>
 <CWD>
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === firefox: new session ===
@@ -210,9 +205,8 @@ count some lines
 <AGE>
 <CWD>
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === firefox: switching ===
@@ -472,9 +466,8 @@ Plan mode
 <HOSTNAME>
 === firefox: plan mode: the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 main
 === firefox: a plan to approve ===
 Plan
@@ -495,9 +488,8 @@ Auto: never asks
 <HOSTNAME>
 === firefox: the plan approved: the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 main
 === firefox: implementing ===
 ◇
@@ -745,17 +737,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
@@ -2281,28 +2273,38 @@ markdown fits: true; page fits: true; scrolling display math: 1, auto
 === firefox: math: errors ===
 none
 === firefox: card: idle ===
-row 1: Ready
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 1: Ready | $<COST>
+row 2: [meter] 0%
 row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+lamps: 0; accented: nothing; 100px high
 fits
 === firefox: card: working, a subagent running ===
-row 1: Running tools | 1 agent running
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: Running tools; 88px high
+row 1: Running tools | $<COST>
+row 2: 1 agent running
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: nothing; 127px high
 fits
 === firefox: card: ready, a subagent running ===
-row 1: Ready | 1 agent running
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: 1 agent running; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent running
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: 1 agent running; 127px high
 fits
 === firefox: card: idle, a mode on ===
-row 1: Ready | 1 agent | verbose
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
+fits
+=== firefox: card: the sidebar at its narrowest ===
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
 fits
 === firefox: card: the composer's chips ===
 chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | <HOSTNAME>
@@ -2311,10 +2313,11 @@ chip problems: none
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === firefox: card: on a host with a long name ===
-row 1: Ready | 1 agent | verbose
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
 fits
 chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)

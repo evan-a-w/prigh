@@ -76,10 +76,10 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
-(* Two quiet lines from the left edge: what the agent is doing, then what
-   applies; the context's meter, the tokens and the cost. The branch is a
-   third when there is one. Where tools run is the composer's, and the plan
-   is the bar's and [/todos]': the card has no room to say them calmly. *)
+(* What the agent is doing, with the cost across from it; whatever applies,
+   when anything does; the context's meter across the card; the branch.
+   Where tools run is the composer's, and the plan is the bar's and
+   [/todos]': the card has no room to say them calmly. *)
 let card (m : App.Model.t) ~inject =
   Node.section
     ~attrs:
@@ -87,18 +87,15 @@ let card (m : App.Model.t) ~inject =
     [ div
         ~cls:"card-status status"
         ([ div
-             ~cls:"card-line card-doing"
-             [ Status_view.activity m
-             ; Status_view.extras m ~plan:false ~inject
-             ]
+             ~cls:"card-head"
+             [ Status_view.activity m; Status_view.cost m ~inject ]
+         ; Status_view.extras m ~plan:false ~inject
+         ; Status_view.meter m ~inject
          ]
-         @ (match Status_view.counters m ~inject with
-            | [] -> []
-            | counters -> [ div ~cls:"card-line card-counters" counters ])
          @
          match m.state with
          | Some ({ git_branch = Some _; _ } as state) ->
-           [ div ~cls:"card-line card-where" [ branch state ~inject ] ]
+           [ div ~cls:"card-where" [ branch state ~inject ] ]
          | Some { git_branch = None; _ } | None -> [])
     ]
 ;;

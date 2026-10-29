@@ -221,8 +221,8 @@ let%expect_test
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    Ready
-    (0%) ↑0 ↓0 $0.00
+    Ready $0.00
+    (0%)
     (main)
     |}];
   H.act
@@ -248,9 +248,9 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    Working
+    Working $1.23
     (3 queued)
-    (75%) ↑123k ↓7.9k $1.23
+    (75%)
     (main)
     (3 queued)
     (main)
@@ -259,7 +259,7 @@ let%expect_test
   [%expect
     {|
     <button type="button"
-            title="Context: 150k of 200k tokens (/compact frees some). Click for the session's details (/session)"
+            title="123k tokens in, 7.9k out, 100k cache read; 75% of a 200k context (/compact frees some). Click for the session's details (/session)"
             aria-label="Context 75% full"
             class="context link status-item warm"
             @on_click>

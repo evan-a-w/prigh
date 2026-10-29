@@ -798,19 +798,23 @@ quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
 the account, under the tree of projects. The tree marks which session it
 is (its row has the cwd as it is now, relative to its project or worktree,
-and a rename button). The card is two quiet lines from its left edge:
-what the agent is doing (`● Ready`, `Thinking`…), then whatever applies
-(the goal, reminders, a scheduled resume, queued messages to take back,
-background agents and jobs (click for the agents panel), transfers, the
-verbosity when not the default); then the context's meter (click for
-`/session`'s details), the tokens and the cost to the cent (its tooltip
-has it exactly; or the budget). The verbosity is muted, and while the
-agent works its background agents are too, without a lamp, so that one
-thing at a time is lit. Under them, in a git repository, the branch
+and a rename button). The card's headline is what the agent is doing
+(`● Ready`, `Thinking`…) with the session's cost across from it, to the
+cent (its tooltip has it exactly; or the budget); under it, only when
+anything applies, a muted line of it (the goal, reminders, a scheduled
+resume, queued messages to take back, background agents and jobs (click
+for the agents panel), transfers, the verbosity when not the default);
+then the context's meter across the card, in the accent colour (its
+percent too from 60%, both brick from 85%), with its percent under the
+cost: its tooltip
+has the tokens in and out, and a click opens `/session`'s details. While
+the agent works its background agents are muted, without a lamp, so that
+one thing at a time is lit. Under them, in a git repository, the branch
 (click for the pull requests, `/pr`). Where tools run is the composer's
 chip, and the model's plan is not on the card: `/todos` shows it, and so
 does the transcript as it changes. The activity keeps a slot wide enough
-for its usual words, so nothing moves as a turn starts and ends. Your
+for its usual words, so the cost never moves as a turn starts and ends
+(in a narrow sidebar it goes under the activity). Your
 account is under it, with the settings gear; the account menu also has
 Settings and Commands and keys (`/help`). With the sidebar closed, and
 always on a phone (where the sidebar is a drawer), a slim bar over the

@@ -41,7 +41,9 @@ let chip ?label ~cls ~title ~command ~inject children =
     children
 ;;
 
-let context (state : State.t) ~inject =
+(* The bar says how full the context is; the card, with no room for the
+   tokens, has them in its title too. *)
+let context ?(usage = false) (state : State.t) ~inject =
   if state.model.context_window <= 0
   then Node.none
   else (
@@ -60,11 +62,23 @@ let context (state : State.t) ~inject =
     chip
       ~cls:("context " ^ level)
       ~title:
-        (sprintf
-           "Context: %s of %s tokens (/compact frees some). Click for the \
-            session's details (/session)"
-           (tokens state.context_tokens)
-           (tokens state.model.context_window))
+        (if usage
+         then
+           sprintf
+             "%s tokens in, %s out, %s cache read; %.0f%% of a %s context \
+              (/compact frees some). Click for the session's details \
+              (/session)"
+             (tokens state.usage.input)
+             (tokens state.usage.output)
+             (tokens state.usage.cache_read)
+             percent
+             (tokens state.model.context_window)
+         else
+           sprintf
+             "Context: %s of %s tokens (/compact frees some). Click for the \
+              session's details (/session)"
+             (tokens state.context_tokens)
+             (tokens state.model.context_window))
       ~command:"/session"
       ~label:(sprintf "Context %.0f%% full" percent)
       ~inject
@@ -296,6 +310,15 @@ let counters (m : App.Model.t) ~inject =
     ]
   | _ -> []
 ;;
+
+let connected (m : App.Model.t) f =
+  match m.state, m.connection with
+  | Some state, Connected -> f state
+  | _ -> Node.none
+;;
+
+let meter m ~inject = connected m (context ~usage:true ~inject)
+let cost m ~inject = connected m (cost ~inject)
 
 let view (m : App.Model.t) ~inject =
   div ~cls:"status" (counters m ~inject @ [ activity m ])
