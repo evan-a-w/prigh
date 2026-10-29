@@ -10,9 +10,9 @@ module Fake_host = Test_host_reconnect.Fake_host
    machine, while that frontend's tool host comes and goes (a reload, a
    reconnect, a restart, a second frontend on that machine). They keep
    running with no client attached, so whatever their tool calls get while
-   the host is away decides whether their work survives: today every call
-   fails, at once or when the host comes back, and the subagent reports
-   failure. *)
+   the host is away decides whether their work survives: calls wait for it
+   to come back, calls it was running carry on when it comes back with them,
+   and only those a restarted host lost fail, saying so. *)
 
 let member_string = Test_host_reconnect.member_string
 
@@ -86,17 +86,21 @@ let start t (h : Test_rpc.H.t) agent =
 
 (* With [host.answer] off: answers anything but the subagent's bash and
    returns that exec, left running on the host. *)
-let rec wait_bash (h : Test_rpc.H.t) (host : Fake_host.t) =
-  match Queue.peek host.sent with
-  | Some json when String.equal (member_string json "name") "bash" ->
-    Queue.dequeue_exn host.sent
-  | Some json when String.equal (member_string json "event") "tool_exec" ->
-    ignore (Queue.dequeue_exn host.sent : Json.t);
-    Fake_host.answer_exec h host ~name:"laptop" json;
-    wait_bash h host
-  | _ ->
-    Eio.Fiber.yield ();
-    wait_bash h host
+let wait_bash (h : Test_rpc.H.t) (host : Fake_host.t) =
+  let rec loop tries =
+    if tries = 0 then failwith "the subagent's bash never reached the host";
+    match Queue.peek host.sent with
+    | Some json when String.equal (member_string json "name") "bash" ->
+      Queue.dequeue_exn host.sent
+    | Some json when String.equal (member_string json "event") "tool_exec" ->
+      ignore (Queue.dequeue_exn host.sent : Json.t);
+      Fake_host.answer_exec h host ~name:"laptop" json;
+      loop tries
+    | _ ->
+      Eio.Fiber.yield ();
+      loop (tries - 1)
+  in
+  loop 100_000
 ;;
 
 let result_from (h : Test_rpc.H.t) (host : Fake_host.t) exec =
@@ -122,8 +126,19 @@ let result_from (h : Test_rpc.H.t) (host : Fake_host.t) exec =
      | _ -> "accepted")
 ;;
 
-let%expect_test "a subagent's tool calls fail at once while its host reconnects"
-  =
+(* Resolved when a subagent's next tool call starts: its executor runs
+   before the fiber waiting for it does. *)
+let subagent_tool_started agent =
+  let started, resolve = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Subagent { event = Tool_start _; _ })
+      when not (Eio.Promise.is_resolved started) ->
+      Eio.Promise.resolve resolve ()
+    | _ -> ());
+  started
+;;
+
+let%expect_test "a subagent's tool calls wait while its host reconnects" =
   let gates = Gates.create () in
   Gates.hold gates "run the tests";
   let waiting, arrive = Eio.Promise.create () in
@@ -135,12 +150,7 @@ let%expect_test "a subagent's tool calls fail at once while its host reconnects"
       then Eio.Promise.resolve arrive ();
       Gates.before gates ~key)
     ~main:[ spawn "run the tests"; Reply.text "started"; Reply.text "noted" ]
-    [ ( "run the tests"
-      , [ bash "s1"
-        ; bash "s2"
-        ; Reply.text "I cannot run anything: the tool host is gone"
-        ] )
-    ]
+    [ "run the tests", [ bash "s1"; bash "s2"; Reply.text "the tests pass" ] ]
   @@ fun t ~sw agent h ->
   let laptop = connect_laptop ~sw h agent in
   Test_background_subagents.log_events agent;
@@ -149,9 +159,12 @@ let%expect_test "a subagent's tool calls fail at once while its host reconnects"
      tool host is away for a moment. *)
   Eio.Promise.await waiting;
   Fake_host.disconnect h laptop;
+  let started = subagent_tool_started agent in
   Gates.release gates "run the tests";
-  Agent.wait_idle agent;
+  (* Its first call waits for the host, which comes back. *)
+  Eio.Promise.await started;
   let (_ : Fake_host.t) = connect_laptop ~sw h agent in
+  Agent.wait_idle agent;
   print_subagent_results ();
   Test_background_subagents.print_messages (Agent.messages agent);
   [%expect
@@ -168,22 +181,52 @@ let%expect_test "a subagent's tool calls fail at once while its host reconnects"
     agent_end
     state: running=false subagents=[a1 running]
     subagent_start a1: run the tests
-    subagent_end a1: ok I cannot run anything: the tool host is gone | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
+    laptop hello: client_id=client-3 host_id=host-laptop
+    laptop ran bash in /home/me
+    laptop ran bash in /home/me
+    subagent_end a1: ok the tests pass | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
     state: running=true subagents=[]
     agent_start
-    user: [subagent a1 finished] run the tests | I cannot run anything: the tool host is gone | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
+    user: [subagent a1 finished] run the tests | the tests pass | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
     assistant: noted
     agent_end
     state: running=false subagents=[]
-    laptop hello: client_id=client-3 host_id=host-laptop
-    subagent tool_result bash: waiting for tool host "laptop" to reconnect; /host picks another
-    subagent tool_result bash: waiting for tool host "laptop" to reconnect; /host picks another
+    subagent tool_result bash: ran on laptop in /home/me
+    subagent tool_result bash: ran on laptop in /home/me
     --- messages
     user: go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
-    user: [subagent a1 finished] run the tests | I cannot run anything: the tool host is gone | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
+    user: [subagent a1 finished] run the tests | the tests pass | [subagent: 3 turns, 50 in / 21 out tokens, $0.0000]
+    assistant: noted
+    |}]
+;;
+
+let%expect_test "cancelling a subagent whose call waits for its host" =
+  with_session
+    ~main:[ spawn "run the tests"; Reply.text "started"; Reply.text "noted" ]
+    [ "run the tests", [ bash "s1"; Reply.text "unreachable" ] ]
+  @@ fun t ~sw agent h ->
+  let laptop = connect_laptop ~sw h agent in
+  Fake_host.disconnect h laptop;
+  let started = subagent_tool_started agent in
+  Test_rpc.call t h ~params:{|{"text": "go"}|} "prompt";
+  Eio.Promise.await started;
+  Test_rpc.call t h ~params:{|{"agent_id": "a1"}|} "cancel_subagent";
+  Agent.wait_idle agent;
+  Test_background_subagents.print_messages (Agent.messages agent);
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    --- messages
+    user: go
+    assistant:  subagent{"task":"run the tests"}
+    tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: started
+    user: [subagent a1 failed] run the tests | [cancelled] | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
     assistant: noted
     |}]
 ;;
@@ -209,7 +252,7 @@ let%expect_test "a subagent's call in flight when its host restarts fails" =
     laptop hello: client_id=client-2 host_id=host-laptop
     {"type":"response","id":"r1","ok":true,"result":{}}
     laptop hello: client_id=client-3 host_id=host-laptop
-    subagent tool_result bash: [tool host reconnected]
+    subagent tool_result bash: [the tool host restarted during this call, so its result is lost: run it again if you still need it]
     --- messages
     user: go
     assistant:  subagent{"task":"run the tests"}
@@ -240,8 +283,9 @@ let%expect_test
       ~host_id:"host-laptop"
       ~cwd:"/home/me"
   in
-  Agent.wait_idle agent;
+  (* Its call carries on there: the subagent waits for its result. *)
   result_from h laptop exec;
+  Agent.wait_idle agent;
   print_subagent_results ();
   Test_background_subagents.print_messages (Agent.messages agent);
   [%expect
@@ -249,8 +293,8 @@ let%expect_test
     laptop hello: client_id=client-2 host_id=host-laptop
     {"type":"response","id":"r1","ok":true,"result":{}}
     second hello: client_id=client-3 host_id=host-laptop
-    laptop's late result: rejected: no tool execution
-    subagent tool_result bash: [tool host reconnected]
+    laptop's late result: accepted
+    subagent tool_result bash: tests passed
     --- messages
     user: go
     assistant:  subagent{"task":"run the tests"}
