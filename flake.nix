@@ -266,19 +266,6 @@
           touch "$out"
         '';
 
-        # prigh.nvim's headless tests: against a fake ACP agent, and against
-        # the built `prigh acp -faux-script` (the real_* cases). No network.
-        checks.nvim-plugin =
-          pkgs.runCommand "prigh-nvim-test" { nativeBuildInputs = [ pkgs.neovim-unwrapped pkgs.git ]; } ''
-            cp -r ${./editors/nvim} nvim
-            chmod -R u+w nvim
-            export HOME="$PWD/home"
-            mkdir -p "$HOME"
-            export PRIGH_BIN=${prighBackend}/bin/prigh
-            NVIM=nvim ${pkgs.runtimeShell} nvim/test/run.sh
-            mkdir "$out"
-          '';
-
         # frontend/web/e2e: Chromium and Firefox against the built backend
         # and the installed prigh-web site.
         checks.web-e2e =

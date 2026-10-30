@@ -1123,25 +1123,6 @@ Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
 the backend's ports carries the RPC, but the terminal and file transfers
 need its `-web` port.
 
-## In Neovim
-
-[`editors/nvim`](editors/nvim/README.md) is prigh.nvim, a Neovim client
-speaking the Agent Client Protocol to `prigh acp` (locally, or `prigh acp
--connect HOST:PORT -token T` for a remote backend): a chat split with
-streamed answers, tool cards and permission cards, the agent reading and
-editing your buffers (unsaved text included), and `:PrighReview` to accept or
-reject its changes hunk by hunk.
-
-```lua
-vim.pack.add({ "https://github.com/evan-a-w/prigh" })
--- the plugin is the repository's editors/nvim, not its root:
-vim.opt.rtp:append(vim.fn.stdpath("data") .. "/site/pack/core/opt/prigh/editors/nvim")
-require("prigh").setup({ cmd = { "prigh", "acp" } })   -- then :Prigh
-```
-
-Then `:helptags ALL` for `:help prigh`, and `:checkhealth prigh`. Other
-plugin managers and troubleshooting: [its Install](editors/nvim/README.md#install).
-
 ## Editors (ACP)
 
 `prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
@@ -1187,7 +1168,7 @@ sees and its edits land in them. `bash`, `grep`, `find` and `ls` still use
 the disk, as do binary files, images, deletes and moves, and whether a
 file exists.
 
-Clients that set `clientCapabilities._meta.prigh.state` (prigh.nvim does)
+Clients that set `clientCapabilities._meta.prigh.state`
 also get the `_prigh/state` notification whenever prigh's status line
 changes — `{sessionId, model, thinking, running, context_tokens,
 context_window, cost_usd, budget_usd, approval_mode, plan_mode, queued:
@@ -2606,7 +2587,5 @@ check.
   backend process, `bin/`, `test/`, `e2e/`, `tmux-test/`) and `web/`
   (prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`,
   `e2e/`).
-- `editors/nvim/` — prigh.nvim, the Neovim ACP client (Lua; headless tests
-  against a scripted fake agent: `editors/nvim/test/run.sh`).
 - `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the
   container; `AGENTS.md` — conventions for working on the code.
