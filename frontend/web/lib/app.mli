@@ -638,6 +638,9 @@ module Action : sig
     (** the review page's menu of what to review or compare with (again
         closes it) *)
     | Review_direct of bool
+    | Compose_commit
+    (** the review's commit box, with its selected files, else the approved
+        ones with changes, else its file *)
     (** compare with the base itself ([true]) or since the merge base *)
     | Review_checkout
     (** check the branch reviewed read-only out into a worktree, recorded

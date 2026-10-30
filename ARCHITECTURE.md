@@ -3103,17 +3103,24 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Git_bar` (pure: the reviewed worktree's `git_status`, read with
       every `git_diff` the open page makes of a worktree (`Git_bar.watch`,
       starting over for another worktree; a branch not checked out has no
-      bar, and `App` ignores its actions), the approved files unticked (`excluded`), the
+      bar, and `App` ignores its actions), the
       commit message, Amend, and the action on its way; `update`/`reply`
       return `Out.t`s: requests tagged `Reply_tag.Git`, `Draft_message`
-      (after staging the ticked files), `Changed` (read the diff again) and
-      `Create_pr`, which opens `Pr_create` for its `dir`) drawn by
+      (after staging the commit's files), `Changed` (read the diff again)
+      and `Create_pr`, which opens `Pr_create` for its `dir`; `commit` is
+      the open commit's chosen files, `None` while it is closed) drawn by
       `Git_bar_view`: `strip` at the page's foot (branch, upstream,
-      counts, Stage approved, Push, Create PR, the last notice or
-      refusal), `tick`, a file's box in the list (`Git_bar.tick`: staged,
-      or approved and not unticked, is ticked; partly staged is mixed),
-      and `commit_box` under the list (Alt+G, Esc and Ctrl+Enter handled
-      in its textarea). `Generate` keeps the one draft streaming into a
+      counts, Commit…, Push, Create PR, the last notice or refusal), and
+      `commit_box` under the list while a commit is open (its files, each
+      with a leave-out button; Alt+G, Esc and Ctrl+Enter handled in its
+      textarea). The file list has no boxes: `Code_review.marked` is the
+      files selected (x, Shift+X, Ctrl/Shift+click), and a file's or the
+      selection's context menu (`Context_menu.Target.Review_files`, its
+      ⋯, right-click, Shift+F10) approves, stages, unstages, commits
+      (`Git_bar.Compose`), selects or copies them. `Code_review`'s
+      `Toggle_approval` on the page's file goes on to the next file not
+      approved (`advance`); `Review_page_view.dock` under the file is
+      ← Approve →, always in the same place. `Generate` keeps the one draft streaming into a
       field (`Target`: the PR dialog, the commit box, the new worktree's
       branch, the rename dialog; its id, the text so far and the field's
       text before) and the undo; `App` reads and writes the targets'

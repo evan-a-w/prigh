@@ -212,18 +212,17 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (main /work)
     against
     (HEAD the uncommitted changes)
-    (○ a.ml +2 −1 since approved +2 −1)
-    (⚠ b.ml +1 −1)
+    (○ a.ml +2 −1 since approved +2 −1) (More (right-click, Shift+F10))
+    (⚠ b.ml +1 −1) (More (right-click, Shift+F10))
     2 files changed, +3 −2
-    (Previous file ([, p, k)) (Next file (], n, j))
     a.ml
-    (Approve)
     Since bob's approval · 10:00: +2 −1 (removed lines are the file as it was then)
     @@ -1,1 +1,2 @@
     1 let x = 2
     2 - let y = 3
     2 + let y = 30
     3 + let z = 4
+    (←) (Approve & next Space) (→) File 1 of 2
     |}];
   H.names h ~selector:".segment.on";
   H.names h ~selector:".review-since-menu option";
@@ -243,20 +242,20 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (Review (Step 1))
     (Rpc (method_ fs_preview) (params ((path /work/b.ml)))
      (tag (Review (Content b.ml))))
-    (Previous file ([, p, k)) (Next file (], n, j))
     b.ml
-    Changed since you approved it (Approve again)
+    Changed since you approved it
     @@ -1 +1 @@
     1 - let b = 1
     1 + let b = 2
+    (←) (Approve again Space) (→) File 2 of 2
     (Review (Set_layout Since))
-    (Previous file ([, p, k)) (Next file (], n, j))
     b.ml
-    Changed since you approved it (Approve again)
+    Changed since you approved it
     Nothing changed since your approval · 10:00 · the changes as they are, below
     @@ -1 +1 @@
     1 - let b = 1
     1 + let b = 2
+    (←) (Approve again Space) (→) File 2 of 2
     |}];
   (* Changes takes a.ml back to its hunks; it stays so. *)
   H.key h "[" ~target:Review;
@@ -418,15 +417,20 @@ let%expect_test "actions read what changed again; the editor's save is one" =
     (Rpc (method_ review_approve)
      (params ((root /work) (path a.ml) (hash 185f77487f5bea33a200aac854de7910)))
      (tag (Review (Changed ()))))
+    (Rpc (method_ fs_preview) (params ((path /work/b.ml)))
+     (tag (Review (Content b.ml))))
     (Rpc (method_ review_since) (params ((root /work)))
      (tag (Review (Since /work))))
     |}];
   H.reply h "review_since" since_json;
+  (* Approving went on to b.ml: back to a.ml. *)
+  H.quiet h (fun () -> H.key h "ArrowLeft" ~target:Review);
   H.key h "e" ~target:Review;
   H.act h (Review (Edit_input "let x = 2\n"));
   H.act h (Review Save);
   [%expect
     {|
+    (Review (Step -1))
     (Review (Set_mode Edit))
     (Focus review-editor)
     (Rpc (method_ fs_write)
@@ -456,8 +460,8 @@ let%expect_test "an older backend: no since-view" =
   H.text h ~selector:".review-files";
   [%expect
     {|
-    (○ a.ml +2 −1)
-    (⚠ b.ml +1 −1)
+    (○ a.ml +2 −1) (More (right-click, Shift+F10))
+    (⚠ b.ml +1 −1) (More (right-click, Shift+F10))
     2 files changed, +3 −2
     |}]
 ;;

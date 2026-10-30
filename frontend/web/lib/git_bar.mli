@@ -3,14 +3,14 @@ open! Import
 
 (** The review page's git bar: the reviewed worktree's branch, how it
     stands with its upstream and what is staged ([git_status]), and its
-    actions: stage and unstage files (ticked in the file list; approved
-    files come ticked), commit (or amend) with a message the model can
-    draft ({!Generate}), push (setting the upstream), and a pull request
-    for the branch. Pure: [update] and [reply] return [Out.t]s, which [App]
-    turns into requests.
+    actions: stage and unstage files (from the file list's menu), commit
+    (or amend) with a message the model can draft ({!Generate}), push
+    (setting the upstream), and a pull request for the branch. Pure:
+    [update] and [reply] return [Out.t]s, which [App] turns into requests.
 
-    A file is ticked when it is staged, or approved and not unticked
-    ([excluded]); committing stages the ticked files first. *)
+    The commit box shows only while composing a commit ([commit]): it
+    commits the files chosen for it (staged first) and whatever git already
+    has staged. *)
 
 module Busy : sig
   type t =
@@ -20,13 +20,13 @@ module Busy : sig
   [@@deriving sexp_of, equal]
 end
 
-module Tick : sig
-  (** A file's box in the review's list. *)
+module Stage : sig
+  (** What git has of a file's changes. *)
   type t =
-    | Clean (** nothing uncommitted: no box *)
-    | Checked
+    | Clean (** nothing uncommitted *)
+    | Unstaged
     | Partly (** staged, with more changes not staged *)
-    | Unchecked
+    | Staged
   [@@deriving sexp_of, equal]
 end
 
@@ -34,7 +34,8 @@ type t =
   { dir : string option (** the worktree ([None]: the session's) *)
   ; status : Git_status.t option
   ; error : string option (** [git_status] failed: no actions *)
-  ; excluded : String.Set.t (** approved files unticked *)
+  ; commit : String.Set.t option
+    (** composing a commit: the files chosen for it (the commit box shows) *)
   ; message : string
   ; amend : bool
   ; busy : Busy.t option
@@ -50,7 +51,7 @@ module Reply : sig
     | Status
     | Staged
     | Staged_to_draft
-    (** the ticked files staged, so their diff is drafted from *)
+    (** the chosen files staged, so their diff is drafted from *)
     | Committed
     | Pushed
   [@@deriving sexp_of, equal]
@@ -70,14 +71,20 @@ end
 
 module Action : sig
   type t =
-    | Toggle of string (** a file's box *)
-    | Stage_approved
+    | Stage of string list
+    | Unstage of string list
+    | Compose of string list
+    (** open the commit box with these files chosen (added to those chosen
+        when it is open) *)
+    | Leave_out of string
+    (** of the commit: unchosen, and unstaged when git has it staged *)
+    | Close_commit
     | Message of string
     | Toggle_amend
     | Commit
     | Push
     | Create_pr
-    | Draft (** Generate, for the message: the ticked files are staged first *)
+    | Draft (** Generate, for the message: the chosen files are staged first *)
   [@@deriving sexp_of, equal]
 end
 
@@ -90,15 +97,19 @@ end
     starts over. *)
 val watch : t -> dir:string option -> t * Out.t list
 
-val update : t -> files:Files.t -> Action.t -> t * Out.t list
+val update : t -> Action.t -> t * Out.t list
 val reply : t -> Reply.t -> (Json.t, string) Result.t -> t * Out.t list
-val tick : t -> files:Files.t -> string -> Tick.t
+val stage : t -> string -> Stage.t
 
-(** The ticked files git does not have staged yet. *)
-val pending : t -> files:Files.t -> string list
+(** What the commit box opens with when nothing is chosen: the approved
+    files with uncommitted changes. *)
+val approved_changes : t -> files:Files.t -> string list
 
-(** Staged files, and the ticked ones to stage. *)
-val to_commit : t -> files:Files.t -> int
+(** The chosen files with changes git does not have staged yet. *)
+val pending : t -> string list
+
+(** What a commit takes: the staged files and the chosen ones, sorted. *)
+val to_commit : t -> string list
 
 (** Whether the actions make sense: the status is in and HEAD is on a
     branch. *)

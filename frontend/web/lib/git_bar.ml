@@ -9,12 +9,12 @@ module Busy = struct
   [@@deriving sexp_of, equal]
 end
 
-module Tick = struct
+module Stage = struct
   type t =
     | Clean
-    | Checked
+    | Unstaged
     | Partly
-    | Unchecked
+    | Staged
   [@@deriving sexp_of, equal]
 end
 
@@ -22,7 +22,7 @@ type t =
   { dir : string option
   ; status : Git_status.t option
   ; error : string option
-  ; excluded : String.Set.t
+  ; commit : String.Set.t option
   ; message : string
   ; amend : bool
   ; busy : Busy.t option
@@ -35,7 +35,7 @@ let empty =
   { dir = None
   ; status = None
   ; error = None
-  ; excluded = String.Set.empty
+  ; commit = None
   ; message = ""
   ; amend = false
   ; busy = None
@@ -68,8 +68,11 @@ end
 
 module Action = struct
   type t =
-    | Toggle of string
-    | Stage_approved
+    | Stage of string list
+    | Unstage of string list
+    | Compose of string list
+    | Leave_out of string
+    | Close_commit
     | Message of string
     | Toggle_amend
     | Commit
@@ -103,36 +106,44 @@ let watch t ~dir =
 
 let file t path = Option.bind t.status ~f:(fun s -> Git_status.find s path)
 
-let approved ~(files : Files.t) path =
-  List.Assoc.find files ~equal:String.equal path |> Option.value ~default:false
-;;
-
-let tick t ~files path : Tick.t =
+let stage t path : Stage.t =
   match file t path with
   | None -> Clean
   | Some f ->
-    let unstaged = Git_status.File.unstaged f in
-    if Git_status.File.staged f
-    then if unstaged then Partly else Checked
-    else if approved ~files path && not (Set.mem t.excluded path)
-    then Checked
-    else Unchecked
+    (match Git_status.File.staged f, Git_status.File.unstaged f with
+     | true, true -> Partly
+     | true, false -> Staged
+     | false, true -> Unstaged
+     | false, false -> Clean)
 ;;
 
-let pending t ~files =
-  List.filter_map files ~f:(fun (path, _) ->
-    match file t path, tick t ~files path with
-    | Some f, Checked when not (Git_status.File.staged f) -> Some f.path
-    | _ -> None)
+let approved_changes t ~(files : Files.t) =
+  List.filter_map files ~f:(fun (path, approved) ->
+    Option.some_if (approved && not (Stage.equal (stage t path) Clean)) path)
+;;
+
+let chosen t = Option.value t.commit ~default:String.Set.empty
+
+let pending t =
+  Set.to_list (chosen t)
+  |> List.filter_map ~f:(fun path ->
+    match file t path with
+    | Some f when Git_status.File.unstaged f -> Some f.path
+    | Some _ | None -> None)
   |> List.dedup_and_sort ~compare:String.compare
 ;;
 
-let to_commit t ~files =
+let to_commit t =
   let staged =
-    Option.value_map t.status ~default:0 ~f:(fun s ->
-      List.count s.files ~f:Git_status.File.staged)
+    Option.value_map t.status ~default:[] ~f:(fun s ->
+      List.filter_map s.files ~f:(fun f ->
+        Option.some_if (Git_status.File.staged f) f.path))
   in
-  staged + List.length (pending t ~files)
+  let chosen =
+    Set.to_list (chosen t)
+    |> List.filter ~f:(fun path -> not (Stage.equal (stage t path) Clean))
+  in
+  List.dedup_and_sort (staged @ chosen) ~compare:String.compare
 ;;
 
 let on_branch t = Option.exists t.status ~f:(fun s -> Option.is_some s.branch)
@@ -142,52 +153,65 @@ let rpc t method_ reply ~busy =
   , [ Out.Rpc { method_; reply } ] )
 ;;
 
-let stage t paths ~reply =
+let stage_rpc t paths ~reply =
   rpc t (Git_stage { dir = t.dir; paths; tracked = false }) reply ~busy:Staging
+;;
+
+let unstage_rpc t paths =
+  rpc t (Git_unstage { dir = t.dir; paths }) Staged ~busy:Staging
+;;
+
+(* The files git has, as it names them (a rename by its new path). *)
+let known t paths ~f =
+  List.filter_map paths ~f:(fun path ->
+    Option.bind (file t path) ~f:(fun g -> Option.some_if (f g) g.path))
+  |> List.dedup_and_sort ~compare:String.compare
 ;;
 
 let refuse t text = { t with failure = Some text; notice = None }, []
 
-let update t ~files (action : Action.t) =
+let update t (action : Action.t) =
   match action with
   | Message message -> { t with message; failure = None }, []
   | Toggle_amend -> { t with amend = not t.amend; failure = None }, []
   | Create_pr -> t, [ Out.Create_pr { dir = t.dir } ]
-  | _ when Option.is_some t.busy -> t, []
-  | Toggle path ->
-    (match file t path, tick t ~files path with
-     | None, _ | _, Clean -> t, []
-     | Some f, Checked when Git_status.File.staged f ->
-       let t = { t with excluded = Set.add t.excluded path } in
-       rpc
-         t
-         (Git_unstage { dir = t.dir; paths = [ f.path ] })
-         Staged
-         ~busy:Staging
-     | Some _, Checked -> { t with excluded = Set.add t.excluded path }, []
-     | Some f, (Partly | Unchecked) ->
-       stage
-         { t with excluded = Set.remove t.excluded path }
-         [ f.path ]
-         ~reply:Staged)
-  | Stage_approved ->
+  | Compose paths ->
     let paths =
-      List.filter_map files ~f:(fun (path, approved) ->
-        match file t path with
-        | Some f when approved && Git_status.File.unstaged f -> Some f.path
-        | Some _ | None -> None)
-      |> List.dedup_and_sort ~compare:String.compare
+      List.filter paths ~f:(fun path -> not (Stage.equal (stage t path) Clean))
     in
-    (match paths with
-     | [] -> refuse t "No approved files with changes to stage."
-     | paths ->
-       let excluded = List.fold paths ~init:t.excluded ~f:Set.remove in
-       stage { t with excluded } paths ~reply:Staged)
+    ( { t with
+        commit = Some (Set.union (chosen t) (String.Set.of_list paths))
+      ; failure = None
+      ; notice = None
+      }
+    , [] )
+  | Close_commit -> { t with commit = None; failure = None }, []
+  | _ when Option.is_some t.busy -> t, []
+  | Leave_out path ->
+    let t =
+      { t with commit = Option.map t.commit ~f:(fun c -> Set.remove c path) }
+    in
+    (match file t path with
+     | Some f when Git_status.File.staged f -> unstage_rpc t [ f.path ]
+     | Some _ | None -> t, [])
+  | Stage paths ->
+    (match known t paths ~f:Git_status.File.unstaged with
+     | [] -> refuse t "Nothing to stage: git has all of their changes."
+     | paths -> stage_rpc t paths ~reply:Staged)
+  | Unstage paths ->
+    (match known t paths ~f:Git_status.File.staged with
+     | [] ->
+       refuse t "Nothing to unstage: git has none of their changes staged."
+     | paths -> unstage_rpc t paths)
   | Commit ->
     if not (on_branch t)
     then refuse t "HEAD is detached: commit on a branch (git switch -c NAME)."
-    else if (not t.amend) && to_commit t ~files = 0
-    then refuse t "Nothing to commit: tick the files to commit."
+    else if (not t.amend) && List.is_empty (to_commit t)
+    then
+      refuse
+        t
+        "Nothing to commit: choose files with changes (right-click them, \
+         Commit…)."
     else if (not t.amend) && String.is_empty (String.strip t.message)
     then refuse t "Write a commit message, or Generate one (Alt+G)."
     else
@@ -197,7 +221,7 @@ let update t ~files (action : Action.t) =
            { dir = t.dir
            ; message = t.message
            ; amend = t.amend
-           ; paths = pending t ~files
+           ; paths = pending t
            })
         Committed
         ~busy:Committing
@@ -206,9 +230,9 @@ let update t ~files (action : Action.t) =
     then refuse t "HEAD is detached: push a branch (git switch -c NAME)."
     else rpc t (Git_push { dir = t.dir }) Pushed ~busy:Pushing
   | Draft ->
-    (match pending t ~files with
+    (match pending t with
      | [] -> { t with failure = None }, [ Out.Draft_message ]
-     | paths -> stage t paths ~reply:Staged_to_draft)
+     | paths -> stage_rpc t paths ~reply:Staged_to_draft)
 ;;
 
 let short sha = String.prefix sha 7
@@ -240,7 +264,7 @@ let reply t (reply : Reply.t) result =
         ; busy = None
         ; message = ""
         ; amend = false
-        ; excluded = String.Set.empty
+        ; commit = None
         ; notice =
             Some
               (sprintf

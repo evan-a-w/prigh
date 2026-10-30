@@ -163,6 +163,10 @@ type t =
     (** what the code view shows unfolded: resolved threads (by id), a
         file's outdated comments (["outdated:PATH"]) and those on lines not
         shown (["hidden:PATH"]) *)
+  ; marked : String.Set.t
+    (** the files selected in the list, which its menu acts on (approve,
+        stage, commit) *)
+  ; mark_from : string option (** the file marked last: Shift extends from it *)
   }
 [@@deriving sexp_of]
 
@@ -265,6 +269,16 @@ module Action : sig
         ; accept : bool
         }
     | Toggle_approval of string
+    (** approving the page's file goes on to the next one not approved *)
+    | Approve_files of
+        { paths : string list
+        ; approve : bool (** or take the approvals back *)
+        }
+    | Mark of
+        { path : string
+        ; range : bool (** every file from the one marked last, or the page's *)
+        } (** select the file in the list, or unselect it *)
+    | Unmark_all
     | Submit (** send the new comments and replies to the agent *)
     | Edit_input of string
     | Save
@@ -355,14 +369,24 @@ val approval
 
 val approved : t -> int
 
+(** The files selected in the list ([marked]) that it still lists, in its
+    order. *)
+val marked : t -> string list
+
+(** The id of the file's row in the list. *)
+val file_dom_id : string -> string
+
 (** Comments with posts the agent has not seen. *)
 val unsent : t -> int
 
-(** The page's keys (focus on the page, not in a field): [\]] / [n] / [j]
-    next file, [\[] / [p] / [k] previous, [a] approve, [c] comment on the
-    selected code, [e] edit or comment mode, [v] the whole file or the hunks,
-    [l] what changed since the last action or not,
-    [s] send the comments, Esc clears the selection then closes. *)
+(** The page's keys (focus on the page, not in a field): → / [\]] / [n] /
+    [j] next file, ← / [\[] / [p] / [k] previous, Space / [a] approve (and go
+    on to the next file not approved) or take the approval back, [x] select
+    the file in the list (Shift+X: the files from the last selected), [c]
+    comment on the selected code, [e] edit or comment mode, [v] the whole
+    file or the hunks, [l] what changed since the last action or not, [s]
+    send the comments, Esc drops the comment, the selected code, the
+    selected files, then closes. *)
 val key
   :  t
   -> key:string

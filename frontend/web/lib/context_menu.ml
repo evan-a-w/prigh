@@ -9,6 +9,7 @@ module Target = struct
         ; path : string
         }
     | Message of int
+    | Review_files of string list
   [@@deriving sexp_of, equal]
 end
 
@@ -51,6 +52,14 @@ module Item = struct
     | Copy_message
     | Trim_before
     | Trim_after
+    | Approve_files
+    | Unapprove_files
+    | Stage_files
+    | Unstage_files
+    | Commit_files
+    | Select_files
+    | Unselect_files
+    | Copy_paths
   [@@deriving sexp_of, equal, enumerate]
 
   let id t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -76,7 +85,15 @@ module Item = struct
     | Unarchive
     | Copy_message
     | Trim_before
-    | Trim_after -> false
+    | Trim_after
+    | Approve_files
+    | Unapprove_files
+    | Stage_files
+    | Unstage_files
+    | Commit_files
+    | Select_files
+    | Unselect_files
+    | Copy_paths -> false
   ;;
 end
 
@@ -129,14 +146,15 @@ let worktree_items (s : Session_summary.t) ~path
 
 let items ?host_home (target : Target.t) s ~current =
   match target with
-  | Session _ | Message _ -> session_items ?host_home s ~current
+  | Session _ | Message _ | Review_files _ ->
+    session_items ?host_home s ~current
   | Worktree { path; _ } -> worktree_items s ~path
 ;;
 
 let picker ?host_home target (s : Session_summary.t) ~current =
   let title =
     match target with
-    | Target.Session _ | Message _ -> "Session"
+    | Target.Session _ | Message _ | Review_files _ -> "Session"
     | Worktree { path; _ } ->
       (match List.find s.worktrees ~f:(fun w -> String.equal w.path path) with
        | Some w -> "Worktree " ^ Session_worktree.label w
@@ -207,16 +225,85 @@ let message_picker (msg : Message.t) =
     ]
 ;;
 
+module Files = struct
+  type t =
+    { paths : string list
+    ; approved : int
+    ; staged : int
+    ; unstaged : int
+    ; selected : bool
+    ; composing : bool
+    ; git : string option
+    }
+  [@@deriving sexp_of, equal]
+end
+
+let files_picker (f : Files.t) =
+  let n = List.length f.paths in
+  let them = if n = 1 then "it" else "them" in
+  let item (kind : Item.t) label ~key ~unless:(disabled, why) =
+    Picker.Item.create
+      ~id:(Item.id kind)
+      ~detail:(if disabled then why else key)
+      ~dimmed:disabled
+      label
+  in
+  let git ~unless:(disabled, why) =
+    match f.git with
+    | Some why -> true, why
+    | None -> disabled, why
+  in
+  Picker.create
+    ~title:
+      (match f.paths with
+       | [ path ] -> Filename.basename path
+       | _ -> sprintf "%d selected files" n)
+    [ item
+        Approve_files
+        "Approve"
+        ~key:(if n = 1 then "Space" else "")
+        ~unless:(f.approved = n, sprintf "Approved as %s are now" them)
+    ; item
+        Unapprove_files
+        "Take back the approval"
+        ~key:""
+        ~unless:(f.approved = 0, "Not approved")
+    ; item
+        Stage_files
+        "Stage"
+        ~key:""
+        ~unless:(git ~unless:(f.unstaged = 0, "Git has all of the changes"))
+    ; item
+        Unstage_files
+        "Unstage"
+        ~key:""
+        ~unless:(git ~unless:(f.staged = 0, "Nothing staged"))
+    ; item
+        Commit_files
+        (if f.composing then "Add to the commit" else "Commit…")
+        ~key:"Shift+C"
+        ~unless:(git ~unless:(f.staged + f.unstaged = 0, "Nothing to commit"))
+    ; (if f.selected
+       then item Unselect_files "Unselect" ~key:"x" ~unless:(false, "")
+       else item Select_files "Select" ~key:"x" ~unless:(false, ""))
+    ; item
+        Copy_paths
+        (if n = 1 then "Copy path" else "Copy paths")
+        ~key:""
+        ~unless:(false, "")
+    ]
+;;
+
 let worktree t =
   match t.target with
-  | Session _ | Message _ -> None
+  | Session _ | Message _ | Review_files _ -> None
   | Worktree { path; _ } -> Some path
 ;;
 
 let session t =
   match t.target with
   | Session path | Worktree { session = path; _ } -> Some path
-  | Message _ -> None
+  | Message _ | Review_files _ -> None
 ;;
 
 let worktree_dom_id ~session path =

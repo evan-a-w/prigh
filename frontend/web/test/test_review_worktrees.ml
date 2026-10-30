@@ -151,12 +151,10 @@ let%expect_test
     (main)
     (merge base abcdef01)
     (Since merge base) (Directly)
-    (○ a.ml 1 +1 −1)
-    (⚠ login.ml +1 −0)
+    (○ a.ml 1 +1 −1) (More (right-click, Shift+F10))
+    (⚠ login.ml +1 −0) (More (right-click, Shift+F10))
     2 files changed, +2 −1
-    (Previous file ([, p, k)) (Next file (], n, j))
     a.ml
-    (Approve)
     @@ -1 +1 @@
     1 - let x = 1
     1 + let x = 2
@@ -165,6 +163,7 @@ let%expect_test
     You 10:00 not sent yet
     In the worktree
     []
+    (←) (Approve & next Space) (→) File 1 of 2
     |}];
   H.show h ~selector:".review-target";
   [%expect
@@ -227,6 +226,9 @@ let%expect_test
       ((root /home/u/.prigh/worktrees/work/feat-login) (path a.ml)
        (hash 8e7f85d53940537408ab49f00ee82988)))
      (tag (Review (Changed ()))))
+    (Rpc (method_ fs_preview)
+     (params ((path /home/u/.prigh/worktrees/work/feat-login/login.ml)))
+     (tag (Review (Content login.ml))))
     (Review Submit)
     (Rpc (method_ review_submit)
      (params ((root /home/u/.prigh/worktrees/work/feat-login)))
@@ -262,11 +264,9 @@ let%expect_test
     (main /work)
     against
     (HEAD the uncommitted changes)
-    (✓ a.ml 1 +1 −1)
+    (✓ a.ml 1 +1 −1) (More (right-click, Shift+F10))
     1 file changed, +1 −1
-    (Previous file ([, p, k)) (Next file (], n, j))
     a.ml
-    (Approved)
     @@ -1 +1 @@
     1 - let x = 1
     1 + let x = 2
@@ -275,6 +275,7 @@ let%expect_test
     You 10:00 not sent yet
     In main
     []
+    (←) (Approved Space) (→) File 1 of 1
     |}];
   (* Taking that approval back names no worktree, as it was made. *)
   H.key h "a" ~target:Review;
