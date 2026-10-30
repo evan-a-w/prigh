@@ -150,10 +150,10 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.textf
             "On %s, where tools run (/host changes it)."
-            (List.find state.hosts ~f:(fun h ->
-               String.equal h.id state.active_host)
-             |> Option.value_map ~default:state.active_host ~f:(fun h -> h.name)
-            )
+            (match Active_host.of_state state with
+             | Connected h -> h.name
+             | Disconnected { name; _ } -> name ^ " (offline)"
+             | Unset -> state.active_host)
         ]
     | _ -> Node.none
   in
@@ -215,8 +215,10 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
 
 let active_host_name (m : App.Model.t) =
   Option.bind m.state ~f:(fun state ->
-    List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host))
-  |> Option.map ~f:(fun h -> h.name)
+    match Active_host.of_state state with
+    | Connected h -> Some h.name
+    | Disconnected { name; _ } -> Some name
+    | Unset -> None)
 ;;
 
 let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =

@@ -198,7 +198,10 @@ has one *active tool host*; `/host` lists the backend and the connected
 frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
-elsewhere or `tools:offline` when the active host has disconnected. A
+elsewhere or, in red, `tools:<name> ⊘ offline` when the active host has
+disconnected (hosts are always shown by their name, the hostname or
+`-name`, which the session keeps for when its host is away, never by their
+`host-…` id unless the backend predates that). A
 session never leaves its host on its own: while the host is away the
 model's tool calls (a main agent's, subagents' and jobs') wait up to a
 minute after it left for it to come back, then fail with a message saying
@@ -774,7 +777,9 @@ the box's own quiet text, the model, the thinking level ("Thinking high",
 "No thinking" for a model without levels) and the approval mode ("Asks:
 edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
 lit) and where tools run (a server icon and the tool host's name, always
-shown, lit as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
+shown; a disconnected host keeps its name, its server struck through in
+red and "offline" beside it, with how to bring it back in its tooltip; lit
+as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
 on the right. A chip opens a small menu standing on it, above the composer
 (below it only when there is no room above), with its command's choices
 (`/model`, `/thinking`, `/mode`, `/host`), the current one checked: the
