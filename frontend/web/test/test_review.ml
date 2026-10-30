@@ -165,18 +165,17 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     (proj /home/me/proj)
     against
     (HEAD the uncommitted changes)
-    (○ src/ main.ml +2 −1)
-    (○ src/ util.ml +2 −0)
+    (○ src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
-    (Previous file ([, p, k)) (Next file (], n, j))
     src/main.ml
-    (Approve)
     @@ -2,3 +2,4 @@
     2 let b = 2
     3 - let c = 3
     3 + let c = 3 * 2
     4 + let d = 4
     5 let e = 5
+    (←) (Approve & next Space) (→) File 1 of 2
     |}];
   H.elements h ~selector:".app";
   [%expect {| <div class="app reviewing"> |}];
@@ -459,13 +458,16 @@ let%expect_test
     "review_approve"
     {|{"comments":[],"approvals":[{"path":"src/main.ml","hash":"7f57d42d80a860a5b495b9ed7f7e860e"}]}|};
   H.text h ~selector:".review-progress";
+  (* Approving went on to the next file not approved; back with ←. *)
+  H.text h ~selector:".review-file.current";
+  H.key h "ArrowLeft" ~target:Review;
   H.text h ~selector:".review-file-head";
   [%expect
     {|
     1/2 approved
-    (Previous file ([, p, k)) (Next file (], n, j))
+    (○ src/ util.ml +2 −0)
+    (Review (Step -1))
     src/main.ml
-    (Approved)
     |}];
   (* The file changes (an agent's edit): the approval no longer counts. *)
   H.event
@@ -482,9 +484,8 @@ let%expect_test
     {|
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/main.ml)))
      (tag (Review (Content src/main.ml))))
-    (Previous file ([, p, k)) (Next file (], n, j))
     src/main.ml
-    Changed since you approved it (Approve again)
+    Changed since you approved it
     |}];
   H.key h "v" ~target:Review;
   H.key h "Escape" ~target:Review;
@@ -504,6 +505,109 @@ let%expect_test
     (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     (Focus review-page)
     |}]
+;;
+
+let%expect_test "Space approves and goes on, ← → step, Space again takes it back" =
+  let h = opened () in
+  let dock () =
+    H.text h ~selector:".review-progress";
+    H.text h ~selector:".review-file.current";
+    H.text h ~selector:".review-dock"
+  in
+  let approvals paths =
+    sprintf
+      {|{"comments":[],"approvals":[%s]}|}
+      (String.concat
+         ~sep:","
+         (List.map paths ~f:(fun (path, hash) ->
+            sprintf {|{"path":"%s","hash":"%s"}|} path hash)))
+  in
+  let main = "src/main.ml", "7f57d42d80a860a5b495b9ed7f7e860e" in
+  dock ();
+  [%expect
+    {|
+    (Complete_accept (run true))
+    0/2 approved
+    (○ src/ main.ml +2 −1)
+    (←) (Approve & next Space) (→) File 1 of 2
+    |}];
+  H.key h " " ~target:Review;
+  H.reply h "review_approve" (approvals [ main ]);
+  dock ();
+  [%expect
+    {|
+    (Review (Toggle_approval src/main.ml))
+    (Rpc (method_ review_approve)
+     (params
+      ((root /home/me/proj) (path src/main.ml)
+       (hash 7f57d42d80a860a5b495b9ed7f7e860e)))
+     (tag (Review (Changed ()))))
+    (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
+     (tag (Review (Content src/util.ml))))
+    1/2 approved
+    (○ src/ util.ml +2 −0)
+    (←) (Approve Space) (→) File 2 of 2
+    |}];
+  (* The last one: nothing left to go on to, so it stays and says so. *)
+  H.key h " " ~target:Review;
+  H.text h ~selector:".toast";
+  [%expect {|
+    (Review (Toggle_approval src/util.ml))
+    (Rpc (method_ review_approve)
+     (params
+      ((root /home/me/proj) (path src/util.ml)
+       (hash 1ccc6f9f4c595676b5f7c4edbcb27af1)))
+     (tag (Review (Changed ()))))
+    (Expire_toast (id 0) (after_ms 4220))
+    All 2 files are approved: send your comments (s) or commit them (C).
+    |}];
+  H.reply h "review_approve" (approvals [ main; "src/util.ml", "1ccc6f9f4c595676b5f7c4edbcb27af1" ]);
+  [%expect {| |}];
+  (* ← goes back; Space on an approved file takes it back, and stays. *)
+  H.key h "ArrowLeft" ~target:Review;
+  dock ();
+  [%expect {|
+    (Review (Step -1))
+    2/2 approved
+    (✓ src/ main.ml +2 −1)
+    (←) (Approved Space) (→) File 1 of 2
+    |}];
+  H.key h " " ~target:Review;
+  [%expect {|
+    (Review (Toggle_approval src/main.ml))
+    (Rpc (method_ review_unapprove) (params ((path src/main.ml)))
+     (tag (Review (Changed ()))))
+    |}];
+  H.key h "ArrowRight" ~target:Review;
+  H.text h ~selector:".review-file.current";
+  [%expect {|
+    (Review (Step 1))
+    (✓ src/ util.ml +2 −0)
+    |}];
+  (* Typing in a field, or with Ctrl or Alt, the keys are the field's. *)
+  List.iter [ Prigh_web.Keys.Target.Field; Multiline; Control ] ~f:(fun target ->
+    List.iter [ " "; "ArrowLeft"; "ArrowRight"; "x" ] ~f:(fun key ->
+      H.key h key ~target));
+  H.key h "ArrowLeft" ~ctrl:true ~target:Review;
+  H.key h "ArrowRight" ~alt:true ~target:Review;
+  [%expect {|
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    (browser default)
+    |}];
+  H.text h ~selector:".review-file.current";
+  [%expect {| (✓ src/ util.ml +2 −0) |}]
 ;;
 
 let point side line offset =
@@ -1114,13 +1218,16 @@ let%expect_test "help lists the review's keys" =
   [%expect
     {|
     Alt+R: open or close the review page (/review): the changes file by file, beside the chat
-    ] / [ (reviewing; also n p, j k): the next / previous changed file
-    a / c / e / v / s (reviewing): approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    → / ← (reviewing; also ] [, n p, j k): the next / previous changed file
+    Space (reviewing): approve the file and go on to the next one not approved (also a); on an approved file, take the approval back
+    x / Shift+X (reviewing): select the file in the list, or unselect it; select every file from the last selected (also Ctrl+click, Shift+click)
+    Shift+F10 / Shift+C (reviewing): the menu of the selected files (else the file): approve, stage, commit, copy; commit them (else the approved files)
+    c / e / v / s (reviewing): comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing): choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     l / Shift+L (reviewing): what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
-    Esc (reviewing): drop the comment or selection, then close the review
+    Esc (reviewing): drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+Enter (the review's commit message): commit the ticked files (approved files come ticked; untick to leave one out)
+    Ctrl+Enter / Esc (the review's commit message): commit the files listed above it; close the commit, keeping the message
     |}]
 ;;
 

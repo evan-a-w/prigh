@@ -1,8 +1,9 @@
 // The review page's git bar against `prigh serve -faux-script`, in a git
 // repository whose `origin` is a local bare repository: the branch and what
-// is staged, an approved file ticked, another ticked by hand, a commit
-// message drafted by the (scripted) model and streamed into its box, the
-// commit, and the push to origin. Run by prigh_web.sh; prints normalised
+// is staged, a file approved with Space, another staged from its context
+// menu, files selected with x, the commit (Shift+C) of the approved and
+// staged files with a message drafted by the (scripted) model and streamed
+// into its box, the commit, and the push to origin. Run by prigh_web.sh; prints normalised
 // snapshots (the expected output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -99,12 +100,16 @@ const show = async (label, selector) => {
   await page.waitForTimeout(150);
   await screenshot(label);
 };
-const ticks = () => page.evaluate(() =>
+const rows = () => page.evaluate(() =>
   [...document.querySelectorAll(".review-files li")].map(li => {
-    const tick = li.querySelector(".git-tick");
-    const state = tick?.getAttribute("aria-checked") ?? "none";
-    const pending = tick?.classList.contains("pending") ? " (staged at the commit)" : "";
-    return `${li.querySelector(".review-file").dataset.path}: ${state}${pending}`;
+    const file = li.querySelector(".review-file");
+    const flags = [
+      file.classList.contains("current") && "current",
+      file.classList.contains("approved") && "approved",
+      file.classList.contains("marked") && "selected",
+      li.querySelector(".review-file-staged")?.textContent,
+    ].filter(Boolean);
+    return `${file.dataset.path}: ${flags.join(", ") || "-"}`;
   }).join("\n"));
 
 try {
@@ -120,19 +125,41 @@ try {
   await page.locator(".git-bar .git-branch").waitFor();
   await page.locator('.review-file[data-path="src/util.ml"]').waitFor();
   await show("the bar", ".git-bar");
-  section("the boxes");
-  console.log(await ticks());
+  section("the list: no boxes");
+  console.log(await rows());
+  console.log(`checkboxes: ${await page.locator(".review-files [role=checkbox], .review-files input[type=checkbox]").count()}`);
 
-  // 2. Approving a file ticks it (staged when committing); util.ml is
-  //    ticked by hand, which stages it now.
+  // 2. Space approves main.ml and moves on to util.ml; util.ml's menu
+  //    (Shift+F10, as right-click) stages it.
   await page.locator(".review-page").focus();
-  await page.keyboard.press("a");
-  await page.locator(".review-file.current.approved").waitFor();
-  await page.locator(".git-tick[aria-label='Commit src/util.ml']").click();
-  await page.locator(".git-tick[aria-label='Commit src/util.ml'][aria-checked=true]").waitFor();
-  section("ticked");
-  console.log(await ticks());
+  await page.keyboard.press(" ");
+  await page.locator(".review-file.approved[data-path='src/main.ml']").waitFor();
+  await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/util.ml");
+  await page.keyboard.press("Shift+F10");
+  await page.locator(".context-menu [data-item=stage_files]").waitFor();
+  await show("util.ml's menu", ".context-menu");
+  await page.locator(".context-menu [data-item=stage_files]").click();
+  await page.locator(".review-file-row:has([data-path='src/util.ml']) .review-file-staged").waitFor();
+  section("approved and staged");
+  console.log(await rows());
   await show("one staged", ".git-bar .git-counts");
+
+  // 2b. x selects files (Shift+X every one from the last), for the
+  //     selection's bar; Esc lets go of them.
+  await page.keyboard.press("x");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Shift+X");
+  await page.locator(".review-selection").waitFor();
+  await show("two selected", ".review-selection");
+  section("selected");
+  console.log(await rows());
+  await page.keyboard.press("Escape");
+  await page.locator(".review-selection").waitFor({ state: "detached" });
+
+  // 2c. Shift+C: the commit, with the approved file and the staged one.
+  await page.keyboard.press("Shift+C");
+  await page.locator(".git-commit").waitFor();
+  await show("the commit's files", ".git-commit-files");
 
   // 3. ✦ Generate: the approved file is staged, then the model's draft
   //    streams into the commit box.

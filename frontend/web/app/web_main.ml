@@ -756,7 +756,11 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
             Js.to_bool ((Js.Unsafe.coerce page)##contains el : bool Js.t))
          &&
          match Dom_html.tagged el with
-         | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
+         | Input _ | Textarea _ | Select _ | A _ -> false
+         | Button _ ->
+           (* The file list's rows and the dock's buttons take the review's
+              keys: Space approves there rather than pressing them. *)
+           Js.Opt.test (el##getAttribute (Js.string "data-review-keys"))
          | _ -> true -> Review
   | Some el
     when Js.Opt.test (el##getAttribute (Js.string "data-worktree")) ->

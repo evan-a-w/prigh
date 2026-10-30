@@ -518,6 +518,7 @@ module Action = struct
     | Review of Code_review.Action.t
     | Review_pick of Review_picker.Which.t
     | Review_direct of bool
+    | Compose_commit
     | Review_checkout
     | Review_worktree of
         { path : string
@@ -958,6 +959,10 @@ let close_dialog (m : Model.t) =
            | Since _ when m.review.open_ -> "review-since-button"
            | Since _ -> "files-since-button")
       ] )
+  | _, Some (Picker { kind = Menu { target = Review_files _; _ }; _ })
+    when m.review.open_ ->
+    ( { m with dialog = None; return_to_settings = false; theme_preview = None }
+    , [ Command.Focus "review-page" ] )
   | _, Some (Picker { kind = Menu { target = Message n; _ }; _ })
     when Option.is_some (Model.message_menu m n) ->
     ( { m with dialog = None; return_to_settings = false; theme_preview = None }
@@ -6579,7 +6584,62 @@ let with_git (m : Model.t) (git_bar, outs) = git_out { m with git_bar } outs
 let git_action (m : Model.t) action =
   match Code_review.read_only m.review with
   | Some _ -> m, []
-  | None -> with_git m (Git_bar.update m.git_bar ~files:(review_files m) action)
+  | None -> with_git m (Git_bar.update m.git_bar action)
+;;
+
+(* Shift+C: the commit box, with the selected files, else the approved ones
+   with changes, else the page's file. *)
+let compose_commit (m : Model.t) =
+  if Option.is_some (Code_review.read_only m.review)
+  then m, []
+  else (
+    let paths =
+      match Code_review.marked m.review with
+      | _ :: _ as marked -> marked
+      | [] ->
+        (match Git_bar.approved_changes m.git_bar ~files:(review_files m) with
+         | _ :: _ as approved -> approved
+         | [] -> Option.to_list m.review.current)
+    in
+    let m, cmds = git_action m (Compose paths) in
+    m, cmds @ [ Command.Focus "git-message" ])
+;;
+
+let review_files_menu (m : Model.t) paths : Context_menu.Files.t option =
+  let paths =
+    List.filter paths ~f:(fun p -> Option.is_some (Code_review.file m.review p))
+  in
+  if List.is_empty paths
+  then None
+  else (
+    let stage p = Git_bar.stage m.git_bar p in
+    Some
+      { paths
+      ; approved =
+          List.count paths ~f:(fun p ->
+            Option.exists (Code_review.file m.review p) ~f:(fun f ->
+              Prigh_ui.File_approval.Status.equal
+                (Code_review.approval m.review f)
+                Approved))
+      ; staged =
+          List.count paths ~f:(fun p ->
+            match stage p with
+            | Staged | Partly -> true
+            | Unstaged | Clean -> false)
+      ; unstaged =
+          List.count paths ~f:(fun p ->
+            match stage p with
+            | Unstaged | Partly -> true
+            | Staged | Clean -> false)
+      ; selected = List.for_all paths ~f:(Set.mem m.review.marked)
+      ; composing = Option.is_some m.git_bar.commit
+      ; git =
+          (match Code_review.read_only m.review, m.git_bar.status with
+           | Some rev, _ ->
+             Some (sprintf "%s is not checked out: check it out to commit" rev)
+           | None, None -> Some "No git status here"
+           | None, Some _ -> None)
+      })
 ;;
 
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
@@ -8006,8 +8066,69 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
       | Copy_id
       | Archive
       | Unarchive
-      | Remove )
+      | Remove
+      | Approve_files
+      | Unapprove_files
+      | Stage_files
+      | Unstage_files
+      | Commit_files
+      | Select_files
+      | Unselect_files
+      | Copy_paths )
     , Some _ ) -> m, []
+;;
+
+(* A review files' menu's item, on the files it was opened on. *)
+let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
+  let m, cmds =
+    match item with
+    | Approve_files -> review_update m (Approve_files { paths; approve = true })
+    | Unapprove_files ->
+      review_update m (Approve_files { paths; approve = false })
+    | Stage_files -> git_action m (Stage paths)
+    | Unstage_files -> git_action m (Unstage paths)
+    | Commit_files -> git_action m (Compose paths)
+    | Select_files | Unselect_files ->
+      let select = Context_menu.Item.equal item Select_files in
+      let marked =
+        if select
+        then List.fold paths ~init:m.review.marked ~f:Set.add
+        else List.fold paths ~init:m.review.marked ~f:Set.remove
+      in
+      { m with review = { m.review with marked } }, []
+    | Copy_paths ->
+      let text = String.concat ~sep:"\n" paths in
+      let m, cmds =
+        toast
+          m
+          (match paths with
+           | [ path ] -> "Copied the path: " ^ path
+           | _ -> sprintf "Copied %d paths" (List.length paths))
+      in
+      m, Command.Copy text :: cmds
+    | Open
+    | Open_tab
+    | Rename
+    | Fork
+    | New_worktree
+    | Switch_back
+    | Switch_here
+    | New_session_here
+    | Review
+    | Files
+    | Terminal
+    | Create_pr
+    | Copy_path
+    | Copy_id
+    | Archive
+    | Unarchive
+    | Delete
+    | Remove
+    | Copy_message
+    | Trim_before
+    | Trim_after -> m, []
+  in
+  m, cmds @ [ Command.Focus "review-page" ]
 ;;
 
 (* A context menu's item: on the message, session or worktree it was opened
@@ -8020,6 +8141,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
   with
   | _, _, None -> m, []
   | Message n, _, Some item -> message_chosen m n item
+  | Review_files paths, _, Some item -> review_files_chosen m paths item
   | (Session _ | Worktree _), None, _ ->
     error m "That session is gone: the sidebar lists the others."
   | (Session _ | Worktree _), Some s, Some item ->
@@ -8072,7 +8194,17 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Unarchive -> set_archived m s ~archived:false
      | Delete -> ask_delete m [ s.path ]
      | Remove -> ask_remove_session_worktree m dir
-     | Copy_message | Trim_before | Trim_after -> m, [])
+     | Copy_message
+     | Trim_before
+     | Trim_after
+     | Approve_files
+     | Unapprove_files
+     | Stage_files
+     | Unstage_files
+     | Commit_files
+     | Select_files
+     | Unselect_files
+     | Copy_paths -> m, [])
 ;;
 
 let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
@@ -8205,7 +8337,12 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        | None -> m, [])
     | Menu menu -> menu_chosen m menu item.id
   in
-  m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
+  let refocus =
+    match kind with
+    | Menu { target = Review_files _; _ } -> false
+    | _ -> Option.is_none m.dialog
+  in
+  m, (if refocus then [ focus_editor ] else []) @ cmds
 ;;
 
 let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
@@ -8749,6 +8886,16 @@ let update_connected (m : Model.t) (action : Action.t) =
               { kind = Menu menu; picker = Context_menu.message_picker msg })
        in
        m, cmds @ [ Command.Place_menu menu.anchor ])
+  | Open_menu ({ target = Review_files paths; _ } as menu) ->
+    (match review_files_menu m paths with
+     | None -> m, []
+     | Some info ->
+       let m, cmds =
+         open_dialog
+           m
+           (Picker { kind = Menu menu; picker = Context_menu.files_picker info })
+       in
+       m, cmds @ [ Command.Place_menu menu.anchor ])
   | Open_menu menu ->
     (match
        Option.bind (Context_menu.session menu) ~f:(find_session_by_path m)
@@ -8898,6 +9045,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Review action -> review_update m action
   | Review_pick which -> open_review_pick m which
   | Review_direct direct -> review_direct m direct
+  | Compose_commit -> compose_commit m
   | Review_checkout -> review_checkout m
   | Review_worktree { path; base } ->
     let m, close =

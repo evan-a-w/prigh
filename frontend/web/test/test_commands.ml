@@ -214,16 +214,19 @@ let%expect_test "/help <command> and /hotkeys" =
     Esc (steering a subagent) write to the main agent again
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
-    ] / [ (reviewing; also n p, j k) the next / previous changed file
-    a / c / e / v / s (reviewing) approve the file; comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    → / ← (reviewing; also ] [, n p, j k) the next / previous changed file
+    Space (reviewing) approve the file and go on to the next one not approved (also a); on an approved file, take the approval back
+    x / Shift+X (reviewing) select the file in the list, or unselect it; select every file from the last selected (also Ctrl+click, Shift+click)
+    Shift+F10 / Shift+C (reviewing) the menu of the selected files (else the file): approve, stage, commit, copy; commit them (else the approved files)
+    c / e / v / s (reviewing) comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
-    Esc (reviewing) drop the comment or selection, then close the review
+    Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
-    Ctrl+Enter (the review's commit message) commit the ticked files (approved files come ticked; untick to leave one out)
+    Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
