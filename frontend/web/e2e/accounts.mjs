@@ -149,7 +149,7 @@ try {
   await page.locator(".settings-toggle").first().click();
   await page.locator(".settings-dialog").waitFor();
   section("bob's settings");
-  console.log((await page.locator(".settings-section h3").allInnerTexts()).join("\n"));
+  console.log((await page.locator(".settings-tab").allInnerTexts()).join("\n"));
   await page.keyboard.press("Escape");
   await page.waitForSelector(".settings-dialog", { state: "detached" });
   // What the composer offers for [typed]: waits until its list offers [name]
@@ -184,12 +184,13 @@ try {
   // Alice's Settings show the Nix store; Collect shows how it went.
   const nixStore = async label => {
     section(label);
-    console.log(clean(await page.locator(".settings-section", { hasText: "Nix store" }).innerText())
+    console.log(clean(await page.locator(".settings-panel-nix").innerText())
       .replace(/\b\d{4}-\d\d-\d\d\b/g, "<DATE>")
       .replace(/ in \d+ s\b/g, " in <N> s"));
     await screenshot(label);
   };
   await page.locator(".settings-toggle").first().click();
+  await page.locator(".settings-tab-nix").click();
   await page.locator(".setting.nix-store .setting-about", { hasText: "GiB" }).waitFor();
   await nixStore("alice's nix store");
   await page.locator(".setting.nix-gc .btn.primary").click();

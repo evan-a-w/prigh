@@ -84,6 +84,8 @@ module Icon : sig
     | Review
     | Filter
     | Scissors
+    | Palette
+    | Package
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

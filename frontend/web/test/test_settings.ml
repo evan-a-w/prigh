@@ -17,43 +17,18 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
+    (Appearance) (Behaviour) (Models) (Git hosting) (Account)
     Appearance
+    How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
     Theme Follows you to every browser you sign in on.
     (Original) (Dark) (Light)
     Accent Your turns, the selection, focus and work in progress.
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
-    Preferences
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
-    (Allow) (Turn notifications off (/notify off))
     Tabs Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
     (Turn session tabs on (/tabs on))
     Transcript detail How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
     (Quiet) (Normal) (Verbose)
-    On the backend
-    Tool confirmation Ask before bash, edits and MCP tools run, in this session and new ones.
-    (Ask before tools run (/confirm on))
-    Model providers Logged in to Anthropic.
-    (Manage providers)
-    Git hosting
-    GitHub github.com
-    Not signed in.
-    (Use a token) (Connect)
-    Forgejo codeberg.org
-    Not signed in.
-    (Use a token) (Connect)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
-    (Add host…)
-    Compaction
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-    [200k] tokens
-    (Off)
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-    (The conversation's model)
-    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-    (Keep old tool outputs (/compaction mask off))
-    Account
-    No sign-in This backend lets anyone in: there is no account to switch or sign out of.
     (Keyboard shortcuts) (Done)
     |}];
   (* Esc: closed, nothing changed. *)
@@ -108,7 +83,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
 let%expect_test "notifications: the switch, and what the browser allows" =
   let h = H.create () in
   let notify () = H.text h ~selector:".setting.notify" in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Behaviour));
   (* Wanted, but the browser has not been asked: Allow asks it. *)
   notify ();
   [%expect
@@ -195,12 +170,8 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
-    label "tokens"
-    button "Off" -- Only at 80% of the model's window (/compaction at off)
     <button class="segment">
     <button class="on segment">
-    <button class="segment">
-    <label class="compact-at-field on segment">
     <button class="segment">
     (Run "/verbosity quiet")
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
@@ -210,11 +181,10 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     <button class="on segment">
     <button class="segment">
     <button class="segment">
-    <label class="compact-at-field on segment">
-    <button class="segment">
     Quiet
     |}];
   (* Tool confirmation is the config's: off (mode auto) by default. *)
+  H.click h ~selector:".settings-tab-behaviour";
   H.text h ~selector:".setting.confirm";
   H.elements h ~selector:".setting.confirm .switch";
   H.click h ~selector:".setting.confirm .switch";
@@ -222,6 +192,7 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
   H.elements h ~selector:".settings-dialog";
   [%expect
     {|
+    (Settings_section Behaviour)
     Tool confirmation Ask before bash, edits and MCP tools run, in this session and new ones.
     (Ask before tools run (/confirm on))
     <button class="switch">
@@ -233,9 +204,11 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     <button class="on switch">
     <div class="modal settings-dialog">
     |}];
+  H.click h ~selector:".settings-tab-models";
   H.text h ~selector:".setting.providers";
   [%expect
     {|
+    (Settings_section Models)
     Model providers Logged in to Anthropic.
     (Manage providers)
     |}];
@@ -266,12 +239,24 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
 (* Every control is named by what it changes; the tooltip has its command. *)
 let%expect_test "the names of the settings' controls" =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
-  List.iter [ "button"; "[role]" ] ~f:(fun selector ->
-    H.names h ~selector:(".settings-dialog " ^ selector));
+  List.iter
+    (Prigh_web.Settings_section.available ~superuser:false)
+    ~f:(fun section ->
+      H.quiet h (fun () -> H.act h (Settings_section section));
+      print_endline ("-- " ^ Prigh_web.Settings_section.name section);
+      List.iter [ "button"; "[role]" ] ~f:(fun selector ->
+        H.names h ~selector:(".settings-panel " ^ selector)));
+  print_endline "-- around them";
+  List.iter
+    [ ".modal-head button"
+    ; ".settings-nav"
+    ; ".settings-tab"
+    ; ".modal-buttons button"
+    ]
+    ~f:(fun selector -> H.names h ~selector:(".settings-dialog " ^ selector));
   [%expect
     {|
-    button "Close" -- Close (Esc)
+    -- Appearance
     [radio] button "Original" -- graphite, warm greys (/theme original)
     [radio] button "Dark" -- neutral greys, only the accent in colour (/theme dark)
     [radio] button "Light" -- paper white (/theme light)
@@ -282,24 +267,10 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    button "Allow" -- Ask the browser to allow notifications (/notify on)
-    [switch] button "Notifications" -- Turn notifications off (/notify off)
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
-    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
-    button "Manage providers" -- /auth (/login, /logout)
-    button "Connect GitHub (github.com) with a token" -- /login github token
-    button "Connect GitHub (github.com)" -- /login github
-    button "Connect Forgejo (codeberg.org) with a token" -- /login forgejo codeberg.org token
-    button "Connect Forgejo (codeberg.org)" -- /login forgejo codeberg.org
-    button "Add host\226\128\166" -- /login forgejo HOST
-    button "Off" -- Only at 80% of the model's window (/compaction at off)
-    button "Summary model: The conversation's model" -- Choose the model (/compaction model)
-    [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
-    button "Keyboard shortcuts" -- /hotkeys
-    button "Done"
     [radiogroup] div "Theme"
     [radio] button "Original" -- graphite, warm greys (/theme original)
     [radio] button "Dark" -- neutral greys, only the accent in colour (/theme dark)
@@ -312,22 +283,208 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    [switch] button "Notifications" -- Turn notifications off (/notify off)
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
+    -- Behaviour
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    button "Allow" -- Ask the browser to allow notifications (/notify on)
+    [switch] button "Notifications" -- Turn notifications off (/notify off)
+    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    [switch] button "Notifications" -- Turn notifications off (/notify off)
+    -- Models
+    button "Manage providers" -- /auth (/login, /logout)
+    button "Off" -- Only at 80% of the model's window (/compaction at off)
+    button "Summary model: The conversation's model" -- Choose the model (/compaction model)
+    [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     [group] div "Compact at"
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
+    -- Git hosting
+    button "Connect GitHub (github.com) with a token" -- /login github token
+    button "Connect GitHub (github.com)" -- /login github
+    button "Connect Forgejo (codeberg.org) with a token" -- /login forgejo codeberg.org token
+    button "Connect Forgejo (codeberg.org)" -- /login forgejo codeberg.org
+    button "Add host\226\128\166" -- /login forgejo HOST
+    -- Account
+    -- around them
+    button "Close" -- Close (Esc)
+    [tablist] div "Settings sections"
+    [tab] button "Appearance" -- /settings appearance
+    [tab] button "Behaviour" -- /settings behaviour
+    [tab] button "Models" -- /settings models
+    [tab] button "Git hosting" -- /settings git
+    [tab] button "Account" -- /settings account
+    button "Keyboard shortcuts" -- /hotkeys
+    button "Done"
     |}]
 ;;
 
 let%expect_test "an open backend has no account to show" =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
-  H.text h ~selector:".settings-section:last-child";
+  H.quiet h (fun () -> H.act h (Settings_section Account));
+  H.text h ~selector:".settings-panel";
   [%expect
     {|
     Account
+    Who you are on this backend.
     No sign-in This backend lets anyone in: there is no account to switch or sign out of.
+    |}]
+;;
+
+(* The sections down the side are tabs: a click or the arrows show one, and
+   the arrows move the focus with it; /settings SECTION opens at one. *)
+let%expect_test "sections: clicks, arrows, Home and End, /settings SECTION" =
+  let h = H.create () in
+  let shown () =
+    H.text h ~selector:".settings-tab[aria-selected=true]";
+    H.text h ~selector:".settings-panel-head h3"
+  in
+  H.quiet h (fun () -> H.act h Open_settings);
+  shown ();
+  H.show h ~selector:".settings-tab-appearance";
+  [%expect
+    {|
+    (Appearance)
+    Appearance
+    <button id="settings-tab-appearance"
+            type="button"
+            role="tab"
+            data-settings-tab="appearance"
+            aria-selected="true"
+            aria-controls="settings-panel"
+            aria-label="Appearance"
+            title="/settings appearance"
+            tabindex="0"
+            class="on settings-tab settings-tab-appearance"
+            @on_click>
+      <icon class="palette"> </icon>
+      <span class="settings-tab-name"> Appearance </span>
+    </button>
+    |}];
+  H.click h ~selector:".settings-tab-git";
+  shown ();
+  [%expect
+    {|
+    (Settings_section Git_hosting)
+    (Git hosting)
+    Git hosting
+    |}];
+  H.key h "ArrowDown" ~target:Settings_tab;
+  shown ();
+  H.key h "ArrowDown" ~target:Settings_tab;
+  shown ();
+  H.key h "ArrowUp" ~target:Settings_tab;
+  H.key h "ArrowLeft" ~target:Settings_tab;
+  shown ();
+  H.key h "End" ~target:Settings_tab;
+  shown ();
+  H.key h "Home" ~target:Settings_tab;
+  H.key h "ArrowUp" ~target:Settings_tab;
+  shown ();
+  [%expect
+    {|
+    (Settings_move Next)
+    (Focus settings-tab-account)
+    (Account)
+    Account
+    (Settings_move Next)
+    (Focus settings-tab-appearance)
+    (Appearance)
+    Appearance
+    (Settings_move Prev)
+    (Focus settings-tab-account)
+    (Settings_move Prev)
+    (Focus settings-tab-git)
+    (Git hosting)
+    Git hosting
+    (Settings_move Last)
+    (Focus settings-tab-account)
+    (Account)
+    Account
+    (Settings_move First)
+    (Focus settings-tab-appearance)
+    (Settings_move Prev)
+    (Focus settings-tab-account)
+    (Account)
+    Account
+    |}];
+  (* The arrows elsewhere on the page are the page's. *)
+  H.key h "ArrowDown" ~target:Control;
+  shown ();
+  [%expect
+    {|
+    (browser default)
+    (Account)
+    Account
+    |}];
+  (* Esc closes; the page opens again where it was. *)
+  H.key h "Escape" ~target:Settings_tab;
+  H.quiet h (fun () -> H.act h Open_settings);
+  shown ();
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Account)
+    Account
+    |}];
+  H.key h "Escape" ~target:Page;
+  H.quiet h (fun () ->
+    H.type_ h "/settings models";
+    H.key h "Enter");
+  shown ();
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Complete_accept (run true))
+    (Models)
+    Models
+    |}];
+  (* Superusers' only section, and a section there is not, say so. *)
+  H.key h "Escape" ~target:Page;
+  List.iter [ "/settings nix"; "/settings colours" ] ~f:(fun command ->
+    H.quiet h (fun () ->
+      H.type_ h command;
+      H.key h "Enter" ~ctrl:true);
+    H.text h ~selector:".toast:last-child");
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    Send
+    Nix store is only for superusers: try /settings appearance, /settings behaviour, /settings models, /settings git, /settings account. (Dismiss)
+    Send
+    No settings section "colours": try /settings appearance, /settings behaviour, /settings models, /settings git, /settings account. (Dismiss)
+    |}]
+;;
+
+let%expect_test "superusers have the Nix store's section" =
+  let h = H.create () in
+  H.act
+    h
+    (Hello
+       { client_id = "c1"
+       ; namespace = None
+       ; user = Some "root"
+       ; superuser = true
+       });
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.text h ~selector:".settings-nav";
+  [%expect
+    {| (Appearance) (Behaviour) (Models) (Git hosting) (Nix store) (R root) |}]
+;;
+
+let%expect_test "/settings completes the sections" =
+  let h = H.create () in
+  H.type_ h "/settings ";
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    Settings sections ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    appearance How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+    behaviour What the agent asks before it acts, and how this browser tells you that something happened.
+    models The providers whose models you use, and how long conversations are summarised. Kept on the backend.
+    git The hosts agents push branches to and open pull requests on.
+    account Who you are on this backend.
     |}]
 ;;

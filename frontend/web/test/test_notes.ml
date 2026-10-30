@@ -409,7 +409,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
-    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)

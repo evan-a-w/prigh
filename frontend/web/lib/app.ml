@@ -399,6 +399,8 @@ module Action = struct
     | Open_snippets of int option
     | Open_help
     | Open_settings
+    | Settings_section of Settings_section.t
+    | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
     | Open_rename
@@ -611,6 +613,7 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; compact_at : Compact_at.t
+    ; settings_section : Settings_section.t
     ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
@@ -840,6 +843,7 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; compact_at = Compact_at.empty
+  ; settings_section = Appearance
   ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
@@ -1548,13 +1552,41 @@ let fetch_nix_status (m : Model.t) ~open_settings =
 ;;
 
 (* Superusers see the Nix store there, as it is now. *)
-let open_settings ?(fetch = true) (m : Model.t) =
-  let m, cmds = open_dialog { m with compact_at = Compact_at.empty } Settings in
+let open_settings ?(fetch = true) ?section (m : Model.t) =
+  let settings_section = Option.value section ~default:m.settings_section in
+  let m, cmds =
+    open_dialog
+      { m with compact_at = Compact_at.empty; settings_section }
+      Settings
+  in
   if fetch && superuser m
   then (
     let m, fetch = fetch_nix_status m ~open_settings:false in
     m, cmds @ fetch)
   else m, cmds
+;;
+
+(* [/settings SECTION]. *)
+let settings_command (m : Model.t) arg =
+  let sections = Settings_section.available ~superuser:(superuser m) in
+  match Settings_section.of_arg arg with
+  | Some section when List.mem sections section ~equal:Settings_section.equal ->
+    open_settings ~section m
+  | found ->
+    let try_ =
+      String.concat
+        ~sep:", "
+        (List.map sections ~f:(fun s -> "/settings " ^ Settings_section.arg s))
+    in
+    error
+      m
+      (match found with
+       | Some section ->
+         sprintf
+           "%s is only for superusers: try %s."
+           (Settings_section.name section)
+           try_
+       | None -> sprintf "No settings section %S: try %s." arg try_)
 ;;
 
 let nix_gc_still_running m =
@@ -5208,7 +5240,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
-  | "settings", _ -> open_settings m
+  | "settings", "" -> open_settings m
+  | "settings", arg -> settings_command m arg
   | "nix-gc", rest when superuser m -> nix_gc_command m rest
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
@@ -7019,7 +7052,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     in
     let m = { m with nix_gc = Nix_gc.status m.nix_gc result } in
     (match tag, result with
-     | Nix_status { open_settings = true }, Ok _ -> open_settings ~fetch:false m
+     | Nix_status { open_settings = true }, Ok _ ->
+       open_settings ~fetch:false { m with settings_section = Nix_store }
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
@@ -8580,6 +8614,16 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
+  | Settings_section section ->
+    (match m.dialog with
+     | Some Settings -> { m with settings_section = section }, []
+     | _ -> open_settings ~section m)
+  | Settings_move move ->
+    let section =
+      Settings_section.move m.settings_section move ~superuser:(superuser m)
+    in
+    ( { m with settings_section = section }
+    , [ Command.Focus (Settings_section.tab_id section) ] )
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m

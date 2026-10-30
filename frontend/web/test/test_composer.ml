@@ -377,7 +377,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through

@@ -35,6 +35,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
       | Argument Tabs -> "Session tabs"
+      | Argument Settings -> "Settings sections"
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
       | Argument Accent -> "Accent colours"

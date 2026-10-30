@@ -285,35 +285,31 @@ let transcript (m : Model.t) ~inject =
 ;;
 
 let view (m : Model.t) ~inject ~terminal =
-  let behind =
-    if Option.is_some m.dialog || Model.waiting m || Files.asking m.files
-    then inert
-    else Fn.id
+  (* Each layer over a part makes it inert once: the attribute twice would
+     not combine. *)
+  let inert_if covered = if covered then inert else Fn.id in
+  let modal =
+    Option.is_some m.dialog || Model.waiting m || Files.asking m.files
   in
   (* A chip's menu is in the composer, which keeps its chips live (the
      composer makes the rest of itself inert). *)
-  let behind_composer =
+  let modal_composer =
     match m.dialog with
     | Some (Popover _) when not (Model.waiting m || Files.asking m.files) ->
-      Fn.id
-    | _ -> behind
+      false
+    | _ -> modal
   in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)
   let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
-  let layered behind =
-    let under_sheet = if sheet then Fn.compose inert behind else behind in
-    if drawer then Fn.compose inert under_sheet else under_sheet
-  in
-  let under_sheet = if sheet then Fn.compose inert behind else behind in
-  let under_drawer = layered behind in
+  let layered covered = inert_if (covered || sheet || drawer) in
+  let under_sheet = inert_if (modal || sheet) in
+  let under_drawer = layered modal in
   (* The panels beside the review are under its drawer; a phone's sheets
      are over its drawer. *)
-  let panel =
-    if Model.focused m && drawer then Fn.compose inert behind else behind
-  in
+  let panel = inert_if (modal || (Model.focused m && drawer)) in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with
     | Some text, _, _ -> placeholder text
@@ -370,7 +366,7 @@ let view (m : Model.t) ~inject ~terminal =
              makes the rest of itself inert). *)
           (match m.dialog with
            | Some (Review_pick _)
-             when not (Model.waiting m || Files.asking m.files) -> layered Fn.id
+             when not (Model.waiting m || Files.asking m.files) -> layered false
            | _ -> under_drawer)
             (Review_page_view.view m ~inject)
         ; (if m.review.open_
@@ -413,7 +409,7 @@ let view (m : Model.t) ~inject ~terminal =
                   ])
              @ [ toasts m ~inject ]
              @ [ under_drawer (Btw_view.view m ~inject)
-               ; layered behind_composer (Composer_view.view m ~inject)
+               ; layered modal_composer (Composer_view.view m ~inject)
                ])
         ; under_drawer (Terminal_view.view m ~inject ~widget:terminal)
         ]
