@@ -646,8 +646,6 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .review-file-row.current .review-file-more,
 .review-file-more:focus-visible,
 .review-file-more[aria-expanded="true"] { opacity: 1; }
-.review-file-row:hover .review-file-counts,
-.review-file-row.current .review-file-counts { visibility: hidden; }
 /* Selected: a quiet wash and a sage edge, apart from the page's file's
    sodium one; both together show both. */
 .review-file.marked { background: color-mix(in srgb, var(--sage) 10%, transparent); box-shadow: inset 2px 0 0 var(--sage); }
@@ -657,15 +655,17 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 /* With files selected: what to do with them, over the list. */
 .review-selection {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px 6px 12px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 8px 12px;
   border-bottom: 1px solid var(--rule);
   background: color-mix(in srgb, var(--sage) 7%, var(--slate));
   animation: appear 0.12s ease-out;
 }
+.review-selection-head, .review-selection-actions { display: flex; align-items: center; gap: 6px; }
 .review-selection-count { font: 500 12px var(--mono); color: var(--sage); margin-right: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .review-selection .btn.icon { width: 26px; height: 26px; }
+@media (prefers-reduced-motion: reduce) { .review-selection { animation: none; } }
 
 /* Under the file, always in the same place: ← Approve → (Space). */
 .review-dock {
@@ -690,8 +690,6 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .review-dock kbd { font-size: 10.5px; padding: 0 4px; }
 .review-dock-step.btn { padding: 5px 8px; background: transparent; color: var(--muted); }
 .review-dock-step.btn:hover:not(:disabled) { color: var(--chalk); }
-.review-dock-step .icon.flip { transform: scaleX(-1); }
-.review-dock-step .icon { width: 14px; height: 14px; }
 .review-approve.btn { min-width: 17ch; gap: 8px; }
 .review-approve .icon { width: 14px; height: 14px; }
 .review-approve.primary kbd { background: color-mix(in srgb, var(--sodium-ink) 14%, transparent); color: var(--sodium-ink); border-color: transparent; }
