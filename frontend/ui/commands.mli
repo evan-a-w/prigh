@@ -81,3 +81,8 @@ val help : superuser:bool -> Content.t
 
 (** The prefixes a prompt can start with ([!command], [@path], ...). *)
 val input_help : Content.t
+
+(** Whether the argument (everything after the command's name) has been
+    finished by a space typed after it: its completion closes, and the next
+    character reopens it for the whole text (paths may contain spaces). *)
+val argument_finished : string -> bool

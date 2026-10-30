@@ -534,7 +534,8 @@ let prigh_state (s : Session.t) =
   let model = field "model" st in
   let active = string_field "active_host" st in
   let host_name =
-    List.find_map (list_field "hosts" st) ~f:(fun h ->
+    Option.first_some (opt_string "active_host_name" st)
+    @@ List.find_map (list_field "hosts" st) ~f:(fun h ->
       if String.equal (string_field "id" h) active
       then opt_string "name" h
       else None)

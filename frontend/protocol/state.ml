@@ -54,6 +54,7 @@ type t =
   ; cost_usd : float
   ; context_tokens : int
   ; active_host : string (** [Host.id]; "backend" or a client id *)
+  ; active_host_name : string option
   ; hosts : Host.t list
     (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
@@ -95,6 +96,7 @@ let of_json j =
     | Ok h -> Ok h
     | Error _ -> Ok "backend"
   in
+  let%bind active_host_name = Json.string_opt_field j "active_host_name" in
   let%bind hosts =
     match Json.list_field j "hosts" ~f:Host.of_json with
     | Ok hosts -> Ok hosts
@@ -161,6 +163,7 @@ let of_json j =
   ; cost_usd
   ; context_tokens
   ; active_host
+  ; active_host_name
   ; hosts
   ; subagents
   ; jobs

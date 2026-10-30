@@ -377,7 +377,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings theme and accent, notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
+    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -560,6 +560,52 @@ let%expect_test "/cd completes directories" =
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
      (tag (Prompt_paths /work)))
     |}]
+;;
+
+let%expect_test "a space after the argument closes its completion" =
+  let h = H.create () in
+  H.type_ h "/cd ~/projects";
+  H.reply h "list_dirs" {|["~/projects/"]|};
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix ~/projects)))
+     (tag (Paths ~/projects)))
+    Directories ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    ~/projects/
+    |}];
+  H.type_ h "/cd ~/projects ";
+  H.text h ~selector:".popup";
+  [%expect {| |}];
+  (* Backspacing over the space reopens it, and so does the next character:
+     paths may contain spaces. *)
+  H.type_ h "/cd ~/projects";
+  H.reply h "list_dirs" {|["~/projects/"]|};
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix ~/projects)))
+     (tag (Paths ~/projects)))
+    Directories ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    ~/projects/
+    |}];
+  H.type_ h "/cd ~/projects D";
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix "~/projects D")))
+     (tag (Paths "~/projects D")))
+    |}];
+  (* One-word arguments like /model's close too. *)
+  H.type_ h "/model gp";
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    Models ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    GPT-6 openai
+    |}];
+  H.type_ h "/model gp ";
+  H.text h ~selector:".popup";
+  [%expect {| |}]
 ;;
 
 let%expect_test "a message that cannot be sent comes back to the editor" =

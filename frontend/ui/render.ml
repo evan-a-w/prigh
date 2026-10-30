@@ -373,11 +373,13 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
   let is_me id =
     Option.value_map m.client_id ~default:false ~f:(String.equal id)
   in
-  match List.find s.hosts ~f:(fun h -> String.equal h.id s.active_host) with
-  | None when List.is_empty s.hosts -> []
-  | None -> [ 2, [ span ~style:(Style.fg Red) "tools:offline" ] ]
-  | Some h when String.equal h.id P.Host.backend_id || is_me h.id -> []
-  | Some h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
+  match Active_host.of_state s with
+  | Unset when List.is_empty s.hosts -> []
+  | Unset -> [ 2, [ span ~style:(Style.fg Red) "tools:none" ] ]
+  | Disconnected { name; _ } ->
+    [ 2, [ span ~style:(Style.fg Red) (sprintf "tools:%s ⊘ offline" name) ] ]
+  | Connected h when String.equal h.id P.Host.backend_id || is_me h.id -> []
+  | Connected h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
 ;;
 
 (* Always shown, like the thinking level; plan mode in yellow. A mode that

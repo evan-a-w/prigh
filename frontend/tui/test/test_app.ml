@@ -1068,6 +1068,82 @@ let%expect_test "/cd completes paths and submits the selected one" =
     |}]
 ;;
 
+let%expect_test "a space after the argument closes its completion" =
+  let h = connected () in
+  H.step ~quiet:true h (Intent (Insert "/cd ~/projects"));
+  H.reply
+    ~quiet:true
+    h
+    (Dirs_for_autocomplete "~/projects")
+    {|["~/projects/"]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ ~/projects/
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects▏
+    deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.step h (Intent (Insert " "));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* Backspacing over the space reopens it, and so does the next character:
+     paths may contain spaces. *)
+  H.step ~quiet:true h (Intent Backspace);
+  H.reply
+    ~quiet:true
+    h
+    (Dirs_for_autocomplete "~/projects")
+    {|["~/projects/"]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ ~/projects/
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects▏
+    deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.step h (Intent (Insert " D"));
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix "~/projects D")))
+      (tag (Dirs_for_autocomplete "~/projects D")))
+    |}];
+  (* /model's argument is one word too. *)
+  let h = connected () in
+  H.step h (Intent (Insert "/model deep "));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /model deep ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test
     "Alt+S and Esc then Enter send what is typed, not the highlight"
   =
@@ -8038,6 +8114,42 @@ let%expect_test "the hello's host id marks this frontend, also after a \
     ──────────────────────────────────────────────────────────────────────
     >
     m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter selects · Esc closes
+    |}]
+;;
+
+(* The status line names the host tools run on when it is another machine,
+   and keeps naming it, in red and said to be offline, while it is
+   disconnected; only a backend predating [active_host_name] leaves its id. *)
+let%expect_test "the status line names a disconnected host" =
+  let h = connected ~width:70 () in
+  let state ?name hosts =
+    sprintf
+      {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/home/me","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-0123456789abcdef",%s"hosts":[{"id":"backend","name":"srv","cwd":"/work"}%s]}|}
+      (Option.value_map
+         name
+         ~default:""
+         ~f:(sprintf {|"active_host_name":%S,|}))
+      hosts
+  in
+  let show ?name hosts =
+    H.event
+      h
+      (State
+         (Or_error.ok_exn
+            (P.State.of_json
+               (Or_error.ok_exn (P.Json.parse (state ?name hosts))))));
+    print_endline (Content.to_styled [ Render.status h.model ])
+  in
+  show
+    ~name:"desktop"
+    {|,{"id":"host-0123456789abcdef","name":"desktop","cwd":"/home/me"}|};
+  show ~name:"desktop" "";
+  show "";
+  [%expect
+    {|
+    [gray]/home/me[/]  [gray]m[/]  [gray]think:n/a[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/1.0k[/]  [gray]$0.00[/]  [yellow]tools:desktop[/]
+    [gray]m[/]  [gray]think:n/a[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/1.0k[/]  [gray]$0.00[/]  [red]tools:desktop ⊘ offline[/]
+    [gray]m[/]  [gray]think:n/a[/]  [gray]ctx:0.0%/1.0k[/]  [red]tools:host-0123456789abcdef ⊘ offline[/]
     |}]
 ;;
 

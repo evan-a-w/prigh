@@ -153,7 +153,11 @@ comes in time they fail the same way ("disconnected" instead of
 calls fail at once) (`prigh tool-host -connect` and the
 TUI's `Tool_host` keep their worker across connections and hold results
 and up to 1 MiB of output while offline). The session stays on that host,
-and the TUI shows `tools:offline`. The model's tool calls (`Agent.executor`
+and `State.active_host_name` keeps naming it (the name recorded with the
+session's location, so also after a restart): the TUI shows `tools:<name> ⊘
+offline` and prigh-web's host chip the name struck through
+(`Prigh_ui.Active_host` tells connected, disconnected and unset apart for
+both). The model's tool calls (`Agent.executor`
 and jobs) made meanwhile wait for it within the same window
 (`Rpc_server.returning`, the time each host id that dropped is given up on,
 passed to `Agent.set_hosts ~returning`; `set_hosts` and host switches
@@ -1836,7 +1840,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   error, `index` counting messages as a page's `older` does (so `limit:
   older - index` before the first page loaded reaches one) and `text` cut
   to 240 bytes.
-  `State` carries `active_host` and `hosts` (the backend first),
+  `State` carries `active_host`, `active_host_name` (its name as last
+  seen, also while it is disconnected; null when unknown) and `hosts`
+  (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null),
   `reminders` (`[{name, text, on: "stop", max_repeats, repeats}` or
@@ -2462,7 +2468,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
     can mark this frontend as "(here)"
     and the status line can show `tools:<host>` when tools run elsewhere or
-    `tools:offline` when the active host is gone. Mouse reporting is on so the
+    `tools:<host> ⊘ offline` when the active host is gone. Mouse reporting is on so the
     wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines)
     and a left click asks `Render.click` what is there (the jump indicator);
     without it the terminal turns the wheel into arrow keys, which walk the
@@ -2863,10 +2869,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       then the account and the settings gear), `Session_view` (the
       current session in one place at a time, by `Model.docked`: with the
       sidebar open beside the chat, its `card` in the sidebar —
-      two lines from the left edge, `Status_view.activity` then its
-      `extras` (but the plan), and `Status_view.counters` (the context,
-      tokens and cost), with the branch (opening `/pr`) under them when
-      there is one — and its `tools`, the panel toggles floating in the chat's top
+      `Status_view.activity` with its `cost` across from it, its
+      `extras` (but the plan) under them, and its `meter` (the context
+      across the card, the tokens in its title), with the branch (opening
+      `/pr`) under them when there is one — and its `tools`, the panel toggles floating in the chat's top
       right corner; otherwise its `bar`, a slim line over the chat with
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
@@ -2918,7 +2924,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       the status so that they never move it: the plan chip (the bar's
       only), queued
       messages, the transfers in progress from `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
-      gear beside the account, the account menu, `/settings` or Ctrl+,:
+      gear beside the account, the account menu, `/settings [SECTION]` or
+      Ctrl+,: one `Settings_section` at a time, picked from tabs down its
+      side (`Model.settings_section`, kept while it is closed; the arrows,
+      Home and End on a tab are `Settings_move`, via `Keys.Target.Settings_tab`;
+      `Settings_view.content` says which rows each section has, so a new
+      setting is a row there):
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
       providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
       fetched as it opens, our collection's progress, also a chip in the

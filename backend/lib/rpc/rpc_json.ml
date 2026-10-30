@@ -297,6 +297,8 @@ let state (s : Agent.State.t) =
     ; "cost_usd", float s.cost_usd
     ; "context_tokens", int s.context_tokens
     ; "active_host", str s.active_host
+    ; ( "active_host_name"
+      , Option.value_map s.active_host_name ~default:`Null ~f:str )
     ; ( "hosts"
       , `Array
           (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->

@@ -2,13 +2,14 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's card at the foot of the docked sidebar: two quiet lines
-   from its left edge, what the agent is doing followed by what applies,
-   then the counters; and the branch when there is one. Where tools run is
-   the composer's chip, and the plan the bar's. Each [card] prints the lines
-   as the user reads them, then what is lit: the lamps, and what is in the accent colour
-   (by its class; style.css mutes the background agents and the modes in
-   the card while the agent works). *)
+(* The session's card at the foot of the docked sidebar: what the agent is
+   doing with the cost across from it, what applies when anything does, the
+   context's meter (the tokens in its title), and the branch when there is
+   one. Where tools run is the composer's chip, and the plan the bar's. Each
+   [card] prints the lines as the user reads them, then what is lit: the
+   lamps, and what is in the accent colour (by its class; style.css mutes
+   the background agents and the modes in the card while the agent
+   works). *)
 
 let plan =
   {|{"steps":[{"step":"Look","status":"completed"},{"step":"Final nix GC","status":"in_progress"}]}|}
@@ -57,12 +58,14 @@ let thinking h =
     {|{"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"thinking","text":""}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},"delta":{"type":"thinking_delta","text":""}}|}
 ;;
 
-(* The card's lines as they stand (the grid puts the activity first). *)
+(* The card's lines as they stand. *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".session-card .card-doing";
-  print_endline "counters:";
-  H.text h ~selector:".session-card .card-counters";
+  H.text h ~selector:".session-card .card-head";
+  print_endline "applies:";
+  H.text h ~selector:".session-card .card-status > .status-extras";
+  print_endline "context:";
+  H.text h ~selector:".session-card .card-status > .context";
   print_endline "where:";
   H.text h ~selector:".session-card .card-where";
   print_endline "lit:";
@@ -78,21 +81,22 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
   [%expect
     {|
     now:
-    Ready
-    counters:
-    (5%) ↑1.6M ↓21k $1.30
+    Ready $1.30
+    applies:
+    context:
+    (5%)
     where:
     lit:
     |}];
-  (* The cost to the cent; its title has it exactly, the tokens theirs. *)
-  H.names h ~selector:".session-card .card-doing > .activity";
-  H.names h ~selector:".session-card .card-counters > *";
+  (* The cost to the cent, its title has it exactly; the context's title has
+     the tokens. *)
+  H.names h ~selector:".session-card .card-head > *";
+  H.names h ~selector:".session-card .card-status > .context";
   [%expect
     {|
     [status] span "Ready"
-    button "Context 5% full" -- Context: 10k of 200k tokens (/compact frees some). Click for the session's details (/session)
-    span "\226\134\1451.6M \226\134\14721k" -- Tokens: 1600000 in, 21000 out, 0 cache read
     span "$1.30" -- Session cost: $1.3021 (/session)
+    button "Context 5% full" -- 1.6M tokens in, 21k out, 0 cache read; 5% of a 200k context (/compact frees some). Click for the session's details (/session)
     |}];
   (* Thinking: the activity is the one thing lit. *)
   state h ~running:true ();
@@ -101,9 +105,10 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
   [%expect
     {|
     now:
-    Thinking
-    counters:
-    (5%) ↑1.6M ↓21k $1.30
+    Thinking $1.30
+    applies:
+    context:
+    (5%)
     where:
     lit:
     <span class="lamp">
@@ -126,10 +131,11 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     now:
-    Running tools
+    Running tools $1.30
+    applies:
     (1 agent running) (quiet)
-    counters:
-    (5%) ↑1.6M ↓21k $1.30
+    context:
+    (5%)
     where:
     lit:
     <span class="lamp">
@@ -148,10 +154,11 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     now:
-    Ready
+    Ready $1.30
+    applies:
     (1 agent running) (quiet)
-    counters:
-    (5%) ↑1.6M ↓21k $1.30
+    context:
+    (5%)
     where:
     lit:
     <span class="lamp">
@@ -190,9 +197,10 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
-    <div class="card-doing card-line">
-    <div class="card-counters card-line">
-    <div class="card-line card-where">
+    <div class="card-head">
+    <div class="status-extras">
+    <button class="context link status-item">
+    <div class="card-where">
     button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -212,9 +220,10 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
     now:
-    Ready
-    counters:
-    (5%) ↑1.6M ↓21k $1.30
+    Ready $1.30
+    applies:
+    context:
+    (5%)
     where:
     lit:
     <button class="btn chip-button host-chip warm">
@@ -228,8 +237,9 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
      (tag (Worktrees (place  "s1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 4)))))
-    <div class="card-doing card-line">
-    <div class="card-counters card-line">
+    <div class="card-head">
+    <div class="status-extras">
+    <button class="context link status-item">
     |}];
   (* Without the sidebar the bar keeps the rest on one line, with the plan
      (opening /todos); the host stays the composer's alone. *)

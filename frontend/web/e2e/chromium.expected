@@ -13,9 +13,8 @@ web
 New session
 No sessions yet: send a message to start one.
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === chromium: signed in: chat ===
@@ -28,9 +27,8 @@ Ctrl+L switch model
 Ctrl+K find a session
 === chromium: signed in: the session's card ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -114,14 +112,12 @@ three lines
 <TIME>
 === chromium: the session's card after a run ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 === chromium: a budget in the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>/$<COST>
+0%
 === chromium: long output, folded ===
 bash
 seq 1 30
@@ -179,9 +175,8 @@ count some lines
 <AGE>
 <CWD>
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === chromium: new session ===
@@ -210,9 +205,8 @@ count some lines
 <AGE>
 <CWD>
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 T
 token
 === chromium: switching ===
@@ -472,9 +466,8 @@ Plan mode
 <HOSTNAME>
 === chromium: plan mode: the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 main
 === chromium: a plan to approve ===
 Plan
@@ -495,9 +488,8 @@ Auto: never asks
 <HOSTNAME>
 === chromium: the plan approved: the status line ===
 Ready
-0%
-↑0 ↓0
 $<COST>
+0%
 main
 === chromium: implementing ===
 ◇
@@ -745,23 +737,30 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, 0%, ↑0 ↓0, $<COST>; 88px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
 .composer: fits
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
 Appearance
+Behaviour
+Models
+Git hosting
+T
+token
+Appearance
+How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
 Theme
 Follows you to every browser you sign in on.
 Original
@@ -770,10 +769,6 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
-Preferences
-Notifications
-Tell you when a turn ends or something waits for you while this tab is hidden.
-The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
 Tabs
 Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
 Transcript detail
@@ -781,43 +776,6 @@ How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
 Quiet
 Normal
 Verbose
-On the backend
-Tool confirmation
-Ask before bash, edits and MCP tools run, in this session and new ones.
-Model providers
-Not logged in to any: log in to one to use its models.
-Manage providers
-Git hosting
-GitHub
-github.com
-Not signed in.
-No OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
-Connect with a token
-Forgejo
-codeberg.org
-Not signed in.
-Signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges."codeberg.org".client_id sets your own
-Use a token
-Connect
-Another Forgejo host
-A self-hosted Forgejo or Gitea, by its host name.
-Add host…
-Compaction
-Compact at
-Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-tokens
-Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
-Mask old tool outputs
-Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-Account
-T
-Signed in as token
-127.0.0.1:<PORT>
-Switch account
-Sign out
 Keyboard shortcuts
 Done
 === chromium: a dialog open: the chips ===
@@ -826,6 +784,13 @@ thinking: under .modal-backdrop
 mode: under .modal-backdrop
 host: under .modal-backdrop
 a choice keeps it open: true
+=== chromium: settings: the sections ===
+clicked Behaviour: tab Behaviour, focus Behaviour, showing Behaviour (labelled by settings-tab-behaviour)
+ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
+End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
+ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
+desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
+phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
 chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
@@ -881,11 +846,11 @@ Back to alice
 I am bob
 === chromium: accounts: bob's settings ===
 Appearance
-Preferences
-On the backend
+Behaviour
+Models
 Git hosting
-Compaction
-Account
+B
+bob
 === chromium: accounts: bob's commands ===
 /setus offers: /setusr [user]
 /nix-g offers: nothing
@@ -915,6 +880,7 @@ forget this account in this browser
 I am alice
 === chromium: accounts: alice's nix store ===
 Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
 Disk usage
 Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
 Last collection: none recorded
@@ -925,6 +891,7 @@ Also delete generations over 14 days…
 Collect
 === chromium: accounts: collected ===
 Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
 Disk usage
 Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
 Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
@@ -1107,6 +1074,9 @@ none
 - -; original orange #f0b44c on #1b1e23
 === chromium: themes: settings ===
 Appearance
+
+How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+
 Theme
 Follows you to every browser you sign in on.
 Original
@@ -1115,6 +1085,13 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Tabs
+Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+Transcript detail
+How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+Quiet
+Normal
+Verbose
 === chromium: themes: dark from the settings ===
 dark orange #f0b44c on #1d1d1d; checked: Dark
 === chromium: themes: saved on the backend ===
@@ -2280,28 +2257,38 @@ markdown fits: true; page fits: true; scrolling display math: 1, auto
 === chromium: math: errors ===
 none
 === chromium: card: idle ===
-row 1: Ready
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
+row 1: Ready | $<COST>
+row 2: [meter] 0%
 row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+lamps: 0; accented: nothing; 100px high
 fits
 === chromium: card: working, a subagent running ===
-row 1: Running tools | 1 agent running
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: Running tools; 88px high
+row 1: Running tools | $<COST>
+row 2: 1 agent running
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: nothing; 127px high
 fits
 === chromium: card: ready, a subagent running ===
-row 1: Ready | 1 agent running
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: 1 agent running; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent running
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 1; accented: 1 agent running; 127px high
 fits
 === chromium: card: idle, a mode on ===
-row 1: Ready | 1 agent | verbose
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
+fits
+=== chromium: card: the sidebar at its narrowest ===
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
 fits
 === chromium: card: the composer's chips ===
 chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | <HOSTNAME>
@@ -2310,10 +2297,11 @@ chip problems: none
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === chromium: card: on a host with a long name ===
-row 1: Ready | 1 agent | verbose
-row 2: [meter] 0% | ↑0 ↓0 | $<COST>
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 88px high
+row 1: Ready | $<COST>
+row 2: 1 agent | verbose
+row 3: [meter] 0%
+row 4: feature/a-rather-long-branch-for-the-sidebar-card
+lamps: 0; accented: nothing; 127px high
 fits
 chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
@@ -2389,7 +2377,7 @@ draft: a draft
 === chromium: pwa: errors ===
 none
 === chromium: compaction: default ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2404,7 +2392,7 @@ field: "200k" (placeholder 200k); Off pressed: false; mask: true
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
 === chromium: compaction: set ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2420,7 +2408,7 @@ compact_at_tokens=150000 compaction_model=null mask_observations=false
 Summary model; first: The conversation's model whichever model the conversation uses
 chosen: a Haiku; compact_at_tokens=150000 compaction_model=anthropic/(a haiku) mask_observations=false
 === chromium: compaction: reloaded ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2434,7 +2422,7 @@ field: "150k" (placeholder 200k); Off pressed: false; mask: false
 === chromium: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === chromium: compaction: off by /compaction ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 Off: only at 80% of the window. Type a number to set one.

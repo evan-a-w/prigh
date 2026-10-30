@@ -111,13 +111,13 @@ await page.addInitScript(() => {
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
       });
-    // Where the status's items are (the card has them on lines of their
-    // own, the bar directly).
+    // Where the status's items are (the card has the activity and the cost
+    // in its headline, the context under them; the bar has them directly).
     const status = document.querySelector(":is(.session-card, .session-bar) .status");
     if (status && window.__status)
       window.__status.push({
         activity: status.querySelector(".activity")?.textContent.trim(),
-        at: [...status.querySelectorAll(":is(.status, .card-line) > :is(.context, .tokens, .cost, .activity)")]
+        at: [...status.querySelectorAll(":is(.status, .card-head) > :is(.context, .tokens, .cost, .activity)")]
           .filter(e => getComputedStyle(e).display !== "none")
           .map(e => {
             const r = e.getBoundingClientRect();

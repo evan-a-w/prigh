@@ -225,7 +225,7 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".session-card .card-line, .session-bar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+    [...document.querySelectorAll(".session-card .card-status > :not(.status-extras:empty), .session-bar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
@@ -1493,7 +1493,7 @@ try {
     const where = await page.evaluate(() => {
       const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-line) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-head) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);
@@ -1535,6 +1535,47 @@ try {
   await page.locator(".settings-dialog .segment.on", { hasText: "Verbose" }).waitFor();
   console.log(`a choice keeps it open: ${await page.locator(".settings-dialog").isVisible()}`);
   await page.locator(".settings-dialog .segment", { hasText: "Normal" }).click();
+  // The sections down the side: a click shows one; on its tab, the arrows
+  // move to the next and Home and End to the ends, the focus with them.
+  const settingsAt = async label => {
+    const at = await page.evaluate(() => ({
+      tab: document.querySelector(".settings-tab[aria-selected=true]")?.innerText.replace(/\s+/g, " "),
+      focus: document.activeElement?.closest(".settings-tab")?.innerText.replace(/\s+/g, " ") ?? document.activeElement?.tagName,
+      panel: document.querySelector(".settings-panel-head h3")?.innerText,
+      labelled: document.getElementById("settings-panel")?.getAttribute("aria-labelledby"),
+    }));
+    console.log(`${label}: tab ${at.tab}, focus ${at.focus}, showing ${at.panel} (labelled by ${at.labelled})`);
+  };
+  section("settings: the sections");
+  await page.locator(".settings-tab", { hasText: "Behaviour" }).click();
+  await page.locator(".settings-panel-behaviour").waitFor();
+  await settingsAt("clicked Behaviour");
+  await page.keyboard.press("ArrowDown");
+  await page.locator(".settings-panel-models").waitFor();
+  await settingsAt("ArrowDown");
+  await page.keyboard.press("End");
+  await page.locator(".settings-panel-account").waitFor();
+  await settingsAt("End");
+  await page.keyboard.press("ArrowDown");
+  await page.locator(".settings-panel-appearance").waitFor();
+  await settingsAt("ArrowDown wraps");
+  await page.locator(".settings-tab", { hasText: "Git hosting" }).click();
+  await page.locator(".settings-panel-git").waitFor();
+  await screenshot("settings: git hosting");
+  const settingsFits = () => page.evaluate(() => {
+    const d = document.querySelector(".settings-dialog").getBoundingClientRect();
+    const nav = document.querySelector(".settings-nav");
+    return `dialog ${Math.round(d.width)}x${Math.round(d.height)}, in the window: ${d.left >= 0 && d.right <= innerWidth && d.top >= 0 && d.bottom <= innerHeight}; \
+sections ${getComputedStyle(nav).flexDirection === "row" ? "across the top" : "down the side"}; panel fits: ${[...document.querySelectorAll(".settings-panel")].every(p => p.scrollWidth <= p.clientWidth)}`;
+  });
+  console.log(`desktop: ${await settingsFits()}`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".settings-tab", { hasText: "Behaviour" }).click();
+  await page.locator(".settings-panel-behaviour").waitFor();
+  console.log(`phone: ${await settingsFits()}`);
+  await screenshot("settings: a phone");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.locator(".settings-tab", { hasText: "Appearance" }).click();
   await page.keyboard.press("Escape");
   await page.waitForSelector(".settings-dialog", { state: "detached" });
   await page.waitForFunction(() => document.activeElement?.id === "editor", null, { timeout: 2000 }).catch(() => {});

@@ -53,6 +53,9 @@ module State : sig
       (** [Host.id]; absent from [hosts] while that host is disconnected, or
               [""] when the backend host is disabled and no client host was
               ever adopted *)
+    ; active_host_name : string option
+      (** its [Host.name] as last seen (kept with the session), so that a
+          disconnected host is still shown by name; [None] when unknown *)
     ; hosts : Host.t list
       (** the backend first (unless disabled), then connected clients *)
     ; subagents : Background_tasks.Summary.t list

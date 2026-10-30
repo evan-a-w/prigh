@@ -155,8 +155,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   status h;
   [%expect
     {|
-    Ready
-    (0%) ↑0 ↓0 $0.00
+    Ready $0.00
+    (0%)
     (main)
     |}]
 ;;
@@ -996,9 +996,9 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    Ready
+    Ready $0.00
     (1 queued)
-    (0%) ↑0 ↓0 $0.00
+    (0%)
     (main)
     (1 queued)
     |}];
