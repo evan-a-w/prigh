@@ -89,6 +89,7 @@ module State = struct
     ; cost_usd : float
     ; context_tokens : int
     ; active_host : string
+    ; active_host_name : string option
     ; hosts : Host.t list
     ; subagents : Background_tasks.Summary.t list
     ; jobs : Background_tasks.Summary.t list
@@ -474,6 +475,15 @@ let state t =
   ; cost_usd = assistant_cost
   ; context_tokens
   ; active_host = t.active_host
+  ; active_host_name =
+      (match
+         List.find (hosts t) ~f:(fun h -> String.equal h.id t.active_host)
+       with
+       | Some host -> Some host.name
+       | None ->
+         Option.some_if
+           (not (String.is_empty t.active_host_name))
+           t.active_host_name)
   ; hosts = hosts t
   ; subagents = Background_tasks.summaries t.background ~kind:Subagent
   ; jobs = Background_tasks.summaries t.background ~kind:Job

@@ -153,7 +153,11 @@ comes in time they fail the same way ("disconnected" instead of
 calls fail at once) (`prigh tool-host -connect` and the
 TUI's `Tool_host` keep their worker across connections and hold results
 and up to 1 MiB of output while offline). The session stays on that host,
-and the TUI shows `tools:offline`. The model's tool calls (`Agent.executor`
+and `State.active_host_name` keeps naming it (the name recorded with the
+session's location, so also after a restart): the TUI shows `tools:<name> ⊘
+offline` and prigh-web's host chip the name struck through
+(`Prigh_ui.Active_host` tells connected, disconnected and unset apart for
+both). The model's tool calls (`Agent.executor`
 and jobs) made meanwhile wait for it within the same window
 (`Rpc_server.returning`, the time each host id that dropped is given up on,
 passed to `Agent.set_hosts ~returning`; `set_hosts` and host switches
@@ -1828,7 +1832,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   error, `index` counting messages as a page's `older` does (so `limit:
   older - index` before the first page loaded reaches one) and `text` cut
   to 240 bytes.
-  `State` carries `active_host` and `hosts` (the backend first),
+  `State` carries `active_host`, `active_host_name` (its name as last
+  seen, also while it is disconnected; null when unknown) and `hosts`
+  (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null),
   `reminders` (`[{name, text, on: "stop", max_repeats, repeats}` or
@@ -2454,7 +2460,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
     can mark this frontend as "(here)"
     and the status line can show `tools:<host>` when tools run elsewhere or
-    `tools:offline` when the active host is gone. Mouse reporting is on so the
+    `tools:<host> ⊘ offline` when the active host is gone. Mouse reporting is on so the
     wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines)
     and a left click asks `Render.click` what is there (the jump indicator);
     without it the terminal turns the wheel into arrow keys, which walk the

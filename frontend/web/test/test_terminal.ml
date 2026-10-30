@@ -10,21 +10,25 @@ let hosts =
      {"id":"c7","name":"laptop","cwd":"/home/me/proj","session_id":"s1","session_name":null}]|}
 ;;
 
-let state ?(session = "s1") ?(active_host = "backend") () =
+let state ?(session = "s1") ?(active_host = "backend") ?active_host_name () =
   H.state_json
     ~fields:
-      [ "session_id", `String session
-      ; "session_path", `String (sprintf "/sessions/%s.jsonl" session)
-      ; "active_host", `String active_host
-      ; "hosts", Jsonaf.of_string hosts
-      ]
+      ([ "session_id", `String session
+       ; "session_path", `String (sprintf "/sessions/%s.jsonl" session)
+       ; "active_host", `String active_host
+       ; "hosts", Jsonaf.of_string hosts
+       ]
+       @ Option.value_map active_host_name ~default:[] ~f:(fun name ->
+         [ "active_host_name", `String name ]))
     ()
 ;;
 
-let state_event h ?session ?active_host () =
+let state_event h ?session ?active_host ?active_host_name () =
   H.event
     h
-    (sprintf {|{"event":"state","state":%s}|} (state ?session ?active_host ()))
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (state ?session ?active_host ?active_host_name ()))
 ;;
 
 let key (m : App.Model.t) =
@@ -241,6 +245,10 @@ let%expect_test "an exited shell, a failure and what to do next" =
     No terminal: the tool host "c9" is not connected Pick a connected tool host with /host, or Retry once it is back.
     (Retry)
     |}];
+  (* A backend that names the host it waits for: the name, not the id. *)
+  state_event h ~active_host:"c9" ~active_host_name:"desktop" ();
+  H.text h ~selector:".terminal-panel .terminal-machine";
+  [%expect {| desktop (offline) |}];
   (* The host is back: a new attempt. *)
   state_event h ~active_host:"c7" ();
   H.text h ~selector:".terminal-body";

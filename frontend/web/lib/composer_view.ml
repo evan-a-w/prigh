@@ -211,24 +211,42 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       ]
 ;;
 
-(* Where tools run, always named; a missing host is lit. *)
+(* Where tools run, always named, also while that host is disconnected (its
+   server struck through, "offline" beside it); no host at all is lit. *)
 let host_chip (m : App.Model.t) (state : State.t) ~inject =
-  let cls, title, label =
-    match
-      List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
-    with
-    | Some h ->
-      "", sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd, h.name
-    | None when String.equal state.active_host Host.backend_id ->
-      "", "Tools run on the backend (/host switches)", "backend"
-    | None -> " warm", "No host runs the tools: /host picks one", "No host"
+  let cls, title, aria, content =
+    match Active_host.of_state state with
+    | Connected h ->
+      ( ""
+      , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
+      , None
+      , [ icon Server; span ~cls:"chip-label" h.name ] )
+    | Disconnected { name; _ } ->
+      ( " offline"
+      , Active_host.reconnect_hint ~name
+      , Some (sprintf "%s, disconnected" name)
+      , [ icon Server_off
+        ; span ~cls:"chip-label" name
+        ; span ~cls:"chip-state" "offline"
+        ] )
+    | Unset when String.equal state.active_host Host.backend_id ->
+      ( ""
+      , "Tools run on the backend (/host switches)"
+      , None
+      , [ icon Server; span ~cls:"chip-label" "backend" ] )
+    | Unset ->
+      ( " warm"
+      , "No host runs the tools: /host picks one"
+      , None
+      , [ icon Server; span ~cls:"chip-label" "No host" ] )
   in
   button
     ~cls:("chip-button host-chip" ^ cls)
     ~title
+    ?label:aria
     ~attrs:(menu_attrs m Host)
     ~on_click:(inject (Action.Open_chip Host))
-    [ icon Server; span ~cls:"chip-label" label; icon ~cls:"chevron" Chevron ]
+    (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
 (* The model, the thinking level, the approval mode and the tool host, along
