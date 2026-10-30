@@ -289,6 +289,22 @@ let unknown_compaction_model t ~home =
   | Ok _ | Error _ -> []
 ;;
 
+let unknown_naming_model t ~home =
+  match Config.load ~home with
+  | Ok { naming_model = Some name; _ } ->
+    (match resolve t name with
+     | Ok _ -> []
+     | Error e ->
+       [ sprintf
+           "naming_model in %s is ignored, so sessions and subagents are named \
+            by generate_model or the session's model (/naming model MODEL \
+            sets another): %s"
+           (Config.path ~home)
+           (Error.to_string_hum e)
+       ])
+  | Ok _ | Error _ -> []
+;;
+
 let reload ?listed t =
   match t.source with
   | None -> ()
@@ -317,6 +333,7 @@ let reload ?listed t =
       problems
       @ unknown_start_model t ~home:source.home
       @ unknown_compaction_model t ~home:source.home
+      @ unknown_naming_model t ~home:source.home
     in
     let new_problems =
       List.filter problems ~f:(fun p ->

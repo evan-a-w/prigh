@@ -66,6 +66,9 @@ type t =
   ; compaction_model : string option
     (** the model that writes compaction summaries; [None]: the
         conversation's *)
+  ; naming_model : string option
+    (** the model that names sessions and subagents ({!Session_description},
+        {!Subagent_name}); [None]: [generate_model], else the session's *)
   ; trace : Trace.Level.t
     (** what sessions record in their trace ({!Trace_file}; default
         [Default]); [PRIGH_TRACE] overrides it *)

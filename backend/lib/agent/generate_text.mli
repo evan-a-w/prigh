@@ -8,7 +8,8 @@ open! Import
     conventions, the session's goal and plan, the conversation) and cleans
     the reply; adding a kind is a constructor and its {!Spec}. The model is
     the config's [generate_model], else the session's
-    ({!Agent.generate_model}), with thinking off; the cost counts towards
+    ({!Agent.generate_model}; a session's title: {!Agent.naming_model}),
+    with thinking off; the cost counts towards
     the session's. *)
 
 module Kind : sig

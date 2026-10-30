@@ -21,6 +21,7 @@ module Summary = struct
     ; call_id : string
     ; parent : string option
     ; task : string
+    ; name : string option
     ; model : string
     ; state : State.t
     ; started_at : float
@@ -42,6 +43,7 @@ module Entry = struct
     ; call_id : string
     ; parent : string option
     ; task : string
+    ; name : string option
     ; model : string
     ; started_at : float
     ; mutable updated_at : float
@@ -81,6 +83,7 @@ module Line = struct
         ; call_id : string
         ; parent : string option [@jsonaf.option]
         ; task : string
+        ; name : string option [@jsonaf.option]
         ; model : string
         ; at : float
         ; run : int
@@ -143,12 +146,13 @@ let write t (line : Line.t) =
       append ())
 ;;
 
-let start t ~id ~call_id ~parent ~task ~model ~at =
+let start t ~id ~call_id ~parent ~task ~name ~model ~at =
   let entry =
     { Entry.id
     ; call_id
     ; parent
     ; task
+    ; name
     ; model
     ; started_at = at
     ; updated_at = at
@@ -209,12 +213,21 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
     touch agent_id (fun e ->
       reopen e ~at:now;
       write t (Continue { id = agent_id; at = now; run = t.runs }))
-  | Subagent_start { call_id; agent_id; task; model; _ } ->
-    start t ~id:agent_id ~call_id ~parent ~task ~model ~at:now;
+  | Subagent_start { call_id; agent_id; task; name; model; _ } ->
+    let name = Some name in
+    start t ~id:agent_id ~call_id ~parent ~task ~name ~model ~at:now;
     write
       t
       (Start
-         { id = agent_id; call_id; parent; task; model; at = now; run = t.runs })
+         { id = agent_id
+         ; call_id
+         ; parent
+         ; task
+         ; name
+         ; model
+         ; at = now
+         ; run = t.runs
+         })
   | Subagent_end { agent_id; result; _ } ->
     touch agent_id (fun e ->
       end_ t e ~at:now ~result;
@@ -251,9 +264,9 @@ let replay t (line : Line.t) =
   let with_entry id f = Option.iter (Hashtbl.find t.by_id id) ~f in
   match line with
   | Run { run } -> t.runs <- Int.max t.runs run
-  | Start { id; call_id; parent; task; model; at; run } ->
+  | Start { id; call_id; parent; task; name; model; at; run } ->
     t.runs <- Int.max t.runs run;
-    start t ~id ~call_id ~parent ~task ~model ~at
+    start t ~id ~call_id ~parent ~task ~name ~model ~at
   | Continue { id; at; run } ->
     t.runs <- Int.max t.runs run;
     with_entry id (reopen ~at)
@@ -327,6 +340,7 @@ let summary t (e : Entry.t) =
   ; call_id = e.call_id
   ; parent = e.parent
   ; task = e.task
+  ; name = e.name
   ; model = e.model
   ; state =
       (match e.result with

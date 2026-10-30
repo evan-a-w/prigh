@@ -45,6 +45,7 @@ type t =
   ; mask_observations : bool
   ; compact_at_tokens : int
   ; compaction_model : string option
+  ; naming_model : string option
   ; trace : Trace.Level.t
   }
 [@@deriving sexp_of]
@@ -72,6 +73,7 @@ let default =
   ; mask_observations = true
   ; compact_at_tokens = 200_000
   ; compaction_model = None
+  ; naming_model = None
   ; trace = Default
   }
 ;;
@@ -129,6 +131,7 @@ let to_json t =
     ; ("mask_observations", if t.mask_observations then `True else `False)
     ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
+    ; "naming_model", option (fun s -> `String s) t.naming_model
     ; "trace", `String (Trace.Level.to_string t.trace)
     ]
 ;;
@@ -250,6 +253,15 @@ let of_json json =
           "config.compaction_model must be a model's name (or null: the \
            session's model)"
     in
+    let%bind naming_model =
+      match find "naming_model" with
+      | None | Some `Null | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ ->
+        Or_error.error_string
+          "config.naming_model must be a model's name (or null: \
+           generate_model, else the session's model)"
+    in
     let%bind compact_at_tokens =
       let error () =
         Or_error.error_string
@@ -356,6 +368,7 @@ let of_json json =
     ; mask_observations
     ; compact_at_tokens
     ; compaction_model
+    ; naming_model
     ; trace
     }
   | _ -> Or_error.error_string "config must be a JSON object"

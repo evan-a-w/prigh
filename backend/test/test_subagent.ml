@@ -303,6 +303,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       { call_id = "p"
       ; agent_id = "p"
       ; task = "go"
+      ; name = "Go"
       ; model = "m"
       ; tools = [ "read"; "ls" ]
       ; worktree = None
@@ -348,6 +349,7 @@ let%expect_test
        { call_id = "p"
        ; agent_id = "p"
        ; task = "go"
+       ; name = "Go"
        ; model = "m"
        ; tools = []
        ; worktree = None

@@ -78,6 +78,8 @@ type t =
       { call_id : string
       ; agent_id : string
       ; task : string
+      ; name : string option
+        (** a few words saying what it does; [None] from older backends *)
       ; model : string
       ; tools : string list
       ; worktree : Agent_worktree.t option

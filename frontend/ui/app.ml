@@ -64,6 +64,8 @@ module Reply_tag = struct
     | Default_dir_saved of string
     | Compaction_shown
     | Compaction_saved of string
+    | Naming_shown
+    | Naming_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -1552,7 +1554,7 @@ let agents_picker m =
             (match m.focus with
              | `Agent id -> String.equal id a.id
              | `Main -> false)
-          a.task)
+          (Agent_view.title a))
     in
     open_picker m Agents (Picker.create ~title:"Subagents" items), [])
 ;;
@@ -1921,7 +1923,13 @@ let set_state m (state : P.State.t) =
   let adopted =
     List.map missed ~f:(fun a ->
       let agent =
-        Agent_view.create ~call_id:"" ~agent_id:a.id ~task:a.task ~model:""
+        Agent_view.create
+          ?name:a.name
+          ~call_id:""
+          ~agent_id:a.id
+          ~task:a.task
+          ~model:""
+          ()
       in
       if a.running
       then agent
@@ -1949,6 +1957,7 @@ let subagent_loaded m (d : P.Subagent_detail.t) =
     Agent_view.replace agents d.id (fun a ->
       { a with
         call_id = d.call_id
+      ; name = Option.first_some d.name a.name
       ; model = d.model
       ; turns = d.turns
       ; status =
@@ -2911,6 +2920,19 @@ let compaction_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let naming_command m (cmd : Commands.Parsed.t) =
+  match Naming_command.parse cmd.rest with
+  | Show -> show_config m ~tag:Naming_shown ~summary:Naming_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/naming " ^ cmd.rest))) e, []
+  | Set_model _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Naming_saved ("/naming " ^ cmd.rest))
+          (Naming_command.fields action)
+      ] )
+;;
+
 (* ---- snippets ---------------------------------------------------------- *)
 
 let snippets m = Option.map m.config ~f:(fun (c : P.Config.t) -> c.snippets)
@@ -3631,6 +3653,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
   | "compaction", _ -> compaction_command m cmd
+  | "naming", _ -> naming_command m cmd
   | "auth", _ ->
     ( m
     , [ rpc "auth_status" ~tag:Auth_show; call Forge_status ~tag:Forge_refresh ]
@@ -5849,7 +5872,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Skill_prompt text -> skill_prompt_failed m text e, []
      | Agent_message { agent_id; kind; text; retry } ->
        agent_message_failed m ~agent_id ~kind ~text ~retry e, []
-     | Fallback_saved text | Default_dir_saved text | Compaction_saved text ->
+     | Fallback_saved text
+     | Default_dir_saved text
+     | Compaction_saved text
+     | Naming_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
          if Editor.is_empty m.editor
@@ -6419,6 +6445,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
              { m with config = Some config }
              (Compaction_command.summary config)
          , [] ))
+     | Naming_shown | Naming_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         notice { m with config = Some config } (Naming_command.summary config), [])
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])

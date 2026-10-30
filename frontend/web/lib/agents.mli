@@ -22,6 +22,7 @@ module Agent : sig
     ; call_id : string (** the [subagent] call that started it *)
     ; parent : string option
     ; task : string
+    ; name : string option (** a few words saying what it does *)
     ; model : string
     ; status : Status.t
     ; started_at : Time_ns.t
@@ -36,6 +37,9 @@ module Agent : sig
   (** A [list_subagents] item and whether it is [stale] (finished before the
       latest run). *)
   val of_json : Json.t -> (t * bool) Or_error.t
+
+  (** Its [name], else its task's first line. *)
+  val title : t -> string
 end
 
 module Job : sig

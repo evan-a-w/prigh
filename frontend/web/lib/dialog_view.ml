@@ -28,7 +28,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Worktrees _ -> "Worktrees"
   | Themes -> "Themes"
   | Accents -> "Colours"
-  | Compaction_models -> "Models"
+  | Compaction_models | Naming_models -> "Models"
 ;;
 
 (* What is wrong with the MCP configuration, under its servers. *)

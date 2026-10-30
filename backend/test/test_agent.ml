@@ -1454,7 +1454,7 @@ let%expect_test "session_description: cleaning replies" =
     ; ""
     ; String.make 120 'x'
     ]
-    ~f:(fun s -> printf "%S\n" (Session_description.clean s));
+    ~f:(fun s -> printf "%S\n" (Naming.clean s));
   [%expect
     {|
     "Fixing the build"

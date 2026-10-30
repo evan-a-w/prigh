@@ -103,6 +103,6 @@ let complete ~(agents : Agent_view.t list) rest =
             , sprintf
                 "%s · %s"
                 a.id
-                (String.concat ~sep:" " (String.split_lines a.task)) )) )
+                (Agent_view.title a) )) )
     else None
 ;;
