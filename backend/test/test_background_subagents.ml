@@ -162,7 +162,7 @@ let%expect_test "spawning returns at once; a finished agent starts a turn" =
     agent_end
     state: running=false subagents=[a1 running]
     --- turn over; subagents running: true
-    [{"id":"a1","task":"look around","running":true}]
+    [{"id":"a1","task":"look around","name":"Look around","running":true}]
     subagent_end a1: ok child report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[]
     agent_start

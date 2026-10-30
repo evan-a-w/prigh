@@ -39,7 +39,18 @@ let users_and_described_at session =
   total, Option.some_if described (total - users_after)
 ;;
 
+(* A turn that failed (not logged in, the provider down) has nothing to
+   name, and naming would only fail the same way. *)
+let replied session =
+  List.exists (Session.messages session) ~f:(function
+    | Message.Assistant { stop_reason = Error _; _ } -> false
+    | Assistant a -> not (String.is_empty (String.strip (Message.Assistant.text a)))
+    | User _ | Tool_result _ -> false)
+;;
+
 let wanted session =
+  replied session
+  &&
   match users_and_described_at session with
   | 0, _ -> false
   | _, None -> true

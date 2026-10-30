@@ -22,7 +22,7 @@ let%expect_test "Naming.clean: one plain line, sentence case, cut at a word" =
     "Review menu keyboard navigation"
     "Port the parser to Eio"
     "Survey host naming code"
-    "A very long title that goes on and on about many…"
+    "A very long title that goes on and on about many different\226\128\166"
     ""
     |}]
 ;;
@@ -40,7 +40,7 @@ let%expect_test "Subagent_name.of_task: the gist of the task, not its preamble" 
     ~f:(fun s -> printf "%S\n" (Subagent_name.of_task s));
   [%expect
     {|
-    "The slash-command argument autocomplete must…"
+    "The slash-command argument autocomplete must\226\128\166"
     "Review the diff of PR #12 for correctness"
     "Survey how hosts are named"
     "Task: x"
@@ -101,16 +101,19 @@ let%expect_test
   |> List.iter ~f:print_endline;
   [%expect
     {|
-    7731 chars
+    7745 chars
     User: Please make the review menu keyboard driven
-    Assistant: I'll look at review_view.ml first.
-    [57 messages omitted]
+    [50 messages omitted]
     Assistant: ok
-    User: follow-up 27: word word word word word word word word wor
+    User: follow-up 25: word word word word word word word word
     Assistant: ok
-    User: follow-up 28: word word word word word word word word wor
+    User: follow-up 26: word word word word word word word word
     Assistant: ok
-    User: follow-up 29: word word word word word word word word wor
+    User: follow-up 27: word word word word word word word word
+    Assistant: ok
+    User: follow-up 28: word word word word word word word word
+    Assistant: ok
+    User: follow-up 29: word word word word word word word word
     Assistant: ok
     Current title: Review menu keys
     |}]
