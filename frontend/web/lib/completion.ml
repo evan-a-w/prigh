@@ -342,7 +342,9 @@ let compute
             in
             (match kind with
              | Directory | Backend_directory | Path ->
-               Some (make (Argument kind) ~prefix ~start [])
+               Option.some_if
+                 (not (Prigh_ui.Commands.argument_finished rest))
+                 (make (Argument kind) ~prefix ~start [])
              | Models when fst (word_at text ~cursor) <= String.length name ->
                None
              | Models ->
@@ -405,6 +407,7 @@ let compute
                           ~start:(start + offset)
                           items))
              | Snippet when String.exists prefix ~f:Char.is_whitespace -> None
+             | _ when Prigh_ui.Commands.argument_finished rest -> None
              | Goal | Budget ->
                (* Free text: only an exact start of a keyword offers it, so
                   Enter sends what was typed. *)
