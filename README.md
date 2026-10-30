@@ -198,7 +198,10 @@ has one *active tool host*; `/host` lists the backend and the connected
 frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
-elsewhere or `tools:offline` when the active host has disconnected. A
+elsewhere or, in red, `tools:<name> ⊘ offline` when the active host has
+disconnected (hosts are always shown by their name, the hostname or
+`-name`, which the session keeps for when its host is away, never by their
+`host-…` id unless the backend predates that). A
 session never leaves its host on its own: while the host is away the
 model's tool calls (a main agent's, subagents' and jobs') wait up to a
 minute after it left for it to come back, then fail with a message saying
@@ -774,7 +777,9 @@ the box's own quiet text, the model, the thinking level ("Thinking high",
 "No thinking" for a model without levels) and the approval mode ("Asks:
 edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
 lit) and where tools run (a server icon and the tool host's name, always
-shown, lit as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
+shown; a disconnected host keeps its name, its server struck through in
+red and "offline" beside it, with how to bring it back in its tooltip; lit
+as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
 on the right. A chip opens a small menu standing on it, above the composer
 (below it only when there is no room above), with its command's choices
 (`/model`, `/thinking`, `/mode`, `/host`), the current one checked: the
@@ -798,19 +803,23 @@ quietly in the chat's top right corner (lit while their panel is open),
 and the session's status is in a card at the foot of the sidebar, above
 the account, under the tree of projects. The tree marks which session it
 is (its row has the cwd as it is now, relative to its project or worktree,
-and a rename button). The card is two quiet lines from its left edge:
-what the agent is doing (`● Ready`, `Thinking`…), then whatever applies
-(the goal, reminders, a scheduled resume, queued messages to take back,
-background agents and jobs (click for the agents panel), transfers, the
-verbosity when not the default); then the context's meter (click for
-`/session`'s details), the tokens and the cost to the cent (its tooltip
-has it exactly; or the budget). The verbosity is muted, and while the
-agent works its background agents are too, without a lamp, so that one
-thing at a time is lit. Under them, in a git repository, the branch
+and a rename button). The card's headline is what the agent is doing
+(`● Ready`, `Thinking`…) with the session's cost across from it, to the
+cent (its tooltip has it exactly; or the budget); under it, only when
+anything applies, a muted line of it (the goal, reminders, a scheduled
+resume, queued messages to take back, background agents and jobs (click
+for the agents panel), transfers, the verbosity when not the default);
+then the context's meter across the card, in the accent colour (its
+percent too from 60%, both brick from 85%), with its percent under the
+cost: its tooltip
+has the tokens in and out, and a click opens `/session`'s details. While
+the agent works its background agents are muted, without a lamp, so that
+one thing at a time is lit. Under them, in a git repository, the branch
 (click for the pull requests, `/pr`). Where tools run is the composer's
 chip, and the model's plan is not on the card: `/todos` shows it, and so
 does the transcript as it changes. The activity keeps a slot wide enough
-for its usual words, so nothing moves as a turn starts and ends. Your
+for its usual words, so the cost never moves as a turn starts and ends
+(in a narrow sidebar it goes under the activity). Your
 account is under it, with the settings gear; the account menu also has
 Settings and Commands and keys (`/help`). With the sidebar closed, and
 always on a phone (where the sidebar is a drawer), a slim bar over the
@@ -824,13 +833,17 @@ changes height.
 
 The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
-about the session: the theme and accent, notifications (on or off, and
-what to do when the browser has not been asked, blocks them or cannot show
-them), session tabs (`/tabs`), transcript detail (`/verbosity`), tool
-confirmation (`/confirm`),
-the providers (`/auth`), who you are signed in (and acting) as with Switch
-account and Sign out, and the keyboard shortcuts. Esc closes it; its
-controls keep it open.
+about the session, in sections listed down its side (across its top on a
+phone): **Appearance** (the theme and accent, session tabs (`/tabs`),
+transcript detail (`/verbosity`)), **Behaviour** (tool confirmation
+(`/confirm`); notifications, on or off, and what to do when the browser has
+not been asked, blocks them or cannot show them), **Models** (the providers
+(`/auth`) and compaction), **Git hosting**, **Nix store** (superusers) and
+**Account** (who you are signed in, and acting, as, with Switch account and
+Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
+opens it at a section; on the list, the arrows, Home and End move between
+sections. It opens where you left it. Esc closes it; its controls keep it
+open; the keyboard shortcuts are in its footer.
 
 Session tabs (off by default; the settings page's Tabs switch or `/tabs
 on|off`, saved for your account, so they follow you to other browsers and
@@ -1946,7 +1959,7 @@ thinking only if it supports it, else a transcript when that does not
 fit), but, being another model, it does not reuse the conversation's
 prompt cache. `/compaction` alone shows all three settings, and
 `/compaction model` alone picks the model from a list. prigh-web's
-settings page has them too, under Compaction: the threshold (or Off), the
+settings page has them too, under Models, Compaction: the threshold (or Off), the
 summary model (a picker) and the masking switch, saved and kept in step
 with `/compaction` like the rest. The system prompt also suggests handing
 wide exploration to subagents, so the main context stays small.

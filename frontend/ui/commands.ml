@@ -429,3 +429,9 @@ let input_help =
     ; "#name", "insert a snippet: Tab or Enter on its completion (/snippet)"
     ]
 ;;
+
+let argument_finished rest =
+  let rest = String.lstrip rest in
+  (not (String.is_empty rest))
+  && Char.is_whitespace (String.get rest (String.length rest - 1))
+;;

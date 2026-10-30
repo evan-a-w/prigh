@@ -28,7 +28,7 @@ let status_json =
                  "next_at_ms":1759686400000}}|}
 ;;
 
-let section h = H.text h ~selector:".settings-section:nth-last-child(2)"
+let section h = H.text h ~selector:".settings-panel-nix"
 
 let report_json =
   {|{"at_ms":1759660000000,"by":"alice","generations":null,
@@ -38,7 +38,7 @@ let report_json =
 
 let%expect_test "Settings shows superusers the store; others do not see it" =
   let h = superuser () in
-  H.act h Open_settings;
+  H.act h (Settings_section Nix_store);
   section h;
   H.reply h "nix_store_status" status_json;
   section h;
@@ -48,27 +48,26 @@ let%expect_test "Settings shows superusers the store; others do not see it" =
     (Rpc (method_ nix_store_status) (params ())
      (tag (Nix_status (open_settings false))))
     Nix store
+    The packages agents fetch with Nix, on the shared /nix volume.
     Disk usage The packages agents fetch with Nix, on the shared /nix volume. Reading the store…
     Collect garbage Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
     (Also delete generations over 14 days…) (Collect)
     Nix store
+    The packages agents fetch with Nix, on the shared /nix volume.
     Disk usage Store: 12.0 GiB in 4321 paths; /nix: 40.0 GiB free of 100.0 GiB (40%). Last collection: 2025-10-04 17:46 by the automatic collection, freed 1.2 GiB: 120 paths, 3 generations deleted in 42 s Automatic: every 1 day, deleting profile generations older than 14 days; next at 2025-10-05 17:46
     (Refresh)
     Collect garbage Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
     (Also delete generations over 14 days…) (Collect)
     |}];
   let h = H.create () in
-  H.act h Open_settings;
-  H.text h ~selector:".settings-section h3";
+  H.act h (Settings_section Nix_store);
+  H.text h ~selector:".settings-nav";
+  H.text h ~selector:".settings-panel-head h3";
   [%expect
     {|
     (Focus dialog)
+    (Appearance) (Behaviour) (Models) (Git hosting) (Account)
     Appearance
-    Preferences
-    On the backend
-    Git hosting
-    Compaction
-    Account
     |}]
 ;;
 
@@ -77,7 +76,7 @@ let%expect_test
   =
   let h = superuser () in
   H.quiet h (fun () ->
-    H.act h Open_settings;
+    H.act h (Settings_section Nix_store);
     H.reply h "nix_store_status" status_json);
   H.click h ~selector:".nix-gc .primary";
   H.event
@@ -95,6 +94,7 @@ let%expect_test
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ nix_store_gc) (params ()) (tag Nix_collected))
     Nix store
+    The packages agents fetch with Nix, on the shared /nix volume.
     Disk usage Store: 12.0 GiB in 4321 paths; /nix: 40.0 GiB free of 100.0 GiB (40%). Last collection: 2025-10-04 17:46 by the automatic collection, freed 1.2 GiB: 120 paths, 3 generations deleted in 42 s Automatic: every 1 day, deleting profile generations older than 14 days; next at 2025-10-05 17:46
     (Refresh)
     Collect garbage Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them. Collecting: 12 paths deleted · deleting unused links...
@@ -104,6 +104,7 @@ let%expect_test
     (Rpc (method_ nix_store_status) (params ())
      (tag (Nix_status (open_settings false))))
     Nix store
+    The packages agents fetch with Nix, on the shared /nix volume.
     Disk usage Store: 12.0 GiB in 4321 paths; /nix: 40.0 GiB free of 100.0 GiB (40%). Last collection: 2025-10-04 17:46 by the automatic collection, freed 1.2 GiB: 120 paths, 3 generations deleted in 42 s Automatic: every 1 day, deleting profile generations older than 14 days; next at 2025-10-05 17:46
     (Refresh)
     Collect garbage Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them. Freed 500.0 MiB: 40 paths deleted in 5 s
@@ -114,7 +115,7 @@ let%expect_test
 let%expect_test "deleting generations asks first, then returns to Settings" =
   let h = superuser () in
   H.quiet h (fun () ->
-    H.act h Open_settings;
+    H.act h (Settings_section Nix_store);
     H.reply h "nix_store_status" status_json);
   H.click h ~selector:".nix-gc .ghost";
   H.text h ~selector:".nix-gc-confirm";

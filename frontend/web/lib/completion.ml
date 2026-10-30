@@ -80,6 +80,7 @@ let argument_items
       ~(skills : Skill.t list)
       ~(snippets : Snippet.t list)
       ~(forges : Forge_account.t list)
+      ~superuser
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
@@ -186,6 +187,14 @@ let argument_items
       [ "on", "notify when the tab is hidden"
       ; "off", "no browser notifications"
       ]
+  | Settings ->
+    List.map (Settings_section.available ~superuser) ~f:(fun section ->
+      let arg = Settings_section.arg section in
+      Picker.Item.create
+        ~id:arg
+        ~detail:(Settings_section.about section)
+        ~search:(arg ^ " " ^ Settings_section.name section)
+        arg)
   | Tabs ->
     simple
       [ "on", "the open sessions as tabs over the chat"
@@ -343,7 +352,9 @@ let compute
             in
             (match kind with
              | Directory | Backend_directory | Path ->
-               Some (make (Argument kind) ~prefix ~start [])
+               Option.some_if
+                 (not (Prigh_ui.Commands.argument_finished rest))
+                 (make (Argument kind) ~prefix ~start [])
              | Models when fst (word_at text ~cursor) <= String.length name ->
                None
              | Models ->
@@ -407,6 +418,7 @@ let compute
                           ~start:(start + offset)
                           items))
              | Snippet when String.exists prefix ~f:Char.is_whitespace -> None
+             | _ when Prigh_ui.Commands.argument_finished rest -> None
              | Goal | Budget ->
                (* Free text: only an exact start of a keyword offers it, so
                   Enter sends what was typed. *)
@@ -422,7 +434,8 @@ let compute
                        ~users
                        ~skills
                        ~snippets
-                       ~forges)
+                       ~forges
+                       ~superuser)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
                 with
@@ -442,7 +455,8 @@ let compute
                        ~users
                        ~skills
                        ~snippets
-                       ~forges)
+                       ~forges
+                       ~superuser)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))

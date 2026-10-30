@@ -15,7 +15,9 @@ let config ?model () =
 
 let settings () =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () ->
+    H.act h Open_settings;
+    H.act h (Settings_section Models));
   h
 ;;
 

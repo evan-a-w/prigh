@@ -75,6 +75,7 @@ module Icon = struct
     | External
     | Key
     | Server
+    | Server_off
     | Help
     | Bot
     | Back
@@ -109,6 +110,8 @@ module Icon = struct
     | Review
     | Filter
     | Scissors
+    | Palette
+    | Package
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -142,6 +145,8 @@ module Icon = struct
       {|<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/>|}
     | Server ->
       {|<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>|}
+    | Server_off ->
+      {|<path d="M8 4h11a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4M4.2 4.6A2 2 0 0 0 3 6.5V9a2 2 0 0 0 2 2h6M21 17.5V15a2 2 0 0 0-2-2h-2M3 15v3a2 2 0 0 0 2 2h14M7 16.5h.01M3 3l18 18"/>|}
     | Help ->
       {|<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>|}
     | Bot ->
@@ -199,6 +204,10 @@ module Icon = struct
     | Filter -> {|<path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>|}
     | Scissors ->
       {|<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 12 12M20 4 8.1 15.9M14.8 14.8 20 20"/>|}
+    | Palette ->
+      {|<path d="M12 3a9 9 0 0 0 0 18c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.9.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10" cy="7.5" r="1" fill="currentColor"/><circle cx="14.5" cy="7.5" r="1" fill="currentColor"/>|}
+    | Package ->
+      {|<path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7 12 12l8.7-5M12 22V12M7.5 4.3l9 5.1"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

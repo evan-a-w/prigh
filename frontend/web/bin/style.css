@@ -596,35 +596,44 @@ kbd {
   padding: 12px 14px 12px 18px;
   border-top: 1px solid var(--rule);
 }
-/* Two quiet lines from the left edge, one thing at a time lit: what the
-   agent is doing, then what applies (wrapping under itself); the context's
-   meter, the tokens and the cost. The branch is a third line when there is
-   one. The activity keeps a slot wide enough for its usual words, so that
-   what follows it stays put as the agent starts and stops; while the agent
-   works, its background agents are told quietly, without a lamp. */
-.card-status.status { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; overflow: visible; }
-.card-line {
-  display: flex;
-  align-items: center;
-  gap: 4px 14px;
-  min-width: 0;
+/* One left edge, and the figures on one right edge. The headline is what
+   the agent is doing, with the cost across from it (under it when the
+   sidebar is too narrow for both: the activity keeps a slot of its usual
+   words, so that the cost never moves as the agent starts and stops); then
+   what applies, muted, when anything does; the context's meter across the
+   card, the one thing coloured by how full it is; the branch. Tokens are
+   the meter's title. While the agent works its lamp is the one lit: the
+   background agents are told quietly. */
+.card-status.status {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0;
+  overflow: visible;
   font-size: 12px;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
-.card-doing .status-item.activity { width: auto; min-width: 13ch; max-width: 60%; font-size: 12.5px; }
-.card-doing > .status-extras { flex: 0 1 auto; flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
-.card-counters .context, .card-counters .tokens, .card-counters .cost { font: 11.5px var(--mono); }
-.card-counters .context { gap: 8px; }
-.card-counters .context > .percent { min-width: 3ch; text-align: right; }
-.card-counters .meter { width: 48px; }
+.session-card .card-status.status .status-item { font: inherit; }
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; font-weight: 560; color: var(--chalk); }
+.card-head > .activity { flex: 1 1 0; width: auto; min-width: min(8.5em, 100%); align-self: center; }
+.card-head > .activity:is(.idle, .running) { color: var(--chalk); }
+.card-head > .activity.retrying { color: var(--brick); }
+.card-status .card-head > .cost { margin-left: auto; color: var(--chalk); }
+.card-status .card-head > .cost.warm { color: var(--sodium); }
+.card-status .card-head > .cost.hot { color: var(--brick); }
+.card-status > .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
 .card-status .status-item.mode { color: var(--muted); }
 .card-status .status-item.mode:hover { color: var(--chalk); }
 .card-status:has(.activity.running) .background.active { color: var(--muted); }
 .card-status:has(.activity.running) .background.active:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background .lamp { display: none; }
-.card-where { font: 11.5px var(--mono); }
-.card-where > .branch { flex: 0 1 auto; min-width: 0; }
+.card-status:has(.activity.running) .background .lamp, .card-status .background > .icon { display: none; }
+.card-status > .context { display: flex; gap: 10px; margin-top: 2px; }
+.card-status > .context > .meter { flex: 1; width: auto; height: 3px; border-radius: 2px; background: var(--rule-2); }
+.card-status > .context .meter-fill { background: var(--sodium); border-radius: inherit; }
+.card-status > .context.hot .meter-fill { background: var(--brick); }
+.card-status > .context > .percent { min-width: 4ch; text-align: right; }
+.card-where { display: flex; min-width: 0; color: var(--faint); }
+.card-where > .branch { flex: 0 1 auto; min-width: 0; color: var(--faint); }
 
 .chat-tools {
   position: absolute;
@@ -926,6 +935,11 @@ kbd {
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
 .composer-controls .host-chip.warm, .composer-box:focus-within .host-chip.warm:not(:hover) { color: var(--sodium); }
+/* A disconnected host keeps its name; its server is struck through in
+   brick and "offline" follows, which the name gives way to first. */
+.host-chip.offline > .icon:first-child { color: var(--brick); }
+.host-chip.offline .chip-label { min-width: 3ch; }
+.host-chip .chip-state { flex-shrink: 0; color: var(--brick); font-size: 11.5px; white-space: nowrap; }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1678,10 +1692,52 @@ kbd {
 
 /* Settings: a row per setting, its name, a line on what it does, and its
    control at the end. The headings say where the setting lives. */
-.settings-dialog { width: min(600px, 100%); max-height: 84vh; }
-.settings-dialog .modal-body { padding-top: 4px; }
-.settings-section + .settings-section { margin-top: 14px; }
-.settings-section h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0; padding: 6px 0; }
+/* Settings: a large panel, the sections down its side as tabs and the one
+   chosen beside them. Its size does not change with the section, so the
+   tabs stay where the pointer is. */
+.modal-backdrop:has(> .settings-dialog) { padding-top: 6vh; }
+.settings-dialog { width: min(940px, 100%); height: min(720px, 88vh); max-height: none; }
+.settings-dialog .modal-head { padding: 12px 10px 10px 18px; border-bottom: 1px solid var(--rule); }
+.settings-dialog .modal-head h2 { font-size: 15px; }
+.settings-dialog .modal-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); padding: 0; overflow: hidden; flex: 1 1 auto; }
+.settings-dialog .modal-buttons { border-top: 1px solid var(--rule); }
+.settings-nav { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; background: var(--well); border-right: 1px solid var(--rule); overflow-y: auto; min-height: 0; }
+.settings-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-tab > svg { width: 16px; height: 16px; flex-shrink: 0; }
+.settings-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-tab:hover { color: var(--chalk); background: var(--slate); }
+.settings-tab.on { color: var(--chalk); background: var(--slate-2); font-weight: 600; }
+.settings-tab.on::before { content: ""; position: absolute; left: -8px; top: 7px; bottom: 7px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sodium); }
+.settings-tab.on > svg { color: var(--sodium); }
+.settings-tab:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+/* The account, last: who we are, at the foot of the list. */
+.settings-tab-account:not(:first-child) { box-shadow: 0 -1px 0 var(--rule); border-radius: 0 0 var(--r-control) var(--r-control); padding-top: 9px; margin-top: auto; }
+.settings-tab-account .avatar { width: 22px; height: 22px; font-size: 11px; flex-shrink: 0; }
+.settings-panel { overflow-y: auto; min-height: 0; padding: 18px 24px 22px; scrollbar-gutter: stable; animation: settings-in 0.12s ease-out; }
+@keyframes settings-in { from { opacity: 0; transform: translateY(3px); } }
+.settings-panel-head { margin-bottom: 6px; }
+.settings-panel-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.settings-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 62ch; }
+.settings-group { margin-top: 14px; }
+.settings-group h4 { margin: 0; padding: 6px 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.settings-group > .setting:first-child { border-top: 0; }
+.settings-group > h4 + .setting { border-top: 0; }
+@media (prefers-reduced-motion: reduce) { .settings-panel { animation: none; } }
 .setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--rule); }
 .setting-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .setting-name { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
@@ -1695,7 +1751,18 @@ kbd {
 .account-setting .setting-text { flex-basis: 0; }
 .account-setting .avatar { align-self: flex-start; }
 @media (max-width: 760px) {
-  .settings-dialog { max-height: 88vh; }
+  /* A phone: the page fills the screen, the sections a strip across its top. */
+  .modal-backdrop:has(> .settings-dialog) { padding: 8px; }
+  .settings-dialog { height: 100%; }
+  .settings-dialog .modal-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-nav { flex-direction: row; gap: 4px; padding: 6px 8px; border-right: 0; border-bottom: 1px solid var(--rule); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  /* More sections past the edge fade out rather than stopping short. */
+  .settings-nav { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 28px; }
+  .settings-tab { flex-shrink: 0; min-height: 36px; padding: 6px 12px; scroll-snap-align: start; }
+  .settings-tab.on::before { left: 10px; right: 10px; top: auto; bottom: -6px; width: auto; height: 3px; border-radius: 3px 3px 0 0; }
+  .settings-tab-account, .settings-tab-account:not(:first-child) { margin-top: 0; box-shadow: none; padding-top: 6px; border-radius: var(--r-control); }
+  .settings-panel { padding: 14px 14px 18px; }
   .account-setting { flex-wrap: wrap; }
   .account-setting .setting-text { flex-basis: calc(100% - 54px); }
 }

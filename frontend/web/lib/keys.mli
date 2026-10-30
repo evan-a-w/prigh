@@ -21,6 +21,7 @@ module Target : sig
     | Files (** the file browser's list (not its fields) *)
     | Review (** the review page (not its fields or buttons) *)
     | Resize of Resize.Handle.t (** a panel's resize handle *)
+    | Settings_tab (** a section's tab down the settings page's side *)
     | Message of int
     (** a focused message of the transcript with a context menu, by its
         entry *)

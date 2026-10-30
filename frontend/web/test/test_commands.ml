@@ -227,6 +227,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+Enter (the review's commit message) commit the ticked files (approved files come ticked; untick to leave one out)
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
+    ↑↓ ←→ Home End (settings' sections) show the previous / next section, or the first / last (/settings SECTION opens at one)
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
     ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
@@ -468,9 +469,9 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready
+    Ready $0.00
     (quiet)
-    (0%) ↑0 ↓0 $0.00
+    (0%)
     (main)
     (quiet)
     |}];
@@ -499,9 +500,9 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    Ready
+    Ready $0.00
     (verbose)
-    (0%) ↑0 ↓0 $0.00
+    (0%)
     (main)
     (verbose)
     |}]
@@ -1826,9 +1827,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
        (supports_thinking true) (cost ((input 5) (output 25) (cache_read 0.5)))))
      (thinking on) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
-     (context_tokens 0) (active_host backend) (hosts ()) (subagents ()) (jobs ())
-     (budget_usd ()) (goal ()) (reminders ()) (resume_at ()) (approval_mode Auto)
-     (plan_mode false) (plan ()) (session_rules ()))
+     (context_tokens 0) (active_host backend) (active_host_name ()) (hosts ())
+     (subagents ()) (jobs ()) (budget_usd ()) (goal ()) (reminders ())
+     (resume_at ()) (approval_mode Auto) (plan_mode false) (plan ())
+     (session_rules ()))
     (Done)
     |}];
   H.key h "Escape" ~target:Page;

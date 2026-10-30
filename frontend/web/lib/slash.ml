@@ -18,6 +18,7 @@ module Argument = struct
     | Plan
     | Notify
     | Tabs
+    | Settings
     | Session
     | Path
     | Host
@@ -60,9 +61,11 @@ let every =
   [ c ~args:"[command]" "help" "show commands and keys, or a command's usage"
   ; c "hotkeys" "show the keyboard shortcuts"
   ; c
+      ~argument:Settings
+      ~args:"[section]"
       "settings"
-      "theme and accent, notifications, transcript detail, tool confirmation, \
-       your account and providers (Ctrl+,)"
+      "appearance, behaviour, models, git hosting and your account; a section \
+       opens at it (Ctrl+,)"
   ; c "new" "start a new session"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"

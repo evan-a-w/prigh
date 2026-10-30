@@ -120,8 +120,8 @@ let%expect_test
   show h;
   [%expect
     {|
-    Ready
-    (0%) ↑0 ↓0 $0.00
+    Ready $0.00
+    (0%)
     (main)
     Reconnecting now…
     ((connection Connected) (lost 5))
@@ -131,8 +131,8 @@ let%expect_test
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 2500))
-    Ready
-    (0%) ↑0 ↓0 $0.00
+    Ready $0.00
+    (0%)
     (main)
     Reconnecting now…
     Reconnected

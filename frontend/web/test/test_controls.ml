@@ -280,38 +280,35 @@ let%expect_test
     {|
     <section aria-label="This session" class="session-card">
       <div class="card-status status">
-        <div class="card-doing card-line">
+        <div class="card-head">
           <span role="status" aria-atomic="true" class="activity idle status-item">
             <span class="idle-dot"> </span>
             <span class="label"> Ready </span>
           </span>
-          <div class="status-extras">
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-        </div>
-        <div class="card-counters card-line">
-          <button type="button"
-                  title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
-                  aria-label="Context 0% full"
-                  class="context link status-item"
-                  @on_click>
-            <span class="meter">
-              <span class="meter-fill" style={ width: 0.00%; }> </span>
-            </span>
-            <span class="percent"> 0% </span>
-          </button>
-          <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
           <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
         </div>
-        <div class="card-line card-where">
+        <div class="status-extras">
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+        <button type="button"
+                title="0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)"
+                aria-label="Context 0% full"
+                class="context link status-item"
+                @on_click>
+          <span class="meter">
+            <span class="meter-fill" style={ width: 0.00%; }> </span>
+          </span>
+          <span class="percent"> 0% </span>
+        </button>
+        <div class="card-where">
           <button type="button"
                   title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
                   aria-haspopup="dialog"
@@ -327,8 +324,8 @@ let%expect_test
   H.text h ~selector:".session-card";
   [%expect
     {|
-    Ready
-    (0%) ↑0 ↓0 $0.00
+    Ready $0.00
+    (0%)
     (feature/narrow-top-bar)
     |}]
 ;;
@@ -432,6 +429,31 @@ let%expect_test
             [ "hosts", Jsonaf.of_string hosts; "active_host", `String "c7" ]
           ()));
   H.names h ~selector:".host-chip";
+  (* Disconnected, it is still named (by its name, not its id), struck
+     through and said to be offline, with what to do in its title; an older
+     backend that does not say its name leaves the id. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "hosts", `Array []
+            ; "active_host", `String "c7"
+            ; "active_host_name", `String "laptop"
+            ]
+          ()));
+  H.names h ~selector:".host-chip";
+  H.elements h ~selector:".host-chip";
+  H.elements h ~selector:".host-chip > *";
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:[ "hosts", `Array []; "active_host", `String "c7" ]
+          ()));
+  H.names h ~selector:".host-chip";
   H.event
     h
     (sprintf
@@ -450,6 +472,13 @@ let%expect_test
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
+    button "laptop, disconnected" -- Tools wait for laptop to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
+    <button class="btn chip-button host-chip offline">
+    <icon class="server_off">
+    <span class="chip-label">
+    <span class="chip-state">
+    <icon class="chevron">
+    button "c7, disconnected" -- Tools wait for c7 to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\
@@ -1110,12 +1139,12 @@ let%expect_test "the status in the card: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".session-card .card-line" in
+  let status () = H.text h ~selector:".session-card .card-status" in
   status ();
   [%expect
     {|
-    Ready
-    (65%) ↑120k ↓9.0k $0.42
+    Ready $0.42
+    (65%)
     (main)
     |}];
   H.event
@@ -1136,22 +1165,21 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".session-card .card-counters > .status-item";
-  H.elements h ~selector:".session-card .status-extras > .status-item";
+  H.elements h ~selector:".session-card .card-status .status-item";
   (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".session-card .card-doing > .activity";
+  H.show h ~selector:".session-card .card-head > .activity";
   [%expect
     {|
-    Working
+    Working $0.00
     (Goal 2/20) (1 queued)
-    (90%) ↑0 ↓0 $0.00
+    (90%)
     (main)
-    <button class="context hot link status-item">
-    <span class="status-item tokens">
+    <span class="activity running status-item">
     <span class="cost status-item">
     <button class="goal link status-item warm">
     <button class="link queued status-item">
+    <button class="context hot link status-item">
     <span title="Working" role="status" aria-atomic="true" class="activity running status-item">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="label"> Working </span>

@@ -13,3 +13,4 @@ module Plan_view = Prigh_ui.Plan_view
 module Confirm_prompt = Prigh_ui.Confirm_prompt
 module Question_form = Prigh_ui.Question_form
 module Transcript_filter = Prigh_ui.Transcript_filter
+module Active_host = Prigh_ui.Active_host

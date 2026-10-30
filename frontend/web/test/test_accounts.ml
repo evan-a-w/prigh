@@ -144,14 +144,17 @@ let signed_in_as ?(users = false) user =
 (* The settings page says who we are, and switches or signs out. *)
 let%expect_test "the settings page: the account, switching it, signing out" =
   let h = signed_in_as "alice" in
-  let account h = H.text h ~selector:".settings-section:last-child" in
+  let account h = H.text h ~selector:".settings-panel-account" in
   H.click h ~selector:".settings-toggle";
+  H.click h ~selector:".settings-tab-account";
   account h;
   [%expect
     {|
     Open_settings
     (Focus dialog)
+    (Settings_section Account)
     Account
+    Who you are on this backend.
     A
     Signed in as alice 127.0.0.1:7790
     (Switch account) (Sign out)
@@ -176,7 +179,7 @@ let%expect_test "the settings page: the account, switching it, signing out" =
     Sign out forget this account in this browser
     |}];
   H.key h "Escape" ~target:Page;
-  H.act h Open_settings;
+  H.act h (Settings_section Account);
   H.click h ~selector:".sign-out";
   [%expect
     {|
@@ -196,11 +199,12 @@ let%expect_test "the settings page: the account, switching it, signing out" =
        ; user = Some "alice"
        ; superuser = false
        });
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Account));
   account h;
   [%expect
     {|
     Account
+    Who you are on this backend.
     A
     Signed in as alice Acting as bob: you see and work in their sessions. 127.0.0.1:7790
     (Switch account) (Sign out)
