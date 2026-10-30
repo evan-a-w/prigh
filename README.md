@@ -920,8 +920,18 @@ each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
 its hunks or, with Whole file (v), all of it with the changes inline, one
 line number per row (a removed line's old one, struck through).
-`]` / `[` (or n / p, j / k) go to the next and previous file, `a`
-approves the file (again), Esc closes. It follows the agent: every edit,
+Under the file, always in the same place, the dock has ← Approve & next →
+and where you are (File 3 of 12): → / ← (or `]` / `[`, n / p, j / k) go to
+the next and previous file, Space (or `a`) approves the file and goes on to
+the next one not approved, so a review is Space, Space, Space without moving
+the mouse; on an approved file Space takes the approval back. The file
+list's rows and the dock's buttons take these keys too, and none fires while
+you type in a field. x selects the file in the list (Shift+X every file from
+the last selected, as do Ctrl+click and Shift+click); a bar over the list
+then approves them, commits them or opens their menu. A file's menu (its ⋯,
+right-click, or Shift+F10 for the selected files, else the file) approves
+or takes back, stages or unstages, commits, selects and copies paths. Esc
+drops the comment, the selected code, the selected files, then closes. It follows the agent: every edit,
 write or command of the agent or its subagents, and every run's end,
 reads the changes again; the arrow button reads them now.
 
@@ -1035,27 +1045,26 @@ directly").
 At the page's foot, away from Send comments, the git bar shows the reviewed
 worktree's branch, how
 it stands with its upstream (`↑2 ↓0 origin/feat-x`, or "not pushed yet")
-and how many files are staged, unstaged and untracked. Each file with
-uncommitted changes has a box in the file list: approved files come ticked
-(drawn hollow until git has them: they are staged when you commit), staged
-ones are ticked, a file only partly staged is half-ticked. Ticking a file
-stages it (`git add`), unticking a staged one unstages it, and Stage approved
-stages every approved file's changes. Under the list, the commit box takes
+and how many files are staged, unstaged and untracked. A file staged has a
+small "staged" badge in the list ("partly" when only some of it is). The
+list has no boxes: Commit… (Shift+C) opens the commit with the selected
+files, else the approved files with changes, else the page's file, each
+listed with a button to leave it out (unstaging it if git had it staged);
+Esc closes it, keeping the message. Under the list, the commit box takes
 the message: ✦ Generate (Alt+G in it) drafts it with the model from the
-staged changes (the ticked files are staged first), the session's goal and
+staged changes (the commit's files are staged first), the session's goal and
 plan and the repository's recent commits (their style) and commit guidance;
 it streams in, Stop or Esc keeps what came, Undo puts back what was there.
 Amend changes the last commit instead (an empty message keeps its own).
-Commit (Ctrl+Enter in the box) commits the ticked files; the bar says what
+Commit (Ctrl+Enter in the box) commits the files it lists; the bar says what
 it did (`Committed 1a2b3c4 Fix the parser on feat/x`) and the page reads the
 changes again. Push pushes the branch to its upstream, setting one (on
 `origin`, else the only remote) when it has none, with the tool host's own
 git credentials: prigh never asks for a password. Create PR opens the
 pull-request dialog for that worktree's branch (see [Git hosting](#git-hosting)).
-Stage approved, Push and Create PR are at the bar's end.
-A branch reviewed without checking it out has no git bar, boxes or commit
-box: check it out into a worktree to commit there.
-Refusals say what to do: nothing ticked, an empty message, a detached HEAD
+Commit…, Push and Create PR are at the bar's end.
+A branch reviewed without checking it out has no git bar or commit box: check it out into a worktree to commit there.
+Refusals say what to do: nothing to commit, an empty message, a detached HEAD
 (`git switch -c NAME`), a push the remote rejected (pull first, e.g. `git
 pull --rebase`), no remote (`git remote add origin URL`), missing
 credentials or committer identity on the tool host. Paths are checked to

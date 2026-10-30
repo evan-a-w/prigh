@@ -281,7 +281,7 @@ let files_picker (f : Files.t) =
     ; item
         Commit_files
         (if f.composing then "Add to the commit" else "Commit…")
-        ~key:"C"
+        ~key:"Shift+C"
         ~unless:(git ~unless:(f.staged + f.unstaged = 0, "Nothing to commit"))
     ; (if f.selected
        then item Unselect_files "Unselect" ~key:"x" ~unless:(false, "")

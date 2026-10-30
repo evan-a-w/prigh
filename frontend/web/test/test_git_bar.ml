@@ -138,7 +138,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     Take back the approval Not approved
     Stage
     Unstage Nothing staged
-    Commit… C
+    Commit… Shift+C
     Select x
     Copy path
     |}];
@@ -173,7 +173,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     Take back the approval Not approved
     Stage Git has all of the changes
     Unstage
-    Commit… C
+    Commit… Shift+C
     Select x
     Copy path
     (Picker_choose unstage_files)
@@ -198,7 +198,8 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
      (tag (Review (Content src/util.ml))))
     (Review (Mark (path src/util.ml) (range true)))
-    2 selected (Approve) (Commit…) (More for them (Shift+F10)) (Unselect them (Esc))
+    2 selected (More for them (Shift+F10)) (Unselect them (Esc))
+    (Approve) (Commit…)
     (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
     (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
@@ -216,7 +217,7 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     Take back the approval
     Stage
     Unstage Nothing staged
-    Commit… C
+    Commit… Shift+C
     Unselect x
     Copy paths
     |}];

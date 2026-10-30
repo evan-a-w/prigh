@@ -199,11 +199,44 @@ let selection_bar (m : App.Model.t) ~inject =
         Option.exists (Code_review.file m.review p) ~f:(fun f ->
           File_approval.Status.equal (Code_review.approval m.review f) Approved))
     in
+    let more =
+      Node.button
+          ~attrs:
+            [ Attr.class_ "btn icon ghost small"
+            ; Attr.type_ "button"
+            ; Attr.id "review-selection-more"
+            ; Attr.title "More for them (Shift+F10)"
+            ; Attr.create "aria-label" "More for the selected files"
+            ; Attr.create "aria-haspopup" "menu"
+            ; Attr.on_click (fun _ ->
+                inject
+                  (App.Action.Open_menu
+                     { target = Review_files paths
+                     ; anchor = Element "review-selection-more"
+                     }))
+            ]
+          [ icon More ]
+    in
+    let clear =
+      button
+          ~cls:"icon ghost small review-selection-clear"
+          ~title:"Unselect them (Esc)"
+          ~label:"Unselect the files"
+          ~on_click:(inject (review Unmark_all))
+          [ icon Close ]
+    in
     div
       ~cls:"review-selection"
       ~attrs:[ Attr.role "toolbar"; Attr.create "aria-label" "Selected files" ]
-      [ span ~cls:"review-selection-count" (sprintf "%d selected" n)
-      ; button
+      [ div
+          ~cls:"review-selection-head"
+          [ span ~cls:"review-selection-count" (sprintf "%d selected" n)
+          ; more
+          ; clear
+          ]
+      ; div
+          ~cls:"review-selection-actions"
+          [ button
           ~cls:"small"
           ~title:
             (if all_approved
@@ -223,28 +256,7 @@ let selection_bar (m : App.Model.t) ~inject =
              ~title:"Commit them (Shift+C)"
              ~on_click:(inject App.Action.Compose_commit)
              [ Node.text "Commit…" ])
-      ; Node.button
-          ~attrs:
-            [ Attr.class_ "btn icon ghost small"
-            ; Attr.type_ "button"
-            ; Attr.id "review-selection-more"
-            ; Attr.title "More for them (Shift+F10)"
-            ; Attr.create "aria-label" "More for the selected files"
-            ; Attr.create "aria-haspopup" "menu"
-            ; Attr.on_click (fun _ ->
-                inject
-                  (App.Action.Open_menu
-                     { target = Review_files paths
-                     ; anchor = Element "review-selection-more"
-                     }))
-            ]
-          [ icon More ]
-      ; button
-          ~cls:"icon ghost small review-selection-clear"
-          ~title:"Unselect them (Esc)"
-          ~label:"Unselect the files"
-          ~on_click:(inject (review Unmark_all))
-          [ icon Close ]
+          ]
       ]
 ;;
 
@@ -274,7 +286,7 @@ let dock (m : App.Model.t) path ~inject =
         ~label:"Previous file"
         ~disabled:(total < 2)
         ~on_click:(inject (review (Step (-1))))
-        [ icon ~cls:"flip" Next; kbd "←" ]
+        [ kbd "←" ]
     ; (match status with
        | None -> Node.none
        | Some status ->
@@ -314,7 +326,7 @@ let dock (m : App.Model.t) path ~inject =
         ~label:"Next file"
         ~disabled:(total < 2)
         ~on_click:(inject (review (Step 1)))
-        [ kbd "→"; icon Next ]
+        [ kbd "→" ]
     ; span
         ~cls:"review-dock-where"
         ~attrs:[ Attr.create "aria-live" "polite" ]
