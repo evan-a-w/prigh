@@ -6845,7 +6845,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       error
         m
         (sprintf
-           "Couldn't set the naming model: %s. Pick one with /naming model" e)
+           "Couldn't set the naming model: %s. Pick one with /naming model"
+           e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->

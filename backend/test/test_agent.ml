@@ -1341,14 +1341,16 @@ let%expect_test
         (Session.description (Agent.session agent) : string option)
       , ((Agent.state agent).session_description : string option)]
   in
-  List.iter [ "first question"; "second question"; "third question"; "fourth" ]
+  List.iter
+    [ "first question"; "second question"; "third question"; "fourth" ]
     ~f:(fun p ->
       Or_error.ok_exn (Agent.prompt agent p);
       Agent.wait_idle agent;
       show_description ());
   dump ();
   Queue.iter requests ~f:print_endline;
-  [%expect {|
+  [%expect
+    {|
     (("Investigating flaky tests") ("Investigating flaky tests"))
     (("Investigating flaky tests") ("Investigating flaky tests"))
     (("Fixing flaky reload tests") ("Fixing flaky reload tests"))
@@ -1396,7 +1398,8 @@ let%expect_test
     Agent.wait_idle agent);
   print_s [%sexp (Session.description (Agent.session agent) : string option)];
   dump ();
-  [%expect {|
+  [%expect
+    {|
     ("Adding OAuth login")
     state: running=true messages=0
     user: a
@@ -1418,7 +1421,8 @@ let%expect_test "auto-describe: a failed turn is not named" =
   Agent.wait_idle agent;
   print_s [%sexp (Session.description (Agent.session agent) : string option)];
   dump ();
-  [%expect {|
+  [%expect
+    {|
     ()
     state: running=true messages=0
     user: a
@@ -1445,7 +1449,8 @@ let%expect_test "auto-describe: a session deleted meanwhile is not recreated" =
   Agent.wait_idle a;
   printf "file exists: %b\n" (Sys_unix.file_exists_exn (path ()));
   dump ();
-  [%expect {|
+  [%expect
+    {|
     deleted while describing
     file exists: false
     state: running=true messages=0

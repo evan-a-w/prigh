@@ -33,6 +33,7 @@ val create
   -> agent_id:string
   -> task:string
   -> model:string
+  -> unit
   -> t
 
 (** Its [name], else its task on one line. *)

@@ -61,8 +61,8 @@ let spec =
           , `String
           , "A short name for it, two to five words saying what it does and \
              how it differs from your other subagents, e.g. \"Fix completion \
-             after a space\" (shown to the user wherever subagents are \
-             listed)" )
+             after a space\" (shown to the user wherever subagents are listed)"
+          )
         ; ( "fork"
           , `Boolean
           , "Start it with your conversation so far (default false: a blank \
@@ -158,7 +158,9 @@ let prepare
       args
   =
   let task = Tool_args.string args "task" in
-  let given = Option.bind (Tool_args.string_opt args "name") ~f:Subagent_name.of_given in
+  let given =
+    Option.bind (Tool_args.string_opt args "name") ~f:Subagent_name.of_given
+  in
   let only = Tool_args.string_list_opt args "tools" in
   let conversation =
     match Tool_args.bool_opt args "fork", context.conversation with
@@ -227,7 +229,9 @@ let prepare
       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
   { Prepared.task
-  ; name = Option.value_or_thunk given ~default:(fun () -> Subagent_name.of_task task)
+  ; name =
+      Option.value_or_thunk given ~default:(fun () ->
+        Subagent_name.of_task task)
   ; named = Option.is_some given
   ; model
   ; thinking
@@ -831,9 +835,12 @@ let create
         let siblings =
           Option.value_map context.background ~default:[] ~f:(fun background ->
             Background_tasks.summaries background ~kind:Subagent
-            |> List.filter_map ~f:(fun (s : Background_tasks.Summary.t) -> s.name))
+            |> List.filter_map ~f:(fun (s : Background_tasks.Summary.t) ->
+              s.name))
         in
-        (match name_task ~task:prepared.task ~siblings ~cancel:context.cancel with
+        (match
+           name_task ~task:prepared.task ~siblings ~cancel:context.cancel
+         with
          | Some name -> { prepared with name }
          | None -> prepared)
     in

@@ -2252,7 +2252,10 @@ let with_naming_model t ~f =
   let fix = "change it with /naming model, or /naming model off" in
   match naming_model t with
   | Error e ->
-    broadcast t (Notice (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
+    broadcast
+      t
+      (Notice
+         (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
     f t.model
   | Ok model when String.equal (Model.key model) (Model.key t.model) -> f model
   | Ok model ->

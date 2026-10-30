@@ -35,6 +35,8 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Ask before tools run (/confirm on))
     Model providers Logged in to Anthropic.
     (Manage providers)
+    Naming model The model that titles sessions and names subagents: a small, fast one is plenty. Default: the generate model, else the session's.
+    (Default)
     Git hosting
     GitHub github.com
     Not signed in.
@@ -290,6 +292,7 @@ let%expect_test "the names of the settings' controls" =
     button "Verbose" -- /verbosity verbose
     [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
     button "Manage providers" -- /auth (/login, /logout)
+    button "Naming model: Default" -- Choose the model (/naming model)
     button "Connect GitHub (github.com) with a token" -- /login github token
     button "Connect GitHub (github.com)" -- /login github
     button "Connect Forgejo (codeberg.org) with a token" -- /login forgejo codeberg.org token

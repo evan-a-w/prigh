@@ -10,8 +10,8 @@ let%expect_test "Naming.clean: one plain line, sentence case, cut at a word" =
     ; "Session title: `Review menu keyboard navigation`"
     ; "\n\n# Port the parser to Eio\n\nBecause..."
     ; "Name: survey host naming code!"
-    ; "a very long title that goes on and on about many different things \
-       until it is cut"
+    ; "a very long title that goes on and on about many different things until \
+       it is cut"
     ; "\"\""
     ]
     ~f:(fun s -> printf "%S\n" (Naming.clean s));
@@ -30,8 +30,8 @@ let%expect_test "Naming.clean: one plain line, sentence case, cut at a word" =
 let%expect_test "Subagent_name.of_task: the gist of the task, not its preamble" =
   List.iter
     [ "Implement on a branch `fix/completion`: the slash-command argument \
-       autocomplete must close once the user types a space. Find the logic \
-       and fix it."
+       autocomplete must close once the user types a space. Find the logic and \
+       fix it."
     ; "Review the diff of PR #12 for correctness. Report back concisely."
     ; "  \n\nsurvey how hosts are named\nmore lines"
     ; "Task: x"
@@ -69,8 +69,8 @@ let%expect_test "Subagent_name.prompt: the task and its siblings' names" =
 ;;
 
 let%expect_test
-    "Session_description.conversation: what was typed and replied, the \
-     first request and the latest turns"
+    "Session_description.conversation: what was typed and replied, the first \
+     request and the latest turns"
   =
   let reply text =
     Message.Assistant
@@ -87,9 +87,7 @@ let%expect_test
     ]
     @ List.concat
         (List.init 30 ~f:(fun i ->
-           [ Message.user (sprintf "follow-up %d: %s" i long)
-           ; reply "ok"
-           ]))
+           [ Message.user (sprintf "follow-up %d: %s" i long); reply "ok" ]))
   in
   let text =
     Session_description.conversation ~current:"Review menu keys" messages
@@ -165,8 +163,7 @@ let with_naming_agent ?naming_model replies f =
   f agent show_requests
 ;;
 
-let%expect_test "the naming model titles the session; unknown ones are refused"
-  =
+let%expect_test "the naming model titles the session; unknown ones are refused" =
   with_naming_agent
     ~naming_model:"deepseek-v4-pro"
     [ Reply.text "Sure."; Reply.text "Fix the parser's error messages" ]
@@ -229,12 +226,13 @@ let%expect_test "the session is named again once it has said more" =
     ; Reply.text "four"
     ]
   @@ fun agent show_requests ->
-  List.iter [ "a bug"; "it's in login"; "it loops on redirect"; "thanks" ]
+  List.iter
+    [ "a bug"; "it's in login"; "it loops on redirect"; "thanks" ]
     ~f:(fun p ->
-    Or_error.ok_exn (Agent.prompt agent p);
-    Agent.wait_idle agent;
-    print_s
-      [%sexp (Session.description (Agent.session agent) : string option)]);
+      Or_error.ok_exn (Agent.prompt agent p);
+      Agent.wait_idle agent;
+      print_s
+        [%sexp (Session.description (Agent.session agent) : string option)]);
   show_requests ();
   [%expect
     {|
@@ -254,7 +252,10 @@ let%expect_test "the session is named again once it has said more" =
 let%expect_test "name_subagent: by the naming model, told its siblings' names" =
   with_naming_agent
     ~naming_model:"deepseek-v4-pro"
-    [ Reply.text "\"Survey host naming.\""; Reply.error "down"; Reply.error "down" ]
+    [ Reply.text "\"Survey host naming.\""
+    ; Reply.error "down"
+    ; Reply.error "down"
+    ]
   @@ fun agent show_requests ->
   let name () =
     Agent.name_subagent

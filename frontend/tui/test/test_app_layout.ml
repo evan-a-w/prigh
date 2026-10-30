@@ -83,7 +83,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]           show or set the models that take…
       /default-dir [off|path]            show or set the directory new se…
       /login [provider] [api_key|oauth]  log in to a provider, or a git h…
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -461,7 +461,7 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /trim [after|undo|show|hide]     drop everything before a message f…
       /name [text]                     set the session name
       /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agent wh…
-      ↕ 1–8 of 15
+      ↕ 1–8 of 16
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
