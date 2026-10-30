@@ -456,23 +456,23 @@ let%expect_test
 ;;
 
 (* The git bar (#56) acts on a worktree: a branch that is not checked out
-   has no bar, no stage boxes and no commit box, and gets no [git_status]. *)
+   has no bar and no commit box, and gets no [git_status]. *)
 let%expect_test "a branch that is not checked out has no git bar" =
   let h = started () in
   let git_ui () =
-    List.iter [ ".git-bar"; ".git-tick"; ".git-commit" ] ~f:(fun selector ->
+    List.iter [ ".git-bar"; ".git-commit" ] ~f:(fun selector ->
       H.elements h ~selector)
   in
   H.reply
     h
     "git_status"
     {|{"root":"/work","branch":"main","head":"abcdef0123","ahead":0,"behind":0,"files":[{"path":"a.ml","worktree":"M"}]}|};
+  H.quiet h (fun () -> H.act h Compose_commit);
   git_ui ();
   [%expect
     {|
     <div class="git-bar">
-    <button class="git-tick">
-    <div class="git-commit">
+    <section class="git-commit">
     |}];
   H.quiet h (fun () ->
     H.key h "r" ~target:Review;
@@ -508,7 +508,7 @@ let%expect_test "a branch that is not checked out has no git bar" =
   (* Its git actions do nothing either (Alt+G in a commit box it no longer
      shows, say). *)
   H.act h (Git Commit);
-  H.act h (Git Stage_approved);
+  H.act h Compose_commit;
   [%expect {| |}];
   (* Back on the worktree: the bar is read again. *)
   H.key h "r" ~target:Review;
@@ -540,8 +540,7 @@ let%expect_test "a branch that is not checked out has no git bar" =
     (Rpc (method_ set_prefs)
      (params ((prefs ((web.review ((compare ()) (last ()))))))) (tag Show_error))
     <div class="git-bar">
-    <button class="git-tick">
-    <div class="git-commit">
+    <section class="git-commit">
     |}]
 ;;
 

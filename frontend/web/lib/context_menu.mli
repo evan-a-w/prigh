@@ -3,7 +3,7 @@ open! Import
 
 (** Context menus: right-click (or Shift+F10, the context menu key, a long
     press, the ⋯ button) on a session or one of its worktrees in the
-    sidebar, or on a message of the transcript. Each item does what a slash
+    sidebar, on a message of the transcript, or on files of the review. Each item does what a slash
     command or a key does elsewhere, which its detail names. Shown as a
     [Picker] dialog ([Dialog.Picker_kind.Menu]) floating at the pointer or
     under the row. *)
@@ -18,6 +18,9 @@ module Target : sig
     | Message of int
     (** a message of the transcript, by its entry: a tool call's is its
         reply's *)
+    | Review_files of string list
+    (** files of the review page's list: those selected, or the one
+        right-clicked *)
   [@@deriving sexp_of, equal]
 end
 
@@ -61,6 +64,14 @@ module Item : sig
     | Copy_message (** its text (a reply's markdown) *)
     | Trim_before
     | Trim_after
+    | Approve_files
+    | Unapprove_files
+    | Stage_files
+    | Unstage_files
+    | Commit_files (** open the commit box with them *)
+    | Select_files (** add them to the selection *)
+    | Unselect_files
+    | Copy_paths
   [@@deriving sexp_of, equal, enumerate]
 
   val id : t -> string
@@ -101,6 +112,27 @@ end
     Those that do not apply are [dimmed]: disabled, their detail says why
     (otherwise it is the slash command that does the same). *)
 val message_picker : Message.t -> Picker.t
+
+(** What a review files' menu offers ({!files_picker}). *)
+module Files : sig
+  type t =
+    { paths : string list
+    ; approved : int (** of [paths] *)
+    ; staged : int (** with changes git has staged *)
+    ; unstaged : int (** with changes git has not staged *)
+    ; selected : bool (** they are the selection *)
+    ; composing : bool (** the commit box is open: Commit adds to it *)
+    ; git : string option
+      (** why there are no git actions (a branch not checked out, no
+          status yet) *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
+(** Approve, Take back the approval, Stage, Unstage, Commit… (Add to the
+    commit), Select or Unselect, Copy path. Those that do not apply are
+    [dimmed], saying why. *)
+val files_picker : Files.t -> Picker.t
 
 (** The worktree's path, for a worktree's menu. *)
 val worktree : t -> string option

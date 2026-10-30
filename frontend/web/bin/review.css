@@ -111,6 +111,8 @@
 .review-file-path .name { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .review-file.approved .review-file-path .name { color: var(--muted); }
 .review-file-counts { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.review-file-staged { font: 600 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--sage); border: 1px solid var(--sage-line); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.review-file-staged.partly { color: var(--muted); border-color: var(--rule-2); border-style: dashed; }
 /* What changed after the last action on the file, under its name. */
 .review-file-since {
   grid-column: 2 / -1;
@@ -144,10 +146,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px 8px 8px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--rule);
 }
-.review-file-head .icon.flip { transform: scaleX(-1); }
 .review-file-title {
   font: 500 13.5px var(--mono);
   margin: 0 6px;
@@ -168,11 +169,6 @@
   padding: 0 5px;
 }
 .review-stale { font-size: 12px; color: var(--sodium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 100 auto; }
-.review-approve { flex-shrink: 0; }
-.review-approve { margin-left: auto; gap: 6px; }
-.review-approve .icon { width: 14px; height: 14px; }
-.review-approve.on { background: transparent; border-color: var(--sage-line); color: var(--sage); }
-.review-approve.on:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
 
 .review-scroll { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 40px; }
 
@@ -634,29 +630,79 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .git-up { transform: scaleY(-1); }
 .git-error { color: var(--faint); }
 
-/* A file's stage box, left of its row in the list. */
-.review-files li { display: flex; align-items: center; }
-.review-files li > .review-file { flex: 1; min-width: 0; }
-.git-tick {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  margin-left: 2px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-control);
-  background: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+/* A row of the list: the file, and its ⋯ (shown on hover, or for the
+   page's file and the selected ones). */
+.review-files li { display: flex; align-items: center; position: relative; }
+.review-files li > .review-file { flex: 1; min-width: 0; padding-right: 30px; }
+.review-file-more.btn.icon {
+  position: absolute;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
-.git-tick.clean { cursor: default; }
-.git-tick:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.git-tick:hover .check { border-color: var(--muted); }
-/* Approved, staged at the commit: drawn hollow until git has it. */
-.git-tick.pending .check.on { background: none; color: var(--sodium); border-style: dashed; }
-.git-tick.partly .check.on { background: color-mix(in srgb, var(--sodium) 45%, transparent); }
+.review-file-row:hover .review-file-more,
+.review-file-row.current .review-file-more,
+.review-file-more:focus-visible,
+.review-file-more[aria-expanded="true"] { opacity: 1; }
+/* Selected: a quiet wash and a sage edge, apart from the page's file's
+   sodium one; both together show both. */
+.review-file.marked { background: color-mix(in srgb, var(--sage) 10%, transparent); box-shadow: inset 2px 0 0 var(--sage); }
+.review-file.marked:hover { background: color-mix(in srgb, var(--sage) 15%, transparent); }
+.review-file.marked.current { background: var(--sodium-wash); box-shadow: inset 2px 0 0 var(--sodium), inset 4px 0 0 var(--sage); }
+
+/* With files selected: what to do with them, over the list. */
+.review-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--sage) 7%, var(--slate));
+  animation: appear 0.12s ease-out;
+}
+.review-selection-head, .review-selection-actions { display: flex; align-items: center; gap: 6px; }
+.review-selection-count { font: 500 12px var(--mono); color: var(--sage); margin-right: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.review-selection .btn.icon { width: 26px; height: 26px; }
+@media (prefers-reduced-motion: reduce) { .review-selection { animation: none; } }
+
+/* Under the file, always in the same place: ← Approve → (Space). */
+.review-dock {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--rule);
+  background: var(--slate);
+}
+.review-dock > :first-child { grid-column: 2; }
+.review-dock-where {
+  grid-column: 5;
+  justify-self: end;
+  font: 11.5px var(--mono);
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.review-dock kbd { font-size: 10.5px; padding: 0 4px; }
+.review-dock-step.btn { padding: 5px 8px; background: transparent; color: var(--muted); }
+.review-dock-step.btn:hover:not(:disabled) { color: var(--chalk); }
+.review-approve.btn { min-width: 17ch; gap: 8px; }
+.review-approve .icon { width: 14px; height: 14px; }
+.review-approve.primary kbd { background: color-mix(in srgb, var(--sodium-ink) 14%, transparent); color: var(--sodium-ink); border-color: transparent; }
+.review-approve.on { background: transparent; border-color: var(--sage-line); color: var(--sage); }
+.review-approve.on:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
+.review-approve-label { flex: 1; text-align: center; }
+.app.narrow .review-dock { grid-template-columns: auto 1fr auto; }
+.app.narrow .review-dock > :first-child { grid-column: 1; }
+.app.narrow .review-approve.btn { min-width: 0; }
+.app.narrow .review-dock-where { display: none; }
+
+.btn.icon.tiny { width: 22px; height: 22px; }
+.btn.icon.tiny .icon { width: 12px; height: 12px; }
 
 /* The commit message, under the file list. */
 .git-commit {
@@ -674,6 +720,13 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
    under the label rather than over the code. */
 .git-commit .field-head { flex-wrap: wrap; row-gap: 2px; }
 .git-message { resize: vertical; min-height: 84px; font: 12.5px/1.45 var(--mono); }
+.git-commit-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.git-commit-title { margin: 0; font: 600 12.5px var(--sans); }
+.git-commit-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; max-height: 120px; overflow-y: auto; }
+.git-commit-file { display: flex; align-items: center; gap: 6px; font: 12px var(--mono); padding-left: 2px; }
+.git-commit-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.git-commit-staged { font: 10.5px var(--sans); color: var(--sage); }
+.git-commit-none { margin: 0; font: 12px/1.4 var(--sans); color: var(--faint); }
 .git-commit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .git-failure, .git-notice { flex-basis: 100%; font: 12px/1.4 var(--sans); overflow-wrap: anywhere; }
 .git-failure { color: var(--brick); }
