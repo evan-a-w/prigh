@@ -458,6 +458,8 @@ let compute_argument
                     ]
                   ~candidates:
                     (Option.value_map sessions ~default:[] ~f:session_items)
+              | (Path | Directory | Default_directory | Sessions)
+                when Commands.argument_finished rest -> None
               | Commands.Argument.Path | Directory | Default_directory ->
                 (* Filled in asynchronously by the platform. *)
                 Some
@@ -538,6 +540,7 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
+              | _ when Commands.argument_finished rest -> None
               | _ ->
                 let items =
                   Option.value

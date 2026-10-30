@@ -1068,6 +1068,82 @@ let%expect_test "/cd completes paths and submits the selected one" =
     |}]
 ;;
 
+let%expect_test "a space after the argument closes its completion" =
+  let h = connected () in
+  H.step ~quiet:true h (Intent (Insert "/cd ~/projects"));
+  H.reply
+    ~quiet:true
+    h
+    (Dirs_for_autocomplete "~/projects")
+    {|["~/projects/"]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ ~/projects/
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects▏
+    deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.step h (Intent (Insert " "));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* Backspacing over the space reopens it, and so does the next character:
+     paths may contain spaces. *)
+  H.step ~quiet:true h (Intent Backspace);
+  H.reply
+    ~quiet:true
+    h
+    (Dirs_for_autocomplete "~/projects")
+    {|["~/projects/"]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ ~/projects/
+    ────────────────────────────────────────────────────────────
+    > /cd ~/projects▏
+    deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.step h (Intent (Insert " D"));
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix "~/projects D")))
+      (tag (Dirs_for_autocomplete "~/projects D")))
+    |}];
+  (* /model's argument is one word too. *)
+  let h = connected () in
+  H.step h (Intent (Insert "/model deep "));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /model deep ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test
     "Alt+S and Esc then Enter send what is typed, not the highlight"
   =
