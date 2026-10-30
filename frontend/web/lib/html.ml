@@ -75,6 +75,7 @@ module Icon = struct
     | External
     | Key
     | Server
+    | Server_off
     | Help
     | Bot
     | Back
@@ -142,6 +143,8 @@ module Icon = struct
       {|<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/>|}
     | Server ->
       {|<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>|}
+    | Server_off ->
+      {|<path d="M8 4h11a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4M4.2 4.6A2 2 0 0 0 3 6.5V9a2 2 0 0 0 2 2h6M21 17.5V15a2 2 0 0 0-2-2h-2M3 15v3a2 2 0 0 0 2 2h14M7 16.5h.01M3 3l18 18"/>|}
     | Help ->
       {|<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>|}
     | Bot ->

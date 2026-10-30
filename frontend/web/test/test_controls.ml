@@ -429,6 +429,31 @@ let%expect_test
             [ "hosts", Jsonaf.of_string hosts; "active_host", `String "c7" ]
           ()));
   H.names h ~selector:".host-chip";
+  (* Disconnected, it is still named (by its name, not its id), struck
+     through and said to be offline, with what to do in its title; an older
+     backend that does not say its name leaves the id. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "hosts", `Array []
+            ; "active_host", `String "c7"
+            ; "active_host_name", `String "laptop"
+            ]
+          ()));
+  H.names h ~selector:".host-chip";
+  H.elements h ~selector:".host-chip";
+  H.elements h ~selector:".host-chip > *";
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:[ "hosts", `Array []; "active_host", `String "c7" ]
+          ()));
+  H.names h ~selector:".host-chip";
   H.event
     h
     (sprintf
@@ -447,6 +472,13 @@ let%expect_test
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
+    button "laptop, disconnected" -- Tools wait for laptop to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
+    <button class="btn chip-button host-chip offline">
+    <icon class="server_off">
+    <span class="chip-label">
+    <span class="chip-state">
+    <icon class="chevron">
+    button "c7, disconnected" -- Tools wait for c7 to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \n\

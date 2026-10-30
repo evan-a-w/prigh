@@ -8100,6 +8100,42 @@ let%expect_test "the hello's host id marks this frontend, also after a \
     |}]
 ;;
 
+(* The status line names the host tools run on when it is another machine,
+   and keeps naming it, in red and said to be offline, while it is
+   disconnected; only a backend predating [active_host_name] leaves its id. *)
+let%expect_test "the status line names a disconnected host" =
+  let h = connected ~width:70 () in
+  let state ?name hosts =
+    sprintf
+      {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/home/me","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-0123456789abcdef",%s"hosts":[{"id":"backend","name":"srv","cwd":"/work"}%s]}|}
+      (Option.value_map
+         name
+         ~default:""
+         ~f:(sprintf {|"active_host_name":%S,|}))
+      hosts
+  in
+  let show ?name hosts =
+    H.event
+      h
+      (State
+         (Or_error.ok_exn
+            (P.State.of_json
+               (Or_error.ok_exn (P.Json.parse (state ?name hosts))))));
+    print_endline (Content.to_styled [ Render.status h.model ])
+  in
+  show
+    ~name:"desktop"
+    {|,{"id":"host-0123456789abcdef","name":"desktop","cwd":"/home/me"}|};
+  show ~name:"desktop" "";
+  show "";
+  [%expect
+    {|
+    [gray]/home/me[/]  [gray]m[/]  [gray]think:n/a[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/1.0k[/]  [gray]$0.00[/]  [yellow]tools:desktop[/]
+    [gray]m[/]  [gray]think:n/a[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/1.0k[/]  [gray]$0.00[/]  [red]tools:desktop ⊘ offline[/]
+    [gray]m[/]  [gray]think:n/a[/]  [gray]ctx:0.0%/1.0k[/]  [red]tools:host-0123456789abcdef ⊘ offline[/]
+    |}]
+;;
+
 let%expect_test "the host picker shows which session other frontends are in" =
   let h = connected ~width:70 () in
   let state =

@@ -935,6 +935,11 @@ kbd {
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
 .composer-controls .host-chip.warm, .composer-box:focus-within .host-chip.warm:not(:hover) { color: var(--sodium); }
+/* A disconnected host keeps its name; its server is struck through in
+   brick and "offline" follows, which the name gives way to first. */
+.host-chip.offline > .icon:first-child { color: var(--brick); }
+.host-chip.offline .chip-label { min-width: 3ch; }
+.host-chip .chip-state { flex-shrink: 0; color: var(--brick); font-size: 11.5px; white-space: nowrap; }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
