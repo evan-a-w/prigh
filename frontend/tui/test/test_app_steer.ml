@@ -13,6 +13,7 @@ let started ?(height = 14) () =
        { call_id = "c1"
        ; agent_id = "a1"
        ; task = "index the repo"
+       ; name = None
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
        ; worktree = None

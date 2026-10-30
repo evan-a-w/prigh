@@ -303,6 +303,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       { call_id = "p"
       ; agent_id = "p"
       ; task = "go"
+      ; name = "Go"
       ; model = "m"
       ; tools = [ "read"; "ls" ]
       ; worktree = None
@@ -325,7 +326,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
   [%expect
     {|
     {"type":"event","event":"subagent","call_id":"p","agent_id":"p","inner":{"type":"event","event":"subagent","call_id":"c1","agent_id":"p/c1","inner":{"type":"event","event":"tool_start","call":{"id":"c1","name":"read","arguments":"{}"}}}}
-    {"type":"event","event":"subagent_start","call_id":"p","agent_id":"p","task":"go","model":"m","tools":["read","ls"]}
+    {"type":"event","event":"subagent_start","call_id":"p","agent_id":"p","task":"go","name":"Go","model":"m","tools":["read","ls"]}
     {"type":"event","event":"subagent_end","call_id":"p","agent_id":"p","usage":{"input":3,"output":4,"cache_read":1},"turns":2,"cost_usd":0.001,"result":{"text":"done","is_error":false}}
     |}]
 ;;
@@ -348,6 +349,7 @@ let%expect_test
        { call_id = "p"
        ; agent_id = "p"
        ; task = "go"
+       ; name = "Go"
        ; model = "m"
        ; tools = []
        ; worktree = None

@@ -1190,7 +1190,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  300, 0 = never), `generate_model`, `mask_observations` (default true),
+  300, 0 = never), `generate_model`, `naming_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
@@ -1202,7 +1202,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   defaults; `archive_after_days` (default 7, 0 = never) is when an
   inactive session counts as archived (`Session.Summary.is_archived`).
   `set_config` merges the given fields over the current ones and
-  resolves `fallback_models`, `generate_model` and `compaction_model`
+  resolves `fallback_models`, `generate_model`, `compaction_model` and
+  `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
   closest matches). A new
   session starts in `default_cwd` (on the backend host) and on
@@ -1584,11 +1585,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   history) with the file now (`Text_diff.unified`, a patience diff written
   as git writes one file's section), or says why it cannot (binary, too
   large, text not kept).
-- `Session_description` — after a turn, once the conversation has a second
-  user message (or a long first one), asks the model for a one-line
-  description and records it (`Agent ~auto_describe`, off under `-faux` and
-  in tests); it runs after the turn has finished so it never delays the
-  user, and shows up in the session list and in `State`.
+- `Session_description` — after the first turn, and once more when the
+  conversation has `refine_after` user messages, asks the naming model
+  (`Agent.naming_model`: `naming_model`, else `generate_model`, else the
+  session's) for a short sentence-case title from the user's messages and
+  the replies (no tool output, each cut short), and records it (`Agent
+  ~auto_describe`, off under `-faux` and in tests); it runs after the turn
+  has finished so it never delays the user, and shows up in the session
+  list and in `State`. `Naming.clean` normalises every title.
+- `Subagent_name` — a subagent's name: the `subagent` tool's `name`, else
+  one the naming model writes from the task and its siblings' names, else
+  the task's first sentence (`of_task`); carried by `subagent_start`, the
+  state's subagents and `Subagent_log`.
 
 ### RPC
 

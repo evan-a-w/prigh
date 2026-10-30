@@ -67,6 +67,7 @@ type t =
       { call_id : string
       ; agent_id : string
       ; task : string
+      ; name : string (** {!Subagent_name} *)
       ; model : string
       ; tools : string list
       ; worktree : Agent_worktree.t option

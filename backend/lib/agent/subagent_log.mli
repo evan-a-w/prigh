@@ -29,6 +29,8 @@ module Summary : sig
     ; call_id : string (** the [subagent] tool call that started it *)
     ; parent : string option
     ; task : string
+    ; name : string option
+      (** {!Subagent_name}; [None] in logs written before names *)
     ; model : string
     ; state : State.t
     ; started_at : float

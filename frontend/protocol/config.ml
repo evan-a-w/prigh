@@ -43,6 +43,7 @@ type t =
   ; compact_at_tokens : int
   ; compaction_model : string option
   ; mask_observations : bool
+  ; naming_model : string option
   }
 [@@deriving sexp_of, equal]
 
@@ -61,6 +62,7 @@ let default =
   ; compact_at_tokens = 200_000
   ; compaction_model = None
   ; mask_observations = true
+  ; naming_model = None
   }
 ;;
 
@@ -123,6 +125,7 @@ let of_json j =
     | Some `False -> Ok false
     | Some _ -> Or_error.error_string "mask_observations must be a boolean"
   in
+  let%bind naming_model = optional_string "naming_model" in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
@@ -138,6 +141,7 @@ let of_json j =
   ; compact_at_tokens
   ; compaction_model
   ; mask_observations
+  ; naming_model
   }
 ;;
 
@@ -161,5 +165,6 @@ let to_json t =
        ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
        ; "compaction_model", optional t.compaction_model
        ; ("mask_observations", if t.mask_observations then `True else `False)
+       ; "naming_model", optional t.naming_model
        ])
 ;;

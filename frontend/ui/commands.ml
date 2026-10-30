@@ -33,6 +33,7 @@ module Argument = struct
     | Commit
     | Agents
     | Compaction
+    | Naming
   [@@deriving sexp_of, equal]
 end
 
@@ -169,6 +170,12 @@ let every =
        the window; model MODEL|off: the model that writes the summaries (off: \
        the session's); mask on|off: replace old tool outputs with placeholders \
        first"
+  ; c
+      ~argument:Argument.Naming
+      "naming"
+      "[model MODEL|off]"
+      "show which model names sessions and subagents; model MODEL|off: name \
+       them with MODEL (off: the generate model, else the session's)"
   ; c
       ~argument:Argument.Trim
       "trim"

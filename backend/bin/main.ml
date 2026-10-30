@@ -222,8 +222,14 @@ let common_params =
         | Some agent -> Agent.compaction_settings agent
         | None -> Compaction_settings.window_only
       in
+      let auto_describe = Option.is_none faux_script && not faux in
+      let name_task ~task ~siblings ~cancel =
+        Option.bind !agent_ref ~f:(fun agent ->
+          Agent.name_subagent agent ~task ~siblings ~cancel)
+      in
       let subagent =
         Tool_subagent.create
+          ?name_task:(Option.some_if auto_describe name_task)
           ~models
           ~worktrees_dir
           ~compaction
@@ -259,7 +265,7 @@ let common_params =
           ?thinking
           ~fallback_model:(default_model ~getenv ~models store)
           ~models
-          ~auto_describe:(Option.is_none faux_script && not faux)
+          ~auto_describe
           ~backend_host
           ?mcp
           ~use_default_cwd:(not cwd_given)

@@ -89,6 +89,8 @@ type t =
       { call_id : string
       ; agent_id : string
       ; task : string
+      ; name : string option
+        (** a few words saying what it does; [None] from older backends *)
       ; model : string
       ; tools : string list
       ; worktree : Agent_worktree.t option
@@ -237,6 +239,7 @@ let rec of_json j =
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in
     let%bind task = Json.string_field j "task" in
+    let%bind name = Json.string_opt_field j "name" in
     let%bind model = Json.string_field j "model" in
     let%bind tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
     let%bind worktree =
@@ -247,7 +250,16 @@ let rec of_json j =
     let%bind forked = Json.bool_default_field j "forked" ~default:false in
     let%map continued = Json.bool_default_field j "continued" ~default:false in
     Subagent_start
-      { call_id; agent_id; task; model; tools; worktree; forked; continued }
+      { call_id
+      ; agent_id
+      ; task
+      ; name
+      ; model
+      ; tools
+      ; worktree
+      ; forked
+      ; continued
+      }
   | "subagent" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%bind agent_id = Json.string_field j "agent_id" in

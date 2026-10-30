@@ -8,6 +8,7 @@ let start ?(call_id = "p1") agent_id task : Agent_event.t =
     { call_id
     ; agent_id
     ; task
+    ; name = Subagent_name.of_task task
     ; model = "faux"
     ; tools = [ "ls" ]
     ; worktree = None
@@ -54,11 +55,11 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
   show log;
   [%expect
     {|
-    ((id a1) (call_id p1) (parent ()) (task "look around") (model faux)
-     (state Running) (started_at 2) (updated_at 5) (ended_at ()) (turns 1)
-     (tool_calls 1) (current_tool ((ls 5))) (message_count 1) (stale false)
-     (result ()))
-    ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (model faux)
+    ((id a1) (call_id p1) (parent ()) (task "look around") (name ("Look around"))
+     (model faux) (state Running) (started_at 2) (updated_at 5) (ended_at ())
+     (turns 1) (tool_calls 1) (current_tool ((ls 5))) (message_count 1)
+     (stale false) (result ()))
+    ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (name (Dig)) (model faux)
      (state Running) (started_at 6) (updated_at 8) (ended_at ()) (turns 0)
      (tool_calls 1) (current_tool ((ls 8))) (message_count 1) (stale false)
      (result ()))
@@ -81,13 +82,13 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
   show log;
   [%expect
     {|
-    ((id a1) (call_id p1) (parent ()) (task "look around") (model faux)
-     (state Complete) (started_at 2) (updated_at 11) (ended_at (11)) (turns 1)
-     (tool_calls 1) (current_tool ()) (message_count 1) (stale false)
+    ((id a1) (call_id p1) (parent ()) (task "look around") (name ("Look around"))
+     (model faux) (state Complete) (started_at 2) (updated_at 11) (ended_at (11))
+     (turns 1) (tool_calls 1) (current_tool ()) (message_count 1) (stale false)
      (result (((text report) (is_error false)))))
-    ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (model faux) (state Failed)
-     (started_at 6) (updated_at 9) (ended_at (9)) (turns 0) (tool_calls 1)
-     (current_tool ()) (message_count 1) (stale false)
+    ((id a1/c2) (call_id c2) (parent (a1)) (task dig) (name (Dig)) (model faux)
+     (state Failed) (started_at 6) (updated_at 9) (ended_at (9)) (turns 0)
+     (tool_calls 1) (current_tool ()) (message_count 1) (stale false)
      (result (((text boom) (is_error true)))))
     |}];
   let stale () =
@@ -205,6 +206,7 @@ let%expect_test "a continued subagent reopens its entry, also when reloaded" =
       { call_id = "p1"
       ; agent_id = "a1"
       ; task = "fix it"
+      ; name = "Fix it"
       ; model = "faux"
       ; tools = [ "ls" ]
       ; worktree = None

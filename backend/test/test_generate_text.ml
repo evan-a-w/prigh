@@ -271,13 +271,11 @@ let%expect_test "branch_name and session_title; errors" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"gen_id":"gen-4","kind":"session_title","text":"Dark mode","model":"deepseek/deepseek-flash","cost_usd":9e-06}}
     model=deepseek/deepseek-flash thinking=Off tools=0 max_tokens=60
-    system: Describe the conversation below in one short line (at most eight words) saying what the user is working on, e.g. "Fixing flaky session tests" or "Adding OAuth login to the CLI". Reply with the line only: no quotes, no trailing period, no preamble.
+    system: You name the sessions of a coding agent for the user's session list. Write a title of two to six words saying what the user is working on, specific enough to tell it apart from their other sessions: name the feature, bug, file, command or tool, e.g. "Fix flaky session reload test", "Add OAuth login to the CLI", "Review menu keyboard navigation". Sentence case. Do not use vague words such as help, question, conversation, session, task or request, and do not describe the assistant. If a current title is given and still fits, reply with it unchanged. Reply with the title only: no quotes, no trailing period, no preamble.
     user:
-    USER:
-    make it dark
+    User: make it dark
 
-    ASSISTANT:
-    Sure.
+    Assistant: Sure.
     |}]
 ;;
 

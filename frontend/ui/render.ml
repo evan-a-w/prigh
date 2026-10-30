@@ -872,10 +872,7 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
       sprintf "✓ done %d turns $%.2f" turns cost_usd
     | Agent_view.Status.Failed _ -> "✗ failed"
   in
-  let task =
-    Text_width.truncate
-      (String.concat ~sep:" " (String.split_lines a.task))
-      ~width:40
+  let task = Text_width.truncate (Agent_view.title a) ~width:40
   in
   [ span
       ~style:(Style.bold (Style.fg Cyan))
@@ -1586,7 +1583,7 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
            | `Agent id -> String.equal id a.id
            | `Main -> false)
         ~dot:d
-        ~name:(sprintf "%d %s" (i + 1) (first_line a.task))
+        ~name:(sprintf "%d %s" (i + 1) (first_line (Agent_view.title a)))
         ~state
         ~meta)
   in
@@ -1651,9 +1648,7 @@ let placeholder (a : Agent_view.t) =
     sprintf
       "Steer %s · %s (Enter: steer, Alt+Enter: follow-up)"
       a.id
-      (Text_width.truncate
-         (String.concat ~sep:" " (String.split_lines a.task))
-         ~width:30)
+      (Text_width.truncate (Agent_view.title a) ~width:30)
   | Done _ | Failed _ ->
     sprintf "%s has finished · Esc goes back to the main agent" a.id
 ;;

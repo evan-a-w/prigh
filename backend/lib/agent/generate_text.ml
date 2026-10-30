@@ -160,7 +160,7 @@ let clean (kind : Kind.t) text =
     let title, body = split_pr text in
     if String.is_empty body then title else title ^ "\n\n" ^ body
   | Branch_name -> branch_name text
-  | Session_title -> Session_description.clean (unfence text)
+  | Session_title -> Naming.clean (unfence text)
 ;;
 
 (* ---- context --------------------------------------------------------- *)
@@ -220,8 +220,6 @@ let last_request agent =
       Option.some_if (not (String.is_empty text)) text
     | Assistant _ | Tool_result _ -> None)
 ;;
-
-let transcript_chars = 12_000
 
 module Spec = struct
   type t =
@@ -339,10 +337,7 @@ let title_spec =
         | [] ->
           Or_error.error_string
             "the session has no conversation to name yet: send a message first"
-        | messages ->
-          Ok
-            (Compaction.render_transcript messages
-             |> Fn.flip String.prefix transcript_chars))
+        | messages -> Ok (Session_description.conversation messages))
   }
 ;;
 
@@ -365,7 +360,11 @@ let prompt agent kind target =
 
 let run agent kind target ~cancel ~on_delta =
   let open Or_error.Let_syntax in
-  let%bind model = Agent.generate_model agent in
+  let%bind model =
+    match kind with
+    | Kind.Session_title -> Agent.naming_model agent
+    | Commit_message | Pr | Branch_name -> Agent.generate_model agent
+  in
   let%bind prompt = prompt_with agent kind target ~cancel in
   let%map reply, cost_usd =
     Agent.complete

@@ -38,6 +38,7 @@ module Argument : sig
     | Commit (** [/commit]'s flags, until the message *)
     | Agents (** [/agents]' subcommands, then a subagent *)
     | Compaction (** [at] or [model], then [off] or a model *)
+    | Naming (** [model], then [off] or a model *)
   [@@deriving sexp_of, equal]
 end
 
