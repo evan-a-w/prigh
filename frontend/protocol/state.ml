@@ -4,6 +4,7 @@ module Subagent = struct
   type t =
     { id : string
     ; task : string
+    ; name : string option
     ; running : bool
     }
   [@@deriving sexp_of, equal]
@@ -12,8 +13,9 @@ module Subagent = struct
     let open Or_error.Let_syntax in
     let%bind id = Json.string_field j "id" in
     let%bind task = Json.string_field j "task" in
+    let%bind name = Json.string_opt_field j "name" in
     let%map running = Json.bool_field j "running" in
-    { id; task; running }
+    { id; task; name; running }
   ;;
 end
 

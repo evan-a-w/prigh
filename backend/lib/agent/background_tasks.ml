@@ -38,6 +38,7 @@ module Task = struct
     { id : string
     ; kind : Kind.t
     ; label : string
+    ; name : string option
     ; started_at : float
     ; mutable cancel : Cancellation.t
     ; mutable finished : unit Promise.t
@@ -53,6 +54,7 @@ module Task = struct
   let id t = t.id
   let kind t = t.kind
   let label t = t.label
+  let name t = t.name
   let outcome t = t.outcome
   let delivered t = t.delivered
   let started_at t = t.started_at
@@ -91,6 +93,7 @@ module Summary = struct
   type t =
     { id : string
     ; label : string
+    ; name : string option
     ; running : bool
     ; status : string option
     }
@@ -192,12 +195,13 @@ let next_id t (kind : Kind.t) =
   Kind.id_prefix kind ^ Int.to_string n
 ;;
 
-let make_task ?input ?inbox ?output t ~kind ~label ~started_at ~cancel =
+let make_task ?input ?inbox ?output ?name t ~kind ~label ~started_at ~cancel =
   let finished, resolve = Promise.create () in
   let task =
     { Task.id = next_id t kind
     ; kind
     ; label
+    ; name
     ; started_at
     ; cancel
     ; finished
@@ -304,11 +308,12 @@ let run_task t (task : Task.t) resolve ~run =
   t.on_change ()
 ;;
 
-let spawn ?input ?inbox t ~kind ~label ~run =
+let spawn ?input ?inbox ?name t ~kind ~label ~run =
   let task, resolve =
     make_task
       ?input
       ?inbox
+      ?name
       t
       ~kind
       ~label
@@ -419,6 +424,7 @@ let summaries t ~kind =
       Some
         { Summary.id = task.id
         ; label = task.label
+        ; name = task.name
         ; running = Task.running task
         ; status = Option.map task.outcome ~f:(fun (o : Outcome.t) -> o.status)
         })

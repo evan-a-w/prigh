@@ -69,6 +69,8 @@ module Reply_tag : sig
     | Default_dir_saved of string (** like [Fallback_saved] *)
     | Compaction_shown (** [get_config] for [/compaction] *)
     | Compaction_saved of string (** like [Fallback_saved] *)
+    | Naming_shown (** [get_config] for [/naming] *)
+    | Naming_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done

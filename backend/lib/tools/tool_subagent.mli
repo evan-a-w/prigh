@@ -11,7 +11,16 @@ open! Import
 val max_turns : int
 
 val create
-  :  ?models:Model_registry.t (** what the [model] argument resolves against *)
+  :  ?name_task:
+       (task:string
+        -> siblings:string list
+        -> cancel:Cancellation.t
+        -> string option)
+       (** names a subagent the model gave no [name], given the names of
+           the caller's other background subagents ({!Subagent_name});
+           without it, or when it gives [None], the name comes from the
+           task *)
+  -> ?models:Model_registry.t (** what the [model] argument resolves against *)
   -> ?worktrees_dir:(unit -> string) (** the config's, when the tool runs *)
   -> ?compaction:(unit -> Compaction_settings.t)
        (** the session's, when the tool runs (default:

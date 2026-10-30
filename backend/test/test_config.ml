@@ -48,6 +48,7 @@ let%expect_test "save then load round trips" =
     ; mask_observations = true
     ; compact_at_tokens = 150_000
     ; compaction_model = Some "anthropic/claude-haiku-4-5"
+    ; naming_model = Some "anthropic/claude-haiku-4-5"
     ; trace = Detailed
     }
   in

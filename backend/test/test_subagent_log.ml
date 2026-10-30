@@ -8,6 +8,7 @@ let start ?(call_id = "p1") agent_id task : Agent_event.t =
     { call_id
     ; agent_id
     ; task
+    ; name = Subagent_name.of_task task
     ; model = "faux"
     ; tools = [ "ls" ]
     ; worktree = None
@@ -205,6 +206,7 @@ let%expect_test "a continued subagent reopens its entry, also when reloaded" =
       { call_id = "p1"
       ; agent_id = "a1"
       ; task = "fix it"
+      ; name = "Fix it"
       ; model = "faux"
       ; tools = [ "ls" ]
       ; worktree = None

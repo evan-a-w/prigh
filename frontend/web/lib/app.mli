@@ -186,6 +186,7 @@ module Reply_tag : sig
     | Fallback_saved (** the new config; its chain is shown *)
     | Default_dir_saved
     | Compaction_saved (** the new config; its settings are shown *)
+    | Naming_saved (** the new config; the naming model is shown *)
     | Default_saved
     | Session_stats
     | Trace (** [trace]: its summary in a dialog *)

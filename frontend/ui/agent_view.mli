@@ -18,6 +18,7 @@ type t =
   { id : string
   ; call_id : string
   ; task : string
+  ; name : string option
   ; model : string
   ; status : Status.t
   ; turns : int
@@ -27,17 +28,22 @@ type t =
 [@@deriving sexp_of]
 
 val create
-  :  call_id:string
+  :  ?name:string
+  -> call_id:string
   -> agent_id:string
   -> task:string
   -> model:string
   -> t
 
+(** Its [name], else its task on one line. *)
+val title : t -> string
+
 val find : t list -> string -> t option
 val replace : t list -> string -> (t -> t) -> t list
 
 val start
-  :  t list
+  :  ?name:string
+  -> t list
   -> call_id:string
   -> agent_id:string
   -> task:string

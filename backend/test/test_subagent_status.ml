@@ -155,6 +155,7 @@ let start ~call_id agent_id : Agent_event.t =
     { call_id
     ; agent_id
     ; task = agent_id
+    ; name = agent_id
     ; model = "faux"
     ; tools = []
     ; worktree = None

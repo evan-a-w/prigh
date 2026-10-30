@@ -227,7 +227,7 @@ let item_row (m : App.Model.t) ~inject ~shortcut (item : Item.t) =
          ~outcome
          ~selected:(selected m item)
          ~shortcut
-         ~title:(first_line agent.task)
+         ~title:(Agent.title agent)
          ~elapsed:
            (elapsed_label outcome (Agents.agent_elapsed agent ~now:(now m)))
          ~meta:
@@ -412,7 +412,7 @@ let crumbs (m : App.Model.t) ~inject (a : Agent.t) =
                ; Attr.on_click (fun _ ->
                    inject (Action.Select_item (Agent b.id)))
                ]
-             [ Node.text (first_line b.task) ]
+             [ Node.text (Agent.title b) ]
          ; Node.span
              ~attrs:
                [ Attr.class_ "crumb-sep"; Attr.create "aria-hidden" "true" ]
@@ -493,9 +493,11 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
            ~shortcut:(fun _ -> None)
            (List.map children ~f:(fun (c : Agent.t) -> Item.Agent c.id, 0)))
   in
-  (* The task is the title: its prompt opens the transcript only when it
-     says more than the title does. *)
-  let task_in_title = not (String.mem (String.strip a.task) '\n') in
+  (* The prompt opens the transcript only when it says more than the title
+     does. *)
+  let task_in_title =
+    Option.is_none a.name && not (String.mem (String.strip a.task) '\n')
+  in
   let transcript =
     match sub with
     | Some s when not (List.is_empty (Chat.entries s.chat)) ->
@@ -567,7 +569,7 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
           (Node.span
              ~attrs:
                [ Attr.class_ "detail-task"; Attr.title (String.strip a.task) ]
-             [ Node.text (first_line a.task) ])
+             [ Node.text (Agent.title a) ])
         ~elapsed:(elapsed_label outcome (Agents.agent_elapsed a ~now:(now m)))
         ~meta:(agent_meta m a)
         ~action:

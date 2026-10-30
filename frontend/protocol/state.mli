@@ -6,6 +6,8 @@ module Subagent : sig
   type t =
     { id : string
     ; task : string
+    ; name : string option
+      (** a few words saying what it does; [None] from older backends *)
     ; running : bool
     }
   [@@deriving sexp_of, equal]

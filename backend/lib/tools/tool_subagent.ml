@@ -57,6 +57,12 @@ let spec =
           , "Complete description of the task, including relevant paths and \
              constraints (with fork, it already knows your conversation: say \
              what to do)" )
+        ; ( "name"
+          , `String
+          , "A short name for it, two to five words saying what it does and \
+             how it differs from your other subagents, e.g. \"Fix completion \
+             after a space\" (shown to the user wherever subagents are \
+             listed)" )
         ; ( "fork"
           , `Boolean
           , "Start it with your conversation so far (default false: a blank \
@@ -78,7 +84,7 @@ let spec =
           , `String
           , "Run it in a fresh git worktree of the working directory's \
              repository, on a new branch: a branch name, or \"auto\" for one \
-             named after the task. Use it for changes to review and merge \
+             named after its name. Use it for changes to review and merge \
              separately, or to keep parallel work apart; its report says where \
              the branch is (default: none, it works in the working directory)" )
         ; ( "max_turns"
@@ -104,6 +110,8 @@ end
 module Prepared = struct
   type t =
     { task : string
+    ; name : string
+    ; named : bool (** [name] was given *)
     ; model : Model.t
     ; thinking : Thinking.t
     ; cwd : string
@@ -131,10 +139,10 @@ let worktree_arg args =
       (Tool_args.Invalid "worktree must be a branch name or \"auto\" (or true)")
 ;;
 
-(* [agent/<the task's first words>]. *)
-let auto_branch task =
+(* [agent/<the name's first words>]. *)
+let auto_branch name =
   let words =
-    String.split_on_chars (String.lowercase task) ~on:[ ' '; '\n'; '\t' ]
+    String.split_on_chars (String.lowercase name) ~on:[ ' '; '\n'; '\t' ]
     |> List.filter ~f:(Fn.non String.is_empty)
     |> fun words -> List.take words 5
   in
@@ -150,6 +158,7 @@ let prepare
       args
   =
   let task = Tool_args.string args "task" in
+  let given = Option.bind (Tool_args.string_opt args "name") ~f:Subagent_name.of_given in
   let only = Tool_args.string_list_opt args "tools" in
   let conversation =
     match Tool_args.bool_opt args "fork", context.conversation with
@@ -218,6 +227,8 @@ let prepare
       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
   { Prepared.task
+  ; name = Option.value_or_thunk given ~default:(fun () -> Subagent_name.of_task task)
+  ; named = Option.is_some given
   ; model
   ; thinking
   ; cwd
@@ -240,7 +251,7 @@ let make_worktree ~worktrees_dir (context : Tool.Context.t) (p : Prepared.t) =
   | Some wanted ->
     let branch, fresh =
       match wanted with
-      | `Auto -> auto_branch p.task, true
+      | `Auto -> auto_branch p.name, true
       | `Branch branch -> branch, false
     in
     Tool.execute_via
@@ -437,6 +448,7 @@ let run_once
        { call_id
        ; agent_id
        ; task = p.task
+       ; name = p.name
        ; model = p.model.id
        ; tools = List.map p.tools ~f:Tool.name
        ; worktree = state.worktree
@@ -798,6 +810,7 @@ let rec park_sync ~provider tasks (state : State.t) =
 ;;
 
 let create
+      ?name_task
       ?(models = Model_registry.builtin ())
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
       ?(compaction = fun () -> Compaction_settings.window_only)
@@ -810,6 +823,19 @@ let create
   let run (context : Tool.Context.t) args =
     let prepared =
       prepare ~models ~current_model ~current_thinking context args
+    in
+    let prepared =
+      match name_task, prepared.named with
+      | None, _ | _, true -> prepared
+      | Some name_task, false ->
+        let siblings =
+          Option.value_map context.background ~default:[] ~f:(fun background ->
+            Background_tasks.summaries background ~kind:Subagent
+            |> List.filter_map ~f:(fun (s : Background_tasks.Summary.t) -> s.name))
+        in
+        (match name_task ~task:prepared.task ~siblings ~cancel:context.cancel with
+         | Some name -> { prepared with name }
+         | None -> prepared)
     in
     match make_worktree ~worktrees_dir context prepared with
     | Error e ->
@@ -827,6 +853,7 @@ let create
              background
              ~inbox
              ~kind:Subagent
+             ~name:prepared.name
              ~label:prepared.task
              ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
                background_outcome
