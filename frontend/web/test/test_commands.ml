@@ -226,6 +226,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+Enter (the review's commit message) commit the ticked files (approved files come ticked; untick to leave one out)
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
+    ↑↓ ←→ Home End (settings' sections) show the previous / next section, or the first / last (/settings SECTION opens at one)
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
     ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines

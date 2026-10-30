@@ -16,6 +16,7 @@ module Target = struct
     | Files
     | Review
     | Resize of Resize.Handle.t
+    | Settings_tab
     | Message of int
     | Page
   [@@deriving sexp_of]
@@ -141,6 +142,9 @@ let help =
   ; ( "Ctrl+Enter (in a dialog's text box)"
     , "accept the dialog, e.g. create the pull request (Enter is a new line)" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
+  ; ( "↑↓ ←→ Home End (settings' sections)"
+    , "show the previous / next section, or the first / last (/settings \
+       SECTION opens at one)" )
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
     , "allow once, always allow (its rules, this session), deny, deny saying \
@@ -174,7 +178,7 @@ let alt_letter t letter =
 
 let on_control t =
   match t.target with
-  | Control -> true
+  | Control | Settings_tab -> true
   | Editor _
   | Field
   | Multiline
@@ -187,6 +191,12 @@ let on_control t =
   | Resize _
   | Message _
   | Page -> false
+;;
+
+let on_settings_tab t =
+  match t.target with
+  | Settings_tab -> true
+  | _ -> false
 ;;
 
 (* Ctrl+` by the key's position, whatever the layout types there. *)
@@ -212,6 +222,14 @@ let review_key (m : App.Model.t) t : App.Action.t option =
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
+  | ("ArrowUp" | "ArrowLeft"), Settings when plain t && on_settings_tab t ->
+    Some (Settings_move Prev)
+  | ("ArrowDown" | "ArrowRight"), Settings when plain t && on_settings_tab t ->
+    Some (Settings_move Next)
+  | "Home", Settings when plain t && on_settings_tab t ->
+    Some (Settings_move First)
+  | "End", Settings when plain t && on_settings_tab t ->
+    Some (Settings_move Last)
   | " ", Filter _ when plain t -> Some (Filter_press None)
   | ( "ArrowUp"
     , ( Picker _
@@ -352,6 +370,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              | Field
              | Multiline
              | Control
+             | Settings_tab
              | Session_search
              | Session _
              | Worktree _
@@ -482,6 +501,7 @@ let question_key t : Question_dialog.Action.t option =
     | Field | Multiline -> true
     | Editor _
     | Control
+    | Settings_tab
     | Session_search
     | Session _
     | Worktree _
@@ -516,6 +536,7 @@ let commenting (m : App.Model.t) t =
   | Editor _
   | Field
   | Multiline
+  | Settings_tab
   | Control
   | Session_search
   | Session _
@@ -606,6 +627,12 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Review -> review_key m t
         | None, Resize h ->
           resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
-        | None, (Field | Multiline | Control | Terminal | Page | Message _) ->
-          None))
+        | ( None
+          , ( Field
+            | Multiline
+            | Control
+            | Settings_tab
+            | Terminal
+            | Page
+            | Message _ ) ) -> None))
 ;;

@@ -35,19 +35,20 @@ let device_code =
     {|"kind":"auth_url","url":"https://github.com/login/device","instructions":"Enter the code ABCD-1234 at https://github.com/login/device"|}
 ;;
 
-let section h = H.text h ~selector:".settings-section:nth-child(4)"
+let section h = H.text h ~selector:".settings-panel-git"
 
 let%expect_test
     "settings: the git hosts, connecting with the device code, back to \
      settings, disconnecting"
   =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Git_hosting));
   H.act h (Reply (Forge Status, Ok (Jsonaf.of_string (forges ()))));
   section h;
   [%expect
     {|
     Git hosting
+    The hosts agents push branches to and open pull requests on.
     GitHub github.com
     Not signed in.
     (Use a token) (Connect)
@@ -97,6 +98,7 @@ let%expect_test
     (Expire_toast (id 0) (after_ms 3060))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     Git hosting
+    The hosts agents push branches to and open pull requests on.
     GitHub github.com
     Signed in as octo (oauth).
     (Disconnect)
@@ -151,7 +153,7 @@ let%expect_test
     "a token, from the settings page; Esc cancels and goes back to it"
   =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Git_hosting));
   H.click h ~selector:".git-host .btn.ghost";
   H.event
     h
@@ -213,7 +215,7 @@ let%expect_test "a failed sign-in says how to try again" =
 
 let%expect_test "another Forgejo host: from settings, or /login forgejo" =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Git_hosting));
   H.click h ~selector:".git-host-add .btn";
   H.text h ~selector:".modal";
   [%expect
@@ -494,12 +496,13 @@ let%expect_test "a backend without git hosting; switching user asks again" =
   switch ();
   print_s [%sexp ((H.model h).forges : Forges.t)];
   H.fail h "forge_status" "unknown method forge_status";
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Git_hosting));
   section h;
   [%expect
     {|
     ((accounts Loading) (signing_out ()))
     Git hosting
+    The hosts agents push branches to and open pull requests on.
     Git hosts This backend can't sign in to git hosts. Unknown method forge_status
     |}];
   switch ();
