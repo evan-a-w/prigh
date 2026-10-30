@@ -200,7 +200,8 @@ retry backend exited
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
   (default_cwd ($TMP)) (worktrees_dir (~/.prigh/worktrees))
   (archive_after_days 7) (notify bell) (snippets ())
-  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)))
+  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+  (naming_model ())))
 <- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
@@ -209,7 +210,8 @@ retry backend exited
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
   (default_cwd ()) (worktrees_dir (~/.prigh/worktrees))
   (archive_after_days 7) (notify bell) (snippets ())
-  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)))
+  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+  (naming_model ())))
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
@@ -219,7 +221,8 @@ retry backend exited
   (archive_after_days 7) (notify bell)
   (snippets (((name review) (text  "Review the diff.\
                                   \nBe brief."))))
-  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)))
+  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+  (naming_model ())))
 <- set_config ERROR: "config.snippets[0].name \"two words\" must be one word: non-empty, without spaces"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
@@ -228,7 +231,8 @@ retry backend exited
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
   (default_cwd ()) (worktrees_dir (~/.prigh/worktrees))
   (archive_after_days 7) (notify bell) (snippets ())
-  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)))
+  (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+  (naming_model ())))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "fix the bug"
