@@ -451,8 +451,14 @@ let%expect_test "state lists background subagents (absent means none)" =
     {|{"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}|};
   [%expect
     {|
-    (((id a1) (task "look around") (running true))
-     ((id a2) (task "run tests")   (running false)))
+    (((id   a1)
+      (task "look around")
+      (name ())
+      (running true))
+     ((id   a2)
+      (task "run tests")
+      (name ())
+      (running false)))
     ()
     |}]
 ;;
@@ -522,7 +528,8 @@ let%expect_test "subagent events are decoded recursively" =
       (call_id  p)
       (agent_id p)
       (task     go)
-      (model    m)
+      (name ())
+      (model m)
       (tools (read ls))
       (worktree ())
       (forked    false)
@@ -897,6 +904,7 @@ let%expect_test "config round trip and config_changed event" =
          ; compact_at_tokens = 150_000
          ; compaction_model = Some "anthropic/claude-haiku-4-5"
          ; mask_observations = false
+         ; naming_model = None
          }
        : Json.t)];
   decode
@@ -919,7 +927,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -936,7 +945,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -953,7 +963,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -971,7 +982,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models ())
@@ -992,7 +1004,8 @@ let%expect_test "config round trip and config_changed event" =
        (text "Review it.\nBriefly."))))
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1010,7 +1023,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 0)
      (compaction_model (claude-haiku-4-5))
-     (mask_observations true))
+     (mask_observations true)
+     (naming_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1028,7 +1042,8 @@ let%expect_test "config round trip and config_changed event" =
      (snippets ())
      (compact_at_tokens 200000)
      (compaction_model ())
-     (mask_observations false))
+     (mask_observations false)
+     (naming_model ()))
     (decode (e "mask_observations must be a boolean"))
     ((scoped_models (a b))
      (approval_mode ask)
@@ -1048,7 +1063,8 @@ let%expect_test "config round trip and config_changed event" =
        (text "Review the diff.\nBe brief."))))
      (compact_at_tokens 150000)
      (compaction_model  anthropic/claude-haiku-4-5)
-     (mask_observations false))
+     (mask_observations false)
+     (naming_model      null))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -1067,7 +1083,8 @@ let%expect_test "config round trip and config_changed event" =
         (snippets ())
         (compact_at_tokens 200000)
         (compaction_model ())
-        (mask_observations true))))
+        (mask_observations true)
+        (naming_model ()))))
     |}]
 ;;
 

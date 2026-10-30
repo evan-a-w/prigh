@@ -293,6 +293,7 @@ let%expect_test "the names of the settings' controls" =
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
+    button "Naming model: Default" -- Choose the model (/naming model)
     button "Off" -- Only at 80% of the model's window (/compaction at off)
     button "Summary model: The conversation's model" -- Choose the model (/compaction model)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)

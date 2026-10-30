@@ -30,6 +30,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Compaction
+    | Naming
     | Pr
     | Worktree
     | Review
@@ -141,6 +142,12 @@ let every =
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
+  ; c
+      ~argument:Naming
+      ~args:"[model MODEL|off]"
+      "naming"
+      "show which model names sessions and subagents; model MODEL|off: name \
+       them with MODEL (off: the generate model, else the session's)"
   ; c
       ~argument:Compaction
       ~args:"[at|model|mask ...]"

@@ -165,6 +165,7 @@ module Reply_tag = struct
     | Fallback_saved
     | Default_dir_saved
     | Compaction_saved
+    | Naming_saved
     | Default_saved
     | Session_stats
     | Trace
@@ -946,7 +947,7 @@ let close_dialog (m : Model.t) =
   | ( true
     , Some
         ( Login _ | Forge_host _ | Nix_gc_confirm _
-        | Picker { kind = Compaction_models; _ } ) ) ->
+        | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -3195,6 +3196,53 @@ let compaction_command (m : Model.t) rest =
     | Show -> with_config m ~f:(fun c -> toast m (compaction_summary c))
     | Error e -> error m (String.capitalize e)
     | (Set_at _ | Set_model _ | Set_mask _) as action -> set_compaction m action)
+;;
+
+let naming_summary config =
+  String.capitalize (Prigh_ui.Naming_command.summary config)
+;;
+
+(* The backend resolves the model as /model does, and says which models
+   come closest to one it doesn't know. *)
+let set_naming (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    ( { m with config = Some (Prigh_ui.Naming_command.apply action config) }
+    , [ set_config
+          (Prigh_ui.Naming_command.apply action config)
+          ~fields:(List.map (Prigh_ui.Naming_command.fields action) ~f:fst)
+          ~tag:Naming_saved
+      ] ))
+;;
+
+let naming_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    open_picker
+      m
+      (Picker
+         { kind = Naming_models
+         ; picker =
+             models_picker
+               m
+               ~title:"Naming model"
+               ~current:config.naming_model
+               ~leading:
+                 [ Picker.Item.create
+                     ~id:"off"
+                     ~detail:"the generate model, else the session's"
+                     ~search:"off default generate session"
+                     ~marked:(Option.is_none config.naming_model)
+                     "Default"
+                 ]
+         }))
+;;
+
+let naming_command (m : Model.t) rest =
+  match Prigh_ui.Naming_command.parse rest with
+  | Error _ when String.equal (String.strip rest) "model" ->
+    naming_models_picker m
+  | Show -> with_config m ~f:(fun c -> toast m (naming_summary c))
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_naming m action
 ;;
 
 let commit_compact_at (m : Model.t) =
@@ -5518,6 +5566,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Ok dir -> set_default_dir m (Some dir)
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
+  | "naming", rest -> naming_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -6824,6 +6873,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
+  | Naming_saved, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't set the naming model: %s. Pick one with /naming model"
+           e)
+    in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->
     (* The change shown at once did not happen: show the backend's. *)
     let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
@@ -7337,6 +7395,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | None ->
            "Default directory cleared: new sessions start in the backend's \
             working directory"))
+  | Naming_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (naming_summary config))
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -8149,6 +8210,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
         ( { m with dialog = Some Settings; return_to_settings = false }
         , Command.Focus "dialog" :: cmds )
       else m, cmds
+    | Naming_models ->
+      let m, cmds =
+        set_naming
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
     | Modes -> mode_by_name m item.id
     | Fork entries ->
       let m =
@@ -8928,7 +9000,7 @@ let update_connected (m : Model.t) (action : Action.t) =
         | ( Some Settings
           , Some
               ( Login _ | Forge_host _ | Nix_gc_confirm _
-              | Picker { kind = Compaction_models; _ } ) ) ->
+              | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
           { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])

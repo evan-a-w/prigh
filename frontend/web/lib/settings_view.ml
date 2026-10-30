@@ -296,6 +296,34 @@ let mask (config : Config.t option) ~inject =
     ]
 ;;
 
+let naming_model (m : App.Model.t) ~inject =
+  let current =
+    match Option.bind m.config ~f:(fun c -> c.naming_model) with
+    | None -> "Default"
+    | Some key ->
+      (match
+         List.find m.models ~f:(fun (model : Llm.t) ->
+           String.equal model.key key)
+       with
+       | Some model -> model.name
+       | None -> key)
+  in
+  row
+    ~cls:"naming-model"
+    ~name:"Naming model"
+    ~about:
+      "The model that titles sessions and names subagents: a small, fast one \
+       is plenty. Default: the generate model, else the session's."
+    [ button
+        ~cls:"small naming-model-choice"
+        ~title:"Choose the model (/naming model)"
+        ~label:("Naming model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/naming model"))
+        [ Node.text current ]
+    ]
+;;
+
 let compaction (m : App.Model.t) ~inject =
   [ compact_at m m.config ~inject
   ; summary_model m m.config ~inject
@@ -591,6 +619,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   | Behaviour -> [ group [ confirm m ~inject; notifications m ~inject ] ]
   | Models ->
     [ group ~title:"Providers" [ providers m ~inject ]
+    ; group ~title:"Naming" [ naming_model m ~inject ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
   | Git_hosting -> [ group (git_hosts m ~inject) ]

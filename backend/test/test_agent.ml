@@ -478,7 +478,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
      (snippets ()) (auto_background_seconds 30) (generate_model ())
      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
-     (trace Default))
+     (naming_model ()) (trace Default))
     {
       "scoped_models": [
         "a"
@@ -501,6 +501,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "mask_observations": true,
       "compact_at_tokens": 200000,
       "compaction_model": null,
+      "naming_model": null,
       "trace": "default"
     }
     (default deepseek/deepseek-flash (On (High)))
@@ -1307,8 +1308,8 @@ let%expect_test "the system prompt says how to get tools when the host has nix" 
 ;;
 
 let%expect_test
-    "auto-describe: after the second user turn, once, off the turn's critical \
-     path"
+    "auto-describe: after the first turn, again at the third, off the turn's \
+     critical path"
   =
   let requests = Queue.create () in
   with_agent
@@ -1327,9 +1328,11 @@ let%expect_test
               |> String.concat ~sep:"|"
             | _ -> "?")))
     [ Reply.text "one"
-    ; Reply.text "two"
     ; Reply.text "  \"Investigating flaky tests.\"\nignored second line"
+    ; Reply.text "two"
     ; Reply.text "three"
+    ; Reply.text "Fixing flaky reload tests"
+    ; Reply.text "four"
     ]
   @@ fun _t agent dump ->
   let show_description () =
@@ -1338,39 +1341,44 @@ let%expect_test
         (Session.description (Agent.session agent) : string option)
       , ((Agent.state agent).session_description : string option)]
   in
-  Or_error.ok_exn (Agent.prompt agent "first question");
-  Agent.wait_idle agent;
-  show_description ();
-  Or_error.ok_exn (Agent.prompt agent "second question");
-  Agent.wait_idle agent;
-  show_description ();
-  Or_error.ok_exn (Agent.prompt agent "third question");
-  Agent.wait_idle agent;
-  show_description ();
+  List.iter
+    [ "first question"; "second question"; "third question"; "fourth" ]
+    ~f:(fun p ->
+      Or_error.ok_exn (Agent.prompt agent p);
+      Agent.wait_idle agent;
+      show_description ());
   dump ();
   Queue.iter requests ~f:print_endline;
   [%expect
     {|
-    (() ())
     (("Investigating flaky tests") ("Investigating flaky tests"))
     (("Investigating flaky tests") ("Investigating flaky tests"))
+    (("Fixing flaky reload tests") ("Fixing flaky reload tests"))
+    (("Fixing flaky reload tests") ("Fixing flaky reload tests"))
     state: running=true messages=0
     user: first question
     assistant: one
+    state: running=false messages=2
     state: running=false messages=2
     state: running=true messages=2
     user: second question
     assistant: two
     state: running=false messages=4
-    state: running=false messages=4
     state: running=true messages=4
     user: third question
     assistant: three
     state: running=false messages=6
+    state: running=false messages=6
+    state: running=true messages=6
+    user: fourth
+    assistant: four
+    state: running=false messages=8
     You are prigh, a coding : first question
+    You name the sessions of: User: first question||Assistan
     You are prigh, a coding : second question
-    Describe the conversatio: USER:|first question||ASSISTAN
     You are prigh, a coding : third question
+    You name the sessions of: User: first question||Assistan
+    You are prigh, a coding : fourth
     |}]
 ;;
 
@@ -1380,13 +1388,12 @@ let%expect_test
   with_agent
     ~auto_describe:true
     [ Reply.text "one"
-    ; Reply.text "two"
     ; Reply.text ""
-    ; Reply.text "three"
+    ; Reply.text "two"
     ; Reply.text "Adding OAuth login"
     ]
   @@ fun _t agent dump ->
-  List.iter [ "a"; "b"; "c" ] ~f:(fun p ->
+  List.iter [ "a"; "b" ] ~f:(fun p ->
     Or_error.ok_exn (Agent.prompt agent p);
     Agent.wait_idle agent);
   print_s [%sexp (Session.description (Agent.session agent) : string option)];
@@ -1398,16 +1405,29 @@ let%expect_test
     user: a
     assistant: one
     state: running=false messages=2
+    notice: naming the session failed: empty reply
     state: running=true messages=2
     user: b
     assistant: two
     state: running=false messages=4
-    notice: session description failed: description failed: empty reply
-    state: running=true messages=4
-    user: c
-    assistant: three
-    state: running=false messages=6
-    state: running=false messages=6
+    state: running=false messages=4
+    |}]
+;;
+
+let%expect_test "auto-describe: a failed turn is not named" =
+  with_agent ~auto_describe:true [ Reply.error "provider down" ]
+  @@ fun _t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "a");
+  Agent.wait_idle agent;
+  print_s [%sexp (Session.description (Agent.session agent) : string option)];
+  dump ();
+  [%expect
+    {|
+    ()
+    state: running=true messages=0
+    user: a
+    assistant:
+    state: running=false messages=2
     |}]
 ;;
 
@@ -1418,16 +1438,15 @@ let%expect_test "auto-describe: a session deleted meanwhile is not recreated" =
     ~auto_describe:true
     ~on_request:(fun (r : Provider.Request.t) ->
       (* The description is asked for: the session goes meanwhile. *)
-      if Option.exists r.system ~f:(String.is_prefix ~prefix:"Describe")
+      if Option.exists r.system ~f:(String.is_prefix ~prefix:"You name")
       then (
         Session.delete_files (path ());
         print_endline "deleted while describing"))
-    [ Reply.text "one"; Reply.text "two"; Reply.text "About deleting" ]
+    [ Reply.text "one"; Reply.text "About deleting" ]
   @@ fun _t a dump ->
   agent := Some a;
-  List.iter [ "a"; "b" ] ~f:(fun p ->
-    Or_error.ok_exn (Agent.prompt a p);
-    Agent.wait_idle a);
+  Or_error.ok_exn (Agent.prompt a "a");
+  Agent.wait_idle a;
   printf "file exists: %b\n" (Sys_unix.file_exists_exn (path ()));
   dump ();
   [%expect
@@ -1438,11 +1457,7 @@ let%expect_test "auto-describe: a session deleted meanwhile is not recreated" =
     user: a
     assistant: one
     state: running=false messages=2
-    state: running=true messages=2
-    user: b
-    assistant: two
-    state: running=false messages=4
-    state: running=false messages=4
+    state: running=false messages=2
     |}]
 ;;
 
@@ -1451,17 +1466,19 @@ let%expect_test "session_description: cleaning replies" =
     [ "Fixing the build"
     ; "\"Fixing the build.\""
     ; "\n\n  Title: yes  \nmore"
+    ; "**Title:** \"Add OAuth login to the CLI\"."
     ; ""
     ; String.make 120 'x'
     ]
-    ~f:(fun s -> printf "%S\n" (Session_description.clean s));
+    ~f:(fun s -> printf "%S\n" (Naming.clean s));
   [%expect
     {|
     "Fixing the build"
     "Fixing the build"
-    "Title: yes"
+    "Yes"
+    "Add OAuth login to the CLI"
     ""
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\226\128\166"
+    "Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\226\128\166"
     |}]
 ;;
 

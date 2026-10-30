@@ -316,10 +316,10 @@ let state (s : Agent.State.t) =
       , `Array
           (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->
              `Object
-               [ "id", str a.id
-               ; "task", str a.label
-               ; "running", bool a.running
-               ])) )
+               ([ "id", str a.id; "task", str a.label ]
+                @ Option.value_map a.name ~default:[] ~f:(fun n ->
+                  [ "name", str n ])
+                @ [ "running", bool a.running ]))) )
     ; ( "jobs"
       , `Array
           (List.map s.jobs ~f:(fun (j : Background_tasks.Summary.t) ->
@@ -766,6 +766,7 @@ let rec event ?now (e : Agent.Event.t) =
            { call_id
            ; agent_id
            ; task
+           ; name
            ; model
            ; tools
            ; worktree
@@ -776,6 +777,7 @@ let rec event ?now (e : Agent.Event.t) =
       ; "call_id", str call_id
       ; "agent_id", str agent_id
       ; "task", str task
+      ; "name", str name
       ; "model", str model
       ; "tools", `Array (List.map tools ~f:str)
       ]
@@ -865,6 +867,7 @@ let subagent_summary (s : Subagent_log.Summary.t) =
     ; "call_id", str s.call_id
     ; "parent", opt str s.parent
     ; "task", str s.task
+    ; "name", opt str s.name
     ; "model", str s.model
     ; "state", str (Subagent_log.State.to_string s.state)
     ; "started_at_ms", ms s.started_at

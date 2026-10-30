@@ -849,12 +849,22 @@ let set_config t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "compaction_model: %s" (Error.to_string_hum e))
   in
+  let%bind naming_model =
+    match config.naming_model with
+    | None -> Ok None
+    | Some name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:(fun m -> Some (Model.key m))
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "naming_model: %s" (Error.to_string_hum e))
+  in
   let config =
     { config with
       fallback_models =
         List.stable_dedup fallback_models ~compare:String.compare
     ; generate_model
     ; compaction_model
+    ; naming_model
     }
   in
   let%bind () =
@@ -2224,6 +2234,61 @@ let run_failed t ~resolve exn =
 
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
+let generate_model t =
+  match t.config.generate_model with
+  | None -> Ok t.model
+  | Some name ->
+    Model_registry.resolve t.models name
+    |> Result.map_error ~f:(fun e ->
+      Error.createf
+        "generate_model: %s (fix it with /settings or in config.json)"
+        (Error.to_string_hum e))
+;;
+
+let naming_model t =
+  match t.config.naming_model with
+  | None -> generate_model t
+  | Some name ->
+    Model_registry.resolve t.models name
+    |> Result.map_error ~f:(fun e ->
+      Error.createf
+        "naming_model: %s (fix it with /naming model or in config.json)"
+        (Error.to_string_hum e))
+;;
+
+(* A naming model that is unknown or fails hands over to the session's, so
+   that a name still comes; the notice says what to fix. *)
+let with_naming_model t ~f =
+  let fix = "change it with /naming model, or /naming model off" in
+  match naming_model t with
+  | Error e ->
+    broadcast
+      t
+      (Notice
+         (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
+    f t.model
+  | Ok model when String.equal (Model.key model) (Model.key t.model) -> f model
+  | Ok model ->
+    (match f model with
+     | Ok _ as ok -> ok
+     | Error e ->
+       broadcast
+         t
+         (Notice
+            (sprintf
+               "%s with %s (%s); trying the session's model"
+               (Error.to_string_hum e)
+               (Model.key model)
+               fix));
+       f t.model)
+;;
+
+let name_subagent t ~task ~siblings ~cancel =
+  with_naming_model t ~f:(fun model ->
+    Subagent_name.ask ~provider:t.provider ~model ~cancel ~task ~siblings ())
+  |> Result.ok
+;;
+
 let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
   refresh_location t;
   cancel_resume_timer t;
@@ -2595,17 +2660,12 @@ and auto_describe t =
     t.describing <- Some finished;
     Fiber.fork ~sw:t.sw (fun () ->
       Guarded.run ~what:"describing the session" (fun () ->
-        match
-          Session_description.describe
-            ~provider:t.provider
-            ~model:t.model
-            session
-        with
+        let describe model =
+          Session_description.describe ~provider:t.provider ~model session
+        in
+        match with_naming_model t ~f:describe with
         | Ok _ -> if phys_equal session t.session then state_changed t
-        | Error e ->
-          broadcast
-            t
-            (Notice ("session description failed: " ^ Error.to_string_hum e)));
+        | Error e -> broadcast t (Notice (Error.to_string_hum e)));
       t.describing <- None;
       Promise.resolve resolve ()))
 
@@ -3611,17 +3671,6 @@ let btw t ~question ~cancel ~on_delta =
   | Error e -> Or_error.error_string e
   | Aborted -> Or_error.error_string "cancelled"
   | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
-;;
-
-let generate_model t =
-  match t.config.generate_model with
-  | None -> Ok t.model
-  | Some name ->
-    Model_registry.resolve t.models name
-    |> Result.map_error ~f:(fun e ->
-      Error.createf
-        "generate_model: %s (fix it with /settings or in config.json)"
-        (Error.to_string_hum e))
 ;;
 
 let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =

@@ -6,6 +6,7 @@ type t =
   ; call_id : string (** the [subagent] call that started it *)
   ; parent : string option
   ; task : string
+  ; name : string option (** [None] from older backends *)
   ; model : string
   ; turns : int
   ; result : Event.Subagent_result.t option (** [None] while it runs *)

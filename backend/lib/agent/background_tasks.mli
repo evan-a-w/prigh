@@ -38,6 +38,9 @@ module Task : sig
   (** The subagent's task or the job's command. *)
   val label : t -> string
 
+  (** A subagent's name ({!Subagent_name}). *)
+  val name : t -> string option
+
   val outcome : t -> Outcome.t option
   val running : t -> bool
   val delivered : t -> bool
@@ -76,6 +79,7 @@ module Summary : sig
   type t =
     { id : string
     ; label : string
+    ; name : string option (** a subagent's ({!Subagent_name}) *)
     ; running : bool
     ; status : string option (** the outcome's, once finished *)
     }
@@ -120,6 +124,7 @@ val auto_background : t -> float option
 val spawn
   :  ?input:Stdin_feed.t
   -> ?inbox:Subagent_inbox.t
+  -> ?name:string
   -> t
   -> kind:Kind.t
   -> label:string

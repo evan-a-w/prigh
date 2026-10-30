@@ -702,6 +702,20 @@ val btw
     else the session's. *)
 val generate_model : t -> Model.t Or_error.t
 
+(** The model that names the session and its subagents: the config's
+    [naming_model], else {!generate_model}. *)
+val naming_model : t -> Model.t Or_error.t
+
+(** A name for a subagent the model gave none ({!Subagent_name.ask}), by
+    {!naming_model} (the session's model when it is unknown or fails, with a
+    notice saying so); [None] when no model can name it. *)
+val name_subagent
+  :  t
+  -> task:string
+  -> siblings:string list
+  -> cancel:Cancellation.t
+  -> string option
+
 (** One tool-less request without thinking, outside the conversation:
     [system] and the one user message [user]; [on_delta] receives the
     streamed text. The cost counts towards the session's. Returns the

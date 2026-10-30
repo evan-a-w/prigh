@@ -42,6 +42,9 @@ type t =
   ; mask_observations : bool
     (** replace old tool outputs with placeholders before summarising
         (default true) *)
+  ; naming_model : string option
+    (** the model that names sessions and subagents; [None]: the backend's
+        [generate_model], else the session's *)
   }
 [@@deriving sexp_of, equal]
 

@@ -9,6 +9,7 @@ let start ~continued =
     { call_id = "c1"
     ; agent_id = "a1"
     ; task = "fix the parser"
+    ; name = None
     ; model = "claude-haiku"
     ; tools = [ "bash" ]
     ; worktree = None
