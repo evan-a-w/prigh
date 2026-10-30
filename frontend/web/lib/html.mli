@@ -49,6 +49,7 @@ module Icon : sig
     | External
     | Key
     | Server
+    | Server_off
     | Help
     | Bot
     | Back

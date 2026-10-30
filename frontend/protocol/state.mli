@@ -40,6 +40,9 @@ type t =
   ; cost_usd : float
   ; context_tokens : int
   ; active_host : string (** [Host.id]; "backend" or a client id *)
+  ; active_host_name : string option
+    (** its name as last seen, also while it is disconnected (absent from
+        [hosts]); [None] when unknown or from older backends *)
   ; hosts : Host.t list
     (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list

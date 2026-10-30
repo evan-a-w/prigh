@@ -70,6 +70,9 @@ let mask t s =
        ~pattern:(sprintf {|"name":"%s"|} (Core_unix.gethostname ()))
        ~with_:{|"name":"<host>"|}
   |> String.substr_replace_all
+       ~pattern:(sprintf {|"active_host_name":"%s"|} (Core_unix.gethostname ()))
+       ~with_:{|"active_host_name":"<host>"|}
+  |> String.substr_replace_all
        ~pattern:(sprintf "tools now run on %s" (Core_unix.gethostname ()))
        ~with_:"tools now run on <host>"
   |> String.substr_replace_all

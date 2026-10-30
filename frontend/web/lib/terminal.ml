@@ -71,9 +71,10 @@ let where t (state : State.t) =
     | Some host -> host.name, host.cwd
     | None ->
       let name =
-        if String.is_empty state.active_host
-        then "no tool host"
-        else state.active_host ^ " (offline)"
+        match Active_host.of_state state with
+        | Disconnected { name; _ } -> name ^ " (offline)"
+        | Connected h -> h.name
+        | Unset -> "no tool host"
       in
       name, state.cwd
   in
