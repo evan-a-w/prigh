@@ -69,11 +69,13 @@ const signIn = async p => {
   await p.locator("form button[type=submit]").click();
   await composer(p).waitFor();
 };
-const compaction = p => p.locator(".settings-section", { has: p.locator(".setting.compact-at") });
-// The settings page, scrolled to the section, once the backend's config is in.
+const compaction = p => p.locator(".settings-group", { has: p.locator(".setting.compact-at") });
+// The settings page's Models section, scrolled to Compaction, once the
+// backend's config is in.
 const openSettings = async p => {
   await p.keyboard.press("Control+,");
   await p.locator(".settings-dialog").waitFor();
+  await p.locator(".settings-tab-models").click();
   await p.locator(".compact-at-input:not([disabled])").waitFor();
   await compaction(p).scrollIntoViewIfNeeded();
 };
@@ -168,7 +170,7 @@ ${(await page.locator(".picker-item").first().innerText()).replace(/\s+/g, " ")}
   await openSettings(phone);
   section("phone");
   console.log(`fits: ${await phone.evaluate(() => {
-    const s = document.querySelector(".settings-section:has(.compact-at)");
+    const s = document.querySelector(".settings-group:has(.compact-at)");
     return s.scrollWidth <= s.clientWidth;
   })}`);
   await screenshot(phone, "phone");

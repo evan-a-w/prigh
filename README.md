@@ -824,13 +824,17 @@ changes height.
 
 The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
-about the session: the theme and accent, notifications (on or off, and
-what to do when the browser has not been asked, blocks them or cannot show
-them), session tabs (`/tabs`), transcript detail (`/verbosity`), tool
-confirmation (`/confirm`),
-the providers (`/auth`), who you are signed in (and acting) as with Switch
-account and Sign out, and the keyboard shortcuts. Esc closes it; its
-controls keep it open.
+about the session, in sections listed down its side (across its top on a
+phone): **Appearance** (the theme and accent, session tabs (`/tabs`),
+transcript detail (`/verbosity`)), **Behaviour** (tool confirmation
+(`/confirm`); notifications, on or off, and what to do when the browser has
+not been asked, blocks them or cannot show them), **Models** (the providers
+(`/auth`) and compaction), **Git hosting**, **Nix store** (superusers) and
+**Account** (who you are signed in, and acting, as, with Switch account and
+Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
+opens it at a section; on the list, the arrows, Home and End move between
+sections. It opens where you left it. Esc closes it; its controls keep it
+open; the keyboard shortcuts are in its footer.
 
 Session tabs (off by default; the settings page's Tabs switch or `/tabs
 on|off`, saved for your account, so they follow you to other browsers and
@@ -1941,7 +1945,7 @@ thinking only if it supports it, else a transcript when that does not
 fit), but, being another model, it does not reuse the conversation's
 prompt cache. `/compaction` alone shows all three settings, and
 `/compaction model` alone picks the model from a list. prigh-web's
-settings page has them too, under Compaction: the threshold (or Off), the
+settings page has them too, under Models, Compaction: the threshold (or Off), the
 summary model (a picker) and the masking switch, saved and kept in step
 with `/compaction` like the rest. The system prompt also suggests handing
 wide exploration to subagents, so the main context stays small.

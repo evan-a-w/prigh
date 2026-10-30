@@ -2910,7 +2910,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       the status so that they never move it: the plan chip (the bar's
       only), queued
       messages, the transfers in progress from `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
-      gear beside the account, the account menu, `/settings` or Ctrl+,:
+      gear beside the account, the account menu, `/settings [SECTION]` or
+      Ctrl+,: one `Settings_section` at a time, picked from tabs down its
+      side (`Model.settings_section`, kept while it is closed; the arrows,
+      Home and End on a tab are `Settings_move`, via `Keys.Target.Settings_tab`;
+      `Settings_view.content` says which rows each section has, so a new
+      setting is a row there):
       the theme and accent (`Theme_view`), notifications, verbosity, `/confirm`,
       providers, the Nix store for superusers (`Nix_gc`: `nix_store_status`
       fetched as it opens, our collection's progress, also a chip in the

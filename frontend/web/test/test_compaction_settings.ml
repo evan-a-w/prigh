@@ -15,7 +15,7 @@ let config ?(at = 200_000) ?model ?(mask = true) () =
         ])
 ;;
 
-let section h = H.text h ~selector:".settings-section:has(.compact-at)"
+let section h = H.text h ~selector:".settings-group:has(.compact-at)"
 
 let field h =
   H.show h ~selector:".compact-at-input";
@@ -24,15 +24,15 @@ let field h =
 
 let settings () =
   let h = H.create () in
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Models));
   h
 ;;
 
 let%expect_test "the section: defaults, then each control" =
   let h = settings () in
   section h;
-  H.names h ~selector:".settings-section:has(.compact-at) input";
-  H.names h ~selector:".settings-section:has(.compact-at) button";
+  H.names h ~selector:".settings-group:has(.compact-at) input";
+  H.names h ~selector:".settings-group:has(.compact-at) button";
   [%expect
     {|
     Compaction
@@ -279,7 +279,7 @@ let%expect_test
   (* A half-typed threshold is the page's: Esc drops it. *)
   H.act h (Compact_at_input "33");
   H.key h "Escape" ~target:Field;
-  H.quiet h (fun () -> H.act h Open_settings);
+  H.quiet h (fun () -> H.act h (Settings_section Models));
   H.text h ~selector:".setting.compact-at .setting-control";
   [%expect
     {|
@@ -299,7 +299,7 @@ let%expect_test
          , Ok
              (Jsonaf.of_string
                 {|{"client_id":"c1","user":"root","namespace":"bob"}|}) ));
-    H.act h Open_settings);
+    H.act h (Settings_section Models));
   section h;
   H.reply h "get_config" (config ());
   section h;
