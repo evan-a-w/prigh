@@ -3,15 +3,6 @@ open! Import
 open Html
 
 let git action = App.Action.Git action
-
-let files (m : App.Model.t) =
-  List.map m.review.files ~f:(fun f ->
-    ( f.path
-    , Prigh_ui.File_approval.Status.equal
-        (Code_review.approval m.review f)
-        Approved ))
-;;
-
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
 
 (* A branch reviewed without a checkout has nothing to stage or commit. *)
@@ -68,11 +59,6 @@ let strip (m : App.Model.t) ~inject =
         ; count untracked "untracked"
         ]
     in
-    let approved_unstaged =
-      List.count (files m) ~f:(fun (path, approved) ->
-        approved
-        && Option.exists (Git_status.find s path) ~f:Git_status.File.unstaged)
-    in
     let push_label =
       match s.upstream with
       | None -> "Push"
@@ -93,12 +79,16 @@ let strip (m : App.Model.t) ~inject =
          | None -> Node.none)
       ; div
           ~cls:"git-actions"
-          [ button
-              ~cls:"small"
-              ~disabled:(busy || approved_unstaged = 0)
-              ~title:"Stage the approved files' changes"
-              ~on_click:(inject (git Stage_approved))
-              [ icon Check; Node.text "Stage approved" ]
+          [ (if Option.is_some t.commit
+             then Node.none
+             else
+               button
+                 ~cls:"small git-compose"
+                 ~disabled:(staged + unstaged + untracked = 0)
+                 ~title:
+                   "Commit the selected files, else the approved ones (Shift+C)"
+                 ~on_click:(inject App.Action.Compose_commit)
+                 [ icon Check; Node.text "Commit…" ])
           ; button
               ~cls:
                 (if s.ahead > 0 || Option.is_none s.upstream
@@ -129,48 +119,6 @@ let strip (m : App.Model.t) ~inject =
       ]
 ;;
 
-let tick (m : App.Model.t) path ~inject =
-  let t = m.git_bar in
-  match Git_bar.tick t ~files:(files m) path with
-  | _ when read_only m -> Node.none
-  | Clean -> span ~cls:"git-tick clean" ""
-  | (Checked | Partly | Unchecked) as tick ->
-    let checked =
-      match tick with
-      | Checked -> "true"
-      | Partly -> "mixed"
-      | Unchecked | Clean -> "false"
-    in
-    let staged =
-      Option.exists
-        (Option.bind t.status ~f:(fun s -> Git_status.find s path))
-        ~f:Git_status.File.staged
-    in
-    Node.button
-      ~attrs:
-        [ classes
-            [ "git-tick" ]
-            [ "on", Git_bar.Tick.equal tick Checked
-            ; "partly", Git_bar.Tick.equal tick Partly
-            ; "pending", Git_bar.Tick.equal tick Checked && not staged
-            ]
-        ; Attr.type_ "button"
-        ; Attr.role "checkbox"
-        ; Attr.create "aria-checked" checked
-        ; Attr.create "aria-label" ("Commit " ^ path)
-        ; Attr.title
-            (match tick with
-             | Checked when staged -> "Staged: untick to unstage it"
-             | Checked ->
-               "Approved: staged when you commit (untick to leave it out)"
-             | Partly -> "Partly staged: tick to stage all of it"
-             | Unchecked | Clean -> "Not staged: tick to stage it")
-        ; (if Option.is_some t.busy then Attr.disabled else Attr.empty)
-        ; Attr.on_click (fun _ -> inject (git (Toggle path)))
-        ]
-      [ check (not (Git_bar.Tick.equal tick Unchecked)) ]
-;;
-
 let commit_key
       (m : App.Model.t)
       ~inject
@@ -189,6 +137,8 @@ let commit_key
   let action : App.Action.t option =
     match key with
     | "Enter" when ctrl -> Some (git Commit)
+    | "Escape" when not (Generate.running_for m.generate Commit_message) ->
+      Some (git Close_commit)
     | "Escape" when Generate.running_for m.generate Commit_message ->
       Some Generate_stop
     | _ when alt && (not ctrl) && String.equal code "KeyG" ->
@@ -205,19 +155,70 @@ let commit_key
 
 let commit_box (m : App.Model.t) ~inject =
   let t = m.git_bar in
-  match t.status with
+  match t.status, t.commit with
   | _ when read_only m -> Node.none
-  | None -> Node.none
-  | Some _ ->
-    let count = Git_bar.to_commit t ~files:(files m) in
+  | None, _ | _, None -> Node.none
+  | Some _, Some _ ->
+    let paths = Git_bar.to_commit t in
+    let count = List.length paths in
     let committing = Option.equal Git_bar.Busy.equal t.busy (Some Committing) in
-    div
-      ~cls:"git-commit"
+    let chosen path =
+      let stage = Git_bar.stage t path in
+      Node.li
+        ~attrs:[ Attr.class_ "git-commit-file" ]
+        [ span ~cls:"git-commit-path" ~attrs:[ Attr.title path ] path
+        ; (match stage with
+           | Staged -> span ~cls:"git-commit-staged" "staged"
+           | Partly -> span ~cls:"git-commit-staged" "partly staged"
+           | Unstaged | Clean -> Node.none)
+        ; button
+            ~cls:"icon ghost tiny"
+            ~disabled:(Option.is_some t.busy)
+            ~title:
+              (match stage with
+               | Staged | Partly -> "Leave it out of the commit (unstages it)"
+               | Unstaged | Clean -> "Leave it out of the commit")
+            ~label:("Leave out " ^ path)
+            ~on_click:(inject (git (Leave_out path)))
+            [ icon Close ]
+        ]
+    in
+    Node.create
+      "section"
+      ~attrs:[ Attr.class_ "git-commit"; Attr.create "aria-label" "Commit" ]
       [ div
+          ~cls:"git-commit-head"
+          [ Node.h3
+              ~attrs:[ Attr.class_ "git-commit-title" ]
+              [ Node.text
+                  (match count with
+                   | 0 -> "Commit"
+                   | n -> sprintf "Commit %s" (plural n "file"))
+              ]
+          ; button
+              ~cls:"icon ghost tiny"
+              ~title:"Close the commit, keeping the message"
+              ~label:"Close the commit"
+              ~on_click:(inject (git Close_commit))
+              [ icon Close ]
+          ]
+      ; (match paths with
+         | [] ->
+           Node.p
+             ~attrs:[ Attr.class_ "git-commit-none" ]
+             [ Node.text
+                 "No files yet: right-click files (or select them with x) and \
+                  choose Add to the commit."
+             ]
+         | paths ->
+           Node.ul
+             ~attrs:[ Attr.class_ "git-commit-files" ]
+             (List.map paths ~f:chosen))
+      ; div
           ~cls:"field-head"
           [ Node.label
               ~attrs:[ Attr.for_ "git-message"; Attr.class_ "field-label" ]
-              [ Node.text "Commit message" ]
+              [ Node.text "Message" ]
           ; Generate_view.button m.generate Commit_message ~inject
           ]
       ; Node.textarea
@@ -250,7 +251,7 @@ let commit_box (m : App.Model.t) ~inject =
           ; button
               ~cls:"small primary git-commit-button"
               ~disabled:(Option.is_some t.busy)
-              ~title:"Commit the ticked files (Ctrl+Enter)"
+              ~title:"Commit these files (Ctrl+Enter)"
               ~attrs:
                 (if committing then [ Attr.create "aria-busy" "true" ] else [])
               ~on_click:(inject (git Commit))

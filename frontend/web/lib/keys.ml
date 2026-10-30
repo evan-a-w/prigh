@@ -111,11 +111,20 @@ let help =
   ; ( "Alt+R"
     , "open or close the review page (/review): the changes file by file, \
        beside the chat" )
-  ; "] / [ (reviewing; also n p, j k)", "the next / previous changed file"
-  ; ( "a / c / e / v / s (reviewing)"
-    , "approve the file; comment on the code selected (drag across it, in the \
-       review or a changed file's preview); edit or comment; the whole file or \
-       the changes; send the new comments to prigh" )
+  ; "→ / ← (reviewing; also ] [, n p, j k)", "the next / previous changed file"
+  ; ( "Space (reviewing)"
+    , "approve the file and go on to the next one not approved (also a); on an \
+       approved file, take the approval back" )
+  ; ( "x / Shift+X (reviewing)"
+    , "select the file in the list, or unselect it; select every file from the \
+       last selected (also Ctrl+click, Shift+click)" )
+  ; ( "Shift+F10 / Shift+C (reviewing)"
+    , "the menu of the selected files (else the file): approve, stage, commit, \
+       copy; commit them (else the approved files)" )
+  ; ( "c / e / v / s (reviewing)"
+    , "comment on the code selected (drag across it, in the review or a \
+       changed file's preview); edit or comment; the whole file or the \
+       changes; send the new comments to prigh" )
   ; ( "r / b / d (reviewing)"
     , "choose what to review (a worktree, or a branch read-only); what to \
        compare it with (a branch, tag, commit or any revision typed); since \
@@ -123,7 +132,9 @@ let help =
   ; ( "l / Shift+L (reviewing)"
     , "what changed since your latest action on the file (or the hunks again); \
        choose the action it compares with: Latest follows your newest" )
-  ; "Esc (reviewing)", "drop the comment or selection, then close the review"
+  ; ( "Esc (reviewing)"
+    , "drop the comment, the selected code, the selected files, then close the \
+       review" )
   ; ( "Enter / Ctrl+S (reviewing)"
     , "add the comment or reply (Shift+Enter: a new line); save the file being \
        edited" )
@@ -135,9 +146,9 @@ let help =
   ; ( "Alt+G (a pull request, commit message, branch or session name)"
     , "✦ Generate: the model drafts it from the changes, the commits and the \
        session (Esc stops, keeping what came; Undo puts the text back)" )
-  ; ( "Ctrl+Enter (the review's commit message)"
-    , "commit the ticked files (approved files come ticked; untick to leave \
-       one out)" )
+  ; ( "Ctrl+Enter / Esc (the review's commit message)"
+    , "commit the files listed above it; close the commit, keeping the message"
+    )
   ; ( "Ctrl+Enter (in a dialog's text box)"
     , "accept the dialog, e.g. create the pull request (Enter is a new line)" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
@@ -192,6 +203,11 @@ let on_control t =
 (* Ctrl+` by the key's position, whatever the layout types there. *)
 let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 
+let menu_key t =
+  String.equal t.key "ContextMenu"
+  || (String.equal t.key "F10" && t.shift && not (t.ctrl || t.alt || t.meta))
+;;
+
 (* The review page's keys; [r], [b] and [d] choose what it compares, [L]
    what its file's since-view does. *)
 let review_key (m : App.Model.t) t : App.Action.t option =
@@ -204,6 +220,18 @@ let review_key (m : App.Model.t) t : App.Action.t option =
   | "d" when plain t ->
     Option.map m.review.diff ~f:(fun d ->
       App.Action.Review_direct (not d.direct))
+  | "C" when t.shift && not (t.alt || t.ctrl || t.meta) -> Some Compose_commit
+  | _ when menu_key t ->
+    let paths =
+      match Code_review.marked m.review with
+      | [] -> Option.to_list m.review.current
+      | marked -> marked
+    in
+    Option.map (List.hd paths) ~f:(fun first ->
+      App.Action.Open_menu
+        { target = Review_files paths
+        ; anchor = Element (Code_review.file_dom_id first)
+        })
   | _ ->
     Code_review.key m.review ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
     |> Option.map ~f:(fun a -> App.Action.Review a)
@@ -388,11 +416,6 @@ let session_search_key t : App.Action.t option =
   | "Enter" when plain t -> Some Open_first_session
   | "Escape" -> Some Leave_sidebar
   | _ -> None
-;;
-
-let menu_key t =
-  String.equal t.key "ContextMenu"
-  || (String.equal t.key "F10" && t.shift && not (t.ctrl || t.alt || t.meta))
 ;;
 
 let session_key (m : App.Model.t) t id : App.Action.t option =

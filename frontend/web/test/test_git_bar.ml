@@ -91,7 +91,7 @@ let show_bar h =
   H.text h ~selector:".review-files"
 ;;
 
-let%expect_test "the bar: branch, upstream, counts; approved files come ticked" =
+let%expect_test "the bar: branch, upstream, counts; no boxes in the list" =
   let h = opened () in
   H.reply
     h
@@ -99,25 +99,15 @@ let%expect_test "the bar: branch, upstream, counts; approved files come ticked" 
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
   show_bar h;
-  [%expect
-    {|
+  H.elements h ~selector:".git-commit";
+  [%expect {|
     (Complete_accept (run true))
     feat/x ↑1 ↓0 origin/feat/x
     0 staged 1 unstaged 1 untracked
-    (Stage approved) (Push ↑1) (Create PR)
-    (☑) (✓ src/ main.ml +2 −1)
-    (☐) (○ src/ util.ml +2 −0)
+    (Commit…) (Push ↑1) (Create PR)
+    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
-    Commit message
-    (✦ Generate)
-    []
-    (☐ Amend) (Commit 1 file)
-    |}];
-  H.names h ~selector:".git-tick";
-  [%expect
-    {|
-    [checkbox] button "Commit src/main.ml" -- Approved: staged when you commit (untick to leave it out)
-    [checkbox] button "Commit src/util.ml" -- Not staged: tick to stage it
     |}];
   (* A status it cannot read: no actions, and why. *)
   H.quiet h (fun () -> H.act h (Review Refresh));
@@ -126,29 +116,37 @@ let%expect_test "the bar: branch, upstream, counts; approved files come ticked" 
   [%expect {| No git actions here: not a git repository: /x (/cd into one) |}]
 ;;
 
-let%expect_test "ticking stages and unstages; Stage approved" =
+let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   let h = opened () in
   H.reply
     h
     "git_status"
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
-  (* Unticking an approved file leaves it out: nothing to tell git. *)
-  H.click h ~selector:".git-tick";
-  H.click h ~selector:".git-tick" ~nth:1;
-  [%expect
-    {|
+  (* The row's ⋯ (or a right-click) opens its menu. *)
+  H.click h ~selector:".review-file-more" ~nth:1;
+  H.text h ~selector:".context-menu";
+  [%expect {|
     (Complete_accept (run true))
-    (Git (Toggle src/main.ml))
-    (Git (Toggle src/util.ml))
-    (Rpc (method_ git_stage) (params ((paths (src/util.ml)))) (tag (Git Staged)))
+    (Open_menu
+     ((target (Review_files (src/util.ml)))
+      (anchor (Element review-file-src-util-ml-more))))
+    (Focus dialog)
+    (Place_menu (Element review-file-src-util-ml-more))
+    util.ml src
+    Approve Space
+    Take back the approval Not approved
+    Stage
+    Unstage Nothing staged
+    Commit… C
+    Select x
+    Copy path
     |}];
-  H.text h ~selector:".git-bar";
-  [%expect
-    {|
-    feat/x ↑1 ↓0 origin/feat/x
-    0 staged 1 unstaged 1 untracked
-    (Stage approved) (Push ↑1) (Create PR)
+  H.click h ~selector:".context-menu [data-item=stage_files]";
+  [%expect {|
+    (Picker_choose stage_files)
+    (Rpc (method_ git_stage) (params ((paths (src/util.ml)))) (tag (Git Staged)))
+    (Focus review-page)
     |}];
   H.reply
     h
@@ -156,45 +154,90 @@ let%expect_test "ticking stages and unstages; Stage approved" =
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~index:"A" ]);
   H.text h ~selector:".review-files ul";
-  [%expect
-    {|
-    (☐) (✓ src/ main.ml +2 −1)
-    (☑) (○ src/ util.ml +2 −0)
+  [%expect {|
+    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ src/ util.ml staged +2 −0) (More (right-click, Shift+F10))
     |}];
-  (* A staged file unticked is unstaged. *)
-  H.click h ~selector:".git-tick" ~nth:1;
-  [%expect
-    {|
-    (Git (Toggle src/util.ml))
+  (* Staged now: its menu offers Unstage instead. *)
+  H.click h ~selector:".review-file-more" ~nth:1;
+  H.text h ~selector:".context-menu";
+  H.click h ~selector:".context-menu [data-item=unstage_files]";
+  [%expect {|
+    (Open_menu
+     ((target (Review_files (src/util.ml)))
+      (anchor (Element review-file-src-util-ml-more))))
+    (Focus dialog)
+    (Place_menu (Element review-file-src-util-ml-more))
+    util.ml src
+    Approve Space
+    Take back the approval Not approved
+    Stage Git has all of the changes
+    Unstage
+    Commit… C
+    Select x
+    Copy path
+    (Picker_choose unstage_files)
     (Rpc (method_ git_unstage) (params ((paths (src/util.ml))))
      (tag (Git Staged)))
+    (Focus review-page)
     |}];
   H.reply
     h
     "git_unstage"
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
-  H.click h ~selector:".git-actions button";
-  [%expect
-    {|
-    (Git Stage_approved)
-    (Rpc (method_ git_stage) (params ((paths (src/main.ml)))) (tag (Git Staged)))
+  (* x selects the file on show, Shift+X every file from the last one
+     selected; the menu then acts on all of them. *)
+  H.key h "x" ~target:Review;
+  H.key h "ArrowRight" ~target:Review;
+  H.key h "X" ~shift:true ~target:Review;
+  H.text h ~selector:".review-files";
+  [%expect {|
+    (Review (Mark (path src/main.ml) (range false)))
+    (Review (Step 1))
+    (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
+     (tag (Review (Content src/util.ml))))
+    (Review (Mark (path src/util.ml) (range true)))
+    2 selected (Approve) (Commit…) (More for them (Shift+F10)) (Unselect them (Esc))
+    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    2 files changed, +4 −1
     |}];
-  H.reply
-    h
-    "git_stage"
-    (status_json
-       [ file "src/main.ml" ~index:"M" ~worktree:"M"
-       ; file "src/util.ml" ~worktree:"?"
-       ]);
-  H.text h ~selector:".review-files ul";
-  H.names h ~selector:".git-tick";
-  [%expect
-    {|
-    (☑) (✓ src/ main.ml +2 −1)
-    (☐) (○ src/ util.ml +2 −0)
-    [checkbox] button "Commit src/main.ml" -- Partly staged: tick to stage all of it
-    [checkbox] button "Commit src/util.ml" -- Not staged: tick to stage it
+  H.key h "F10" ~shift:true ~target:Review;
+  H.text h ~selector:".context-menu";
+  [%expect {|
+    (Open_menu
+     ((target (Review_files (src/main.ml src/util.ml)))
+      (anchor (Element review-file-src-main-ml))))
+    (Focus dialog)
+    (Place_menu (Element review-file-src-main-ml))
+    2 selected files main.ml, util.ml
+    Approve
+    Take back the approval
+    Stage
+    Unstage Nothing staged
+    Commit… C
+    Unselect x
+    Copy paths
+    |}];
+  H.click h ~selector:".context-menu [data-item=approve_files]";
+  [%expect {|
+    (Picker_choose approve_files)
+    (Rpc (method_ review_approve)
+     (params
+      ((root /home/me/proj) (path src/util.ml)
+       (hash 1ccc6f9f4c595676b5f7c4edbcb27af1)))
+     (tag (Review (Changed ()))))
+    (Focus review-page)
+    |}];
+  (* Esc drops the selection before it closes the review. *)
+  H.key h "Escape" ~target:Review;
+  H.text h ~selector:".review-files";
+  [%expect {|
+    (Review Unmark_all)
+    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    2 files changed, +4 −1
     |}]
 ;;
 
@@ -207,12 +250,26 @@ let%expect_test
     "git_status"
     (status_json
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~worktree:"?" ]);
+  (* Commit… (Shift+C) opens the commit with the approved files. *)
+  H.click h ~selector:".git-compose";
+  H.text h ~selector:".git-commit";
+  [%expect {|
+    (Complete_accept (run true))
+    Compose_commit
+    (Focus git-message)
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml (Leave it out of the commit)
+    Message
+    (✦ Generate)
+    []
+    (☐ Amend) (Commit 1 file)
+    |}];
   (* Refusals say what to do. *)
   H.click h ~selector:".git-commit-button";
   H.text h ~selector:".git-failure";
   [%expect
     {|
-    (Complete_accept (run true))
     (Git Commit)
     Write a commit message, or Generate one (Alt+G).
     |}];
@@ -239,7 +296,10 @@ let%expect_test
   H.text h ~selector:".git-commit";
   [%expect
     {|
-    Commit message
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml staged (Leave it out of the commit (unstages it))
+    Message
     (Stop)
     [Double c]
     (☐ Amend) (Commit 1 file)
@@ -251,7 +311,10 @@ let%expect_test
   H.text h ~selector:".git-commit";
   [%expect
     {|
-    Commit message
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml staged (Leave it out of the commit (unstages it))
+    Message
     (✦ Generate) (Undo)
     [Double c and add d]
     (☐ Amend) (Commit 1 file)
@@ -261,7 +324,10 @@ let%expect_test
   [%expect
     {|
     (Generate_undo Commit_message)
-    Commit message
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml staged (Leave it out of the commit (unstages it))
+    Message
     (✦ Generate)
     []
     (☐ Amend) (Commit 1 file)
@@ -295,12 +361,17 @@ let%expect_test
     Committed 1234567 Double c on feat/x
     feat/x ↑2 ↓0 origin/feat/x
     0 staged 0 unstaged 1 untracked
-    (Stage approved) (Push ↑2) (Create PR)
+    (Commit…) (Push ↑2) (Create PR)
     Committed 1234567 Double c on feat/x
     |}];
   (* Amending without a message keeps the commit's. *)
+  H.key h "C" ~shift:true ~target:Review;
   H.click h ~selector:".git-amend";
-  [%expect {| (Git Toggle_amend) |}];
+  [%expect {|
+    Compose_commit
+    (Focus git-message)
+    (Git Toggle_amend)
+    |}];
   H.click h ~selector:".git-commit-button";
   [%expect
     {|
@@ -321,6 +392,7 @@ let%expect_test "a draft that fails puts the text back and says why" =
     "git_status"
     (status_json
        [ file "src/main.ml" ~index:"M"; file "src/util.ml" ~worktree:"?" ]);
+  H.quiet h (fun () -> H.act h Compose_commit);
   H.input h ~selector:"#git-message" "mine";
   H.click h ~selector:".git-commit .generate-go";
   H.event h {|{"event":"generate_delta","gen_id":"gen-1","delta":"Half"}|};
@@ -334,7 +406,10 @@ let%expect_test "a draft that fails puts the text back and says why" =
     (Generate Commit_message)
     (Rpc (method_ generate_text) (params ((gen_id gen-1) (kind commit_message)))
      (tag (Generated gen-1)))
-    Commit message
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml staged (Leave it out of the commit (unstages it))
+    Message
     (✦ Generate)
     [mine]
     (☐ Amend) (Commit 1 file)
@@ -354,7 +429,10 @@ let%expect_test "a draft that fails puts the text back and says why" =
      (tag (Generated gen-2)))
     Generate_stop
     (Rpc (method_ generate_cancel) (params ((gen_id gen-2))) (tag Ignore))
-    Commit message
+    Commit 1 file
+    (Close the commit, keeping the message)
+    src/main.ml staged (Leave it out of the commit (unstages it))
+    Message
     (✦ Generate) (Undo)
     [Part]
     (☐ Amend) (Commit 1 file)
@@ -400,7 +478,7 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     Pushed feat/x to origin
     feat/x ↑0 ↓0 origin/feat/x
     0 staged 1 unstaged 0 untracked
-    (Stage approved) (Push) (Create PR)
+    (Commit…) (Push) (Create PR)
     Pushed feat/x to origin
     |}];
   H.quiet h (fun () -> H.act h (Review Refresh));
@@ -408,6 +486,7 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     h
     "git_status"
     (status_json ~branch:None [ file "src/main.ml" ~index:"M" ]);
+  H.quiet h (fun () -> H.act h Compose_commit);
   H.input h ~selector:"#git-message" "x";
   H.click h ~selector:".git-commit-button";
   H.text h ~selector:".git-bar";
@@ -418,7 +497,7 @@ let%expect_test "push: refused, then pushed; detached HEAD" =
     (Git Commit)
     detached HEAD ↑1 ↓0 origin/feat/x
     1 staged 0 unstaged 0 untracked
-    (Stage approved) (Push ↑1) (Create PR)
+    (Push ↑1) (Create PR)
     HEAD is detached: commit on a branch (git switch -c NAME).
     HEAD is detached: commit on a branch (git switch -c NAME).
     |}]

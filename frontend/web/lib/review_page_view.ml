@@ -57,28 +57,78 @@ let comment_count (t : Code_review.t) path =
     Review_comment.Status.equal c.status Open)
 ;;
 
+(* A menu of files: at the pointer, or (from the keyboard, which gives no
+   position) under the row. *)
+let open_menu
+      ~inject
+      paths
+      ~row
+      (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t)
+  =
+  let x = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientX)
+  and y = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientY) in
+  let anchor : Context_menu.Anchor.t =
+    if x = 0 && y = 0 then Element row else Point { x; y }
+  in
+  Js_of_ocaml.Dom.preventDefault ev;
+  Effect.Many
+    [ Effect.Stop_propagation
+    ; inject (App.Action.Open_menu { target = Review_files paths; anchor })
+    ]
+;;
+
+(* What a row's menu acts on: the selection when the row is in it. *)
+let menu_paths (t : Code_review.t) path =
+  if Set.mem t.marked path then Code_review.marked t else [ path ]
+;;
+
+(* Buttons that take the review's keys rather than Space pressing them (see
+   [key_target] in web_main). *)
+let review_keys = Attr.create "data-review-keys" ""
+
 let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
   let t = m.review in
   let current = Option.exists t.current ~f:(String.equal f.path) in
+  let marked = Set.mem t.marked f.path in
   let dir, name = split_path f.path in
   let status = Code_review.approval t f in
   let comments = comment_count t f.path in
+  let id = Code_review.file_dom_id f.path in
+  let more_id = id ^ "-more" in
   Node.li
-    [ Git_bar_view.tick m f.path ~inject
-    ; Node.button
+    ~attrs:
+      [ classes [ "review-file-row" ] [ "current", current; "marked", marked ]
+      ; Attr.on_contextmenu (open_menu ~inject (menu_paths t f.path) ~row:id)
+      ]
+    [ Node.button
         ~attrs:
           [ classes
               [ "review-file" ]
               [ "current", current
+              ; "marked", marked
               ; "approved", File_approval.Status.equal status Approved
               ; "changed", File_approval.Status.equal status Changed
               ]
           ; Attr.type_ "button"
+          ; review_keys
+          ; Attr.id id
           ; Attr.create "data-path" f.path
           ; (if current then Attr.create "aria-current" "true" else Attr.empty)
+          ; Attr.create "aria-selected" (Bool.to_string marked)
           ; Attr.title
-              (sprintf "%s: %s" f.path (File_approval.Status.to_string status))
-          ; Attr.on_click (fun _ -> inject (review (Go f.path)))
+              (sprintf
+                 "%s: %s (Ctrl+click or x selects it, right-click for more)"
+                 f.path
+                 (File_approval.Status.to_string status))
+          ; Attr.on_click (fun ev ->
+              let shift = Js_of_ocaml.Js.to_bool ev##.shiftKey
+              and ctrl =
+                Js_of_ocaml.Js.to_bool ev##.ctrlKey
+                || Js_of_ocaml.Js.to_bool ev##.metaKey
+              in
+              if shift || ctrl
+              then inject (review (Mark { path = f.path; range = shift }))
+              else inject (review (Go f.path)))
           ]
         [ approval_mark status
         ; Node.span
@@ -97,12 +147,178 @@ let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
                  [ Attr.title ("Changed after your last action: " ^ label) ]
                label
            | None -> Node.none)
+        ; (match Git_bar.stage m.git_bar f.path with
+           | Staged ->
+             span
+               ~cls:"review-file-staged"
+               ~attrs:[ Attr.title "Staged: git commits it as it is" ]
+               "staged"
+           | Partly ->
+             span
+               ~cls:"review-file-staged partly"
+               ~attrs:[ Attr.title "Partly staged: some changes are not" ]
+               "partly"
+           | Unstaged | Clean -> Node.none)
         ; span
             ~cls:"review-file-counts"
             (match f.status with
              | Binary -> "bin"
              | Added | Deleted | Modified -> sprintf "+%d −%d" f.added f.removed)
         ]
+    ; Node.button
+        ~attrs:
+          [ Attr.class_ "btn icon ghost more review-file-more"
+          ; Attr.type_ "button"
+          ; Attr.id more_id
+          ; Attr.tabindex (-1)
+          ; Attr.title "More (right-click, Shift+F10)"
+          ; Attr.create "aria-label" ("More for " ^ f.path)
+          ; Attr.create "aria-haspopup" "menu"
+          ; Attr.on_click (fun _ ->
+              Effect.Many
+                [ Effect.Stop_propagation
+                ; inject
+                    (App.Action.Open_menu
+                       { target = Review_files (menu_paths t f.path)
+                       ; anchor = Element more_id
+                       })
+                ])
+          ]
+        [ icon More ]
+    ]
+;;
+
+(* With files selected: what to do with them, over the list. *)
+let selection_bar (m : App.Model.t) ~inject =
+  match Code_review.marked m.review with
+  | [] -> Node.none
+  | paths ->
+    let n = List.length paths in
+    let all_approved =
+      List.for_all paths ~f:(fun p ->
+        Option.exists (Code_review.file m.review p) ~f:(fun f ->
+          File_approval.Status.equal (Code_review.approval m.review f) Approved))
+    in
+    div
+      ~cls:"review-selection"
+      ~attrs:[ Attr.role "toolbar"; Attr.create "aria-label" "Selected files" ]
+      [ span ~cls:"review-selection-count" (sprintf "%d selected" n)
+      ; button
+          ~cls:"small"
+          ~title:
+            (if all_approved
+             then "Take back their approvals"
+             else "Approve them as they are now")
+          ~on_click:
+            (inject
+               (review (Approve_files { paths; approve = not all_approved })))
+          [ icon Check
+          ; Node.text (if all_approved then "Unapprove" else "Approve")
+          ]
+      ; (if Option.is_some (Code_review.read_only m.review)
+         then Node.none
+         else
+           button
+             ~cls:"small"
+             ~title:"Commit them (Shift+C)"
+             ~on_click:(inject App.Action.Compose_commit)
+             [ Node.text "Commit…" ])
+      ; Node.button
+          ~attrs:
+            [ Attr.class_ "btn icon ghost small"
+            ; Attr.type_ "button"
+            ; Attr.id "review-selection-more"
+            ; Attr.title "More for them (Shift+F10)"
+            ; Attr.create "aria-label" "More for the selected files"
+            ; Attr.create "aria-haspopup" "menu"
+            ; Attr.on_click (fun _ ->
+                inject
+                  (App.Action.Open_menu
+                     { target = Review_files paths
+                     ; anchor = Element "review-selection-more"
+                     }))
+            ]
+          [ icon More ]
+      ; button
+          ~cls:"icon ghost small review-selection-clear"
+          ~title:"Unselect them (Esc)"
+          ~label:"Unselect the files"
+          ~on_click:(inject (review Unmark_all))
+          [ icon Close ]
+      ]
+;;
+
+(* Under the file, always in the same place: the previous file, approve
+   (and go on), the next; the keys say so. *)
+let dock (m : App.Model.t) path ~inject =
+  let t = m.review in
+  let files = t.files in
+  let total = List.length files in
+  let index =
+    List.findi files ~f:(fun _ (f : Diff_files.File.t) ->
+      String.equal f.path path)
+    |> Option.value_map ~default:0 ~f:(fun (i, _) -> i + 1)
+  in
+  let status =
+    Option.map (Code_review.file t path) ~f:(Code_review.approval t)
+  in
+  let left = total - Code_review.approved t in
+  let kbd k = Node.create "kbd" [ Node.text k ] in
+  div
+    ~cls:"review-dock"
+    ~attrs:[ Attr.role "toolbar"; Attr.create "aria-label" "Review the file" ]
+    [ button
+        ~cls:"review-dock-step"
+        ~attrs:[ review_keys ]
+        ~title:"Previous file (←, [, k)"
+        ~label:"Previous file"
+        ~disabled:(total < 2)
+        ~on_click:(inject (review (Step (-1))))
+        [ icon ~cls:"flip" Next; kbd "←" ]
+    ; (match status with
+       | None -> Node.none
+       | Some status ->
+         let approved = File_approval.Status.equal status Approved in
+         Node.button
+           ~attrs:
+             [ classes
+                 [ "btn"; "review-approve" ]
+                 [ "on", approved; "primary", not approved ]
+             ; Attr.type_ "button"
+             ; review_keys
+             ; Attr.create "aria-pressed" (Bool.to_string approved)
+             ; Attr.title
+                 (if approved
+                  then "Take the approval back (Space)"
+                  else
+                    "Approve this file as it is now and go on to the next \
+                     (Space)")
+             ; Attr.on_click (fun _ -> inject (review (Toggle_approval path)))
+             ]
+           [ icon Check
+           ; Node.span
+               ~attrs:[ Attr.class_ "review-approve-label" ]
+               [ Node.text
+                   (match status with
+                    | Approved -> "Approved"
+                    | Changed -> "Approve again"
+                    | Unapproved when left > 1 -> "Approve & next"
+                    | Unapproved -> "Approve")
+               ]
+           ; kbd "Space"
+           ])
+    ; button
+        ~cls:"review-dock-step"
+        ~attrs:[ review_keys ]
+        ~title:"Next file (→, ], j)"
+        ~label:"Next file"
+        ~disabled:(total < 2)
+        ~on_click:(inject (review (Step 1)))
+        [ kbd "→"; icon Next ]
+    ; span
+        ~cls:"review-dock-where"
+        ~attrs:[ Attr.create "aria-live" "polite" ]
+        (sprintf "File %d of %d" index total)
     ]
 ;;
 
@@ -200,19 +416,7 @@ let current_file (m : App.Model.t) path ~inject =
   let head =
     div
       ~cls:"review-file-head"
-      [ button
-          ~cls:"icon ghost"
-          ~title:"Previous file ([, p, k)"
-          ~label:"Previous file"
-          ~on_click:(inject (review (Step (-1))))
-          [ icon ~cls:"flip" Next ]
-      ; button
-          ~cls:"icon ghost"
-          ~title:"Next file (], n, j)"
-          ~label:"Next file"
-          ~on_click:(inject (review (Step 1)))
-          [ icon Next ]
-      ; Node.h2
+      [ Node.h2
           ~attrs:[ Attr.class_ "review-file-title" ]
           [ Node.text path
           ; (match file with
@@ -225,28 +429,6 @@ let current_file (m : App.Model.t) path ~inject =
          | Some Changed ->
            span ~cls:"review-stale" "Changed since you approved it"
          | Some (Approved | Unapproved) | None -> Node.none)
-      ; (match status with
-         | None -> Node.none
-         | Some status ->
-           let approved = File_approval.Status.equal status Approved in
-           Node.button
-             ~attrs:
-               [ classes [ "btn"; "small"; "review-approve" ] [ "on", approved ]
-               ; Attr.type_ "button"
-               ; Attr.create "aria-pressed" (Bool.to_string approved)
-               ; Attr.title
-                   (if approved
-                    then "Take the approval back (a)"
-                    else "Approve this file as it is now (a)")
-               ; Attr.on_click (fun _ -> inject (review (Toggle_approval path)))
-               ]
-             [ icon Check
-             ; Node.text
-                 (match status with
-                  | Approved -> "Approved"
-                  | Changed -> "Approve again"
-                  | Unapproved -> "Approve")
-             ])
       ]
   in
   let body =
@@ -268,6 +450,7 @@ let current_file (m : App.Model.t) path ~inject =
     ~cls:"review-current"
     [ head
     ; div ~cls:"review-scroll" ~attrs:[ Attr.id "review-scroll" ] [ body ]
+    ; dock m path ~inject
     ]
 ;;
 
@@ -604,7 +787,8 @@ let view (m : App.Model.t) ~inject =
                 [ Attr.class_ "review-files"
                 ; Attr.create "aria-label" "Changed files"
                 ]
-              [ Node.ul (List.map files ~f:(file_row m ~inject))
+              [ selection_bar m ~inject
+              ; Node.ul (List.map files ~f:(file_row m ~inject))
               ; div
                   ~cls:"review-files-foot"
                   [ Node.text (Diff_files.summary files) ]

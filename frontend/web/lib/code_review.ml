@@ -115,6 +115,8 @@ type t =
   ; picked : (int * Review_since.File.t option) String.Map.t
   ; views : Layout.t String.Map.t
   ; unfolded : String.Set.t
+  ; marked : String.Set.t
+  ; mark_from : string option
   }
 [@@deriving sexp_of]
 
@@ -149,6 +151,8 @@ let empty =
   ; picked = String.Map.empty
   ; views = String.Map.empty
   ; unfolded = String.Set.empty
+  ; marked = String.Set.empty
+  ; mark_from = None
   }
 ;;
 
@@ -243,6 +247,15 @@ module Action = struct
         ; accept : bool
         }
     | Toggle_approval of string
+    | Approve_files of
+        { paths : string list
+        ; approve : bool
+        }
+    | Mark of
+        { path : string
+        ; range : bool
+        }
+    | Unmark_all
     | Submit
     | Edit_input of string
     | Save
@@ -678,6 +691,59 @@ let select t ~path ~start ~end_ ~pop =
   | None -> None, []
 ;;
 
+(* Approving or taking back each file of [paths] that is not so already. *)
+let approve_rpcs t paths ~approve =
+  List.filter_map paths ~f:(fun path ->
+    match file t path with
+    | None -> None
+    | Some f ->
+      (match approval t f, Review.approval t.review path with
+       | Approved, Some { root; _ } when not approve ->
+         Some (rpc (Review_unapprove { root; path }) (Changed None))
+       | (Changed | Unapproved), _ when approve ->
+         Some
+           (rpc
+              (Review_approve { root = review_root t; path; hash = f.hash })
+              (Changed None))
+       | _ -> None))
+;;
+
+(* Approving [approving] moves on to the next file after it that is not
+   approved, round the list; when there is none, it stays. *)
+let advance t ~approving =
+  let all = paths t in
+  let unapproved path =
+    (not (String.equal path approving))
+    && Option.exists (file t path) ~f:(fun f ->
+      not (File_approval.Status.equal (approval t f) Approved))
+  in
+  let after, before =
+    match List.findi all ~f:(fun _ p -> String.equal p approving) with
+    | Some (i, _) -> List.drop all (i + 1), List.take all i
+    | None -> all, []
+  in
+  match List.find (after @ before) ~f:unapproved with
+  | Some next -> show t next
+  | None ->
+    let n = List.length all in
+    ( t
+    , [ toast
+          (if n = 1
+           then "The file is approved: send your comments (s) or commit it (C)."
+           else
+             sprintf
+               "All %d files are approved: send your comments (s) or commit \
+                them (C)."
+               n)
+      ] )
+;;
+
+let file_dom_id path =
+  "review-file-"
+  ^ String.map path ~f:(fun c -> if Char.is_alphanum c then c else '-')
+;;
+
+let marked t = List.filter (paths t) ~f:(Set.mem t.marked)
 let comment_busy t id = { t with busy = Set.add t.busy id }
 
 let rec update t (action : Action.t) =
@@ -718,6 +784,8 @@ let rec update t (action : Action.t) =
       ; picked = String.Map.empty
       ; views = String.Map.empty
       ; unfolded = String.Set.empty
+      ; marked = String.Set.empty
+      ; mark_from = None
       }
     in
     update (scoped t) (Open None)
@@ -899,15 +967,48 @@ let rec update t (action : Action.t) =
     (match file t path with
      | None -> t, [ toast (sprintf "%s has no changes to approve." path) ]
      | Some f ->
-       (match approval t f, Review.approval t.review path with
-        | Approved, Some { root; _ } ->
-          t, [ rpc (Review_unapprove { root; path }) (Changed None) ]
+       (match approval t f with
+        | Approved -> t, approve_rpcs t [ path ] ~approve:false
+        | Changed | Unapproved ->
+          let outs = approve_rpcs t [ path ] ~approve:true in
+          if t.open_ && Option.exists t.current ~f:(String.equal path)
+          then (
+            let t, more = advance t ~approving:path in
+            t, outs @ more)
+          else t, outs))
+  | Approve_files { paths; approve } ->
+    (match approve_rpcs t paths ~approve with
+     | [] ->
+       ( t
+       , [ toast
+             (if approve
+              then "Already approved, as they are now."
+              else "None of them is approved.")
+         ] )
+     | outs -> t, outs)
+  | Mark { path; range } ->
+    let all = paths t in
+    if not (List.mem all path ~equal:String.equal)
+    then t, []
+    else (
+      let marked =
+        match range, Option.first_some t.mark_from t.current with
+        | true, Some from when List.mem all from ~equal:String.equal ->
+          let index p =
+            fst (List.findi_exn all ~f:(fun _ q -> String.equal p q))
+          in
+          let lo = Int.min (index from) (index path)
+          and hi = Int.max (index from) (index path) in
+          List.filteri all ~f:(fun i _ -> i >= lo && i <= hi)
+          |> List.fold ~init:t.marked ~f:Set.add
         | _ ->
-          ( t
-          , [ rpc
-                (Review_approve { root = review_root t; path; hash = f.hash })
-                (Changed None)
-            ] )))
+          if Set.mem t.marked path
+          then Set.remove t.marked path
+          else Set.add t.marked path
+      in
+      ( { t with marked; mark_from = (if range then t.mark_from else Some path) }
+      , [] ))
+  | Unmark_all -> { t with marked = String.Set.empty; mark_from = None }, []
   | Submit ->
     if unsent t = 0
     then
@@ -1250,9 +1351,13 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
   then None
   else (
     match key with
-    | "]" | "n" | "j" -> Some (Step 1)
-    | "[" | "p" | "k" -> Some (Step (-1))
-    | "a" -> Option.map t.current ~f:(fun p -> Action.Toggle_approval p)
+    | "]" | "n" | "j" | "ArrowRight" -> Some (Step 1)
+    | "[" | "p" | "k" | "ArrowLeft" -> Some (Step (-1))
+    | "a" | " " -> Option.map t.current ~f:(fun p -> Action.Toggle_approval p)
+    | "x" ->
+      Option.map t.current ~f:(fun path -> Action.Mark { path; range = false })
+    | "X" when shift ->
+      Option.map t.current ~f:(fun path -> Action.Mark { path; range = true })
     | "c" when Mode.equal t.mode Comment -> Some Start_comment
     | "e" -> Some (Set_mode (if Mode.equal t.mode Edit then Comment else Edit))
     | "v" ->
@@ -1275,6 +1380,8 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
       then Some Draft_cancel
       else if Option.is_some t.selection
       then Some Clear_selection
+      else if not (List.is_empty (marked t))
+      then Some Unmark_all
       else Some Close
     | _ -> None)
 ;;

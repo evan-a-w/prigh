@@ -22,6 +22,14 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Delete | Remove -> Trash
   | Copy_message -> Copy
   | Trim_before | Trim_after -> Scissors
+  | Approve_files -> Check
+  | Unapprove_files -> Undo
+  | Stage_files -> Plus
+  | Unstage_files -> Dash
+  | Commit_files -> Branch
+  | Select_files -> Square
+  | Unselect_files -> Cross
+  | Copy_paths -> Copy
 ;;
 
 (* What the menu is about, above its items. *)
@@ -31,6 +39,20 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
     , List.find m.sessions ~f:(fun s ->
         [%equal: string option] (Some s.path) (Context_menu.session menu)) )
   with
+  | Review_files paths, _ ->
+    div
+      ~cls:"context-menu-head"
+      [ span
+          ~cls:"context-menu-title"
+          (match paths with
+           | [ path ] -> Filename.basename path
+           | _ -> sprintf "%d selected files" (List.length paths))
+      ; span
+          ~cls:"context-menu-sub"
+          (match paths with
+           | [ path ] -> Filename.dirname path
+           | _ -> String.concat ~sep:", " (List.map paths ~f:Filename.basename))
+      ]
   | Message n, _ ->
     (match App.Model.message_menu m n with
      | None -> Node.none
@@ -49,7 +71,7 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
   | _, None -> Node.none
   | (Session _ | Worktree _), Some s ->
     (match menu.target with
-     | Session _ | Message _ ->
+     | Session _ | Message _ | Review_files _ ->
        div
          ~cls:"context-menu-head"
          [ span ~cls:"context-menu-title" (Session_list.title s)
@@ -124,6 +146,10 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
     | Review | Files | Terminal -> 2
     | Copy_path | Copy_id | Copy_message -> 3
     | Archive | Unarchive | Delete | Remove -> 4
+    | Approve_files | Unapprove_files -> 0
+    | Stage_files | Unstage_files | Commit_files -> 1
+    | Select_files | Unselect_files -> 2
+    | Copy_paths -> 3
   in
   let sections =
     List.mapi items ~f:(fun i item -> i, item)

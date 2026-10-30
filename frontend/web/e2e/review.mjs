@@ -317,10 +317,18 @@ try {
     marks.map(m => `${m.dataset.comment}${m.classList.contains("hot") ? " (lit)" : ""}: ${m.textContent}`))).join("\n"));
   await page.mouse.move(5, 5);
 
-  // 5. Approving: a, and the button.
-  await page.keyboard.press("a");
-  await page.locator(".review-file.current.approved").waitFor();
+  // 5. Approving: Space approves and goes on to the next file not approved,
+  //    the dock under the file (← Approve →) staying where it is; ← goes
+  //    back, and Space there would take the approval back.
+  await show("page: the dock", ".review-dock");
+  await page.keyboard.press(" ");
+  await page.locator(".review-file.approved[data-path='src/main.ml']").waitFor();
+  await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/util.ml");
+  await show("page: approved, on to util.ml", ".review-dock");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/main.ml");
   await show("page: main.ml approved", ".review-head");
+  await show("page: back on main.ml", ".review-dock");
 
   // 6. Sending the comments: the agent replies to each, proposes a change
   //    and edits the README meanwhile, which shows up live.
@@ -415,7 +423,7 @@ try {
   await page.locator(".review-file[data-path='README.md']").click();
   await page.locator(".review-page").focus();
   await page.keyboard.press("a");
-  await page.locator(".review-file.current.approved").waitFor();
+  await page.locator(".review-file.approved[data-path='README.md']").waitFor();
   await page.locator("#review-base-button").click();
   await page.locator("[data-id='base:HEAD']").click();
   await page.locator('.review-file[data-path="src/login.ml"]').waitFor({ state: "detached" });
@@ -434,7 +442,7 @@ try {
   await page.waitForFunction(() => document.querySelector(".review-file.current")?.dataset.path === "src/util.ml");
   await page.locator(".review-page").focus();
   await page.keyboard.press("a");
-  await page.locator(".review-file.current.approved[data-path='src/util.ml']").waitFor();
+  await page.locator(".review-file.approved[data-path='src/util.ml']").waitFor();
   await page.locator(".composer textarea").fill("Add const to util.ml");
   await page.locator(".composer textarea").press("Enter");
   await idle();
