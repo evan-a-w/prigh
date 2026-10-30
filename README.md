@@ -1604,8 +1604,10 @@ in the same way (it blocks until the subagent reports).
 
 A subagent can work in a git worktree of its own, when the model (or you,
 asking it) sets the `subagent` tool's `worktree` option: a branch name, or
-`auto` for one named after the task (`agent/fix-the-parser-bug`, `-2` when
-taken). The worktree is made like `/worktree new` does, from where the
+`auto` for one named after the subagent (`agent/fix-the-parser-bug`, `-2`
+when taken). A subagent's name (the `subagent` tool's `name`, else written
+by the naming model, else the task's first sentence) is a few words saying
+what it does, distinct from its siblings, and is what the frontends list. The worktree is made like `/worktree new` does, from where the
 session is (in the same subdirectory), and the subagent works there; its
 report ends with where the work is (`[worktree: the work is on branch
 agent/fix-the-parser-bug, checked out in ...]`) so that you can review it,
@@ -1817,7 +1819,10 @@ editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
 command moves to the background and how long a wait lasts, above),
 `generate_model` (the model ✦ Generate drafts commit messages, pull
-requests, branch names and session names with; default: the session's),
+requests and branch names with; default: the session's),
+`naming_model` (the model that names sessions and subagents; default:
+`generate_model`, else the session's; `/naming model` picks it, also on
+prigh-web's settings page),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
@@ -2080,6 +2085,7 @@ it.
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
 | `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`); also on prigh-web's settings page |
+| `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: `generate_model`, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |

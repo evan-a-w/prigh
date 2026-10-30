@@ -10,8 +10,9 @@ open! Import
 (** How many of the user's messages make a session worth naming again. *)
 val refine_after : int
 
-(** True when the session has no description yet and a message from the
-    user, or when its description predates the user's {!refine_after}th
+(** True when the model has replied with text (a turn that failed has
+    nothing to name) and the session has no description yet and a message
+    from the user, or when its description predates the user's {!refine_after}th
     message and the conversation has reached it. *)
 val wanted : Session.t -> bool
 

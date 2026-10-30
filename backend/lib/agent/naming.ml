@@ -44,8 +44,8 @@ let clean ?(max_length = 60) text =
     |> List.find ~f:(fun l -> not (String.is_empty (String.strip l ~drop:is_wrapper)))
     |> Option.value ~default:""
   in
-  let line = String.strip line ~drop:is_wrapper |> drop_label in
-  let line = String.strip line ~drop:is_wrapper in
+  let unwrap = String.strip ~drop:(fun c -> is_wrapper c || Char.is_whitespace c) in
+  let line = unwrap line |> drop_label |> unwrap in
   let line = String.rstrip line ~drop:is_trailing in
   shorten (String.capitalize line) ~max_length
 ;;
