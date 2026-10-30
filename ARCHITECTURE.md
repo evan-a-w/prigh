@@ -3323,48 +3323,6 @@ terminal frontend and `web/` prigh-web, the browser one.
     `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
 
-## Neovim client (`editors/nvim/`)
-
-prigh.nvim is an Agent Client Protocol client in Lua: it spawns `prigh acp`
-(the ACP agent side of the backend) and talks JSON-RPC 2.0 over
-newline-delimited stdio. Protocol and UI are separate modules so other editor
-ports can mirror them:
-
-- `acp.lua` — the transport: spawn (`vim.system`), line framing, request ids
-  and pending callbacks, incoming requests answered through a `respond`
-  callback, stderr into `log.lua` (`:PrighLog`), exit fails pending requests.
-- `agent.lua` — the client: `initialize` (advertises `fs.readTextFile`,
-  `fs.writeTextFile`, `elicitation.form`, `session.notices`, boolean config
-  options, `_meta.prigh.state`), `session/new|load|list`, the last session
-  per directory (`stdpath("data")/prigh/last_sessions.json`), prompts with a
-  client-side queue, `session/cancel`, modes and config options, and the
-  agent's requests (`fs/*`, `session/request_permission`,
-  `elicitation/create`). The UI is reached only through callbacks
-  (`permission`, `elicit`, `unqueue`).
-- `session.lua` — one session's state, folded from `session/update` (message
-  and thought chunks, tool calls by id, plan, commands, mode, config options,
-  usage, title, notices) and `_prigh/state`; views subscribe to `entry`,
-  `status` and `reset` events. Loading another session resets it.
-- `fs.lua` — reads return a loaded buffer's text (unsaved changes included);
-  writes to a loaded buffer apply only the changed hunks as one undo step,
-  then `:noautocmd write`; each file's text before the agent's first write
-  is kept for the review.
-- `review.lua` (+ `diff.lua`) — the editor-side hunk review, independent of
-  ACP: the buffer holds the new text, old lines are virtual lines, decisions
-  are marks, and the rejected hunks are reverted in one undo step at the end;
-  buffer edits re-diff against the base and keep decisions by hunk identity.
-  The planned `_prigh/edit` (scoped edits proposed by the agent) reuses it
-  with `after`.
-- `render.lua`, `status.lua` (pure) and `chat.lua`, `pickers.lua`,
-  `elicit.lua`, `complete.lua`, `context.lua` — the Neovim UI: the chat
-  buffer re-renders only the entry that changed; permission cards take over
-  the chat's keys until answered.
-
-Tests (`editors/nvim/test`) run each case in a headless Neovim against
-`fake_agent.lua`, which replays a scripted exchange and logs what the client
-sent; transcripts are compared with `.expected` files (`PROMOTE=1`
-re-records); the flake check `nvim-plugin` runs them.
-
 ## Data on disk
 
 - `~/.config/prigh/auth.json` — credentials (pi-compatible), and git hosts'
