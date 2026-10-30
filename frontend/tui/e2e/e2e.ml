@@ -61,9 +61,9 @@ let show label sexp =
     | List [ Atom "duration_seconds"; Atom _ ] ->
       List [ Atom "duration_seconds"; Atom "<t>" ]
     | List [ Atom "at"; Atom _ ] -> List [ Atom "at"; Atom "<at>" ]
-    | List [ Atom "name"; Atom host ]
+    | List [ Atom (("name" | "active_host_name") as key); Atom host ]
       when String.equal host (Core_unix.gethostname ()) ->
-      List [ Atom "name"; Atom "<host>" ]
+      List [ Atom key; Atom "<host>" ]
     | Atom s -> Atom (normalise s)
     | List l -> List (List.map l ~f:go)
   in
