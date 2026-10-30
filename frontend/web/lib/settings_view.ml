@@ -19,10 +19,12 @@ let row ?(cls = "") ?note ~name ~about controls =
     ]
 ;;
 
-let section title rows =
+let group ?title rows =
   Node.section
-    ~attrs:[ Attr.class_ "settings-section" ]
-    (Node.h3 [ Node.text title ] :: rows)
+    ~attrs:[ Attr.class_ "settings-group" ]
+    (match title with
+     | Some title -> Node.h4 [ Node.text title ] :: rows
+     | None -> rows)
 ;;
 
 let switch ?(disabled = false) ~label ~title ~on ~on_click () =
@@ -578,7 +580,83 @@ let account (m : App.Model.t) ~inject =
     ]
 ;;
 
+module Section = Settings_section
+
+(* A section's settings, in groups: a new setting is a row in its list. *)
+let content (m : App.Model.t) (section : Section.t) ~inject =
+  match section with
+  | Appearance ->
+    [ group (Theme_view.rows m ~inject @ [ tabs m ~inject; verbosity m ~inject ])
+    ]
+  | Behaviour -> [ group [ confirm m ~inject; notifications m ~inject ] ]
+  | Models ->
+    [ group ~title:"Providers" [ providers m ~inject ]
+    ; group ~title:"Compaction" (compaction m ~inject)
+    ]
+  | Git_hosting -> [ group (git_hosts m ~inject) ]
+  | Nix_store -> [ group (nix_store m ~inject) ]
+  | Account -> [ group (account m ~inject) ]
+;;
+
+let section_icon : Section.t -> Icon.t = function
+  | Appearance -> Palette
+  | Behaviour -> Shield
+  | Models -> Brain
+  | Git_hosting -> Repo
+  | Nix_store -> Package
+  | Account -> User
+;;
+
+(* The sections down the side (a strip over the page on a phone), as tabs:
+   the arrows move between them. The account's tab, last, is the user. *)
+let nav (m : App.Model.t) ~current ~inject =
+  let tab (section : Section.t) =
+    let selected = Section.equal section current in
+    let face =
+      match section, Account_view.who m with
+      | Account, Some who ->
+        [ span ~cls:"avatar" (Account_view.initial who.name)
+        ; span ~cls:"settings-tab-name" who.name
+        ]
+      | _ ->
+        [ icon (section_icon section)
+        ; span ~cls:"settings-tab-name" (Section.name section)
+        ]
+    in
+    Node.button
+      ~attrs:
+        [ classes
+            [ "settings-tab"; "settings-tab-" ^ Section.arg section ]
+            [ "on", selected ]
+        ; Attr.id (Section.tab_id section)
+        ; Attr.type_ "button"
+        ; Attr.role "tab"
+        ; Attr.create "data-settings-tab" (Section.arg section)
+        ; Attr.create "aria-selected" (Bool.to_string selected)
+        ; Attr.create "aria-controls" "settings-panel"
+        ; Attr.create "aria-label" (Section.name section)
+        ; Attr.title ("/settings " ^ Section.arg section)
+        ; Attr.tabindex (if selected then 0 else -1)
+        ; Attr.on_click (fun _ -> inject (Action.Settings_section section))
+        ]
+      face
+  in
+  Node.div
+    ~attrs:
+      [ Attr.class_ "settings-nav"
+      ; Attr.role "tablist"
+      ; Attr.create "aria-label" "Settings sections"
+      ; Attr.create
+          "aria-orientation"
+          (if m.narrow then "horizontal" else "vertical")
+      ]
+    (List.map (Section.available ~superuser:(App.superuser m)) ~f:tab)
+;;
+
 let view (m : App.Model.t) ~inject =
+  let current =
+    Section.visible m.settings_section ~superuser:(App.superuser m)
+  in
   Modal.view
     ~cls:"settings-dialog"
     ~title:"Settings"
@@ -594,16 +672,22 @@ let view (m : App.Model.t) ~inject =
           ~on_click:(inject Action.Close_dialog)
           [ Node.text "Done" ]
       ]
-    [ section "Appearance" (Theme_view.rows m ~inject)
-    ; section
-        "Preferences"
-        [ notifications m ~inject; tabs m ~inject; verbosity m ~inject ]
-    ; section "On the backend" [ confirm m ~inject; providers m ~inject ]
-    ; section "Git hosting" (git_hosts m ~inject)
-    ; section "Compaction" (compaction m ~inject)
-    ; (if App.superuser m
-       then section "Nix store" (nix_store m ~inject)
-       else Node.none)
-    ; section "Account" (account m ~inject)
+    [ nav m ~current ~inject
+    ; Node.div
+        ~key:(Section.arg current)
+        ~attrs:
+          [ classes
+              [ "settings-panel"; "settings-panel-" ^ Section.arg current ]
+              []
+          ; Attr.id "settings-panel"
+          ; Attr.role "tabpanel"
+          ; Attr.create "aria-labelledby" (Section.tab_id current)
+          ]
+        (Node.header
+           ~attrs:[ Attr.class_ "settings-panel-head" ]
+           [ Node.h3 [ Node.text (Section.name current) ]
+           ; Node.p [ Node.text (Section.about current) ]
+           ]
+         :: content m current ~inject)
     ]
 ;;

@@ -174,7 +174,7 @@ try {
   await page.locator(".settings-dialog").waitFor();
   await page.waitForTimeout(200);
   section("settings");
-  console.log(await page.locator(".settings-section").first().innerText());
+  console.log(await page.locator(".settings-panel").innerText());
   await dialogShot("settings original");
   await page.locator(".theme-choice", { hasText: "Dark" }).click();
   await lookIs(page, "dark", "orange");

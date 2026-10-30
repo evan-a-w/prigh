@@ -758,6 +758,8 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
          match Dom_html.tagged el with
          | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
          | _ -> true -> Review
+  | Some el when Js.Opt.test (el##getAttribute (Js.string "data-settings-tab"))
+    -> Settings_tab
   | Some el
     when Js.Opt.test (el##getAttribute (Js.string "data-worktree")) ->
     let attr name =

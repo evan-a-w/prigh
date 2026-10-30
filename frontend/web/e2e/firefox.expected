@@ -762,6 +762,13 @@ the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of t
 === firefox: settings ===
 Settings
 Appearance
+Behaviour
+Models
+Git hosting
+T
+token
+Appearance
+How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
 Theme
 Follows you to every browser you sign in on.
 Original
@@ -770,11 +777,6 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
-Preferences
-Notifications
-Tell you when a turn ends or something waits for you while this tab is hidden.
-The browser has not been asked yet: Allow asks it.
-Allow
 Tabs
 Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
 Transcript detail
@@ -782,43 +784,6 @@ How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
 Quiet
 Normal
 Verbose
-On the backend
-Tool confirmation
-Ask before bash, edits and MCP tools run, in this session and new ones.
-Model providers
-Not logged in to any: log in to one to use its models.
-Manage providers
-Git hosting
-GitHub
-github.com
-Not signed in.
-No OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
-Connect with a token
-Forgejo
-codeberg.org
-Not signed in.
-Signs in through codeberg.org's pre-registered git-credential-oauth app (its consent page names it); forges."codeberg.org".client_id sets your own
-Use a token
-Connect
-Another Forgejo host
-A self-hosted Forgejo or Gitea, by its host name.
-Add host…
-Compaction
-Compact at
-Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-tokens
-Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
-Mask old tool outputs
-Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-Account
-T
-Signed in as token
-127.0.0.1:<PORT>
-Switch account
-Sign out
 Keyboard shortcuts
 Done
 === firefox: a dialog open: the chips ===
@@ -827,6 +792,13 @@ thinking: under .modal-backdrop
 mode: under .modal-backdrop
 host: under .modal-backdrop
 a choice keeps it open: true
+=== firefox: settings: the sections ===
+clicked Behaviour: tab Behaviour, focus Behaviour, showing Behaviour (labelled by settings-tab-behaviour)
+ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
+End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
+ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
+desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
+phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
 chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
@@ -882,11 +854,11 @@ Back to alice
 I am bob
 === firefox: accounts: bob's settings ===
 Appearance
-Preferences
-On the backend
+Behaviour
+Models
 Git hosting
-Compaction
-Account
+B
+bob
 === firefox: accounts: bob's commands ===
 /setus offers: /setusr [user]
 /nix-g offers: nothing
@@ -916,6 +888,7 @@ forget this account in this browser
 I am alice
 === firefox: accounts: alice's nix store ===
 Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
 Disk usage
 Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
 Last collection: none recorded
@@ -926,6 +899,7 @@ Also delete generations over 14 days…
 Collect
 === firefox: accounts: collected ===
 Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
 Disk usage
 Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
 Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
@@ -1108,6 +1082,9 @@ none
 - -; original orange #f0b44c on #1b1e23
 === firefox: themes: settings ===
 Appearance
+
+How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+
 Theme
 Follows you to every browser you sign in on.
 Original
@@ -1116,6 +1093,13 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Tabs
+Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+Transcript detail
+How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+Quiet
+Normal
+Verbose
 === firefox: themes: dark from the settings ===
 dark orange #f0b44c on #1d1d1d; checked: Dark
 === firefox: themes: saved on the backend ===
@@ -2390,7 +2374,7 @@ draft: a draft
 === firefox: pwa: errors ===
 none
 === firefox: compaction: default ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2405,7 +2389,7 @@ field: "200k" (placeholder 200k); Off pressed: false; mask: true
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
 === firefox: compaction: set ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2421,7 +2405,7 @@ compact_at_tokens=150000 compaction_model=null mask_observations=false
 Summary model; first: The conversation's model whichever model the conversation uses
 chosen: a Haiku; compact_at_tokens=150000 compaction_model=anthropic/(a haiku) mask_observations=false
 === firefox: compaction: reloaded ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -2435,7 +2419,7 @@ field: "150k" (placeholder 200k); Off pressed: false; mask: false
 === firefox: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === firefox: compaction: off by /compaction ===
-Compaction
+COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 Off: only at 80% of the window. Type a number to set one.
