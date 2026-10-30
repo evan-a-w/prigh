@@ -29,7 +29,14 @@ let%expect_test "parsing /naming's arguments" =
     ~f:(fun rest ->
       print_s
         [%message rest ~_:(Naming_command.parse rest : Naming_command.Action.t)]);
-  [%expect {| |}]
+  [%expect
+    {|
+    ("" Show)
+    ("model claude-haiku-4-5" (Set_model (claude-haiku-4-5)))
+    ("model off" (Set_model ()))
+    (model (Error "which model? usage: /naming or /naming model MODEL|off"))
+    ("colour blue" (Error "usage: /naming or /naming model MODEL|off"))
+    |}]
 ;;
 
 let%expect_test "/naming shows, completes, sets, and a refusal" =
@@ -59,5 +66,82 @@ let%expect_test "/naming shows, completes, sets, and a refusal" =
     "naming_model: unknown model \"claude-haku\"; did you mean: \
      anthropic/claude-haiku-4-5 (Claude Haiku 4.5)";
   H.show h;
-  [%expect {| |}]
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ─────────────────────────────────────────────────┐
+    │ sessions and subagents are named by the generate model,  │
+    │ else the session's model (/naming model MODEL|off)       │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ off                         the generate model, else the …
+      anthropic/claude-fable-5    Claude Fable 5
+      anthropic/claude-fable-5-1  Claude Fable 5.1
+      openai/gpt-5.5              GPT-5.5
+      deepseek/deepseek-flash     DeepSeek V4.1 Flash
+    ────────────────────────────────────────────────────────────
+    > /naming model ▏
+    deepseek-flash  Tab accepts · Enter as typed · Esc hides
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /naming model haiku▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    (Rpc
+      (method_ set_config)
+      (params ((config ((naming_model haiku)))))
+      (tag (Naming_saved "/naming model haiku")))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ─────────────────────────────────────────────────┐
+    │ sessions and subagents are named by                      │
+    │ anthropic/claude-haiku-4-5 (/naming model MODEL|off)     │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    (Rpc
+      (method_ set_config)
+      (params ((config ((naming_model claude-haku)))))
+      (tag (Naming_saved "/naming model claude-haku")))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────┐
+    │ naming_model: unknown model "claude-haku"; did you mean: │
+    │ anthropic/claude-haiku-4-5 (Claude Haiku 4.5)            │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > /naming model claude-haku▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
 ;;

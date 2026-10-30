@@ -224,7 +224,8 @@ let%expect_test
       (snippets ())
       (compact_at_tokens 200000)
       (compaction_model ())
-      (mask_observations true)))
+      (mask_observations true)
+      (naming_model ())))
     |}]
 ;;
 

@@ -779,7 +779,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -796,7 +796,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -813,7 +813,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -2855,7 +2855,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 305 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 308 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -4318,7 +4318,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "find all auth code in the rep…
+    ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "Find auth code"
 
 
 
@@ -4334,7 +4334,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     ▌ find all auth code in the repository
     … bash $ grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
-    > ▏Steer c1 · find all auth code in the rep… (Enter: steer, Alt+Enter: follow-u…
+    > ▏Steer c1 · Find auth code (Enter: steer, Alt+Enter: follow-up)
     deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ running tools · → c1 · Esc: main agent
     |}];
   H.next_agent h;
@@ -5316,7 +5316,8 @@ let%expect_test
       (snippets ())
       (compact_at_tokens 200000)
       (compaction_model ())
-      (mask_observations true)))
+      (mask_observations true)
+      (naming_model ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode Auto)
@@ -5334,7 +5335,8 @@ let%expect_test
       (snippets ())
       (compact_at_tokens 200000)
       (compaction_model ())
-      (mask_observations true)))
+      (mask_observations true)
+      (naming_model ())))
     |}]
 ;;
 
@@ -6352,7 +6354,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (snippets ())
       (compact_at_tokens 200000)
       (compaction_model ())
-      (mask_observations true)))
+      (mask_observations true)
+      (naming_model ())))
 
 
 
@@ -7120,6 +7123,7 @@ let with_agents ~width ~height =
            { call_id = id
            ; agent_id = id
            ; task
+           ; name = None
            ; model
            ; tools = [ "bash" ]
            ; worktree = None
@@ -8381,7 +8385,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8398,7 +8402,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 69
+      ↕ 1–8 of 70
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8681,7 +8685,7 @@ let%expect_test
                                 │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
                                 │   /default-dir [off|path]            show or set the directory new sessions start in
                                 │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 69
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 70
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

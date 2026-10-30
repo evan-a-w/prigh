@@ -17,7 +17,8 @@ let first_sentence line =
     then line
     else (
       match line.[i] with
-      | '.' | '!' | '?' when Char.is_whitespace line.[i + 1] -> String.prefix line i
+      | ('.' | '!' | '?') when Char.is_whitespace line.[i + 1] ->
+        String.prefix line i
       | _ -> go (i + 1))
   in
   go 0
@@ -47,13 +48,13 @@ let of_task task =
 ;;
 
 let instructions =
-  "You name the subagents a coding agent starts, for the user's list of \
-   them. Write a name of two to five words saying what this subagent does, \
-   in the imperative and sentence case, e.g. \"Fix completion after a \
-   space\", \"Review the parser changes\", \"Survey host naming code\". Make \
-   it differ from the other subagents' names, if any are listed: say what \
-   sets this one apart. Reply with the name only: no quotes, no trailing \
-   period, no preamble."
+  "You name the subagents a coding agent starts, for the user's list of them. \
+   Write a name of two to five words saying what this subagent does, in the \
+   imperative and sentence case, e.g. \"Fix completion after a space\", \
+   \"Review the parser changes\", \"Survey host naming code\". Make it differ \
+   from the other subagents' names, if any are listed: say what sets this one \
+   apart. Reply with the name only: no quotes, no trailing period, no \
+   preamble."
 ;;
 
 let prompt ~task ~siblings =

@@ -91,6 +91,7 @@ let%expect_test "every command does something (none is unknown)" =
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /tabs                      toast: Session tabs are off: /tabs on shows the open sessions as tabs
     /compact                   toast: Compacting the conversation…
+    /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     /diff                      toast: Reading the changes…
     /review                    rpc git_diff, rpc git_status
@@ -349,7 +350,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (default_model ()) (default_thinking ()) (fallback_models ())
       (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
       (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-      (mask_observations true)))
+      (mask_observations true) (naming_model ())))
     |}]
 ;;
 

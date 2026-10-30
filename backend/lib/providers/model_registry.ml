@@ -297,8 +297,8 @@ let unknown_naming_model t ~home =
      | Error e ->
        [ sprintf
            "naming_model in %s is ignored, so sessions and subagents are named \
-            by generate_model or the session's model (/naming model MODEL \
-            sets another): %s"
+            by generate_model or the session's model (/naming model MODEL sets \
+            another): %s"
            (Config.path ~home)
            (Error.to_string_hum e)
        ])

@@ -99,10 +99,7 @@ let complete ~(agents : Agent_view.t list) rest =
       Some
         ( String.length rest - String.length name
         , List.mapi agents ~f:(fun i (a : Agent_view.t) ->
-            ( Int.to_string (i + 1)
-            , sprintf
-                "%s · %s"
-                a.id
-                (Agent_view.title a) )) )
+            Int.to_string (i + 1), sprintf "%s · %s" a.id (Agent_view.title a))
+        )
     else None
 ;;
