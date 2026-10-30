@@ -8,7 +8,7 @@
    (cost ((input 0.3) (output 1.2) (cache_read 0.006)))))
  (thinking on) (running false) (message_count 0)
  (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
- (context_tokens 0) (active_host backend)
+ (context_tokens 0) (active_host backend) (active_host_name <host>)
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null) (home $TMP))))
@@ -76,7 +76,7 @@
    (cost ((input 10) (output 50) (cache_read 0.25)))))
  (thinking high) (running false) (message_count 2)
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 9e-06)
- (context_tokens 10) (active_host backend)
+ (context_tokens 10) (active_host backend) (active_host_name <host>)
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null) (home $TMP))))
