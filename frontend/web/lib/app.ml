@@ -987,6 +987,13 @@ let field json name =
 ;;
 
 let close_dialog (m : Model.t) =
+  (* The filter's menu hangs from its button in a phone's header tray: done
+     with it, the tray goes too. *)
+  let m =
+    match m.dialog with
+    | Some (Filter _) when m.status_tray -> { m with status_tray = false }
+    | _ -> m
+  in
   match m.return_to_settings, m.dialog with
   | ( true
     , Some

@@ -147,9 +147,12 @@ const screenshot = async label => {
 const composer = () => page.locator(".composer textarea");
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
+// With a phone's header tray open, its backdrop takes taps: Enter sends.
+let sendByKey = false;
 const send = async text => {
   await composer().fill(text);
-  await page.locator(".btn.send").click();
+  if (sendByKey) await composer().press("Enter");
+  else await page.locator(".btn.send").click();
 };
 
 // Remembers the nodes on show that must stay, and counts the nodes removed
@@ -286,7 +289,12 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400);
-  await turn("a turn starts and ends on a phone: the status in the bar", "Checked again.");
+  // The status is in the header's tray, behind the glance: open, it is
+  // measured there.
+  await page.locator(".bar-tray-toggle").click();
+  await page.locator(".bar-tray.open").waitFor();
+  sendByKey = true;
+  await turn("a turn starts and ends on a phone: the status in the tray", "Checked again.");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

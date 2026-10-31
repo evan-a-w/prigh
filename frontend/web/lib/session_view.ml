@@ -40,12 +40,19 @@ let rename (m : App.Model.t) (state : State.t) ~inject =
 ;;
 
 let panel_toggles (m : App.Model.t) ~inject =
+  (* A panel opened from a phone's tray: the tray gets out of its way (the
+     filter's menu hangs from its button, so that one keeps it). *)
+  let opening a =
+    if m.narrow && m.status_tray
+    then Effect.Many [ inject Action.Toggle_status_tray; inject a ]
+    else inject a
+  in
   div
     ~cls:"panel-toggles"
     [ Filter_view.button m ~inject
-    ; Files_view.toggle m ~inject
-    ; Terminal_view.toggle m ~inject
-    ; Agents_view.toggle m ~inject
+    ; Files_view.toggle m ~inject:opening
+    ; Terminal_view.toggle m ~inject:opening
+    ; Agents_view.toggle m ~inject:opening
     ]
 ;;
 

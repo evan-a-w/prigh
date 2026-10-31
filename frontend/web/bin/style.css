@@ -1900,7 +1900,7 @@ kbd {
   .bar-tray.open .status-extras .status-text { display: inline; }
   .bar-tray.open .status .meter { display: block; }
   .bar-tray.open .status .cost { display: inline-flex; }
-  .bar-tray.open .status-item.activity:is(.running, .idle) { width: auto; }
+  .bar-tray.open .status-item.activity:is(.running, .idle) { width: 14ch; justify-content: flex-start; }
   .bar-tray.open .status-item.activity > .label { display: inline; }
   .bar-tray.open .chip-popover[data-chip] { left: 0; right: 0; }
   .bar-tray-backdrop {
