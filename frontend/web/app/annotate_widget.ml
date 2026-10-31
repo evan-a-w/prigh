@@ -58,16 +58,37 @@ let redraw () =
 
 let changed () = !schedule (Action.Annotate_strokes (List.length !strokes))
 
-(* The canvas takes the image's own size, so the drawing keeps its
-   resolution; CSS lays it over the image as shown. *)
+(* The image is shown as large as the stage allows (a small one scaled up,
+   so there is room to draw), the canvas over it. The canvas has the
+   image's own resolution, or the shown size when that is larger, so the
+   drawing keeps its detail. *)
 let setup () =
   strokes := [];
   drawing := None;
   match canvas (), image () with
   | Some c, Some img ->
     let size () =
-      c##.width := img##.naturalWidth;
-      c##.height := img##.naturalHeight;
+      let nw = Float.of_int img##.naturalWidth in
+      let nh = Float.of_int img##.naturalHeight in
+      let sw, sh =
+        match
+          Dom_html.document##querySelector (Js.string ".annotate-stage")
+          |> Js.Opt.to_option
+        with
+        | Some stage ->
+          ( Float.of_int stage##.clientWidth -. 16.
+          , Float.of_int stage##.clientHeight -. 16. )
+        | None -> nw, nh
+      in
+      let fit =
+        Float.min (sw /. nw) (sh /. nh) |> Float.min 8. |> Float.max 0.01
+      in
+      let dw = Float.round_down (nw *. fit)
+      and dh = Float.round_down (nh *. fit) in
+      img##.style##.width := Js.string (sprintf "%gpx" dw);
+      img##.style##.height := Js.string (sprintf "%gpx" dh);
+      c##.width := Int.max img##.naturalWidth (Float.to_int dw);
+      c##.height := Int.max img##.naturalHeight (Float.to_int dh);
       redraw ()
     in
     if Js.to_bool img##.complete && img##.naturalWidth > 0
@@ -101,7 +122,12 @@ let export () =
     out##.width := c##.width;
     out##.height := c##.height;
     let ctx = out##getContext Dom_html._2d_ in
-    ctx##drawImage img (Js.float 0.) (Js.float 0.);
+    ctx##drawImage_withSize
+      img
+      (Js.float 0.)
+      (Js.float 0.)
+      (Js.float (Float.of_int c##.width))
+      (Js.float (Float.of_int c##.height));
     ctx##drawImage_fromCanvas c (Js.float 0.) (Js.float 0.);
     let url = Js.to_string (out##toDataURL_type (Js.string "image/png")) in
     (match String.lsplit2 url ~on:',' with
