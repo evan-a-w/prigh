@@ -495,9 +495,7 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
   in
   (* The prompt opens the transcript only when it says more than the title
      does. *)
-  let task_in_title =
-    Option.is_none a.name && not (String.mem (String.strip a.task) '\n')
-  in
+  let task_in_title = Agent.task_in_title a in
   let transcript =
     match sub with
     | Some s when not (List.is_empty (Chat.entries s.chat)) ->

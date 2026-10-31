@@ -876,3 +876,46 @@ let%expect_test "a forked subagent runs out of turns and is continued" =
     (✓ Done Fix the parser Parser fixed.)
     |}]
 ;;
+
+let%expect_test
+    "the prompt opens the transcript only when it says more than the title"
+  =
+  let show ?name task =
+    let a =
+      { Agents.Agent.id = "a1"
+      ; call_id = "s1"
+      ; parent = None
+      ; task
+      ; name
+      ; model = "m"
+      ; status = Running
+      ; started_at = H.now
+      ; ended_at = None
+      ; turns = 0
+      ; tool_calls = 0
+      ; current_tool = None
+      ; result = None
+      }
+    in
+    printf
+      "%-40s %-26s %b\n"
+      (sprintf "%S" task)
+      (Agents.Agent.title a)
+      (Agents.Agent.task_in_title a)
+  in
+  show "Survey the project";
+  show ~name:"Survey the project" "Survey the project";
+  show ~name:"Count files" "count files.";
+  show ~name:"Count files" "Count the files in src";
+  show ~name:"Survey the project" "Survey the project\nthen report";
+  show "Survey the project\nthen report";
+  [%expect
+    {|
+    "Survey the project"                     Survey the project         true
+    "Survey the project"                     Survey the project         true
+    "count files."                           Count files                true
+    "Count the files in src"                 Count files                false
+    "Survey the project\nthen report"        Survey the project         false
+    "Survey the project\nthen report"        Survey the project         false
+    |}]
+;;
