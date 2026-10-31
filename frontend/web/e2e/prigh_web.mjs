@@ -867,7 +867,11 @@ try {
   await shell("cat -v");
   await page.keyboard.press("Escape");
   await page.keyboard.press("Enter");
-  await terminalHas("^[");
+  // The line as typed (echoed) and as cat wrote it back: both, not just the
+  // echo.
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".terminal-panel .xterm-rows > div")]
+      .filter(row => row.textContent.trim() === "^[").length >= 2);
   await page.keyboard.press("Control+D");
   await page.waitForFunction(() =>
     [...document.querySelectorAll(".terminal-panel .xterm-rows > div")]
