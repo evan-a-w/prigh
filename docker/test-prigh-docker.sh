@@ -192,6 +192,36 @@ run_tests() {
 	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_INTERVAL=5
 	pd PRIGH_TOKEN=tok PRIGH_NIX_GC_KEEP_DAYS=2w
 
+	section "Nix garbage collection: PRIGH_NIX_MIN_FREE and PRIGH_NIX_MAX_FREE"
+	fake_root
+	owned /home/prigh 1000
+	echo 109051904 >"$r/fs-kib" # 104 GiB
+	pd PRIGH_TOKEN=tok | grep garbage
+	files /run/prigh/nix.conf
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=20% PRIGH_NIX_MAX_FREE=50% | grep garbage
+	files /run/prigh/nix.conf
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=10G PRIGH_NIX_MAX_FREE=40g | grep garbage
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=1073741824 PRIGH_NIX_MAX_FREE=1t | grep garbage
+	files /run/prigh/nix.conf
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=512M PRIGH_NIX_MAX_FREE=2048000K | grep garbage
+	# Only min-free set: max-free's default, or 2 GiB more if that is not more.
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=5G | grep garbage
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=40% | grep garbage
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=0 | grep garbage
+	files /run/prigh/nix.conf
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=0 PRIGH_NIX_MAX_FREE=0 | grep garbage
+	pd PRIGH_MODE=tui PRIGH_NIX_MIN_FREE=25% | grep garbage
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=20GB
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=1.5G
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=-1
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=101%
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MAX_FREE=lots
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MAX_FREE=99999999999T
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=20G PRIGH_NIX_MAX_FREE=20G
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MAX_FREE=10%
+	pd PRIGH_TOKEN=tok PRIGH_NIX_MIN_FREE=1G PRIGH_NIX_MAX_FREE=0
+	pd PRIGH_NIX_MAX_FREE=1% nix-gc
+
 	section "Nix garbage collection: the backend's requests, prigh-docker nix-gc"
 	fake_root
 	owned /home/prigh 1000
