@@ -116,6 +116,14 @@ module Merge_method = struct
   ;;
 end
 
+module Branch_deletion = struct
+  type t =
+    | Not_asked
+    | Deleted
+    | Kept of string
+  [@@deriving sexp_of, equal]
+end
+
 let merge
       (api : Forge_api.t)
       repo
@@ -140,7 +148,30 @@ let merge
   let opt name =
     Option.value_map ~default:[] ~f:(fun v -> [ name, `String v ])
   in
-  let same_repo = not (String.mem pr.head ':') in
+  (* Only a branch of the base repository itself, never its default branch
+     nor the pull request's base (a fork's head is often called [main]). *)
+  let%bind (deletion : Branch_deletion.t) =
+    if not delete_branch
+    then Ok Branch_deletion.Not_asked
+    else if not pr.same_repo
+    then
+      Ok
+        (Branch_deletion.Kept
+           "it is in another repository (a fork, or one that was deleted), not \
+            this one")
+    else (
+      let%bind default = Forge_api.default_branch api repo in
+      if String.equal pr.head default || String.equal pr.head pr.base
+      then
+        Or_error.errorf
+          "refusing to delete %s: it is %s; merge without delete_branch"
+          pr.head
+          (if String.equal pr.head default
+           then "the repository's default branch"
+           else "the pull request's base branch")
+      else Ok Branch_deletion.Deleted)
+  in
+  let delete = Branch_deletion.equal deletion Deleted in
   let refused (response : Forge_http.Response.t) =
     let detail =
       Option.value (Forge_api.message_of_body response.body) ~default:""
@@ -184,30 +215,42 @@ let merge
                     (not (String.is_empty pr.head_sha))
                     pr.head_sha)))
     in
-    if delete_branch && same_repo
-    then
-      Forge_api.send
-        api
-        ~what:(sprintf "deleting the branch %s" pr.head)
-        Delete
-        (sprintf "%s/git/refs/heads/%s" (Forge_repo.api_url repo) pr.head)
-      >>| ignore
-    else Ok ()
+    if delete
+    then (
+      match
+        Forge_api.send
+          api
+          ~what:(sprintf "deleting the branch %s" pr.head)
+          Delete
+          (sprintf
+             "%s/git/refs/heads/%s"
+             (Forge_repo.api_url repo)
+             (Forge_api.encode_ref pr.head))
+      with
+      | Ok _ -> Ok deletion
+      | Error e ->
+        Ok
+          (Branch_deletion.Kept ("deleting it failed: " ^ Error.to_string_hum e)))
+    else Ok deletion
   | Forgejo ->
-    call
-      Post
-      (pull_url repo n ^ "/merge")
-      (`Object
-          ([ "Do", `String (Merge_method.to_string method_)
-           ; ( "delete_branch_after_merge"
-             , if delete_branch && same_repo then `True else `False )
-           ]
-           @ opt "MergeTitleField" title
-           @ opt "MergeMessageField" message
-           @ opt
-               "head_commit_id"
-               (Option.some_if (not (String.is_empty pr.head_sha)) pr.head_sha)
-          ))
+    let%map () =
+      call
+        Post
+        (pull_url repo n ^ "/merge")
+        (`Object
+            ([ "Do", `String (Merge_method.to_string method_)
+             ; ("delete_branch_after_merge", if delete then `True else `False)
+             ]
+             @ opt "MergeTitleField" title
+             @ opt "MergeMessageField" message
+             @ opt
+                 "head_commit_id"
+                 (Option.some_if
+                    (not (String.is_empty pr.head_sha))
+                    pr.head_sha)))
+    in
+    (* Forgejo deletes it itself, after the merge. *)
+    deletion
 ;;
 
 module Review = struct
@@ -278,7 +321,13 @@ module Line_comment = struct
         ; author = J.str json [ "user"; "login" ]
         ; path = J.str json [ "path" ]
         ; line =
-            first [ "line"; "original_line"; "position"; "original_position" ]
+            (* GitHub's [position]s count lines of the diff, not the file;
+               Forgejo's (whose comments come per review) are file lines. *)
+            first
+              (match review_id with
+               | Some _ ->
+                 [ "line"; "original_line"; "position"; "original_position" ]
+               | None -> [ "line"; "original_line" ])
         ; body = J.str json [ "body" ]
         ; in_reply_to = J.int json [ "in_reply_to_id" ]
         ; created_at = J.str json [ "created_at" ]

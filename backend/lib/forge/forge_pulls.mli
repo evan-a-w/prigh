@@ -47,8 +47,20 @@ module Merge_method : sig
   val of_string : string -> t Or_error.t
 end
 
+(** What happened to the head branch after a merge. *)
+module Branch_deletion : sig
+  type t =
+    | Not_asked
+    | Deleted
+    | Kept of string (** why not *)
+  [@@deriving sexp_of, equal]
+end
+
 (** Merges it at [sha] (its head: refused if it moved), then deletes the
-    branch if asked (only a branch of the same repository). *)
+    branch if asked: only a branch of the base repository itself (never a
+    fork's, nor one whose repository was deleted), and never the
+    repository's default branch or the pull request's base, which is refused
+    before merging. *)
 val merge
   :  Forge_api.t
   -> Forge_repo.t
@@ -57,7 +69,7 @@ val merge
   -> title:string option
   -> message:string option
   -> delete_branch:bool
-  -> unit Or_error.t
+  -> Branch_deletion.t Or_error.t
 
 module Review : sig
   type t =

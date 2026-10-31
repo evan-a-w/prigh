@@ -83,16 +83,29 @@ let http_error
       host
       detail
       (Forge_instance.login_arg t.instance)
+  | 429 -> Or_error.errorf "%s: %s: rate limited (HTTP 429%s)" host what detail
   | 403 ->
     let lower = String.lowercase detail in
     if String.is_substring lower ~substring:"rate limit"
     then Or_error.errorf "%s: %s: rate limited (HTTP 403%s)" host what detail
     else (
+      let header name =
+        match Forge_http.Response.header response name with
+        | Some v when not (String.is_empty (String.strip v)) ->
+          Some (String.strip v)
+        | _ -> None
+      in
+      (* Classic tokens get the scopes the call needs; fine-grained tokens
+         and GitHub Apps the permissions. *)
       let needs =
-        match Forge_http.Response.header response "X-Accepted-OAuth-Scopes" with
-        | Some scopes when not (String.is_empty (String.strip scopes)) ->
-          sprintf " (it needs %s)" (String.strip scopes)
-        | _ -> ""
+        match
+          ( header "X-Accepted-OAuth-Scopes"
+          , header "X-Accepted-GitHub-Permissions" )
+        with
+        | _, Some permissions ->
+          sprintf " (it needs the permission %s)" permissions
+        | Some scopes, None -> sprintf " (it needs %s)" scopes
+        | None, None -> ""
       in
       Or_error.errorf
         "%s: %s: not allowed (HTTP 403%s): the account may lack access to the \
@@ -154,18 +167,71 @@ let get_json t ~what ?not_found ?on_404 url =
   send_json t ~what ?not_found ?on_404 Get url
 ;;
 
-(* [<URL>; rel="next", <URL>; rel="last"] *)
+(* [<URL>; rel="next", <URL>; rel="last"]: each link is [<...>] followed by
+   its parameters up to the next [<], so a comma inside a URL (a search's
+   [q]) does not split it. *)
 let next_link (response : Forge_http.Response.t) =
   Option.bind (Forge_http.Response.header response "Link") ~f:(fun link ->
-    List.find_map (String.split link ~on:',') ~f:(fun part ->
-      match String.lsplit2 part ~on:';' with
-      | Some (url, params)
-        when String.is_substring params ~substring:"rel=\"next\"" ->
-        let url = String.strip url in
-        Option.some_if
-          (String.is_prefix url ~prefix:"<" && String.is_suffix url ~suffix:">")
-          (String.sub url ~pos:1 ~len:(String.length url - 2))
-      | _ -> None))
+    let rec links s acc =
+      match String.index s '<' with
+      | None -> List.rev acc
+      | Some start ->
+        (match String.index_from s start '>' with
+         | None -> List.rev acc
+         | Some stop ->
+           let url = String.sub s ~pos:(start + 1) ~len:(stop - start - 1) in
+           let rest = String.drop_prefix s (stop + 1) in
+           let params, rest =
+             match String.index rest '<' with
+             | Some k -> String.prefix rest k, String.drop_prefix rest k
+             | None -> rest, ""
+           in
+           links rest ((url, params) :: acc))
+    in
+    List.find_map (links link []) ~f:(fun (url, params) ->
+      Option.some_if (String.is_substring params ~substring:"rel=\"next\"") url))
+;;
+
+(* A next page on another host (or scheme) than the API's is not followed:
+   the request would carry the token there. *)
+let same_origin t url =
+  let api = Uri.of_string (Forge_instance.api_url t.instance) in
+  let next = Uri.of_string url in
+  let origin u =
+    ( Option.map (Uri.scheme u) ~f:String.lowercase
+    , Option.map (Uri.host u) ~f:String.lowercase
+    , Uri.port u )
+  in
+  [%equal: string option * string option * int option]
+    (origin api)
+    (origin next)
+;;
+
+let encode_segment s =
+  String.concat_map s ~f:(fun c ->
+    if
+      Char.is_alphanum c
+      || Char.equal c '-'
+      || Char.equal c '.'
+      || Char.equal c '_'
+      || Char.equal c '~'
+    then String.of_char c
+    else sprintf "%%%02X" (Char.to_int c))
+;;
+
+let encode_ref ref_ =
+  String.concat
+    ~sep:"/"
+    (List.map (String.split ref_ ~on:'/') ~f:encode_segment)
+;;
+
+let with_query url query =
+  match query with
+  | [] -> url
+  | query ->
+    url
+    ^ (if String.mem url '?' then "&" else "?")
+    ^ Uri.encoded_of_query (List.map query ~f:(fun (k, v) -> k, [ v ]))
 ;;
 
 let page_size t =
@@ -191,6 +257,7 @@ let with_page_size t url =
 let get_list
       ?(limit = 100)
       ?(items = fun json -> Some json)
+      ?(keep = fun _ -> true)
       t
       ~what
       ?not_found
@@ -201,12 +268,15 @@ let get_list
     let%bind response = send_response t ~what ?not_found Get url in
     let%bind json = parse ~what response.body in
     match items json with
-    | Some (`Array page) ->
+    | Some (`Array raw_page) ->
+      let page = List.filter raw_page ~f:keep in
       let acc = List.rev_append page acc in
       let count = count + List.length page in
       (match next_link response with
-       | Some next when count < limit && not (List.is_empty page) ->
-         go next acc count
+       | Some next
+         when count < limit
+              && (not (List.is_empty raw_page))
+              && same_origin t next -> go next acc count
        | _ -> Ok (List.take (List.rev acc) limit))
     | _ -> Or_error.errorf "%s: expected a list" what
   in

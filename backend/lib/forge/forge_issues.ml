@@ -123,16 +123,7 @@ end
 let issues_url repo = Forge_repo.api_url repo ^ "/issues"
 let issue_url repo n = sprintf "%s/%d" (issues_url repo) n
 let name (repo : Forge_repo.t) = sprintf "%s/%s" repo.owner repo.name
-
-let with_query url query =
-  match query with
-  | [] -> url
-  | query ->
-    url
-    ^ "?"
-    ^ Uri.encoded_of_query (List.map query ~f:(fun (k, v) -> k, [ v ]))
-;;
-
+let with_query = Forge_api.with_query
 let parse_all items = Or_error.all (List.map items ~f:Issue.of_json)
 
 let list (api : Forge_api.t) repo (f : Filter.t) =
@@ -160,7 +151,7 @@ let list (api : Forge_api.t) repo (f : Filter.t) =
            @ (match f.state with
               | "all" -> []
               | s -> [ "state:" ^ s ])
-           @ List.map f.labels ~f:(fun l -> sprintf "label:%S" l)
+           @ List.map f.labels ~f:(fun l -> sprintf "label:\"%s\"" l)
            @ Option.value_map f.assignee ~default:[] ~f:(fun a ->
              [ "assignee:" ^ a ])
            @ Option.value_map f.author ~default:[] ~f:(fun a ->
@@ -178,8 +169,11 @@ let list (api : Forge_api.t) repo (f : Filter.t) =
            [ "q", q ])
       >>= parse_all
     | Github, None ->
+      (* GitHub's issues include its pull requests: they do not count
+         towards [limit], so pages are fetched until it is reached. *)
       Forge_api.get_list
         api
+        ~keep:(fun json -> Option.is_none (Json.member "pull_request" json))
         ~limit:f.limit
         ~what
         ~not_found
@@ -247,9 +241,9 @@ let label_ids (api : Forge_api.t) repo names =
       | Some (_, id) -> First id
       | None -> Second n)
   in
-  let%bind ids, missing =
+  let%bind ids, missing, known =
     match find repo_labels with
-    | ids, [] -> Ok (ids, [])
+    | ids, [] -> Ok (ids, [], repo_labels)
     | _ ->
       let org =
         match
@@ -262,7 +256,9 @@ let label_ids (api : Forge_api.t) repo names =
         | Ok l -> l
         | Error _ -> []
       in
-      Ok (find (repo_labels @ org))
+      let known = repo_labels @ org in
+      let ids, missing = find known in
+      Ok (ids, missing, known)
   in
   match missing with
   | [] -> Ok ids
@@ -271,7 +267,7 @@ let label_ids (api : Forge_api.t) repo names =
       "%s has no label %s (it has %s)"
       (name repo)
       (String.concat ~sep:", " missing)
-      (match repo_labels with
+      (match known with
        | [] -> "none"
        | l -> String.concat ~sep:", " (List.map l ~f:fst))
 ;;
@@ -380,7 +376,7 @@ let remove_labels (api : Forge_api.t) repo n labels =
   let open Or_error.Let_syntax in
   let%bind keys =
     match api.instance.kind with
-    | Github -> Ok (List.map labels ~f:Uri.pct_encode)
+    | Github -> Ok (List.map labels ~f:Forge_api.encode_segment)
     | Forgejo -> label_ids api repo labels >>| List.map ~f:Int.to_string
   in
   let%bind () =

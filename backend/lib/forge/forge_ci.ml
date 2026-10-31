@@ -227,8 +227,7 @@ let runs (api : Forge_api.t) repo ~branch ~limit =
   match api.instance.kind with
   | Github ->
     let query =
-      Option.value_map branch ~default:"" ~f:(fun b ->
-        "?branch=" ^ Uri.pct_encode b)
+      Option.value_map branch ~default:[] ~f:(fun b -> [ "branch", b ])
     in
     Or_error.bind
       (Forge_api.get_list
@@ -236,7 +235,7 @@ let runs (api : Forge_api.t) repo ~branch ~limit =
          ~limit
          ~items:(Json.member "workflow_runs")
          ~what:"the workflow runs"
-         (actions ^ "/runs" ^ query))
+         (Forge_api.with_query (actions ^ "/runs") query))
       ~f:(all Run.of_json)
   | Forgejo ->
     let open Or_error.Let_syntax in
