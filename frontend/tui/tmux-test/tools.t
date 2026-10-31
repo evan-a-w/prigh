@@ -108,7 +108,7 @@ prints the captured panes.
   >  a1 has finished · Esc goes back to the main agent
   deepseek-flash  think:on  ctx:0.0%/1.0M  agents:main [1✓] 2✓  → a1 (finished) · Esc: main agent
   === agent 2
-  ◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "say hello"
+  ◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "Say hello"
   
   
   
