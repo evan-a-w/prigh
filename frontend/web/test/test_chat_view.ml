@@ -46,6 +46,15 @@ let%expect_test "user messages: text, pasted images" =
                    class="thumb"/>
               <span class="lightbox">
                 <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]"/>
+                <span class="lightbox-tools">
+                  <button type="button"
+                          title="Draw on this image"
+                          data-annotate="new"
+                          class="btn lightbox-annotate">
+                    <icon class="pencil"> </icon>
+                    Draw
+                  </button>
+                </span>
               </span>
             </summary>
           </details>

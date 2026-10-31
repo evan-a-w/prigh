@@ -13,6 +13,11 @@ val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 (** What the agent is doing (or that the backend is out of reach). *)
 val activity : App.Model.t -> Node.t
 
+(** At a glance, for a phone's header: a dot (a lamp while the agent works)
+    and the context's percent. Hidden from screen readers: the button that
+    shows it names what it opens, and the status itself is in the tray. *)
+val glance : App.Model.t -> Node.t
+
 (** What applies: goal, reminders, resume, queued messages to take back,
     background subagents and jobs, transfers, the verbosity and, with
     [plan], the model's plan. In the header it goes before the status, so

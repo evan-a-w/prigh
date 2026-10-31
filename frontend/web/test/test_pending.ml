@@ -16,7 +16,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
             title="Not connected to the backend"
             aria-label="Send"
             disabled=""
-            class="btn primary send"
+            class="btn primary round send"
             @on_click>
       <icon class="send"> </icon>
     </button>
@@ -79,7 +79,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
             aria-label="Sending"
             disabled=""
             aria-busy="true"
-            class="btn busy primary send"
+            class="btn busy primary round send"
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
     </button>
@@ -97,7 +97,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
   [%expect
     {|
     <div class="msg user">
-    <button class="btn primary send">
+    <button class="btn primary round send">
     |}]
 ;;
 

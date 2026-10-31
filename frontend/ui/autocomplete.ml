@@ -286,7 +286,14 @@ let argument_items
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
-  | Remind | Worktree | Review | Commit | Agents | Compaction | Naming -> None
+  | Remind
+  | Worktree
+  | Review
+  | Commit
+  | Agents
+  | Compaction
+  | Naming
+  | Dictation -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -476,7 +483,8 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
-              | (Remind | Commit | Agents | Compaction | Naming) as kind ->
+              | (Remind | Commit | Agents | Compaction | Naming | Dictation) as
+                kind ->
                 let rest = String.drop_prefix line start in
                 Option.bind
                   (match kind with
@@ -484,6 +492,7 @@ let compute_argument
                    | Agents -> Agents_command.complete ~agents rest
                    | Compaction -> Compaction_command.complete ~models rest
                    | Naming -> Naming_command.complete ~models rest
+                   | Dictation -> Dictation_command.complete rest
                    | _ -> Remind_command.complete ~reminders rest)
                   ~f:(fun (offset, candidates) ->
                     let prefix = String.drop_prefix rest offset in

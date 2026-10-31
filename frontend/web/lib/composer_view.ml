@@ -31,6 +31,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Remind -> "Reminders"
       | Argument Compaction -> "Compaction"
       | Argument Naming -> "Naming"
+      | Argument Dictation -> "Dictation"
       | Argument Worktree -> "Worktrees"
       | Argument Review -> "Review"
       | Argument Resume -> "Automatic resume"
@@ -89,6 +90,10 @@ let popup (m : App.Model.t) ~inject =
       ]
 ;;
 
+(* Each opens full size in the drawing dialog (a lightbox inside the
+   composer would be held to it: its container query contains fixed
+   positions), where saving a drawing replaces it; the cross takes it off
+   the message. *)
 let images (m : App.Model.t) ~inject =
   match m.images with
   | [] -> Node.none
@@ -98,13 +103,25 @@ let images (m : App.Model.t) ~inject =
       (List.mapi list ~f:(fun i image ->
          div
            ~cls:"pending-image"
-           [ Node.img
+           [ Node.button
                ~attrs:
-                 [ Attr.src (Chat_view.image_src image)
-                 ; Attr.alt (Image.to_string_hum image)
-                 ; Attr.title (Image.to_string_hum image)
+                 [ Attr.type_ "button"
+                 ; Attr.class_ "pending-thumb"
+                 ; Attr.title "View it, or draw on it"
+                 ; Attr.create
+                     "aria-label"
+                     ("View or draw on " ^ Image.to_string_hum image)
+                 ; Attr.on_click (fun _ ->
+                     inject (Action.Annotate { image; target = Pending i }))
                  ]
-               ()
+               [ Node.img
+                   ~attrs:
+                     [ Attr.class_ "thumb"
+                     ; Attr.src (Image_view.src image)
+                     ; Attr.alt (Image.to_string_hum image)
+                     ]
+                   ()
+               ]
            ; button
                ~cls:"remove-image"
                ~title:"Remove image"
@@ -172,17 +189,17 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
-(* The model and the tool host, along the bottom of the box, each opening
-   its menu over itself (the command's choices). The thinking level and the
-   mode are the chat header's ({!Session_chips_view}). *)
-let controls (m : App.Model.t) ~inject =
+(* The lower tier, under the box: what the message goes to, each chip
+   opening its menu over itself (the command's choices). The thinking level
+   and the mode are the chat header's ({!Session_chips_view}). *)
+let tier (m : App.Model.t) ~inject =
   match m.state with
-  | None -> div ~cls:"composer-controls" []
+  | None -> Node.none
   | Some state ->
     Node.div
       ~attrs:
         [ classes
-            [ "composer-controls" ]
+            [ "composer-tier"; "composer-controls" ]
             [ "menu-open", Session_chips_view.menu_open m [ Model; Host ] ]
         ; Attr.role "group"
         ; Attr.create "aria-label" "Model and host"
@@ -190,6 +207,95 @@ let controls (m : App.Model.t) ~inject =
       [ Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
       ; Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
       ]
+;;
+
+(* The +: a menu of what can go with the message. *)
+let plus (m : App.Model.t) ~inject =
+  Node.div
+    ~attrs:
+      [ classes
+          [ "composer-plus" ]
+          [ "menu-open", Session_chips_view.menu_open m [ Attach ] ]
+      ]
+    [ Session_chips_view.anchor
+        m
+        Attach
+        (button
+           ~cls:"icon ghost round plus"
+           ~title:"Add files or images (or paste, or drop them here)"
+           ~label:"Add files or images"
+           ~attrs:
+             [ Attr.create "aria-haspopup" "menu"
+             ; Attr.create
+                 "aria-expanded"
+                 (Bool.to_string (Session_chips_view.menu_open m [ Attach ]))
+             ]
+           ~on_click:(inject (Action.Open_chip Attach))
+           [ icon Plus ])
+        ~inject
+    ]
+;;
+
+(* While dictating: how long, how loud, and a way out. *)
+let dictation (m : App.Model.t) ~inject =
+  let status ~cls children =
+    Node.div
+      ~attrs:
+        [ Attr.class_ ("dictation " ^ cls)
+        ; Attr.role "status"
+        ; Attr.create "aria-live" "polite"
+        ]
+      (children
+       @ [ button
+             ~cls:"ghost dictation-cancel"
+             ~title:"Discard the recording (Esc)"
+             ~label:"Discard the recording"
+             ~on_click:(inject Action.Dictation_cancel)
+             [ icon Close ]
+         ])
+  in
+  match m.dictation with
+  | Idle -> Node.none
+  | Starting _ ->
+    status
+      ~cls:"starting"
+      [ Html.lamp (); span ~cls:"dictation-label" "Listening…" ]
+  | Recording { engine; elapsed_ms; level } ->
+    status
+      ~cls:"recording"
+      [ Node.span
+          ~attrs:
+            [ Attr.class_ "dictation-dot"
+            ; Attr.css_var ~name:"level" (sprintf "%.2f" level)
+            ]
+          []
+      ; span ~cls:"dictation-time" (Dictation.elapsed elapsed_ms)
+      ; span
+          ~cls:"dictation-label"
+          (match engine with
+           | Server -> "Recording"
+           | Browser -> "Listening (browser)")
+      ]
+  | Transcribing ->
+    status
+      ~cls:"transcribing"
+      [ Html.lamp (); span ~cls:"dictation-label" "Transcribing…" ]
+;;
+
+let mic (m : App.Model.t) ~inject =
+  let active = Dictation.active m.dictation in
+  button
+    ~cls:(if active then "icon round mic on" else "icon ghost round mic")
+    ~title:
+      (match m.dictation with
+       | Idle -> "Dictate (speak, then click again to stop)"
+       | Starting _ | Recording _ -> "Stop and put the words in"
+       | Transcribing -> "Transcribing…")
+    ~label:(if active then "Stop dictating" else "Dictate")
+    ~disabled:(Dictation.equal m.dictation Transcribing)
+    ~attrs:[ Attr.create "aria-pressed" (Bool.to_string active) ]
+    ~on_click:(inject Action.Dictate)
+    [ icon Mic ]
 ;;
 
 let steered (m : App.Model.t) =
@@ -280,6 +386,9 @@ let view (m : App.Model.t) ~inject =
        && List.is_empty m.files.attachments)
   in
   let sending = m.pending.sending > 0 in
+  (* Running with nothing to steer with, the disc stops the agent (a
+     subagent being steered keeps its steer). *)
+  let stops = running && (not has_input) && Option.is_none (steered m) in
   let connected = connected m in
   (* A chip's menu leaves only the chips live. *)
   let rest =
@@ -294,90 +403,104 @@ let view (m : App.Model.t) ~inject =
     [ rest (popup m ~inject)
     ; rest (Queue_view.view m ~inject)
     ; div
-        ~cls:"composer-box"
-        [ (match m.recipient with
-           | Main -> Node.none
-           | Agent id -> rest (steer_chip m id ~inject))
-        ; rest (images m ~inject)
-        ; rest (Files_view.chips m ~inject)
-        ; rest
-          @@ Node.textarea
-               ~attrs:
-                 [ Attr.class_ "editor"
-                 ; Attr.id "editor"
-                 ; Attr.placeholder (placeholder m)
-                 ; Attr.create "aria-label" "Message"
-                 ; Attr.create "dir" "auto"
-                 ; (match App.Model.popup m with
-                    | None -> Attr.empty
-                    | Some c ->
-                      Attr.many
-                        [ Attr.role "combobox"
-                        ; Attr.create "aria-controls" "completion-list"
-                        ; Attr.create "aria-expanded" "true"
-                        ; Attr.create "aria-autocomplete" "list"
-                        ; Attr.create
-                            "aria-activedescendant"
-                            (sprintf
-                               "completion-option-%d"
-                               (Completion.selected c))
-                        ])
-                 ; Attr.value m.draft
-                 ; Attr.rows 1
-                 ; Attr.create "autocomplete" "off"
-                 ; Attr.create "enterkeyhint" "send"
-                 ; Attr.on_input (fun ev text ->
-                     let cursor =
-                       Option.value (caret ev) ~default:(String.length text)
-                     in
-                     inject (Action.Edit { text; cursor }))
-                 ]
-               []
-        ; div
-            ~cls:"composer-bar"
-            [ controls m ~inject
+        ~cls:"composer-stack"
+        [ div
+            ~cls:"composer-box"
+            [ (match m.recipient with
+               | Main -> Node.none
+               | Agent id -> rest (steer_chip m id ~inject))
+            ; rest (images m ~inject)
+            ; rest (Files_view.chips m ~inject)
             ; rest
-              @@ div
-                   ~cls:"composer-buttons"
-                   [ Files_view.attach_button m ~inject
-                   ; (if running
-                      then
-                        button
-                          ~cls:"stop"
-                          ~title:"Stop (Esc)"
-                          ~label:"Stop"
-                          ~on_click:(inject Action.Abort)
-                          [ icon Stop ]
-                      else Node.none)
-                   ; (if sending
-                      then
-                        button
-                          ~cls:"primary send busy"
-                          ~title:"Sending…"
-                          ~label:"Sending"
-                          ~disabled:true
-                          ~attrs:[ Attr.create "aria-busy" "true" ]
-                          ~on_click:Effect.Ignore
-                          [ Html.lamp () ]
-                      else
-                        button
-                          ~cls:"primary send"
-                          ~title:
-                            (match steered m with
-                             | _ when not connected ->
-                               "Not connected to the backend"
-                             | Some id -> sprintf "Steer %s (Enter)" id
-                             | None when running -> "Steer (Enter)"
-                             | None -> "Send (Enter)")
-                          ~label:
-                            (if running || Option.is_some (steered m)
-                             then "Steer"
-                             else "Send")
-                          ~disabled:((not has_input) || not connected)
-                          ~on_click:(inject Action.Send)
-                          [ icon Send ])
-                   ]
+              @@ Node.textarea
+                   ~attrs:
+                     [ Attr.class_ "editor"
+                     ; Attr.id "editor"
+                     ; Attr.placeholder (placeholder m)
+                     ; Attr.create "aria-label" "Message"
+                     ; Attr.create "dir" "auto"
+                     ; (match App.Model.popup m with
+                        | None -> Attr.empty
+                        | Some c ->
+                          Attr.many
+                            [ Attr.role "combobox"
+                            ; Attr.create "aria-controls" "completion-list"
+                            ; Attr.create "aria-expanded" "true"
+                            ; Attr.create "aria-autocomplete" "list"
+                            ; Attr.create
+                                "aria-activedescendant"
+                                (sprintf
+                                   "completion-option-%d"
+                                   (Completion.selected c))
+                            ])
+                     ; Attr.value m.draft
+                     ; Attr.rows 1
+                     ; Attr.create "autocomplete" "off"
+                     ; Attr.create "enterkeyhint" "send"
+                     ; Attr.on_input (fun ev text ->
+                         let cursor =
+                           Option.value (caret ev) ~default:(String.length text)
+                         in
+                         inject (Action.Edit { text; cursor }))
+                     ]
+                   []
+            ; div
+                ~cls:"composer-row"
+                [ plus m ~inject
+                ; rest (dictation m ~inject)
+                ; rest
+                  @@ div
+                       ~cls:"composer-buttons"
+                       [ mic m ~inject
+                       ; (if running && not stops
+                          then
+                            button
+                              ~cls:"icon ghost round stop"
+                              ~title:"Stop (Esc)"
+                              ~label:"Stop"
+                              ~on_click:(inject Action.Abort)
+                              [ icon Stop ]
+                          else Node.none)
+                       ; (if sending
+                          then
+                            button
+                              ~cls:"primary round send busy"
+                              ~title:"Sending…"
+                              ~label:"Sending"
+                              ~disabled:true
+                              ~attrs:[ Attr.create "aria-busy" "true" ]
+                              ~on_click:Effect.Ignore
+                              [ Html.lamp () ]
+                          else if stops
+                          then
+                            (* Nothing to steer with: the one button stops. *)
+                            button
+                              ~cls:"primary round stop"
+                              ~title:"Stop (Esc)"
+                              ~label:"Stop"
+                              ~on_click:(inject Action.Abort)
+                              [ icon Stop ]
+                          else
+                            button
+                              ~cls:"primary round send"
+                              ~title:
+                                (match steered m with
+                                 | _ when not connected ->
+                                   "Not connected to the backend"
+                                 | Some id -> sprintf "Steer %s (Enter)" id
+                                 | None when running -> "Steer (Enter)"
+                                 | None -> "Send (Enter)")
+                              ~label:
+                                (if running || Option.is_some (steered m)
+                                 then "Steer"
+                                 else "Send")
+                              ~disabled:((not has_input) || not connected)
+                              ~on_click:(inject Action.Send)
+                              [ icon Send ])
+                       ]
+                ]
             ]
+        ; tier m ~inject
         ]
     ]
 ;;

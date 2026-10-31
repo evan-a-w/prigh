@@ -338,6 +338,7 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ when t.shift || t.ctrl || t.meta -> None
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send
+  | "Escape", _ when Dictation.active m.dictation -> Some Dictation_cancel
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
   | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
     Some (Set_recipient Main)
@@ -627,6 +628,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | "ArrowUp" when ctrl_only t -> Some (Jump_to_user_message (-1))
      | "ArrowDown" when ctrl_only t -> Some (Jump_to_user_message 1)
      | "Escape" when App.Model.drawer m -> Some Toggle_sidebar
+     | "Escape" when m.narrow && m.status_tray && Option.is_none m.dialog ->
+       Some Toggle_status_tray
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)

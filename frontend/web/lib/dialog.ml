@@ -29,6 +29,8 @@ module Picker_kind = struct
     | Accents
     | Compaction_models
     | Naming_models
+    | Dictation_models
+    | Attach
     | Menu of Context_menu.t
   [@@deriving sexp_of, equal]
 end
@@ -112,6 +114,7 @@ type t =
       ; error : string option
       }
   | Nix_gc_confirm of Nix_generations.t
+  | Annotate of Annotate.t
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -150,6 +153,7 @@ let per_session = function
           | Trim_after _ )
       ; _
       }
+  | Annotate _
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true
   | Picker
       { kind =
@@ -164,7 +168,9 @@ let per_session = function
           | Themes
           | Accents
           | Compaction_models
-          | Naming_models )
+          | Naming_models
+          | Dictation_models
+          | Attach )
       ; _
       }
   | Help

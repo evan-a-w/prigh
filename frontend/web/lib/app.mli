@@ -187,6 +187,8 @@ module Reply_tag : sig
     | Default_dir_saved
     | Compaction_saved (** the new config; its settings are shown *)
     | Naming_saved (** the new config; the naming model is shown *)
+    | Dictation_saved (** the new config; the dictation model is shown *)
+    | Transcribed (** a dictation's text, put in at the caret *)
     | Default_saved
     | Session_stats
     | Trace (** [trace]: its summary in a dialog *)
@@ -319,6 +321,15 @@ module Command : sig
     | Place_popover
     (** a chip's menu, once rendered: above the composer, or below its chip
         when only there is room; inside the composer sideways *)
+    | Pick_images (** the composer's image picker *)
+    | Start_dictation of Dictation.Engine.t
+    | Stop_dictation (** and transcribe what was said *)
+    | Cancel_dictation
+    | Annotate_setup (** the drawing's canvas, once rendered *)
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_export
+    (** the image with the drawing on it, as {!Action.Annotated} *)
     | Place_menu of Context_menu.Anchor.t
     (** the context menu, once rendered: at the anchor, kept in the
         window *)
@@ -545,6 +556,9 @@ module Action : sig
     (** a session's or worktree's context menu (right-click, Shift+F10, the
         context menu key, a long press, the row's ⋯) *)
     | Toggle_sidebar
+    | Toggle_status_tray
+    (** a phone's header: the tray with the thinking level, the mode, the
+        status and the panels' toggles, under the header *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -557,6 +571,30 @@ module Action : sig
     | Cycle_mode (** Alt+M: ask → auto-edit → auto → plan *)
     | Add_image of Image.t
     | Remove_image of int
+    | Dictate (** the microphone: start, or stop and transcribe *)
+    | Dictation_cancel
+    | Dictation_progress of
+        { elapsed_ms : int
+        ; level : float
+        }
+    | Dictation_audio of
+        { mime_type : string
+        ; data : string (** base64 *)
+        }
+    | Dictation_text of string (** the browser's recognition heard this *)
+    | Dictation_failed of string
+    | Browser_speech of bool
+    | Annotate of
+        { image : Image.t
+        ; target : Annotate.Target.t
+        }
+    | Annotate_color of string
+    | Annotate_size of int
+    | Annotate_strokes of int (** the page's count, after each stroke *)
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_save
+    | Annotated of Image.t (** the image with the drawing on it *)
     | Show_toast of
         { text : string
         ; error : bool
@@ -699,6 +737,11 @@ module Model : sig
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
+    ; dictation : Dictation.t
+    ; dictation_engine : Dictation.Engine.t
+    (** what the next dictation uses: the backend's, until it says it
+        cannot transcribe *)
+    ; browser_speech : bool (** the browser has SpeechRecognition *)
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
       (** the background subagents' queues, those not empty *)
@@ -720,6 +763,8 @@ module Model : sig
       (** the sessions sidebar beside the chat (a drawer on a phone); while
           reviewing it is hidden, and [review_drawer] shows it *)
     ; review_drawer : bool
+    ; status_tray : bool
+      (** on a phone, the header's tray is open ({!Action.Toggle_status_tray}) *)
       (** while reviewing on a wide page, the sessions sidebar shows as a
           drawer over the page (Ctrl+B); it goes when the review closes *)
     ; scrolled_up : bool (** the chat is not following new output *)
