@@ -142,7 +142,7 @@ const chips = () => page.evaluate(() => {
 // meter as [meter]), then the lamps lit, what is in the accent colour, and
 // anything outside the card or cut off without an ellipsis.
 const card = () => page.evaluate(() => {
-  const root = document.querySelector(".session-card, .session-bar");
+  const root = document.querySelector(".session-bar");
   if (!root) return "(no card)";
   const shown = e => {
     const r = e.getBoundingClientRect();
@@ -197,7 +197,7 @@ const both = async label => {
   console.log(clean(await card()));
   for (const t of ["dark", "light"]) {
     await theme(t);
-    await screenshot(`${label} ${t}`, ".session-card");
+    await screenshot(`${label} ${t}`, ".session-bar");
   }
   await screenshot(label);
   await theme("dark");
@@ -208,28 +208,28 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".session-card .branch").waitFor();
+  await page.locator(".session-bar .branch").waitFor();
   await both("idle");
 
   // The agent at work, its subagent too.
   await command("survey the project");
-  await page.locator(".session-card .status-item.background.active").waitFor();
+  await page.locator(".session-bar .status-item.background.active").waitFor();
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("main-go"));
   await both("working, a subagent running");
 
   // The agent done, its subagent still running.
   open("main-go");
-  await page.locator(".session-card .activity.idle").waitFor();
+  await page.locator(".session-bar .activity.idle").waitFor();
   await both("ready, a subagent running");
 
   // All done, and a mode on (the transcript's verbosity).
   open("sub-go");
-  await page.waitForFunction(() => !document.querySelector(".session-card .status-item.background.active"));
+  await page.waitForFunction(() => !document.querySelector(".session-bar .status-item.background.active"));
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
-  await page.locator(".session-card .activity.idle").waitFor();
+  await page.locator(".session-bar .activity.idle").waitFor();
   await page.keyboard.press("Control+o");
-  await page.locator(".session-card .status-item.mode").waitFor();
+  await page.locator(".session-bar .status-item.mode").waitFor();
   await both("idle, a mode on");
 
   // The sidebar at its narrowest: still one line for the activity and the
@@ -279,7 +279,7 @@ try {
   console.log(clean(await chips()));
 
   // The context opens the session's details.
-  await page.locator(".session-card .context").click();
+  await page.locator(".session-bar button.context").click();
   await page.locator(".modal").waitFor();
   section("the context opens the session's details");
   console.log(clean(await page.locator(".modal h2, .modal .dialog-title").first().innerText()));
@@ -293,7 +293,7 @@ try {
   console.log(clean(await card()));
   await screenshot("the sidebar closed");
   await page.keyboard.press("Control+b");
-  await page.locator(".session-card").waitFor();
+  await page.locator(".session-bar").waitFor();
 
   // A phone: the bar again.
   await page.setViewportSize({ width: 390, height: 760 });

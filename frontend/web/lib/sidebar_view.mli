@@ -5,14 +5,10 @@ open! Import
     running marked, age, repository and branch, size), each with the
     worktrees that matter to it under it (folding; changes, sync, a
     subagent's or a pull request's), context menus on both (right-click,
-    Shift+F10, a long press, ⋯), the archived ones, delete; then [session],
-    the current session's card; the signed-in user, help, the settings and
-    sign out. *)
-val view
-  :  App.Model.t
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> session:Node.t
-  -> Node.t
+    Shift+F10, a long press, ⋯), the archived ones, delete; then the
+    signed-in user, help, the settings and sign out. (The current session's
+    status is the chat header's: {!Session_view.bar}.) *)
+val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** The gear opening the settings ([/settings]). *)
 val settings : inject:(App.Action.t -> unit Effect.t) -> Node.t

@@ -79,9 +79,6 @@ let%expect_test "everything shows at first; the button is left of the files'" =
   transcript h;
   [%expect
     {|
-    button "Filter the transcript" -- Filter the transcript (/filter)
-    button "Files" -- Files (Ctrl+Shift+F)
-    button "Terminal" -- Terminal (Ctrl+`)
     Survey the repository
     Thought Let me look first.
     Let me look first.

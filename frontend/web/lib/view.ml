@@ -291,8 +291,8 @@ let view (m : Model.t) ~inject ~terminal =
   let modal =
     Option.is_some m.dialog || Model.waiting m || Files.asking m.files
   in
-  (* A chip's menu is in the composer, which keeps its chips live (the
-     composer makes the rest of itself inert). *)
+  (* A chip's menu is in the composer or the header (thinking, mode), which
+     stay live under it: the menu's backdrop covers the rest of them. *)
   let modal_composer =
     match m.dialog with
     | Some (Popover _) when not (Model.waiting m || Files.asking m.files) ->
@@ -340,11 +340,7 @@ let view (m : Model.t) ~inject ~terminal =
       (if (m.narrow || Model.focused m) && not (Model.sidebar_shown m)
        then inert
        else under_sheet)
-        (Sidebar_view.view
-           m
-           ~inject
-           ~session:
-             (if Model.docked m then Session_view.card m ~inject else Node.none))
+        (Sidebar_view.view m ~inject)
     ; (if Model.docked m
        then Resize_view.handle m ~inject Sidebar
        else Node.none)
@@ -376,17 +372,14 @@ let view (m : Model.t) ~inject ~terminal =
             ~attrs:[ Attr.class_ "main" ]
             (List.map
                ~f:under_drawer
-               (Option.to_list (Session_tabs_view.view m ~inject)
-                @ [ (if Model.docked m
-                     then Node.none
-                     else Session_view.bar m ~inject)
-                  ; banner m ~inject
+               (Option.to_list (Session_tabs_view.view m ~inject))
+             @ [ layered modal_composer (Session_view.bar m ~inject) ]
+             @ List.map
+                 ~f:under_drawer
+                 [ banner m ~inject
                   ; div
                       ~cls:"chat-frame"
-                      [ (if Model.docked m
-                         then Session_view.tools m ~inject
-                         else Node.none)
-                      ; Node.div
+                      [ Node.div
                           ~attrs:
                             [ Attr.classes
                                 [ "chat"
@@ -406,7 +399,7 @@ let view (m : Model.t) ~inject ~terminal =
                          | Some _ -> Node.none
                          | None -> Jump_view.view m ~inject)
                       ]
-                  ])
+                  ]
              @ [ toasts m ~inject ]
              @ [ under_drawer (Btw_view.view m ~inject)
                ; layered modal_composer (Composer_view.view m ~inject)

@@ -555,7 +555,7 @@ let%expect_test
      ignores its answers"
   =
   let h = H.create () in
-  H.click h ~selector:".session-card .branch";
+  H.click h ~selector:".session-bar .branch";
   [%expect
     {|
     (Run /pr)
