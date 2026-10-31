@@ -163,7 +163,7 @@ module Pending_confirm : sig
     { call_id : string
     ; agent_id : string option (** a subagent's call *)
     ; name : string
-    ; summary : string (** what the call does; [exit_plan_mode]'s is the plan *)
+    ; summary : string (** what the call does *)
     ; rules : string list
       (** what [Always] adds ({!Approval_rule.suggest}); empty when it is
           not offered *)
@@ -458,12 +458,12 @@ val save_as_default : t -> unit Or_error.t
     [allow_rule] entries), so a reloaded session keeps them; a new session
     starts in the config's [approval_mode].
 
-    In plan mode file edits are refused, and every other destructive tool
+    In plan mode the calls {!Plan_mode.changes_work} names (file edits,
+    worktrees, pull requests) are refused, and every other destructive tool
     asks (unless a rule allows it). The model is told when plan mode changes
     ({!System_prompt.plan_mode_note}: with the next user message, or between
-    turns of a running loop), and asks to leave it with [exit_plan_mode],
-    whose confirmation carries the plan: approving it leaves plan mode
-    (keeping the approval mode). *)
+    turns of a running loop). Only the user leaves plan mode
+    ({!set_mode}): the model presents its plan and waits. *)
 
 (** Answers a pending [Tool_confirm] request. Fails if no confirmation is
     outstanding for [call_id] (of the subagent [agent_id]): it was answered
@@ -478,8 +478,8 @@ val respond_confirm
 
 (** Switches the approval mode and/or plan mode, recording it in the
     session. Pending confirmations the new mode lets through are allowed;
-    leaving plan mode by hand approves a pending [exit_plan_mode], and, when
-    idle, carries on an active goal (see {!set_goal}). *)
+    leaving plan mode, when idle, carries on an active goal (see
+    {!set_goal}). *)
 val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
@@ -645,7 +645,7 @@ val set_budget : t -> float option -> unit Or_error.t
     that ends normally is followed by a continuation restating it, up to the
     config's [goal_max_continuations]; an abort, a failed run, the budget or
     the cap stop it (with a [Notice]). In plan mode no continuation follows
-    (the model waits for its plan's approval); leaving plan mode resumes
+    (the model waits for the user to leave it); leaving plan mode resumes
     them. *)
 val set_goal : t -> string -> unit Or_error.t
 

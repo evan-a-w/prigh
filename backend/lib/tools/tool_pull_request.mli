@@ -13,6 +13,9 @@ open! Import
 
 val name : string
 
+(** Whether [action] changes anything ([create], [checkout]). *)
+val changes : string -> bool
+
 val create
   :  forges:Forges.t
   -> ?worktrees_dir:(unit -> string) (** the config's, when the tool runs *)

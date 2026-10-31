@@ -382,8 +382,9 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
   | Connected h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
 ;;
 
-(* Always shown, like the thinking level; plan mode in yellow. A mode that
-   asks first or refuses outlasts [auto] at narrow widths. *)
+(* Always shown, like the thinking level; plan mode in yellow, then how to
+   leave it while there is room. A mode that asks first or refuses outlasts
+   [auto] at narrow widths. *)
 let mode_part (s : P.State.t) =
   let mode = Session_mode.of_state s in
   let style = if mode.plan then attention else gray in
@@ -391,6 +392,10 @@ let mode_part (s : P.State.t) =
     if (not mode.plan) && P.Approval_mode.equal mode.approval Auto then 4 else 3
   in
   [ priority, [ span ~style ("mode:" ^ Session_mode.label mode) ] ]
+  @
+  if mode.plan
+  then [ 5, [ span ~style:gray (sprintf "(%s leaves)" Session_mode.leave) ] ]
+  else []
 ;;
 
 let plan_part (s : P.State.t) =
@@ -404,15 +409,6 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
   let question =
     span ~style:(Style.bold (Style.fg Yellow)) (Confirm_prompt.title c)
   in
-  let plan =
-    if Confirm_prompt.is_plan c
-    then
-      Content.wrap
-        (List.map (String.split_lines c.summary) ~f:Content.Line.of_string)
-        ~width:inner
-      @ [ [] ]
-    else []
-  in
   let answers =
     List.map (Confirm_prompt.answers c) ~f:(fun (_, key, label) ->
       [ span ~style:(Style.bold Style.plain) key
@@ -420,9 +416,9 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
       ])
   in
   Boxed.render
-    ~title:(if Confirm_prompt.is_plan c then "Plan" else "Confirm")
+    ~title:"Confirm"
     ~width
-    (Content.wrap [ [ question ] ] ~width:inner @ plan @ answers)
+    (Content.wrap [ [ question ] ] ~width:inner @ answers)
 ;;
 
 (* The keys of a question, most important first, wrapped in the box. *)

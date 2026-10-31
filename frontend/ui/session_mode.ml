@@ -40,6 +40,7 @@ let of_name ~current name =
 (* The backend's classification: its test "which built-in tools ask in each
    mode" lists the tools that ask. *)
 let others_ask = "bash, job_input and MCP tools ask first"
+let leave = "/plan off or Alt+M"
 
 let title t =
   if t.plan
@@ -53,7 +54,11 @@ let title t =
 
 let describe t =
   if t.plan
-  then "read-only planning: no file edits; " ^ others_ask
+  then
+    "read-only planning, until you leave it ("
+    ^ leave
+    ^ "): no file edits; "
+    ^ others_ask
   else (
     match t.approval with
     | Ask -> "bash, job_input, edits and MCP tools ask first"

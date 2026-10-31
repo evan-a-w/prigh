@@ -2,7 +2,7 @@ open! Core
 open! Import
 
 (** A tool confirmation as both frontends show it: what is asked and the
-    answers, each with its key. [exit_plan_mode]'s is the plan to approve. *)
+    answers, each with its key. *)
 
 module Answer : sig
   type t =
@@ -13,9 +13,7 @@ module Answer : sig
   [@@deriving sexp_of, equal]
 end
 
-val is_plan : P.Pending.Confirm.t -> bool
-
-(** e.g. [Run bash: make test?], [Approve the plan and start implementing?] *)
+(** e.g. [Run bash: make test?] *)
 val title : P.Pending.Confirm.t -> string
 
 (** The answers offered, with their keys ([y], [a], [n], [r]) and labels;
@@ -23,7 +21,7 @@ val title : P.Pending.Confirm.t -> string
 val answers : P.Pending.Confirm.t -> (Answer.t * string * string) list
 
 (** What the reason prompt asks. *)
-val reason_question : P.Pending.Confirm.t -> string
+val reason_question : string
 
 (** [tool_confirm_respond]'s parameters; [reason] only with [Deny]. *)
 val params

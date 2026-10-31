@@ -410,7 +410,7 @@ file edits run; bash, job_input and MCP tools ask first
 Auto: never asks
 tools run without asking
 Plan mode
-read-only planning: no file edits; bash, job_input and MCP tools ask first
+read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
 Enter chooses, ← → the next setting, Esc closes
 mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: mode ask ===
@@ -469,29 +469,9 @@ Ready
 $<COST>
 0%
 main
-=== firefox: a plan to approve ===
-Plan
-Approve the plan and start implementing?
-Write the schema
-Test it
-y
-Approve: leave plan mode and implement
-n
-Keep planning
-r
-Keep planning, saying what to change
-=== firefox: the plan approved ===
-DeepSeek V4.1 Flash
-Thinking
-high
-Auto: never asks
-<HOSTNAME>
-=== firefox: the plan approved: the status line ===
-Ready
-$<COST>
-0%
-main
-=== firefox: implementing ===
+=== firefox: plan mode: the composer's placeholder ===
+Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
+=== firefox: the plan, in plan mode ===
 ◇
 Plan mode on: the model was told to plan, not change files
 plan it
@@ -501,10 +481,25 @@ update_plan
 0/2 done
 Write the schema
 Test it
-exit_plan_mode
-approved
 Write the schema
 Test it
+<TIME>
+=== firefox: plan mode off ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Auto: never asks
+<HOSTNAME>
+=== firefox: plan mode off: the status line ===
+Ready
+$<COST>
+0%
+main
+=== firefox: implementing ===
+◇
+Plan mode off: the model was told it can change files
+go ahead
+<TIME>
 Implementing.
 <TIME>
 === firefox: permissions ===

@@ -344,6 +344,10 @@ let connected (m : App.Model.t) =
 ;;
 
 (* One line at any width (CSS cuts it with an ellipsis, never wraps it). *)
+let planning (m : App.Model.t) =
+  Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.plan_mode)
+;;
+
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
   let cramped = m.narrow || m.agents.open_ || m.files.open_ in
@@ -365,6 +369,11 @@ let placeholder (m : App.Model.t) =
     | None when App.Model.running m && cramped -> "Steer the agent…"
     | None when App.Model.running m ->
       "Steer (Enter) or queue a follow-up (Alt+Enter)…"
+    | None when planning m && cramped -> "Plan mode: /plan off to implement"
+    | None when planning m ->
+      sprintf
+        "Plan mode: discuss the plan, or leave it to implement (%s)…"
+        Session_mode.leave
     | None when cramped -> "Ask prigh…  / commands"
     | None -> "Ask prigh anything…  / commands, @ files")
 ;;

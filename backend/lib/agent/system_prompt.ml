@@ -284,10 +284,13 @@ let plan_mode_note ~on =
   then
     "[Plan mode is on: you are planning, not implementing. Investigate with \
      read-only tools (bash only for read-only commands; the user confirms each \
-     one), ask the user about anything unclear with ask_user, and do not \
-     change any files: edits are refused. Keep the steps in update_plan. When \
-     the plan is ready, call exit_plan_mode with it; the user approves it \
-     before you implement it.]"
+     one) and ask the user about anything unclear with ask_user. Keep the \
+     steps in update_plan. When the plan is ready, present it as your reply \
+     (concise: the steps and the files they touch), then stop and wait. Do not \
+     implement any of it: do not change files, worktrees or pull requests \
+     (they are refused) and do not run commands that change anything. Only the \
+     user turns plan mode off, when they want the plan implemented: do not try \
+     to leave plan mode or ask them to.]"
   else
     "[Plan mode is off: you can change files and run commands again, as the \
      user's approval mode allows.]"

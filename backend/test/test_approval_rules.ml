@@ -258,6 +258,12 @@ let%expect_test "decisions" =
     ; "read", {|{"path": "a.ml"}|}, false
     ; "read", {|{"path": "secrets/key"}|}, false
     ; "mcp__x__y", {|{}|}, true
+    ; "worktree", {|{"action": "list"}|}, false
+    ; "worktree", {|{"action": "create"}|}, true
+    ; "pull_request", {|{"action": "view"}|}, false
+    ; "pull_request", {|{"action": "create"}|}, true
+    ; "subagent", {|{"task": "look"}|}, false
+    ; "subagent", {|{"task": "fix", "worktree": "auto"}|}, false
     ]
   in
   List.iter
@@ -277,10 +283,11 @@ let%expect_test "decisions" =
             ~cwd:"/work"
             ~home:"/home/u"
             ~destructive
+            ~changes_work:(Plan_mode.changes_work ~tool (Jsonaf.of_string args))
             (call tool args)
         in
         printf
-          "  %-10s %-36s %s\n"
+          "  %-12s %-42s %s\n"
           tool
           args
           (match decision with
@@ -295,37 +302,61 @@ let%expect_test "decisions" =
   [%expect
     {|
     ask:
-      bash       {"command": "git status"}            allow
-      bash       {"command": "make"}                  ask [bash(make:*)]
-      bash       {"command": "make && rm -rf build"}  deny [denied by the rule bash(rm:*) in permis
-      edit       {"path": "a.ml"}                     ask [edit]
-      read       {"path": "a.ml"}                     allow
-      read       {"path": "secrets/key"}              ask []
-      mcp__x__y  {}                                   ask [mcp__x__y]
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        ask [bash(make:*)]
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           ask [edit]
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         ask [mcp__x__y]
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       ask [worktree]
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       ask [pull_request]
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        allow
     auto-edit:
-      bash       {"command": "git status"}            allow
-      bash       {"command": "make"}                  ask [bash(make:*)]
-      bash       {"command": "make && rm -rf build"}  deny [denied by the rule bash(rm:*) in permis
-      edit       {"path": "a.ml"}                     allow
-      read       {"path": "a.ml"}                     allow
-      read       {"path": "secrets/key"}              ask []
-      mcp__x__y  {}                                   ask [mcp__x__y]
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        ask [bash(make:*)]
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           allow
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         ask [mcp__x__y]
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       ask [worktree]
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       ask [pull_request]
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        allow
     auto:
-      bash       {"command": "git status"}            allow
-      bash       {"command": "make"}                  allow
-      bash       {"command": "make && rm -rf build"}  deny [denied by the rule bash(rm:*) in permis
-      edit       {"path": "a.ml"}                     allow
-      read       {"path": "a.ml"}                     allow
-      read       {"path": "secrets/key"}              ask []
-      mcp__x__y  {}                                   allow
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        allow
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           allow
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         allow
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       allow
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       allow
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        allow
     auto + plan:
-      bash       {"command": "git status"}            allow
-      bash       {"command": "make"}                  ask [bash(make:*)]
-      bash       {"command": "make && rm -rf build"}  deny [denied by the rule bash(rm:*) in permis
-      edit       {"path": "a.ml"}                     deny [plan mode] Files cannot be changed whil
-      read       {"path": "a.ml"}                     allow
-      read       {"path": "secrets/key"}              ask []
-      mcp__x__y  {}                                   ask [mcp__x__y]
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        ask [bash(make:*)]
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           deny [plan mode] Plan mode is on: you are pla
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         ask [mcp__x__y]
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       deny [plan mode] Plan mode is on: you are pla
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       deny [plan mode] Plan mode is on: you are pla
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        deny [plan mode] Plan mode is on: you are pla
     |}]
 ;;
 
@@ -360,6 +391,7 @@ let%expect_test "which built-in tools ask in each mode" =
               ~home:"/h"
               ~destructive:
                 (Tool_spec.Destructive.call tool.spec.destructive (`Object []))
+              ~changes_work:(Plan_mode.changes_work ~tool:name (`Object []))
               (Approval_rule.Call.create ~cwd:"/w" ~tool:name (`Object []))
           with
           | Allow -> None

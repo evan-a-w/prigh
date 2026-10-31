@@ -7,7 +7,7 @@ open! Import
 
 (** [execute] (bash), [read] (read, ls), [search] (grep, find), [edit]
     (edit, write, apply_patch), [fetch] (web_fetch, web_search), [think]
-    (update_plan), [switch_mode] (exit_plan_mode), else [other]. *)
+    (update_plan), else [other]. *)
 val kind : string -> string
 
 (** A one-line title: the command, the path, the pattern, the URL... *)

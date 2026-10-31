@@ -653,7 +653,6 @@ let confirm (m : App.Model.t) ~inject =
         (Action.Answer_confirm
            { call_id = c.call_id; agent_id = c.agent_id; answer })
     in
-    let plan = Confirm_prompt.is_plan c in
     let waiting =
       match rest with
       | [] -> []
@@ -665,9 +664,6 @@ let confirm (m : App.Model.t) ~inject =
         ( [ Node.p
               ~attrs:[ Attr.class_ "confirm-question" ]
               [ Node.text (Confirm_prompt.title c) ]
-          ; (if plan
-             then div ~cls:"confirm-plan" [ Markdown_view.render c.summary ]
-             else Node.none)
           ; div
               ~cls:"confirm-answers"
               (List.map (Confirm_prompt.answers c) ~f:(fun (a, key, label) ->
@@ -704,7 +700,7 @@ let confirm (m : App.Model.t) ~inject =
                 [ Attr.class_ "confirm-reason-label"
                 ; Attr.for_ "confirm-reason"
                 ]
-              [ Node.text (Confirm_prompt.reason_question c) ]
+              [ Node.text Confirm_prompt.reason_question ]
           ; Node.input
               ~attrs:
                 [ Attr.id "confirm-reason"
@@ -723,14 +719,14 @@ let confirm (m : App.Model.t) ~inject =
                 ~cls:"danger"
                 ~title:"Enter"
                 ~on_click:(inject Action.Send_confirm_reason)
-                [ Node.text (if plan then "Keep planning" else "Deny") ]
+                [ Node.text "Deny" ]
             ]
         , back )
     in
     Modal.view
       ~id:"confirm"
-      ~cls:(if plan then "confirm-dialog plan-dialog" else "confirm-dialog")
-      ~title:(if plan then "Plan" else "Confirm")
+      ~cls:"confirm-dialog"
+      ~title:"Confirm"
       ~on_close
       ~footer
       body
