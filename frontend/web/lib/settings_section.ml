@@ -2,7 +2,7 @@ open! Core
 
 type t =
   | Appearance
-  | Behaviour
+  | Sessions
   | Models
   | Git_hosting
   | Nix_store
@@ -12,7 +12,7 @@ type t =
 let available ~superuser =
   List.filter all ~f:(function
     | Nix_store -> superuser
-    | Appearance | Behaviour | Models | Git_hosting | Account -> true)
+    | Appearance | Sessions | Models | Git_hosting | Account -> true)
 ;;
 
 let visible t ~superuser =
@@ -21,7 +21,7 @@ let visible t ~superuser =
 
 let name = function
   | Appearance -> "Appearance"
-  | Behaviour -> "Behaviour"
+  | Sessions -> "Sessions"
   | Models -> "Models"
   | Git_hosting -> "Git hosting"
   | Nix_store -> "Nix store"
@@ -30,14 +30,14 @@ let name = function
 
 let about = function
   | Appearance ->
-    "How this page looks. The theme, accent and tabs follow you to every \
-     browser you sign in on; the transcript's detail is this browser's."
-  | Behaviour ->
-    "What the agent asks before it acts, and how this browser tells you that \
-     something happened."
+    "How this page looks. Saved for your account, so it follows you to every \
+     browser you sign in on."
+  | Sessions ->
+    "How new sessions start, and how this browser tells you that something \
+     happened. Kept on the backend."
   | Models ->
-    "The providers whose models you use, and how long conversations are \
-     summarised. Kept on the backend."
+    "The providers whose models you use, the models prigh uses for its own \
+     work, and when long conversations are summarised. Kept on the backend."
   | Git_hosting ->
     "The hosts agents push branches to and open pull requests on."
   | Nix_store ->
@@ -47,7 +47,7 @@ let about = function
 
 let arg = function
   | Appearance -> "appearance"
-  | Behaviour -> "behaviour"
+  | Sessions -> "sessions"
   | Models -> "models"
   | Git_hosting -> "git"
   | Nix_store -> "nix"
@@ -66,6 +66,7 @@ let of_arg s =
   else (
     match List.find all ~f:(fun t -> String.equal (arg t) s) with
     | Some t -> Some t
+    | None when String.is_prefix "behaviour" ~prefix:s -> Some Sessions
     | None -> List.find all ~f:matches)
 ;;
 

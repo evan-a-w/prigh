@@ -17,17 +17,23 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance) (Behaviour) (Models) (Git hosting) (Account)
+    (Appearance) (Sessions) (Models) (Git hosting) (Account)
     Appearance
-    How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
-    Theme Follows you to every browser you sign in on.
+    How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+    Look
+    Theme
+    The page's colours.
     (Original) (Dark) (Light)
-    Accent Your turns, the selection, focus and work in progress.
+    Accent
+    Your turns, the selection, focus and work in progress.
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
-    Tabs Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+    Layout
+    Tabs
+    The open sessions as tabs over the chat (not on a phone).
     (Turn session tabs on (/tabs on))
-    Transcript detail How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+    Transcript detail This browser
+    How much of tool calls and thinking the transcript shows (Ctrl+O).
     (Quiet) (Normal) (Verbose)
     (Keyboard shortcuts) (Done)
     |}];
@@ -83,12 +89,13 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
 let%expect_test "notifications: the switch, and what the browser allows" =
   let h = H.create () in
   let notify () = H.text h ~selector:".setting.notify" in
-  H.quiet h (fun () -> H.act h (Settings_section Behaviour));
+  H.quiet h (fun () -> H.act h (Settings_section Sessions));
   (* Wanted, but the browser has not been asked: Allow asks it. *)
   notify ();
   [%expect
     {|
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
     (Allow) (Turn notifications off (/notify off))
     |}];
   H.click h ~selector:".setting.notify .primary";
@@ -105,7 +112,8 @@ let%expect_test "notifications: the switch, and what the browser allows" =
   H.show h ~selector:".setting.notify .switch";
   [%expect
     {|
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden.
     (Turn notifications off (/notify off))
     <button type="button"
             role="switch"
@@ -128,7 +136,8 @@ let%expect_test "notifications: the switch, and what the browser allows" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.notify false)))))
      (tag Show_error))
     (Expire_toast (id 0) (after_ms 3220))
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden.
     (Turn notifications on (/notify on))
     <div class="modal settings-dialog">
     |}];
@@ -141,7 +150,8 @@ let%expect_test "notifications: the switch, and what the browser allows" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.notify true)))))
      (tag Show_error))
     (Expire_toast (id 1) (after_ms 6000))
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden.
     (Turn notifications off (/notify off))
     |}];
   H.act h (Set_notification_permission "denied");
@@ -150,14 +160,16 @@ let%expect_test "notifications: the switch, and what the browser allows" =
   notify ();
   [%expect
     {|
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden. The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
     (Turn notifications off (/notify off))
-    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. This page cannot show them: they need https or localhost. The tab's title still counts what happened.
+    Notifications This browser
+    Tell you when a turn ends or something waits for you while this tab is hidden. This page cannot show them: they need https or localhost. The tab's title still counts what happened.
     (Turn notifications off (/notify off))
     |}]
 ;;
 
-let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
+let%expect_test "transcript detail, default mode, providers, shortcuts" =
   let h = H.create () in
   H.quiet h (fun () -> H.act h Open_settings);
   H.names h ~selector:".segment";
@@ -183,25 +195,31 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
     <button class="segment">
     Quiet
     |}];
-  (* Tool confirmation is the config's: off (mode auto) by default. *)
-  H.click h ~selector:".settings-tab-behaviour";
-  H.text h ~selector:".setting.confirm";
-  H.elements h ~selector:".setting.confirm .switch";
-  H.click h ~selector:".setting.confirm .switch";
-  H.elements h ~selector:".setting.confirm .switch";
+  (* The default mode is the config's: auto by default. Ask, auto-edit or
+     auto, for new sessions and this one. *)
+  H.click h ~selector:".settings-tab-sessions";
+  H.text h ~selector:".setting.default-mode";
+  H.elements h ~selector:".setting.default-mode .segment";
+  H.click h ~selector:".setting.default-mode .segment:nth-child(2)";
+  H.elements h ~selector:".setting.default-mode .segment";
   H.elements h ~selector:".settings-dialog";
   [%expect
     {|
-    (Settings_section Behaviour)
-    Tool confirmation Ask before bash, edits and MCP tools run, in this session and new ones.
-    (Ask before tools run (/confirm on))
-    <button class="switch">
-    (Run "/confirm on")
-    (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
+    (Settings_section Sessions)
+    Mode
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto). This session changes too.
+    (Ask) (Auto-edit) (Auto)
+    <button class="segment">
+    <button class="segment">
+    <button class="on segment">
+    (Run "/confirm auto-edit")
+    (Rpc (method_ set_config) (params ((config ((approval_mode auto-edit)))))
      (tag
       (Config_saved
-       "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
-    <button class="on switch">
+       "Mode auto-edit, also for new sessions: file edits run; bash, job_input and MCP tools ask first")))
+    <button class="segment">
+    <button class="on segment">
+    <button class="segment">
     <div class="modal settings-dialog">
     |}];
   H.click h ~selector:".settings-tab-models";
@@ -209,7 +227,8 @@ let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
   [%expect
     {|
     (Settings_section Models)
-    Model providers Logged in to Anthropic.
+    Model providers
+    Logged in to Anthropic.
     (Manage providers)
     |}];
   H.click h ~selector:".setting.providers .btn";
@@ -285,17 +304,20 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Yellow" -- Yellow (/accent yellow)
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
-    -- Behaviour
-    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    -- Sessions
+    button "Use this session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on (/change_default)
+    button "Ask" -- /confirm ask
+    button "Auto-edit" -- /confirm auto-edit
+    button "Auto" -- /confirm auto
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
-    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    [group] div "Default mode"
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
     button "Naming model: Default" -- Choose the model (/naming model)
-    button "Off" -- Only at 80% of the model's window (/compaction at off)
     button "Summary model: The conversation's model" -- Choose the model (/compaction model)
+    button "Off" -- Only at 80% of the model's window (/compaction at off)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     [group] div "Compact at"
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
@@ -310,7 +332,7 @@ let%expect_test "the names of the settings' controls" =
     button "Close" -- Close (Esc)
     [tablist] div "Settings sections"
     [tab] button "Appearance" -- /settings appearance
-    [tab] button "Behaviour" -- /settings behaviour
+    [tab] button "Sessions" -- /settings sessions
     [tab] button "Models" -- /settings models
     [tab] button "Git hosting" -- /settings git
     [tab] button "Account" -- /settings account
@@ -327,7 +349,8 @@ let%expect_test "an open backend has no account to show" =
     {|
     Account
     Who you are on this backend.
-    No sign-in This backend lets anyone in: there is no account to switch or sign out of.
+    No sign-in
+    This backend lets anyone in: there is no account to switch or sign out of.
     |}]
 ;;
 
@@ -453,9 +476,9 @@ let%expect_test "sections: clicks, arrows, Home and End, /settings SECTION" =
     Close_dialog
     (Focus editor)
     Send
-    Nix store is only for superusers: try /settings appearance, /settings behaviour, /settings models, /settings git, /settings account. (Dismiss)
+    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings models, /settings git, /settings account. (Dismiss)
     Send
-    No settings section "colours": try /settings appearance, /settings behaviour, /settings models, /settings git, /settings account. (Dismiss)
+    No settings section "colours": try /settings appearance, /settings sessions, /settings models, /settings git, /settings account. (Dismiss)
     |}]
 ;;
 
@@ -472,7 +495,7 @@ let%expect_test "superusers have the Nix store's section" =
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";
   [%expect
-    {| (Appearance) (Behaviour) (Models) (Git hosting) (Nix store) (R root) |}]
+    {| (Appearance) (Sessions) (Models) (Git hosting) (Nix store) (R root) |}]
 ;;
 
 let%expect_test "/settings completes the sections" =
@@ -482,9 +505,9 @@ let%expect_test "/settings completes the sections" =
   [%expect
     {|
     Settings sections ↑↓ Tab Enter Esc   Ctrl+Enter as typed
-    appearance How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
-    behaviour What the agent asks before it acts, and how this browser tells you that something happened.
-    models The providers whose models you use, and how long conversations are summarised. Kept on the backend.
+    appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+    sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.
+    models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
     git The hosts agents push branches to and open pull requests on.
     account Who you are on this backend.
     |}]

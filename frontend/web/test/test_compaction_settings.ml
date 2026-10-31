@@ -36,16 +36,15 @@ let%expect_test "the section: defaults, then each control" =
   [%expect
     {|
     Compaction
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+    Compact at
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [200k] tokens
     (Off)
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-    (The conversation's model)
-    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+    Mask old tool outputs
+    Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Keep old tool outputs (/compaction mask off))
     input "Compact at, in tokens" -- /compaction at TOKENS, e.g. 150k or 200000
     button "Off" -- Only at 80% of the model's window (/compaction at off)
-    button "Summary model: The conversation's model" -- Choose the model (/compaction model)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     |}];
   (* A threshold: typed, applied with Enter, shown at once and saved. *)
@@ -133,7 +132,8 @@ let%expect_test "the section: defaults, then each control" =
     (Run "/compaction at off")
     (Rpc (method_ set_config) (params ((config ((compact_at_tokens 0)))))
      (tag Compaction_saved))
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Off: only at 80% of the window. Type a number to set one.
+    Compact at
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Off: only at 80% of the window. Type a number to set one.
     [] tokens
     (Off)
     <label class="compact-at-field segment">
@@ -189,7 +189,8 @@ let%expect_test "summary model: the model picker, then back to settings" =
     (Rpc (method_ set_config)
      (params ((config ((compaction_model anthropic/claude-sonnet-5)))))
      (tag Compaction_saved))
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+    Summaries
+    Writes the summary when a conversation is compacted: a cheaper model costs less, but cannot reuse the conversation's prompt cache.
     (Claude Sonnet 5)
     true
     |}];
@@ -222,7 +223,8 @@ let%expect_test "summary model: the model picker, then back to settings" =
     (Focus dialog)
     (Rpc (method_ set_config) (params ((config ((compaction_model null)))))
      (tag Compaction_saved))
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
+    Summaries
+    Writes the summary when a conversation is compacted: a cheaper model costs less, but cannot reuse the conversation's prompt cache.
     (The conversation's model)
     |}]
 ;;
@@ -258,12 +260,12 @@ let%expect_test
   [%expect
     {|
     Compaction
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+    Compact at
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [90k] tokens
     (Off)
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-    (GPT-6)
-    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+    Mask old tool outputs
+    Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Mask old tool outputs (/compaction mask on))
     |}];
   (* This one's, typed in the composer behind the page. *)
@@ -307,20 +309,20 @@ let%expect_test
     {|
     Dialog_accept
     Compaction
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Waiting for the backend's settings…
+    Compact at
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Waiting for the backend's settings…
     [] tokens
     (Off)
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-    (The conversation's model)
-    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+    Mask old tool outputs
+    Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Mask old tool outputs (/compaction mask on))
     Compaction
-    Compact at Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+    Compact at
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [200k] tokens
     (Off)
-    Summary model The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-    (The conversation's model)
-    Mask old tool outputs Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+    Mask old tool outputs
+    Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Keep old tool outputs (/compaction mask off))
     |}]
 ;;
