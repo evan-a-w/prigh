@@ -96,6 +96,7 @@ let methods =
   ; "btw_cancel"
   ; "generate_text"
   ; "generate_cancel"
+  ; "transcribe"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -331,6 +332,7 @@ end
 type t =
   { login : Login_manager.t
   ; forges : Forges.t
+  ; transcription_http : Transcription.Http.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
   ; backend_host : bool
@@ -577,6 +579,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?transcription_http
       ?nix_store
       ~login
       ~sessions_dir
@@ -599,6 +602,9 @@ let create
   in
   let t =
     { login
+    ; transcription_http =
+        Option.value_or_thunk transcription_http ~default:(fun () ->
+          Transcription.Http.real ~env)
     ; forges
     ; token
     ; namespace
@@ -1659,6 +1665,38 @@ let btw t (client : Client.t) params =
             ]))))
 ;;
 
+(* The audio arrives as base64 and goes to the config's [dictation_model];
+   only the calling client hears the text. *)
+let transcribe t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind mime_type = string_param params "mime_type" in
+  let%bind base64 = string_param params "data" in
+  (* Too large is said before decoding it. *)
+  let%bind () =
+    let decoded = String.length base64 / 4 * 3 in
+    if decoded > Transcription.Audio.max_bytes + 3
+    then Transcription.Audio.check_size decoded
+    else Ok ()
+  in
+  let%bind data =
+    Base64.decode base64
+    |> Result.map_error ~f:(fun (`Msg m) ->
+      Error.createf "param \"data\" must be base64: %s" m)
+  in
+  let agent = client.agent in
+  let%map text =
+    Transcription.transcribe
+      ~env:(Agent.env agent)
+      ~getenv:(Login_manager.getenv t.login)
+      ~http:t.transcription_http
+      ~store:(Login_manager.store t.login)
+      ~providers:(Model_registry.providers (Login_manager.models t.login))
+      ~model:(Config.dictation_model (Agent.config agent))
+      { mime_type; data }
+  in
+  `Object [ "text", `String text ]
+;;
+
 (* Like [btw]: the draft streams to the asking client only. *)
 let generate_text t (client : Client.t) params =
   let open Or_error.Let_syntax in
@@ -2087,6 +2125,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       ~params
   | "btw" -> Some (btw t client params)
   | "generate_text" -> Some (generate_text t client params)
+  | "transcribe" -> Some (transcribe t client params)
   | "generate_cancel" ->
     Some
       (Or_error.map (string_param params "gen_id") ~f:(fun gen_id ->

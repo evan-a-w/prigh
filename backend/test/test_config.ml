@@ -19,7 +19,7 @@ let%expect_test "a missing file yields the default" =
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
       (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
-      (naming_model ()) (trace Default)))
+      (naming_model ()) (dictation_model ()) (trace Default)))
     |}]
 ;;
 
@@ -49,6 +49,7 @@ let%expect_test "save then load round trips" =
     ; compact_at_tokens = 150_000
     ; compaction_model = Some "anthropic/claude-haiku-4-5"
     ; naming_model = Some "anthropic/claude-haiku-4-5"
+    ; dictation_model = Some "openai/whisper-1"
     ; trace = Detailed
     }
   in
@@ -87,6 +88,7 @@ let%expect_test "save then load round trips" =
       "compact_at_tokens": 150000,
       "compaction_model": "anthropic/claude-haiku-4-5",
       "naming_model": "anthropic/claude-haiku-4-5",
+      "dictation_model": "openai/whisper-1",
       "trace": "detailed"
     }
     (Ok
@@ -102,7 +104,8 @@ let%expect_test "save then load round trips" =
                              \nBe brief."))))
       (auto_background_seconds 30) (generate_model ()) (mask_observations true)
       (compact_at_tokens 150000) (compaction_model (anthropic/claude-haiku-4-5))
-      (naming_model (anthropic/claude-haiku-4-5)) (trace Detailed)))
+      (naming_model (anthropic/claude-haiku-4-5))
+      (dictation_model (openai/whisper-1)) (trace Detailed)))
     |}]
 ;;
 
@@ -125,7 +128,7 @@ let%expect_test "unknown fields are ignored" =
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
       (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
-      (naming_model ()) (trace Default)))
+      (naming_model ()) (dictation_model ()) (trace Default)))
     |}]
 ;;
 
@@ -148,6 +151,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   write t ".prigh/config.json" {|{"default_thinking": true}|};
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
+  write t ".prigh/config.json" {|{"dictation_model": 1}|};
+  print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   [%expect
     {|
     (Error
@@ -158,6 +163,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
     (Error
      (config.default_thinking "thinking must be one of: off, on, low, high, max"))
     (Error "config.default_thinking must be a string")
+    (Error
+     "config.dictation_model must be a model's provider/id (or null: openai/gpt-4o-mini-transcribe)")
     |}]
 ;;
 
@@ -178,7 +185,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, compact_at_tokens, compaction_model, naming_model, trace)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, compact_at_tokens, compaction_model, naming_model, dictation_model, trace)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -217,7 +224,7 @@ let%expect_test "null defaults are unset" =
       (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30) (generate_model ())
       (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
-      (naming_model ()) (trace Default)))
+      (naming_model ()) (dictation_model ()) (trace Default)))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
@@ -228,7 +235,7 @@ let%expect_test "null defaults are unset" =
       (archive_after_days 7) (notify Bell) (snippets ())
       (auto_background_seconds 30) (generate_model ()) (mask_observations true)
       (compact_at_tokens 200000) (compaction_model ()) (naming_model ())
-      (trace Default)))
+      (dictation_model ()) (trace Default)))
     |}]
 ;;
 
@@ -280,7 +287,8 @@ let%expect_test "a leftover reminders setting says where reminders went" =
      fallback_models default_cwd worktrees_dir max_budget_usd
      goal_max_continuations resume_on_limit_reset ask_user_timeout_seconds
      archive_after_days snippets auto_background_seconds generate_model
-     mask_observations compact_at_tokens compaction_model naming_model trace)
+     mask_observations compact_at_tokens compaction_model naming_model
+     dictation_model trace)
     |}]
 ;;
 

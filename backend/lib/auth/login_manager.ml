@@ -69,6 +69,7 @@ let create
 ;;
 
 let store t = t.store
+let getenv t = t.getenv
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
 let emit t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 let in_progress t = Option.is_some t.flow
