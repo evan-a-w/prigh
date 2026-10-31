@@ -121,6 +121,7 @@ let images (m : App.Model.t) ~inject =
                      ; Attr.alt (Image.to_string_hum image)
                      ]
                    ()
+               ; icon ~cls:"draw-hint" Pencil
                ]
            ; button
                ~cls:"remove-image"
@@ -400,11 +401,15 @@ let view (m : App.Model.t) ~inject =
     ~attrs:
       [ classes [ "composer" ] [ "offline", not connected; "sending", sending ]
       ]
-    [ rest (popup m ~inject)
-    ; rest (Queue_view.view m ~inject)
-    ; div
-        ~cls:"composer-stack"
-        [ div
+    [ rest (Queue_view.view m ~inject)
+    ; Node.div
+        ~attrs:
+          [ classes
+              [ "composer-stack" ]
+              [ "completing", Option.is_some (App.Model.popup m) ]
+          ]
+        [ rest (popup m ~inject)
+        ; div
             ~cls:"composer-box"
             [ (match m.recipient with
                | Main -> Node.none
