@@ -82,9 +82,10 @@ let is_edit name =
 ;;
 
 let plan_mode_refusal =
-  "[plan mode] Files cannot be changed while planning. Keep investigating with \
-   read-only tools, then call exit_plan_mode with the plan for the user to \
-   approve."
+  "[plan mode] Plan mode is on: you are planning, not implementing, so files, \
+   worktrees and pull requests cannot be changed. Only the user turns plan \
+   mode off; do not try to get around this or ask them to. Keep investigating \
+   with read-only tools, then present the plan in your reply and wait."
 ;;
 
 let decide
@@ -95,6 +96,7 @@ let decide
       ~cwd
       ~home
       ~destructive
+      ~changes_work
       (call : Approval_rule.Call.t)
   =
   let find rules f = List.find rules ~f:(fun r -> f r ~cwd ~home call) in
@@ -107,7 +109,7 @@ let decide
           it: ask the user]"
          (Approval_rule.to_string rule))
   | None ->
-    if plan && is_edit call.tool
+    if plan && changes_work
     then Deny plan_mode_refusal
     else if Option.is_some (find rules.ask Approval_rule.touches)
     then (* an allow rule could not cover it: ask rules come first *)

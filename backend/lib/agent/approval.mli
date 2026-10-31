@@ -36,12 +36,12 @@ end
 (** The tools that change files: [edit], [write], [apply_patch]. *)
 val is_edit : string -> bool
 
-(** In order: a deny rule touching the call denies it; plan mode denies file
-    edits; an ask rule touching it asks; an allow rule (the config's or the
-    session's) covering it allows it; plan mode asks for every other
-    destructive tool; then the mode decides for destructive tools ([Ask]
-    asks, [Auto_edit] asks unless it is an edit, [Auto] allows), and
-    non-destructive ones run. *)
+(** In order: a deny rule touching the call denies it; plan mode denies a
+    call that [changes_work] ({!Plan_mode.changes_work}); an ask rule
+    touching it asks; an allow rule (the config's or the session's) covering
+    it allows it; plan mode asks for every other destructive tool; then the
+    mode decides for destructive tools ([Ask] asks, [Auto_edit] asks unless
+    it is an edit, [Auto] allows), and non-destructive ones run. *)
 val decide
   :  mode:Approval_mode.t
   -> plan:bool
@@ -50,6 +50,7 @@ val decide
   -> cwd:string
   -> home:string
   -> destructive:bool
+  -> changes_work:bool
   -> Approval_rule.Call.t
   -> Decision.t
 

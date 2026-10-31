@@ -55,7 +55,7 @@ type t =
   ; resume_at : Time_ns.t option
     (** when a run stopped by a usage limit resumes by itself *)
   ; approval_mode : Approval_mode.t
-  ; plan_mode : bool (** read-only planning, see [exit_plan_mode] *)
+  ; plan_mode : bool (** read-only planning, until the user turns it off *)
   ; plan : Plan.t option (** the model's [update_plan] *)
   ; session_rules : string list
     (** rules the user allowed for the session ("don't ask again") *)

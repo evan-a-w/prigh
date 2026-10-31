@@ -678,7 +678,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .chip.job { color: var(--muted); }
 .chip.waiting { color: var(--sodium); }
 
-/* update_plan's checklist, exit_plan_mode's plan */
+/* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
 .plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
 .plan-steps { list-style: none; margin: 0; padding: 0; font-size: 13px; }

@@ -746,16 +746,6 @@ let%expect_test
        ; deadline = None
        });
   H.step ~quiet:true h (Key (Key.plain Escape));
-  H.event
-    h
-    (Tool_confirm
-       { call_id = "p1"
-       ; agent_id = None
-       ; name = "exit_plan_mode"
-       ; summary = "1. Write the schema\n2. Test it"
-       ; rules = []
-       });
-  H.step ~quiet:true h (Key (Key.char 'n'));
   [%expect
     {|
     (Notify
@@ -778,11 +768,6 @@ let%expect_test
       (notification (
         (title "prigh: a question for you in work")
         (body  "Which database?"))))
-    (Notify
-      (mode Bell)
-      (notification (
-        (title "prigh: waiting for you in work")
-        (body  "Approve the plan: 1. Write the schema"))))
     |}];
   command "/notify desktop";
   H.reply ~quiet:true h (Notice_on_success "notifications: desktop") "{}";
@@ -811,13 +796,13 @@ let%expect_test
       (tag (
         Notice_on_success
         "notifications off (/notify bell or /notify desktop turns them on)")))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       denied bash
     ↩ job j1 "make test"  exited 0
         ok
-      plan not approved: still planning
     ────────────────────────────── notifications off (/notify bell or /notify desktop turns them on) ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01

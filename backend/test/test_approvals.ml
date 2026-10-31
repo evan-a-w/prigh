@@ -463,7 +463,8 @@ let plan_args =
 ;;
 
 let%expect_test
-    "plan mode: edits refused, bash asks, the plan is approved and implemented"
+    "plan mode: changes refused, bash asks, the plan is the reply; only the \
+     user leaves plan mode"
   =
   with_agent
     [ Reply.tool_call
@@ -473,98 +474,85 @@ let%expect_test
           {|{"path":"a.txt","edits":[{"old_text":"a","new_text":"b"}]}|}
         ()
     ; Reply.tool_call ~id:"c2" ~name:"bash" ~arguments:{|{"command":"ls"}|} ()
-    ; Reply.tool_call ~id:"c3" ~name:"update_plan" ~arguments:plan_args ()
+    ; Reply.tool_call
+        ~id:"c3"
+        ~name:"worktree"
+        ~arguments:{|{"action":"create","branch":"feat/x"}|}
+        ()
     ; Reply.tool_call
         ~id:"c4"
-        ~name:"exit_plan_mode"
-        ~arguments:{|{"plan":"1. change a.txt\n2. test"}|}
+        ~name:"subagent"
+        ~arguments:{|{"task":"implement it","worktree":"auto"}|}
         ()
     ; Reply.tool_call
         ~id:"c5"
+        ~name:"worktree"
+        ~arguments:{|{"action":"list"}|}
+        ()
+    ; Reply.tool_call ~id:"c6" ~name:"update_plan" ~arguments:plan_args ()
+    ; Reply.text "1. change a.txt\n2. test"
+    ; Reply.tool_call
+        ~id:"c7"
         ~name:"write"
         ~arguments:{|{"path":"a.txt","content":"b\n"}|}
         ()
     ; Reply.text "done"
-    ; Reply.text "second"
     ]
   @@ fun _t agent requests ->
   Agent.set_mode agent ~plan:true;
   Or_error.ok_exn (Agent.prompt agent "add a feature");
   Agent.wait_idle agent;
   requests ();
-  (* Told once: the next message carries no note. *)
-  Or_error.ok_exn (Agent.prompt agent "thanks");
+  print_s [%sexp ((Agent.state agent).plan_mode : bool)];
+  Agent.set_mode agent ~plan:false;
+  Or_error.ok_exn (Agent.prompt agent "implement it");
   Agent.wait_idle agent;
   requests ();
   [%expect
     {|
     mode=auto+plan plan=none rules=[]
-    edit {"path":"a.txt","edits":[{"old_text":"a","new_text":"b"}]} -> ERROR [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools, then call exit_plan_mode with the plan for the user to approve.
+    edit {"path":"a.txt","edits":[{"old_text":"a","new_text":"b"}]} -> ERROR [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull requests cannot be changed. Only the user turns plan mode off; do not try to get around this or ask them to. Keep investigating with read-only tools, then present the plan in your reply and wait.
     confirm c2 bash: ls [bash(ls:*)]
       -> Allow
     bash {"command":"ls"} -> sessions
+    worktree {"action":"create","branch":"feat/x"} -> ERROR [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull requests cannot be changed. Only the user turns plan mode off; do not try to get around this or ask them to. Keep investigating with read-only tools, then present the plan in your reply and wait.
+    subagent {"task":"implement it","worktree":"auto"} -> ERROR [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull requests cannot be changed. Only the user turns plan mode off; do not try to get around this or ask them to. Keep investigating with read-only tools, then present the plan in your reply and wait.
+    worktree {"action":"list"} -> ERROR not a git repository: $DIR (git init starts one, or /cd into one)
     mode=auto+plan plan=read the code:completed,change it:in_progress,test:pending rules=[]
     update_plan {"explanation":"first pass","plan":[{"step":"read the code", -> Plan updated (1 of 3 steps completed)
-    confirm c4 exit_plan_mode: 1. change a.txt
-    2. test []
-      -> Allow
-    mode=auto plan=read the code:completed,change it:in_progress,test:pending rules=[]
-    exit_plan_mode {"plan":"1. change a.txt\n2. test"} -> The user approved the plan. Plan mode is off (approval mode: auto), so you can change files now: implement the plan.
-    write {"path":"a.txt","content":"b\n"} -> wrote 1 line to $DIR/a.txt
     user message sent:
-    [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one), ask the user about anything unclear with ask_user, and do not change any files: edits are refused. Keep the steps in update_plan. When the plan is ready, call exit_plan_mode with it; the user approves it before you implement it.]
+    [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one) and ask the user about anything unclear with ask_user. Keep the steps in update_plan. When the plan is ready, present it as your reply (concise: the steps and the files they touch), then stop and wait. Do not implement any of it: do not change files, worktrees or pull requests (they are refused) and do not run commands that change anything. Only the user turns plan mode off, when they want the plan implemented: do not try to leave plan mode or ask them to.]
 
     add a feature
+    true
+    mode=auto plan=read the code:completed,change it:in_progress,test:pending rules=[]
+    write {"path":"a.txt","content":"b\n"} -> wrote 1 line to $DIR/a.txt
     user message sent:
-    thanks
+    [Plan mode is off: you can change files and run commands again, as the user's approval mode allows.]
+
+    implement it
     |}]
 ;;
 
-let%expect_test
-    "plan mode: an unapproved plan keeps planning, with the feedback"
-  =
-  with_agent
-    ~answer:(fun _ -> Deny (Some "also update the docs"))
-    [ Reply.tool_call
-        ~id:"c1"
-        ~name:"exit_plan_mode"
-        ~arguments:{|{"plan":"change a.txt"}|}
-        ()
-    ; Reply.text "revising"
-    ]
-  @@ fun _t agent _requests ->
-  Agent.set_mode agent ~plan:true;
-  Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.wait_idle agent;
-  [%expect
-    {|
-    mode=auto+plan plan=none rules=[]
-    confirm c1 exit_plan_mode: change a.txt []
-      -> (Deny("also update the docs"))
-    exit_plan_mode {"plan":"change a.txt"} -> ERROR [the user did not approve the plan; their feedback: also update the docs] Stay in plan mode: revise the plan and call exit_plan_mode again when it is ready.
-    |}]
-;;
-
-let%expect_test
-    "plan mode turned off while exit_plan_mode waits: not called approved"
-  =
+let%expect_test "plan mode: the model has no tool to leave it" =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun r ->
+        print_s
+          [%sexp
+            (List.map r.tools ~f:(fun (s : Tool_spec.t) -> s.name)
+             : string list)])
+      [ Reply.text "the plan" ]
+  in
   let agent =
     Agent.create
       ~env:t.env
       ~sw
-      ~provider:
-        (Faux_provider.create
-           [ Reply.tool_call
-               ~id:"c1"
-               ~name:"exit_plan_mode"
-               ~arguments:{|{"plan":"change a.txt"}|}
-               ()
-           ; Reply.text "done"
-           ])
+      ~provider
       ~tools:(Tools.all @ Tools.interaction)
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
@@ -572,38 +560,10 @@ let%expect_test
       ()
   in
   Agent.set_mode agent ~plan:true;
-  Agent.subscribe agent ~f:(function
-    | Loop (Tool_confirm { call_id; _ }) ->
-      printf "confirm %s; turning plan mode off\n" call_id;
-      Agent.set_mode agent ~plan:false
-    | Loop (Tool_end { result; _ }) -> printf "result: %s\n" result.text
-    | _ -> ());
-  Or_error.ok_exn (Agent.prompt agent "go");
+  Or_error.ok_exn (Agent.prompt agent "plan it");
   Agent.wait_idle agent;
   [%expect
-    {|
-    confirm c1; turning plan mode off
-    result: The user turned plan mode off without answering about this plan (approval mode: auto): you can change files now. Implement the plan unless they said otherwise.
-    |}]
-;;
-
-let%expect_test "exit_plan_mode outside plan mode does not ask" =
-  with_agent
-    [ Reply.tool_call
-        ~id:"c1"
-        ~name:"exit_plan_mode"
-        ~arguments:{|{"plan":"x"}|}
-        ()
-    ; Reply.text "ok"
-    ]
-  @@ fun _t agent _requests ->
-  Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.wait_idle agent;
-  [%expect
-    {|
-    mode=auto plan=none rules=[]
-    exit_plan_mode {"plan":"x"} -> ERROR plan mode is not on, so there is no plan to approve: go ahead
-    |}]
+    {| (bash read write edit ls grep find web_fetch update_plan ask_user) |}]
 ;;
 
 let%expect_test "plan mode switched on during a run is told between turns" =
@@ -654,7 +614,7 @@ let%expect_test "plan mode switched on during a run is told between turns" =
   [%expect
     {|
     bash ->
-    write -> [plan mode] Files cannot be changed whil
+    write -> [plan mode] Plan mode is on: you are pla
     user: go
     user: [Plan mode is on: you are planning, not
     |}]
@@ -1028,7 +988,7 @@ let%expect_test
     {|
     mode=auto+plan plan=none rules=[]
     user message sent:
-    [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one), ask the user about anything unclear with ask_user, and do not change any files: edits are refused. Keep the steps in update_plan. When the plan is ready, call exit_plan_mode with it; the user approves it before you implement it.]
+    [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one) and ask the user about anything unclear with ask_user. Keep the steps in update_plan. When the plan is ready, present it as your reply (concise: the steps and the files they touch), then stop and wait. Do not implement any of it: do not change files, worktrees or pull requests (they are refused) and do not run commands that change anything. Only the user turns plan mode off, when they want the plan implemented: do not try to leave plan mode or ask them to.]
 
     [prigh goal] Work on this goal until it is fully achieved:
 

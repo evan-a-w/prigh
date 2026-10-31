@@ -30,7 +30,12 @@ val of_name : current:t -> string -> t option
     commands"], ["Asks: commands"], ["Auto: never asks"], ["Plan mode"]. *)
 val title : t -> string
 
-(** One line on what the mode does, for notices and pickers. *)
+(** How the user leaves plan mode (the model cannot): ["/plan off or
+    Alt+M"]. *)
+val leave : string
+
+(** One line on what the mode does, for notices and pickers; plan mode's
+    says how to leave it ({!leave}). *)
 val describe : t -> string
 
 (** [set_mode]'s parameters. *)

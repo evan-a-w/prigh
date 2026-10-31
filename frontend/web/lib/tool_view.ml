@@ -684,24 +684,6 @@ let present
         ; error_body
         ]
     }
-  | "exit_plan_mode" ->
-    let plan = str "plan" in
-    { arg = None
-    ; chips =
-        (match result with
-         | Some { is_error = false; _ } -> [ chip ~cls:"ok" "approved" ]
-         | Some { is_error = true; text; _ }
-           when String.is_prefix text ~prefix:"[the user did not approve" ->
-           [ chip ~cls:"bad" "not approved" ]
-         | Some _ -> []
-         | None -> [ chip ~cls:"waiting" "waiting for your approval" ])
-    ; body =
-        [ (if String.is_empty (String.strip plan)
-           then Node.none
-           else div "plan" [ Markdown_view.render ~streaming plan ])
-        ; error_body
-        ]
-    }
   | _ ->
     let arg = first_line (summary call) in
     { arg = Option.some_if (not (String.is_empty arg)) (span "arg" arg)

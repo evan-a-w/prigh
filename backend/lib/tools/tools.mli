@@ -5,8 +5,7 @@ open! Core
 val all : Tool.t list
 
 (** The main agent's tools for the user and the session: [update_plan]
-    ({!Plan}), [ask_user] and [exit_plan_mode]. Not in [all]: tool hosts do
-    not run them. *)
+    ({!Plan}) and [ask_user]. Not in [all]: tool hosts do not run them. *)
 val interaction : Tool.t list
 
 (** Built-in tools that stand in for one of [all] for some models

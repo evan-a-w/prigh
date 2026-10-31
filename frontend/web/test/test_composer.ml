@@ -390,7 +390,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
-    /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
+    /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
@@ -439,7 +439,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
-    plan read-only planning: no file edits; bash, job_input and MCP tools ask first
+    plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     |}];
   H.type_ h "/model gpt";
   H.key h "Enter";

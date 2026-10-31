@@ -890,8 +890,7 @@ the composer, each tagged "Steers this turn" or "After this turn", with
 Edit (back into the editor) and remove buttons; one leaving the queue says
 so ("Steer delivered: …") when it reaches the transcript. A tool confirmation is a dialog with a
 button per answer (y, a for always with the rule it adds, n, r for a
-reason typed in the dialog, Esc going back to the buttons), the plan of
-`exit_plan_mode` rendered as markdown; the model's questions are a dialog of
+reason typed in the dialog, Esc going back to the buttons); the model's questions are a dialog of
 radio buttons or checkboxes with an "Other" field (keys as in the TUI, or
 clicks). Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
@@ -2081,7 +2080,7 @@ it.
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
 | `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
-| `/plan [on\|off]` | toggle plan mode (read-only planning until you approve the plan) |
+| `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
@@ -2454,16 +2453,20 @@ then allow rules; a denied call is refused with a message the model sees.
 out. There is no per-project config: rules are per user (per namespace).
 
 Plan mode (`/plan`, `/mode plan` or Alt+M) is for investigating and
-planning before changing anything: file edits are refused, and every other
-destructive tool asks (in every approval mode) unless an allow rule covers
-it, so read-only commands can run once you allow them. The model is told
-when plan mode starts and ends. It keeps its steps with `update_plan` and,
-when the plan is ready, calls `exit_plan_mode` with it: the plan shows as a
-confirmation, and approving it leaves plan mode (back to the approval mode
-you had) for the model to implement it; `n` or `r` keep it planning, with
-your feedback. An active `/goal` gets no automatic continuations while plan
-mode is on (the model cannot make progress on it, only plan); leaving plan
-mode carries on with it.
+planning before changing anything. Only you leave it (`/plan off`, or
+Alt+M on to the next mode; the TUI's status line and prigh-web's composer
+say so): the model has no tool to leave it and is told not to ask. File
+edits, creating or removing worktrees, creating or checking out pull
+requests and subagents in a worktree of their own are refused, with a
+message telling the model that plan mode is on until you turn it off;
+every other destructive tool asks (in every approval mode) unless an allow
+rule covers it, so read-only commands can run once you allow them. The
+model is told when plan mode starts and ends. It keeps its steps with
+`update_plan`, presents the finished plan as its reply and waits; turning
+plan mode off (back to the approval mode you had) and asking it to go
+ahead has it implement the plan. An active `/goal` gets no automatic
+continuations while plan mode is on (the model cannot make progress on it,
+only plan); leaving plan mode carries on with it.
 
 The model's plan (`update_plan`: steps pending, in progress or done, as in
 Codex) is session state: the status line shows `plan 2/5: current step`

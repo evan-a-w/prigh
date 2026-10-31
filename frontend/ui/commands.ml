@@ -121,7 +121,7 @@ let every =
       "plan"
       "[on|off]"
       "toggle plan mode: the model investigates and plans, changing no files, \
-       until you approve its plan"
+       until you turn it off"
   ; c "todos" "" "show the model's plan (its update_plan steps)"
   ; c
       "permissions"

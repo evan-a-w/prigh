@@ -10,8 +10,6 @@ module Answer = struct
   [@@deriving sexp_of, equal]
 end
 
-let is_plan (c : P.Pending.Confirm.t) = String.equal c.name "exit_plan_mode"
-
 let who (c : P.Pending.Confirm.t) =
   match c.agent_id with
   | None -> ""
@@ -21,7 +19,6 @@ let who (c : P.Pending.Confirm.t) =
 let title (c : P.Pending.Confirm.t) =
   let what =
     match c.name with
-    | "exit_plan_mode" -> "Approve the plan and start implementing?"
     | "bash" -> sprintf "Run bash: %s?" c.summary
     | "write" -> sprintf "Write %s?" c.summary
     | "edit" -> sprintf "Edit %s?" c.summary
@@ -34,31 +31,20 @@ let title (c : P.Pending.Confirm.t) =
 ;;
 
 let answers (c : P.Pending.Confirm.t) =
-  if is_plan c
-  then
-    [ Answer.Allow, "y", "approve: leave plan mode and implement"
-    ; Deny, "n", "keep planning"
-    ; Deny_with_reason, "r", "keep planning, saying what to change"
-    ]
-  else
-    [ Answer.Allow, "y", "allow once" ]
-    @ (match c.rules with
-       | [] -> []
-       | rules ->
-         [ ( Answer.Always
-           , "a"
-           , sprintf
-               "always allow %s this session"
-               (String.concat ~sep:", " rules) )
-         ])
-    @ [ Deny, "n", "deny"; Deny_with_reason, "r", "deny, saying why" ]
+  [ Answer.Allow, "y", "allow once" ]
+  @ (match c.rules with
+     | [] -> []
+     | rules ->
+       [ ( Answer.Always
+         , "a"
+         , sprintf
+             "always allow %s this session"
+             (String.concat ~sep:", " rules) )
+       ])
+  @ [ Deny, "n", "deny"; Deny_with_reason, "r", "deny, saying why" ]
 ;;
 
-let reason_question c =
-  if is_plan c
-  then "What should change in the plan?"
-  else "Why not? (the model sees it)"
-;;
+let reason_question = "Why not? (the model sees it)"
 
 let params (c : P.Pending.Confirm.t) (answer : Answer.t) ~reason =
   let allow, always =
@@ -79,12 +65,9 @@ let params (c : P.Pending.Confirm.t) (answer : Answer.t) ~reason =
 ;;
 
 let acknowledgement (c : P.Pending.Confirm.t) (answer : Answer.t) =
-  match is_plan c, answer with
-  | true, Allow -> "plan approved"
-  | true, (Deny | Deny_with_reason) -> "plan not approved: still planning"
-  | false, Allow -> sprintf "allowed %s" c.name
-  | false, Always ->
+  match answer with
+  | Allow -> sprintf "allowed %s" c.name
+  | Always ->
     sprintf "allowed %s; always: %s" c.name (String.concat ~sep:", " c.rules)
-  | false, (Deny | Deny_with_reason) -> sprintf "denied %s" c.name
-  | true, Always -> "plan approved"
+  | Deny | Deny_with_reason -> sprintf "denied %s" c.name
 ;;

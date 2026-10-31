@@ -815,15 +815,6 @@ kbd {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.plan-dialog .confirm-question { font: 600 13.5px var(--sans); background: none; padding: 0; }
-.confirm-plan {
-  background: var(--well);
-  border-radius: var(--r-control);
-  padding: 4px 14px;
-  margin-bottom: 10px;
-  max-height: 40vh;
-  overflow: auto;
-}
 .confirm-answers { display: flex; flex-direction: column; gap: 6px; }
 .btn.confirm-answer { justify-content: flex-start; gap: 10px; text-align: left; height: auto; min-height: 32px; padding: 5px 10px; }
 .btn.confirm-answer kbd { flex-shrink: 0; }

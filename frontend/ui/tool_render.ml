@@ -102,7 +102,7 @@ let arg (call : P.Tool_call.t) =
     | "ls" -> Some (Option.value (str "path") ~default:".")
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
-    | "ask_user" | "update_plan" | "exit_plan_mode" -> None
+    | "ask_user" | "update_plan" -> None
     | "job_kill" | "subagent_cancel" -> ids ()
     | _ ->
       (match
@@ -586,28 +586,6 @@ let render_step
              Log_line.indent
                ~depth:2
                (Content.Line.of_string ("? " ^ q.question))) ))
-    | "exit_plan_mode", _ ->
-      let plan = str "plan" in
-      let chips =
-        match result with
-        | Some { is_error = false; _ } -> [ chip ~style:green "approved" ]
-        | Some { is_error = true; text; _ }
-          when String.is_prefix text ~prefix:"[the user did not approve" ->
-          [ chip ~style:red "not approved" ]
-        | Some _ -> []
-        | None -> [ chip ~style:(Style.fg Yellow) "waiting for your approval" ]
-      in
-      let refusal =
-        match result with
-        | Some ({ is_error = true; _ } as r) -> error r.text
-        | Some _ | None -> []
-      in
-      ( chips
-      , (match verbosity with
-         | Quiet -> []
-         | Normal -> output ~style:Style.plain ~head:30 plan
-         | Verbose -> output ~style:Style.plain ~head:all plan)
-        @ refusal )
     | ("ls" | "grep" | "find"), _ ->
       let flags =
         List.filter_opt
