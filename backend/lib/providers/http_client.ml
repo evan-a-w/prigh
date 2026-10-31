@@ -103,6 +103,7 @@ let with_default_port uri =
 ;;
 
 let stream
+      ?(meth = `GET)
       ~(env : Env.t)
       ?(cancel = Cancellation.never)
       ?timeout
@@ -139,14 +140,22 @@ let stream
       Trace.span ~detailed:true "http_send"
       @@ fun () ->
       idle (fun () ->
-        match body with
-        | None -> Cohttp_eio.Client.get client ~sw ~headers uri
-        | Some body ->
+        match meth, body with
+        | `GET, None -> Cohttp_eio.Client.get client ~sw ~headers uri
+        | `POST, Some body ->
           Cohttp_eio.Client.post
             client
             ~sw
             ~headers
             ~body:(Cohttp_eio.Body.of_string body)
+            uri
+        | meth, body ->
+          Cohttp_eio.Client.call
+            client
+            ~sw
+            ~headers
+            ?body:(Option.map body ~f:Cohttp_eio.Body.of_string)
+            meth
             uri)
     with
     | exception
@@ -198,6 +207,7 @@ let post_stream
       ~body
   =
   stream
+    ~meth:`POST
     ~env
     ?cancel
     ?timeout
@@ -221,10 +231,11 @@ let get_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~on_chunk () =
     ()
 ;;
 
-let collect ~env ?cancel ?timeout ~url ~headers ~body () =
+let collect ?meth ~env ?cancel ?timeout ~url ~headers ~body () =
   let buf = Buffer.create 1024 in
   Result.map
     (stream
+       ?meth
        ~env
        ?cancel
        ?timeout
@@ -237,9 +248,13 @@ let collect ~env ?cancel ?timeout ~url ~headers ~body () =
 ;;
 
 let post ~env ?cancel ?timeout ~url ~headers ~body () =
-  collect ~env ?cancel ?timeout ~url ~headers ~body:(Some body) ()
+  collect ~meth:`POST ~env ?cancel ?timeout ~url ~headers ~body:(Some body) ()
 ;;
 
 let get ~env ?cancel ?timeout ~url ~headers () =
   collect ~env ?cancel ?timeout ~url ~headers ~body:None ()
+;;
+
+let request ~env ?cancel ?timeout ~meth ~url ~headers ?body () =
+  collect ~meth ~env ?cancel ?timeout ~url ~headers ~body ()
 ;;
