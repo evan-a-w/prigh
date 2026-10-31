@@ -40,6 +40,9 @@ module Picker_kind : sig
     (** [/compaction model]: model keys, or [off] (the conversation's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the generate model's) *)
+    | Dictation_models
+    (** [/dictation model]: transcription model keys, or [off] (the
+        default); other keys are typed in the filter *)
     | Menu of Context_menu.t
     (** a session's or worktree's context menu; item ids are
         [Context_menu.Item.id]s *)
