@@ -2788,8 +2788,8 @@ let verbosity_picker (m : Model.t) =
 
 (* The default mode for new sessions, which the backend applies to this
    session too. *)
-let set_confirm (m : Model.t) enabled =
-  let approval_mode : Approval_mode.t = if enabled then Ask else Auto in
+(* The default mode, which the backend also gives this session. *)
+let set_default_mode (m : Model.t) (approval_mode : Approval_mode.t) =
   let m =
     { m with
       state =
@@ -2797,18 +2797,20 @@ let set_confirm (m : Model.t) enabled =
           { s with approval_mode; plan_mode = false })
     }
   in
+  let mode : Session_mode.t = { approval = approval_mode; plan = false } in
   save_config
     m
     { (config m) with approval_mode }
     ~fields:[ "approval_mode" ]
     ~notice:
-      (if enabled
-       then
-         "Tool confirmation on (mode ask, also for new sessions): "
-         ^ Session_mode.describe { approval = Ask; plan = false }
-       else
-         "Tool confirmation off (mode auto, also for new sessions): "
-         ^ Session_mode.describe { approval = Auto; plan = false })
+      (sprintf
+         "Mode %s, also for new sessions: %s"
+         (Approval_mode.to_string approval_mode)
+         (Session_mode.describe mode))
+;;
+
+let set_confirm (m : Model.t) enabled =
+  set_default_mode m (if enabled then Ask else Auto)
 ;;
 
 let mode_text (mode : Session_mode.t) =
@@ -5364,7 +5366,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "confirm", ("on" | "true") -> set_confirm m true
   | "confirm", ("off" | "false") -> set_confirm m false
   | "confirm", other ->
-    error m (sprintf "Unknown setting “%s”: use on or off." other)
+    (match Approval_mode.of_string other with
+     | Some mode -> set_default_mode m mode
+     | None ->
+       error
+         m
+         (sprintf
+            "Unknown setting “%s”: use on, off, ask, auto-edit or auto."
+            other))
   | "budget", "" ->
     current_state m ~f:(fun s ->
       toast m (String.capitalize (Prigh_ui.Loop_status.describe_budget s)))
