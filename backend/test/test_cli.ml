@@ -506,28 +506,28 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 10.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
     $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 12000
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 12.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
     $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 0
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 16.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               13.4k    0    46.5k    13.4k    20.1k     0     0     0  15.6k       1/0/1     6/6       -       -
+      none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
     |}]
 ;;

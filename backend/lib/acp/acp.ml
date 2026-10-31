@@ -391,7 +391,8 @@ let modes =
   ; "auto", "Auto", "run every tool without asking"
   ; ( "plan"
     , "Plan"
-    , "investigate and plan, changing no files, until you approve the plan" )
+    , "investigate and plan, changing no files, until you switch to another \
+       mode" )
   ]
 ;;
 

@@ -77,7 +77,7 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+        "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
@@ -128,7 +128,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
        ask        bash, job_input, edits and MCP tools ask first
     ▸* auto-edit  file edits run; bash, job_input and MCP tools…
        auto       tools run without asking
-       plan       read-only planning: no file edits; bash, job_…
+       plan       read-only planning, until you leave it (/plan…
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -144,7 +144,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+        "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     |}];
   H.show h;
   [%expect
@@ -180,7 +180,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+        "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
@@ -414,52 +414,31 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "the plan to approve" =
-  let h = Test_app.connected ~height:18 () in
-  H.event h (State (with_mode ~plan_mode:true Auto));
-  H.event
-    h
-    (Tool_confirm
-       (confirm
-          ~name:"exit_plan_mode"
-          "p1"
-          "1. Add the flag to main.ml\n2. Test it"));
-  H.show h;
+let%expect_test "plan mode: the status line says how to leave it" =
+  let show width =
+    let h = Test_app.connected ~width ~height:8 () in
+    H.event h (State (with_mode ~plan_mode:true Auto));
+    H.show h
+  in
+  show 100;
+  show 60;
   [%expect
     {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ┌─ Plan ───────────────────────────────────────────────────┐
-    │ Approve the plan and start implementing?                 │
-    │ 1. Add the flag to main.ml                               │
-    │ 2. Test it                                               │
-    │                                                          │
-    │ y  approve: leave plan mode and implement                │
-    │ n  keep planning                                         │
-    │ r  keep planning, saying what to change                  │
-    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:plan  (/plan off or Alt+M leaves)  ctx:0.1%/1.0M  $0.01
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
-    ? ▏
-    deepseek-flash  mode:plan  ctx:0.1%/1.0M  confirm: y/n/r
-    |}];
-  (* No "always" for a plan. *)
-  H.keys h "a";
-  H.mode h;
-  H.keys h "r";
-  H.keys h "also update the docs";
-  H.enter h;
-  [%expect
-    {|
-    confirm
-    (Rpc
-      (method_ tool_confirm_respond)
-      (params (
-        (call_id p1)
-        (allow   false)
-        (reason  "also update the docs")))
-      (tag Show_error))
+    > ▏
+    deepseek-flash  think:off  mode:plan  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -651,7 +630,7 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "the plan, questions and plan approval in the transcript" =
+let%expect_test "the plan and questions in the transcript" =
   let h = Test_app.connected ~width:70 ~height:30 () in
   let plan_args =
     {|{"explanation":"first pass","plan":[{"step":"read the code","status":"completed"},{"step":"change it","status":"in_progress"},{"step":"test","status":"pending"}]}|}
@@ -674,14 +653,6 @@ let%expect_test "the plan, questions and plan approval in the transcript" =
     {|{"questions":[{"question":"Which database?"}]}|}
     "t2"
     (Some "The user answered:\nQ: Which database?\nA: Postgres\n");
-  run
-    "exit_plan_mode"
-    {|{"plan":"1. Change main.ml\n2. Test"}|}
-    "t3"
-    ~is_error:true
-    (Some
-       "[the user did not approve the plan; their feedback: docs too] Stay in \
-        plan mode.");
   run "ask_user" {|{"questions":[{"question":"Ready?"}]}|} "t4" None;
   H.show h;
   [%expect
@@ -698,11 +669,6 @@ let%expect_test "the plan, questions and plan approval in the transcript" =
     ✓ ask_user
         Q: Which database?
         A: Postgres
-    ✕ exit_plan_mode  not approved
-        1. Change main.ml
-        2. Test
-        [the user did not approve the plan; their feedback: docs too] Stay
-        in plan mode.
     … ask_user  waiting for your answer
         ? Ready?
     ──────────────────────────────────────────────────────────────────────

@@ -9,7 +9,6 @@ let kind = function
   | "edit" | "write" | "apply_patch" -> "edit"
   | "web_fetch" | "web_search" -> "fetch"
   | "update_plan" -> "think"
-  | "exit_plan_mode" -> "switch_mode"
   | _ -> "other"
 ;;
 
@@ -82,7 +81,6 @@ let title ~name ~args ~cwd =
       (Option.map (string_arg args "task") ~f:(first_line ~max:70))
   | "ask_user" -> "Question for you"
   | "update_plan" -> "Update the plan"
-  | "exit_plan_mode" -> "Leave plan mode"
   | name -> name
 ;;
 

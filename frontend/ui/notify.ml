@@ -51,13 +51,10 @@ let of_event (event : P.Event.t) ~where =
       { title = "prigh: done in " ^ where
       ; body = Option.value (last_reply messages) ~default:"The turn ended."
       }
-  | Tool_confirm ({ name; summary; _ } as c) ->
+  | Tool_confirm { name; summary; _ } ->
     Some
       { title = "prigh: waiting for you in " ^ where
-      ; body =
-          (if Confirm_prompt.is_plan c
-           then "Approve the plan: " ^ one_line summary
-           else sprintf "Allow %s: %s?" name (one_line summary))
+      ; body = sprintf "Allow %s: %s?" name (one_line summary)
       }
   | Ask_user { questions; _ } ->
     Some

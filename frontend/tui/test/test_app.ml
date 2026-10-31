@@ -7091,7 +7091,7 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+        "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (

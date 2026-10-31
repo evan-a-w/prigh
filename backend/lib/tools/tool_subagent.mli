@@ -9,6 +9,10 @@ open! Import
     [~/.prigh/worktrees]), whose branch its report names. *)
 
 val max_turns : int
+val name : string
+
+(** Whether a call's arguments ask for a worktree of its own. *)
+val wants_worktree : Json.t -> bool
 
 val create
   :  ?name_task:
