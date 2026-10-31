@@ -694,14 +694,14 @@ echo "/dev/x 1000 300 700 30% /nix"
 ;;
 
 (* A stand-in for the container's helper: takes one request from the FIFO,
-   writes a log and the result the way docker/prigh-docker does. It gives up
-   after 10 seconds without a request, and is killed after 20, so that a
-   failing test leaves no process behind. *)
+   writes a log and the result the way docker/prigh-docker does. It is
+   killed after 20 seconds, so that a failing test leaves no process behind.
+   POSIX sh (/bin/sh is dash on Debian): no [read -t]. *)
 let fake_helper ~dir ~result =
   sprintf
     {|exec 3<>%s/requests
 : > %s/ready
-read -r -t 10 verb id gens by <&3 || exit 1
+read -r verb id gens by <&3 || exit 1
 echo "$verb $gens $by" > %s/request
 printf 'by=%%s\nsince=5\ngenerations=%%s\n' "$by" "$gens" > %s/running
 echo "removing profile version 4" > %s/$id.log
