@@ -1,25 +1,17 @@
 open! Core
 open! Import
 
-(** The status of the header over the chat (sidebar closed, or a phone),
-    on one line: the context (opening the session's details), tokens and
-    cost, and what the agent is doing, in a slot of its own width so that
-    nothing moves as it changes; the context and the activity when narrow.
-    The cost is to the cent; its title has it exactly. The sidebar's session
-    card lays out {!activity}, {!cost} and {!meter} itself. *)
+(** The session's status, at the right of the header over the chat
+    ({!Session_view.bar}), on one quiet line: what the agent is doing (a dot
+    when idle, its words only while it works or is out of reach), a short
+    thin meter of the context with its percent (its details show over it on
+    hover or focus, a click opens the session's details, [/session]) and the
+    cost to the cent (spent / budget with a budget, opening [/budget]). The
+    tokens, the exact cost, the model and the branch are in the details. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What the agent is doing (or that the backend is out of reach). *)
 val activity : App.Model.t -> Node.t
-
-(** The session's cost to the cent (its title has it exactly), or spent /
-    budget (opening [/budget]); none while out of reach. *)
-val cost : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
-
-(** The context's meter and percent (opening the session's details), its
-    title the tokens in and out; none while out of reach or with no context
-    window. *)
-val meter : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** What applies: goal, reminders, resume, queued messages to take back,
     background subagents and jobs, transfers, the verbosity and, with

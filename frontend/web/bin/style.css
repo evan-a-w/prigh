@@ -583,88 +583,121 @@ kbd {
 
 .scrim { display: none; }
 
-/* The session: in the docked sidebar a card of its status, with the
-   panels' toggles floating over the chat's corner; else a slim bar over the
-   chat (one of them at a time). The bar steps down with the chat column's
-   width, not the window's (see the container queries at the end). Its
-   height is fixed: what the status says never moves the page. */
-.session-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0 -10px;
-  padding: 12px 14px 12px 18px;
-  border-top: 1px solid var(--rule);
-}
-/* One left edge, and the figures on one right edge. The headline is what
-   the agent is doing, with the cost across from it (under it when the
-   sidebar is too narrow for both: the activity keeps a slot of its usual
-   words, so that the cost never moves as the agent starts and stops); then
-   what applies, muted, when anything does; the context's meter across the
-   card, the one thing coloured by how full it is; the branch. Tokens are
-   the meter's title. While the agent works its lamp is the one lit: the
-   background agents are told quietly. */
-.card-status.status {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 0;
-  overflow: visible;
-  font-size: 12px;
-  color: var(--muted);
-}
-.session-card .card-status.status .status-item { font: inherit; }
-.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; font-weight: 560; color: var(--chalk); }
-.card-head > .activity { flex: 1 1 0; width: auto; min-width: min(8.5em, 100%); align-self: center; }
-.card-head > .activity:is(.idle, .running) { color: var(--chalk); }
-.card-head > .activity.retrying { color: var(--brick); }
-.card-status .card-head > .cost { margin-left: auto; color: var(--chalk); }
-.card-status .card-head > .cost.warm { color: var(--sodium); }
-.card-status .card-head > .cost.hot { color: var(--brick); }
-.card-status > .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
-.card-status .status-item.mode { color: var(--muted); }
-.card-status .status-item.mode:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background.active { color: var(--muted); }
-.card-status:has(.activity.running) .background.active:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background .lamp, .card-status .background > .icon { display: none; }
-.card-status > .context { display: flex; gap: 10px; margin-top: 2px; }
-.card-status > .context > .meter { flex: 1; width: auto; height: 3px; border-radius: 2px; background: var(--rule-2); }
-.card-status > .context .meter-fill { background: var(--sodium); border-radius: inherit; }
-.card-status > .context.hot .meter-fill { background: var(--brick); }
-.card-status > .context > .percent { min-width: 4ch; text-align: right; }
-.card-where { display: flex; min-width: 0; color: var(--faint); }
-.card-where > .branch { flex: 0 1 auto; min-width: 0; color: var(--faint); }
-
-.chat-tools {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: var(--z-tools);
-  padding: 2px;
-  border-radius: var(--r-control);
-  background: var(--bg);
-}
-.chat-tools > .panel-toggles { gap: 2px; }
-.chat-tools .btn.icon { width: 30px; height: 30px; }
-.chat-frame:has(> .chat-tools) > .jump-nav { top: 50px; }
-
+/* The session: one slim header over the chat, docked sidebar or not. The
+   title on the left with its branch in a quiet mono beside it; at the right
+   the status, the panels' toggles after a hairline. The status is three
+   figures and no words while all is well: a dot, a short meter with its
+   percent, the cost. Words only while the agent works or the backend is out
+   of reach. The bar steps down with the chat column's width, not the
+   window's (see the container queries at the end). Its height is fixed:
+   what the status says never moves the page. */
 .session-bar {
   container: bar / inline-size;
+  position: relative;
+  z-index: var(--z-tools);
   display: flex;
   align-items: center;
   gap: 12px;
   height: 44px;
-  padding: 0 8px;
+  padding: 0 8px 0 10px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--rule);
+  background: var(--bg);
 }
+.session-bar.docked { padding-left: 16px; }
 .session-bar > .toggle-sidebar { margin-right: -6px; color: var(--muted); }
-.session-bar > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--muted); font-size: 13.5px; }
-.session-bar > .session-name:hover { color: var(--chalk); }
-.session-bar > .status-extras { flex: 1 1 0; justify-content: flex-end; }
-.session-bar > .status { flex-shrink: 0; margin-left: auto; }
+.session-title { display: flex; align-items: baseline; gap: 10px; flex: 0 1 auto; min-width: 6ch; overflow: hidden; }
+.session-title > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--chalk); font-size: 13.5px; font-weight: 560; }
+.session-title > .branch {
+  flex: 0 10 auto;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 11.5px var(--mono);
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: var(--r-chip);
+}
+.session-title > .branch:hover { color: var(--chalk); }
+.session-title > .branch:hover .branch-name { text-decoration: underline; text-underline-offset: 2px; }
+.session-title > .branch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.session-bar > .status-extras { flex: 0 0 auto; contain: none; justify-content: flex-end; margin-left: auto; }
+.session-bar > .status { flex-shrink: 0; margin-left: auto; overflow: visible; }
+.session-bar > .status-extras + .status { margin-left: 0; }
+.session-bar > .panel-toggles { gap: 2px; padding-left: 8px; border-left: 1px solid var(--rule); }
+.session-bar .panel-toggles .btn.icon { width: 30px; height: 30px; }
 .session-bar > .settings-toggle { color: var(--faint); }
 .session-bar > .settings-toggle:hover { color: var(--chalk); }
+
+/* The thinking level and the mode: figures like the status's, not buttons,
+   until pointed at; their menus open below them. A mode where nothing asks
+   is lit, as is plan. */
+.session-chips { display: flex; align-items: center; gap: 2px; flex-shrink: 0; position: relative; }
+.session-bar:has(.session-chips.menu-open) { z-index: var(--z-menu-anchor); }
+.session-chips .chip-button {
+  height: 26px;
+  padding: 0 7px;
+  gap: 6px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  font: 12px var(--sans);
+}
+.session-chips .chip-button:not(.awaiting):is(:hover, :focus-visible),
+.session-chips .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
+.session-chips .chip-button .icon { width: 12px; height: 12px; }
+.session-chips .thinking-chip .thinking-meter { height: 10px; }
+.session-chips .thinking-chip .thinking-meter > .bar.on { background: currentColor; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(1) { height: 3px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(2) { height: 5px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(3) { height: 7.5px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(4) { height: 10px; }
+.session-chips .thinking-chip.unsupported { color: var(--faint); }
+.session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode { color: var(--sodium); }
+
+/* The context's gauge and its details, over it on hover (to the keyboard
+   they are its description): what the
+   header has no room for, in two columns, figures in mono. */
+.status-gauge { position: relative; display: inline-flex; }
+.status-details {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -8px;
+  z-index: var(--z-menu-surface);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 12px;
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out, visibility 0s 0.12s;
+  pointer-events: none;
+}
+.status-gauge:hover > .status-details {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.15s, 0.15s, 0s;
+}
+.status-detail { display: contents; }
+.status-detail-key { color: var(--faint); }
+.status-detail-value { color: var(--chalk); font: 11.5px var(--mono); text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.status-detail.context.warm .status-detail-value { color: var(--sodium); }
+.status-detail.context.hot .status-detail-value { color: var(--brick); }
+.status-detail-hint { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .status-details { transition: none; } }
+@media (hover: none) { .status-details { display: none; } }
 
 /* Session tabs (/tabs on): the open sessions over the chat. The current one
    is cut from the chat's own ground with the sidebar's sodium edge; the
@@ -1025,13 +1058,17 @@ kbd {
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); }
-.status-item.activity { width: 20ch; flex-shrink: 0; gap: 7px; }
+/* A slot of its own, so that the meter and the cost never move as the
+   agent starts and stops; its words start at the slot's left. */
+.status-item.activity { width: 14ch; flex-shrink: 0; gap: 7px; justify-content: flex-start; }
+/* Idle says nothing: the dot, its word for screen readers and the title. */
+.status-item.activity.idle { color: var(--faint); }
 .status-item.activity > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status .context > .percent { min-width: 3ch; text-align: right; }
 .status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
-.idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--faint-line); }
-.meter { width: 40px; height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; }
+.idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--sage, var(--faint-line)); opacity: 0.8; }
+.meter { width: 28px; height: 3px; border-radius: 2px; background: var(--rule-2); overflow: hidden; }
 .meter-fill { display: block; height: 100%; background: var(--muted); }
 .context.warm { color: var(--sodium); }
 .context.warm .meter-fill { background: var(--sodium); }
@@ -1660,25 +1697,26 @@ kbd {
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
 }
 
-/* The bar's steps. A narrower bar drops the counters (the context's link
-   has them, in the session's details), then says what applies with icons
-   alone (their tooltips and names say the rest), then the activity is a
-   dot. */
+/* The bar's steps. A narrower bar drops the branch, then says what applies
+   with icons alone (their tooltips and names say the rest), then the meter
+   (its percent stays) and the running words (the lamp stays). */
 @container bar (width < 760px) {
   .status { gap: 0 12px; }
-  .status .tokens, .status .cost:not(.budget) { display: none; }
+  .session-title > .branch { display: none; }
 }
 @container bar (width < 600px) {
   .status-extras .status-text, .status-extras .status-item.mode { display: none; }
-  .status-item.activity { width: 14ch; }
+  .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
+  .status-item.activity:is(.running, .idle) > .label { display: none; }
+  .status-item.activity:is(.connecting, .offline) { width: auto; }
+  .session-chips .chip-label { display: none; }
 }
 @container bar (width < 480px) {
   .status, .status-extras { gap: 0 10px; padding: 4px 0; }
-  .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
-  .status-item.activity:is(.running, .idle) > .label { display: none; }
-  /* Not working but out of touch: that is worth the room. */
-  .status-item.activity:is(.connecting, .offline) { width: auto; }
-  .status .meter { display: none; }
+  .status .meter, .status .cost { display: none; }
+  .session-bar { gap: 8px; }
+  .session-title { min-width: 4ch; }
+  .session-bar > .panel-toggles { padding-left: 0; border-left: 0; }
 }
 
 /* Settings: a row per setting, its name, a line on what it does, and its
@@ -1724,19 +1762,30 @@ kbd {
 .settings-panel-head { margin-bottom: 6px; }
 .settings-panel-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .settings-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 62ch; }
-.settings-group { margin-top: 14px; }
-.settings-group h4 { margin: 0; padding: 6px 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-.settings-group > .setting:first-child { border-top: 0; }
-.settings-group > h4 + .setting { border-top: 0; }
+/* A group: a small heading, then its rows on a card, rules between them. */
+.settings-group { margin-top: 18px; }
+.settings-group-head { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 7px; }
+.settings-group h4 { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.settings-group-note { color: var(--faint); font-size: 12px; }
+.settings-card { background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-surface); padding: 0 14px; }
+.settings-card > .setting:first-child { border-top: 0; }
 @media (prefers-reduced-motion: reduce) { .settings-panel { animation: none; } }
-.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--rule); }
 .setting-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setting-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .setting-name { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
-.setting-about { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+/* Where a setting is kept, when not where its section's are. */
+.setting-scope { font-size: 10.5px; letter-spacing: 0.02em; color: var(--faint); border: 1px solid var(--rule-2); border-radius: 999px; padding: 0 6px; line-height: 15px; cursor: help; }
+.setting-about { color: var(--muted); font-size: 12.5px; line-height: 1.45; max-width: 60ch; }
 .setting-about.host { font: 11.5px var(--mono); color: var(--faint); }
 .setting-note { font-size: 12.5px; line-height: 1.45; }
 .setting-note.warm { color: var(--sodium); }
 .setting-note.muted { color: var(--faint); }
+/* A choice made in a picker: reads as a select box. */
+.setting-select { gap: 6px; max-width: 240px; }
+.setting-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setting-select > .chevron { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
+.setting-select:hover > .chevron { color: var(--chalk); }
 .setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
 .account-setting { flex-wrap: nowrap; }
 .account-setting .setting-text { flex-basis: 0; }
@@ -1971,7 +2020,8 @@ kbd {
    behind dimmed. */
 @media (max-width: 760px) {
   .composer-box { position: relative; }
-  .composer-controls, .chip-anchor { position: static; }
+  .composer-controls, .chip-anchor, .session-chips { position: static; }
+  .session-bar .chip-popover[data-chip] { left: 8px; right: 8px; }
   .chip-popover { z-index: var(--z-menu-surface); bottom: calc(100% + 8px); }
   .chip-popover,
   .chip-popover[data-chip] {

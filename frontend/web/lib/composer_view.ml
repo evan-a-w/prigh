@@ -114,29 +114,8 @@ let images (m : App.Model.t) ~inject =
            ]))
 ;;
 
-(* A choice the backend has still to confirm. *)
-let pending_chip ?(attrs = []) ?title ~cls label =
-  button
-    ~cls:("chip-button awaiting " ^ cls)
-    ~title:(Option.value title ~default:(sprintf "Switching to %s…" label))
-    ~disabled:true
-    ~attrs:(Attr.create "aria-busy" "true" :: attrs)
-    ~on_click:Effect.Ignore
-    [ Html.lamp (); span ~cls:"chip-label" label ]
-;;
-
-(* What the chip's button says about its menu, open or not. *)
-let menu_attrs (m : App.Model.t) (chip : Chip.t) =
-  let open_ =
-    match m.dialog with
-    | Some (Popover { chip = shown; _ }) -> Chip.equal shown chip
-    | _ -> false
-  in
-  [ Attr.create "aria-haspopup" "dialog"
-  ; Attr.create "aria-expanded" (Bool.to_string open_)
-  ; (if open_ then Attr.create "aria-controls" "chip-popover" else Attr.empty)
-  ]
-;;
+let pending_chip = Session_chips_view.pending_chip
+let menu_attrs = Session_chips_view.menu_attrs
 
 let model_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.model with
@@ -153,64 +132,6 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
       [ span ~cls:"chip-label" state.model.name; icon ~cls:"chevron" Chevron ]
-;;
-
-(* A narrow composer shows the level alone, after its icon. *)
-let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
-  match m.pending.thinking with
-  | Some level ->
-    pending_chip
-      ~cls:"thinking-chip"
-      ~title:(sprintf "Switching to thinking %s…" level)
-      ("Thinking " ^ level)
-  | None when state.model.supports_thinking ->
-    button
-      ~cls:"chip-button thinking-chip"
-      ~title:
-        (sprintf
-           "Thinking %s: how much the model reasons before it answers (Alt+T \
-            cycles, /thinking)"
-           state.thinking)
-      ~attrs:(menu_attrs m Thinking)
-      ~on_click:(inject (Action.Open_chip Thinking))
-      [ icon Brain
-      ; span ~cls:"chip-key" "Thinking"
-      ; span ~cls:"chip-label" state.thinking
-      ; icon ~cls:"chevron" Chevron
-      ]
-  | None ->
-    button
-      ~cls:"chip-button thinking-chip unsupported"
-      ~title:(sprintf "%s has no thinking levels" state.model.name)
-      ~on_click:(inject (Action.Open_chip Thinking))
-      [ icon Brain; span ~cls:"chip-label" "No thinking" ]
-;;
-
-(* What asks first: a narrow composer shows its icon and [label] (ask,
-   auto-edit, auto, plan). *)
-let mode_chip (m : App.Model.t) (state : State.t) ~inject =
-  let short mode = [ Attr.create "data-short" (Session_mode.label mode) ] in
-  match m.pending.mode with
-  | Some mode ->
-    pending_chip
-      ~attrs:(short mode)
-      ~cls:"mode-chip"
-      ~title:(sprintf "Switching to %s…" (Session_mode.label mode))
-      (Session_mode.title mode)
-  | None ->
-    let mode = Session_mode.of_state state in
-    button
-      ~cls:("chip-button mode-chip" ^ if mode.plan then " plan-mode" else "")
-      ~title:
-        (sprintf
-           "%s (Alt+M cycles, /mode picks)"
-           (String.capitalize (Session_mode.describe mode)))
-      ~attrs:(short mode @ menu_attrs m Mode)
-      ~on_click:(inject (Action.Open_chip Mode))
-      [ icon Shield
-      ; span ~cls:"chip-label" (Session_mode.title mode)
-      ; icon ~cls:"chevron" Chevron
-      ]
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
@@ -251,9 +172,9 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
-(* The model, the thinking level, the approval mode and the tool host, along
-   the bottom of the box, each opening its menu over itself (the command's
-   choices). *)
+(* The model and the tool host, along the bottom of the box, each opening
+   its menu over itself (the command's choices). The thinking level and the
+   mode are the chat header's ({!Session_chips_view}). *)
 let controls (m : App.Model.t) ~inject =
   match m.state with
   | None -> div ~cls:"composer-controls" []
@@ -262,41 +183,13 @@ let controls (m : App.Model.t) ~inject =
       ~attrs:
         [ classes
             [ "composer-controls" ]
-            [ ( "menu-open"
-              , match m.dialog with
-                | Some (Popover _) -> true
-                | _ -> false )
-            ]
+            [ "menu-open", Session_chips_view.menu_open m [ Model; Host ] ]
         ; Attr.role "group"
-        ; Attr.create "aria-label" "Model, thinking, mode and host"
+        ; Attr.create "aria-label" "Model and host"
         ]
-      (List.map
-         [ Chip.Model, model_chip
-         ; Thinking, thinking_chip
-         ; Mode, mode_chip
-         ; Host, host_chip
-         ]
-         ~f:(fun (chip, view) ->
-           let menu =
-             match m.dialog with
-             | Some (Popover { chip = shown; picker })
-               when Chip.equal shown chip ->
-               Some (Chip_popover_view.view m ~chip picker ~inject)
-             | _ -> None
-           in
-           div
-             ~attrs:
-               [ classes
-                   [ "chip-anchor"
-                   ; (match chip with
-                      | Model -> "model"
-                      | Thinking -> "thinking"
-                      | Mode -> "mode"
-                      | Host -> "host")
-                   ]
-                   [ "open", Option.is_some menu ]
-               ]
-             [ view m state ~inject; Option.value menu ~default:Node.none ]))
+      [ Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
+      ; Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
+      ]
 ;;
 
 let steered (m : App.Model.t) =

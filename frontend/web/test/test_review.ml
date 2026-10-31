@@ -229,6 +229,7 @@ let%expect_test
     -- the desk:
     <main class="main">
     -- the chat column:
+    <header class="docked session-bar">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -266,8 +267,18 @@ let%expect_test
   H.elements h ~selector:".session-card";
   [%expect
     {|
-    (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.00 Ready
+    (Sessions (Ctrl+B))
+    (New session) (main)
+    (on)
+    (auto)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -368,6 +379,7 @@ let%expect_test
     <main class="main">
     <section class="terminal-panel">
     -- the chat column:
+    <header class="docked session-bar">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">

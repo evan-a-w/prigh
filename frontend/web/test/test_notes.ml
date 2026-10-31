@@ -349,8 +349,6 @@ let%expect_test
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
@@ -410,7 +408,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
-    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)

@@ -28,25 +28,28 @@ let%expect_test "the names of the controls" =
     button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archived 1" -- Show the archived sessions
-    button "Context 0% full" -- 0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)
-    button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
+    button "New session" -- Rename (/name)
+    button "main" -- On branch main, in /work: pull requests (/pr)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "Context 0% full: the session's details"
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "backend" -- Tools run on the backend (/host switches)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
     input "Search sessions"
     textarea "Message"
-    [status] span "Ready"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
+    [group] div "Thinking and mode"
+    [status] span "Ready"
+    [tooltip] div "Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
     [region] div "Transcript"
-    [group] div "Model, thinking, mode and host"
+    [group] div "Model and host"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -58,13 +61,10 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
-    button "Context 0% full" -- 0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)
-    button "main" -- On branch main, in /work: pull requests (/pr)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"
     [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
-    [status] span "Ready"
     |}]
 ;;
 
@@ -142,13 +142,11 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     [img] span "Done"
     button "Remove image"
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "backend" -- Tools run on the backend (/host switches)
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
     textarea "Message"
-    [group] div "Model, thinking, mode and host"
+    [group] div "Model and host"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

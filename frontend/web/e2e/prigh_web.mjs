@@ -225,7 +225,8 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".session-card .card-status > :not(.status-extras:empty), .session-bar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+    [...document.querySelectorAll(".session-bar :is(.session-chips, .status-extras:not(:empty), .status)")]
+      .map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
@@ -233,9 +234,9 @@ const showStatus = async label => {
 const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(":is(.session-card, .session-bar) *")]
+    [...document.querySelectorAll(".session-bar *")]
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
-        || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where")))
+        || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where, .status-details")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
       .join("\n"))));
 };
@@ -957,7 +958,8 @@ try {
   await bodyHas("reconnecting");
   await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
   await bodyLacks("Connection lost");
-  // The thinking level and the mode sit beside the model, each a picker.
+  // The model and where tools run in the composer; the thinking level and
+  // the mode in the header's status, each a picker.
   await show("the model, thinking and mode controls", ".composer-controls");
   // /host opens the host picker (the session's card names the host only
   // when there is another to choose).
@@ -1012,8 +1014,8 @@ try {
   await page.locator("#chip-popover .popover-item").first().waitFor();
   await page.locator("#chip-popover .popover-item", { hasText: "Asks: edits & commands" }).click();
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
-  await page.locator(".mode-chip:not(.awaiting)", { hasText: "Asks: edits & commands" }).waitFor();
-  await show("mode ask", ".composer-controls");
+  await page.locator(".mode-chip:not(.awaiting) .chip-label", { hasText: /^ask$/ }).waitFor();
+  await show("mode ask", ".session-chips");
   await send("build it");
   await page.locator("#confirm").waitFor();
   await show("a confirmation", "#confirm");
@@ -1037,7 +1039,7 @@ try {
   // Each step is shown at once; the backend's replies settle on the last.
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
   await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
-  await show("plan mode (Alt+M)", ".composer-controls");
+  await show("plan mode (Alt+M)", ".session-chips");
   await showStatus("plan mode: the status line");
   section("plan mode: the composer's placeholder");
   console.log(await page.locator("#editor").getAttribute("placeholder"));
@@ -1050,7 +1052,7 @@ try {
   await send("go ahead");
   await bodyHas("Implementing.");
   await idle();
-  await show("plan mode off", ".composer-controls");
+  await show("plan mode off", ".session-chips");
   await showStatus("plan mode off: the status line");
   await showTurn("implementing");
   await send("/permissions");
@@ -1496,9 +1498,9 @@ try {
   const showTopBar = async label => {
     section(label);
     const where = await page.evaluate(() => {
-      const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
+      const at = ".session-bar";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras, .card-head) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       const title = document.querySelector(`${at} .session-name > span`);
@@ -1506,7 +1508,7 @@ try {
       return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
     console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
-    for (const s of [".session-card, .session-bar", ".composer"]) {
+    for (const s of [".session-bar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
@@ -1552,9 +1554,9 @@ try {
     console.log(`${label}: tab ${at.tab}, focus ${at.focus}, showing ${at.panel} (labelled by ${at.labelled})`);
   };
   section("settings: the sections");
-  await page.locator(".settings-tab", { hasText: "Behaviour" }).click();
-  await page.locator(".settings-panel-behaviour").waitFor();
-  await settingsAt("clicked Behaviour");
+  await page.locator(".settings-tab", { hasText: "Sessions" }).click();
+  await page.locator(".settings-panel-sessions").waitFor();
+  await settingsAt("clicked Sessions");
   await page.keyboard.press("ArrowDown");
   await page.locator(".settings-panel-models").waitFor();
   await settingsAt("ArrowDown");
@@ -1575,8 +1577,8 @@ sections ${getComputedStyle(nav).flexDirection === "row" ? "across the top" : "d
   });
   console.log(`desktop: ${await settingsFits()}`);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator(".settings-tab", { hasText: "Behaviour" }).click();
-  await page.locator(".settings-panel-behaviour").waitFor();
+  await page.locator(".settings-tab", { hasText: "Sessions" }).click();
+  await page.locator(".settings-panel-sessions").waitFor();
   console.log(`phone: ${await settingsFits()}`);
   await screenshot("settings: a phone");
   await page.setViewportSize({ width: 1280, height: 800 });

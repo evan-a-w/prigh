@@ -2,14 +2,13 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's card at the foot of the docked sidebar: what the agent is
-   doing with the cost across from it, what applies when anything does, the
-   context's meter (the tokens in its title), and the branch when there is
-   one. Where tools run is the composer's chip, and the plan the bar's. Each
-   [card] prints the lines as the user reads them, then what is lit: the
-   lamps, and what is in the accent colour (by its class; style.css mutes
-   the background agents and the modes in the card while the agent
-   works). *)
+(* The session's status in the chat's header, docked sidebar or not: what
+   the agent is doing (a dot alone while idle), the context's short meter
+   (its details over it) and the cost; what applies before it, when
+   anything does; the branch beside the title when there is one. Where tools
+   run is the composer's chip. Each [card] prints the lines as the user reads
+   them, then what is lit: the lamps, and what is in the accent colour (by
+   its class). *)
 
 let plan =
   {|{"steps":[{"step":"Look","status":"completed"},{"step":"Final nix GC","status":"in_progress"}]}|}
@@ -58,20 +57,27 @@ let thinking h =
     {|{"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"thinking","text":""}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},"delta":{"type":"thinking_delta","text":""}}|}
 ;;
 
-(* The card's lines as they stand. *)
+(* The header's status as it stands. *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".session-card .card-head";
+  H.text h ~selector:".session-bar .status";
   print_endline "applies:";
-  H.text h ~selector:".session-card .card-status > .status-extras";
+  H.text h ~selector:".session-bar > .status-extras";
   print_endline "context:";
-  H.text h ~selector:".session-card .card-status > .context";
+  H.text h ~selector:".session-bar .status .context";
   print_endline "where:";
-  H.text h ~selector:".session-card .card-where";
+  H.text h ~selector:".session-bar .session-title > .branch";
   print_endline "lit:";
   List.iter
-    [ "lamp"; "running"; "queued"; "mode"; "background.active"; "warm"; "hot" ]
-    ~f:(fun cls -> H.elements h ~selector:(".session-card ." ^ cls))
+    [ "lamp"
+    ; "running"
+    ; "queued"
+    ; "status-item.mode"
+    ; "background.active"
+    ; "warm"
+    ; "hot"
+    ]
+    ~f:(fun cls -> H.elements h ~selector:(".session-bar ." ^ cls))
 ;;
 
 let%expect_test "the card idle, thinking, with a subagent and a mode" =
@@ -81,22 +87,31 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
   [%expect
     {|
     now:
-    Ready $1.30
+    Ready (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Click for the session’s details · /compact frees context
+    $1.30
     applies:
     context:
     (5%)
+    Context 10k / 200k · 5%
     where:
     lit:
     |}];
   (* The cost to the cent, its title has it exactly; the context's title has
      the tokens. *)
-  H.names h ~selector:".session-card .card-head > *";
-  H.names h ~selector:".session-card .card-status > .context";
+  H.names h ~selector:".session-bar .status > *";
+  H.names h ~selector:".session-bar .status .context";
   [%expect
     {|
     [status] span "Ready"
+    span "5% Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
     span "$1.30" -- Session cost: $1.3021 (/session)
-    button "Context 5% full" -- 1.6M tokens in, 21k out, 0 cache read; 5% of a 200k context (/compact frees some). Click for the session's details (/session)
+    button "Context 5% full: the session's details"
+    div "Context 10k / 200k \194\183 5%"
     |}];
   (* Thinking: the activity is the one thing lit. *)
   state h ~running:true ();
@@ -105,10 +120,17 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
   [%expect
     {|
     now:
-    Thinking $1.30
+    Thinking (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Click for the session’s details · /compact frees context
+    $1.30
     applies:
     context:
     (5%)
+    Context 10k / 200k · 5%
     where:
     lit:
     <span class="lamp">
@@ -131,11 +153,18 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     now:
-    Running tools $1.30
+    Running tools (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Click for the session’s details · /compact frees context
+    $1.30
     applies:
     (1 agent running) (quiet)
     context:
     (5%)
+    Context 10k / 200k · 5%
     where:
     lit:
     <span class="lamp">
@@ -154,11 +183,18 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     now:
-    Ready $1.30
+    Ready (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Click for the session’s details · /compact frees context
+    $1.30
     applies:
     (1 agent running) (quiet)
     context:
     (5%)
+    Context 10k / 200k · 5%
     where:
     lit:
     <span class="lamp">
@@ -166,8 +202,8 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     <button class="active background link status-item">
     |}];
   (* Clicking the agents opens them, the context the session's details. *)
-  H.click h ~selector:".session-card .background";
-  H.click h ~selector:".session-card .context";
+  H.click h ~selector:".session-bar .background";
+  H.click h ~selector:".session-bar .context";
   [%expect
     {|
     (Open_subagents ())
@@ -189,19 +225,23 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
   in
   (* A branch: a third line, the branch only, whatever the hosts; the plan
      is not on the card. *)
-  H.elements h ~selector:".session-card .card-status > *";
-  H.names h ~selector:".session-card .card-where > *";
-  H.elements h ~selector:".session-card .plan";
+  H.elements h ~selector:".session-bar > *";
+  H.names h ~selector:".session-bar .session-title > .branch";
+  H.elements h ~selector:".session-bar .plan";
   state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
-  H.names h ~selector:".session-card .card-where > *";
+  H.names h ~selector:".session-bar .session-title > .branch";
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
-    <div class="card-head">
+    <Vdom.Node.none-widget class="">
+    <div class="session-title">
     <div class="status-extras">
-    <button class="context link status-item">
-    <div class="card-where">
+    <div class="session-chips">
+    <div class="status">
+    <div class="panel-toggles">
+    <Vdom.Node.none-widget class="">
     button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
+    <button class="link mode plan status-item">
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
@@ -220,26 +260,37 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
     now:
-    Ready $1.30
+    Ready (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Click for the session’s details · /compact frees context
+    $1.30
     applies:
     context:
     (5%)
+    Context 10k / 200k · 5%
     where:
     lit:
     <button class="btn chip-button host-chip warm">
     |}];
   (* Out of git: no third line. *)
   state h ();
-  H.elements h ~selector:".session-card .card-status > *";
+  H.elements h ~selector:".session-bar > *";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 4)))))
-    <div class="card-head">
+    <Vdom.Node.none-widget class="">
+    <div class="session-title">
     <div class="status-extras">
-    <button class="context link status-item">
+    <div class="session-chips">
+    <div class="status">
+    <div class="panel-toggles">
+    <Vdom.Node.none-widget class="">
     |}];
   (* Without the sidebar the bar keeps the rest on one line, with the plan
      (opening /todos); the host stays the composer's alone. *)
@@ -255,9 +306,19 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
-    (Sessions (Ctrl+B)) (New session)
+    (Sessions (Ctrl+B))
+    (New session) (feature/a-rather-long-branch-for-the-sidebar-card)
     (plan 1/2: Final nix GC)
-    (5%) ↑1.6M ↓21k $1.30 Ready
+    (on)
+    (auto)
+    Ready (5%)
+    Context 10k / 200k · 5%
+    Tokens 1.6M in · 21k out · 0 cached
+    Cost $1.3021
+    Model Claude Opus 5.5
+    Branch feature/a-rather-long-branch-for-the-sidebar-card
+    Click for the session’s details · /compact frees context
+    $1.30
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     (Run /todos)

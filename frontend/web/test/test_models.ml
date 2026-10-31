@@ -9,8 +9,6 @@ let%expect_test
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.act h (Run "/model");
@@ -172,8 +170,6 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (DeepSeek Chat)
-    (No thinking)
-    (Auto: never asks)
     (backend)
     |}];
   H.type_ h "/thinking high";
@@ -221,9 +217,14 @@ let%expect_test
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    Ready $0.00
-    (0%)
-    (main)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     |}];
   H.act
     h
@@ -248,19 +249,23 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    Working $1.23
+    Working (75%)
+    Context 150k / 200k · 75%
+    Tokens 123k in · 7.9k out · 100k cached
+    Cost $1.2345
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $1.23
     (3 queued)
-    (75%)
-    (main)
-    (3 queued)
-    (main)
     |}];
   H.show h ~selector:".context";
   [%expect
     {|
     <button type="button"
-            title="123k tokens in, 7.9k out, 100k cache read; 75% of a 200k context (/compact frees some). Click for the session's details (/session)"
-            aria-label="Context 75% full"
+            aria-label="Context 75% full: the session's details"
+            aria-describedby="status-details"
+            aria-haspopup="dialog"
             class="context link status-item warm"
             @on_click>
       <span class="meter">
@@ -268,6 +273,10 @@ let%expect_test
       </span>
       <span class="percent"> 75% </span>
     </button>
+    <div class="context status-detail warm">
+      <span class="status-detail-key"> Context </span>
+      <span class="status-detail-value"> 150k / 200k · 75% </span>
+    </div>
     |}];
   (* The queued messages come back into the editor, last first. *)
   H.type_ h "draft";

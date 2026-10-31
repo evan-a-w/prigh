@@ -58,17 +58,31 @@ let%expect_test
   H.text h ~selector:".status-extras .resume";
   [%expect
     {|
-    Ready $0.00
-    (0%)
-    (main)
-    Ready ($4.20/$5.00)
-    (0%)
-    (main)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $4.2000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    ($4.20/$5.00)
     <button class="budget cost link status-item warm">
-    Ready ($5.50/$5.00)
-    (Goal 3/20) (Resumes 14:05)
-    (0%)
-    (main)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $5.5000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    ($5.50/$5.00)
     (Goal 3/20) (Resumes 14:05)
     <button class="budget cost hot link status-item">
     <button class="goal link status-item warm">

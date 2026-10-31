@@ -17,19 +17,21 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking on"
             aria-haspopup="dialog"
             aria-expanded="false"
             class="btn chip-button thinking-chip"
             @on_click>
-      <icon class="brain"> </icon>
-      <span class="chip-key"> Thinking </span>
+      <span aria-hidden="true" class="thinking-meter">
+        <span class="bar on"> </span>
+        <span class="bar on"> </span>
+        <span class="bar"> </span>
+        <span class="bar"> </span>
+      </span>
       <span class="chip-label"> on </span>
-      <icon class="chevron"> </icon>
     </button>
     |}];
   (* Its menu: the levels, the current one checked, the keyboard's on the
@@ -79,15 +81,19 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     </div>
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking on"
             aria-haspopup="dialog"
             aria-expanded="true"
             aria-controls="chip-popover"
             class="btn chip-button thinking-chip"
             @on_click>
-      <icon class="brain"> </icon>
-      <span class="chip-key"> Thinking </span>
+      <span aria-hidden="true" class="thinking-meter">
+        <span class="bar on"> </span>
+        <span class="bar on"> </span>
+        <span class="bar"> </span>
+        <span class="bar"> </span>
+      </span>
       <span class="chip-label"> on </span>
-      <icon class="chevron"> </icon>
     </button>
     |}];
   (* Esc closes it without a change. *)
@@ -98,8 +104,6 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     Close_dialog
     (Focus editor)
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   (* Alt+T: the next level shows at once, waiting on the backend. *)
@@ -112,13 +116,11 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     (Claude Opus 5.5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     <button class="awaiting btn chip-button thinking-chip">
     |}];
   H.text h ~selector:".thinking-chip .chip-label";
-  [%expect {| Thinking high |}];
+  [%expect {| high |}];
   H.reply h "set_thinking" "{}";
   H.event
     h
@@ -129,8 +131,6 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     |}]
 ;;
@@ -157,8 +157,6 @@ let%expect_test "a model without thinking says so, and the chip tells why" =
   [%expect
     {|
     (DeepSeek Chat)
-    (No thinking)
-    (Auto: never asks)
     (backend)
     |}];
   H.click h ~selector:".thinking-chip";
@@ -190,13 +188,13 @@ let%expect_test "every approval mode, as the chip names it" =
       H.elements h ~selector:".mode-chip");
   [%expect
     {|
-    (Asks: edits & commands)
+    (ask)
     <button class="btn chip-button mode-chip">
-    (Asks: commands)
+    (auto-edit)
     <button class="btn chip-button mode-chip">
-    (Auto: never asks)
-    <button class="btn chip-button mode-chip">
-    (Plan mode)
+    (auto)
+    <button class="btn chip-button mode-chip never-asks">
+    (plan)
     <button class="btn chip-button mode-chip plan-mode">
     |}]
 ;;
@@ -235,99 +233,18 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
-    <section class="session-card">
     <div class="sidebar-footer">
-    <Vdom.Node.none-widget class="">
+    <header class="docked session-bar">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
     <footer class="composer">
-    <div class="chat-tools">
-      <div class="panel-toggles">
-        <button type="button"
-                title="Filter the transcript (/filter)"
-                aria-label="Filter the transcript"
-                id="filter-toggle"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                class="btn filter-toggle ghost icon"
-                @on_click>
-          <icon class="filter"> </icon>
-        </button>
-        <button type="button"
-                title="Files (Ctrl+Shift+F)"
-                aria-label="Files"
-                aria-expanded="false"
-                class="btn files-toggle ghost icon"
-                @on_click>
-          <icon class="folder"> </icon>
-        </button>
-        <button type="button"
-                title="Terminal (Ctrl+`)"
-                aria-label="Terminal"
-                aria-expanded="false"
-                class="btn ghost icon terminal-toggle"
-                @on_click>
-          <icon class="terminal"> </icon>
-        </button>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
-    </div>
     |}];
   H.show h ~selector:".session-card";
-  [%expect
-    {|
-    <section aria-label="This session" class="session-card">
-      <div class="card-status status">
-        <div class="card-head">
-          <span role="status" aria-atomic="true" class="activity idle status-item">
-            <span class="idle-dot"> </span>
-            <span class="label"> Ready </span>
-          </span>
-          <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
-        </div>
-        <div class="status-extras">
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-        <button type="button"
-                title="0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)"
-                aria-label="Context 0% full"
-                class="context link status-item"
-                @on_click>
-          <span class="meter">
-            <span class="meter-fill" style={ width: 0.00%; }> </span>
-          </span>
-          <span class="percent"> 0% </span>
-        </button>
-        <div class="card-where">
-          <button type="button"
-                  title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
-                  aria-haspopup="dialog"
-                  class="branch"
-                  @on_click>
-            <icon class="branch"> </icon>
-            <span class="branch-name"> feature/narrow-top-bar </span>
-          </button>
-        </div>
-      </div>
-    </section>
-    |}];
+  [%expect {| |}];
   H.text h ~selector:".session-card";
-  [%expect
-    {|
-    Ready $0.00
-    (0%)
-    (feature/narrow-top-bar)
-    |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test
@@ -521,8 +438,6 @@ let%expect_test "with one host the chip still names it, and says how to add one"
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (container)
     (Open_chip Host)
     (Focus popover-filter)
@@ -568,7 +483,7 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     |}];
   (* The card and the bar no longer name it: the chip does. *)
   H.key h "Escape" ~target:Field;
-  H.elements h ~selector:".session-card .host";
+  H.elements h ~selector:".composer .host-chip";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.elements h ~selector:".session-bar .host";
   H.text h ~selector:".session-bar";
@@ -576,8 +491,19 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     {|
     Close_dialog
     (Focus editor)
-    (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.00 Ready
+    <button class="btn chip-button host-chip">
+    (Sessions (Ctrl+B))
+    (New session) (main)
+    (on)
+    (auto)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
@@ -617,10 +543,20 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
               @on_click>
         <icon class="menu"> </icon>
       </button>
-      <button type="button" title="Rename (/name)" class="session-name" @on_click>
-        <span dir="auto"> New session </span>
-        <icon class="pencil"> </icon>
-      </button>
+      <div class="session-title">
+        <button type="button" title="Rename (/name)" class="session-name" @on_click>
+          <span dir="auto"> New session </span>
+          <icon class="pencil"> </icon>
+        </button>
+        <button type="button"
+                title="On branch main, in /home/ada/projects/prigh/tui: pull requests (/pr)"
+                aria-haspopup="dialog"
+                class="branch"
+                @on_click>
+          <icon class="branch"> </icon>
+          <span class="branch-name"> main </span>
+        </button>
+      </div>
       <div class="status-extras">
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -632,23 +568,81 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
+      <div role="group" aria-label="Thinking and mode" class="session-chips">
+        <div class="chip-anchor thinking">
+          <button type="button"
+                  title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+                  aria-label="Thinking on"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  class="btn chip-button thinking-chip"
+                  @on_click>
+            <span aria-hidden="true" class="thinking-meter">
+              <span class="bar on"> </span>
+              <span class="bar on"> </span>
+              <span class="bar"> </span>
+              <span class="bar"> </span>
+            </span>
+            <span class="chip-label"> on </span>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+        <div class="chip-anchor mode">
+          <button type="button"
+                  title="Tools run without asking (Alt+M cycles, /mode picks)"
+                  aria-label="Auto: never asks"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  class="btn chip-button mode-chip never-asks"
+                  @on_click>
+            <icon class="shield"> </icon>
+            <span class="chip-label"> auto </span>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+      </div>
       <div class="status">
-        <button type="button"
-                title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
-                aria-label="Context 0% full"
-                class="context link status-item"
-                @on_click>
-          <span class="meter">
-            <span class="meter-fill" style={ width: 0.00%; }> </span>
-          </span>
-          <span class="percent"> 0% </span>
-        </button>
-        <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
-        <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
         <span role="status" aria-atomic="true" class="activity idle status-item">
           <span class="idle-dot"> </span>
           <span class="label"> Ready </span>
         </span>
+        <span class="status-gauge">
+          <button type="button"
+                  aria-label="Context 0% full: the session's details"
+                  aria-describedby="status-details"
+                  aria-haspopup="dialog"
+                  class=" context link status-item"
+                  @on_click>
+            <span class="meter">
+              <span class="meter-fill" style={ width: 0.00%; }> </span>
+            </span>
+            <span class="percent"> 0% </span>
+          </button>
+          <div role="tooltip" id="status-details" class="status-details">
+            <div class="context status-detail">
+              <span class="status-detail-key"> Context </span>
+              <span class="status-detail-value"> 0 / 200k · 0% </span>
+            </div>
+            <div class="status-detail">
+              <span class="status-detail-key"> Tokens </span>
+              <span class="status-detail-value"> 0 in · 0 out · 0 cached </span>
+            </div>
+            <div class="status-detail">
+              <span class="status-detail-key"> Cost </span>
+              <span class="status-detail-value"> $0.0000 </span>
+            </div>
+            <div class="status-detail">
+              <span class="status-detail-key"> Model </span>
+              <span class="status-detail-value"> Claude Opus 5.5 </span>
+            </div>
+            <div class="branch-line status-detail">
+              <span class="status-detail-key"> Branch </span>
+              <span class="status-detail-value"> main </span>
+            </div>
+            <div class="status-detail-hint"> Click for the session’s details · /compact frees context </div>
+          </div>
+        </span>
+        <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
       </div>
       <div class="panel-toggles">
         <button type="button"
@@ -692,8 +686,18 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   H.text h ~selector:".session-bar";
   [%expect
     {|
-    (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.00 Ready
+    (Sessions (Ctrl+B))
+    (New session) (main)
+    (on)
+    (auto)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -704,7 +708,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   [%expect
     {|
     Toggle_sidebar
-    <section class="session-card">
+    <header class="docked session-bar">
     |}];
   (* A phone: the sidebar is a drawer, the bar stays (under the drawer). *)
   H.quiet h (fun () -> H.act h (Set_narrow true));
@@ -742,8 +746,6 @@ let%expect_test
     <div class="composer-controls">
     <div class="composer-buttons">
     <button class="btn chip-button model-chip">
-    <button class="btn chip-button thinking-chip">
-    <button class="btn chip-button mode-chip">
     <button class="btn chip-button host-chip">
     <button class="attach btn ghost icon">
     <button class="btn primary send">
@@ -860,8 +862,6 @@ let%expect_test
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.click h ~selector:".mode-chip";
@@ -880,8 +880,6 @@ let%expect_test
     Close_dialog
     (Focus editor)
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   (* Clicking a choice takes it. *)
@@ -897,8 +895,6 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     (Claude Sonnet 5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     |}]
 ;;
@@ -1139,13 +1135,18 @@ let%expect_test "the status in the card: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".session-card .card-status" in
+  let status () = H.text h ~selector:".session-bar .status" in
   status ();
   [%expect
     {|
-    Ready $0.42
-    (65%)
-    (main)
+    Ready (65%)
+    Context 130k / 200k · 65%
+    Tokens 120k in · 9.0k out · 0 cached
+    Cost $0.4200
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.42
     |}];
   H.event
     h
@@ -1165,28 +1166,30 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".session-card .card-status .status-item";
+  H.elements h ~selector:".session-bar .status .status-item";
   (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".session-card .card-head > .activity";
+  H.show h ~selector:".session-bar .status > .activity";
   [%expect
     {|
-    Working $0.00
-    (Goal 2/20) (1 queued)
-    (90%)
-    (main)
+    Working (90%)
+    Context 180k / 200k · 90%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     <span class="activity running status-item">
-    <span class="cost status-item">
-    <button class="goal link status-item warm">
-    <button class="link queued status-item">
     <button class="context hot link status-item">
+    <span class="cost status-item">
     <span title="Working" role="status" aria-atomic="true" class="activity running status-item">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="label"> Working </span>
     </span>
     |}];
   (* The context opens the session's details, with the counters. *)
-  H.click h ~selector:".session-card .context";
+  H.click h ~selector:".session-bar .status .context";
   [%expect
     {|
     (Run /session)
@@ -1201,7 +1204,6 @@ let%expect_test "the status in the card: idle, running, and what applies" =
   H.text h ~selector:".session-bar";
   [%expect
     {|
-    Connecting…
     (Sessions (Ctrl+B))
     Connecting…
     (Settings (Ctrl+, or /settings))
@@ -1221,14 +1223,13 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
     <div class="app narrow">
     <button type="button"
             title="Tools run without asking (Alt+M cycles, /mode picks)"
-            data-short="auto"
+            aria-label="Auto: never asks"
             aria-haspopup="dialog"
             aria-expanded="false"
-            class="btn chip-button mode-chip"
+            class="btn chip-button mode-chip never-asks"
             @on_click>
       <icon class="shield"> </icon>
-      <span class="chip-label"> Auto: never asks </span>
-      <icon class="chevron"> </icon>
+      <span class="chip-label"> auto </span>
     </button>
     <textarea id="editor"
               placeholder="Ask prigh…  / commands"

@@ -49,13 +49,6 @@ let panel_toggles (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* Over the chat's top right corner, quietly: no bar under them. *)
-let tools (m : App.Model.t) ~inject =
-  match m.state with
-  | None -> Node.none
-  | Some _ -> div ~cls:"chat-tools" [ panel_toggles m ~inject ]
-;;
-
 (* It opens the pull requests ([/pr]). *)
 let branch (state : State.t) ~inject =
   match state.git_branch with
@@ -76,54 +69,42 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
-(* What the agent is doing, with the cost across from it; whatever applies,
-   when anything does; the context's meter across the card; the branch.
-   Where tools run is the composer's, and the plan is the bar's and
-   [/todos]': the card has no room to say them calmly. *)
-let card (m : App.Model.t) ~inject =
-  Node.section
-    ~attrs:
-      [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
-    [ div
-        ~cls:"card-status status"
-        ([ div
-             ~cls:"card-head"
-             [ Status_view.activity m; Status_view.cost m ~inject ]
-         ; Status_view.extras m ~plan:false ~inject
-         ; Status_view.meter m ~inject
-         ]
-         @
-         match m.state with
-         | Some ({ git_branch = Some _; _ } as state) ->
-           [ div ~cls:"card-where" [ branch state ~inject ] ]
-         | Some { git_branch = None; _ } | None -> [])
-    ]
-;;
-
+(* The chat's header, docked or not: the title (with the branch beside it
+   where there is room), then what applies and the status at the right, then
+   the panels' toggles. The sidebar's toggle and the settings only when the
+   sidebar, which has its own, is not docked. *)
 let bar (m : App.Model.t) ~inject =
+  let docked = App.Model.docked m in
   let toggle =
-    button
-      ~cls:"icon ghost toggle-sidebar"
-      ~title:"Sessions (Ctrl+B)"
-      ~label:"Sessions"
-      ~on_click:(inject Action.Toggle_sidebar)
-      [ icon Menu ]
+    if docked
+    then Node.none
+    else
+      button
+        ~cls:"icon ghost toggle-sidebar"
+        ~title:"Sessions (Ctrl+B)"
+        ~label:"Sessions"
+        ~on_click:(inject Action.Toggle_sidebar)
+        [ icon Menu ]
   in
+  let settings = if docked then Node.none else Sidebar_view.settings ~inject in
   Node.header
-    ~attrs:[ Attr.class_ "session-bar" ]
+    ~attrs:[ classes [ "session-bar" ] [ "docked", docked ] ]
     (match m.state with
      | None ->
        [ toggle
        ; Status_view.extras m ~plan:true ~inject
        ; Status_view.view m ~inject
-       ; Sidebar_view.settings ~inject
+       ; settings
        ]
      | Some state ->
        [ toggle
-       ; rename m state ~inject
+       ; div
+           ~cls:"session-title"
+           [ rename m state ~inject; branch state ~inject ]
        ; Status_view.extras m ~plan:true ~inject
+       ; Session_chips_view.view m ~inject
        ; Status_view.view m ~inject
        ; panel_toggles m ~inject
-       ; Sidebar_view.settings ~inject
+       ; settings
        ])
 ;;

@@ -52,7 +52,6 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Reconnecting…
-    (main)
     <footer class="composer offline">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
@@ -159,8 +158,6 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   [%expect
     {|
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.elements h ~selector:".chip-button.awaiting";
@@ -174,10 +171,8 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   [%expect
     {|
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
-    (Thinking max)
+    (max)
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     No such level (Dismiss)
     |}]

@@ -551,7 +551,7 @@ let user_footer (m : App.Model.t) ~inject =
       ]
 ;;
 
-let view (m : App.Model.t) ~inject ~session:card =
+let view (m : App.Model.t) ~inject =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
   let sessions = Session_list.filter m.sessions ~query:m.session_query in
   Node.aside
@@ -639,7 +639,6 @@ let view (m : App.Model.t) ~inject ~session:card =
                   else [ delete_archived ~inject archived ]
                 else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
-    ; card
     ; user_footer m ~inject
     ]
 ;;

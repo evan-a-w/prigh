@@ -70,6 +70,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     {|
     (Focus dialog)
     <aside class="sidebar">
+    <header class="docked session-bar">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -90,6 +91,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="sidebar">
+    <header class="docked session-bar">
     <div class="chat-frame">
     <footer class="composer">
     <aside class="agents-panel">
@@ -200,7 +202,7 @@ let%expect_test "help lists every key and command" =
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -465,7 +467,8 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     Forgejo codeberg.org
     Not signed in.
     (Use a token) (Connect)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    Another Forgejo host
+    A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
     |}];
   H.act h (Logout "anthropic");

@@ -170,7 +170,7 @@ let reveal_selected () =
 ;;
 
 (* A chip's menu opens upward from its chip, standing clear of the composer's
-   box (raised by [--popover-lift]); below the chip only when there is not
+   box (a header chip's: downward, below the header) (raised by [--popover-lift]); below the chip only when there is not
    room enough above and more below. The height it may take goes to style.css
    as [--popover-room]. *)
 let place_popover () =
@@ -185,7 +185,7 @@ let place_popover () =
               (Js.Unsafe.meth_call
                  anchor
                  "closest"
-                 [| Js.Unsafe.inject (Js.string ".composer-box") |]
+                 [| Js.Unsafe.inject (Js.string ".composer-box, .session-bar") |]
                : Dom_html.element Js.t Js.opt)
           with
           | Some box -> box##getBoundingClientRect
@@ -213,7 +213,7 @@ let place_popover () =
           (Js.string (if down then "below" else "above"));
         set "--popover-lift" lift;
         set "--popover-room" (if down then below else above);
-        (* Within the composer's box: a chip far right opens leftward. *)
+        (* Within the composer's box (the header's): a chip far right opens leftward. *)
         set "--popover-shift" 0.;
         let menu = el##getBoundingClientRect in
         let right =
