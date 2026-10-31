@@ -1368,6 +1368,8 @@ try {
   await page.waitForFunction(() => !document.querySelector(".toast"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  // The panels' toggles are in the header's tray, behind the glance.
+  await page.locator(".bar-tray-toggle").click();
   await page.locator(".files-toggle").click();
   await row("todo.md").waitFor();
   await page.waitForTimeout(400); // the sheet's slide

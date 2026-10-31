@@ -12,9 +12,6 @@ prigh
 web
 New session
 No sessions yet: send a message to start one.
-Ready
-$<COST>
-0%
 T
 token
 === chromium: signed in: chat ===
@@ -26,9 +23,12 @@ What are we building?
 Ctrl+L switch model
 Ctrl+K find a session
 === chromium: signed in: the session's card ===
+New session
+on
+auto
 Ready
-$<COST>
 0%
+$<COST>
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -111,13 +111,16 @@ three
 three lines
 <TIME>
 === chromium: the session's card after a run ===
+count some lines
+on
+auto
 Ready
-$<COST>
 0%
+$<COST>
 === chromium: a budget in the status line ===
 Ready
-$<COST>/$<COST>
 0%
+$<COST>/$<COST>
 === chromium: long output, folded ===
 bash
 seq 1 30
@@ -160,15 +163,15 @@ data:image/png;base64, 12x30
 save enabled: false
 === chromium: drawn on, in the composer ===
 data:image/png;base64, 20x10
-data:image/png;base64, 96x240
+data:image/png;base64, 12x30
 composer cleared: true
 === chromium: the prompt's images ===
 data:image/png;base64, 20x10
-data:image/png;base64, 96x240
+data:image/png;base64, 12x30
 === chromium: the backend's copy of the prompt ===
 what are these?
 image/png 20x10
-image/png 96x240
+image/png 12x30
 url has the session: true
 same session after reload: true
 === chromium: sidebar after reload ===
@@ -180,9 +183,6 @@ Select
 count some lines
 <AGE>
 <CWD>
-Ready
-$<COST>
-0%
 T
 token
 === chromium: new session ===
@@ -210,9 +210,6 @@ hello again
 count some lines
 <AGE>
 <CWD>
-Ready
-$<COST>
-0%
 T
 token
 === chromium: switching ===
@@ -390,9 +387,25 @@ uploaded to the tool host; the agent gets their paths
 Images…
 shown to the model; draw on it before sending
 Enter chooses, Esc closes
-attach's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 closed: true; focus: editor
-model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
+answer straight away
+Low
+a little
+On
+the provider's default budget
+High
+more
+Max
+as much as the model allows
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: the model chip's menu, filtered ===
 DeepSeek V4.1 Flash
 DeepSeek, not logged in
@@ -403,10 +416,10 @@ DeepSeek, not logged in
 <CWD>/sub
 The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
 Enter chooses, ← → the next setting, Esc closes
-host's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+host's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: mode ask ===
-DeepSeek V4.1 Flash
-<HOSTNAME>
+high
+ask
 === chromium: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -447,13 +460,14 @@ A: SQLite
 SQLite it is.
 <TIME>
 === chromium: plan mode (Alt+M) ===
-DeepSeek V4.1 Flash
-<HOSTNAME>
+high
+plan
 === chromium: plan mode: the status line ===
+high
+plan
 Ready
-$<COST>
 0%
-main
+$<COST>
 === chromium: plan mode: the composer's placeholder ===
 Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
 === chromium: the plan, in plan mode ===
@@ -470,13 +484,15 @@ Write the schema
 Test it
 <TIME>
 === chromium: plan mode off ===
-DeepSeek V4.1 Flash
-<HOSTNAME>
+high
+auto
 === chromium: plan mode off: the status line ===
+plan 0/2: Write the schema
+high
+auto
 Ready
-$<COST>
 0%
-main
+$<COST>
 === chromium: implementing ===
 ◇
 Plan mode off: the model was told it can change files
@@ -513,7 +529,7 @@ Done waiting.
 model: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
-attach's menu: above the composer, as wide as the composer, inside the window; focus in it: true
+attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -712,42 +728,42 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: settings ===
 Settings
 Appearance
-Behaviour
+Sessions
 Models
 Git hosting
 T
 token
 Appearance
-How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+LOOK
 Theme
-Follows you to every browser you sign in on.
+The page's colours.
 Original
 Dark
 Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+LAYOUT
 Tabs
-Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+The open sessions as tabs over the chat (not on a phone).
 Transcript detail
-How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
 Quiet
 Normal
 Verbose
@@ -758,7 +774,7 @@ model: under .modal-backdrop
 host: under .modal-backdrop
 a choice keeps it open: true
 === chromium: settings: the sections ===
-clicked Behaviour: tab Behaviour, focus Behaviour, showing Behaviour (labelled by settings-tab-behaviour)
+clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
 ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
@@ -766,17 +782,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
+chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
-.composer: div.composer-box overlaps div.composer-tier.composer-controls
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
+.composer: fits
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -819,7 +835,7 @@ Back to alice
 I am bob
 === chromium: accounts: bob's settings ===
 Appearance
-Behaviour
+Sessions
 Models
 Git hosting
 B
@@ -1037,7 +1053,7 @@ frames empty but still tall: 0
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
-=== chromium: stability: a turn starts and ends on a phone: the status in the bar ===
+=== chromium: stability: a turn starts and ends on a phone: the status in the tray ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
@@ -1048,20 +1064,23 @@ none
 === chromium: themes: settings ===
 Appearance
 
-How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
 
+LOOK
 Theme
-Follows you to every browser you sign in on.
+The page's colours.
 Original
 Dark
 Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+LAYOUT
 Tabs
-Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+The open sessions as tabs over the chat (not on a phone).
 Transcript detail
-How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
 Quiet
 Normal
 Verbose
@@ -1925,7 +1944,7 @@ files beside: true
 agents beside: true
 === chromium: review: focus: the review closed ===
 sidebar: shown
-session bar over the chat: false
+session bar over the chat: true
 terminal from the chat's left to the chat's right: true
 terminal under them: true
 files beside: true
@@ -2289,38 +2308,24 @@ markdown fits: true; page fits: true; scrolling display math: 1, auto
 === chromium: math: errors ===
 none
 === chromium: card: idle ===
-row 1: Ready | $<COST>
-row 2: [meter] 0%
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 100px high
+row 1: New session | feature/a-rather-long-branch-for-the-sidebar-card | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: nothing; 44px high
 fits
 === chromium: card: working, a subagent running ===
-row 1: Running tools | $<COST>
-row 2: 1 agent running
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent running | Running tools | [meter] 0% | $<COST>
+lamps: 2; accented: 1 agent running, Running tools; 44px high
 fits
 === chromium: card: ready, a subagent running ===
-row 1: Ready | $<COST>
-row 2: 1 agent running
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: 1 agent running; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent running | Ready | [meter] 0% | $<COST>
+lamps: 1; accented: 1 agent running; 44px high
 fits
 === chromium: card: idle, a mode on ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
 === chromium: card: the sidebar at its narrowest ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
 === chromium: card: the composer's chips ===
 chips 1: DeepSeek V4.1 Flash | <HOSTNAME>
@@ -2329,22 +2334,19 @@ chip problems: none
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === chromium: card: on a host with a long name ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
 chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
 === chromium: card: the context opens the session's details ===
 Session
 === chromium: card: the sidebar closed ===
-row 1: survey the project | 1 agent | verbose | [meter] 0% | ↑0 ↓0 | $<COST> | Ready
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
 lamps: 0; accented: verbose; 44px high
 fits
 === chromium: card: a phone ===
-row 1: survey the project | icon | 0% | icon
+row 1: survey the project
 lamps: 0; accented: nothing; 44px high
 fits
 chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
@@ -2414,9 +2416,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "200k" (placeholder 200k); Off pressed: false; mask: true
@@ -2429,9 +2428,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "150k" (placeholder 200k); Off pressed: false; mask: false
@@ -2445,9 +2441,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "150k" (placeholder 200k); Off pressed: false; mask: false
@@ -2460,9 +2453,6 @@ Also summarise once the context passes this many tokens (default 200k), not only
 Off: only at 80% of the window. Type a number to set one.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "" (placeholder 150k); Off pressed: true; mask: false
