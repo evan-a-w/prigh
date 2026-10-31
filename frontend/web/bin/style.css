@@ -858,17 +858,21 @@ kbd {
   flex-direction: column;
   gap: 6px;
 }
-/* One instrument: what you write on top, and along its bottom edge what it
-   goes to (model, thinking, mode) and what to do with it (attach, stop,
-   send). */
+/* Two tiers. The box is what you write and what to do with it: + to add
+   to it on the left, the microphone and send on the right. Under it, a
+   narrower recessed strip says where the message goes (model, host): it
+   reads as a ledge the box sits on, quieter than the box itself. */
+.composer-stack { position: relative; display: flex; flex-direction: column; }
 .composer-box {
+  position: relative;
   background: var(--slate);
   border: 1px solid var(--rule-2);
   border-radius: var(--r-surface);
-  padding: 6px;
+  padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  box-shadow: 0 6px 18px -10px var(--edge-shadow);
   transition: border-color 0.12s;
 }
 .composer-box:focus-within { border-color: var(--sodium); }
@@ -879,22 +883,92 @@ kbd {
   background: transparent;
   font-size: 15px;
   line-height: 1.5;
-  padding: 6px 8px 4px;
-  min-height: 34px;
+  padding: 6px 6px 4px;
+  min-height: 48px;
   max-height: 40vh;
   overflow-y: auto;
 }
-.composer-bar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.composer-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.composer-plus { position: relative; display: flex; flex-shrink: 0; }
+.composer-plus.menu-open { z-index: var(--z-menu-anchor); }
+.round.btn { width: 34px; height: 34px; padding: 0; border-radius: 50%; flex-shrink: 0; transition: background-color 0.12s, color 0.12s; }
+.round.btn .icon { width: 18px; height: 18px; }
+.btn.ghost.round { color: var(--muted); }
+@media (hover: hover) {
+  .btn.ghost.round:not(:disabled):hover { background: var(--slate-2); color: var(--chalk); }
+}
+.chip-anchor.open > .btn.plus { background: var(--slate-2); color: var(--chalk); }
+.chip-anchor.open > .btn.plus .icon { transform: rotate(45deg); }
+.btn.plus .icon { transition: transform 0.15s ease-out; }
+.composer-buttons { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+/* Send is the one bold thing: a sodium disc, unlit until there is
+   something to send. Running with nothing typed, the disc stops. */
+.composer-buttons .send .icon { color: var(--sodium-ink); width: 17px; height: 17px; stroke-width: 2.5; }
+.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--slate-2); opacity: 1; }
+.composer-buttons .send:disabled .icon { color: var(--faint); }
+.composer-buttons .stop .icon { width: 12px; height: 12px; }
+.composer-buttons .stop.ghost { background: var(--brick-wash); color: var(--brick); }
+.composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
+/* Listening: the microphone is lit brick, and pulses with the voice. */
+.btn.mic.on { background: var(--brick); border-color: var(--brick); color: var(--sodium-ink); }
+.btn.mic.on .icon { color: #fff; }
+.btn.mic:disabled { opacity: 0.6; }
+.dictation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px 0 12px;
+  border-radius: 15px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12.5px;
+  animation: popover-rise 0.12s ease-out;
+}
+.dictation-dot {
+  --level: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brick);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--brick-line);
+  transition: box-shadow 0.1s linear;
+}
+.dictation-time { font-variant-numeric: tabular-nums; color: var(--chalk); }
+.dictation-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dictation .lamp { flex-shrink: 0; }
+.dictation-cancel.btn { width: 24px; height: 24px; padding: 0; border-radius: 50%; color: var(--faint); }
+.dictation-cancel .icon { width: 12px; height: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .dictation-dot { transition: none; box-shadow: none; }
+  .btn.plus .icon { transition: none; }
+}
+
+/* The lower tier: a ledge under the box, inset from its sides. */
+.composer-tier {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin: -1px 14px 0;
+  padding: 4px 6px 3px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-top: 0;
+  border-radius: 0 0 var(--r-surface) var(--r-surface);
+}
 .composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
-/* Settings of the message, written in the box's own voice: plain words
-   that line up with the text above them, until pointed at. Their chevrons
+/* Settings of the message, quiet words until pointed at. Their chevrons
    (and a hover's wash) say they open something; the pickers are the
    commands' own. */
 .chip-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 28px;
+  gap: 5px;
+  height: 26px;
   min-width: 0;
   flex-shrink: 0;
   border-radius: var(--r-control);
@@ -913,10 +987,10 @@ kbd {
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
 .composer-controls .chip-button > .icon:first-child { display: none; }
-.chip-button .chevron { width: 11px; height: 11px; opacity: 0; transition: opacity 0.12s; }
+.chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
-.composer-box:focus-within .chip-button:not(:hover, :focus-visible) { color: var(--muted); }
 .model-chip { color: var(--muted); }
+.composer-tier .model-chip { color: var(--chalk); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
@@ -925,7 +999,7 @@ kbd {
 .composer-controls .host-chip > .icon:first-child { display: inline-block; }
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
-.composer-controls .host-chip.warm, .composer-box:focus-within .host-chip.warm:not(:hover) { color: var(--sodium); }
+.composer-controls .host-chip.warm { color: var(--sodium); }
 /* A disconnected host keeps its name; its server is struck through in
    brick and "offline" follows, which the name gives way to first. */
 .host-chip.offline > .icon:first-child { color: var(--brick); }
@@ -934,21 +1008,17 @@ kbd {
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Send is the one bold thing: a sodium disc, unlit until there is
-   something to send. */
-.composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.composer-buttons .btn { width: 32px; height: 32px; padding: 0; border-radius: 50%; transition: none; }
-.composer-buttons .send .icon { color: var(--sodium-ink); width: 17px; height: 17px; stroke-width: 2.5; }
-.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--slate-2); opacity: 1; }
-.composer-buttons .send:disabled .icon { color: var(--faint); }
-.composer-buttons .stop { background: var(--brick-wash); }
-.composer-buttons .stop .icon { width: 12px; height: 12px; }
 
-.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 2px 0; }
+/* Images going with the message: each opens full size, where it can be
+   drawn on. */
+.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 2px 2px; }
 .pending-image { position: relative; }
-.pending-image img { display: block; height: 64px; max-width: 120px; object-fit: contain; background: var(--well); border-radius: var(--r-control); border: 1px solid var(--rule); }
+.pending-thumb { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: var(--r-control); }
+.pending-thumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.pending-image img.thumb { display: block; height: 64px; max-width: 120px; object-fit: contain; background: var(--well); border-radius: var(--r-control); border: 1px solid var(--rule); }
 .remove-image {
   position: absolute;
+  z-index: 1;
   top: -6px;
   right: -6px;
   width: 20px;
@@ -960,6 +1030,7 @@ kbd {
 }
 .remove-image:hover { color: var(--brick); }
 .remove-image .icon { width: 11px; height: 11px; }
+.attach-icon { --mark-size: 15px; color: var(--muted); }
 
 .popup {
   position: absolute;
@@ -1970,8 +2041,8 @@ kbd {
 /* A phone: the menu is as wide as the composer's box, over it, the page
    behind dimmed. */
 @media (max-width: 760px) {
-  .composer-box { position: relative; }
-  .composer-controls, .chip-anchor { position: static; }
+  .composer-stack { position: relative; }
+  .composer-controls, .composer-plus, .composer-stack .chip-anchor { position: static; }
   .chip-popover { z-index: var(--z-menu-surface); bottom: calc(100% + 8px); }
   .chip-popover,
   .chip-popover[data-chip] {
@@ -2012,3 +2083,58 @@ kbd {
 .compact-at-field:focus-within { outline: 2px solid var(--sodium); outline-offset: 0; }
 .compact-at-field:has(.compact-at-input[aria-invalid="true"]) { box-shadow: inset 0 0 0 1px var(--brick); }
 .summary-model-choice { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Drawing on an image: the image as large as the dialog lets it be, the
+   canvas exactly over it, and above them the pen (colours, then widths, as
+   dots of that colour) with undo and clear. */
+.modal.annotate-dialog { width: min(1100px, calc(100vw - 32px)); max-width: none; height: min(860px, calc(100dvh - 32px)); max-height: none; }
+.annotate-dialog .modal-body { display: flex; flex-direction: column; gap: 10px; overflow: hidden; scrollbar-gutter: auto; flex: 1; }
+.annotate-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.annotate-swatches, .annotate-sizes { display: flex; align-items: center; gap: 6px; }
+.annotate-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px #0000003d;
+  cursor: pointer;
+}
+.annotate-swatch.on { border-color: var(--chalk); box-shadow: 0 0 0 2px var(--slate), inset 0 0 0 1px #0000003d; }
+.annotate-size {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+.annotate-size:hover { background: var(--slate-2); }
+.annotate-size.on { background: var(--slate-2); border-color: var(--rule-2); }
+.annotate-dot { width: var(--pen); height: var(--pen); max-width: 18px; max-height: 18px; border-radius: 50%; background: var(--swatch); }
+.annotate-sep { width: 1px; height: 22px; background: var(--rule); }
+.annotate-spacer { flex: 1; }
+.annotate-toolbar .btn.small { gap: 6px; }
+.annotate-toolbar .btn .icon { width: 14px; height: 14px; }
+.annotate-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  background: var(--well) repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  overflow: hidden;
+}
+.annotate-frame { position: relative; display: inline-block; max-width: 100%; max-height: 100%; line-height: 0; }
+.annotate-frame img { display: block; max-width: 100%; max-height: min(680px, calc(100dvh - 230px)); object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.annotate-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.annotate-hint { flex: 1; color: var(--faint); font-size: 12px; }
+@media (max-width: 760px) {
+  .modal.annotate-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
+  .annotate-frame img { max-height: calc(100dvh - 210px); }
+  .annotate-hint { display: none; }
+}

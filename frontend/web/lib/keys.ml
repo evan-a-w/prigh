@@ -338,6 +338,7 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ when t.shift || t.ctrl || t.meta -> None
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send
+  | "Escape", _ when Dictation.active m.dictation -> Some Dictation_cancel
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
   | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
     Some (Set_recipient Main)

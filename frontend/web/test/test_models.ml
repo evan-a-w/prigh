@@ -9,8 +9,6 @@ let%expect_test
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.act h (Run "/model");
@@ -172,8 +170,6 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (DeepSeek Chat)
-    (No thinking)
-    (Auto: never asks)
     (backend)
     |}];
   H.type_ h "/thinking high";
@@ -305,7 +301,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (Attach files (or drop them here)) (Stop (Esc)) (Steer (Enter))
+    (Dictate (speak, then click again to stop)) (Stop (Esc))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

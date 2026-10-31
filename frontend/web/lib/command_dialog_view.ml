@@ -704,6 +704,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Trim_after_confirm { point; busy; error } ->
     Some (trim_after_confirm m point ~busy ~error ~inject)
   | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
+  | Annotate _ -> None
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)

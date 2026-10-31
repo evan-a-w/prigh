@@ -86,6 +86,10 @@ module Icon : sig
     | Scissors
     | Palette
     | Package
+    | Mic
+    | Image
+    | Paperclip
+    | Eraser
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

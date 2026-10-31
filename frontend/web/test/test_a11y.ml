@@ -35,18 +35,17 @@ let%expect_test "the names of the controls" =
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
-    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "backend" -- Tools run on the backend (/host switches)
-    button "Attach files" -- Attach files (or drop them here)
+    button "Add files or images" -- Add files or images (or paste, or drop them here)
+    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "backend" -- Tools run on the backend (/host switches)
     input "Search sessions"
     textarea "Message"
     [status] span "Ready"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
-    [group] div "Model, thinking, mode and host"
+    [group] div "Model and host"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -140,15 +139,15 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     {|
     button "Show all 30 lines"
     [img] span "Done"
+    button "View or draw on [image: image/png, 8 B]" -- View it, or draw on it
     button "Remove image"
-    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "backend" -- Tools run on the backend (/host switches)
-    button "Attach files" -- Attach files (or drop them here)
+    button "Add files or images" -- Add files or images (or paste, or drop them here)
+    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "backend" -- Tools run on the backend (/host switches)
     textarea "Message"
-    [group] div "Model, thinking, mode and host"
+    [group] div "Model and host"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

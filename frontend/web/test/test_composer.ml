@@ -11,11 +11,8 @@ let%expect_test
   [%expect
     {|
     []
-    (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
-    (backend)
-    (Attach files (or drop them here)) (Send (Enter))
+    (Add files or images (or paste, or drop them here))
+    (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect
@@ -24,7 +21,7 @@ let%expect_test
             title="Send (Enter)"
             aria-label="Send"
             disabled=""
-            class="btn primary send"
+            class="btn primary round send"
             @on_click>
       <icon class="send"> </icon>
     </button>
@@ -124,9 +121,13 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
     {|
     <div class="pending-images">
       <div class="pending-image">
-        <img src="data:image/png;base64,iVBORw0KGgo="
-             alt="[image: image/png, 8 B]"
-             title="[image: image/png, 8 B]"/>
+        <button type="button"
+                title="View it, or draw on it"
+                aria-label="View or draw on [image: image/png, 8 B]"
+                class="pending-thumb"
+                @on_click>
+          <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+        </button>
         <button type="button"
                 title="Remove image"
                 aria-label="Remove image"
@@ -136,9 +137,13 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
         </button>
       </div>
       <div class="pending-image">
-        <img src="data:image/jpeg;base64,iVBORw0KGgo="
-             alt="[image: image/jpeg, 8 B]"
-             title="[image: image/jpeg, 8 B]"/>
+        <button type="button"
+                title="View it, or draw on it"
+                aria-label="View or draw on [image: image/jpeg, 8 B]"
+                class="pending-thumb"
+                @on_click>
+          <img src="data:image/jpeg;base64,iVBORw0KGgo=" alt="[image: image/jpeg, 8 B]" class="thumb"/>
+        </button>
         <button type="button"
                 title="Remove image"
                 aria-label="Remove image"
