@@ -743,6 +743,7 @@ let%expect_test
   H.names h ~selector:".composer-tier .chip-button";
   [%expect
     {|
+    <Vdom.Node.none-widget class="">
     <div class="composer-box">
     <div class="composer-controls composer-tier">
     <Vdom.Node.none-widget class="">

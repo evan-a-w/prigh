@@ -127,6 +127,7 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
                 class="pending-thumb"
                 @on_click>
           <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+          <icon class="pencil"> </icon>
         </button>
         <button type="button"
                 title="Remove image"
@@ -143,6 +144,7 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
                 class="pending-thumb"
                 @on_click>
           <img src="data:image/jpeg;base64,iVBORw0KGgo=" alt="[image: image/jpeg, 8 B]" class="thumb"/>
+          <icon class="pencil"> </icon>
         </button>
         <button type="button"
                 title="Remove image"

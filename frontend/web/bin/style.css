@@ -887,32 +887,41 @@ kbd {
 .composer {
   container: composer / inline-size;
   position: relative;
-  padding: 8px 16px 10px;
+  padding: 8px 16px 12px;
   max-width: 892px;
   width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  --composer-inset: 14px; /* one left edge: the text, the +, the chips */
 }
-/* Two tiers. The box is what you write and what to do with it: + to add
-   to it on the left, the microphone and send on the right. Under it, a
-   narrower recessed strip says where the message goes (model, host): it
-   reads as a ledge the box sits on, quieter than the box itself. */
-.composer-stack { position: relative; display: flex; flex-direction: column; }
-.composer-box {
+/* One card, two zones under one outline. Above: what you write and what to
+   do with it (+ on the left; the microphone and send on the right). Below a
+   hairline, recessed: where it goes (model, host). The accent is spent on
+   send alone; focus brightens the edge rather than painting it. */
+.composer-stack {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--slate);
   border: 1px solid var(--rule-2);
   border-radius: var(--r-surface);
-  padding: 6px 8px 8px;
+  box-shadow: 0 8px 24px -14px var(--edge-shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.composer-stack:focus-within {
+  border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2));
+  box-shadow: 0 0 0 3px var(--sodium-wash), 0 8px 24px -14px var(--edge-shadow);
+}
+.composer-box {
+  position: relative;
+  padding: 8px calc(var(--composer-inset) - 6px) 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  box-shadow: 0 6px 18px -10px var(--edge-shadow);
-  transition: border-color 0.12s;
+  gap: 4px;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
 }
-.composer-box:focus-within { border-color: var(--sodium); }
 .editor {
   resize: none;
   border: 0;
@@ -920,16 +929,29 @@ kbd {
   background: transparent;
   font-size: 15px;
   line-height: 1.5;
-  padding: 6px 6px 4px;
+  padding: 6px 6px 2px;
   min-height: 48px;
   max-height: 40vh;
   overflow-y: auto;
+  caret-color: var(--sodium);
 }
-.composer-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.editor::placeholder { color: var(--faint); }
+/* The placeholder is one line, cut rather than wrapped. */
+.editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer-row { display: flex; align-items: center; gap: 8px; min-height: 32px; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }
-.round.btn { width: 34px; height: 34px; padding: 0; border-radius: 50%; flex-shrink: 0; transition: background-color 0.12s, color 0.12s; }
-.round.btn .icon { width: 18px; height: 18px; }
+/* One size of control: 32px circles, 18px icons of one weight. + and the
+   microphone are quiet until pointed at; send is filled. */
+.round.btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.round.btn .icon { width: 18px; height: 18px; stroke-width: 1.9; }
 .btn.ghost.round { color: var(--muted); }
 @media (hover: hover) {
   .btn.ghost.round:not(:disabled):hover { background: var(--slate-2); color: var(--chalk); }
@@ -937,31 +959,34 @@ kbd {
 .chip-anchor.open > .btn.plus { background: var(--slate-2); color: var(--chalk); }
 .chip-anchor.open > .btn.plus .icon { transform: rotate(45deg); }
 .btn.plus .icon { transition: transform 0.15s ease-out; }
-.composer-buttons { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
-/* Send is the one bold thing: a sodium disc, unlit until there is
-   something to send. Running with nothing typed, the disc stops. */
-.composer-buttons .send .icon { color: var(--sodium-ink); width: 17px; height: 17px; stroke-width: 2.5; }
-.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--slate-2); opacity: 1; }
+.composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+/* Send: a sodium disc; with nothing to send, an empty ring. Running with
+   nothing typed, the disc stops. */
+.composer-buttons .send .icon { color: var(--sodium-ink); stroke-width: 2.4; }
+.composer-buttons .send:disabled {
+  background: transparent;
+  border: 1.5px solid var(--rule-2);
+  opacity: 1;
+}
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-buttons .stop .icon { width: 12px; height: 12px; }
-.composer-buttons .stop.ghost { background: var(--brick-wash); color: var(--brick); }
+.composer-buttons .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
 .composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
-/* Listening: the microphone is lit brick, and pulses with the voice. */
-.btn.mic.on { background: var(--brick); border-color: var(--brick); color: var(--sodium-ink); }
-.btn.mic.on .icon { color: #fff; }
+/* Listening: the microphone is a brick disc; the row says how long and how
+   loud, at the buttons' height, on no surface of its own. */
+.btn.mic.on { background: var(--brick); border-color: var(--brick); }
+.btn.mic.on .icon { color: var(--graphite); }
 .btn.mic:disabled { opacity: 0.6; }
 .dictation {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  height: 30px;
-  padding: 0 4px 0 12px;
-  border-radius: 15px;
-  background: var(--well);
-  border: 1px solid var(--rule);
+  flex: 1 1 auto;
+  height: 32px;
+  padding: 0 4px 0 6px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   animation: popover-rise 0.12s ease-out;
 }
 .dictation-dot {
@@ -977,25 +1002,25 @@ kbd {
 .dictation-time { font-variant-numeric: tabular-nums; color: var(--chalk); }
 .dictation-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dictation .lamp { flex-shrink: 0; }
-.dictation-cancel.btn { width: 24px; height: 24px; padding: 0; border-radius: 50%; color: var(--faint); }
+.dictation-cancel.btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--faint); margin-left: auto; }
 .dictation-cancel .icon { width: 12px; height: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .dictation-dot { transition: none; box-shadow: none; }
   .btn.plus .icon { transition: none; }
+  .composer-stack { transition: none; }
 }
 
-/* The lower tier: a ledge under the box, inset from its sides. */
+/* The lower zone: where the message goes, recessed under a hairline, as
+   wide as the card. */
 .composer-tier {
   display: flex;
   align-items: center;
   gap: 2px;
   min-width: 0;
-  margin: -1px 14px 0;
-  padding: 4px 6px 3px;
+  padding: 4px calc(var(--composer-inset) - 8px);
   background: var(--well);
-  border: 1px solid var(--rule);
-  border-top: 0;
-  border-radius: 0 0 var(--r-surface) var(--r-surface);
+  border-top: 1px solid var(--rule);
+  border-radius: 0 0 calc(var(--r-surface) - 1px) calc(var(--r-surface) - 1px);
 }
 .composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
 /* Settings of the message, quiet words until pointed at. Their chevrons
@@ -1004,8 +1029,8 @@ kbd {
 .chip-button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 26px;
+  gap: 6px;
+  height: 28px;
   min-width: 0;
   flex-shrink: 0;
   border-radius: var(--r-control);
@@ -1024,10 +1049,11 @@ kbd {
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
 .composer-controls .chip-button > .icon:first-child { display: none; }
-.chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s; }
+.chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s, transform 0.15s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
 .model-chip { color: var(--muted); }
-.composer-tier .model-chip { color: var(--chalk); }
+.composer-tier .model-chip { color: var(--chalk); font-weight: 500; }
+.composer-tier .host-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
@@ -1042,46 +1068,80 @@ kbd {
 .host-chip.offline > .icon:first-child { color: var(--brick); }
 .host-chip.offline .chip-label { min-width: 3ch; }
 .host-chip .chip-state { flex-shrink: 0; color: var(--brick); font-size: 11.5px; white-space: nowrap; }
-.editor::placeholder { color: var(--faint); }
-/* The placeholder is one line, cut rather than wrapped. */
-.editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Images going with the message: each opens full size, where it can be
-   drawn on. */
-.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 2px 2px; }
-.pending-image { position: relative; }
-.pending-thumb { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: var(--r-control); }
+/* Images going with the message: square tiles, each opening where it can
+   be drawn on (the pencil says so), removed from its own corner. */
+.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 6px 4px; }
+.pending-image { position: relative; animation: popover-rise 0.12s ease-out; }
+.pending-thumb {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  background: var(--well);
+  cursor: pointer;
+  border-radius: var(--r-control);
+  overflow: hidden;
+}
 .pending-thumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.pending-image img.thumb { display: block; height: 64px; max-width: 120px; object-fit: contain; background: var(--well); border-radius: var(--r-control); border: 1px solid var(--rule); }
-.remove-image {
+.pending-image img.thumb { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pending-thumb .draw-hint {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.remove-image.btn {
   position: absolute;
   z-index: 1;
-  top: -6px;
-  right: -6px;
+  top: 4px;
+  right: 4px;
   width: 20px;
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  background: var(--slate-2);
-  border-color: var(--rule-2);
+  background: rgb(0 0 0 / 0.55);
+  border-color: transparent;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s, background-color 0.12s;
 }
-.remove-image:hover { color: var(--brick); }
-.remove-image .icon { width: 11px; height: 11px; }
+.remove-image .icon { width: 10px; height: 10px; stroke-width: 2.5; }
+.remove-image.btn:hover { background: var(--brick); color: #fff; }
+.pending-image:is(:hover, :focus-within) :is(.draw-hint, .remove-image.btn) { opacity: 1; }
+@media (hover: none) {
+  .pending-image :is(.draw-hint, .remove-image.btn) { opacity: 1; }
+}
 .attach-icon { --mark-size: 15px; color: var(--muted); }
 
+/* / and @ completion: attached to the top of the card, as wide, the card's
+   top corners squared while it is open, so the two read as one. */
 .popup {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: calc(100% - 4px);
+  left: -1px;
+  right: -1px;
+  bottom: 100%;
   background: var(--slate);
   border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
+  border-bottom: 0;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  box-shadow: 0 -10px 28px -16px var(--edge-shadow);
   overflow: hidden;
   z-index: var(--z-float);
-  animation: rise 0.12s ease-out;
+  animation: popover-rise 0.12s ease-out;
 }
+.composer-stack.completing { border-top-left-radius: 0; border-top-right-radius: 0; }
+.composer-stack.completing > .composer-box { border-top: 1px solid var(--rule); border-radius: 0; }
+.composer-stack.completing:focus-within > .popup { border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2)); }
 .popup-title {
   display: flex;
   justify-content: space-between;
@@ -1380,8 +1440,7 @@ kbd {
 
 @media (max-width: 760px) {
   .session-bar { gap: 8px; }
-  .composer { padding: 6px 8px 8px; }
-  .popup { left: 8px; right: 8px; }
+  .composer { padding: 6px 8px 8px; --composer-inset: 12px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
   .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
   .main:has(.jump-to-bottom) .toast { max-width: none; }
@@ -1661,7 +1720,7 @@ kbd {
 .session.opening .session-title { color: var(--muted); }
 .composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
 
-.composer.offline .composer-box { border-style: dashed; }
+.composer.offline .composer-stack { border-style: dashed; }
 .status-item.connecting { color: var(--muted); }
 .status-item.connecting.offline { color: var(--brick); }
 .loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
@@ -2064,10 +2123,11 @@ kbd {
   .btn.icon { min-width: 36px; min-height: 36px; }
 }
 
-/* A composer chip's menu: a small surface standing on its chip, opening
-   upward over the chat (below the chip only when there is no room above:
-   web_main's place_popover, which also gives the height it may take). Its
-   chip stays lit while it is open, and only the chips stay above the
+/* A chip's menu (and the + menu): a small surface standing on what opened
+   it, left edges aligned, 6px clear: upward over the composer and the chat,
+   below only when there is no room above (web_main's place_popover, which
+   also gives the height it may take and shifts it in from the right edge).
+   Its chip stays lit while it is open, and only the chips stay above the
    backdrop, so a click on another chip opens that one's menu. Only then:
    the rest of the time, what covers the page (a dialog, the image viewer,
    a phone's drawer) covers the chips too. */
@@ -2078,8 +2138,8 @@ kbd {
 .chip-anchor.open > .chip-button .chevron { opacity: 1; transform: rotate(180deg); }
 .chip-popover {
   position: absolute;
-  left: calc(var(--popover-shift, 0px) - 2px);
-  bottom: calc(100% + var(--popover-lift, 0px) + 8px);
+  left: var(--popover-shift, 0px);
+  bottom: calc(100% + 6px);
   width: 300px;
   max-width: calc(100vw - 24px);
   max-height: min(26rem, var(--popover-room, 70vh));
@@ -2091,7 +2151,7 @@ kbd {
 }
 .chip-popover[data-placement="below"] {
   bottom: auto;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   border-bottom-left-radius: var(--r-surface);
   border-top-left-radius: 4px;
 }
@@ -2158,22 +2218,12 @@ kbd {
   .chip-popover { animation: none; }
   .chip-anchor.open > .chip-button .chevron { transition: none; }
 }
-/* A phone: the menu is as wide as the composer's box, over it, the page
-   behind dimmed. */
+/* A phone: the menus stay on what opened them, as wide as the screen
+   allows (place_popover shifts them in); the header's span the header. */
 @media (max-width: 760px) {
-  .composer-stack { position: relative; }
-  .composer-controls, .composer-plus, .composer-stack .chip-anchor { position: static; }
   .session-chips { position: static; }
-  .session-bar .chip-popover[data-chip] { left: 8px; right: 8px; }
-  .chip-popover { z-index: var(--z-menu-surface); bottom: calc(100% + 8px); }
-  .chip-popover,
-  .chip-popover[data-chip] {
-    left: 0;
-    right: 0;
-    width: auto;
-    max-width: none;
-    border-radius: var(--r-surface);
-  }
+  .session-bar .chip-popover[data-chip] { left: 8px; right: 8px; width: auto; max-width: none; }
+  .chip-popover { z-index: var(--z-menu-surface); max-width: calc(100vw - 16px); }
   .chip-popover { max-height: min(70dvh, var(--popover-room, 70dvh)); }
   .popover-item { padding-top: 10px; padding-bottom: 10px; }
 }

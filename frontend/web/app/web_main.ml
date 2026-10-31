@@ -178,10 +178,11 @@ let pick_images () =
     el##click)
 ;;
 
-(* A chip's menu opens upward from its chip, standing clear of the composer's
-   box (raised by [--popover-lift]); below the chip when there is not room
-   enough above and more below, as for the header's chips. The height it may
-   take goes to style.css as [--popover-room]. *)
+(* A chip's menu (or the + menu) opens upward from what opened it, its left
+   edge on the chip's; below it when there is not room enough above and more
+   below, as for the header's chips. The height it may take goes to
+   style.css as [--popover-room]; [--popover-shift] moves it left as far as
+   it must to stay inside the composer (the header) and the window. *)
 let place_popover () =
   Browser.after_render (fun () ->
     Option.iter (Dom_html.getElementById_opt "chip-popover") ~f:(fun el ->
@@ -201,8 +202,7 @@ let place_popover () =
           | None -> chip
         in
         let margin = 8. in
-        let lift = Js.to_float chip##.top -. Js.to_float box##.top in
-        let above = Js.to_float box##.top -. margin in
+        let above = Js.to_float chip##.top -. margin in
         let below =
           Float.of_int Dom_html.window##.innerHeight
           -. Js.to_float chip##.bottom
@@ -220,9 +220,7 @@ let place_popover () =
         el##setAttribute
           (Js.string "data-placement")
           (Js.string (if down then "below" else "above"));
-        set "--popover-lift" lift;
         set "--popover-room" (if down then below else above);
-        (* Within the composer's box (the header's): a chip far right opens leftward. *)
         set "--popover-shift" 0.;
         let menu = el##getBoundingClientRect in
         let right =
