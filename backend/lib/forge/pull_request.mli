@@ -21,6 +21,10 @@ type t =
   ; draft : bool
   ; author : string
   ; head : string (** the branch, [owner:branch] from another repository *)
+  ; same_repo : bool
+    (** the head branch is in the base repository itself (by full name, not
+        owner: a fork can share its owner); [false] when the head repository
+        is gone (a deleted fork) *)
   ; head_sha : string
   ; base : string
   ; url : string

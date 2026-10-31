@@ -458,6 +458,7 @@ let%expect_test "pull request changes on GitHub" =
         "/graphql"
         {|{"data":{"markPullRequestReadyForReview":{"pullRequest":{"isDraft":false}}}}|}
     ; route Put "/repos/o/r/pulls/7/merge" {|{"merged":true,"sha":"def"}|}
+    ; route Get "/repos/o/r" {|{"full_name":"o/r","default_branch":"main"}|}
     ; route Delete "/repos/o/r/git/refs/heads/feat/x" ~status:204 ""
     ; route
         Post
@@ -508,6 +509,8 @@ let%expect_test "pull request changes on GitHub" =
   [%expect
     {|
     GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r
       Authorization: Bearer tok
     PUT https://api.github.com/repos/o/r/pulls/7/merge
       Authorization: Bearer tok
@@ -606,6 +609,10 @@ let%expect_test "pull request changes on Forgejo" =
     ; route Patch "/api/v1/repos/o/r/pulls/7" (fj_pr ~title:"Add x" ())
     ; route Post "/api/v1/repos/o/r/pulls/7/merge" ""
     ; route
+        Get
+        "/api/v1/repos/o/r"
+        {|{"full_name":"o/r","default_branch":"main"}|}
+    ; route
         Post
         "/api/v1/repos/o/r/pulls/7/reviews"
         {|{"id":5,"user":{"login":"octocat"},"state":"REQUEST_CHANGES","body":"Fix a.","submitted_at":"2026-10-22T10:00:00Z","html_url":"u"}|}
@@ -637,6 +644,8 @@ let%expect_test "pull request changes on Forgejo" =
   [%expect
     {|
     GET https://codeberg.org/api/v1/repos/o/r/pulls/7
+      Authorization: token tok
+    GET https://codeberg.org/api/v1/repos/o/r
       Authorization: token tok
     POST https://codeberg.org/api/v1/repos/o/r/pulls/7/merge
       Authorization: token tok
@@ -680,6 +689,225 @@ let%expect_test "pull request changes on Forgejo" =
     {|{"action":"reply","number":7,"comment_id":40,"body":"Done."}|};
   [%expect
     {| ERROR: pull_request reply: codeberg.org (Forgejo) cannot reply in a review thread: comment on the pull request instead, quoting the comment |}]
+;;
+
+let%expect_test
+    "merge never deletes a branch outside the repository, nor its default or \
+     base branch"
+  =
+  let pr ~number ?head_owner ?head_name ?head_deleted ?(head = "feat/x") () =
+    Fake_forge.pr_json
+      ~host:"github.com"
+      ~number
+      ~title:"Add x"
+      ?head_owner
+      ?head_name
+      ?head_deleted
+      ~head
+      ()
+  in
+  with_tools
+    Github
+    [ route
+        Get
+        "/repos/o/r/pulls/7"
+        (pr ~number:7 ~head_deleted:true ~head:"main" ())
+    ; route
+        Get
+        "/repos/o/r/pulls/8"
+        (pr ~number:8 ~head_name:"r-fork" ~head:"main" ())
+    ; route Get "/repos/o/r/pulls/9" (pr ~number:9 ~head:"dev" ())
+    ; route Get "/repos/o/r/pulls/10" (pr ~number:10 ~head:"main" ())
+    ; route Get "/repos/o/r/pulls/11" (pr ~number:11 ~head:"fix/a#b" ())
+    ; route Put "/repos/o/r/pulls/7/merge" {|{"merged":true}|}
+    ; route Put "/repos/o/r/pulls/8/merge" {|{"merged":true}|}
+    ; route Put "/repos/o/r/pulls/11/merge" {|{"merged":true}|}
+    ; route Delete "/repos/o/r/git/refs/heads/fix/a%23b" ~status:204 ""
+    ; route Get "/repos/o/r" {|{"full_name":"o/r","default_branch":"dev"}|}
+    ]
+  @@ fun ~run ->
+  let merge n =
+    run
+      "pull_request"
+      (sprintf {|{"action":"merge","number":%d,"delete_branch":true}|} n)
+  in
+  (* a deleted fork's head: [head.repo] is null *)
+  merge 7;
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer tok
+    PUT https://api.github.com/repos/o/r/pulls/7/merge
+      Authorization: Bearer tok
+      {"merge_method":"merge","sha":"abc123"}
+    merged #7 Add x (merge) into main, kept main: it is in another repository (a fork, or one that was deleted), not this one
+    https://github.com/o/r/pull/7
+    |}];
+  (* a fork with the same owner *)
+  merge 8;
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/pulls/8
+      Authorization: Bearer tok
+    PUT https://api.github.com/repos/o/r/pulls/8/merge
+      Authorization: Bearer tok
+      {"merge_method":"merge","sha":"abc123"}
+    merged #8 Add x (merge) into main, kept main: it is in another repository (a fork, or one that was deleted), not this one
+    https://github.com/o/r/pull/8
+    |}];
+  (* the default branch, then the base: refused before merging *)
+  merge 9;
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/pulls/9
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r
+      Authorization: Bearer tok
+    ERROR: pull_request merge: refusing to delete dev: it is the repository's default branch; merge without delete_branch
+    |}];
+  merge 10;
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/pulls/10
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r
+      Authorization: Bearer tok
+    ERROR: pull_request merge: refusing to delete main: it is the pull request's base branch; merge without delete_branch
+    |}];
+  (* a branch name with [#]: encoded, its [/] kept *)
+  merge 11;
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/pulls/11
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r
+      Authorization: Bearer tok
+    PUT https://api.github.com/repos/o/r/pulls/11/merge
+      Authorization: Bearer tok
+      {"merge_method":"merge","sha":"abc123"}
+    DELETE https://api.github.com/repos/o/r/git/refs/heads/fix/a%23b
+      Authorization: Bearer tok
+    merged #11 Add x (merge) into main, deleted fix/a#b
+    https://github.com/o/r/pull/11
+    |}]
+;;
+
+let%expect_test "label names and branches are encoded in URLs" =
+  with_tools
+    Github
+    [ route Delete "/repos/o/r/issues/12/labels/area%2Fbackend" ~status:200 "[]"
+    ; route Get "/repos/o/r/issues/12" (gh_issue ())
+    ; route Get "/repos/o/r/actions/runs" {|{"workflow_runs":[]}|}
+    ; route Get "/search/issues" {|{"items":[]}|}
+    ]
+  @@ fun ~run ->
+  run "issue" {|{"action":"unlabel","number":12,"labels":["area/backend"]}|};
+  run "repo" {|{"action":"runs","branch":"a+b&c"}|};
+  run "issue" {|{"action":"list","search":"crash","labels":["prioritet: høy"]}|};
+  [%expect
+    {|
+    DELETE https://api.github.com/repos/o/r/issues/12/labels/area%2Fbackend
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r/issues/12
+      Authorization: Bearer tok
+    #12 Crash on start: labels none
+    GET https://api.github.com/repos/o/r/actions/runs?per_page=100&branch=a%2Bb%26c
+      Authorization: Bearer tok
+    no CI runs in o/r on github.com
+    GET https://api.github.com/search/issues?per_page=100&q=repo:o/r%20is:issue%20state:open%20label:%22prioritet:%20h%C3%B8y%22%20crash
+      Authorization: Bearer tok
+    no open issues in o/r on github.com
+    |}]
+;;
+
+let%expect_test "GitHub issue lists fill up to the limit past pull requests" =
+  with_tools
+    Github
+    [ route
+        Get
+        "/repos/o/r/issues"
+        ~query:"page=2"
+        (sprintf "[%s,%s]" (gh_issue ~number:20 ()) (gh_issue ~number:21 ()))
+    ; route
+        Get
+        "/repos/o/r/issues"
+        ~headers:
+          [ ( "Link"
+            , {|<https://api.github.com/repos/o/r/issues?q=a,b&page=2>; rel="next", <https://api.github.com/repos/o/r/issues?page=9>; rel="last"|}
+            )
+          ]
+        (sprintf
+           "[%s,%s,%s]"
+           (gh_issue ~number:10 ())
+           (gh_issue ~number:11 ~pull:true ())
+           (gh_issue ~number:12 ~pull:true ()))
+    ]
+  @@ fun ~run ->
+  run "issue" {|{"action":"list","limit":2}|};
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/issues?per_page=100&state=open&sort=updated&direction=desc
+      Authorization: Bearer tok
+    GET https://api.github.com/repos/o/r/issues?q=a,b&page=2
+      Authorization: Bearer tok
+    2 open issues in o/r on github.com (the first 2: limit shows more):
+    #10 Crash on start (open, by alice, 1 comment, updated 2026-10-21)
+    #20 Crash on start (open, by alice, 1 comment, updated 2026-10-21)
+    |}]
+;;
+
+let%expect_test "a next page on another host is not fetched" =
+  with_tools
+    Github
+    [ route
+        Get
+        "/repos/o/r/issues"
+        ~headers:
+          [ ( "Link"
+            , {|<https://evil.example/repos/o/r/issues?page=2>; rel="next"|} )
+          ]
+        (sprintf "[%s]" (gh_issue ()))
+    ]
+  @@ fun ~run ->
+  run "issue" {|{"action":"list","limit":5}|};
+  [%expect
+    {|
+    GET https://api.github.com/repos/o/r/issues?per_page=100&state=open&sort=updated&direction=desc
+      Authorization: Bearer tok
+    1 open issue in o/r on github.com:
+    #12 Crash on start (open, by alice, 1 comment, updated 2026-10-21)
+    |}]
+;;
+
+let%expect_test "403 for fine-grained tokens, and 429" =
+  with_tools
+    Github
+    [ route
+        Post
+        "/repos/o/r/issues/12/comments"
+        ~status:403
+        ~headers:[ "X-Accepted-GitHub-Permissions", "issues=write" ]
+        {|{"message":"Resource not accessible by personal access token"}|}
+    ; route
+        Patch
+        "/repos/o/r/issues/12"
+        ~status:429
+        {|{"message":"You have exceeded a secondary rate limit."}|}
+    ]
+  @@ fun ~run ->
+  run "issue" {|{"action":"comment","number":12,"body":"x"}|};
+  run "issue" {|{"action":"close","number":12}|};
+  [%expect
+    {|
+    POST https://api.github.com/repos/o/r/issues/12/comments
+      Authorization: Bearer tok
+      {"body":"x"}
+    ERROR: issue comment: github.com: a comment on #12: not allowed (HTTP 403: Resource not accessible by personal access token): the account may lack access to the repository, or the sign-in may lack a scope (it needs the permission issues=write): ask the user to sign in again with /login github
+    PATCH https://api.github.com/repos/o/r/issues/12
+      Authorization: Bearer tok
+      {"state":"closed"}
+    ERROR: issue close: github.com: #12 of o/r: rate limited (HTTP 429: You have exceeded a secondary rate limit.)
+    |}]
 ;;
 
 (* ---- the repository and CI --------------------------------------------- *)

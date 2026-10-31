@@ -63,14 +63,27 @@ let pr_json
       ?(merged = false)
       ?(draft = false)
       ?(head_owner = "o")
+      ?(head_name = "r")
+      ?(head_deleted = false)
       ?(head = "feat/x")
       ~host
       ~number
       ~title
       ()
   =
+  let head_repo =
+    if head_deleted
+    then "null"
+    else
+      sprintf
+        {|{"name":%S,"full_name":"%s/%s","owner":{"login":%S}}|}
+        head_name
+        head_owner
+        head_name
+        head_owner
+  in
   sprintf
-    {|{"number":%d,"title":%S,"state":%S,"merged":%b,"merged_at":%s,"draft":%b,"user":{"login":"alice"},"head":{"ref":%S,"sha":"abc123","repo":{"owner":{"login":%S}}},"base":{"ref":"main","repo":{"owner":{"login":"o"}}},"html_url":"https://%s/o/r/pull/%d","body":"Does x.","created_at":"2026-10-20T10:00:00Z","updated_at":"2026-10-21T10:00:00Z"}|}
+    {|{"number":%d,"title":%S,"state":%S,"merged":%b,"merged_at":%s,"draft":%b,"user":{"login":"alice"},"head":{"ref":%S,"sha":"abc123","repo":%s},"base":{"ref":"main","repo":{"name":"r","full_name":"o/r","owner":{"login":"o"}}},"html_url":"https://%s/o/r/pull/%d","body":"Does x.","created_at":"2026-10-20T10:00:00Z","updated_at":"2026-10-21T10:00:00Z"}|}
     number
     title
     state
@@ -78,7 +91,7 @@ let pr_json
     (if merged then {|"2026-10-22T10:00:00Z"|} else "null")
     draft
     head
-    head_owner
+    head_repo
     host
     number
 ;;

@@ -228,13 +228,13 @@ let%expect_test "pull requests and checks from GitHub's and Forgejo's JSON" =
     {|
     (Ok
      ((number 3) (title "Add x") (state Open) (draft true) (author alice)
-      (head feat/x) (head_sha abc123) (base main)
+      (head feat/x) (same_repo true) (head_sha abc123) (base main)
       (url https://github.com/o/r/pull/3) (body "Does x.")
       (created_at 2026-10-20T10:00:00Z) (updated_at 2026-10-21T10:00:00Z)))
     (Ok
      ((number 4) (title "WIP: half done") (state Merged) (draft true)
-      (author alice) (head fork:feat/x) (head_sha abc123) (base main)
-      (url https://codeberg.org/o/r/pull/4) (body "Does x.")
+      (author alice) (head fork:feat/x) (same_repo false) (head_sha abc123)
+      (base main) (url https://codeberg.org/o/r/pull/4) (body "Does x.")
       (created_at 2026-10-20T10:00:00Z) (updated_at 2026-10-21T10:00:00Z)))
     (Error "pull request: missing number")
     WIP: Add x
@@ -321,15 +321,15 @@ let%expect_test
   [%expect
     {|
     (((number 2) (title "[WIP] x") (state Open) (draft true) (author alice)
-      (head feat/x) (head_sha abc123) (base main)
+      (head feat/x) (same_repo true) (head_sha abc123) (base main)
       (url https://git.lan/o/r/pull/2) (body "Does x.")
       (created_at 2026-10-20T10:00:00Z) (updated_at 2026-10-21T10:00:00Z)))
     ("diff --git a/x b/x\n" false)
     ((state failure) (items (((name ci) (state failure) (url (https://ci/9))))))
     ((number 3) (title "WIP: y") (state Open) (draft true) (author alice)
-     (head feat/x) (head_sha abc123) (base main) (url https://git.lan/o/r/pull/3)
-     (body "Does x.") (created_at 2026-10-20T10:00:00Z)
-     (updated_at 2026-10-21T10:00:00Z))
+     (head feat/x) (same_repo true) (head_sha abc123) (base main)
+     (url https://git.lan/o/r/pull/3) (body "Does x.")
+     (created_at 2026-10-20T10:00:00Z) (updated_at 2026-10-21T10:00:00Z))
     error: git.lan: team/gone not found (HTTP 404): check the URL of the git remote origin, or sign in as an account that can see team/gone (/login forgejo git.lan)
     error: git.lan has no Forgejo API at https://git.lan/api/v1: if it is a GitHub, set forges."git.lan".kind to github in ~/.prigh/config.json
     error: git.lan: the diff of #9: HTTP 500: oops

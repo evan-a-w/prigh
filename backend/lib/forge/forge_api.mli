@@ -74,15 +74,29 @@ val get_json
     hosts send, up to [limit] (default 100) items. [items] finds the list in
     a page (default: the page is the list). Asks for the host's largest page
     ([per_page=100], Forgejo [limit=50], which its MAX_RESPONSE_ITEMS may
-    lower) unless [url] names a size. *)
+    lower) unless [url] names a size. Only items satisfying [keep] are
+    returned and counted towards [limit]. A next page on another origin than the
+    API's is not followed (the token would go there). *)
 val get_list
   :  ?limit:int
   -> ?items:(Json.t -> Json.t option)
+  -> ?keep:(Json.t -> bool)
   -> t
   -> what:string
   -> ?not_found:string
   -> string
   -> Json.t list Or_error.t
+
+(** Percent-encodes a path segment: everything but letters, digits and
+    [-._~] ([/], [#], [?] included), e.g. a label name. *)
+val encode_segment : string -> string
+
+(** A branch name as a path ([refs/heads/<this>]): its [/]-separated parts
+    encoded with [encode_segment]. *)
+val encode_ref : string -> string
+
+(** [url] with [query] appended, its keys and values encoded. *)
+val with_query : string -> (string * string) list -> string
 
 (** GitHub's GraphQL API: the reply's [data], or its errors. Forgejo has
     none (an error). *)

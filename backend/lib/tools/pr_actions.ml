@@ -159,7 +159,7 @@ let run ~forges ~git ~args action =
        in
        with_repo (fun api repo ->
          let%bind pr = Forge_api.get_pull api repo n in
-         let%bind () =
+         let%bind deletion =
            Forge_pulls.merge
              api
              repo
@@ -178,7 +178,10 @@ let run ~forges ~git ~args action =
                  (Tool_args.string_opt args "method")
                  ~default:"merge")
               pr.base
-              (if delete_branch then sprintf ", deleted %s" pr.head else "")
+              (match deletion with
+               | Not_asked -> ""
+               | Deleted -> sprintf ", deleted %s" pr.head
+               | Kept why -> sprintf ", kept %s: %s" pr.head why)
               pr.url)))
   | "review" ->
     let n = number args in

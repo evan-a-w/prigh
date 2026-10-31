@@ -22,6 +22,7 @@ type t =
   ; draft : bool
   ; author : string
   ; head : string
+  ; same_repo : bool
   ; head_sha : string
   ; base : string
   ; url : string
@@ -92,6 +93,22 @@ let of_json (kind : Forge_kind.t) json =
     | Some h, Some b when not (String.equal h b) -> h ^ ":" ^ head_ref
     | _ -> head_ref
   in
+  let same_repo =
+    let full side =
+      match string_at json [ side; "repo"; "full_name" ] with
+      | Some name -> Some name
+      | None ->
+        (match
+           ( string_at json [ side; "repo"; "owner"; "login" ]
+           , string_at json [ side; "repo"; "name" ] )
+         with
+         | Some owner, Some name -> Some (owner ^ "/" ^ name)
+         | _ -> None)
+    in
+    match full "head", full "base" with
+    | Some h, Some b -> String.Caseless.equal h b
+    | _ -> false
+  in
   return
     { number
     ; title
@@ -99,6 +116,7 @@ let of_json (kind : Forge_kind.t) json =
     ; draft
     ; author = str [ "user"; "login" ]
     ; head
+    ; same_repo
     ; head_sha = str [ "head"; "sha" ]
     ; base = str [ "base"; "ref" ]
     ; url = str [ "html_url" ]
