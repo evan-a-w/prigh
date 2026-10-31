@@ -79,7 +79,7 @@ const script3 = [
   { text: "1. Write the **schema**\n2. Test it" },
   { text: "Implementing." },
   // Long enough to queue messages while it runs.
-  { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: { command: "sleep 4" } }] },
+  { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: { command: "sleep 8" } }] },
   { text: "Done waiting." },
   { text: "Noted." },
   { text: "Read the attachments." },
