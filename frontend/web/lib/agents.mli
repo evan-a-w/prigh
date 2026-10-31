@@ -40,6 +40,10 @@ module Agent : sig
 
   (** Its [name], else its task's first line. *)
   val title : t -> string
+
+  (** Its task says no more than its {!title}: one line, the same words
+      (ignoring case and trailing punctuation). *)
+  val task_in_title : t -> bool
 end
 
 module Job : sig
