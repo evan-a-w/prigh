@@ -97,6 +97,12 @@ other variables are the server's. From inside tmux the line says `tmux
 switch-client -t ...`. Quitting the TUI closes the session; if it fails,
 its error stays on screen until Enter.
 
+Worktrees, diffs, review and the git hosts run `git` on the tool host.
+The Nix wrapper appends its own git to the end of `PATH`, so a `git` already
+on `PATH` wins and prigh still works where there is none (a systemd
+service's `PATH` rarely includes the user's profile). Without the wrapper,
+`git` must be on the `PATH` prigh starts with; the error names that `PATH`.
+
 The first `nix build`/`nix develop` evaluation is slow (opam-nix resolves the
 pinned package set through import-from-derivation) and the first build compiles
 both OCaml toolchains plus their package sets (about an hour on a small
