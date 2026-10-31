@@ -4,7 +4,7 @@ open! Core
 
 type t =
   | Appearance
-  | Behaviour
+  | Sessions
   | Models
   | Git_hosting
   | Nix_store (** superusers only *)

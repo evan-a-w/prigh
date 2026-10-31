@@ -64,7 +64,7 @@ let every =
       ~argument:Settings
       ~args:"[section]"
       "settings"
-      "appearance, behaviour, models, git hosting and your account; a section \
+      "appearance, sessions, models, git hosting and your account; a section \
        opens at it (Ctrl+,)"
   ; c "new" "start a new session"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"

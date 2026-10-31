@@ -1,20 +1,8 @@
-/* Git hosting: the session card's branch (it opens the pull requests), the
+/* Git hosting: the
    GitHub device code, the settings page's git hosts, and the pull request
    dialogs. A pull request's state is a quiet outlined tag: sage once merged,
    brick once closed, dashed while a draft; checks use the outcome marks and
    the lamp, as tools do. */
-
-.card-where .branch {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-  border-radius: var(--r-chip);
-}
-.card-where .branch:hover { color: var(--chalk); }
-.card-where .branch:hover .branch-name { text-decoration: underline; text-underline-offset: 2px; }
-.card-where .branch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 
 /* The one thing to carry to another tab: big, in the machine's face, and
    selected whole by a click. */
