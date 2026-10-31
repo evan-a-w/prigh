@@ -698,7 +698,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
-    /confirm [on|off]                  ask before destructive tools (approval mode ask or auto, also for new sessions)
+    /confirm [on|off|mode]             ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, auto
     /mode [ask|auto-edit|auto|plan]    pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /todos                             show the model's plan (its update_plan steps)

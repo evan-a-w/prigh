@@ -107,9 +107,9 @@ let every =
   ; c
       ~argument:Argument.Confirm
       "confirm"
-      "[on|off]"
-      "ask before destructive tools (approval mode ask or auto, also for new \
-       sessions)"
+      "[on|off|mode]"
+      "ask before destructive tools: the approval mode new sessions (and this \
+       one) start in; on: ask, off: auto, or ask, auto-edit, auto"
   ; c
       ~argument:Argument.Mode
       "mode"
