@@ -106,13 +106,29 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
             )
           ]
         else [])
-     @ (if has "pull_request"
-        then
-          [ "- For pull requests (listing, reading, opening, checking out), \
-             use the pull_request tool, not gh: it signs in to the git host as \
-             the user."
-          ]
-        else [])
+     @ (let uses =
+          List.filter_map
+            [ ( "pull_request"
+              , "pull requests (listing, reading, opening, checking out, \
+                 commenting, reviewing, merging)" )
+            ; "issue", "issues"
+            ; "repo", "the repository and its CI runs"
+            ]
+            ~f:(fun (tool, what) ->
+              Option.some_if (has tool) (sprintf "the %s tool for %s" tool what))
+        in
+        match uses with
+        | [] -> []
+        | uses ->
+          [ sprintf
+              "- On the git host, use %s, not gh: %s to the host as the user."
+              (match List.rev uses with
+               | [ one ] -> one
+               | last :: rest ->
+                 String.concat ~sep:", " (List.rev rest) ^ " and " ^ last
+               | [] -> "")
+              (if List.length uses = 1 then "it signs in" else "they sign in")
+          ])
      @ (if Role.equal role Main && has "subagent"
         then
           [ "- You are the orchestrator: for substantial work (implementing a \

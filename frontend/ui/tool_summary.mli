@@ -19,6 +19,12 @@ val worktree : Tool_args.t -> string option
     [view #12], [create "Add x" (draft)]. *)
 val pull_request : Tool_args.t -> string option
 
+(** [issue]'s argument: the action and the issue, e.g. [close #12]. *)
+val issue : Tool_args.t -> string option
+
+(** [repo]'s argument: the action and its run or job, e.g. [logs job 7]. *)
+val repo : Tool_args.t -> string option
+
 (** Whether a [job_input] call ends the job's stdin. *)
 val closes_stdin : Tool_args.t -> bool
 

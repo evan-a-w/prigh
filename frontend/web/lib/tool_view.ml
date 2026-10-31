@@ -28,6 +28,10 @@ let summary (call : Tool_call.t) =
   then Option.value (Tool_summary.worktree args) ~default:""
   else if String.equal call.name "pull_request"
   then Option.value (Tool_summary.pull_request args) ~default:""
+  else if String.equal call.name "issue"
+  then Option.value (Tool_summary.issue args) ~default:""
+  else if String.equal call.name "repo"
+  then Option.value (Tool_summary.repo args) ~default:""
   else
     List.find_map
       [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
