@@ -93,6 +93,16 @@ module Agent = struct
     | Some name -> name
     | None -> Chat_html.first_line t.task
   ;;
+
+  let task_in_title t =
+    let words s =
+      String.rstrip (String.strip s) ~drop:(fun c ->
+        Char.is_whitespace c || String.mem ".!?:;,\"'`*_" c)
+      |> String.lowercase
+    in
+    let task = String.strip t.task in
+    (not (String.mem task '\n')) && String.equal (words task) (words (title t))
+  ;;
 end
 
 module Job = struct

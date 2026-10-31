@@ -596,6 +596,59 @@ let print_perfetto spans =
   | json -> print_endline (Jsonaf.to_string json)
 ;;
 
+(* Spans starting in the same microsecond: an instant at the end of one span
+   comes before the next span starting then, but a span (here a fast
+   [connect]) never comes before its parent. *)
+let%expect_test "Perfetto: instants at a span's start and end" =
+  let span ?parent ~id name start stop =
+    { Trace.Span.id
+    ; parent
+    ; name
+    ; track = "main"
+    ; wall = 1000. +. start
+    ; start
+    ; stop
+    ; status = Ok
+    ; attrs = []
+    }
+  in
+  let spans =
+    [ span ~id:"t" "turn" 0. 2.
+    ; span ~id:"m1" ~parent:"t" "model_request" 0. 1.
+    ; span ~id:"c1" ~parent:"m1" "connect" 0. 0.
+    ; span ~id:"s1" ~parent:"m1" "stream" 0. 1.
+    ; span ~id:"e1" ~parent:"m1" "end" 1. 1.
+    ; span ~id:"m2" ~parent:"t" "model_request" 1. 2.
+    ; span ~id:"c2" ~parent:"m2" "connect" 1. 1.
+    ]
+  in
+  List.iter
+    [ spans; List.rev spans ]
+    ~f:(fun spans ->
+      match Trace_report.perfetto spans with
+      | `Object fields ->
+        (match List.Assoc.find fields ~equal:String.equal "traceEvents" with
+         | Some (`Array events) ->
+           List.filter_map events ~f:(function
+             | `Object e ->
+               (match List.Assoc.find e ~equal:String.equal "ph" with
+                | Some (`String "X") ->
+                  (match List.Assoc.find e ~equal:String.equal "cat" with
+                   | Some (`String cat) -> Some cat
+                   | _ -> None)
+                | _ -> None)
+             | _ -> None)
+           |> String.concat ~sep:" "
+           |> print_endline
+         | _ -> print_endline "no traceEvents")
+      | json -> print_endline (Jsonaf.to_string json));
+  [%expect
+    {|
+    turn model_request stream connect end model_request connect
+    turn model_request stream connect end model_request connect
+    |}]
+;;
+
 (* One session with a bit of everything: the summary splits the main
    agent's time, and Perfetto puts subagents and jobs on their own threads. *)
 let%expect_test "the summary and the Perfetto export of a session" =

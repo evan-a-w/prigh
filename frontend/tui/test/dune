@@ -23,9 +23,11 @@
   prigh_tui
   bonsai_term))
 
-; Rendering depends on TERM (OSC 8 hyperlinks or inline URLs): fix it.
+; Rendering depends on TERM (OSC 8 hyperlinks or inline URLs), and times
+; print in the local zone: fix both.
 
 (env
  (_
   (env-vars
-   (TERM dumb))))
+   (TERM dumb)
+   (TZ UTC))))
