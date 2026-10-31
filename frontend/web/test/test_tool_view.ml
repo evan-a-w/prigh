@@ -281,6 +281,15 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
                    class="thumb"/>
               <span class="lightbox">
                 <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]"/>
+                <span class="lightbox-tools">
+                  <button type="button"
+                          title="Draw on this image"
+                          data-annotate="new"
+                          class="btn lightbox-annotate">
+                    <icon class="pencil"> </icon>
+                    Draw
+                  </button>
+                </span>
               </span>
             </summary>
           </details>

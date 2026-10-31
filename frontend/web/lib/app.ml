@@ -167,6 +167,7 @@ module Reply_tag = struct
     | Compaction_saved
     | Naming_saved
     | Dictation_saved
+    | Transcribed
     | Default_saved
     | Session_stats
     | Trace
@@ -275,6 +276,14 @@ module Command = struct
     | Focus of string
     | Clear_text_selection
     | Place_popover
+    | Pick_images
+    | Start_dictation of Dictation.Engine.t
+    | Stop_dictation
+    | Cancel_dictation
+    | Annotate_setup
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_export
     | Place_menu of Context_menu.Anchor.t
     | Open_tab of string
     | Set_caret of int
@@ -466,6 +475,30 @@ module Action = struct
     | Cycle_mode
     | Add_image of Image.t
     | Remove_image of int
+    | Dictate
+    | Dictation_cancel
+    | Dictation_progress of
+        { elapsed_ms : int
+        ; level : float
+        }
+    | Dictation_audio of
+        { mime_type : string
+        ; data : string
+        }
+    | Dictation_text of string
+    | Dictation_failed of string
+    | Browser_speech of bool
+    | Annotate of
+        { image : Image.t
+        ; target : Annotate.Target.t
+        }
+    | Annotate_color of string
+    | Annotate_size of int
+    | Annotate_strokes of int
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_save
+    | Annotated of Image.t
     | Show_toast of
         { text : string
         ; error : bool
@@ -566,6 +599,9 @@ module Model = struct
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list
+    ; dictation : Dictation.t
+    ; dictation_engine : Dictation.Engine.t
+    ; browser_speech : bool
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
     ; recipient : Recipient.t
@@ -798,6 +834,9 @@ let init =
   ; completion = None
   ; history = History.empty
   ; images = []
+  ; dictation = Idle
+  ; dictation_engine = Server
+  ; browser_speech = false
   ; queue = Queued.empty
   ; agent_queues = []
   ; recipient = Main
@@ -2869,11 +2908,36 @@ let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Thinking -> Thinking
   | Mode -> Modes
   | Host -> Hosts
+  | Attach -> Attach
 ;;
 
 let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
   | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Host -> false
+  | Model | Mode | Host | Attach -> false
+;;
+
+(* The composer's +: what can go with the message. *)
+let attach_menu =
+  Picker.create
+    ~title:"Add to your message"
+    [ Picker.Item.create
+        ~id:"files"
+        ~detail:"uploaded to the tool host; the agent gets their paths"
+        ~search:"files attach upload"
+        "Files…"
+    ; Picker.Item.create
+        ~id:"image"
+        ~detail:"shown to the model; draw on it before sending"
+        ~search:"image photo picture screenshot"
+        "Images…"
+    ]
+;;
+
+(* Along the composer's lower tier, in this order; ← → step between them.
+   The others open from elsewhere. *)
+let on_composer_tier : Chip.t -> bool = function
+  | Model | Host -> true
+  | Thinking | Mode | Attach -> false
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
@@ -2892,6 +2956,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
           | Thinking -> thinking_levels_picker m
           | Mode -> modes_picker state
           | Host -> hosts_list m state
+          | Attach -> attach_menu
         in
         let m, cmds =
           open_dialog
@@ -2899,7 +2964,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
             ~focus:
               (match chip with
                | Model | Host -> "popover-filter"
-               | Thinking | Mode -> "popover-list")
+               | Thinking | Mode | Attach -> "popover-list")
             (Popover { chip; picker })
         in
         m, cmds @ [ Command.Place_popover ]))
@@ -2909,7 +2974,79 @@ let open_chip (m : Model.t) (chip : Chip.t) =
 let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
   | Some (Popover { chip; _ }), Some state ->
-    open_chip m (Chip.step chip delta ~skip:(chip_opens_nothing state))
+    if on_composer_tier chip
+    then
+      open_chip
+        m
+        (Chip.step chip delta ~skip:(fun c ->
+           chip_opens_nothing state c || not (on_composer_tier c)))
+    else m, []
+  | _ -> m, []
+;;
+
+(* Dictation: the microphone records (or the browser listens) until pressed
+   again, then the text goes in at the caret. *)
+let no_dictation_model =
+  "Dictation needs a transcription model: pick one in Settings → Models (an \
+   OpenAI key, or a custom provider with /audio/transcriptions)."
+;;
+
+let dictate (m : Model.t) =
+  match m.dictation with
+  | Idle ->
+    let engine = m.dictation_engine in
+    { m with dictation = Starting engine }, [ Command.Start_dictation engine ]
+  | Starting _ -> { m with dictation = Idle }, [ Command.Cancel_dictation ]
+  | Recording _ ->
+    { m with dictation = Transcribing }, [ Command.Stop_dictation ]
+  | Transcribing -> m, []
+;;
+
+let dictated (m : Model.t) text =
+  let m = { m with dictation = Idle } in
+  if String.is_empty (String.strip text)
+  then toast m "Nothing was heard."
+  else (
+    let draft, cursor = Dictation.insert ~draft:m.draft ~cursor:m.cursor text in
+    edit_at_caret m ~cursor draft)
+;;
+
+(* The backend cannot transcribe: the browser's recognition, where there is
+   one, listens from the next press. *)
+let dictation_failed (m : Model.t) e =
+  let m = { m with dictation = Idle } in
+  if Dictation.no_provider e
+  then
+    if m.browser_speech
+    then
+      toast
+        { m with dictation_engine = Browser }
+        "No transcription model is set up, so the browser's speech recognition \
+         listens instead: press the microphone again (Settings → Models sets \
+         one up)."
+    else error m no_dictation_model
+  else error m (String.capitalize e)
+;;
+
+let annotate_dialog (m : Model.t) ~f =
+  match m.dialog with
+  | Some (Annotate a) ->
+    let a, cmds = f a in
+    { m with dialog = Some (Annotate a) }, cmds
+  | _ -> m, []
+;;
+
+(* The drawing, saved: over the attachment it was made on, or attached. *)
+let annotated (m : Model.t) (image : Image.t) =
+  match m.dialog with
+  | Some (Annotate { target; _ }) ->
+    let images =
+      match target with
+      | Pending i when i < List.length m.images ->
+        List.mapi m.images ~f:(fun j old -> if j = i then image else old)
+      | Pending _ | New -> m.images @ [ image ]
+    in
+    { m with dialog = None; images }, [ focus_editor ]
   | _ -> m, []
 ;;
 
@@ -7043,6 +7180,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | Transcribed, Error e ->
+    (match m.dictation with
+     | Transcribing -> dictation_failed m e
+     | Idle | Starting _ | Recording _ -> m, [])
   | (Dequeued | Unqueued _), Error e ->
     (* Shown removed at once: the backend's queue is the truth. *)
     let m, cmds = error m (String.capitalize e) in
@@ -7540,7 +7681,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       toast { m with config = Some config } (naming_summary config))
   | Dictation_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
-      toast { m with config = Some config } (dictation_summary config))
+      (* The backend may transcribe now: it is asked again. *)
+      toast
+        { m with config = Some config; dictation_engine = Server }
+        (dictation_summary config))
+  | Transcribed, Ok json ->
+    (match m.dictation, field json "text" with
+     | Transcribing, Some (`String text) -> dictated m text
+     | Transcribing, _ -> dictated m ""
+     | (Idle | Starting _ | Recording _), _ -> m, [])
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -8391,6 +8540,10 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     match (kind : Dialog.Picker_kind.t) with
     | Models -> set_model m item.id
     | Thinking -> set_thinking m item.id
+    | Attach ->
+      (match item.id with
+       | "image" -> m, [ Command.Pick_images ]
+       | _ -> with_files m (Files.update m.files (Pick Chat)))
     | Login ->
       (match String.chop_prefix item.id ~prefix:"forge ", item.id with
        | Some host, _ -> forge_account_login m host
@@ -8721,9 +8874,11 @@ let dialog_accept (m : Model.t) =
            ~again:("forgejo " ^ host)
        in
        { m with return_to_settings = back }, cmds)
+  | Some (Annotate a) ->
+    if a.strokes > 0 then m, [ Command.Annotate_export ] else m, []
 ;;
 
-(* Following new output again: the jump button, or sending something. *)
+(* Following new output again): the jump button, or sending something. *)
 let to_bottom (m : Model.t) =
   { m with scrolled_up = false }, [ Command.Scroll_to_bottom ]
 ;;
@@ -9161,6 +9316,45 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Question action -> question m action
   | Cycle_mode -> cycle_mode m
   | Add_image image -> { m with images = m.images @ [ image ] }, []
+  | Dictate -> dictate m
+  | Dictation_cancel ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing ->
+       { m with dictation = Idle }, [ Command.Cancel_dictation ])
+  | Dictation_progress { elapsed_ms; level } ->
+    (match m.dictation with
+     | Starting engine | Recording { engine; _ } ->
+       { m with dictation = Recording { engine; elapsed_ms; level } }, []
+     | Idle | Transcribing -> m, [])
+  | Dictation_audio { mime_type; data } ->
+    (match m.dictation with
+     | Transcribing ->
+       m, [ call (Transcribe { mime_type; data }) ~tag:Transcribed ]
+     | Idle | Starting _ | Recording _ -> m, [])
+  | Dictation_text text ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing -> dictated m text)
+  | Dictation_failed e ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing -> dictation_failed m e)
+  | Browser_speech b -> { m with browser_speech = b }, []
+  | Annotate { image; target } ->
+    let m, cmds = open_dialog m (Annotate (Annotate.create image target)) in
+    m, cmds @ [ Command.Annotate_setup ]
+  | Annotate_color color -> annotate_dialog m ~f:(fun a -> { a with color }, [])
+  | Annotate_size size -> annotate_dialog m ~f:(fun a -> { a with size }, [])
+  | Annotate_strokes strokes ->
+    annotate_dialog m ~f:(fun a -> { a with strokes }, [])
+  | Annotate_undo ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_undo ])
+  | Annotate_clear ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_clear ])
+  | Annotate_save ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_export ])
+  | Annotated image -> annotated m image
   | Remove_image i ->
     { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
   | Show_toast { text; error } -> toast m ~error text

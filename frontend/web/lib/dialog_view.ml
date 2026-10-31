@@ -28,6 +28,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Worktrees _ -> "Worktrees"
   | Themes -> "Themes"
   | Accents -> "Colours"
+  | Attach -> "Attach"
   | Compaction_models | Naming_models | Dictation_models -> "Models"
 ;;
 
@@ -638,6 +639,7 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Pulls l) -> Pull_requests_view.list l ~inject
   | Some (Pull p) -> Pull_requests_view.page m p ~inject
   | Some (Pr_create f) -> Pull_requests_view.create m.generate f ~inject
+  | Some (Annotate a) -> Annotate_view.view a ~inject
   | Some (Pr_checked_out { number; checkout }) ->
     Pull_requests_view.checked_out ~number checkout ~inject
   | Some dialog ->

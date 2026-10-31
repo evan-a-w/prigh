@@ -173,6 +173,15 @@ let reveal_selected () =
    box (raised by [--popover-lift]); below the chip only when there is not
    room enough above and more below. The height it may take goes to style.css
    as [--popover-room]. *)
+(* The composer's image picker, a hidden input (Files_view.pickers): what
+   is chosen goes through [read_images] (see the [change] listener). *)
+let image_input_id = "image-attach-input"
+
+let pick_images () =
+  Option.iter (Dom_html.getElementById_opt image_input_id) ~f:(fun el ->
+    el##click)
+;;
+
 let place_popover () =
   Browser.after_render (fun () ->
     Option.iter (Dom_html.getElementById_opt "chip-popover") ~f:(fun el ->
@@ -185,7 +194,7 @@ let place_popover () =
               (Js.Unsafe.meth_call
                  anchor
                  "closest"
-                 [| Js.Unsafe.inject (Js.string ".composer-box") |]
+                 [| Js.Unsafe.inject (Js.string ".composer-stack") |]
                : Dom_html.element Js.t Js.opt)
           with
           | Some box -> box##getBoundingClientRect
@@ -213,7 +222,7 @@ let place_popover () =
           (Js.string (if down then "below" else "above"));
         set "--popover-lift" lift;
         set "--popover-room" (if down then below else above);
-        (* Within the composer's box: a chip far right opens leftward. *)
+        (* Within the composer: a chip far right opens leftward. *)
         set "--popover-shift" 0.;
         let menu = el##getBoundingClientRect in
         let right =
@@ -523,6 +532,15 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Focus id -> Effect.of_sync_fun focus id
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Place_popover -> Effect.of_sync_fun place_popover ()
+    | Pick_images -> Effect.of_sync_fun pick_images ()
+    | Start_dictation engine -> Effect.of_sync_fun Dictation_widget.start engine
+    | Stop_dictation -> Effect.of_sync_fun Dictation_widget.stop ()
+    | Cancel_dictation -> Effect.of_sync_fun Dictation_widget.cancel ()
+    | Annotate_setup ->
+      Effect.of_sync_fun (fun () -> Browser.after_render Annotate_widget.setup) ()
+    | Annotate_undo -> Effect.of_sync_fun Annotate_widget.undo ()
+    | Annotate_clear -> Effect.of_sync_fun Annotate_widget.clear ()
+    | Annotate_export -> Effect.of_sync_fun Annotate_widget.export ()
     | Place_menu anchor -> Effect.of_sync_fun Menu_listeners.place anchor
     | Open_tab session ->
       Effect.of_sync_fun
@@ -980,6 +998,16 @@ let install_listeners ~schedule ~current =
         else read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ~schedule;
+  Dictation_widget.install ~schedule;
+  Annotate_widget.install ~schedule;
+  listen (Dom.Event.make "change") (fun ev ->
+    (match Js.Opt.to_option ev##.target with
+     | Some el when String.equal (Js.to_string el##.id) image_input_id ->
+       let input : Dom_html.inputElement Js.t = Js.Unsafe.coerce el in
+       Js.Opt.iter input##.files (fun files -> read_images ~schedule files);
+       input##.value := Js.string ""
+     | _ -> ());
+    Js._true);
   Paging_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
   Jump_listeners.install ();

@@ -541,7 +541,6 @@ let%expect_test "/confirm" =
       (Config_saved
        "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 5580))
-    (Asks: edits & commands)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
