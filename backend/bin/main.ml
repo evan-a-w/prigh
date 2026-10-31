@@ -255,6 +255,8 @@ let common_params =
                      ~session:(fun () -> Option.map !agent_ref ~f:Agent.session)
                      ()
                  ; Tool_pull_request.create ~forges ~worktrees_dir ()
+                 ; Tool_issue.create ~forges ()
+                 ; Tool_repo.create ~forges ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)
