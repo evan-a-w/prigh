@@ -415,14 +415,15 @@ scenario_approvals() {
 	capture approvals "Alt+M: auto-edit"
 }
 
-# Plan mode: Alt+M into it, an edit refused, the plan approved, then
+# Plan mode: Alt+M into it, an edit refused, the plan given as a reply; the
+# user leaves plan mode with /plan off and asks for it, and it is
 # implemented.
 setup_plan() {
 	extra_args="-- -faux-script $tmp/script.json"
 	cat >"$tmp/script.json" <<'JSON'
 [
   {"text": "looking", "tool_calls": [{"id": "c1", "name": "write", "arguments": {"path": "a.txt", "content": "x"}}]},
-  {"text": "planned", "tool_calls": [{"id": "c2", "name": "exit_plan_mode", "arguments": {"plan": "1. Write a.txt\n2. Check it"}}]},
+  {"text": "Plan:\n1. Write a.txt\n2. Check it"},
   {"text": "implementing", "tool_calls": [{"id": "c3", "name": "write", "arguments": {"path": "a.txt", "content": "x"}}]},
   {"text": "all done"}
 ]
@@ -435,13 +436,17 @@ scenario_plan() {
 	wait_for "mode:plan"
 	type_text "add a.txt"
 	keys Enter
-	wait_for "Approve the plan"
+	wait_for "2. Check it"
 	settle
-	capture plan "the plan to approve"
-	keys y
+	capture plan "the plan, in plan mode"
+	type_text "/plan off"
+	keys Enter
+	wait_for "mode:auto"
+	type_text "go ahead"
+	keys Enter
 	wait_for "all done"
 	settle
-	capture plan "approved and implemented"
+	capture plan "plan mode off, implemented"
 }
 
 # The model asks: a dialog per question, answered with the keys. Without a

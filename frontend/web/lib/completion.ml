@@ -179,7 +179,7 @@ let argument_items
              ~f:Session_mode.describe )))
   | Plan ->
     simple
-      [ "on", "read-only planning until you approve the plan"
+      [ "on", "read-only planning until you turn it off"
       ; "off", "leave plan mode"
       ]
   | Notify ->

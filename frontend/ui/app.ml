@@ -5318,14 +5318,13 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
   | (Insert ("n" | "N") | Cancel | Interrupt), _ -> no { m with mode = Editing }
-  | Insert ("a" | "A"), Tool_confirm ({ rules = _ :: _; _ } as c)
-    when not (Confirm_prompt.is_plan c) ->
+  | Insert ("a" | "A"), Tool_confirm ({ rules = _ :: _; _ } as c) ->
     answer_confirm { m with mode = Editing } c Always
   | Insert ("r" | "R"), Tool_confirm c ->
     ( { m with
         mode =
           Text_prompt
-            { question = Confirm_prompt.reason_question c
+            { question = Confirm_prompt.reason_question
             ; action = Deny_reason { confirm = c; draft = Editor.text m.editor }
             }
       ; editor = Editor.clear m.editor

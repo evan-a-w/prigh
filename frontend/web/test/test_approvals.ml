@@ -62,7 +62,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
+       "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
     <button type="button"
             title="Switching to plan…"
             disabled=""
@@ -79,9 +79,9 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   toasts h;
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4980))
+    (Expire_toast (id 0) (after_ms 6000))
     <button type="button"
-            title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
+            title="Read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             data-short="plan"
             aria-haspopup="dialog"
             aria-expanded="false"
@@ -91,7 +91,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
       <span class="chip-label"> Plan mode </span>
       <icon class="chevron"> </icon>
     </button>
-    Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
+    Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     |}];
   (* Option+M types a symbol on a Mac: the physical key counts. *)
   H.key h "µ" ~alt:true ~code:"KeyM";
@@ -104,7 +104,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
      (tag
       (Mode_set "Mode: ask (bash, job_input, edits and MCP tools ask first)")))
     (Asks: edits & commands)
-    Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
+    Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     |}];
   (* Not taken: said, and the backend's state shown again. *)
   H.fail h "set_mode" "no session";
@@ -115,7 +115,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     (Plan mode)
-    Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
+    Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     Couldn't set the mode: no session (Dismiss)
     |}];
   (* Clicking the chip opens its menu over it: what each asks first. *)
@@ -130,7 +130,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Asks: edits & commands bash, job_input, edits and MCP tools ask first
     Asks: commands file edits run; bash, job_input and MCP tools ask first
     Auto: never asks tools run without asking
-    ✓ Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
+    ✓ Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Enter chooses, ← → the next setting, Esc closes
     |}];
   (* The filter knows the short names too. *)
@@ -201,7 +201,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
+       "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
     (Plan mode)
     (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
      (tag Ignore))
@@ -213,7 +213,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
+       "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/plan off") (max 500))) (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
@@ -246,9 +246,9 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
-    plan read-only planning: no file edits; bash, job_input and MCP tools ask first
+    plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Plan mode ↑↓ Tab Enter Esc   Ctrl+Enter as typed
-    on read-only planning until you approve the plan
+    on read-only planning until you turn it off
     off leave plan mode
     |}]
 ;;
@@ -357,7 +357,7 @@ let%expect_test "/permissions" =
     (Focus dialog)
     Permissions
     (Close (Esc))
-    Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
+    Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     Allowed this session: nothing yet (a confirmation's "always" adds to it)
     allow (config): bash(git status:*)
     deny (config): bash(rm:*), write(/etc/**)
@@ -522,82 +522,46 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     |}]
 ;;
 
-let%expect_test "approving the plan" =
+let%expect_test "plan mode: the composer says how to leave it" =
+  let placeholder h = H.show h ~selector:"#editor" in
   let h = H.create ~state:(state ~plan_mode:true ()) () in
-  H.event
-    h
-    (confirm
-       ~name:"exit_plan_mode"
-       ~rules:[ "never shown" ]
-       "p1"
-       "## Plan\n\n1. Change `main.ml`\n2. Test");
-  modal h;
-  H.show h ~selector:".confirm-plan";
+  placeholder h;
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  placeholder h;
+  H.event h (sprintf {|{"event":"state","state":%s}|} (state ()));
+  placeholder h;
   [%expect
     {|
-    (Focus confirm)
-    Plan
-    (Close (Esc))
-    Approve the plan and start implementing?
-    Plan
-    Change main.ml
-    Test
-    (y Approve: leave plan mode and implement) (n Keep planning) (r Keep planning, saying what to change)
-    <div class="confirm-plan">
-      <div class="markdown">
-        <div class="md-part">
-          <h2 dir="auto"> Plan </h2>
-        </div>
-        <div class="md-part">
-          <ol>
-            <li dir="auto">
-              Change
-              <code> main.ml </code>
-            </li>
-            <li dir="auto"> Test </li>
-          </ol>
-        </div>
-      </div>
-    </div>
-    |}];
-  H.key h "a";
-  H.key h "r";
-  H.input h ~selector:"#confirm-reason" "add docs";
-  modal h;
-  H.click h ~selector:".modal-buttons .danger";
-  toasts h;
-  [%expect
-    {|
-    (browser default)
-    (Answer_confirm (call_id p1) (agent_id ()) (answer Deny_with_reason))
-    (Focus confirm-reason)
-    (Confirm_reason_input "add docs")
-    Plan
-    (Close (Esc))
-    Approve the plan and start implementing?
-    What should change in the plan?
-    [add docs]
-    (Back) (Keep planning)
-    Send_confirm_reason
-    (Rpc (method_ tool_confirm_respond)
-     (params ((call_id p1) (allow false) (reason "add docs"))) (tag Answer))
-    (Focus editor)
-    (Expire_toast (id 0) (after_ms 2820))
-    Plan not approved: still planning
-    |}];
-  H.event h (confirm ~name:"exit_plan_mode" "p2" "1. Do it");
-  H.key h "y";
-  toasts h;
-  [%expect
-    {|
-    (Focus confirm)
-    (Answer_confirm (call_id p2) (agent_id ()) (answer Allow))
-    (Rpc (method_ tool_confirm_respond) (params ((call_id p2) (allow true)))
-     (tag Answer))
-    (Focus editor)
-    (Expire_toast (id 1) (after_ms 2500))
-    Plan not approved: still planning
-    Plan approved
+    <textarea id="editor"
+              placeholder="Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…"
+              aria-label="Message"
+              dir="auto"
+              rows="1"
+              autocomplete="off"
+              enterkeyhint="send"
+              class="editor"
+              #value=""
+              @on_input> </textarea>
+    <textarea id="editor"
+              placeholder="Plan mode: /plan off to implement"
+              aria-label="Message"
+              dir="auto"
+              rows="1"
+              autocomplete="off"
+              enterkeyhint="send"
+              class="editor"
+              #value=""
+              @on_input> </textarea>
+    <textarea id="editor"
+              placeholder="Ask prigh…  / commands"
+              aria-label="Message"
+              dir="auto"
+              rows="1"
+              autocomplete="off"
+              enterkeyhint="send"
+              class="editor"
+              #value=""
+              @on_input> </textarea>
     |}]
 ;;
 
@@ -1095,7 +1059,7 @@ let tool ?result ?(is_error = false) name id arguments =
     ])
 ;;
 
-let%expect_test "update_plan, ask_user and exit_plan_mode in the transcript" =
+let%expect_test "update_plan and ask_user in the transcript" =
   let chat =
     Chat_harness.chat
       ~running:true
@@ -1116,25 +1080,15 @@ let%expect_test "update_plan, ask_user and exit_plan_mode in the transcript" =
            ~is_error:true
            ~result:"The user declined to answer."
        @ tool
-           "exit_plan_mode"
-           "t4"
-           {|{"plan":"1. Change `main.ml`\n2. Test"}|}
-           ~is_error:true
-           ~result:
-             "[the user did not approve the plan; their feedback: docs too] \
-              Stay in plan mode."
-       @ tool "exit_plan_mode" "t5" {|{"plan":"1. Do it"}|} ~result:"Approved."
-       @ tool
            "ask_user"
            "t6"
-           {|{"questions":[{"question":"Ready?"},{"question":"Sure?"}]}|}
-       @ tool "exit_plan_mode" "t7" {|{"plan":"1. Again"}|})
+           {|{"questions":[{"question":"Ready?"},{"question":"Sure?"}]}|})
   in
   Chat_harness.text chat;
   [%expect
     {|
     ✓ update_plan 1/3 done first pass ✓ read the code ▸ change it ○ test ✓ ask_user Q: Which database?
-    A: Postgres ✕ ask_user no answer The user declined to answer. ✕ exit_plan_mode not approved Change main.ml Test [the user did not approve the plan; their feedback: docs too] Stay in plan mode. ✓ exit_plan_mode approved Do it ask_user waiting for your answer Ready? Sure? exit_plan_mode waiting for your approval Again
+    A: Postgres ✕ ask_user no answer The user declined to answer. ask_user waiting for your answer Ready? Sure?
     |}];
   Chat_harness.show ~selector:".tool-update_plan" chat;
   [%expect

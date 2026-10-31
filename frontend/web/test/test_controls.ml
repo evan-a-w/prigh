@@ -876,7 +876,7 @@ let%expect_test
     (Focus popover-list)
     Place_popover
     (Dialog_move 1)
-    Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
+    Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Close_dialog
     (Focus editor)
     (Claude Sonnet 5)
@@ -1113,14 +1113,14 @@ let%expect_test "narrow: the same menu" =
     Asks: edits & commands bash, job_input, edits and MCP tools ask first
     Asks: commands file edits run; bash, job_input and MCP tools ask first
     ✓ Auto: never asks tools run without asking
-    Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first
+    Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Enter chooses, ← → the next setting, Esc closes
     [dialog] div "When tools ask first"
     [listbox] div "When tools ask first"
     [option] div "Asks: edits & commands bash, job_input, edits and MCP tools ask first"
     [option] div "Asks: commands file edits run; bash, job_input and MCP tools ask first"
     [option] div "Auto: never asks tools run without asking"
-    [option] div "Plan mode read-only planning: no file edits; bash, job_input and MCP tools ask first"
+    [option] div "Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first"
     |}]
 ;;
 

@@ -2,6 +2,7 @@ open! Core
 open! Import
 
 let max_turns = 50
+let name = "subagent"
 
 let instructions =
   "You are a subagent. Complete the task you were given, using the tools \
@@ -43,7 +44,7 @@ let sync_description =
 ;;
 
 let spec =
-  { Tool_spec.name = "subagent"
+  { Tool_spec.name
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
@@ -137,6 +138,13 @@ let worktree_arg args =
   | Some _ ->
     raise
       (Tool_args.Invalid "worktree must be a branch name or \"auto\" (or true)")
+;;
+
+let wants_worktree args =
+  match worktree_arg args with
+  | Some _ -> true
+  | None -> false
+  | exception Tool_args.Invalid _ -> false
 ;;
 
 (* [agent/<the name's first words>]. *)

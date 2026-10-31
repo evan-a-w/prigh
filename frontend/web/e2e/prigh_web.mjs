@@ -55,8 +55,8 @@ const script2 = [
   { text: "Noted." },
   { text: "Noted." },
 ];
-// After another restart: a bash call that asks first, a question, a plan to
-// approve, a run to queue messages in, then a session to archive.
+// After another restart: a bash call that asks first, a question, a plan made
+// in plan mode, a run to queue messages in, then a session to archive.
 const script3 = [
   { text: "building", tool_calls: [{ id: "b1", name: "bash", arguments: { command: "echo built-ok" } }] },
   { text: "Built." },
@@ -73,10 +73,10 @@ const script3 = [
     text: "here is the plan",
     tool_calls: [
       { id: "p1", name: "update_plan",
-        arguments: { plan: [{ step: "Write the schema", status: "in_progress" }, { step: "Test it", status: "pending" }] } },
-      { id: "p2", name: "exit_plan_mode", arguments: { plan: "1. Write the **schema**\n2. Test it" } },
+        arguments: { plan: [{ step: "Write the schema", status: "pending" }, { step: "Test it", status: "pending" }] } },
     ],
   },
+  { text: "1. Write the **schema**\n2. Test it" },
   { text: "Implementing." },
   // Long enough to queue messages while it runs.
   { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: { command: "sleep 4" } }] },
@@ -951,7 +951,8 @@ try {
   }
   // 11. Approvals. In mode ask a bash call asks first: "always" allows its
   //     rule for the rest of the session. The model's question is answered
-  //     with clicks; in plan mode its plan is approved with y.
+  //     with clicks; in plan mode it plans until the user turns plan mode
+  //     off.
   await stopServer();
   await bodyHas("reconnecting");
   await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
@@ -1038,15 +1039,19 @@ try {
   await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
   await show("plan mode (Alt+M)", ".composer-controls");
   await showStatus("plan mode: the status line");
+  section("plan mode: the composer's placeholder");
+  console.log(await page.locator("#editor").getAttribute("placeholder"));
   await send("plan it");
-  await page.locator("#confirm.plan-dialog").waitFor();
-  await show("a plan to approve", "#confirm");
-  await page.keyboard.press("y");
+  await bodyHas("Test it");
+  await idle();
+  await showTurn("the plan, in plan mode");
+  await send("/plan off");
+  await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
+  await send("go ahead");
   await bodyHas("Implementing.");
   await idle();
-  await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
-  await show("the plan approved", ".composer-controls");
-  await showStatus("the plan approved: the status line");
+  await show("plan mode off", ".composer-controls");
+  await showStatus("plan mode off: the status line");
   await showTurn("implementing");
   await send("/permissions");
   await page.locator(".modal").waitFor();

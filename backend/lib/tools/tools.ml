@@ -14,9 +14,8 @@ let all =
   ]
 ;;
 
-(* What the main agent uses to talk to the user: [update_plan], [ask_user],
-   [exit_plan_mode]. *)
-let interaction = [ Plan.tool; Tool_ask_user.tool; Tool_exit_plan_mode.tool ]
+(* What the main agent uses to talk to the user: [update_plan], [ask_user]. *)
+let interaction = [ Plan.tool; Tool_ask_user.tool ]
 let variants = [ Tool_apply_patch.tool ]
 let builtin = all @ variants
 let find name = List.find builtin ~f:(fun t -> String.equal (Tool.name t) name)
@@ -71,12 +70,7 @@ let subagent_control =
 (* The session's plan, goal, plan mode and the user belong to the main
    agent. *)
 let main_agent_only =
-  [ Plan.tool_name
-  ; Tool_ask_user.name
-  ; Tool_exit_plan_mode.name
-  ; Goal.tool_name
-  ; Tool_review_reply.name
-  ]
+  [ Plan.tool_name; Tool_ask_user.name; Goal.tool_name; Tool_review_reply.name ]
 ;;
 
 (* Why a tool is not available at [depth], if it is not. *)

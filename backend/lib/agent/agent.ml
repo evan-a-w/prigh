@@ -674,49 +674,6 @@ let denied_text = function
   | Some reason -> sprintf "[denied by user] Their reason: %s" reason
 ;;
 
-let exit_plan_mode t context args =
-  if not t.plan_mode
-  then
-    Tool.Result.error
-      "plan mode is not on, so there is no plan to approve: go ahead"
-  else (
-    match
-      confirm
-        t
-        context
-        ~name:Tool_exit_plan_mode.name
-        ~summary:(Tool_exit_plan_mode.plan args)
-        ~rules:[]
-        ~recheck:(fun () -> not t.plan_mode)
-    with
-    | None -> Tool.Result.error "[cancelled]"
-    | Some (Allow | Always) when not t.plan_mode ->
-      (* Released by the user switching plan mode off, not by an answer. *)
-      tell t { t.told with plan_mode = false };
-      Tool.Result.ok
-        (sprintf
-           "The user turned plan mode off without answering about this plan \
-            (approval mode: %s): you can change files now. Implement the plan \
-            unless they said otherwise."
-           (Approval_mode.to_string t.approval_mode))
-    | Some (Allow | Always) ->
-      tell t { t.told with plan_mode = false };
-      switch_mode t ~plan:false;
-      Tool.Result.ok
-        (sprintf
-           "The user approved the plan. Plan mode is off (approval mode: %s), \
-            so you can change files now: implement the plan."
-           (Approval_mode.to_string t.approval_mode))
-    | Some (Deny reason) ->
-      Tool.Result.error
-        (sprintf
-           "[the user did not approve the plan%s] Stay in plan mode: revise \
-            the plan and call exit_plan_mode again when it is ready."
-           (match reason with
-            | None -> ""
-            | Some reason -> "; their feedback: " ^ reason)))
-;;
-
 let ask_user t ~cancel ~call_id ~timeout_seconds questions =
   let timeout =
     User_question.timeout
@@ -1364,57 +1321,53 @@ let active_host_home t =
 let approve t : Tool.approver =
   fun context tool args ->
   let name = Tool.name tool in
-  if String.equal name Tool_exit_plan_mode.name
-  then Some (exit_plan_mode t context args)
-  else (
-    (* Asking an older host for its home is only worth it for a [~] in the
-       call; rules with [~] use what is known (else the backend's home). *)
-    let home =
-      Option.bind (find_host t t.active_host) ~f:(fun host ->
-        if String.is_substring (Json.to_string args) ~substring:"~"
-        then host_home t host
-        else known_home t host)
-      |> Option.value_or_thunk ~default:(fun () -> Tool.expand_home "~")
+  (* Asking an older host for its home is only worth it for a [~] in the
+     call; rules with [~] use what is known (else the backend's home). *)
+  let home =
+    Option.bind (find_host t t.active_host) ~f:(fun host ->
+      if String.is_substring (Json.to_string args) ~substring:"~"
+      then host_home t host
+      else known_home t host)
+    |> Option.value_or_thunk ~default:(fun () -> Tool.expand_home "~")
+  in
+  let call = Approval_rule.Call.create ~home ~cwd:context.cwd ~tool:name args in
+  let decide () =
+    Approval.decide
+      ~mode:t.approval_mode
+      ~plan:t.plan_mode
+      ~rules:t.config.permissions
+      ~session:t.session_rules
+      ~cwd:t.cwd
+      ~home
+      ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
+      ~changes_work:(Plan_mode.changes_work ~tool:name args)
+      call
+  in
+  match decide () with
+  | Allow -> None
+  | Deny text -> Some (Tool.Result.error text)
+  | Ask { rules } ->
+    let recheck () =
+      match decide () with
+      | Allow -> true
+      | Ask _ | Deny _ -> false
     in
-    let call =
-      Approval_rule.Call.create ~home ~cwd:context.cwd ~tool:name args
-    in
-    let decide () =
-      Approval.decide
-        ~mode:t.approval_mode
-        ~plan:t.plan_mode
-        ~rules:t.config.permissions
-        ~session:t.session_rules
-        ~cwd:t.cwd
-        ~home
-        ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
-        call
-    in
-    match decide () with
-    | Allow -> None
-    | Deny text -> Some (Tool.Result.error text)
-    | Ask { rules } ->
-      let recheck () =
-        match decide () with
-        | Allow -> true
-        | Ask _ | Deny _ -> false
-      in
-      (match
-         confirm
-           t
-           context
-           ~name
-           ~summary:(Agent_loop.tool_summary ~name args)
-           ~rules
-           ~recheck
-       with
-       | None -> Some (Tool.Result.error "[cancelled]")
-       | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
-       | Some (Allow | Always) ->
-         (* Plan mode may have started while the user was deciding. *)
-         (match decide () with
-          | Deny text -> Some (Tool.Result.error text)
-          | Allow | Ask _ -> None)))
+    (match
+       confirm
+         t
+         context
+         ~name
+         ~summary:(Agent_loop.tool_summary ~name args)
+         ~rules
+         ~recheck
+     with
+     | None -> Some (Tool.Result.error "[cancelled]")
+     | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
+     | Some (Allow | Always) ->
+       (* Plan mode may have started while the user was deciding. *)
+       (match decide () with
+        | Deny text -> Some (Tool.Result.error text)
+        | Allow | Ask _ -> None))
 ;;
 
 (* Where [path] would take the session on [host], creating it or asking
@@ -2466,8 +2419,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
            then false
            else if t.plan_mode
            then
-             (* The model cannot work towards the goal in plan mode: it waits
-             for the user to approve the plan, then carries on. *)
+             (* The model cannot work towards the goal in plan mode: it
+                carries on once the user turns plan mode off. *)
              false
            else (
              match budget_exhausted t, last_stop added with
@@ -3581,7 +3534,7 @@ let clear_reminders t =
 ;;
 
 (* Leaving plan mode while idle carries on an active goal, which waited for
-   the plan's approval. *)
+   the user to leave it. *)
 let set_mode ?approval ?plan t =
   let was_planning = t.plan_mode in
   switch_mode ?approval ?plan t;

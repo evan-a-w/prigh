@@ -899,8 +899,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   in a list of messages, which is how `Agent` keeps it as session state
   (persisted for free, following rewinds and forks). `User_question`
   (`ask_user`'s questions, answers checked against them, the result text)
-  and `Tool_ask_user`; `Tool_exit_plan_mode` (its call is handled entirely
-  by the agent's approver). `Tools.interaction` holds the three; they are
+  and `Tool_ask_user`. `Tools.interaction` holds the two; they are
   not tool-host tools, and `Tools.for_context` drops them for subagents,
   which cannot ask the user (nor `goal_complete`, `job_input` and the other
   background controls).
@@ -1102,8 +1101,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   in the session, and lets through any other pending call they now cover),
   `Deny reason`), a mode change lets through those it no longer stops, and
   `Tool_confirm_done` follows whatever ends it, so every frontend closes its
-  dialog. `exit_plan_mode` is answered by the approver itself: a
-  confirmation whose summary is the plan; approving leaves plan mode.
+  dialog. In plan mode `Approval.decide` refuses what
+  `Plan_mode.changes_work` names (file edits, worktree and pull-request
+  changes, subagents in a worktree) and asks for every other destructive
+  call; only the user leaves plan mode (the model has no tool for it).
   `set_mode` switches the approval mode and/or plan mode (recorded in the
   session; a changed config `approval_mode` switches the session too). The
   model is told about plan mode by `System_prompt.plan_mode_note`, on the
@@ -2390,8 +2391,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     transcript, and fetches `get_state`, `get_messages` and `get_pending`,
     whose reply also sets the queue. Deny with a reason is a
     `Text_prompt` (`Deny_reason`, keeping the editor's draft; Esc goes back
-    to the confirmation). `Tool_render` draws `update_plan`, `ask_user` and
-    `exit_plan_mode` calls.
+    to the confirmation). `Tool_render` draws `update_plan` and `ask_user`
+    calls.
   - `Layout` computes the frame's fixed zones from the size, the sidebar
     preference (off by default, Alt+L) and the editor's rows: main area
     (sidebar of `Layout.sidebar_width` columns at `Layout.sidebar_threshold`
@@ -2954,8 +2955,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       dialog, the popup or the editor owns a key; `help`, and `browser`:
       the TUI's keys that the browser keeps).
     - Approvals: the confirmation dialog (`Dialog_view`, answers from
-      `Prigh_ui.Confirm_prompt` as buttons, a reason field, the plan of
-      `exit_plan_mode` as markdown) and `Question_dialog`/`Question_view`
+      `Prigh_ui.Confirm_prompt` as buttons, a reason field) and `Question_dialog`/`Question_view`
       (the model's `ask_user`, over `Prigh_ui.Question_form`: radio buttons
       or checkboxes and an own answer, keys and clicks, and the deadline's
       note); both queue
@@ -3450,7 +3450,8 @@ splitting, globs, which calls rules cover and touch, suggestions and
 `Approval.decide` across the modes; `test_approvals.ml` drives agents with
 `Faux_provider` through the modes, always-allow rules surviving a reload,
 deny with a reason, config rules, subagents' confirmations, plan mode (edits
-refused, notes, `exit_plan_mode` approved or not, switched on mid-run),
+and other implementing calls refused, notes, no tool to leave it, switched
+on mid-run),
 `update_plan` and `ask_user` (answers, first answer wins, abort); and
 `test_approvals_rpc.ml` the same over the RPC with two clients
 (`set_mode`, `get_pending`, `tool_confirm_done`, `ask_user_respond`). The

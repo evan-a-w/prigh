@@ -1,4 +1,4 @@
-What waits for the user: confirmations, approvals, plans, questions.
+What waits for the user: confirmations, approvals, plan mode, questions.
 Each command runs one scenario from harness.sh in a fresh tmux session and
 prints the captured panes.
 
@@ -136,45 +136,40 @@ prints the captured panes.
   >
   $TMP/cwd  deepseek-flash  think:on  mode:auto-edit  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh plan
-  === the plan to approve
+  === the plan, in plan mode
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
-      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
-      then call exit_plan_mode with the plan for the user to approve.
-    planned
-  … exit_plan_mode  waiting for your approval
-      1. Write a.txt
-      2. Check it
-  ┌─ Plan ───────────────────────────────────────────────────────────────────────────────────────────┐
-  │ Approve the plan and start implementing?                                                         │
-  │ 1. Write a.txt                                                                                   │
-  │ 2. Check it                                                                                      │
-  │                                                                                                  │
-  │ y  approve: leave plan mode and implement                                                        │
-  │ n  keep planning                                                                                 │
-  │ r  keep planning, saying what to change                                                          │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+      [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull
+      requests cannot be changed. Only the user turns plan mode off; do not try to get around this or
+      ask them to. Keep investigating with read-only tools, then present the plan in your reply and
+      wait.
+    Plan:
+    1. Write a.txt
+    2. Check it
   ────────────────────────────────────────────────────────────────────────────────────────────────────
-  ?
-  deepseek-flash  think:on  mode:plan  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/n/r
-  === approved and implemented
+  >
+  deepseek-flash  think:on  mode:plan  (/plan off or Alt+M leaves)  view:normal  ctx:0.0%/1.0M  $0.00
+  === plan mode off, implemented
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
-      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
-      then call exit_plan_mode with the plan for the user to approve.
-    planned
-  ✓ exit_plan_mode  approved
-      1. Write a.txt
-      2. Check it
-    plan approved
+      [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull
+      requests cannot be changed. Only the user turns plan mode off; do not try to get around this or
+      ask them to. Keep investigating with read-only tools, then present the plan in your reply and
+      wait.
+    Plan:
+    1. Write a.txt
+    2. Check it
+  
+  ◇ Plan mode off: the model was told it can change files
+  ▌ go ahead
     implementing
   ✓ write a.txt  1 line
     all done
