@@ -34,11 +34,17 @@ services:
       PRIGH_GIT_NAME: ${PRIGH_GIT_NAME:-}
       PRIGH_GIT_EMAIL: ${PRIGH_GIT_EMAIL:-}
       # Scheduled Nix garbage collection (DOCKER.md, "Garbage collection"):
-      # how often (default 1d; 0 = off) and the days of users' profile
-      # generations it keeps (default 14; 0 = only the current ones, off =
+      # how often (default 12h; 0 = off) and the days of users' profile
+      # generations it keeps (default 7; 0 = only the current ones, off =
       # all).
       PRIGH_NIX_GC_INTERVAL: ${PRIGH_NIX_GC_INTERVAL:-}
       PRIGH_NIX_GC_KEEP_DAYS: ${PRIGH_NIX_GC_KEEP_DAYS:-}
+      # Nix's min-free and max-free: while it builds or fetches, it collects
+      # when less than MIN is free on /nix's filesystem, until MAX is. A size
+      # (20G, 512M) or a percentage of the filesystem (20%); defaults 15% and
+      # 30% (clamped to 1-50 GiB and 3-100 GiB); MIN 0 = off.
+      PRIGH_NIX_MIN_FREE: ${PRIGH_NIX_MIN_FREE:-}
+      PRIGH_NIX_MAX_FREE: ${PRIGH_NIX_MAX_FREE:-}
     ports:
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_WEB_PORT:-7790}:7790"
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_SERVER_PORT:-7777}:7777"

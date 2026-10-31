@@ -171,8 +171,10 @@ user, `default`.
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
 | `PRIGH_CWD` | `/home/prigh` | working directory for `PRIGH_MODE=tui` only |
-| `PRIGH_NIX_GC_INTERVAL` | `1d` | how often the container collects Nix garbage: a number with `s`, `m`, `h` or `d` (`12h`, `7d`); `0` or `off`: never (see [Garbage collection](#garbage-collection)) |
-| `PRIGH_NIX_GC_KEEP_DAYS` | `14` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
+| `PRIGH_NIX_GC_INTERVAL` | `12h` | how often the container collects Nix garbage: a number with `s`, `m`, `h` or `d` (`12h`, `7d`); `0` or `off`: never (see [Garbage collection](#garbage-collection)) |
+| `PRIGH_NIX_GC_KEEP_DAYS` | `7` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
+| `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free`: while it builds or fetches, Nix collects garbage when less than this is free on `/nix`'s filesystem. Bytes as `nix.conf` takes them (`20G`, `512M`, `1T`, `10737418240`) or a percentage of the filesystem (`20%`); `0`: never |
+| `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`: such a collection stops once this much is free; same forms, more than `PRIGH_NIX_MIN_FREE` |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
@@ -240,15 +242,23 @@ only used with `nix shell` or `nix run` is garbage, fetched again when
 needed. GC roots in `/nix/var/nix/gcroots/prigh` keep the paths prigh and
 nix need. Three things clean it:
 
-- **While Nix works.** When it fetches or builds with less than 10% of the
-  volume's filesystem free, it deletes unused paths until 25% is (at least
-  1 and 3 GiB, at most 50 and 100 GiB). The entrypoint sizes these limits
-  from the filesystem at every start, in `/run/prigh/nix.conf` (included by
-  `/etc/nix/nix.conf`); the startup line says what they are.
-- **On a schedule.** Every `PRIGH_NIX_GC_INTERVAL` (default a day; the
+- **While Nix works.** When it fetches or builds with less than
+  `PRIGH_NIX_MIN_FREE` free on the volume's filesystem, it deletes unused
+  paths until `PRIGH_NIX_MAX_FREE` is free: Nix's own `min-free` and
+  `max-free`, as a size (`20G`) or a percentage of the filesystem (`20%`).
+  The defaults, 15% and 30%, are clamped to 1–50 GiB and 3–100 GiB (on a
+  104 GiB disk: below 15.6 GiB free, up to 31.2 GiB); values you set are
+  used as given, and `PRIGH_NIX_MIN_FREE=0` turns this off. The entrypoint
+  works them out from the filesystem at every start, into
+  `/run/prigh/nix.conf` (included by `/etc/nix/nix.conf`); the startup line
+  says what they are. Only Nix's own work triggers this: when something
+  else on a shared disk fills it, the scheduled collection is what frees
+  space, so raise these values (or shorten the interval) if `/nix` shares
+  its disk.
+- **On a schedule.** Every `PRIGH_NIX_GC_INTERVAL` (default 12 hours; the
   first run at least 5 minutes after start, counted from the last one, so
   restarts do not postpone it), the entrypoint deletes every user's profile
-  generations older than `PRIGH_NIX_GC_KEEP_DAYS` (default 14), as that user,
+  generations older than `PRIGH_NIX_GC_KEEP_DAYS` (default 7), as that user,
   then runs `nix store gc` as root. Profiles are those under
   `~/.local/state/nix/profiles` (where `nix profile` keeps them) and the
   older `/nix/var/nix/profiles/per-user/NAME`; the current generation is
