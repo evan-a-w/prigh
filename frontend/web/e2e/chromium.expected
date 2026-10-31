@@ -144,25 +144,31 @@ a red flag with a blue stripe
 data:image/png;base64, 24x16
 === chromium: an image open: the chips ===
 model: under .lightbox
-thinking: under .lightbox
-mode: under .lightbox
 host: under .lightbox
+=== chromium: drawing on the read tool's image ===
+viewer closed: true
+Saving attaches the drawing to your next message.
+Cancel
+Attach
 === chromium: a chip's menu open: the chips ===
 model: the chip, on top
-thinking: the chip, on top
-mode: the chip, on top
 host: the chip, on top
 === chromium: attached in the composer ===
 data:image/png;base64, 20x10
 data:image/png;base64, 12x30
+=== chromium: drawing: nothing drawn, nothing to save ===
+save enabled: false
+=== chromium: drawn on, in the composer ===
+data:image/png;base64, 20x10
+data:image/png;base64, 96x240
 composer cleared: true
 === chromium: the prompt's images ===
 data:image/png;base64, 20x10
-data:image/png;base64, 12x30
+data:image/png;base64, 96x240
 === chromium: the backend's copy of the prompt ===
 what are these?
 image/png 20x10
-image/png 12x30
+image/png 96x240
 url has the session: true
 same session after reload: true
 === chromium: sidebar after reload ===
@@ -368,56 +374,38 @@ anything new?
 === chromium: the model saw the note ===
 [Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 anything new?
-=== chromium: the model, thinking and mode controls ===
+=== chromium: the model and host controls ===
 DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
 <HOSTNAME>
 === chromium: the host picker ===
 Where tools run
 <HOSTNAME>
 <CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
-=== chromium: the thinking chip's menu ===
-Thinking
-Alt+T cycles
-Off
-answer straight away
-Low
-a little
-On
-the provider's default budget
-High
-more
-Max
-as much as the model allows
-Enter chooses, ← → the next setting, Esc closes
-thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+=== chromium: the + menu ===
+Add to your message
+or paste, or drop
+Files…
+uploaded to the tool host; the agent gets their paths
+Images…
+shown to the model; draw on it before sending
+Enter chooses, Esc closes
+attach's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 closed: true; focus: editor
 model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: the model chip's menu, filtered ===
 DeepSeek V4.1 Flash
 DeepSeek, not logged in
 1M
-=== chromium: the mode chip's menu, from the model's with → → ===
-When tools ask first
-Alt+M cycles
-Asks: edits & commands
-bash, job_input, edits and MCP tools ask first
-Asks: commands
-file edits run; bash, job_input and MCP tools ask first
-Auto: never asks
-tools run without asking
-Plan mode
-read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+=== chromium: the host chip's menu, from the model's with → ===
+/host
+<HOSTNAME>
+<CWD>/sub
+The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
 Enter chooses, ← → the next setting, Esc closes
-mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+host's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 === chromium: mode ask ===
 DeepSeek V4.1 Flash
-Thinking
-high
-Asks: edits & commands
 <HOSTNAME>
 === chromium: a confirmation ===
 Confirm
@@ -460,9 +448,6 @@ SQLite it is.
 <TIME>
 === chromium: plan mode (Alt+M) ===
 DeepSeek V4.1 Flash
-Thinking
-high
-Plan mode
 <HOSTNAME>
 === chromium: plan mode: the status line ===
 Ready
@@ -486,9 +471,6 @@ Test it
 <TIME>
 === chromium: plan mode off ===
 DeepSeek V4.1 Flash
-Thinking
-high
-Auto: never asks
 <HOSTNAME>
 === chromium: plan mode off: the status line ===
 Ready
@@ -529,11 +511,9 @@ Done waiting.
 <TIME>
 === chromium: phone: the drawer open: the chips ===
 model: under .sidebar, .scrim
-thinking: under .sidebar, .scrim
-mode: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
-thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
+attach's menu: above the composer, as wide as the composer, inside the window; focus in it: true
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -732,19 +712,19 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
+chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
@@ -775,8 +755,6 @@ Keyboard shortcuts
 Done
 === chromium: a dialog open: the chips ===
 model: under .modal-backdrop
-thinking: under .modal-backdrop
-mode: under .modal-backdrop
 host: under .modal-backdrop
 a choice keeps it open: true
 === chromium: settings: the sections ===
@@ -788,17 +766,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
+chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
 .session-card, .session-bar: fits
-.composer: fits
+.composer: div.composer-box overlaps div.composer-tier.composer-controls
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -2345,7 +2323,7 @@ row 4: feature/a-rather-long-branch-for-the-sidebar-card
 lamps: 0; accented: nothing; 127px high
 fits
 === chromium: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | <HOSTNAME>
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME>
 chip problems: none
 === chromium: card: another host to choose ===
 ✓ <HOSTNAME>
@@ -2357,7 +2335,7 @@ row 3: [meter] 0%
 row 4: feature/a-rather-long-branch-for-the-sidebar-card
 lamps: 0; accented: nothing; 127px high
 fits
-chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | build-runner-eu-west-a-long-hostname
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
 === chromium: card: the context opens the session's details ===
 Session
@@ -2369,7 +2347,7 @@ fits
 row 1: survey the project | icon | 0% | icon
 lamps: 0; accented: nothing; 44px high
 fits
-chips 1: DeepSeek V4.1 Flash | on | icon | build-runner-eu-west-a-long-hostname
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
 === chromium: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
