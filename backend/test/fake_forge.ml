@@ -5,23 +5,30 @@ open! Prigh
    them. *)
 
 type t =
-  { handler : Forge_http.Request.t -> int * string
+  { handler : Forge_http.Request.t -> Forge_http.Response.t
   ; requests : Forge_http.Request.t Queue.t
   }
 
-let create handler = { handler; requests = Queue.create () }
+(* [handler] answers with a status and a body (no headers). *)
+let create handler =
+  { handler =
+      (fun r ->
+        let status, body = handler r in
+        { Forge_http.Response.status; headers = []; body })
+  ; requests = Queue.create ()
+  }
+;;
+
+(* [handler] answers with whole responses (headers too). *)
+let create_full handler = { handler; requests = Queue.create () }
 
 let http t : Forge_http.t =
   fun ?cancel:_ request ->
   Queue.enqueue t.requests request;
-  let status, body = t.handler request in
-  Ok { Forge_http.Response.status; body }
+  Ok (t.handler request)
 ;;
 
-let meth_string : Forge_http.Meth.t -> string = function
-  | Get -> "GET"
-  | Post -> "POST"
-;;
+let meth_string = Forge_http.Meth.to_string
 
 (* What was asked: method, URL, Authorization and Accept when not the
    usual, and the body. *)
