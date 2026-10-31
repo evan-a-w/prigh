@@ -62,7 +62,7 @@ let card h =
   print_endline "now:";
   H.text h ~selector:".session-bar .status";
   print_endline "applies:";
-  H.text h ~selector:".session-bar > .status-extras";
+  H.text h ~selector:".session-bar .bar-tray > .status-extras";
   print_endline "context:";
   H.text h ~selector:".session-bar .status .context";
   print_endline "where:";
@@ -226,6 +226,7 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
   (* A branch: a third line, the branch only, whatever the hosts; the plan
      is not on the card. *)
   H.elements h ~selector:".session-bar > *";
+  H.elements h ~selector:".bar-tray > *";
   H.names h ~selector:".session-bar .session-title > .branch";
   H.elements h ~selector:".session-bar .plan";
   state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
@@ -235,11 +236,14 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
     {|
     <Vdom.Node.none-widget class="">
     <div class="session-title">
+    <Vdom.Node.none-widget class="">
+    <div class="bar-tray">
+    <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="status-extras">
     <div class="session-chips">
     <div class="status">
     <div class="panel-toggles">
-    <Vdom.Node.none-widget class="">
     button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
     <button class="link mode plan status-item">
     (Rpc (method_ list_worktrees) (params ())
@@ -278,6 +282,7 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
   (* Out of git: no third line. *)
   state h ();
   H.elements h ~selector:".session-bar > *";
+  H.elements h ~selector:".bar-tray > *";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -286,11 +291,14 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
                             \n/work") (purpose (Sidebar 4)))))
     <Vdom.Node.none-widget class="">
     <div class="session-title">
+    <Vdom.Node.none-widget class="">
+    <div class="bar-tray">
+    <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="status-extras">
     <div class="session-chips">
     <div class="status">
     <div class="panel-toggles">
-    <Vdom.Node.none-widget class="">
     |}];
   (* Without the sidebar the bar keeps the rest on one line, with the plan
      (opening /todos); the host stays the composer's alone. *)
@@ -323,5 +331,44 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
     (Settings (Ctrl+, or /settings))
     (Run /todos)
     (Focus dialog)
+    |}]
+;;
+
+(* A phone: the header keeps its title, the rest folds into a tray that a
+   glance at the status (a dot, the percent) opens; Esc or the scrim close
+   it. Wider, there is no glance and the tray is laid out in the header. *)
+let%expect_test "a phone's header: the glance opens the tray" =
+  let h = H.create () in
+  H.elements h ~selector:".bar-tray-toggle";
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.show h ~selector:".bar-tray-toggle";
+  H.click h ~selector:".bar-tray-toggle";
+  H.elements h ~selector:".bar-tray.open";
+  H.names h ~selector:".bar-tray-toggle";
+  H.key h "Escape" ~target:Page;
+  H.elements h ~selector:".bar-tray.open";
+  H.click h ~selector:".bar-tray-toggle";
+  H.click h ~selector:".bar-tray-backdrop";
+  H.elements h ~selector:".bar-tray-backdrop";
+  [%expect {|
+    <button type="button"
+            title="Status, thinking, mode and panels"
+            aria-label="Status and controls"
+            aria-controls="bar-tray"
+            aria-expanded="false"
+            class="bar-tray-toggle btn ghost"
+            @on_click>
+      <span aria-hidden="true" class="status-glance">
+        <span class="idle-dot"> </span>
+        <span class="glance-percent"> 0% </span>
+      </span>
+      <icon class="chevron"> </icon>
+    </button>
+    Toggle_status_tray
+    <div class="bar-tray open">
+    button "Status and controls" -- Status, thinking, mode and panels
+    Toggle_status_tray
+    Toggle_status_tray
+    Toggle_status_tray
     |}]
 ;;

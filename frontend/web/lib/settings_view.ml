@@ -354,6 +354,28 @@ let naming_model (m : App.Model.t) ~inject =
     ]
 ;;
 
+let dictation_model (m : App.Model.t) ~inject =
+  let current =
+    Option.bind m.config ~f:(fun c -> c.dictation_model)
+    |> Option.value ~default:Config.default_dictation_model
+  in
+  row
+    ~cls:"dictation-model"
+    ~name:"Dictation"
+    ~about:
+      "Turns what you say into text (the composer's microphone): an OpenAI \
+       or OpenAI-compatible transcription model. Without one, the browser's \
+       own speech recognition, where it has one."
+    [ select
+        ~cls:"dictation-model-choice"
+        ~title:"Choose the model (/dictation model)"
+        ~label:("Dictation model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/dictation model"))
+        current
+    ]
+;;
+
 let compaction (m : App.Model.t) ~inject =
   [ compact_at m m.config ~inject; mask m.config ~inject ]
 ;;
@@ -661,7 +683,10 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ; group
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"
-        [ naming_model m ~inject; summary_model m m.config ~inject ]
+        [ naming_model m ~inject
+          ; summary_model m m.config ~inject
+          ; dictation_model m ~inject
+          ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]

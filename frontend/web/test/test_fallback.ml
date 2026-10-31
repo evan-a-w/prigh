@@ -60,7 +60,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
      (tag Ignore))
     (Expire_toast (id 0) (after_ms 5780))
@@ -91,7 +91,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5)) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   (* After a hand-over the status line's model moves on, and so does
      /fallback's "now on". *)
@@ -137,7 +137,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}]
 ;;
 
@@ -165,7 +165,7 @@ let%expect_test
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
   let m, cmds = App.update { App.init with draft = "/fallback gpt-6" } Send in
@@ -294,7 +294,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
       (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   run h "/default-dir";
   H.text h ~selector:".toast:last-child";

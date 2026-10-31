@@ -69,6 +69,30 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
+(* A phone's header has room for the title: the thinking level, the mode,
+   the status and the panels' toggles fold into a tray under it, opened by a
+   glance at the status (a dot and the context's percent). Only on a phone,
+   and CSS shows it only where the header is narrow (under 480px); wider,
+   the tray is laid out in the header as ever. *)
+let tray_button (m : App.Model.t) ~inject =
+  if not m.narrow
+  then Node.none
+  else
+    Node.button
+      ~attrs:
+        [ Attr.class_ "btn ghost bar-tray-toggle"
+        ; Attr.type_ "button"
+        ; Attr.title "Status, thinking, mode and panels"
+        ; Attr.create "aria-label" "Status and controls"
+        ; Attr.create "aria-controls" "bar-tray"
+        ; Attr.create
+            "aria-expanded"
+            (Bool.to_string m.status_tray)
+        ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+        ]
+      [ Status_view.glance m; icon ~cls:"tray-chevron" Chevron ]
+;;
+
 (* The chat's header, docked or not: the title (with the branch beside it
    where there is room), then what applies and the status at the right, then
    the panels' toggles. The sidebar's toggle and the settings only when the
@@ -101,10 +125,26 @@ let bar (m : App.Model.t) ~inject =
        ; div
            ~cls:"session-title"
            [ rename m state ~inject; branch state ~inject ]
-       ; Status_view.extras m ~plan:true ~inject
-       ; Session_chips_view.view m ~inject
-       ; Status_view.view m ~inject
-       ; panel_toggles m ~inject
+       ; tray_button m ~inject
+       ; Node.div
+           ~attrs:
+             [ classes [ "bar-tray" ] [ "open", m.narrow && m.status_tray ]
+             ; Attr.id "bar-tray"
+             ]
+           [ Status_view.extras m ~plan:true ~inject
+           ; Session_chips_view.view m ~inject
+           ; Status_view.view m ~inject
+           ; panel_toggles m ~inject
+           ]
+       ; (if m.narrow && m.status_tray
+          then
+            Node.div
+              ~attrs:
+                [ Attr.class_ "bar-tray-backdrop"
+                ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+                ]
+              []
+          else Node.none)
        ; settings
        ])
 ;;

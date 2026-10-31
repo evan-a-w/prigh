@@ -314,7 +314,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    (Attach files (or drop them here)) (Stop (Esc)) (Steer (Enter))
+    (Dictate (speak, then click again to stop)) (Stop (Esc))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

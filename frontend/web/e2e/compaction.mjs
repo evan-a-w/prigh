@@ -124,7 +124,7 @@ try {
 
   // The summary model: the model picker, then back on the page.
   await page.locator(".summary-model-choice").click();
-  await page.locator(".modal input").waitFor();
+  await page.locator(".modal #picker-input").waitFor();
   section("picker");
   console.log(`${await page.locator(".modal-head h2").innerText()}; first: \
 ${(await page.locator(".picker-item").first().innerText()).replace(/\s+/g, " ")}`);

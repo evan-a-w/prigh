@@ -8,6 +8,7 @@ let title : Chip.t -> string = function
   | Thinking -> "Thinking"
   | Mode -> "When tools ask first"
   | Host -> "Where tools run"
+  | Attach -> "Add to your message"
 ;;
 
 let shortcut : Chip.t -> string = function
@@ -15,6 +16,7 @@ let shortcut : Chip.t -> string = function
   | Thinking -> "Alt+T cycles"
   | Mode -> "Alt+M cycles"
   | Host -> "/host"
+  | Attach -> "or paste, or drop"
 ;;
 
 let option_id i = sprintf "popover-option-%d" i
@@ -49,7 +51,7 @@ let row
   let model =
     match (chip : Chip.t) with
     | Model -> List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    | Thinking | Mode | Host -> None
+    | Thinking | Mode | Host | Attach -> None
   in
   let detail =
     match model with
@@ -79,7 +81,12 @@ let row
       ; Attr.create "aria-checked" (Bool.to_string item.marked)
       ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
       ]
-    [ (if item.marked
+    [ (if Chip.equal chip Attach
+       then
+         Html.mark
+           ~cls:"popover-check attach-icon"
+           (if String.equal item.id "image" then Image else Paperclip)
+       else if item.marked
        then Html.mark ~cls:"picked popover-check" Check
        else Node.span ~attrs:[ Attr.class_ "mark popover-check" ] [])
     ; Node.span
@@ -96,7 +103,7 @@ let row
            ~attrs:[ Attr.title "Context window, in tokens" ]
            (App.compact_tokens l.context_window)
        | Thinking, _ -> meter item.id
-       | (Model | Mode | Host), _ -> Node.none)
+       | (Model | Mode | Host | Attach), _ -> Node.none)
     ]
 ;;
 
@@ -191,7 +198,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode -> [ Attr.tabindex 0; active ])
+           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ])
         (rows m ~chip p ~inject)
   in
   Node.div
@@ -204,7 +211,8 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            | Model -> "model"
            | Thinking -> "thinking"
            | Mode -> "mode"
-           | Host -> "host")
+           | Host -> "host"
+           | Attach -> "attach")
       ; Attr.role "dialog"
       ; Attr.create "aria-label" (title chip)
       ]
@@ -213,7 +221,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           let what =
             match chip with
             | Host -> "hosts"
-            | Model | Thinking | Mode -> "models"
+            | Model | Thinking | Mode | Attach -> "models"
           in
           div
             ~cls:"popover-search"
@@ -238,7 +246,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
                 ()
             ; span ~cls:"popover-shortcut" (shortcut chip)
             ]
-        | Thinking | Mode ->
+        | Thinking | Mode | Attach ->
           div
             ~cls:"popover-head"
             [ span ~cls:"popover-title" (title chip)
@@ -249,10 +257,15 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
      @ Option.to_list
          (match chip with
           | Host -> host_note m
-          | Model | Thinking | Mode -> None)
+          | Model | Thinking | Mode | Attach -> None)
      @ [ div
            ~cls:"menu-keys"
-           [ Node.text "Enter chooses, ← → the next setting, Esc closes" ]
+           [ Node.text
+               (match chip with
+                | Attach -> "Enter chooses, Esc closes"
+                | Model | Thinking | Mode | Host ->
+                  "Enter chooses, ← → the next setting, Esc closes")
+           ]
        ])
 ;;
 

@@ -363,7 +363,7 @@ const controlsShown = () => page.evaluate(() => {
 const popoverPlace = () => page.evaluate(() => {
   const menu = document.querySelector("#chip-popover");
   const r = menu.getBoundingClientRect();
-  const chip = menu.parentNode.querySelector(".chip-button").getBoundingClientRect();
+  const chip = menu.parentNode.querySelector(".chip-button, .plus").getBoundingClientRect();
   const box = document.querySelector(".composer-box").getBoundingClientRect();
   const near = (a, b) => Math.abs(a - b) <= 4;
   const where = r.bottom <= box.top ? "above the composer" : r.top >= chip.bottom ? "below the chip" : "over the composer";
@@ -647,7 +647,12 @@ try {
     const card = page.locator(".tool").last();
     section("long output, folded");
     console.log(clean(await card.innerText()));
-    await card.locator("button.fold").click();
+    // Clicked again if the transcript was still settling (Firefox scrolls
+    // it to the end after the turn, moving the button under the pointer).
+    for (let i = 0; i < 20 && !(await card.locator("button.fold[aria-expanded=true]").count()); i++) {
+      await card.locator("button.fold").click();
+      await page.waitForTimeout(150);
+    }
     await card.locator("button.fold[aria-expanded=true]").waitFor();
     section("long output, expanded");
     const lines = clean(await card.innerText()).split("\n");
@@ -672,7 +677,16 @@ try {
   await showChips("an image open: the chips", ".lightbox");
   await page.locator(".tool details.image[open] .lightbox").click();
   await page.locator(".tool details.image[open]").waitFor({ state: "detached" });
-  await page.locator(".thinking-chip").click();
+  // Its Draw opens the drawing dialog, whose drawing would be attached.
+  await page.locator(".tool details.image summary").first().click();
+  await page.locator(".tool details.image[open] .lightbox-annotate").click();
+  await page.locator(".annotate-dialog #annotate-canvas").waitFor();
+  section("drawing on the read tool's image");
+  console.log(`viewer closed: ${await page.locator("details.image[open]").count() === 0}`);
+  console.log(clean(await page.locator(".annotate-dialog .modal-buttons").innerText()));
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".annotate-dialog", { state: "detached" });
+  await page.locator(".model-chip").click();
   await page.locator("#chip-popover").waitFor();
   await page.waitForTimeout(200); // its rise
   await showChips("a chip's menu open: the chips", ".menu-backdrop");
@@ -685,6 +699,26 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".composer img").length === 2);
   await showImages("attached in the composer", page.locator(".composer img"));
   await screenshot("attached");
+  // Drawn on: the thumbnail opens the drawing dialog; a stroke, saved,
+  // replaces the image with a PNG of the same size.
+  const undrawn = await page.locator(".composer img").nth(1).getAttribute("src");
+  await page.locator(".pending-thumb").nth(1).click();
+  await page.locator(".annotate-dialog #annotate-canvas").waitFor();
+  await page.waitForFunction(() => document.querySelector("#annotate-canvas").width > 0);
+  section("drawing: nothing drawn, nothing to save");
+  console.log(`save enabled: ${await page.locator(".annotate-save").isEnabled()}`);
+  const canvas = await page.locator("#annotate-canvas").boundingBox();
+  await page.mouse.move(canvas.x + canvas.width * 0.2, canvas.y + canvas.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + canvas.width * 0.5, canvas.y + canvas.height * 0.6, { steps: 8 });
+  await page.mouse.move(canvas.x + canvas.width * 0.8, canvas.y + canvas.height * 0.3, { steps: 8 });
+  await page.mouse.up();
+  await page.locator(".annotate-save:not([disabled])").waitFor();
+  await screenshot("drawing on an attached image");
+  await page.locator(".annotate-save").click();
+  await page.waitForSelector(".annotate-dialog", { state: "detached" });
+  await page.waitForFunction(b => document.querySelectorAll(".composer img")[1]?.src !== b, undrawn);
+  await showImages("drawn on, in the composer", page.locator(".composer img"));
   await send("what are these?");
   await bodyHas("you sent me two images");
   await idle();
@@ -958,9 +992,9 @@ try {
   await bodyHas("reconnecting");
   await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
   await bodyLacks("Connection lost");
-  // The model and where tools run in the composer; the thinking level and
-  // the mode in the header's status, each a picker.
-  await show("the model, thinking and mode controls", ".composer-controls");
+  // The model and where tools run in the composer's lower tier; the
+  // thinking level and the mode in the header's status, each a picker.
+  await show("the model and host controls", ".composer-controls");
   // /host opens the host picker (the session's card names the host only
   // when there is another to choose).
   await composer().fill("/host");
@@ -971,16 +1005,30 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector(".modal", { state: "detached" });
   // Quiet until pointed at: then lit, with a chevron.
-  await page.locator(".thinking-chip").hover();
+  await page.locator(".host-chip").hover();
   await page.waitForTimeout(300);
   await screenshot("a chip pointed at");
-  // A chip opens a menu standing on it, not a dialog: above the composer's
-  // box, from the chip's left edge, inside the window, the keyboard in it.
+  // The + opens a menu standing on it, not a dialog: above the composer's
+  // box, from its left edge, inside the window, the keyboard in it.
+  await page.locator(".composer-plus .plus").click();
+  await page.locator("#chip-popover .popover-item", { hasText: "Images" }).waitFor();
+  await page.waitForTimeout(300); // its rise
+  await show("the + menu", "#chip-popover");
+  console.log(await popoverPlace());
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
+  console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
+  // The header's thinking chip opens its menu under it; → goes to the
+  // mode's beside it.
   await page.locator(".thinking-chip").click();
   await page.locator("#chip-popover .popover-item", { hasText: "high" }).waitFor();
   await page.waitForTimeout(300); // its rise
   await show("the thinking chip's menu", "#chip-popover");
   console.log(await popoverPlace());
+  await page.keyboard.press("ArrowRight");
+  await page.locator("#chip-popover[data-chip=mode]").waitFor();
+  await page.keyboard.press("ArrowLeft");
+  await page.locator("#chip-popover[data-chip=thinking]").waitFor();
   await page.locator("#chip-popover .popover-item", { hasText: "high" }).click();
   await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
   console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
@@ -1000,19 +1048,14 @@ try {
   await page.locator("#chip-popover[data-chip=model]").waitFor();
   await page.waitForTimeout(100);
   await page.keyboard.press("ArrowRight");
-  await page.locator("#chip-popover[data-chip=thinking]").waitFor();
-  await page.waitForTimeout(100);
-  await page.keyboard.press("ArrowRight");
-  await page.locator("#chip-popover[data-chip=mode]").waitFor();
+  await page.locator("#chip-popover[data-chip=host]").waitFor();
   await page.waitForTimeout(300); // its rise
-  await show("the mode chip's menu, from the model's with → →", "#chip-popover");
+  await show("the host chip's menu, from the model's with →", "#chip-popover");
   console.log(await popoverPlace());
   // A click beside it closes it.
   await page.mouse.click(700, 200);
   await page.waitForSelector("#chip-popover", { state: "detached" });
-  await page.locator(".mode-chip").click();
-  await page.locator("#chip-popover .popover-item").first().waitFor();
-  await page.locator("#chip-popover .popover-item", { hasText: "Asks: edits & commands" }).click();
+  await send("/mode ask");
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
   await page.locator(".mode-chip:not(.awaiting) .chip-label", { hasText: /^ask$/ }).waitFor();
   await show("mode ask", ".session-chips");
@@ -1048,7 +1091,7 @@ try {
   await idle();
   await showTurn("the plan, in plan mode");
   await send("/plan off");
-  await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
+  await page.waitForFunction(() => !document.querySelector("#editor")?.placeholder.toLowerCase().includes("plan"));
   await send("go ahead");
   await bodyHas("Implementing.");
   await idle();
@@ -1104,7 +1147,7 @@ try {
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400); // the drawer's slide
   // A chip's menu is as wide as the composer's box there.
-  await page.locator(".thinking-chip").click();
+  await page.locator(".composer-plus .plus").click();
   await page.locator("#chip-popover").waitFor();
   await page.waitForTimeout(300);
   section("phone: a chip's menu");

@@ -815,6 +815,16 @@ let set_config t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "naming_model: %s" (Error.to_string_hum e))
   in
+  let%bind () =
+    match config.dictation_model with
+    | None -> Ok ()
+    | Some name ->
+      Transcription.check_model
+        ~providers:(Model_registry.providers t.models)
+        name
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "dictation_model: %s" (Error.to_string_hum e))
+  in
   let config =
     { config with
       fallback_models =

@@ -325,6 +325,30 @@ let activity (m : App.Model.t) =
         [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; label "Ready" ]
 ;;
 
+let glance (m : App.Model.t) =
+  let dot =
+    match m.state, m.connection with
+    | Some state, Connected when state.running || m.pending.sending > 0 ->
+      Html.lamp ()
+    | Some _, Connected -> Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
+    | _ -> Html.lamp ()
+  in
+  let percent =
+    match m.state, m.connection with
+    | Some state, Connected ->
+      let percent = context_percent state in
+      let level = context_level percent in
+      Node.span
+        ~attrs:
+          [ classes [ "glance-percent" ] [ level, not (String.is_empty level) ] ]
+        [ Node.text (sprintf "%.0f%%" percent) ]
+    | _ -> Node.none
+  in
+  Node.span
+    ~attrs:[ Attr.class_ "status-glance"; Attr.create "aria-hidden" "true" ]
+    [ dot; percent ]
+;;
+
 let view (m : App.Model.t) ~inject =
   div
     ~cls:"status"

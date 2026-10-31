@@ -47,6 +47,10 @@ val create
   -> t
 
 val store : t -> Auth_store.t
+
+(** Where credentials not in the store come from ([OPENAI_API_KEY], ...). *)
+val getenv : t -> string -> string option
+
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val models : t -> Model_registry.t
 

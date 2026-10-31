@@ -1191,7 +1191,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  300, 0 = never), `generate_model`, `naming_model`, `mask_observations` (default true),
+  300, 0 = never), `generate_model`, `naming_model`, `dictation_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
@@ -1206,7 +1206,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
-  closest matches). A new
+  closest matches). `dictation_model` is kept as written, refused
+  only when its provider cannot transcribe (`Transcription.check_model`). A new
   session starts in `default_cwd` (on the backend host) and on
   `default_model`, else the first of `fallback_models`.
 - `User_prefs` — a user's preferences and data that frontends keep on the
@@ -1874,7 +1875,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   response is `{gen_id, kind, text, title?, body?, model, cost_usd}`, the
   text cleaned (`Generate_text.clean`: fences and quotes dropped, a branch
   name made valid, a PR split into title and body).
-  `generate_cancel {gen_id}` (or disconnecting) cancels it. The review's
+  `generate_cancel {gen_id}` (or disconnecting) cancels it.
+  `transcribe {mime_type, data}` (data: base64 audio, at most 25 MB) is
+  `{text}` from `Transcription` on `Config.dictation_model` (default
+  `openai/gpt-4o-mini-transcribe`): a hand-built multipart/form-data
+  `POST {base}/audio/transcriptions` (`model`, `response_format=json`,
+  `file` named by the MIME type, e.g. `speech.webm`), to OpenAI with its
+  API key (`OPENAI_API_KEY` or `auth.json`) or to a custom provider's
+  `base_url` with its key; other providers cannot transcribe. Errors say
+  what to do (`No transcription provider: ...` when the key is missing,
+  `/dictation model` to choose another). The HTTP is a
+  `Transcription.Http.t` that `Rpc_server.create ~transcription_http`
+  replaces in tests. The review's
   git (`Git_rpc`, on the active tool host): `git_status {dir?}`,
   `git_stage {dir?, paths, tracked?}`, `git_unstage {dir?, paths}` (each
   answering the status), `git_commit {dir?, message, amend?, paths?}`

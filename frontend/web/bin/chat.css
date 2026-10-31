@@ -888,6 +888,11 @@ details.image[open] .lightbox {
   object-fit: contain;
   border-radius: var(--r-control);
 }
+/* The viewer's own button, top right: draw on what it shows. */
+.lightbox-tools { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; cursor: default; }
+.lightbox-annotate.btn { gap: 6px; background: var(--slate); border-color: var(--rule-2); color: var(--chalk); box-shadow: var(--float-shadow); }
+.lightbox-annotate.btn:hover { border-color: var(--sodium); }
+.lightbox-annotate .icon { width: 14px; height: 14px; }
 
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }

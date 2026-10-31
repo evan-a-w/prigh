@@ -305,6 +305,21 @@ let unknown_naming_model t ~home =
   | Ok _ | Error _ -> []
 ;;
 
+let unknown_dictation_model t ~home =
+  match Config.load ~home with
+  | Ok { dictation_model = Some name; _ } ->
+    (match Transcription.check_model ~providers:t.providers name with
+     | Ok () -> []
+     | Error e ->
+       [ sprintf
+           "dictation_model in %s cannot transcribe, so dictation fails until \
+            it is changed (/dictation model MODEL|off): %s"
+           (Config.path ~home)
+           (Error.to_string_hum e)
+       ])
+  | Ok _ | Error _ -> []
+;;
+
 let reload ?listed t =
   match t.source with
   | None -> ()
@@ -334,6 +349,7 @@ let reload ?listed t =
       @ unknown_start_model t ~home:source.home
       @ unknown_compaction_model t ~home:source.home
       @ unknown_naming_model t ~home:source.home
+      @ unknown_dictation_model t ~home:source.home
     in
     let new_problems =
       List.filter problems ~f:(fun p ->

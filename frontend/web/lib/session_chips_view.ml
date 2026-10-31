@@ -48,7 +48,8 @@ let anchor (m : App.Model.t) chip button ~inject =
              | Model -> "model"
              | Thinking -> "thinking"
              | Mode -> "mode"
-             | Host -> "host")
+             | Host -> "host"
+             | Attach -> "attach-menu")
           ]
           [ "open", Option.is_some menu ]
       ]

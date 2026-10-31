@@ -40,6 +40,10 @@ module Picker_kind : sig
     (** [/compaction model]: model keys, or [off] (the conversation's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the generate model's) *)
+    | Dictation_models
+    (** [/dictation model]: transcription model keys, or [off] (the
+        default); other keys are typed in the filter *)
+    | Attach (** the composer's +: item ids are [files] and [image] *)
     | Menu of Context_menu.t
     (** a session's or worktree's context menu; item ids are
         [Context_menu.Item.id]s *)
@@ -133,6 +137,7 @@ type t =
       } (** asked before removing it *)
   | Nix_gc_confirm of Nix_generations.t
   (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
+  | Annotate of Annotate.t (** drawing on an image *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)
