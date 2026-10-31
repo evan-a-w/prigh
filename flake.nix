@@ -153,6 +153,10 @@
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
             export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighWebRoot}}"
             export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
+            # Worktrees, diffs, review and the git hosts run git: fall back
+            # to ours when PATH has none (a systemd service's PATH rarely
+            # includes the user's profile). Appended, so the user's git wins.
+            export PATH="''${PATH:+$PATH:}${pkgs.git}/bin"
             if [ "''${1:-}" = "-web" ]; then
               shift
               for arg in "$@"; do
@@ -187,6 +191,7 @@
           #!${pkgs.runtimeShell}
           printf '%s\n' "$@" > "$ARGS_OUT"
           printf '%s\n' "$PRIGH_WEB_ROOT" > "$ROOT_OUT"
+          command -v git > "$ARGS_OUT.git" || true
           EOF
           chmod +x fake-backend
           ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
@@ -203,6 +208,8 @@
             /work
           ''} args
           test "$(cat root)" = "${prighWebRoot}"
+          # git is found even with no git on PATH
+          test "$(cat args.git)" = "${pkgs.git}/bin/git"
           ARGS_OUT="$PWD/default-args" ROOT_OUT="$PWD/default-root" \
             PRIGH_BACKEND="$PWD/fake-backend" \
             ${prigh}/bin/prigh -web

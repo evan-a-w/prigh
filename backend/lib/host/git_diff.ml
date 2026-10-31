@@ -113,10 +113,7 @@ let git ~env ~cancel ?(ok_codes = [ 0 ]) ~dir args =
   | { exit = Signaled _ | Timed_out; stderr; _ } ->
     raise (Failed ("git failed: " ^ String.strip stderr))
   | exception Eio.Io _ ->
-    raise
-      (Failed
-         "git is not installed on the tool host: install it there (e.g. nix \
-          profile install nixpkgs#git)")
+    raise (Failed (Git_missing.message ()))
 ;;
 
 let string_arg arguments name =

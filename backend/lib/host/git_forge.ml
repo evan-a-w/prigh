@@ -114,10 +114,7 @@ let git ~env ~cancel ?(timeout = Time_ns.Span.of_sec 30.) ~dir args =
   | { exit = Signaled _; stderr; _ } ->
     raise (Failed ("git failed: " ^ String.strip stderr))
   | exception Eio.Io _ ->
-    raise
-      (Failed
-         "git is not installed on the tool host: install it there (e.g. nix \
-          profile install nixpkgs#git)")
+    raise (Failed (Git_missing.message ()))
 ;;
 
 module Runner = struct
