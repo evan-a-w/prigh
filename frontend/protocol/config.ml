@@ -44,6 +44,7 @@ type t =
   ; compaction_model : string option
   ; mask_observations : bool
   ; naming_model : string option
+  ; dictation_model : string option
   }
 [@@deriving sexp_of, equal]
 
@@ -63,8 +64,11 @@ let default =
   ; compaction_model = None
   ; mask_observations = true
   ; naming_model = None
+  ; dictation_model = None
   }
 ;;
+
+let default_dictation_model = "openai/gpt-4o-mini-transcribe"
 
 let of_json j =
   let open Or_error.Let_syntax in
@@ -126,6 +130,7 @@ let of_json j =
     | Some _ -> Or_error.error_string "mask_observations must be a boolean"
   in
   let%bind naming_model = optional_string "naming_model" in
+  let%bind dictation_model = optional_string "dictation_model" in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
@@ -142,6 +147,7 @@ let of_json j =
   ; compaction_model
   ; mask_observations
   ; naming_model
+  ; dictation_model
   }
 ;;
 
@@ -166,5 +172,6 @@ let to_json t =
        ; "compaction_model", optional t.compaction_model
        ; ("mask_observations", if t.mask_observations then `True else `False)
        ; "naming_model", optional t.naming_model
+       ; "dictation_model", optional t.dictation_model
        ])
 ;;

@@ -71,6 +71,8 @@ module Reply_tag : sig
     | Compaction_saved of string (** like [Fallback_saved] *)
     | Naming_shown (** [get_config] for [/naming] *)
     | Naming_saved of string (** like [Fallback_saved] *)
+    | Dictation_shown (** [get_config] for [/dictation] *)
+    | Dictation_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done

@@ -187,6 +187,7 @@ module Reply_tag : sig
     | Default_dir_saved
     | Compaction_saved (** the new config; its settings are shown *)
     | Naming_saved (** the new config; the naming model is shown *)
+    | Dictation_saved (** the new config; the dictation model is shown *)
     | Default_saved
     | Session_stats
     | Trace (** [trace]: its summary in a dialog *)

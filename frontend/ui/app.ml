@@ -66,6 +66,8 @@ module Reply_tag = struct
     | Compaction_saved of string
     | Naming_shown
     | Naming_saved of string
+    | Dictation_shown
+    | Dictation_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -2932,6 +2934,20 @@ let naming_command m (cmd : Commands.Parsed.t) =
           (Naming_command.fields action)
       ] )
 ;;
+let dictation_command m (cmd : Commands.Parsed.t) =
+  match Dictation_command.parse cmd.rest with
+  | Show ->
+    show_config m ~tag:Dictation_shown ~summary:Dictation_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/dictation " ^ cmd.rest))) e, []
+  | Set_model _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Dictation_saved ("/dictation " ^ cmd.rest))
+          (Dictation_command.fields action)
+      ] )
+;;
+
 
 (* ---- snippets ---------------------------------------------------------- *)
 
@@ -3653,6 +3669,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
   | "compaction", _ -> compaction_command m cmd
+  | "dictation", _ -> dictation_command m cmd
   | "naming", _ -> naming_command m cmd
   | "auth", _ ->
     ( m
@@ -6446,7 +6463,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
-         notice { m with config = Some config } (Naming_command.summary config), [])
+         ( notice { m with config = Some config } (Naming_command.summary config)
+         , [] ))
+     | Dictation_shown | Dictation_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Dictation_command.summary config)
+         , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])

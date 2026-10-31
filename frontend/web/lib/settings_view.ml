@@ -324,6 +324,29 @@ let naming_model (m : App.Model.t) ~inject =
     ]
 ;;
 
+let dictation_model (m : App.Model.t) ~inject =
+  let current =
+    Option.bind m.config ~f:(fun c -> c.dictation_model)
+    |> Option.value ~default:"Default"
+  in
+  row
+    ~cls:"dictation-model"
+    ~name:"Dictation model"
+    ~about:
+      ("The model that turns dictation into text: an OpenAI or \
+        OpenAI-compatible provider's transcription model. Default: "
+       ^ Config.default_dictation_model
+       ^ ".")
+    [ button
+        ~cls:"small dictation-model-choice"
+        ~title:"Choose the model (/dictation model)"
+        ~label:("Dictation model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/dictation model"))
+        [ Node.text current ]
+    ]
+;;
+
 let compaction (m : App.Model.t) ~inject =
   [ compact_at m m.config ~inject
   ; summary_model m m.config ~inject
@@ -620,6 +643,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   | Models ->
     [ group ~title:"Providers" [ providers m ~inject ]
     ; group ~title:"Naming" [ naming_model m ~inject ]
+    ; group ~title:"Dictation" [ dictation_model m ~inject ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
   | Git_hosting -> [ group (git_hosts m ~inject) ]

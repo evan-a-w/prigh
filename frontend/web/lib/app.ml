@@ -166,6 +166,7 @@ module Reply_tag = struct
     | Default_dir_saved
     | Compaction_saved
     | Naming_saved
+    | Dictation_saved
     | Default_saved
     | Session_stats
     | Trace
@@ -948,7 +949,9 @@ let close_dialog (m : Model.t) =
   | ( true
     , Some
         ( Login _ | Forge_host _ | Nix_gc_confirm _
-        | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
+        | Picker
+            { kind = Compaction_models | Naming_models | Dictation_models; _ }
+          ) ) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -3248,6 +3251,79 @@ let naming_command (m : Model.t) rest =
   | Show -> with_config m ~f:(fun c -> toast m (naming_summary c))
   | Error e -> error m (String.capitalize e)
   | Set_model _ as action -> set_naming m action
+;;
+
+let dictation_summary config =
+  String.capitalize (Prigh_ui.Dictation_command.summary config)
+;;
+
+(* The backend says when the model's provider cannot transcribe. *)
+let set_dictation (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Dictation_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:(List.map (Prigh_ui.Dictation_command.fields action) ~f:fst)
+          ~tag:Dictation_saved
+      ] ))
+;;
+
+(* OpenAI's transcription models, and the configured one if it is another
+   (a custom provider's, set with /dictation model PROVIDER/ID). *)
+let dictation_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    let current = config.dictation_model in
+    let suggested =
+      List.map Prigh_ui.Dictation_command.suggestions ~f:(fun (key, detail) ->
+        Picker.Item.create
+          ~id:key
+          ~detail
+          ~search:(key ^ " " ^ detail)
+          ~marked:(Option.equal String.equal current (Some key))
+          key)
+    in
+    let configured =
+      match current with
+      | Some key
+        when not
+               (List.Assoc.mem
+                  Prigh_ui.Dictation_command.suggestions
+                  ~equal:String.equal
+                  key) ->
+        [ Picker.Item.create
+            ~id:key
+            ~detail:"configured"
+            ~search:key
+            ~marked:true
+            key
+        ]
+      | Some _ | None -> []
+    in
+    open_picker
+      m
+      (Picker
+         { kind = Dictation_models
+         ; picker =
+             Picker.create
+               ~title:"Dictation model"
+               (Picker.Item.create
+                  ~id:"off"
+                  ~detail:Config.default_dictation_model
+                  ~search:"off default"
+                  ~marked:(Option.is_none current)
+                  "Default"
+                :: (configured @ suggested))
+         }))
+;;
+
+let dictation_command (m : Model.t) rest =
+  match Prigh_ui.Dictation_command.parse rest with
+  | Error _ when String.equal (String.strip rest) "model" ->
+    dictation_models_picker m
+  | Show -> with_config m ~f:(fun c -> toast m (dictation_summary c))
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_dictation m action
 ;;
 
 let commit_compact_at (m : Model.t) =
@@ -5572,6 +5648,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
   | "naming", rest -> naming_command m rest
+  | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -6942,6 +7019,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Dictation_saved, Error e ->
+    let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->
     (* The change shown at once did not happen: show the backend's. *)
     let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
@@ -7458,6 +7538,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
+  | Dictation_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (dictation_summary config))
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -8342,6 +8425,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
         ( { m with dialog = Some Settings; return_to_settings = false }
         , Command.Focus "dialog" :: cmds )
       else m, cmds
+    | Dictation_models ->
+      let m, cmds =
+        set_dictation
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
     | Naming_models ->
       let m, cmds =
         set_naming
@@ -9147,8 +9241,10 @@ let update_connected (m : Model.t) (action : Action.t) =
         | ( Some Settings
           , Some
               ( Login _ | Forge_host _ | Nix_gc_confirm _
-              | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
-          { m' with return_to_settings = true }, cmds
+              | Picker
+                  { kind = Compaction_models | Naming_models | Dictation_models
+                  ; _
+                  } ) ) -> { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
   | Toggle_terminal ->

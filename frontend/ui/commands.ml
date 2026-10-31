@@ -34,6 +34,7 @@ module Argument = struct
     | Agents
     | Compaction
     | Naming
+    | Dictation
   [@@deriving sexp_of, equal]
 end
 
@@ -176,6 +177,13 @@ let every =
       "[model MODEL|off]"
       "show which model names sessions and subagents; model MODEL|off: name \
        them with MODEL (off: the generate model, else the session's)"
+  ; c
+      ~argument:Argument.Dictation
+      "dictation"
+      "[model MODEL|off]"
+      "show which model transcribes dictation (speech to text); model \
+       MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible \
+       provider's (off: openai/gpt-4o-mini-transcribe)"
   ; c
       ~argument:Argument.Trim
       "trim"

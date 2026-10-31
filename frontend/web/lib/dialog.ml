@@ -29,6 +29,7 @@ module Picker_kind = struct
     | Accents
     | Compaction_models
     | Naming_models
+    | Dictation_models
     | Menu of Context_menu.t
   [@@deriving sexp_of, equal]
 end
@@ -164,7 +165,8 @@ let per_session = function
           | Themes
           | Accents
           | Compaction_models
-          | Naming_models )
+          | Naming_models
+          | Dictation_models )
       ; _
       }
   | Help
