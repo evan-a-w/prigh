@@ -421,17 +421,23 @@ let perfetto spans =
       Float.min m s.wall)
   in
   let us x = Float.iround_nearest_exn (x *. 1e6) in
+  let starts (s : Trace.Span.t) = us (s.wall -. base) in
   let timed =
     List.map tree.spans ~f:(fun (s : Trace.Span.t) ->
-      let ts = us (s.wall -. base) in
+      let ts = starts s in
       let end_ = us (s.wall -. base +. Trace.Span.duration s) in
-      s, ts, end_, List.length (Tree.ancestors tree s))
-    (* At the same time, instants first: one at the end of a span then
-       nests in it, not in the next span starting there. *)
-    |> List.stable_sort ~compare:(fun (_, ts1, end1, d1) (_, ts2, end2, d2) ->
-      [%compare: int * bool * int * int]
-        (ts1, end1 > ts1, d1, -end1)
-        (ts2, end2 > ts2, d2, -end2))
+      let ancestors = Tree.ancestors tree s in
+      (* At the same time, instants first: one at the end of a span then
+         nests in it, not in the next span starting there. But never before
+         its parent starting then too. *)
+      let early =
+        end_ = ts
+        && not
+             (List.exists ancestors ~f:(fun (a : Trace.Span.t) -> starts a = ts))
+      in
+      s, ts, end_, (not early, List.length ancestors))
+    |> List.stable_sort ~compare:(fun (_, ts1, end1, k1) (_, ts2, end2, k2) ->
+      [%compare: int * (bool * int) * int] (ts1, k1, -end1) (ts2, k2, -end2))
   in
   let tracks = String.Table.create () in
   let track_order = Queue.create () in
