@@ -77,7 +77,7 @@ prints the captured panes.
   >
   deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === agent 1
-  ◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "count files"
+  ◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "Count files"
   
   
   
