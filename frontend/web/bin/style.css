@@ -583,62 +583,11 @@ kbd {
 
 .scrim { display: none; }
 
-/* The session: one slim header over the chat, docked sidebar or not. The
-   title on the left with its branch in a quiet mono beside it; at the right
-   the status, the panels' toggles after a hairline. The status is three
-   figures and no words while all is well: a dot, a short meter with its
-   percent, the cost. Words only while the agent works or the backend is out
-   of reach. The bar steps down with the chat column's width, not the
-   window's (see the container queries at the end). Its height is fixed:
-   what the status says never moves the page. */
-.session-bar {
-  container: bar / inline-size;
-  position: relative;
-  z-index: var(--z-tools);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 44px;
-  padding: 0 8px 0 10px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--rule);
-  background: var(--bg);
-}
-.session-bar.docked { padding-left: 16px; }
-.session-bar > .toggle-sidebar { margin-right: -6px; color: var(--muted); }
-.session-title { display: flex; align-items: baseline; gap: 10px; flex: 0 1 auto; min-width: 6ch; overflow: hidden; }
-.session-title > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--chalk); font-size: 13.5px; font-weight: 560; }
-.session-title > .branch {
-  flex: 0 10 auto;
-  min-width: 0;
-  background: none;
-  border: 0;
-  padding: 0;
-  font: 11.5px var(--mono);
-  color: var(--faint);
-  cursor: pointer;
-  border-radius: var(--r-chip);
-}
-.session-title > .branch:hover { color: var(--chalk); }
-.session-title > .branch:hover .branch-name { text-decoration: underline; text-underline-offset: 2px; }
-.session-title > .branch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.bar-tray > .status-extras { flex: 0 0 auto; contain: none; justify-content: flex-end; margin-left: auto; }
-.bar-tray > .status { flex-shrink: 0; margin-left: auto; overflow: visible; }
-.bar-tray > .status-extras + .status { margin-left: 0; }
-.bar-tray > .panel-toggles { gap: 2px; padding-left: 8px; border-left: 1px solid var(--rule); }
-.session-bar .panel-toggles .btn.icon { width: 30px; height: 30px; }
-.session-bar > .settings-toggle { color: var(--faint); }
-/* Wide, the tray is no box at all: its parts sit in the header's row. On a
-   phone's narrow header it folds under the glance (see the bar's steps). */
-.bar-tray { display: contents; }
-.bar-tray-toggle, .bar-tray-backdrop { display: none; }
-.session-bar > .settings-toggle:hover { color: var(--chalk); }
 
 /* The thinking level and the mode: figures like the status's, not buttons,
    until pointed at; their menus open below them. A mode where nothing asks
    is lit, as is plan. */
 .session-chips { display: flex; align-items: center; gap: 2px; flex-shrink: 0; position: relative; }
-.session-bar:has(.session-chips.menu-open) { z-index: var(--z-menu-anchor); }
 .session-chips .chip-button {
   height: 26px;
   padding: 0 7px;
@@ -688,7 +637,7 @@ kbd {
   transition: opacity 0.12s ease-out, transform 0.12s ease-out, visibility 0s 0.12s;
   pointer-events: none;
 }
-.status-gauge:hover > .status-details {
+.status-gauge:is(:hover, :focus-within) > .status-details {
   visibility: visible;
   opacity: 1;
   transform: none;
@@ -701,7 +650,7 @@ kbd {
 .status-detail.context.hot .status-detail-value { color: var(--brick); }
 .status-detail-hint { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 11.5px; }
 @media (prefers-reduced-motion: reduce) { .status-details { transition: none; } }
-@media (hover: none) { .status-details { display: none; } }
+@media (hover: none) { .status-gauge:not(:focus-within) > .status-details { display: none; } }
 
 /* Session tabs (/tabs on): the open sessions over the chat. The current one
    is cut from the chat's own ground with the sidebar's sodium edge; the
@@ -1180,7 +1129,7 @@ kbd {
    takes what is left beside the title. */
 .status-extras { contain: inline-size; }
 .status-extras:empty { display: none; }
-.status .context, .status .tokens, .status .cost { font: 11.5px var(--mono); }
+.status-item.context, .status-item.cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); }
@@ -1190,7 +1139,7 @@ kbd {
 /* Idle says nothing: the dot, its word for screen readers and the title. */
 .status-item.activity.idle { color: var(--faint); }
 .status-item.activity > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.status .context > .percent { min-width: 3ch; text-align: right; }
+.status-item.context > .percent { min-width: 3ch; text-align: right; }
 .status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
 .idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--sage, var(--faint-line)); opacity: 0.8; }
@@ -1430,7 +1379,6 @@ kbd {
 .app.narrow .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: var(--z-scrim); }
 
 @media (max-width: 760px) {
-  .session-bar { gap: 8px; }
   .composer { padding: 6px 8px 8px; --composer-inset: 12px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
   .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
@@ -1828,94 +1776,6 @@ kbd {
   .composer-controls .host-chip { padding: 0 8px; }
 }
 
-/* The bar's steps. A narrower bar drops the branch, then says what applies
-   with icons alone (their tooltips and names say the rest), then the meter
-   (its percent stays) and the running words (the lamp stays). */
-@container bar (width < 760px) {
-  .status { gap: 0 12px; }
-  .session-title > .branch { display: none; }
-}
-@container bar (width < 600px) {
-  .status-extras .status-text, .status-extras .status-item.mode { display: none; }
-  .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
-  .status-item.activity:is(.running, .idle) > .label { display: none; }
-  .status-item.activity:is(.connecting, .offline) { width: auto; }
-  .session-chips .chip-label { display: none; }
-}
-/* A phone's header: the title, the glance (a dot, the context's percent)
-   and the settings. The glance opens the tray under the header: the
-   thinking level and the mode, the status in full, what applies, then the
-   panels' toggles on a row of their own. */
-@container bar (width < 480px) {
-  .session-bar { gap: 6px; }
-  .session-title { flex: 1 1 auto; min-width: 4ch; }
-  .bar-tray-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 6px 0 8px;
-    color: var(--muted);
-    font: 12px var(--mono);
-    flex-shrink: 0;
-  }
-  .bar-tray-toggle[aria-expanded="true"] { background: var(--slate-2); color: var(--chalk); }
-  .bar-tray-toggle .tray-chevron { width: 12px; height: 12px; transition: transform 0.12s ease-out; }
-  .bar-tray-toggle[aria-expanded="true"] .tray-chevron { transform: rotate(180deg); }
-  .status-glance { display: inline-flex; align-items: center; gap: 6px; }
-  .status-glance .glance-percent.warm { color: var(--sodium); }
-  .status-glance .glance-percent.hot { color: var(--brick); }
-  .bar-tray { display: none; }
-  .bar-tray.open {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 8px;
-    right: 8px;
-    z-index: var(--z-menu-surface);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 12px;
-    padding: 10px 12px;
-    background: var(--slate);
-    border: 1px solid var(--rule-2);
-    border-radius: var(--r-surface);
-    box-shadow: var(--float-shadow);
-    animation: popover-rise 0.12s ease-out;
-  }
-  .bar-tray.open > .session-chips { order: 1; margin-left: -7px; }
-  .bar-tray.open > .status { order: 2; margin-left: auto; padding: 0; gap: 0 12px; }
-  .bar-tray.open > .status-extras { order: 3; flex: 1 1 100%; justify-content: flex-start; margin: 0; }
-  .bar-tray.open > .panel-toggles {
-    order: 4;
-    flex: 1 1 100%;
-    justify-content: space-around;
-    padding: 8px 0 0;
-    border-top: 1px solid var(--rule);
-  }
-  .bar-tray.open .session-chips .chip-label,
-  .bar-tray.open .status-extras .status-text { display: inline; }
-  .bar-tray.open .status .meter { display: block; }
-  .bar-tray.open .status .cost { display: inline-flex; }
-  .bar-tray.open .status-item.activity:is(.running, .idle) { width: 14ch; justify-content: flex-start; }
-  .bar-tray.open .status-item.activity > .label { display: inline; }
-  .bar-tray.open .chip-popover[data-chip] { left: 0; right: 0; }
-  .bar-tray-backdrop {
-    display: block;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    height: 100dvh;
-    z-index: var(--z-menu-surface);
-    background: rgb(0 0 0 / 0.25);
-  }
-  .bar-tray.open { z-index: calc(var(--z-menu-surface) + 1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bar-tray.open { animation: none; }
-  .bar-tray-toggle .tray-chevron { transition: none; }
-}
 
 /* Settings: a row per setting, its name, a line on what it does, and its
    control at the end. The headings say where the setting lives. */
@@ -2218,8 +2078,6 @@ kbd {
 /* A phone: the menus stay on what opened them, as wide as the screen
    allows (place_popover shifts them in); the header's span the header. */
 @media (max-width: 760px) {
-  .session-chips { position: static; }
-  .session-bar .chip-popover[data-chip] { left: 8px; right: 8px; width: auto; max-width: none; }
   .chip-popover { z-index: var(--z-menu-surface); max-width: calc(100vw - 16px); }
   .chip-popover { max-height: min(70dvh, var(--popover-room, 70dvh)); }
   .popover-item { padding-top: 10px; padding-bottom: 10px; }

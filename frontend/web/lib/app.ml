@@ -402,6 +402,7 @@ module Action = struct
     | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
+    | Set_mode of Session_mode.t
     | Open_chip of Chip.t
     | Open_filter (** the transcript filter's menu; again: closes it *)
     | Filter_press of Filter_menu.Row.t option
@@ -617,6 +618,7 @@ module Model = struct
     ; sidebar_open : bool
     ; review_drawer : bool
     ; status_tray : bool
+    ; status_style : Status_style.t
     ; scrolled_up : bool
     ; session_query : string
     ; archived_open : bool
@@ -852,6 +854,7 @@ let init =
   ; update_ready = false
   ; sidebar_open = true
   ; status_tray = false
+  ; status_style = Status_style.default
   ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
@@ -2185,6 +2188,14 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
           m.tabs
           (Option.exists value ~f:(Json.equal `True))
     }
+  else if String.equal key Key.status_style
+  then
+    { m with
+      status_style =
+        Option.value
+          (Option.bind string ~f:Status_style.of_name)
+          ~default:Status_style.default
+    }
   else if String.equal key Key.open_tabs
   then
     if startup || not m.tabs.loaded
@@ -2945,19 +2956,27 @@ let attach_menu =
     ]
 ;;
 
-(* Along the composer's lower tier, in this order; ← → step between them.
-   The others open from elsewhere. *)
-(* The chips that sit together, which ← → and Tab go along: the composer's
-   lower tier (model, host) and the chat header's (thinking, mode); the +
-   stands alone. *)
-let chip_row : Chip.t -> int = function
+(* The chips that sit together, which ← → and Tab go along: the model and
+   the host; the thinking level and the mode beside them where the status
+   style puts them in the composer's row (the ring, the border meter),
+   elsewhere a group of their own; the + stands alone. *)
+let chip_row (m : Model.t) : Chip.t -> int = function
   | Model | Host -> 0
-  | Thinking | Mode -> 1
+  | Thinking | Mode ->
+    (match m.status_style with
+     | Ring | Border -> 0
+     | Island | Whisper | Hub | Sidebar -> 1)
   | Attach -> 2
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
 let open_chip (m : Model.t) (chip : Chip.t) =
+  (* The hub has the thinking level and the mode in the model's menu. *)
+  let chip : Chip.t =
+    match chip, m.status_style with
+    | (Thinking | Mode), Hub -> Model
+    | chip, _ -> chip
+  in
   match m.dialog with
   | Some (Popover { chip = shown; _ }) when Chip.equal shown chip ->
     close_dialog m
@@ -2991,11 +3010,11 @@ let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
   | Some (Popover { chip = Attach; _ }), _ -> m, []
   | Some (Popover { chip; _ }), Some state ->
-    let row = chip_row chip in
+    let row = chip_row m chip in
     open_chip
       m
       (Chip.step chip delta ~skip:(fun c ->
-         chip_opens_nothing state c || chip_row c <> row))
+         chip_opens_nothing state c || chip_row m c <> row))
   | _ -> m, []
 ;;
 
@@ -4808,6 +4827,37 @@ let set_tabs (m : Model.t) enabled =
   m, save_pref m Key.tabs (Option.some_if enabled `True) @ cmds
 ;;
 
+(* Where the status sits: the setting's choice, said in a toast. *)
+let set_status_style (m : Model.t) style =
+  let m, cmds =
+    toast
+      { m with status_style = style }
+      ~replaces:[ "Status: " ]
+      (sprintf
+         "Status: %s, %s (/status-style)"
+         (Status_style.title style)
+         (Status_style.describe style))
+  in
+  ( m
+  , save_pref m Key.status_style (Some (`String (Status_style.name style)))
+    @ cmds )
+;;
+
+let status_style_picker (m : Model.t) =
+  Dialog.Picker
+    { kind = Status_styles
+    ; picker =
+        Picker.create
+          ~title:"Where the status sits"
+          (List.map Status_style.all ~f:(fun s ->
+             Picker.Item.create
+               ~id:(Status_style.name s)
+               ~detail:(Status_style.describe s)
+               ~marked:(Status_style.equal s m.status_style)
+               (Status_style.title s)))
+    }
+;;
+
 let close_tab (m : Model.t) id =
   let current = current_session m in
   let id = Option.first_some id current in
@@ -5692,6 +5742,19 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          "Unknown /notify argument “%s”: /notify on or /notify off (/notify \
           alone says what is on)"
          other)
+  | "status-style", "" -> open_picker m (status_style_picker m)
+  | "status-style", name ->
+    (match Status_style.of_name name with
+     | Some s -> set_status_style m s
+     | None ->
+       error
+         m
+         (sprintf
+            "Unknown status style “%s”: use %s."
+            name
+            (String.concat
+               ~sep:", "
+               (List.map Status_style.all ~f:Status_style.name))))
   | "tabs", "" ->
     toast
       m
@@ -8587,6 +8650,10 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        | Some v -> set_verbosity m v
        | None -> m, [])
     | Confirm_tools -> set_confirm m (String.equal item.id "on")
+    | Status_styles ->
+      (match Status_style.of_name item.id with
+       | Some s -> set_status_style m s
+       | None -> m, [])
     | Themes -> theme_named m item.id
     | Accents -> accent_named m item.id
     | Compaction_models ->
@@ -9087,6 +9154,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     , [ focus_editor ] )
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
+  | Set_mode mode -> set_mode m mode
   | Open_chip chip -> open_chip m chip
   | Open_filter -> open_filter m
   | Filter_press row -> filter_press m row

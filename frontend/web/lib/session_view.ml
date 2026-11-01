@@ -24,23 +24,8 @@ let session_title (m : App.Model.t) (state : State.t) =
        |> Option.value ~default:"New session")
 ;;
 
-let rename (m : App.Model.t) (state : State.t) ~inject =
-  Node.button
-    ~attrs:
-      [ Attr.class_ "session-name"
-      ; Attr.type_ "button"
-      ; Attr.title "Rename (/name)"
-      ; Attr.on_click (fun _ -> inject Action.Open_rename)
-      ]
-    [ Node.span
-        ~attrs:[ Attr.create "dir" "auto" ]
-        [ Node.text (session_title m state) ]
-    ; icon ~cls:"edit-hint" Pencil
-    ]
-;;
-
 let panel_toggles (m : App.Model.t) ~inject =
-  (* A panel opened from a phone's tray: the tray gets out of its way (the
+  (* A panel opened from a phone's menu: the menu gets out of its way (the
      filter's menu hangs from its button, so that one keeps it). *)
   let opening a =
     if m.narrow && m.status_tray
@@ -56,102 +41,87 @@ let panel_toggles (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* It opens the pull requests ([/pr]). *)
-let branch (state : State.t) ~inject =
-  match state.git_branch with
-  | Some branch ->
-    Node.button
-      ~attrs:
-        [ Attr.class_ "branch"
-        ; Attr.type_ "button"
-        ; Attr.title
-            (sprintf
-               "On branch %s, in %s: pull requests (/pr)"
-               branch
-               state.cwd)
-        ; Attr.create "aria-haspopup" "dialog"
-        ; Attr.on_click (fun _ -> inject (Action.Run "/pr"))
-        ]
-      [ icon Branch; span ~cls:"branch-name" branch ]
-  | None -> Node.none
+(* On a phone: one round button for the panels' toggles, what applies and
+   the settings, which open in a small menu under it. *)
+let more (m : App.Model.t) ~inject =
+  Node.div
+    ~attrs:[ classes [ "chrome-more" ] [ "open", m.status_tray ] ]
+    [ Node.button
+        ~attrs:
+          [ Attr.class_ "btn icon ghost round chrome-button more-toggle"
+          ; Attr.type_ "button"
+          ; Attr.title "Panels and settings"
+          ; Attr.create "aria-label" "Panels and settings"
+          ; Attr.create "aria-controls" "chrome-menu"
+          ; Attr.create "aria-expanded" (Bool.to_string m.status_tray)
+          ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+          ]
+        [ icon More ]
+    ; (if m.status_tray
+       then
+         Node.fragment
+           [ Node.div
+               ~attrs:
+                 [ Attr.class_ "chrome-backdrop"
+                 ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+                 ]
+               []
+           ; Node.div
+               ~attrs:
+                 [ Attr.class_ "chrome-menu menu-surface"; Attr.id "chrome-menu" ]
+               [ Status_view.notes m ~inject
+               ; panel_toggles m ~inject
+               ; Sidebar_view.settings ~inject
+               ]
+           ]
+       else Node.none)
+    ]
 ;;
 
-(* A phone's header has room for the title: the thinking level, the mode,
-   the status and the panels' toggles fold into a tray under it, opened by a
-   glance at the status (a dot and the context's percent). Only on a phone,
-   and CSS shows it only where the header is narrow (under 480px); wider,
-   the tray is laid out in the header as ever. *)
-let tray_button (m : App.Model.t) ~inject =
-  if not m.narrow
-  then Node.none
-  else
-    Node.button
-      ~attrs:
-        [ Attr.class_ "btn ghost bar-tray-toggle"
-        ; Attr.type_ "button"
-        ; Attr.title "Status, thinking, mode and panels"
-        ; Attr.create "aria-label" "Status and controls"
-        ; Attr.create "aria-controls" "bar-tray"
-        ; Attr.create
-            "aria-expanded"
-            (Bool.to_string m.status_tray)
-        ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
-        ]
-      [ Status_view.glance m; icon ~cls:"tray-chevron" Chevron ]
-;;
-
-(* The chat's header, docked or not: the title (with the branch beside it
-   where there is room), then what applies and the status at the right, then
-   the panels' toggles. The sidebar's toggle and the settings only when the
-   sidebar, which has its own, is not docked. *)
-let bar (m : App.Model.t) ~inject =
+(* Over the top of the chat, with no bar of its own: the sidebar's toggle
+   (when it is not docked) at the left, the status's island in the middle
+   (where the style puts it there), and what applies and the panels'
+   toggles at the right (on a phone, in a menu). *)
+let chrome (m : App.Model.t) ~inject =
   let docked = App.Model.docked m in
   let toggle =
     if docked
     then Node.none
     else
       button
-        ~cls:"icon ghost toggle-sidebar"
+        ~cls:"icon ghost round chrome-button toggle-sidebar"
         ~title:"Sessions (Ctrl+B)"
         ~label:"Sessions"
         ~on_click:(inject Action.Toggle_sidebar)
         [ icon Menu ]
   in
-  let settings = if docked then Node.none else Sidebar_view.settings ~inject in
-  Node.header
-    ~attrs:[ classes [ "session-bar" ] [ "docked", docked ] ]
-    (match m.state with
-     | None ->
-       [ toggle
-       ; Status_view.extras m ~plan:true ~inject
-       ; Status_view.view m ~inject
-       ; settings
-       ]
-     | Some state ->
-       [ toggle
-       ; div
-           ~cls:"session-title"
-           [ rename m state ~inject; branch state ~inject ]
-       ; tray_button m ~inject
-       ; Node.div
-           ~attrs:
-             [ classes [ "bar-tray" ] [ "open", m.narrow && m.status_tray ]
-             ; Attr.id "bar-tray"
-             ]
-           [ Status_view.extras m ~plan:true ~inject
-           ; Session_chips_view.view m ~inject
-           ; Status_view.view m ~inject
-           ; panel_toggles m ~inject
-           ]
-       ; (if m.narrow && m.status_tray
-          then
-            Node.div
-              ~attrs:
-                [ Attr.class_ "bar-tray-backdrop"
-                ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
-                ]
-              []
-          else Node.none)
-       ; settings
-       ])
+  let island =
+    match m.status_style with
+    | Island -> Status_style_view.island m ~inject
+    | Ring | Whisper | Border | Hub | Sidebar -> Node.none
+  in
+  let tools =
+    if m.narrow
+    then more m ~inject
+    else
+      div
+        ~cls:"chrome-tools"
+        [ Status_view.notes m ~inject
+        ; panel_toggles m ~inject
+        ; (if docked then Node.none else Sidebar_view.settings ~inject)
+        ]
+  in
+  div
+    ~cls:"chrome-anchor"
+    [ Node.div
+        ~attrs:
+          [ classes
+              [ "chat-chrome" ]
+              [ "docked", docked ]
+          ]
+        [ div ~cls:"chrome-left" [ toggle ]
+        ; div ~cls:"chrome-center" [ island ]
+        ; div ~cls:"chrome-right" [ tools ]
+        ]
+    ]
 ;;

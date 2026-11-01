@@ -168,6 +168,97 @@ let host_note (m : App.Model.t) =
   | _ -> None
 ;;
 
+(* The model chip's menu with the status as the hub ({!Status_style.Hub}):
+   under the models, the thinking level, the mode and the usage, each a row
+   of choices that leaves the menu open. *)
+let hub_sections (m : App.Model.t) ~inject =
+  match m.state with
+  | None -> Node.none
+  | Some state ->
+    let section name ?(note = "") body =
+      Node.div
+        ~attrs:[ Attr.class_ "hub-section"; Attr.role "group"; Attr.create "aria-label" name ]
+        [ div
+            ~cls:"hub-head"
+            [ span ~cls:"hub-title" name; span ~cls:"popover-shortcut" note ]
+        ; body
+        ]
+    in
+    let choice ~current ~label ~title ~on_click =
+      Node.button
+        ~attrs:
+          [ classes [ "hub-choice" ] [ "on", current ]
+          ; Attr.type_ "button"
+          ; Attr.title title
+          ; Attr.create "aria-pressed" (Bool.to_string current)
+          ; Attr.on_click (fun _ -> on_click)
+          ]
+        [ Node.text label ]
+    in
+    let thinking =
+      if not state.model.supports_thinking
+      then Node.none
+      else (
+        let level = Option.value m.pending.thinking ~default:state.thinking in
+        section
+          "Thinking"
+          ~note:"Alt+T"
+          (div
+             ~cls:"hub-choices"
+             (List.map App.thinking_levels ~f:(fun l ->
+                choice
+                  ~current:(String.equal l level)
+                  ~label:l
+                  ~title:(sprintf "Thinking: %s (/thinking %s)" l l)
+                  ~on_click:(inject (Action.Set_thinking l))))))
+    in
+    let mode =
+      let current =
+        Option.value m.pending.mode ~default:(Session_mode.of_state state)
+      in
+      section
+        "Mode"
+        ~note:"Alt+M"
+        (div
+           ~cls:"hub-choices"
+           (List.map (Session_mode.choices ~current) ~f:(fun mode ->
+              choice
+                ~current:(Session_mode.equal mode current)
+                ~label:(Session_mode.label mode)
+                ~title:(Session_mode.describe mode)
+                ~on_click:(inject (Action.Set_mode mode)))))
+    in
+    let usage =
+      section
+        "Usage"
+        (div
+           ~cls:"hub-usage"
+           [ (match Status_view.context_percent state with
+              | Some percent ->
+                Node.span
+                  ~attrs:[ Attr.class_ "hub-context" ]
+                  [ Status_view.meter percent
+                  ; span ~cls:"percent" (sprintf "%.0f%%" percent)
+                  ; span
+                      ~cls:"hub-of"
+                      (sprintf
+                         "%s / %s"
+                         (Status_view.tokens state.context_tokens)
+                         (Status_view.tokens state.model.context_window))
+                  ]
+              | None -> Node.none)
+           ; Status_view.cost state ~inject
+           ; span
+               ~cls:"hub-tokens"
+               (sprintf
+                  "%s in · %s out"
+                  (Status_view.tokens state.usage.input)
+                  (Status_view.tokens state.usage.output))
+           ])
+    in
+    div ~cls:"hub-sections" [ thinking; mode; usage ]
+;;
+
 let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   let visible = Picker.visible p in
   let active =
@@ -258,6 +349,9 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
          (match chip with
           | Host -> host_note m
           | Model | Thinking | Mode | Attach -> None)
+     @ (match chip, m.status_style with
+        | Model, Hub -> [ hub_sections m ~inject ]
+        | _ -> [])
      @ [ div
            ~cls:"menu-keys"
            [ Node.text

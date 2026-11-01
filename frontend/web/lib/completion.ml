@@ -200,6 +200,10 @@ let argument_items
       [ "on", "the open sessions as tabs over the chat"
       ; "off", "no tabs: switch from the sidebar"
       ]
+  | Status_style ->
+    simple
+      (List.map Status_style.all ~f:(fun s ->
+         Status_style.name s, Status_style.describe s))
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create

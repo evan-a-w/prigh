@@ -474,6 +474,8 @@ module Action : sig
     | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
+    | Set_mode of Session_mode.t
+    (** from a menu that stays open (the model chip's, in {!Status_style.Hub}) *)
     | Open_chip of Chip.t
     | Open_filter (** the transcript filter's menu; again: closes it *)
     | Filter_press of Filter_menu.Row.t option
@@ -763,10 +765,13 @@ module Model : sig
       (** the sessions sidebar beside the chat (a drawer on a phone); while
           reviewing it is hidden, and [review_drawer] shows it *)
     ; review_drawer : bool
-    ; status_tray : bool
-      (** on a phone, the header's tray is open ({!Action.Toggle_status_tray}) *)
       (** while reviewing on a wide page, the sessions sidebar shows as a
           drawer over the page (Ctrl+B); it goes when the review closes *)
+    ; status_tray : bool
+      (** on a phone, the chat's "more" menu is open (the panels' toggles
+          and the settings: {!Action.Toggle_status_tray}) *)
+    ; status_style : Status_style.t
+      (** where the session's status sits ([/status-style], a preference) *)
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_query : string
     ; archived_open : bool (** the sidebar shows the archived sessions *)
