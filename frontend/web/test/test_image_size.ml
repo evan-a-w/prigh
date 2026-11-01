@@ -98,6 +98,7 @@ let%expect_test "sniffing, and which files are worth reading as images" =
         name
         (Image_size.looks_like_image ~mime_type ~name));
   print_endline (Image_size.size_hum 655_360);
+  print_endline (Image_size.size_hum 300);
   print_endline (Image_size.size_hum 5_000_000);
   [%expect
     {|
@@ -114,6 +115,7 @@ let%expect_test "sniffing, and which files are worth reading as images" =
     image/svg+xml              logo.svg     false
     text/plain                 x.png        false
     640 KB
+    300 B
     4.8 MB
     |}]
 ;;
