@@ -36,7 +36,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     The open sessions as tabs over the chat (not on a phone).
     (Turn session tabs on (/tabs on))
     Transcript detail This browser
-    How much of tool calls and thinking the transcript shows (Ctrl+O).
+    How much of tool calls and thinking the transcript shows (Ctrl+O) .
     (Quiet) (Normal) (Verbose)
     (Keyboard shortcuts) (Done)
     |}];

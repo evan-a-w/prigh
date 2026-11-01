@@ -96,7 +96,8 @@ let verbosity (m : App.Model.t) ~inject =
     ~cls:"verbosity"
     ~scope:Browser
     ~name:"Transcript detail"
-    ~about:"How much of tool calls and thinking the transcript shows (Ctrl+O)."
+    ~keys:"Ctrl+O"
+    ~about:"How much of tool calls and thinking the transcript shows."
     [ segmented
         ~label:"Transcript detail"
         (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
