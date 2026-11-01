@@ -205,6 +205,9 @@ try {
   // 4. A long output comes cut; unfolded, it loads whole.
   await scrollTo(10);
   const tool = page.locator(".tool", { hasText: "dune test m10" }).first();
+  // Its line opens it.
+  await tool.locator("button.tool-head").evaluate(button => button.click());
+  await tool.locator("button.fold").waitFor();
   section("a long output");
   console.log(`shown lines: ${await tool.locator(".output pre").evaluateAll(pres =>
     pres.map(p => p.innerText.split("\n").length).join(" + "))}`);
@@ -216,6 +219,9 @@ try {
     pres.map(p => p.innerText.split("\n").length).join(" + "))} lines`);
   await screenshot("a long output");
   await tool.locator("button.fold").evaluate(button => button.click());
+  // And its line closes it again: the page as it was.
+  await tool.locator("button.tool-head").evaluate(button => button.click());
+  await tool.locator("button.tool-head[aria-expanded=false]").waitFor();
 
   // 5. Reloaded while reading an older page: back at the same place.
   await scrollTo(5);

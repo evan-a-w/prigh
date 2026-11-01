@@ -447,18 +447,14 @@ let%expect_test "a tool call's menu is its reply's" =
         </div>
       </div>
       <div class="ok tool tool-bash">
-        <div class="tool-head">
+        <button type="button" data-fold="c1#open" aria-expanded="false" class="tool-head">
           <span title="Done" role="img" aria-label="Done" class="done mark">
             <icon class="check"> </icon>
           </span>
           <span class="name"> bash </span>
           <span class="arg command"> ls </span>
-        </div>
-        <div class="tool-body">
-          <div class="output">
-            <pre> a b </pre>
-          </div>
-        </div>
+          <span class="chev">  </span>
+        </button>
       </div>
     </div>
     <div data-message-entry="2" id="msg-2" tabindex="-1" class="assistant msg">

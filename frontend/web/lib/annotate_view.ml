@@ -50,6 +50,36 @@ let widths (a : Annotate.t) ~inject =
          [ Node.span ~attrs:[ Attr.class_ "annotate-dot" ] [] ]))
 ;;
 
+(* Zoom, done by the page (app/annotate_widget.ml: [data-annotate-zoom]),
+   which also writes the percentage. *)
+let zoom_controls =
+  let zoom ?(cls = "") action ~label body =
+    Node.button
+      ~attrs:
+        [ Attr.type_ "button"
+        ; Attr.class_ ("annotate-zoom-btn " ^ cls)
+        ; Attr.title label
+        ; Attr.create "aria-label" label
+        ; Attr.create "data-annotate-zoom" action
+        ]
+      body
+  in
+  Node.span
+    ~attrs:
+      [ Attr.class_ "annotate-zoom"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" "Zoom"
+      ]
+    [ zoom "out" ~label:"Zoom out (−)" [ icon Zoom_out ]
+    ; zoom
+        ~cls:"annotate-zoom-pct"
+        "fit"
+        ~label:"Fit (0); Ctrl+scroll or pinch to zoom, scroll to pan"
+        [ Node.text "100%" ]
+    ; zoom "in" ~label:"Zoom in (+)" [ icon Zoom_in ]
+    ]
+;;
+
 let view (a : Annotate.t) ~inject =
   let nothing = a.strokes = 0 in
   Modal.view
@@ -79,6 +109,7 @@ let view (a : Annotate.t) ~inject =
         ; Node.span ~attrs:[ Attr.class_ "annotate-sep" ] []
         ; widths a ~inject
         ; Node.span ~attrs:[ Attr.class_ "annotate-spacer" ] []
+        ; zoom_controls
         ; button
             ~cls:"ghost small annotate-undo"
             ~title:"Undo the last stroke (Ctrl+Z)"

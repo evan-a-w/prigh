@@ -40,6 +40,35 @@ let finish ?(is_error = false) h text =
        is_error)
 ;;
 
+(* A call's line opens its card (a failure's is open already). *)
+let open_card h = H.act h (Toggle_fold "c1#open")
+
+let%expect_test "a call is one line at rest; the line opens its output" =
+  let h = H.create () in
+  start h;
+  finish h (lines 3);
+  H.show h ~selector:".tool";
+  open_card h;
+  H.text h ~selector:".tool";
+  [%expect
+    {|
+    <div class="ok tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="false" class="tool-head">
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
+        <span class="name"> bash </span>
+        <span class="arg command"> make </span>
+        <span class="chev">  </span>
+      </button>
+    </div>
+    (✓ bash make)
+    line 1
+    line 2
+    line 3
+    |}]
+;;
+
 let%expect_test "a failure folds to its last lines, where the error is" =
   let h = H.create () in
   start h;
@@ -94,6 +123,7 @@ let%expect_test "bash: the last lines while it runs, then folded, expanded" =
     </div>
     |}];
   finish h (lines 30);
+  open_card h;
   H.text h ~selector:".tool-body";
   [%expect
     {|
@@ -197,7 +227,6 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
      (tag Show_error))
     (Expire_toast (id 1) (after_ms 4660))
     <div class="chat verbosity-quiet">
-    (Show all 20 lines)
     ()
     |}];
   H.act h Cycle_verbosity;
@@ -210,7 +239,6 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
      (tag Show_error))
     (Expire_toast (id 2) (after_ms 4180))
     <div class="chat verbosity-normal">
-    (Show all 20 lines)
     |}]
 ;;
 
@@ -325,7 +353,7 @@ let%expect_test "a delivered job's output: its last lines, unfolded on demand" =
   H.text h ~selector:".delivery-section";
   [%expect
     {|
-    ↩ job j1 exited 0 make
+    ↩ job j1 make exited 0
     line 8
     line 9
     line 10

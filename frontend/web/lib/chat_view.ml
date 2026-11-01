@@ -156,7 +156,8 @@ let user ?skill times (u : Message.User.t) =
              "attachments"
              (List.map paths ~f:(fun path ->
                 Node.span
-                  ~attrs:[ Attr.class_ "attachment"; Attr.title "Attached file" ]
+                  ~attrs:
+                    [ Attr.class_ "attachment"; Attr.title "Attached file" ]
                   [ Node.text ("@" ^ path) ])))
       ; Option.value_map u.at ~default:Node.none ~f:(time times)
       ]
@@ -281,9 +282,9 @@ let parts : Chat.Entry.t -> Transcript_filter.Kind.t list = function
     List.filter_map message.content ~f:(fun c ->
       Option.some_if (not (blank c)) (content_kind c))
     @
-    (match message.stop_reason with
-     | Error _ | Aborted | Length -> [ Notes ]
-     | End_turn | Tool_use -> [])
+      (match message.stop_reason with
+      | Error _ | Aborted | Length -> [ Notes ]
+      | End_turn | Tool_use -> [])
 ;;
 
 let hidden ?(deleting = Int.Set.empty) ~fold chat =
@@ -409,9 +410,10 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
       (if streaming then "msg assistant streaming" else "msg assistant")
       ((pending :: blocks)
        @ [ stopped
-         ; (if streaming
-               || (List.is_empty blocks
-                   && not (Transcript_filter.is_all (Fold.filter fold)))
+         ; (if
+              streaming
+              || (List.is_empty blocks
+                  && not (Transcript_filter.is_all (Fold.filter fold)))
             then Node.none
             else footer times message)
          ])
@@ -437,7 +439,14 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
      | Some { kind = Delivery; title } ->
        noted
          (match Prigh_ui.Delivery.parse u.text with
-          | Some sections -> div "msg" [ Delivery_view.view ~fold sections ]
+          | Some sections ->
+            div
+              "msg"
+              [ Delivery_view.view
+                  ~name:(Tool_view.agent_name chat)
+                  ~fold
+                  sections
+              ]
           | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
      | Some { kind = Summary; _ } ->
        compaction
@@ -512,7 +521,11 @@ and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
       ; running
       ; tools
       ; times
-      ; expanded = List.map ids ~f:(Fold.expanded fold)
+      ; expanded =
+          List.concat_map ids ~f:(fun id ->
+            [ Fold.expanded fold id
+            ; Fold.expanded fold (Tool_view.open_key id)
+            ])
       ; nested =
           Option.some_if
             (List.exists tools ~f:(fun tool ->
@@ -542,9 +555,9 @@ and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
         | Some more ->
           [ Attr.id (message_id n); Attr.tabindex (-1) ]
           @
-          (match menu_classes more with
-           | [] -> []
-           | classes -> [ Attr.classes classes ])
+            (match menu_classes more with
+            | [] -> []
+            | classes -> [ Attr.classes classes ])
       in
       match node with
       | Element e when not (List.is_empty attrs) ->

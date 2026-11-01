@@ -322,12 +322,13 @@ let%expect_test
   [%expect
     {|
     Scroll_to_bottom
-    <div class="running tool tool-bash">
-      <div class="tool-head">
+    <div class="open running tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> rm -rf build </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="live output">
           <div class="missed"> Output from while this page was away shows when it ends. </div>

@@ -1015,6 +1015,7 @@ let install_listeners ~schedule ~current =
   Chat_listeners.install ~schedule;
   Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;
+  Viewer_widget.install ~schedule;
   listen (Dom.Event.make "change") (fun ev ->
     (match Js.Opt.to_option ev##.target with
      | Some el when String.equal (Js.to_string el##.id) image_input_id ->
