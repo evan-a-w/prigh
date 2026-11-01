@@ -96,7 +96,7 @@ let%expect_test "list, view, checks and diff" =
   run {|{"action":"diff","number":7}|};
   run {|{"action":"view","number":99}|};
   run {|{"action":"view"}|};
-  run {|{"action":"merge","number":7}|};
+  run {|{"action":"frobnicate","number":7}|};
   Fake_forge.print_requests fake;
   [%expect
     {|
@@ -125,7 +125,7 @@ let%expect_test "list, view, checks and diff" =
 
     ERROR: pull_request view: github.com: pull request #99 of o/r not found (HTTP 404): action=list lists the open ones; the closest: #7 From a contributor (open), #5 Old one (open, draft)
     ERROR: invalid arguments: missing "number": the pull request's number (action=list shows them)
-    ERROR: invalid arguments: unknown action "merge": use list, view, checks, diff, create or checkout
+    ERROR: invalid arguments: unknown action "frobnicate": use list, view, checks, diff, comments, create, checkout, comment, edit, merge, close, reopen, ready, draft, review, reply or request_reviewers
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
       Authorization: Bearer ghp_mine
     GET https://api.github.com/repos/o/r/pulls/7
@@ -263,15 +263,13 @@ let%expect_test
      ())
     checked #7 out in $DIR/worktrees/r/pr-7, on the branch pr-7 (its worktree already, fast-forwarded)
     Work there: cd '$DIR/worktrees/r/pr-7' in bash commands, paths under it in file tools, or pass it as a subagent's cwd. Remove it with the worktree tool when it is done with.
-    ERROR: pull_request checkout: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? action=list lists them): fatal: couldn't find remote ref refs/pull/3/head; the closest: #5 Old one (open, draft), #7 From a contributor (open)
+    ERROR: pull_request checkout: git fetch origin refs/pull/3/head (is #3 a pull request of origin's repository? action=list lists them): fatal: couldn't find remote ref refs/pull/3/head
     open pull requests in o/r on github.com:
     #7 From a contributor (open; alice, fork:feat/x -> main) https://github.com/o/r/pull/7
     #5 Old one (open, draft; alice, feat/x -> main) https://github.com/o/r/pull/5
     ERROR: pull_request list: not a git repository: $DIR (cwd names one)
     ERROR: pull_request list: no GitHub or Forgejo remote in $DIR/r (git remote -v lists upstream /srv/x.git): add one with git remote add origin URL
     ERROR: pull_request create: no GitHub or Forgejo remote in $DIR/r (git remote -v lists upstream /srv/x.git): add one with git remote add origin URL
-    GET https://api.github.com/repos/o/r/pulls?state=all&per_page=100&sort=updated&direction=desc
-      Authorization: Bearer ghp_mine
     GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
       Authorization: Bearer ghp_mine
     |}]

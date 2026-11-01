@@ -83,6 +83,39 @@ let http_error
       host
       detail
       (Forge_instance.login_arg t.instance)
+  | 429 -> Or_error.errorf "%s: %s: rate limited (HTTP 429%s)" host what detail
+  | 403 ->
+    let lower = String.lowercase detail in
+    if String.is_substring lower ~substring:"rate limit"
+    then Or_error.errorf "%s: %s: rate limited (HTTP 403%s)" host what detail
+    else (
+      let header name =
+        match Forge_http.Response.header response name with
+        | Some v when not (String.is_empty (String.strip v)) ->
+          Some (String.strip v)
+        | _ -> None
+      in
+      (* Classic tokens get the scopes the call needs; fine-grained tokens
+         and GitHub Apps the permissions. *)
+      let needs =
+        match
+          ( header "X-Accepted-OAuth-Scopes"
+          , header "X-Accepted-GitHub-Permissions" )
+        with
+        | _, Some permissions ->
+          sprintf " (it needs the permission %s)" permissions
+        | Some scopes, None -> sprintf " (it needs %s)" scopes
+        | None, None -> ""
+      in
+      Or_error.errorf
+        "%s: %s: not allowed (HTTP 403%s): the account may lack access to the \
+         repository, or the sign-in may lack a scope%s: sign in again with \
+         /login %s"
+        host
+        what
+        detail
+        needs
+        (Forge_instance.login_arg t.instance))
   | 404 ->
     (match on_404 with
      | Some message -> Or_error.error_string message
@@ -91,7 +124,7 @@ let http_error
   | status -> Or_error.errorf "%s: %s: HTTP %d%s" host what status detail
 ;;
 
-let send t ?accept ?body ~what ?not_found ?on_404 meth url =
+let raw t ?accept ?body meth url =
   let request : Forge_http.Request.t =
     { meth
     ; url
@@ -99,20 +132,208 @@ let send t ?accept ?body ~what ?not_found ?on_404 meth url =
     ; body = Option.map body ~f:Json.to_string
     }
   in
-  Or_error.bind (t.http ~cancel:t.cancel request) ~f:(fun response ->
+  t.http ~cancel:t.cancel request
+;;
+
+let send_response t ?accept ?body ~what ?not_found ?on_404 meth url =
+  Or_error.bind (raw t ?accept ?body meth url) ~f:(fun response ->
     if response.status / 100 = 2
-    then Ok response.body
+    then Ok response
     else http_error t ~what ?not_found ?on_404 response)
 ;;
 
+let send t ?accept ?body ~what ?not_found ?on_404 meth url =
+  Or_error.map
+    (send_response t ?accept ?body ~what ?not_found ?on_404 meth url)
+    ~f:(fun response -> response.body)
+;;
+
 let parse ~what body =
-  match Json.parse body with
-  | Ok json -> Ok json
-  | Error _ -> Or_error.errorf "%s: the reply is not JSON" what
+  if String.is_empty (String.strip body)
+  then Ok `Null
+  else (
+    match Json.parse body with
+    | Ok json -> Ok json
+    | Error _ -> Or_error.errorf "%s: the reply is not JSON" what)
+;;
+
+let send_json t ?body ~what ?not_found ?on_404 meth url =
+  Or_error.bind
+    (send t ?body ~what ?not_found ?on_404 meth url)
+    ~f:(parse ~what)
 ;;
 
 let get_json t ~what ?not_found ?on_404 url =
-  Or_error.bind (send t ~what ?not_found ?on_404 Get url) ~f:(parse ~what)
+  send_json t ~what ?not_found ?on_404 Get url
+;;
+
+(* [<URL>; rel="next", <URL>; rel="last"]: each link is [<...>] followed by
+   its parameters up to the next [<], so a comma inside a URL (a search's
+   [q]) does not split it. *)
+let next_link (response : Forge_http.Response.t) =
+  Option.bind (Forge_http.Response.header response "Link") ~f:(fun link ->
+    let rec links s acc =
+      match String.index s '<' with
+      | None -> List.rev acc
+      | Some start ->
+        (match String.index_from s start '>' with
+         | None -> List.rev acc
+         | Some stop ->
+           let url = String.sub s ~pos:(start + 1) ~len:(stop - start - 1) in
+           let rest = String.drop_prefix s (stop + 1) in
+           let params, rest =
+             match String.index rest '<' with
+             | Some k -> String.prefix rest k, String.drop_prefix rest k
+             | None -> rest, ""
+           in
+           links rest ((url, params) :: acc))
+    in
+    List.find_map (links link []) ~f:(fun (url, params) ->
+      Option.some_if (String.is_substring params ~substring:"rel=\"next\"") url))
+;;
+
+(* A next page on another host (or scheme) than the API's is not followed:
+   the request would carry the token there. *)
+let same_origin t url =
+  let api = Uri.of_string (Forge_instance.api_url t.instance) in
+  let next = Uri.of_string url in
+  let origin u =
+    ( Option.map (Uri.scheme u) ~f:String.lowercase
+    , Option.map (Uri.host u) ~f:String.lowercase
+    , Uri.port u )
+  in
+  [%equal: string option * string option * int option]
+    (origin api)
+    (origin next)
+;;
+
+let encode_segment s =
+  String.concat_map s ~f:(fun c ->
+    if
+      Char.is_alphanum c
+      || Char.equal c '-'
+      || Char.equal c '.'
+      || Char.equal c '_'
+      || Char.equal c '~'
+    then String.of_char c
+    else sprintf "%%%02X" (Char.to_int c))
+;;
+
+let encode_ref ref_ =
+  String.concat
+    ~sep:"/"
+    (List.map (String.split ref_ ~on:'/') ~f:encode_segment)
+;;
+
+let with_query url query =
+  match query with
+  | [] -> url
+  | query ->
+    url
+    ^ (if String.mem url '?' then "&" else "?")
+    ^ Uri.encoded_of_query (List.map query ~f:(fun (k, v) -> k, [ v ]))
+;;
+
+let page_size t =
+  match t.instance.kind with
+  | Github -> 100
+  | Forgejo -> 50
+;;
+
+let with_page_size t url =
+  let uri = Uri.of_string url in
+  let param =
+    match t.instance.kind with
+    | Github -> "per_page"
+    | Forgejo -> "limit"
+  in
+  if Option.is_some (Uri.get_query_param uri param)
+  then url
+  else
+    Uri.to_string
+      (Uri.add_query_param' uri (param, Int.to_string (page_size t)))
+;;
+
+let get_list
+      ?(limit = 100)
+      ?(items = fun json -> Some json)
+      ?(keep = fun _ -> true)
+      t
+      ~what
+      ?not_found
+      url
+  =
+  let rec go url acc count =
+    let open Or_error.Let_syntax in
+    let%bind response = send_response t ~what ?not_found Get url in
+    let%bind json = parse ~what response.body in
+    match items json with
+    | Some (`Array raw_page) ->
+      let page = List.filter raw_page ~f:keep in
+      let acc = List.rev_append page acc in
+      let count = count + List.length page in
+      (match next_link response with
+       | Some next
+         when count < limit
+              && (not (List.is_empty raw_page))
+              && same_origin t next -> go next acc count
+       | _ -> Ok (List.take (List.rev acc) limit))
+    | _ -> Or_error.errorf "%s: expected a list" what
+  in
+  go (with_page_size t url) [] 0
+;;
+
+let graphql t ~what ~query ~variables =
+  match t.instance.kind with
+  | Forgejo -> Or_error.errorf "%s: %s has no GraphQL API" what t.instance.host
+  | Github ->
+    let url =
+      match t.instance.host with
+      | "github.com" -> "https://api.github.com/graphql"
+      | _ -> t.instance.web_url ^ "/api/graphql"
+    in
+    let body = `Object [ "query", `String query; "variables", variables ] in
+    Or_error.bind (send_json t ~body ~what Post url) ~f:(fun json ->
+      match Json.member "errors" json with
+      | Some (`Array (_ :: _ as errors)) ->
+        Or_error.errorf
+          "%s: %s"
+          what
+          (String.concat
+             ~sep:"; "
+             (List.map errors ~f:(fun e ->
+                match Json.member "message" e with
+                | Some (`String m) -> m
+                | _ -> Json.to_string e)))
+      | _ ->
+        (match Json.member "data" json with
+         | Some data -> Ok data
+         | None -> Or_error.errorf "%s: the reply has no data" what))
+;;
+
+let get_following t ~what url =
+  let open Or_error.Let_syntax in
+  let%bind response = raw t ~accept:"*/*" Get url in
+  match response.status with
+  | 301 | 302 | 303 | 307 | 308 ->
+    (match Forge_http.Response.header response "Location" with
+     | None -> Or_error.errorf "%s: a redirect without a Location" what
+     | Some location ->
+       (* the location is signed: it must not get the token *)
+       let%bind response =
+         t.http
+           ~cancel:t.cancel
+           { meth = Get
+           ; url = location
+           ; headers = [ "User-Agent", "prigh" ]
+           ; body = None
+           }
+       in
+       if response.status / 100 = 2
+       then Ok response.body
+       else http_error t ~what response)
+  | status when status / 100 = 2 -> Ok response.body
+  | _ -> http_error t ~what response
 ;;
 
 let repo_hint (repo : Forge_repo.t) =
