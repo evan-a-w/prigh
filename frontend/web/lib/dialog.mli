@@ -36,7 +36,6 @@ module Picker_kind : sig
     | Worktrees of Worktree.Listing.t (** item ids are their paths *)
     | Themes (** item ids are [Theme.Name.to_string]s *)
     | Accents (** item ids are [Theme.Accent.to_string]s *)
-    | Status_styles (** item ids are [Status_style.name]s *)
     | Compaction_models
     (** [/compaction model]: model keys, or [off] (the conversation's) *)
     | Naming_models

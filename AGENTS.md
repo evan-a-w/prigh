@@ -134,14 +134,12 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 - Every error tells you what to do next (closest matches, the command to run).
 - State is always visible: the status line shows model, thinking, context,
   cost, user, queued messages, agents, and any mode the UI is in (prigh-web
-  has no header: the model and host are the composer's chips, and the
-  activity, context, cost, thinking and mode sit where the status style puts
-  them (Settings → Appearance → Layout, /status-style: an island over the
-  chat, the default, a ring round send, a line under the composer, the
-  composer's border, the model chip or the sidebar's foot), each with one
-  details card; on a phone they sit in one strip across the top, under the
-  safe area, with the sidebar's ☰ and a ⋯ sheet of the panels and settings;
-  the user is at the foot of the sidebar and on its settings page).
+  has no header: the composer's row has the model, host, thinking, mode and
+  verbosity chips, then the status (activity, context, cost) with its
+  details card; on a phone the thinking, mode, verbosity and usage are at
+  the top of the ⋯ sheet, the top strip (under the safe area) has the
+  sidebar's ☰, the session's name and ⋯, and the user is at the foot of the
+  sidebar and on its settings page).
 - Phones are first class (prigh-web is used as an installed PWA): one
   strip of chrome, never pieces floating over each other or the text; menus
   and the ⋯ are sheets from the bottom; settings fill the screen, a list of

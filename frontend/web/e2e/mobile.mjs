@@ -256,7 +256,7 @@ const visit = async (w, h, { safe = false } = {}) => {
 
   await step("the files", async () => {
     await page.getByRole("button", { name: "Panels and settings" }).tap();
-    await page.locator(".chrome-menu .files-row").tap();
+    await page.locator(".chrome-menu .files-sheet-row").tap();
     await page.locator(".files-panel").waitFor();
   });
   await page.getByRole("button", { name: "Close files" }).tap();

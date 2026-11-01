@@ -1,5 +1,5 @@
-// The status over the chat (the island, and what applies beside it): its
-// rows as they stand idle, while the agent works with a subagent running,
+// The status at the composer's right (the activity, the context, the
+// cost) and what applies over the chat: its rows as they stand idle, while the agent works with a subagent running,
 // with only the subagent left, and with a mode on (then in the narrowest
 // sidebar), in the dark and light themes, on a long branch; then with the
 // sidebar closed and on a phone. For each it prints the rows (what sits on
@@ -109,7 +109,7 @@ const clean = text =>
 // The composer's chips, by row (they wrap rather than spill), with anything
 // outside the composer or cut off without an ellipsis.
 const chips = () => page.evaluate(() => {
-  const root = document.querySelector(".composer-controls");
+  const root = document.querySelector(".composer-row");
   if (!root) return "(no chips)";
   const box = document.querySelector(".composer").getBoundingClientRect();
   const rows = [];
@@ -121,7 +121,7 @@ const chips = () => page.evaluate(() => {
     row.items.push({ left: r.left, text: e.innerText.trim().replace(/\s+/g, " ") || "icon" });
   }
   rows.sort((a, b) => a.top - b.top);
-  const problems = [...root.querySelectorAll("*")].flatMap(e => {
+  const problems = [...root.querySelectorAll("*")].filter(e => !e.closest(".status-details, #chip-popover")).flatMap(e => {
     const r = e.getBoundingClientRect();
     if (r.width === 0) return [];
     const out = r.left < box.left - 1 || r.right > box.right + 1 ? ["outside"] : [];
@@ -142,14 +142,15 @@ const chips = () => page.evaluate(() => {
 // meter as [meter]), then the lamps lit, what is in the accent colour, and
 // anything outside the card or cut off without an ellipsis.
 const card = () => page.evaluate(() => {
-  const root = document.querySelector(".chat-chrome");
+  const root = document.querySelector(".composer-status");
   if (!root) return "(no card)";
+  const notes = document.querySelector(".chat-chrome .status-notes");
   const shown = e => {
     const r = e.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
   };
-  const items = [...root.querySelectorAll(".status-item")].filter(shown)
-    .filter(e => !e.parentElement.closest(".status-item"));
+  const items = [root, notes].filter(Boolean).flatMap(r => [...r.querySelectorAll(".status-item")]).filter(shown)
+    .filter(e => !e.parentElement.closest(".status-item") && !e.closest(".status-details"));
   const box = root.getBoundingClientRect();
   const rows = [];
   for (const e of items) {
@@ -169,7 +170,7 @@ const card = () => page.evaluate(() => {
   probe.remove();
   const accented = items.filter(e => getComputedStyle(e).color === accent).map(e => e.innerText.trim());
   const lamps = [...root.querySelectorAll(".lamp")].filter(shown).length;
-  const problems = [...root.querySelectorAll("*")].filter(shown).flatMap(e => {
+  const problems = [...root.querySelectorAll("*")].filter(shown).filter(e => !e.closest(".status-details")).flatMap(e => {
     const r = e.getBoundingClientRect();
     const out = r.left < box.left - 1 || r.right > box.right + 1 ? ["outside"] : [];
     const cs = getComputedStyle(e);
@@ -197,7 +198,7 @@ const both = async label => {
   console.log(clean(await card()));
   for (const t of ["dark", "light"]) {
     await theme(t);
-    await screenshot(`${label} ${t}`, ".chat-chrome");
+    await screenshot(`${label} ${t}`, ".composer");
   }
   await screenshot(label);
   await theme("dark");
@@ -208,28 +209,28 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".status-island .activity.idle", { hasText: "Ready" }).waitFor();
+  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
   await both("idle");
 
   // The agent at work, its subagent too.
   await command("survey the project");
   // The subagent tool at work (its call written), as the card had it.
-  await page.locator(".status-island .activity", { hasText: "Running tools" }).waitFor();
+  await page.locator(".composer-status .activity", { hasText: "Running tools" }).waitFor();
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("main-go"));
   await both("working, a subagent running");
 
   // The agent done, its subagent still running.
   open("main-go");
-  await page.locator(".status-island .activity.idle").waitFor();
+  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
   await both("ready, a subagent running");
 
   // All done, and a mode on (the transcript's verbosity).
   open("sub-go");
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
-  await page.locator(".status-island .activity.idle").waitFor();
+  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
   await page.keyboard.press("Control+o");
-  await page.locator(".chat-chrome .status-item.mode").waitFor();
+  await page.locator(".composer .chip-anchor.verbosity", { hasText: "verbose" }).waitFor();
   await both("idle, a mode on");
 
   // The sidebar at its narrowest: still one line for the activity and the
@@ -279,7 +280,7 @@ try {
   console.log(clean(await chips()));
 
   // The context opens the session's details.
-  await page.locator(".status-island button.context").click();
+  await page.locator(".composer-status button.context").click();
   await page.locator(".modal").waitFor();
   section("the context opens the session's details");
   console.log(clean(await page.locator(".modal h2, .modal .dialog-title").first().innerText()));
@@ -295,7 +296,7 @@ try {
   await page.keyboard.press("Control+b");
   await page.locator(".chat-chrome").waitFor();
 
-  // A phone: ☰, the island and ⋯.
+  // A phone: ☰, the session's name and ⋯; the status at the composer.
   await page.setViewportSize({ width: 390, height: 760 });
   await page.locator(".chat-chrome").waitFor();
   section("a phone");

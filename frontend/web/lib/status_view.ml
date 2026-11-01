@@ -339,14 +339,7 @@ let modes (m : App.Model.t) ~inject =
         ]
       [ Node.text text ]
   in
-  [ (match m.verbosity with
-     | Normal -> Node.none
-     | v ->
-       chip
-         ~title:"Transcript verbosity (Ctrl+O cycles)"
-         ~command:"/verbosity"
-         (Prigh_ui.Verbosity.name v))
-  ; (match
+  [ (match
        Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
      with
      | Some text ->
@@ -373,4 +366,33 @@ let notes (m : App.Model.t) ~inject =
     in
     div ~cls:"status-notes" items
   | _ -> Node.none
+;;
+
+(* {2 In the composer's row} *)
+
+let composer_status (m : App.Model.t) ~inject =
+  match m.state with
+  | None -> Node.none
+  | Some state ->
+    Node.div
+      ~attrs:
+        [ classes [ "composer-status" ] [ "busy", busy m ]
+        ; Attr.role "group"
+        ; Attr.create "aria-label" "Session status"
+        ]
+      [ gauge
+          ~cls:"above"
+          m
+          state
+          [ activity m
+          ; (match context_percent state with
+             | Some p ->
+               context_button
+                 state
+                 ~inject
+                 [ ring ~cls:"mini" p []; span ~cls:"percent" (sprintf "%.0f%%" p) ]
+             | None -> context_button state ~inject [ ring ~cls:"mini" 0. [] ])
+          ; cost state ~inject
+          ]
+      ]
 ;;

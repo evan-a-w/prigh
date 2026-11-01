@@ -98,7 +98,7 @@ await page.addInitScript(() => {
       for (const entry of list.getEntries()) {
         const where = (entry.sources || []).map(s => s.node).filter(n => n && n.nodeType === 1);
         if (where.some(n => n.closest("#chat, .chat-chrome"))) window.__shifts.push(entry.value);
-        if (where.some(n => n.closest(".status-island"))) window.__statusShifts?.push(entry.value);
+        if (where.some(n => n.closest(".composer-status"))) window.__statusShifts?.push(entry.value);
       }
     }).observe({ type: "layout-shift" });
   } catch {}
@@ -111,23 +111,21 @@ await page.addInitScript(() => {
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
       });
-    // Where the status's items are, in the island over the chat (from its
-    // left edge: the pill is centred, so it grows both ways).
-    const status = document.querySelector(".status-island > .status-gauge");
-    const left = status?.closest(".status-island").getBoundingClientRect().left ?? 0;
+    // Where the status's items are, at the composer's right (from its right
+    // edge: the activity comes and goes at its left).
+    const status = document.querySelector(".composer-status > .status-gauge");
+    const right = status?.closest(".composer-status").getBoundingClientRect().right ?? 0;
     if (status && window.__status)
       window.__status.push({
         activity: status.querySelector(".activity")?.textContent.trim(),
-        at: [...status.querySelectorAll(":scope > :is(.context, .cost, .activity)")]
+        // The context and the cost: the activity comes and goes before them.
+        at: [...status.querySelectorAll(":scope > :is(.context, .cost)")]
           .filter(e => getComputedStyle(e).display !== "none")
           .map(e => {
             const r = e.getBoundingClientRect();
             const name = ["context", "tokens", "cost"].find(c => e.classList.contains(c)) ?? "activity";
-            return `${name}@${Math.round(r.left - left)}`;
+            return `${name}@${Math.round(right - r.right)}`;
           })
-          .concat([...status.querySelectorAll(".activity > .label")]
-            .filter(e => e.offsetWidth > 0)
-            .map(e => `label@${Math.round(e.getBoundingClientRect().left - left)}`))
           .join(" "),
       });
     setTimeout(() => requestAnimationFrame(sample), 0);
@@ -264,7 +262,7 @@ try {
   const turn = async (label, reply) => {
     await page.evaluate(() => { window.__status = []; window.__statusShifts = []; });
     await send("check it");
-    await page.locator(".status-island .activity", { hasText: "Running tools" }).waitFor();
+    await page.locator(".composer-status .activity", { hasText: "Running tools" }).waitFor();
     await send("and the rest");
     await page.locator(".queued-tag").first().waitFor();
     await bodyHas(reply);
@@ -283,12 +281,11 @@ try {
     console.log(`layout shift in the status: ${r.shift < 0.0001 ? "none" : r.shift.toFixed(4)}`);
     await screenshot(label);
   };
-  await turn("a turn starts and ends: the status in the island", "Checked.");
+  await turn("a turn starts and ends: the status at the composer", "Checked.");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400);
-  // The island sits between ☰ and ⋯.
-  await turn("a turn starts and ends on a phone: the status in the island", "Checked again.");
+  await turn("a turn starts and ends on a phone: the status at the composer", "Checked again.");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

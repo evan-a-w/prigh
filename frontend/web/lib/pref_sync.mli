@@ -29,9 +29,6 @@ module Key : sig
   (** Whether session tabs are on ([/tabs]). *)
   val tabs : string
 
-  (** Where the session's status sits ([/status-style]). *)
-  val status_style : string
-
   (** The open session tabs: their ids, in order. *)
   val open_tabs : string
 

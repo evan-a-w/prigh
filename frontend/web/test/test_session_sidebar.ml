@@ -121,13 +121,13 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
   list h;
   [%expect
     {|
-    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10))
+    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login) (agent/fix-the-parser subagent) (pr-7 #7)
-    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10))
+    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login here)
-    (Landing page 2h ago site trunk) (More (right-click, Shift+F10))
-    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10))
-    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10))
+    (Landing page 2h ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (redesign here)
     (Archived 1)
     |}];
@@ -201,12 +201,12 @@ let%expect_test "folding a session's worktrees: a preference, by session" =
     (Cache_prefs (((key web.sidebar-folded) (value ((s1))))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-folded (s1))))))
      (tag Show_error))
-    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10))
-    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10))
+    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login here)
-    (Landing page 2h ago site trunk) (More (right-click, Shift+F10))
-    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10))
-    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10))
+    (Landing page 2h ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (redesign here)
     (Archived 1)
     |}];
@@ -907,11 +907,11 @@ let%expect_test
   H.elements h ~selector:".session-home";
   [%expect
     {|
-    (Login form 2m ago prigh feat/login from main) (1) (More (right-click, Shift+F10))
+    (Login form 2m ago prigh feat/login from main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login here)
-    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10))
+    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (redesign here)
-    (Landing page 2m ago site trunk) (More (right-click, Shift+F10))
+    (Landing page 2m ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
     <span class="session-home">
     <span class="session-home">
     |}];
@@ -1074,11 +1074,11 @@ let%expect_test "Switch back runs /worktree back; the session's home goes" =
              (branch (main)) (main true))))))))))
     (Expire_toast (id 0) (after_ms 2540))
     Back in main (~/src/prigh)
-    (Login form 2m ago prigh feat/login) (1) (More (right-click, Shift+F10))
+    (Login form 2m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login here)
-    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10))
+    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (redesign here)
-    (Landing page 2m ago site trunk) (More (right-click, Shift+F10))
+    (Landing page 2m ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 

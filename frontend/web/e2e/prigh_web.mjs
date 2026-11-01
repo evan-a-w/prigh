@@ -225,16 +225,19 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".chat-chrome :is(.status-island, .status-notes:not(:empty))")]
+    [...document.querySelectorAll(".composer-status .status-gauge > .status-item, .composer-row .row-chips .chip-button, .chat-chrome .status-notes:not(:empty)")]
+      .filter(e => getComputedStyle(e).display !== "none")
       .map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
-// The chrome over the chat, with each select showing its chosen option.
+// The chrome over the chat, the status and the session's chips, with each
+// select showing its chosen option.
 const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".chat-chrome *")]
+    [...document.querySelectorAll(".chat-chrome *, .composer-status *, .composer-row .row-chips *")]
+      .filter(e => e.getClientRects().length > 0)
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
         || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where, .status-details")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
@@ -350,7 +353,7 @@ const layoutProblems = selector => page.evaluate(selector => {
 // The composer's chips as shown: each chip's text, or "icon" for an icon
 // alone.
 const controlsShown = () => page.evaluate(() => {
-  return [...document.querySelectorAll(".composer-controls .chip-button")].map(chip => {
+  return [...document.querySelectorAll(".composer-row .chip-button")].filter(c => c.getClientRects().length > 0 && !c.closest("#chip-popover")).map(chip => {
     const after = getComputedStyle(chip, "::after");
     const extra = after.display !== "none" && after.content.startsWith('"') ? after.content.slice(1, -1) : "";
     const text = (chip.innerText.trim().replace(/\s+/g, " ") + " " + extra).trim();
@@ -360,7 +363,7 @@ const controlsShown = () => page.evaluate(() => {
 
 // Where a chip's menu stands: below its chip, above the composer's box or
 // over it, at the chip's left edge (or as wide as the box it is placed in:
-// the composer, or the island for its chips), inside the window.
+// the composer), inside the window.
 const popoverPlace = () => page.evaluate(() => {
   const menu = document.querySelector("#chip-popover");
   const r = menu.getBoundingClientRect();
@@ -374,7 +377,7 @@ const popoverPlace = () => page.evaluate(() => {
   const near = (a, b) => Math.abs(a - b) <= 4;
   const where = r.top >= chip.bottom ? "below the chip" : r.bottom <= box.top ? "above the composer" : "over the composer";
   const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
-    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? `shifted inside the ${inComposer ? "composer" : "island"}` : "out of line";
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
   const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
   return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
@@ -640,10 +643,10 @@ try {
 
   // A budget shows in the status line as spend against it.
   await send("/budget 5");
-  await page.locator(".status-island .budget").waitFor();
-  await show("a budget in the status line", ".status-island");
+  await page.locator(".composer-status .budget").waitFor({ state: "attached" });
+  await show("a budget in the status line", ".composer-status");
   await send("/budget off");
-  await page.locator(".status-island .budget").waitFor({ state: "detached" });
+  await page.locator(".composer-status .budget").waitFor({ state: "detached" });
   // 2b. Long output folds to its first and last lines; its toggle shows it
   //     all, and folds it again.
   await send("count to thirty");
@@ -1550,8 +1553,8 @@ try {
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
 
-  // 15. The chrome floating over the chat (the status island and the
-  //     panels' toggles) and the composer fit, however wide the panels
+  // 15. The chrome floating over the chat (the panels' toggles and what
+  //     applies) and the status at the composer and the composer fit, however wide the panels
   //     around the chat make it: the composer's chips take shorter labels.
   //     Nothing overlaps or is cut off.
   const chatWidth = () => width(".main");
@@ -1565,12 +1568,12 @@ try {
     const where = await page.evaluate(() => {
       const at = ".chat-chrome";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status-island .status-gauge, .status-notes) > .status-item`)]
+      const status = [...document.querySelectorAll(".composer-status .status-gauge > .status-item, .chat-chrome .status-notes > .status-item")]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       return { at, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; ${where.at}: ${clean(where.status)}; ${where.height}px high`);
+    console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; status: ${clean(where.status)}; ${where.at} ${where.height}px high`);
     for (const s of [".chat-chrome", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);

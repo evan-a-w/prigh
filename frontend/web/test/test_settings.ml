@@ -29,9 +29,6 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
     Layout
-    Status
-    Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
-    (Island A pill floating over the top of the chat) (Send ring A ring of context round send; thinking and mode by the model) (Status line One quiet line under the message box) (Border meter The message box's edge fills with context) (Model chip The model chip shows the context; its menu has the rest) (Sidebar A card at the sidebar's foot (a line under the box without it))
     Tabs
     The open sessions as tabs over the chat (not on a phone).
     (Turn session tabs on (/tabs on))
@@ -85,7 +82,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   [%expect
     {|
     <aside class="sidebar">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}]
 ;;
 
@@ -289,12 +286,6 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    button "Island" -- a pill floating over the top of the chat (/status-style island)
-    button "Send ring" -- a ring of context round send; thinking and mode by the model (/status-style ring)
-    button "Status line" -- one quiet line under the message box (/status-style whisper)
-    button "Border meter" -- the message box's edge fills with context (/status-style border)
-    button "Model chip" -- the model chip shows the context; its menu has the rest (/status-style hub)
-    button "Sidebar" -- a card at the sidebar's foot (a line under the box without it) (/status-style sidebar)
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
@@ -311,7 +302,6 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    [group] div "Status"
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
     -- Sessions
