@@ -152,6 +152,14 @@ let model (m : Model.t) =
     ; "context_window", int m.context_window
     ; "max_output", int m.max_output
     ; "supports_thinking", bool m.supports_thinking
+    ; "supports_images", bool m.supports_images
+    ; ( "image_limit"
+      , let limit = Image_limit.for_model m in
+        `Object
+          [ (* decoded bytes: what a client measures *)
+            "max_bytes", int (limit.max_base64_bytes * 3 / 4)
+          ; "max_dimension", int limit.max_dimension
+          ] )
     ; ( "cost"
       , `Object
           [ "input", float m.cost.input

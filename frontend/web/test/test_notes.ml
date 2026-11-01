@@ -385,6 +385,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /default-dir [path|off] show or set the directory new sessions start in
     /mkdir [path] create a directory (and its parents) and change to it
+    /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /delete-archived delete every archived session, after a confirmation
     /retry-backend-connection reconnect to the backend now
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
@@ -421,6 +422,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /default-dir [path|off] show or set the directory new sessions start in
     /delete-archived delete every archived session, after a confirmation
+    /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /retry-backend-connection reconnect to the backend now
     |}]
 ;;

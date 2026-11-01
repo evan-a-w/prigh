@@ -1561,10 +1561,10 @@ let%expect_test
     {|
     (aiproxy/gpt-4o aiproxy/openai/gpt-4o-mini)
     {"type":"event","event":"notice","text":"providers.broken needs a \"base_url\" such as \"http://localhost:3000/v1\" (in $DIR/.prigh/config.json); that provider is skipped"}
-    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
     |}];
   call ~params:{|{"model": "aiproxy/openai/gpt-4o-mini"}|} "set_model";
   call ~params:{|{"model": "aiproxy/gpt-5"}|} "set_model";
@@ -1578,7 +1578,7 @@ let%expect_test
   custom_entries (call_quiet "auth_status") ~f:Fn.id;
   [%expect
     {|
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")
