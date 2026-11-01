@@ -208,7 +208,7 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".status-island").waitFor();
+  await page.locator(".status-island .activity.idle", { hasText: "Ready" }).waitFor();
   await both("idle");
 
   // The agent at work, its subagent too.
