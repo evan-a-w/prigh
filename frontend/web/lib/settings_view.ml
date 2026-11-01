@@ -79,11 +79,12 @@ let status_style (m : App.Model.t) ~inject =
       ("Where the activity, context, cost, thinking and mode show: "
        ^ Status_style.describe m.status_style
        ^ ".")
-    [ segmented
+    [ choice_list
         ~label:"Status"
         (List.map Status_style.all ~f:(fun s ->
            let name = Status_style.name s in
            ( Status_style.title s
+           , String.capitalize (Status_style.describe s)
            , sprintf "%s (/status-style %s)" (Status_style.describe s) name
            , Status_style.equal s m.status_style
            , inject (Action.Run ("/status-style " ^ name)) )))
@@ -147,7 +148,7 @@ let default_model (m : App.Model.t) ~inject =
   let current =
     match m.config with
     | None -> None
-    | Some { default_model = None; _ } -> Some "The backend's default"
+    | Some { default_model = None; _ } -> Some "the backend's default"
     | Some { default_model = Some key; default_thinking; _ } ->
       Some
         (match default_thinking with

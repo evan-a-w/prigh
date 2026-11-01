@@ -2228,7 +2228,7 @@ transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed 
 transcript: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5, Step 6, Noted after the trim
 === firefox: trim: phone ===
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Cancel | Trim
 === firefox: trim: errors ===
 none
 === firefox: filter: opened ===
@@ -2527,9 +2527,11 @@ Appearance, Sessions, Models, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
+choice controls fit: true; the status styles a list: true
 back to the list: true
 === firefox: mobile: 390x844: settings: models ===
 ok
+choice controls fit: true
 === firefox: mobile: 390x844: the drawer ===
 ok
 === firefox: mobile: 390x844: the model menu ===
@@ -2557,9 +2559,11 @@ Appearance, Sessions, Models, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
+choice controls fit: true; the status styles a list: true
 back to the list: true
 === firefox: mobile: 320x640: settings: models ===
 ok
+choice controls fit: true
 === firefox: mobile: 320x640: the drawer ===
 ok
 === firefox: mobile: 320x640: the model menu ===

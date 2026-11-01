@@ -4,7 +4,8 @@ open Html
 module Action = App.Action
 module Filter = Pull_requests.Filter
 
-let keys_hint text = span ~cls:"keys-hint" text
+(* Only for a keyboard: hidden on a phone. *)
+let keys_only text = span ~cls:"keys-hint keyboard" text
 
 let link ?(cls = "") ~href children =
   Node.a
@@ -124,7 +125,7 @@ let list (l : Pull_requests.t) ~inject =
     ~title:"Pull requests"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "↑↓ to move, Enter to open, Esc to close"
+      [ keys_only "↑↓ to move, Enter to open, Esc to close"
       ; button
           ~title:"/pr new"
           ~on_click:(inject Action.New_pr)
@@ -335,7 +336,7 @@ let page (m : App.Model.t) (p : Pr_page.t) ~inject =
               ~on_click:(inject Action.Close_dialog)
               [ icon Back; Node.text "All pull requests" ]
           ]
-        | None -> [ keys_hint "Esc closes" ])
+        | None -> [ keys_only "Esc closes" ])
        @ (match pr with
           | Some pr ->
             [ link
@@ -489,7 +490,7 @@ let create (generate : Generate.t) (f : Pr_create.t) ~inject =
           [ Node.text "Close" ]
       ]
     | None ->
-      [ keys_hint "Ctrl+Enter creates it"
+      [ keys_only "Ctrl+Enter creates it"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"

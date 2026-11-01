@@ -311,6 +311,51 @@
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
 .app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
 .app.narrow .settings-group h4 { font-size: 12px; }
+/* A wide row is the words, then the control: neither grows into a gap. */
+.app.narrow .setting-wide { flex-wrap: nowrap; }
+.app.narrow .setting-wide .setting-text { flex: none; }
+/* A segmented control takes the row's width, its choices an even grid. */
+.app.narrow .setting .setting-control:has(> .segmented) { flex: 1 1 100%; margin-left: 0; }
+.app.narrow .setting .segmented > .segment { min-height: 44px; padding: 6px 8px; }
+/* Many or long choices (the status styles): a list of rows, each its name
+   over a line about it, a radio's ring before them. */
+.choice-list .segment-about { display: none; }
+.app.narrow .setting .segmented.choice-list { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 3px; }
+.app.narrow .segmented.choice-list > .segment {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+  justify-content: stretch;
+  text-align: left;
+  padding: 9px 12px;
+  min-height: 52px;
+  white-space: normal;
+}
+.app.narrow .segmented.choice-list > .segment::before {
+  content: "";
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--rule-2);
+}
+.app.narrow .segmented.choice-list > .segment.on::before { border: 5px solid var(--sodium); }
+.app.narrow .choice-list .segment-name { font-size: 15px; font-weight: 600; color: var(--chalk); }
+.app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
+/* Compaction's threshold field: one line, the number and its unit centred. */
+.app.narrow .segmented:has(.compact-at-field) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.app.narrow .compact-at-field { justify-content: center; white-space: nowrap; padding: 0 8px; }
+.app.narrow .compact-at-input { width: 6ch; font-size: 16px; }
+.app.narrow .compact-at-unit { white-space: nowrap; }
+/* Tabs never show on a phone: their switch is for the desktop. */
+.app.narrow .setting.tabs { display: none; }
+
+/* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
+.app.narrow .keyboard { display: none !important; }
+@media (hover: none) and (pointer: coarse) { .keyboard { display: none !important; } }
 
 /* {1 The drawer} */
 
@@ -318,13 +363,16 @@
   width: min(86vw, 340px);
   padding-top: var(--safe-t);
   padding-bottom: var(--safe-b);
-  padding-left: var(--safe-l);
+  padding-left: max(10px, var(--safe-l));
+  padding-right: 10px;
   overscroll-behavior: contain;
 }
 .app.narrow .sidebar-head { min-height: var(--strip-h); }
 .app.narrow .sidebar :is(.btn, .session-row, .sidebar-footer button) { min-height: var(--tap); }
 .app.narrow .sidebar .btn.icon { min-width: var(--tap); }
 .app.narrow .sidebar input { font-size: 16px; min-height: var(--tap); }
+/* No gutter for an overlay scrollbar: the rows line up with the search. */
+.app.narrow .sessions { margin: 0; padding: 0 0 8px; scrollbar-gutter: auto; }
 
 /* {1 Panels: full screen, under the safe area} */
 

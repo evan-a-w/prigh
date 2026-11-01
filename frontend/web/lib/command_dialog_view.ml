@@ -5,6 +5,9 @@ module Action = App.Action
 
 let keys_hint text = span ~cls:"keys-hint" text
 
+(* Only for a keyboard: hidden on a phone. *)
+let keys_only text = span ~cls:"keys-hint keyboard" text
+
 let done_button ~inject =
   button
     ~cls:"primary"
@@ -162,7 +165,7 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Tab completes, ↑↓ choose"
+      [ keys_only "Tab completes, ↑↓ choose"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -232,7 +235,7 @@ let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
     ~title:"Create folder?"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Enter creates, Esc cancels"
+      [ keys_only "Enter creates, Esc cancels"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -307,7 +310,7 @@ let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
     ~title:"New worktree"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Enter creates, Esc cancels"
+      [ keys_only "Enter creates, Esc cancels"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -433,7 +436,7 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
     ~title:"Trim the context here?"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Enter trims, Esc cancels"
+      [ keys_only "Enter trims, Esc cancels"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -488,7 +491,7 @@ let trim_after_confirm
     ~title:"Trim the context after this?"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Enter trims, Esc cancels"
+      [ keys_only "Enter trims, Esc cancels"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -683,7 +686,7 @@ let loading ~title ~inject =
     ~cls:"loading-dialog"
     ~title
     ~on_close:(inject Action.Close_dialog)
-    ~footer:[ keys_hint "Esc closes" ]
+    ~footer:[ keys_only "Esc closes" ]
     [ div
         ~cls:"loading-row"
         ~attrs:[ Attr.role "status" ]
