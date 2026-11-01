@@ -220,6 +220,7 @@ count some lines
 <TIME>
 === chromium: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?

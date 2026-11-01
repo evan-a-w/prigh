@@ -220,6 +220,7 @@ count some lines
 <TIME>
 === firefox: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
