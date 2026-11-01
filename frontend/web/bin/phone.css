@@ -462,4 +462,11 @@
   .app.narrow .composer-status .ring.mini { display: none; }
   .app.narrow .composer-status > .status-gauge { padding-left: 4px; }
   .app.narrow .composer-status .status-item.link { padding: 0 4px; }
+  /* "auto-edit" whole: a longer word gets the room it needs. */
+  .session-choice { flex: 1 1 auto; padding: 0 2px; font-size: 13px; }
+}
+/* A phone on its side has the room: the chips are back in the row (the ⋯
+   sheet keeps them too). */
+@container composer (min-width: 640px) {
+  .app.narrow .row-chips { display: flex; }
 }
