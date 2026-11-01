@@ -951,7 +951,7 @@ dialog.viewer {
   border: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: color-mix(in srgb, #07080a 90%, transparent);
+  background: color-mix(in srgb, #07080a calc(90% - var(--swipe, 0) * 60%), transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: #e6e6e6;
@@ -1185,3 +1185,10 @@ dialog.viewer::backdrop { background: transparent; }
 }
 .delivery-head[data-agent]:hover .open-agent { color: var(--chalk); }
 .delivery-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+
+/* A finger at fit drags the image (aside to the next, down to close): it
+   follows, then springs back unless it went far enough. */
+.viewer:not(.dragging) .viewer-img { transition: translate 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.viewer.animate .viewer-img { transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1), translate 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.viewer.dragging .viewer-img { transition: none; }
+@media (prefers-reduced-motion: reduce) { .viewer .viewer-img { transition: none !important; } }

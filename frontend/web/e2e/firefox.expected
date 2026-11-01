@@ -23,11 +23,11 @@ What are we building?
 Ctrl+L switch model
 Ctrl+K find a session
 === firefox: signed in: the session's card ===
-Ready
-0%
-$<COST>
 on
 auto
+normal
+0%
+$<COST>
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -107,17 +107,14 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === firefox: the session's card after a run ===
-Ready
+on
+auto
+normal
 0%
 $<COST>
-on
-auto
 === firefox: a budget in the status line ===
-Ready
 0%
 $<COST>/$<COST>
-on
-auto
 === firefox: long output, at rest ===
 bash
 seq 1 30
@@ -222,8 +219,8 @@ switched back: true
 count some lines
 <TIME>
 === firefox: backend gone ===
-Reconnecting…
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
@@ -399,7 +396,7 @@ more
 Max
 as much as the model allows
 Enter chooses, ← → the next setting, Esc closes
-thinking's menu: below the chip, shifted inside the island, inside the window; focus in it: true
+thinking's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 closed: true; focus: editor
 model's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: the model chip's menu, filtered ===
@@ -416,6 +413,7 @@ host's menu: over the composer, at the chip's left edge, inside the window; focu
 === firefox: mode ask ===
 high
 ask
+normal
 === firefox: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -456,12 +454,13 @@ SQLite it is.
 === firefox: plan mode (Alt+M) ===
 high
 plan
+normal
 === firefox: plan mode: the status line ===
-Ready
-0%
-$<COST>
 high
 plan
+normal
+0%
+$<COST>
 === firefox: plan mode: the composer's placeholder ===
 Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
 === firefox: the plan, in plan mode ===
@@ -479,13 +478,14 @@ Test it
 === firefox: plan mode off ===
 high
 auto
+normal
 === firefox: plan mode off: the status line ===
-Ready
-0%
-$<COST>
+plan 0/2: Write the schema
 high
 auto
-plan 0/2: Write the schema
+normal
+0%
+$<COST>
 === firefox: implementing ===
 ◇
 Plan mode off: the model was told it can change files
@@ -721,17 +721,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .chat-chrome: Ready, 0%, $<COST>; 44px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, icon; .chat-chrome: Ready, 0%; 44px high
+chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, icon; .chat-chrome: icon, 0%; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -755,14 +755,6 @@ Accent
 Your turns, the selection, focus and work in progress.
 Custom
 LAYOUT
-Status
-Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
-Island
-Send ring
-Status line
-Border meter
-Model chip
-Sidebar
 Tabs
 The open sessions as tabs over the chat (not on a phone).
 Transcript detail
@@ -786,17 +778,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .chat-chrome: Ready, 0%, $<COST>; 44px high
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, icon; .chat-chrome: Ready, 0%; 44px high
+chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, icon; .chat-chrome: icon, 0%; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -1056,11 +1048,11 @@ selection kept: true
 frames sampled: true
 frames with lines out of view: 0
 frames empty but still tall: 0
-=== firefox: stability: a turn starts and ends: the status in the island ===
+=== firefox: stability: a turn starts and ends: the status at the composer ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
-=== firefox: stability: a turn starts and ends on a phone: the status in the island ===
+=== firefox: stability: a turn starts and ends on a phone: the status at the composer ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
@@ -1083,14 +1075,6 @@ Accent
 Your turns, the selection, focus and work in progress.
 Custom
 LAYOUT
-Status
-Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
-Island
-Send ring
-Status line
-Border meter
-Model chip
-Sidebar
 Tabs
 The open sessions as tabs over the chat (not on a phone).
 Transcript detail
@@ -2355,162 +2339,119 @@ markdown fits: true; page fits: true; scrolling display math: 1, auto
 === firefox: math: errors ===
 none
 === firefox: card: idle ===
-row 1: Ready | 0% | $<COST>
-lamps: 0; accented: nothing; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: working, a subagent running ===
 row 1: Running tools | 0% | $<COST>
-lamps: 1; accented: Running tools; 44px high
+lamps: 1; accented: Running tools; 28px high
 fits
 === firefox: card: ready, a subagent running ===
-row 1: Ready | 0% | $<COST>
-lamps: 0; accented: nothing; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: idle, a mode on ===
-row 1: Ready | 0% | $<COST> | verbose
-lamps: 0; accented: verbose; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: the sidebar at its narrowest ===
-row 1: Ready | 0% | $<COST> | verbose
-lamps: 0; accented: verbose; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | <HOSTNAME>
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | on | auto | verbose
 chip problems: none
 === firefox: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === firefox: card: on a host with a long name ===
-row 1: Ready | 0% | $<COST> | verbose
-lamps: 0; accented: verbose; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | on | auto | verbose
 chip problems: none (host name truncated)
 === firefox: card: the context opens the session's details ===
 Session
 === firefox: card: the sidebar closed ===
-row 1: Ready | 0% | $<COST> | verbose
-lamps: 0; accented: verbose; 44px high
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: a phone ===
-row 1: Ready | 0%
-lamps: 0; accented: nothing; 48px high
+row 1: 0%
+lamps: 0; accented: nothing; 40px high
 fits
 chips 1: DeepSeek V4.1 Flash | icon
 chip problems: none
-=== firefox: status: the tab's title ===
-make the port configurable · prigh
-=== firefox: status: island, desktop, idle ===
-island: Ready | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-details by keyboard: shown, described
-=== firefox: status: ring, desktop, idle ===
-send ring: Send
-row chips: Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-details by keyboard: shown, described
-=== firefox: status: whisper, desktop, idle ===
-whisper: Ready | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-details by keyboard: shown, described
-=== firefox: status: border, desktop, idle ===
-row chips: Thinking on | Auto: never asks
-border meter: (drawn)
-border tag: Context 36% full: the session's details | $<COST>
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-details by keyboard: shown, described
-=== firefox: status: hub, desktop, idle ===
-hub badge: (drawn)
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 0; header bar: none
-no context button
-=== firefox: status: sidebar, desktop, idle ===
-sidebar card: Ready | $<COST> | Context 36% full: the session's details | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-details by keyboard: shown, described
-=== firefox: status: island, phone, idle ===
-island: Ready | Context 36% full: the session's details | Thinking on | Auto: never asks
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 1; header bar: none
-=== firefox: status: ring, phone, idle ===
-send ring: Send
-row chips: Thinking on | Auto: never asks
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 1; header bar: none
-=== firefox: status: whisper, phone, idle ===
-whisper: Ready | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 1; header bar: none
-=== firefox: status: border, phone, idle ===
-row chips: Thinking on | Auto: never asks
-border meter: (drawn)
-border tag: Context 36% full: the session's details | $<COST>
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 1; header bar: none
-=== firefox: status: hub, phone, idle ===
-hub badge: (drawn)
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 0; header bar: none
-=== firefox: status: sidebar, phone, idle ===
-whisper: Ready | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Sessions, Panels and settings
-fits
-details cards: 1; header bar: none
-=== firefox: status: the context opens the session's details ===
-Session
-=== firefox: status: the hub's menu ===
-THINKING, MODE, USAGE
-menu open after a choice: true
-the badge shows the mode
-=== firefox: status: island, working ===
-island: Running tools | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-=== firefox: status: ring, working ===
-send ring: Stop
-row chips: Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-=== firefox: status: whisper, working ===
-whisper: Running tools | Context 36% full: the session's details | $<COST> | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-=== firefox: status: border, working ===
-row chips: Thinking on | Auto: never asks
-border meter: (drawn)
-border tag: Running tools | Context 36% full: the session's details | $<COST>
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
-=== firefox: status: hub, working ===
-hub badge: (drawn)
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 0; header bar: none
-=== firefox: status: sidebar, working ===
-sidebar card: Running tools | $<COST> | Context 36% full: the session's details | Thinking on | Auto: never asks
-chrome buttons: Filter the transcript, Files, Terminal
-fits
-details cards: 1; header bar: none
+=== firefox: status: desktop 1280: the status ===
+shows: true; clear of the mic and send: true
+the row fits: true
+it says: 36%
+=== firefox: status: desktop 700: the status ===
+shows: true; clear of the mic and send: true
+the row fits: true
+it says: 36%
+=== firefox: status: desktop: the chips' menus act ===
+thinking by mouse: high; menu closed: true
+mode by mouse: ask; menu closed: true
+verbosity by mouse: verbose; menu closed: true
+thinking by keyboard: max; menu closed: true
+mode by keyboard: auto-edit; menu closed: true
+verbosity by keyboard: normal; menu closed: true
+=== firefox: status: desktop: a click outside closes, and goes no further ===
+model: closed: true; the filter's menu opened: false
+host: closed: true; the filter's menu opened: false
++: closed: true; the filter's menu opened: false
+thinking: closed: true; the filter's menu opened: false
+mode: closed: true; the filter's menu opened: false
+verbosity: closed: true; the filter's menu opened: false
+=== firefox: status: desktop: the status's details ===
+on hover: true
+on keyboard focus (Context 36% full): true
+the context opens: Session
+=== firefox: status: 390x844: the composer's row ===
+the row fits: true
+it shows: Add files or images, DeepSeek V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+=== firefox: status: 390x844: the ⋯ sheet's choices act ===
+Thinking: high; reopened: high
+Mode: ask; reopened: ask
+Transcript: verbose; reopened: verbose
+=== firefox: status: 390x844: a tap outside closes, and goes no further ===
+model: closed: true; the drawer opened: false
+host: closed: true; the drawer opened: false
++: closed: true; the drawer opened: false
+=== firefox: status: 390x844: drags ===
+from the left edge: the drawer opens: true
+a row to the left: its actions: Archive, Delete
+a tap elsewhere puts it back: true
+dragged left: the drawer closes: true
+the model's sheet down by its grip: closed: true
+the ⋯ sheet down by its grip: closed: true
+a settings section, from the left edge: back to the list: true
+a pending image's tile up: removed: true
+the viewer at fit, aside: 1 / 2 to 2 / 2
+down: closed: true
+=== firefox: status: 320x640: the composer's row ===
+the row fits: true
+it shows: Add files or images, DeepSeek V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+=== firefox: status: 320x640: the ⋯ sheet's choices act ===
+Thinking: high; reopened: high
+Mode: ask; reopened: ask
+Transcript: verbose; reopened: verbose
+=== firefox: status: 320x640: a tap outside closes, and goes no further ===
+model: closed: true; the drawer opened: false
+host: closed: true; the drawer opened: false
++: closed: true; the drawer opened: false
+=== firefox: status: 320x640: drags ===
+from the left edge: the drawer opens: true
+a row to the left: its actions: Archive, Delete
+a tap elsewhere puts it back: true
+dragged left: the drawer closes: true
+the model's sheet down by its grip: closed: true
+the ⋯ sheet down by its grip: closed: true
+a settings section, from the left edge: back to the list: true
+a pending image's tile up: removed: true
+the viewer at fit, aside: 1 / 2 to 2 / 2
+down: closed: true
 === firefox: mobile: 390x844: the chat ===
 ok
 === firefox: mobile: 390x844: the chrome ===
@@ -2528,7 +2469,7 @@ Appearance, Sessions, Models, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
-choice controls fit: true; the status styles a list: true
+choice controls fit: true
 back to the list: true
 === firefox: mobile: 390x844: settings: models ===
 ok
@@ -2560,7 +2501,7 @@ Appearance, Sessions, Models, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
-choice controls fit: true; the status styles a list: true
+choice controls fit: true
 back to the list: true
 === firefox: mobile: 320x640: settings: models ===
 ok

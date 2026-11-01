@@ -17,3 +17,8 @@ val backdrop : inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** How hard the model thinks at a level: rising bars, lit up to it. *)
 val meter : string -> Node.t
+
+(** The session's settings as rows of choices that leave the rest open: the
+    thinking level, the mode, the transcript's verbosity and the usage (the
+    phone's ⋯ sheet, where the composer's row has no room for their chips). *)
+val session_sections : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

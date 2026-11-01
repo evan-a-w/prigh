@@ -25,12 +25,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
             aria-expanded="false"
             class="btn chip-button thinking-chip"
             @on_click>
-      <span aria-hidden="true" class="thinking-meter">
-        <span class="bar on"> </span>
-        <span class="bar on"> </span>
-        <span class="bar"> </span>
-        <span class="bar"> </span>
-      </span>
+      <icon class="brain"> </icon>
       <span class="chip-label"> on </span>
     </button>
     |}];
@@ -87,12 +82,7 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
             aria-controls="chip-popover"
             class="btn chip-button thinking-chip"
             @on_click>
-      <span aria-hidden="true" class="thinking-meter">
-        <span class="bar on"> </span>
-        <span class="bar on"> </span>
-        <span class="bar"> </span>
-        <span class="bar"> </span>
-      </span>
+      <icon class="brain"> </icon>
       <span class="chip-label"> on </span>
     </button>
     |}];
@@ -233,14 +223,13 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
-    <Vdom.Node.none-widget class="">
     <div class="sidebar-footer">
     <div class="chrome-anchor">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}];
   H.show h ~selector:".session-card";
   [%expect {| |}];
@@ -495,18 +484,6 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     (Focus editor)
     <button class="btn chip-button host-chip">
     (Sessions (Ctrl+B))
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking on
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
@@ -537,7 +514,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     <div class="chat-chrome">
       <div class="chrome-left">
         <button type="button"
@@ -549,97 +526,11 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
         </button>
       </div>
       <div class="chrome-center">
-        <div data-popover-box="" role="group" aria-label="Session status" class="status-island">
-          <span class="below status-gauge">
-            <span title="Ready" role="status" aria-atomic="true" class="activity idle status-item">
-              <span class="idle-dot"> </span>
-              <span class="label"> Ready </span>
-            </span>
-            <button type="button"
-                    aria-label="Context 0% full: the session's details"
-                    aria-describedby="status-details"
-                    aria-haspopup="dialog"
-                    class="context link status-item"
-                    @on_click>
-              <span class="mini ring" custom-css-vars=((--pct 0.0))> </span>
-              <span class="percent"> 0% </span>
-            </button>
-            <span title="Session cost: $0.0000" class="cost status-item"> $0.00 </span>
-            <div role="tooltip" id="status-details" class="status-details">
-              <div class="status-detail">
-                <span class="status-detail-key"> Status </span>
-                <span class="status-detail-value"> Ready </span>
-              </div>
-              <div class="context status-detail">
-                <span class="status-detail-key"> Context </span>
-                <span class="status-detail-value"> 0 / 200k · 0% </span>
-              </div>
-              <div class="status-detail">
-                <span class="status-detail-key"> Tokens </span>
-                <span class="status-detail-value"> 0 in · 0 out · 0 cached </span>
-              </div>
-              <div class="status-detail">
-                <span class="status-detail-key"> Cost </span>
-                <span class="status-detail-value"> $0.0000 </span>
-              </div>
-              <div class="status-detail">
-                <span class="status-detail-key"> Thinking </span>
-                <span class="status-detail-value"> on </span>
-              </div>
-              <div class="status-detail">
-                <span class="status-detail-key"> Mode </span>
-                <span class="status-detail-value"> Auto: never asks </span>
-              </div>
-              <div class="status-detail">
-                <span class="status-detail-key"> Model </span>
-                <span class="status-detail-value"> Claude Opus 5.5 </span>
-              </div>
-              <div class="branch-line status-detail">
-                <span class="status-detail-key"> Branch </span>
-                <span class="status-detail-value"> main </span>
-              </div>
-              <div class="status-detail-hint"> Click for the session’s details · /compact frees context </div>
-            </div>
-          </span>
-          <div role="group" aria-label="Thinking and mode" class="island-chips session-chips">
-            <div class="chip-anchor thinking">
-              <button type="button"
-                      title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-                      aria-label="Thinking on"
-                      aria-haspopup="dialog"
-                      aria-expanded="false"
-                      class="btn chip-button thinking-chip"
-                      @on_click>
-                <span aria-hidden="true" class="thinking-meter">
-                  <span class="bar on"> </span>
-                  <span class="bar on"> </span>
-                  <span class="bar"> </span>
-                  <span class="bar"> </span>
-                </span>
-                <span class="chip-label"> on </span>
-              </button>
-              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            </div>
-            <div class="chip-anchor mode">
-              <button type="button"
-                      title="Tools run without asking (Alt+M cycles, /mode picks)"
-                      aria-label="Auto: never asks"
-                      aria-haspopup="dialog"
-                      aria-expanded="false"
-                      class="btn chip-button mode-chip never-asks"
-                      @on_click>
-                <icon class="shield"> </icon>
-                <span class="chip-label"> auto </span>
-              </button>
-              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            </div>
-          </div>
-        </div>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="chrome-right">
         <div class="chrome-tools">
           <div class="status-notes">
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -692,18 +583,6 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   [%expect
     {|
     (Sessions (Ctrl+B))
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking on
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -730,7 +609,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
     <div class="chat-chrome strip">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}]
 ;;
 
@@ -752,10 +631,12 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <textarea class="editor">
     <div class="composer-row">
-    <Vdom.Node.none-widget class="">
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     |}];
@@ -817,6 +698,9 @@ let%expect_test
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Stop" -- Stop (Esc)
     button "Steer" -- Steer (Enter)
@@ -1032,32 +916,32 @@ let%expect_test
     Place_popover
     Host
     (Chip_step 1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Model
+    Thinking
     (Chip_step 1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Host
+    Mode
     (Chip_step -1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Model
+    Thinking
     (Chip_step 1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Host
+    Mode
     (Chip_step -1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Model
+    Thinking
     (Chip_step 1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
     (Chip_step 1)
-    (Focus popover-filter)
+    (Focus popover-list)
     Place_popover
-    Model
+    Verbosity
     |}];
   (* In the model's filter, once something is typed, ← → move the caret. *)
   H.key h "Escape" ~target:Field;
@@ -1090,11 +974,12 @@ let%expect_test
     <textarea class="editor">
     <div class="composer-buttons">
     <div class="composer-controls menu-open">
-    <div class="chip-anchor thinking">
-    <div class="chip-anchor mode">
     <div class="attach-menu chip-anchor">
     <div class="chip-anchor model open">
     <div class="chip-anchor host">
+    <div class="chip-anchor thinking">
+    <div class="chip-anchor mode">
+    <div class="chip-anchor verbosity">
     |}];
   H.click h ~selector:".host-chip";
   shown ();
@@ -1149,7 +1034,7 @@ let%expect_test "narrow: the same menu" =
     |}]
 ;;
 
-let%expect_test "the status in the island: idle, running, and what applies" =
+let%expect_test "the status at the composer: idle, running, and what applies" =
   let h =
     H.create
       ~state:
@@ -1164,7 +1049,7 @@ let%expect_test "the status in the island: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".status-island" in
+  let status () = H.text h ~selector:".composer-status" in
   status ();
   [%expect
     {|
@@ -1178,8 +1063,6 @@ let%expect_test "the status in the island: idle, running, and what applies" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     |}];
   H.event
     h
@@ -1199,13 +1082,13 @@ let%expect_test "the status in the island: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".status-island .status-item";
+  H.elements h ~selector:".composer-status .status-item";
   (* The context nearly full: its ring is hot; the goal is a note. *)
-  H.elements h ~selector:".status-island .ring";
+  H.elements h ~selector:".composer-status .ring";
   H.text h ~selector:".status-notes";
   (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".status-island .activity";
+  H.show h ~selector:".composer-status .activity";
   [%expect
     {|
     Working (90%) $0.00
@@ -1218,8 +1101,6 @@ let%expect_test "the status in the island: idle, running, and what applies" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     <span class="activity running status-item">
     <button class="context link status-item">
     <span class="cost status-item">
@@ -1231,15 +1112,14 @@ let%expect_test "the status in the island: idle, running, and what applies" =
     </span>
     |}];
   (* The context opens the session's details, with the counters. *)
-  H.click h ~selector:".status-island .context";
+  H.click h ~selector:".composer-status .context";
   [%expect
     {|
     (Run /session)
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     |}];
-  (* Waiting for the backend, the card and the island say so where the
-     status goes. *)
+  (* Waiting for the backend, the card and the composer's status say so. *)
   let h = H.connecting () in
   H.text h ~selector:".session-card";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
@@ -1247,7 +1127,6 @@ let%expect_test "the status in the island: idle, running, and what applies" =
   [%expect
     {|
     (Sessions (Ctrl+B))
-    Connecting…
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
@@ -1271,7 +1150,6 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
             class="btn chip-button model-chip"
             @on_click>
       <span class="chip-label"> Claude Opus 5.5 </span>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <icon class="chevron"> </icon>
     </button>
     <textarea id="editor"
@@ -1287,9 +1165,9 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
     |}]
 ;;
 
-(* ← → go along the chips that sit together: the island's thinking and mode,
-   the composer's model and host; never from one group into the other. *)
-let%expect_test "← → stay within the island's chips and the composer's" =
+(* ← → go along the composer's chips, one row: model, host, thinking, mode
+   and the transcript's verbosity, round from the last to the first. *)
+let%expect_test "← → go along the composer's chips" =
   let h = H.create () in
   let shown () = H.text h ~selector:"#chip-popover .popover-head" in
   H.quiet h (fun () -> H.click h ~selector:".thinking-chip");
@@ -1309,10 +1187,11 @@ let%expect_test "← → stay within the island's chips and the composer's" =
     (Chip_step 1)
     When tools ask first Alt+M cycles
     (Chip_step 1)
-    Thinking Alt+T cycles
+    Transcript Ctrl+O cycles
     Close_dialog
     (Open_chip Model)
     (Chip_step 1)
     (Chip_step 1)
+    Thinking Alt+T cycles
     |}]
 ;;

@@ -351,6 +351,19 @@ let%expect_test
     (Add files or images (or paste, or drop them here))
     (Claude Opus 5.5)
     (backend)
+    (on)
+    (auto)
+    (normal)
+    Ready (0%) $0.00
+    Status Ready
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
     (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));

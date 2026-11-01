@@ -811,48 +811,47 @@ a rename button) and in the browser tab's title. A few round, translucent
 buttons float over the chat's top corners: in the top right the filter,
 files, terminal and agents toggles (lit while their panel is open), with,
 before them, what applies, only when it does (the goal, reminders, a
-scheduled resume, transfers, the verbosity when not the default, the plan
+scheduled resume, transfers, the plan
 chip `plan 2/5: step` that runs `/todos`); with the sidebar closed, its
 button in the top left and the settings gear after the toggles. On a phone
 the top right is a single ⋯ that opens all of these in a small menu. The
 chat starts under them and fades out beneath them as it scrolls.
 
-The session's status (what the agent is doing, `Ready`, `Thinking`…; how
-full the context is; the cost, to the cent, or against the budget; the
-thinking level and the mode) has one of six places, your choice in Settings
-→ Appearance → Layout or with `/status-style NAME`, saved for your account:
+The composer's row has, after the model and host chips, the session's
+thinking level (a brain and the level), its mode (a shield and the mode's
+short name) and the transcript's verbosity (lines and `quiet`, `normal` or
+`verbose`), each opening a small menu over itself (Alt+T, Alt+M and Ctrl+O
+cycle them; under a 600px column they are icons alone). At the row's right,
+before the microphone, the session's status: what the agent is doing while
+it works (`Thinking`, `Running tools`…; idle, nothing), how full the context
+is (a ring and the percent) and the cost, to the cent, or against the budget.
+On a phone the row keeps +, the model, the host's icon, the status, the
+microphone and send; the thinking level, mode, verbosity and usage are at
+the top of the ⋯ sheet, as rows of choices.
 
-- `island` (the default): a frosted pill at the top centre of the chat,
-  between the corners' buttons, glowing in the accent colour while the agent
-  works;
-- `ring`: the context as a ring round the send button, turning while the
-  agent works, the thinking and the mode (when it is not Ask) beside the
-  composer's chips;
-- `whisper`: one muted line in monospace under the composer, each part a
-  link (shorter on a phone);
-- `border`: the composer's bottom edge is the context's meter, shimmering
-  while the agent works, with the activity and cost at its end, the
-  thinking and the mode after the host;
-- `hub`: the model's chip carries a small ring with the percent and the
-  mode's icon, and its menu gains Thinking, Mode and Usage sections;
-- `sidebar`: a small card at the foot of the sidebar, above the account (as
-  `whisper` with the sidebar closed and on a phone).
+The status's details card opens on pointing at it or focusing it (the
+tokens in and out, the cost, the thinking, the mode, the model and the git
+branch), and a click on the context opens `/session`'s details. The context
+is in the accent colour from 60%, brick from 85%; so is a cost near or over
+its budget. The figures keep their place as a turn starts and ends; the
+animations stop with the system's reduced motion.
 
-In every place the same details card opens on pointing at the status or
-focusing it (the tokens in and out, the cost, the thinking, the mode, the
-model and the git branch), and a click on the context opens `/session`'s
-details. The context is in the accent colour from 60%, brick from 85%; so is
-a cost near or over its budget. The activity keeps a width of its own, so
-nothing moves as a turn starts and ends; the animations stop with the
-system's reduced motion. Your account is at the foot of the sidebar, with
+On a phone, by touch: a swipe in from the left edge brings the drawer out
+with your finger (drag it left to put it back); a session's row swiped left
+shows Archive and Delete behind it; every sheet (a chip's menu, ⋯, a context
+menu) has a grip and closes when dragged down, as when tapped beside; a
+settings page goes back on a swipe in from the left edge; a pending image's
+tile swiped up is removed; in the image viewer, at fit, a swipe aside goes
+to the next image and a swipe down closes it. A long press is a right-click.
+Each drag is locked to the way it starts, so scrolling is never taken
+over. Your account is at the foot of the sidebar, with
 the settings gear; the account menu also has Settings and Commands and keys
 (`/help`).
 
 The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
-phone): **Appearance** (the theme and accent, where the status shows
-(`/status-style`), session tabs (`/tabs`),
+phone): **Appearance** (the theme and accent, session tabs (`/tabs`),
 transcript detail (`/verbosity`)), **Behaviour** (tool confirmation
 (`/confirm`); notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
@@ -2157,7 +2156,6 @@ it.
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/tabs [on\|off]` (prigh-web) | show the open sessions as tabs over the chat, saved for your account; alone, says whether they are on |
-| `/status-style [island\|ring\|whisper\|border\|hub\|sidebar]` (prigh-web) | where the session's status shows (see "prigh-web"), saved for your account; alone, a picker |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |

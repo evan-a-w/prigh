@@ -9,7 +9,6 @@ module Key = struct
   let terminal_open = "web.terminal-open"
   let folded = "web.sidebar-folded"
   let tabs = "web.tabs"
-  let status_style = "web.status-style"
   let open_tabs = "web.open-tabs"
   let review = "web.review"
   let history = "history"
@@ -23,7 +22,6 @@ module Key = struct
     ; terminal_open
     ; folded
     ; tabs
-    ; status_style
     ; open_tabs
     ; review
     ; history

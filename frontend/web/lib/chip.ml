@@ -2,9 +2,10 @@ open! Core
 
 type t =
   | Model
+  | Host
   | Thinking
   | Mode
-  | Host
+  | Verbosity
   | Attach
 [@@deriving sexp_of, equal, enumerate]
 

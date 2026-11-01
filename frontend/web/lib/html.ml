@@ -121,6 +121,7 @@ module Icon = struct
     | Fit
     | Download
     | Prev
+    | Lines
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -140,7 +141,8 @@ module Icon = struct
     | Chevron -> {|<path d="m6 9 6 6 6-6"/>|}
     | Arrow_down -> {|<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>|}
     | Brain ->
-      {|<path d="M12 5a3 3 0 0 0-5.8-1A3 3 0 0 0 4 8a3 3 0 0 0 0 6 3 3 0 0 0 3 4 3 3 0 0 0 5 1M12 5a3 3 0 0 1 5.8-1A3 3 0 0 1 20 8a3 3 0 0 1 0 6 3 3 0 0 1-3 4 3 3 0 0 1-5 1M12 5v14"/>|}
+      (* Lucide's brain. *)
+      {|<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375M6.003 5.125A3 3 0 0 0 6.401 6.5M3.477 10.896a4 4 0 0 1 .585-.396M19.938 10.5a4 4 0 0 1 .585.396M6 18a4 4 0 0 1-1.967-.516M19.967 17.484A4 4 0 0 1 18 18"/>|}
     | Folder ->
       {|<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>|}
     | Branch ->
@@ -233,6 +235,7 @@ module Icon = struct
       {|<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>|}
     | Download -> {|<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>|}
     | Prev -> {|<path d="m14 7-5 5 5 5"/>|}
+    | Lines -> {|<path d="M4 6h16M4 12h11M4 18h14"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
