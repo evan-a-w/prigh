@@ -44,10 +44,16 @@ let times =
     ~utc_offset:(Time_ns.Span.of_hr 2.)
 ;;
 
-let show ?fold ?selector chat =
-  Render.html ?selector (Chat_view.view ?fold times chat)
+(* Cards open, so that what they show is checked: the app's own tests check
+   them at rest. *)
+let cards_open =
+  Fold.create ~cards_open:true ~verbosity:Normal ~toggled:String.Set.empty ()
 ;;
 
-let text ?fold ?selector chat =
-  Render.text ?selector (Chat_view.view ?fold times chat)
+let show ?(fold = cards_open) ?selector chat =
+  Render.html ?selector (Chat_view.view ~fold times chat)
+;;
+
+let text ?(fold = cards_open) ?selector chat =
+  Render.text ?selector (Chat_view.view ~fold times chat)
 ;;

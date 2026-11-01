@@ -219,8 +219,7 @@ let%expect_test
     question 1
     10:01
     Listing.
-    ✓ bash ls
-    a b
+    (✓ bash ls)
     done
     |}]
 ;;
