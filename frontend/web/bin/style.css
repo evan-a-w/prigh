@@ -896,10 +896,10 @@ kbd {
   gap: 6px;
   --composer-inset: 14px; /* one left edge: the text, the +, the chips */
 }
-/* One card, two zones under one outline. Above: what you write and what to
-   do with it (+ on the left; the microphone and send on the right). Below a
-   hairline, recessed: where it goes (model, host). The accent is spent on
-   send alone; focus brightens the edge rather than painting it. */
+/* One card, one surface: what you write, then one row right under it: the
+   + and where the message goes (model, host) on the left, the microphone
+   and send on the right. The accent is spent on send alone; focus brightens
+   the edge rather than painting it. */
 .composer-stack {
   position: relative;
   display: flex;
@@ -916,11 +916,11 @@ kbd {
 }
 .composer-box {
   position: relative;
-  padding: 8px calc(var(--composer-inset) - 6px) 8px;
+  padding: 10px calc(var(--composer-inset) - 6px) 6px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  gap: 2px;
+  border-radius: var(--r-surface);
 }
 .editor {
   resize: none;
@@ -929,8 +929,8 @@ kbd {
   background: transparent;
   font-size: 15px;
   line-height: 1.5;
-  padding: 6px 6px 2px;
-  min-height: 48px;
+  padding: 4px 6px 0;
+  min-height: 24px;
   max-height: 40vh;
   overflow-y: auto;
   caret-color: var(--sodium);
@@ -938,7 +938,7 @@ kbd {
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer-row { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.composer-row { display: flex; align-items: center; gap: 4px; min-height: 32px; min-width: 0; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }
 /* One size of control: 32px circles, 18px icons of one weight. + and the
@@ -1010,18 +1010,9 @@ kbd {
   .composer-stack { transition: none; }
 }
 
-/* The lower zone: where the message goes, recessed under a hairline, as
-   wide as the card. */
-.composer-tier {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  padding: 4px calc(var(--composer-inset) - 8px);
-  background: var(--well);
-  border-top: 1px solid var(--rule);
-  border-radius: 0 0 calc(var(--r-surface) - 1px) calc(var(--r-surface) - 1px);
-}
+/* Where the message goes: beside the +, on the card's own surface, taking
+   what the buttons leave (names are cut with an ellipsis; a narrow
+   composer shows the host as its server alone). */
 .composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
 /* Settings of the message, quiet words until pointed at. Their chevrons
    (and a hover's wash) say they open something; the pickers are the
@@ -1052,8 +1043,8 @@ kbd {
 .chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s, transform 0.15s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
 .model-chip { color: var(--muted); }
-.composer-tier .model-chip { color: var(--chalk); font-weight: 500; }
-.composer-tier .host-chip { color: var(--muted); }
+.composer-controls .model-chip { color: var(--chalk); font-weight: 500; }
+.composer-controls .host-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
@@ -1829,6 +1820,12 @@ kbd {
   .composer-controls .mode-chip:not(.awaiting) .chip-label { display: none; }
   .composer-controls .mode-chip:not(.awaiting)::after { content: attr(data-short); }
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
+  /* The host is its server alone (its name in the tooltip and its menu),
+     so the model keeps its name. */
+  .composer-controls .host-chip:not(.warm) .chip-label,
+  .composer-controls .host-chip .chip-state { display: none; }
+  .chip-anchor.host, .chip-anchor.host > .host-chip { min-width: 0; flex-shrink: 0; }
+  .composer-controls .host-chip { padding: 0 8px; }
 }
 
 /* The bar's steps. A narrower bar drops the branch, then says what applies

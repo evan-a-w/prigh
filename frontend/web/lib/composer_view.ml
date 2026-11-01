@@ -160,7 +160,7 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     | Connected h ->
       ( ""
       , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
-      , None
+      , Some h.name
       , [ icon Server; span ~cls:"chip-label" h.name ] )
     | Disconnected { name; _ } ->
       ( " offline"
@@ -173,7 +173,7 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     | Unset when String.equal state.active_host Host.backend_id ->
       ( ""
       , "Tools run on the backend (/host switches)"
-      , None
+      , Some "backend"
       , [ icon Server; span ~cls:"chip-label" "backend" ] )
     | Unset ->
       ( " warm"
@@ -190,17 +190,17 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
-(* The lower tier, under the box: what the message goes to, each chip
-   opening its menu over itself (the command's choices). The thinking level
-   and the mode are the chat header's ({!Session_chips_view}). *)
-let tier (m : App.Model.t) ~inject =
+(* What the message goes to, in the row under the text beside the +, each
+   chip opening its menu over itself (the command's choices). The thinking
+   level and the mode are the chat header's ({!Session_chips_view}). *)
+let chips (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
   | Some state ->
     Node.div
       ~attrs:
         [ classes
-            [ "composer-tier"; "composer-controls" ]
+            [ "composer-controls" ]
             [ "menu-open", Session_chips_view.menu_open m [ Model; Host ] ]
         ; Attr.role "group"
         ; Attr.create "aria-label" "Model and host"
@@ -452,7 +452,11 @@ let view (m : App.Model.t) ~inject =
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject
-                ; rest (dictation m ~inject)
+                ; (* While dictating, the recording takes the chips' place. *)
+                  (match m.dictation with
+                   | Idle -> chips m ~inject
+                   | Starting _ | Recording _ | Transcribing ->
+                     rest (dictation m ~inject))
                 ; rest
                   @@ div
                        ~cls:"composer-buttons"
@@ -505,7 +509,6 @@ let view (m : App.Model.t) ~inject =
                        ]
                 ]
             ]
-        ; tier m ~inject
         ]
     ]
 ;;

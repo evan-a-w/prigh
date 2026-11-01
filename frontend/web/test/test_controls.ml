@@ -263,6 +263,7 @@ let%expect_test
     {|
     <button type="button"
             title="Tools run on desktop, in /work (/host switches)"
+            aria-label="desktop"
             aria-haspopup="dialog"
             aria-expanded="false"
             class="btn chip-button host-chip"
@@ -745,17 +746,16 @@ let%expect_test
     {|
     <Vdom.Node.none-widget class="">
     <div class="composer-box">
-    <div class="composer-controls composer-tier">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <textarea class="editor">
     <div class="composer-row">
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Dictate" -- Dictate (speak, then click again to stop)
-    button "Send" -- Send (Enter)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Dictate" -- Dictate (speak, then click again to stop)
+    button "Send" -- Send (Enter)
     |}];
   (* The +: a menu of what can go with the message. *)
   H.click h ~selector:".composer-plus .plus";
@@ -813,6 +813,8 @@ let%expect_test
   [%expect
     {|
     button "Add files or images" -- Add files or images (or paste, or drop them here)
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "backend" -- Tools run on the backend (/host switches)
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Stop" -- Stop (Esc)
     button "Steer" -- Steer (Enter)
@@ -1085,7 +1087,7 @@ let%expect_test
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     <textarea class="editor">
     <div class="composer-buttons">
-    <div class="composer-controls composer-tier menu-open">
+    <div class="composer-controls menu-open">
     <div class="chip-anchor thinking">
     <div class="chip-anchor mode">
     <div class="attach-menu chip-anchor">
@@ -1115,7 +1117,7 @@ let%expect_test
     Close_dialog
     (Focus editor)
     closed
-    <div class="composer-controls composer-tier">
+    <div class="composer-controls">
     |}];
   ()
 ;;

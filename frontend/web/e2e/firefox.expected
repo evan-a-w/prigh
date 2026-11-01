@@ -732,11 +732,11 @@ chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; 
 .session-bar: fits
 .composer: fits
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+chat 520; chips: DeepSeek V4.1 Flash, icon; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === firefox: settings ===
@@ -786,11 +786,11 @@ chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; 
 .session-bar: fits
 .composer: fits
 === firefox: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+chat 600; chips: DeepSeek V4.1 Flash, icon; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === firefox: errors ===
@@ -2149,7 +2149,7 @@ Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything b
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === firefox: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-at the pointer: 2,0
+at the pointer: 2,-201
 marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
@@ -2162,7 +2162,7 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === firefox: trim: keyboard ===
-under the message: 0,2
+under the message: 0,-199
 highlighted: Trim everything before this
 === firefox: trim: trimmed ===
 divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
@@ -2349,8 +2349,8 @@ fits
 row 1: survey the project
 lamps: 0; accented: nothing; 44px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
-chip problems: none (host name truncated)
+chips 1: DeepSeek V4.1 Flash | icon
+chip problems: none
 === firefox: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200

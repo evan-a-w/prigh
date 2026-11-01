@@ -732,11 +732,11 @@ chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; 
 .session-bar: fits
 .composer: fits
 === chromium: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+chat 520; chips: DeepSeek V4.1 Flash, icon; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === chromium: settings ===
@@ -786,11 +786,11 @@ chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; 
 .session-bar: fits
 .composer: fits
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+chat 600; chips: DeepSeek V4.1 Flash, icon; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+chat 400; chips: DeepSeek V4.1 Flash, icon; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
 .session-bar: fits
 .composer: fits
 === chromium: errors ===
@@ -2349,8 +2349,8 @@ fits
 row 1: survey the project
 lamps: 0; accented: nothing; 44px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
-chip problems: none (host name truncated)
+chips 1: DeepSeek V4.1 Flash | icon
+chip problems: none
 === chromium: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200
