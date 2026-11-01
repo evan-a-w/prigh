@@ -260,6 +260,9 @@
   .status-whisper .meter,
   .status-whisper .whisper-branch,
   .status-whisper .whisper-chips .chip-label { display: none; }
+  /* The card spans the line, not the gauge, so it stays on the screen. */
+  .status-whisper > .status-gauge { position: static; }
+  .status-whisper .status-gauge.above > .status-details { left: 4px; right: 4px; min-width: 0; }
 }
 
 /* {1 C: the border} */

@@ -412,6 +412,7 @@ let%expect_test "hub: the model chip's ring; its menu has thinking, mode, usage"
     {|
     (Set_thinking high)
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
+    (Focus popover-filter)
     <div class="chip-popover menu-surface">
     button "high" -- Thinking: high (/thinking high)
     button "auto" -- tools run without asking
@@ -421,6 +422,7 @@ let%expect_test "hub: the model chip's ring; its menu has thinking, mode, usage"
      (tag
       (Mode_set
        "Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)")))
+    (Focus popover-filter)
     <div class="chip-popover menu-surface">
     |}];
   (* Alt+T still cycles the thinking, with no chip of its own. *)

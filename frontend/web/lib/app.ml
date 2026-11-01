@@ -3005,6 +3005,16 @@ let open_chip (m : Model.t) (chip : Chip.t) =
         m, cmds @ [ Command.Place_popover ]))
 ;;
 
+(* A choice in the hub's menu (the model's, with the thinking level and the
+   mode) keeps the menu open, and the keyboard in it: Esc still closes it,
+   arrows still move (the clicked button is redrawn, leaving the focus
+   nowhere). *)
+let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
+  match before.dialog with
+  | Some (Popover { chip = Model; _ }) -> m, cmds @ [ Command.Focus "popover-filter" ]
+  | _ -> m, cmds
+;;
+
 (* ← → and Tab: the neighbouring chip's menu, as in a menu bar. *)
 let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
@@ -9168,8 +9178,8 @@ let update_connected (m : Model.t) (action : Action.t) =
       }
     , [ focus_editor ] )
   | Set_model key -> set_model m key
-  | Set_thinking level -> set_thinking m level
-  | Set_mode mode -> set_mode m mode
+  | Set_thinking level -> hub_keeps_focus m (set_thinking m level)
+  | Set_mode mode -> hub_keeps_focus m (set_mode m mode)
   | Open_chip chip -> open_chip m chip
   | Open_filter -> open_filter m
   | Filter_press row -> filter_press m row

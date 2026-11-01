@@ -242,6 +242,7 @@ try {
   await page.locator("#chip-popover .hub-choice.on", { hasText: /^auto$/ }).waitFor();
   console.log(`menu open after a choice: ${await page.locator("#chip-popover").count() === 1}`);
   await page.keyboard.press("Escape");
+  await page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 });
   await page.locator(".hub-badge .hub-mode.loud").waitFor();
   console.log("the badge shows the mode");
   // Alt+M still cycles the mode; then back to auto, which never asks.
@@ -251,6 +252,7 @@ try {
   await page.locator("#chip-popover .hub-choice", { hasText: /^auto$/ }).click();
   await page.locator("#chip-popover .hub-choice.on", { hasText: /^auto$/ }).waitFor();
   await page.keyboard.press("Escape");
+  await page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 });
 
   // While the agent works.
   let turn = 0;
