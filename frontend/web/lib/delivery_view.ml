@@ -30,7 +30,9 @@ let section
            ])
       (present
          [ span "icon" "↩"
-         ; (if job then span "kind" (sprintf "job %s" section.id) else Node.none)
+         ; span
+             "kind"
+             (if job then sprintf "Job %s:" section.id else "Report:")
          ; span
              "task"
              (Option.value
