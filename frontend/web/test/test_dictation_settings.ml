@@ -30,7 +30,7 @@ let%expect_test "dictation model: shown, picked, back to the default" =
   [%expect
     {|
     Dictation
-    Turns what you say into text (the composer's microphone): an OpenAI or OpenAI-compatible transcription model. Without one, the browser's own speech recognition, where it has one.
+    Turns what you say into text (the composer's microphone): an OpenAI or OpenAI-compatible transcription model. Without one, the browser's own speech recognition, where it has one. Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom (README: Free dictation with Groq)
     (openai/gpt-4o-mini-transcribe)
     button "Dictation model: openai/gpt-4o-mini-transcribe" -- Choose the model (/dictation model)
     (Run "/dictation model")
@@ -58,7 +58,7 @@ let%expect_test "dictation model: shown, picked, back to the default" =
      (tag Dictation_saved))
     (Expire_toast (id 0) (after_ms 4420))
     Dictation
-    Turns what you say into text (the composer's microphone): an OpenAI or OpenAI-compatible transcription model. Without one, the browser's own speech recognition, where it has one.
+    Turns what you say into text (the composer's microphone): an OpenAI or OpenAI-compatible transcription model. Without one, the browser's own speech recognition, where it has one. Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom (README: Free dictation with Groq)
     (openai/whisper-1)
     Dictation is transcribed by openai/whisper-1 (/dictation model MODEL|off)
     |}];
@@ -124,5 +124,52 @@ let%expect_test "/dictation from the composer, and a model the backend refuses" 
     {|
     (Rpc (method_ get_config) (params ()) (tag Config))
     Couldn't set the dictation model: dictation_model: Anthropic cannot transcribe: pick an OpenAI or OpenAI-compatible model with /dictation model (e.g. openai/gpt-4o-mini-transcribe) (Dismiss)
+    |}]
+;;
+
+(* Groq's free Whisper: a hint on the row, and in the list only once a
+   custom provider named groq can run it. *)
+let groq =
+  {|{"provider":"groq","name":"groq","methods":[{"method":"api_key","label":"groq API key"}],"configured":{"method":"api_key","source":"key"},"expires_ms":null,"custom":{"base_url":"https://api.groq.com/openai/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}|}
+;;
+
+let%expect_test "Groq's free Whisper: hinted, listed once groq is added" =
+  let h = settings () in
+  H.text h ~selector:".setting.dictation-model .setting-note";
+  H.quiet h (fun () -> H.click h ~selector:".dictation-model-choice");
+  H.text h ~selector:".picker-item";
+  [%expect
+    {|
+    Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom (README: Free dictation with Groq)
+    (Run "/dictation model")
+    Default openai/gpt-4o-mini-transcribe ✓
+    openai/gpt-4o-mini-transcribe OpenAI, fast and cheap (the default)
+    openai/gpt-4o-transcribe OpenAI, most accurate
+    openai/whisper-1 OpenAI Whisper
+    |}];
+  H.quiet h (fun () ->
+    H.key h "Escape" ~target:Field;
+    H.act
+      h
+      (Reply
+         ( Auth_status Refresh
+         , Ok
+             (Jsonaf.of_string
+                (String.chop_suffix_exn (String.strip H.auth_json) ~suffix:"]"
+                 ^ ","
+                 ^ groq
+                 ^ "]")) )));
+  H.text h ~selector:".setting.dictation-model .setting-note";
+  H.quiet h (fun () -> H.click h ~selector:".dictation-model-choice");
+  H.text h ~selector:".picker-item";
+  [%expect {|
+    Close_dialog
+    Free: groq/whisper-large-v3-turbo, in the list
+    (Run "/dictation model")
+    Default openai/gpt-4o-mini-transcribe ✓
+    openai/gpt-4o-mini-transcribe OpenAI, fast and cheap (the default)
+    openai/gpt-4o-transcribe OpenAI, most accurate
+    openai/whisper-1 OpenAI Whisper
+    groq/whisper-large-v3-turbo Groq's Whisper, free (rate-limited)
     |}]
 ;;

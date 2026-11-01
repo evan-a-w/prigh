@@ -1372,6 +1372,18 @@ list says (or add models it does not list); unlisted fields default to a
 - Ollama: `ollama serve`, then `/login custom` with name `ollama`, base URL
   `http://localhost:11434/v1`, chat completions and no key;
   `/model ollama/llama3.2`.
+- Free dictation with Groq: get a key at
+  [console.groq.com](https://console.groq.com) (free tier, no card;
+  rate-limited, about 20 requests a minute, 2,000 a day and 25 MB an
+  upload), then `/login custom` with name `groq`, base URL
+  `https://api.groq.com/openai/v1`, chat completions and the key, and
+  `/dictation model groq/whisper-large-v3-turbo` (or `groq/whisper-large-v3`,
+  slower and more accurate). Groq's chat models then show in `/model` too. A
+  self-hosted OpenAI-compatible Whisper server (such as
+  [speaches](https://github.com/speaches-ai/speaches)) works the same way,
+  with an empty key. Without a provider that can transcribe, prigh-web falls
+  back to the browser's own speech recognition (Chrome, Edge and Safari;
+  Chrome sends the audio to Google; Firefox has none).
 
 `api` is `chat` (default), `responses` or `anthropic`; `headers` are sent
 with every request; `cost` is in dollars per million tokens. A context
@@ -1834,7 +1846,8 @@ prigh-web's settings page),
 `dictation_model` (the speech-to-text model of the `transcribe` method,
 `provider/id` on OpenAI or an OpenAI-compatible custom provider; default
 `openai/gpt-4o-mini-transcribe`; `/dictation model` picks it, also on
-prigh-web's settings page),
+prigh-web's settings page; free with Groq, see "Free dictation with
+Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context

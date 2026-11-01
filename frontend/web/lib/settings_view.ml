@@ -380,7 +380,23 @@ let dictation_model (m : App.Model.t) ~inject =
     Option.bind m.config ~f:(fun c -> c.dictation_model)
     |> Option.value ~default:Config.default_dictation_model
   in
+  let groq =
+    List.exists m.auth ~f:(fun s ->
+      String.equal s.provider "groq" && Option.is_some s.custom)
+  in
+  let note =
+    if String.is_prefix current ~prefix:"groq/"
+    then None
+    else if groq
+    then Some ("muted", "Free: groq/whisper-large-v3-turbo, in the list")
+    else
+      Some
+        ( "muted"
+        , "Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom \
+           (README: Free dictation with Groq)" )
+  in
   row
+    ?note
     ~cls:"dictation-model"
     ~name:"Dictation"
     ~about:
