@@ -645,6 +645,14 @@ try {
   await idle();
   {
     const card = page.locator(".tool").last();
+    section("long output, at rest");
+    console.log(clean(await card.innerText()));
+    // Its line opens it (clicked again if the transcript was still settling).
+    for (let i = 0; i < 20 && !(await card.locator("button.tool-head[aria-expanded=true]").count()); i++) {
+      await card.locator("button.tool-head").click();
+      await page.waitForTimeout(150);
+    }
+    await card.locator("button.fold").waitFor();
     section("long output, folded");
     console.log(clean(await card.innerText()));
     // Clicked again if the transcript was still settling (Firefox scrolls
@@ -809,23 +817,25 @@ try {
   await showPanel("a nested subagent");
   await page.locator(".agents-foot .btn", { hasText: "Show in chat" }).click();
   await page.waitForFunction(() => {
-    const card = document.querySelector("#chat [data-call=s1] [data-call=n1]");
+    // A nested subagent's card is in its agent's view, not the chat: the
+    // chat shows the line of the subagent it is under.
+    const card = document.querySelector("#chat [data-call=s1]");
     const chat = document.getElementById("chat").getBoundingClientRect();
     const box = card?.getBoundingClientRect();
     return box && box.top >= chat.top && box.bottom <= chat.bottom;
   });
-  console.log("the nested card is in view in the chat");
+  console.log("its top-level card is in view in the chat");
   await page.keyboard.press("Alt+3");
   await page.waitForSelector(".job-output");
   await showPanel("a background job");
   await page.keyboard.press("Alt+0");
   await page.waitForSelector(".agents-panel", { state: "detached" });
-  await page.locator("#chat [data-agent=a1]").click();
+  await page.locator("#chat .tool-head[data-agent=a1]").click();
   await page.waitForSelector(".agents-detail .agents-transcript .entries");
   await showPanel("a card opens its agent");
   // What it is stays pinned under its transcript, scrolled either way (in a
   // short window, so that it scrolls).
-  await page.setViewportSize({ width: 1280, height: 420 });
+  await page.setViewportSize({ width: 1280, height: 300 });
   await page.waitForTimeout(200);
   const pinned = () => page.evaluate(() => {
     const panel = document.querySelector(".agents-panel").getBoundingClientRect();
