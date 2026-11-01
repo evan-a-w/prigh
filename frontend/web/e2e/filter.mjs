@@ -147,6 +147,9 @@ const shown = () => page.evaluate(() => {
 });
 const button = () => page.evaluate(() => {
   const b = document.getElementById("filter-toggle");
+  // A phone's: the ⋯ sheet's row, which says what it hides.
+  if (b.classList.contains("sheet-row"))
+    return `${b.innerText.trim().replace(/\s+/g, " ")}; ${b.classList.contains("on") ? "on" : "off"}`;
   const next = b.nextElementSibling;
   return `${b.getAttribute("aria-label")}; ${b.classList.contains("active") ? "accented" : "plain"}; ` +
     `badge ${b.querySelector(".badge")?.innerText ?? "none"}; next: ${next?.getAttribute("aria-label")}`;
@@ -159,8 +162,15 @@ const menu = () => page.evaluate(() =>
       : el.getAttribute("aria-checked") === "false" ? "[ ]" : "   "} ${el.querySelector(".menu-label").innerText}`)
     .join("\n"));
 // The menu under its button and inside the window.
-const placement = () => page.evaluate(() => {
-  const m = document.querySelector(".filter-menu").getBoundingClientRect();
+const placement = () => page.evaluate(async () => {
+  const el = document.querySelector(".filter-menu");
+  // Where it settles: a phone's sheet slides up.
+  await Promise.all(el.getAnimations().map(a => a.finished));
+  const m = el.getBoundingClientRect();
+  const inside0 = m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight;
+  // A phone's: a sheet across the bottom (its row in the ⋯ sheet is gone).
+  if (document.querySelector(".app.narrow"))
+    return `a sheet across the bottom: ${m.left <= 1 && m.right >= innerWidth - 1 && Math.abs(m.bottom - innerHeight) <= 1}; inside the window: ${inside0}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
   const b = document.getElementById("filter-toggle").getBoundingClientRect();
   const inside = m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight;
   return `below the button: ${m.top >= b.bottom - 1}; inside the window: ${inside}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
@@ -328,7 +338,8 @@ try {
   await page.locator(".filter-menu .menu-item", { hasText: "Thinking" }).click();
   await page.locator(".filter-menu .menu-item", { hasText: "Tool calls" }).click();
   await page.waitForFunction(() => !document.querySelector("#chat .thinking, #chat .tool:not(.tool-subagent)"));
-  await page.mouse.click(200, 700);
+  // Above the sheet: outside it.
+  await page.mouse.click(200, 150);
   await closed();
   console.log(await shown());
   // The click outside closed the ⋯ menu too: the button is in it; then

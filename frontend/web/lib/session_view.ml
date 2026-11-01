@@ -44,10 +44,11 @@ let panel_toggles (m : App.Model.t) ~inject =
 (* On a phone: one button for the rest, which opens a sheet from the bottom
    with a labelled row each: what applies, the jump list, the filter, the
    panels and the settings (no row of bare icons to guess at). *)
-let sheet_row ?(on = false) ?detail ?badge ~cls ~name ~glyph ~on_click () =
+let sheet_row ?(on = false) ?id ?detail ?badge ~cls ~name ~glyph ~on_click () =
   Node.button
     ~attrs:
-      [ classes [ "sheet-row"; cls ] [ "on", on ]
+      [ classes ("sheet-row" :: String.split cls ~on:' ') [ "on", on ]
+      ; Option.value_map id ~default:Attr.empty ~f:Attr.id
       ; Attr.type_ "button"
       ; (if on then Attr.create "aria-pressed" "true" else Attr.empty)
       ; Attr.on_click (fun _ -> on_click)
@@ -88,6 +89,7 @@ let sheet (m : App.Model.t) ~inject =
         ()
     ; sheet_row
         ~cls:"filter-row"
+        ~id:Filter_menu.anchor
         ~name:"Filter the transcript"
         ?detail:
           (if hidden > 0
@@ -98,14 +100,14 @@ let sheet (m : App.Model.t) ~inject =
         ~on_click:(go Action.Open_filter)
         ()
     ; sheet_row
-        ~cls:"files-row"
+        ~cls:"files-row files-toggle"
         ~name:"Files"
         ~on:m.files.open_
         ~glyph:Folder
         ~on_click:(go (Action.Files Toggle))
         ()
     ; sheet_row
-        ~cls:"terminal-row"
+        ~cls:"terminal-row terminal-toggle"
         ~name:"Terminal"
         ~on:m.terminal.open_
         ~glyph:Terminal
