@@ -568,3 +568,29 @@ let%expect_test "delivery of a subagent that ran out of turns" =
   [%expect
     {| ↩ Fix the parser out of turns Open › Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
 ;;
+
+let%expect_test "an image the model refused as too large: downsize and retry" =
+  Chat_harness.show
+    (Chat_harness.chat
+       [ message_end
+           ~stop:
+             {|{"type":"error","message":"HTTP 400: invalid_request_error: messages.12.content.0: image exceeds 5 MB maximum"}|}
+           []
+       ]);
+  [%expect {|
+    <div class="entries">
+      <div data-entry="0" class="assistant msg">
+        <div class="error stop">
+          <span class="title"> The model returned an error </span>
+          <div class="detail">
+            HTTP 400: invalid_request_error: messages.12.content.0: image exceeds 5 MB maximum
+          </div>
+          <span class="hint">
+            An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+          </span>
+          <button type="button" data-run="/downsize-images" class="stop-action"> Downsize images and retry </button>
+        </div>
+      </div>
+    </div>
+    |}]
+;;
