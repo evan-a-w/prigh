@@ -322,6 +322,12 @@ module Command : sig
     (** a chip's menu, once rendered: above the composer, or below its chip
         when only there is room; inside the composer sideways *)
     | Pick_images (** the composer's image picker *)
+    | Downsize_image of
+        { image : Image.t
+        ; target : Image_size.Target.t
+        }
+    (** re-encoded smaller on a canvas, as {!Action.Downsized} (or
+        [Downsize_failed]) *)
     | Start_dictation of Dictation.Engine.t
     | Stop_dictation (** and transcribe what was said *)
     | Cancel_dictation
@@ -574,6 +580,15 @@ module Action : sig
     | Cycle_mode (** Alt+M: ask → auto-edit → auto → plan *)
     | Add_image of Image.t
     | Remove_image of int
+    | Downsize_image of int
+    | Downsized of
+        { original : Image.t
+        ; image : Image.t
+        }
+    | Downsize_failed of
+        { original : Image.t
+        ; reason : string
+        }
     | Dictate (** the microphone: start, or stop and transcribe *)
     | Dictation_cancel
     | Dictation_progress of
@@ -740,6 +755,7 @@ module Model : sig
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
+    ; downsizing : Image.t list (** of [images], being made smaller *)
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t
     (** what the next dictation uses: the backend's, until it says it
@@ -865,6 +881,14 @@ module Model : sig
 
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t
+
+  (** What the model images go to (switched to, or the session's) accepts
+      per image ({!Image_size.default_limit} when the backend does not say). *)
+  val image_limit : t -> Llm.Image_limit.t
+
+  (** Whether each of [images] fits {!image_limit}: checked again as the
+      model changes. *)
+  val image_verdicts : t -> Image_size.Verdict.t list
 
   (** The completion popup when it has something to show. *)
   val popup : t -> Completion.t option

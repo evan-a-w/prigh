@@ -547,6 +547,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Place_popover -> Effect.of_sync_fun place_popover ()
     | Pick_images -> Effect.of_sync_fun pick_images ()
+    | Downsize_image { image; target } ->
+      Effect.of_sync_fun (fun () -> Downsize.run image target) ()
     | Start_dictation engine -> Effect.of_sync_fun Dictation_widget.start engine
     | Stop_dictation -> Effect.of_sync_fun Dictation_widget.stop ()
     | Cancel_dictation -> Effect.of_sync_fun Dictation_widget.cancel ()
@@ -725,19 +727,57 @@ let component client settings ~current (local_ graph) =
   }
 ;;
 
-let supported_images = [ "image/png"; "image/jpeg"; "image/gif"; "image/webp" ]
-
-(* Pasted or dropped image files become images in the prompt (the backend
-   checks and downscales them); other files are uploaded to the tool host and
-   attached by path. *)
+(* Pasted, dropped or attached files that are images become images in the
+   prompt, to view, draw on and downsize (the backend checks and downscales
+   them too), whatever their MIME type says: one models accept by its magic
+   number, or another the browser can draw (HEIC on Safari, AVIF, BMP),
+   re-encoded as PNG. Other files are uploaded to the tool host and attached
+   by path. *)
 let read_images ~schedule (files : File.fileList Js.t) =
   let others = ref [] in
+  let as_file file = Files_widget.choose Chat [ file ] in
+  let add ~mime_type data =
+    schedule
+      (App.Action.Add_image
+         { mime_type; data; bytes = Prigh_protocol.Image.decoded_size data })
+  in
+  (* Drawn on a canvas and re-encoded: what the browser can show but models
+     do not take. *)
+  let convert file url =
+    let img = Dom_html.createImg Dom_html.document in
+    img##.onload
+    := Dom_html.handler (fun _ ->
+         let w = img##.naturalWidth
+         and h = img##.naturalHeight in
+         (if w <= 0 || h <= 0
+          then as_file file
+          else (
+            let canvas = Dom_html.createCanvas Dom_html.document in
+            canvas##.width := w;
+            canvas##.height := h;
+            let ctx = canvas##getContext Dom_html._2d_ in
+            ctx##drawImage img (Js.float 0.) (Js.float 0.);
+            match
+              String.lsplit2
+                (Js.to_string (canvas##toDataURL_type (Js.string "image/png")))
+                ~on:','
+            with
+            | Some (_, data) -> add ~mime_type:"image/png" data
+            | None -> as_file file));
+         Js._false);
+    img##.onerror
+    := Dom_html.handler (fun _ ->
+         as_file file;
+         Js._false);
+    img##.src := Js.string url
+  in
   for i = 0 to files##.length - 1 do
     Js.Opt.iter
       (files##item i)
       (fun file ->
          let mime_type = Js.to_string file##._type in
-         if not (List.mem supported_images mime_type ~equal:String.equal)
+         let name = Js.to_string file##.name in
+         if not (Prigh_web.Image_size.looks_like_image ~mime_type ~name)
          then others := file :: !others
          else (
            let reader = new%js File.fileReader in
@@ -750,14 +790,11 @@ let read_images ~schedule (files : File.fileList Js.t) =
                    let url = Js.to_string url in
                    (match String.lsplit2 url ~on:',' with
                     | Some (_, data) ->
-                      schedule
-                        (App.Action.Add_image
-                           { mime_type
-                           ; data
-                           ; bytes = Prigh_protocol.Image.decoded_size data
-                           })
-                    | None -> ())
-                 | None -> ());
+                      (match Prigh_web.Image_size.sniff data with
+                       | Some mime_type -> add ~mime_type data
+                       | None -> convert file url)
+                    | None -> as_file file)
+                 | None -> as_file file);
                 Js._true);
            reader##readAsDataURL file))
   done;
@@ -1037,10 +1074,13 @@ let install_listeners ~schedule ~current =
   Chat_listeners.install ~schedule;
   Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;
+  Downsize.install ~schedule;
   Viewer_widget.install ~schedule;
   listen (Dom.Event.make "change") (fun ev ->
     (match Js.Opt.to_option ev##.target with
-     | Some el when String.equal (Js.to_string el##.id) image_input_id ->
+     | Some el
+       when String.equal (Js.to_string el##.id) image_input_id
+            || String.equal (Js.to_string el##.id) "chat-attach-input" ->
        let input : Dom_html.inputElement Js.t = Js.Unsafe.coerce el in
        Js.Opt.iter input##.files (fun files -> read_images ~schedule files);
        input##.value := Js.string ""

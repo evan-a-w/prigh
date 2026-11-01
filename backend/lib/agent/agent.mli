@@ -687,6 +687,13 @@ val resume_pending : t -> bool
 
 val resume_now : t -> unit Or_error.t
 
+(** [/downsize-images]: makes the model's image limit stricter
+    ({!Image_limit.tighten}), so every image in the conversation is sent
+    smaller from the next request on, and, when the last reply failed and
+    nothing runs, sends the conversation again. Returns the new limit and
+    whether it did. Fails for a model that cannot see images. *)
+val downsize_images : t -> (Image.Limit.t * bool) Or_error.t
+
 (** Answers a side question with one tool-less model call over a snapshot of
     the conversation (see {!Btw}), concurrently with any run and without
     touching the session; [on_delta] receives the streamed text. The usage

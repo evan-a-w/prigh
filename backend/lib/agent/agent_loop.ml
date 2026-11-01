@@ -192,12 +192,36 @@ let unrecoverable_overflow message ~reason =
        reason)
 ;;
 
+let image_attempts = 2
+
+(* An image the provider refused as too large that cannot be made smaller. *)
+let unfit_image message ~(model : Model.t) ~reason =
+  Stop_reason.Error
+    (sprintf
+       "%s (an image is too large for %s and prigh could not downsize it: %s; \
+        or remove the image: /rewind to before it)"
+       message
+       model.name
+       reason)
+;;
+
+let refused_image message ~(model : Model.t) ~limit =
+  Stop_reason.Error
+    (sprintf
+       "%s (%s still refused the images downsized to %s: /downsize-images \
+        makes them smaller and tries again)"
+       message
+       model.name
+       (Image.Limit.describe limit))
+;;
+
 let run
       ~env
       ~(provider : Provider.t)
       ~(config : Config.t)
       ~cwd
       ?(cancel = Cancellation.never)
+      ?image_tools
       ?(depth = 0)
       ?agent_id
       ?(steer = fun () -> [])
@@ -349,11 +373,32 @@ let run
       let turn_span = Trace.start "turn" ~attrs:[ "turn", Int !turns ] in
       Trace.within turn_span
       @@ fun () ->
+      (* Images over the model's limit are sent downscaled. *)
+      let fit_images () =
+        let limit =
+          Image_limit.for_request
+            config.model
+            ~images:(Image_fit.count !messages)
+        in
+        if not config.model.supports_images
+        then !messages, limit, { Image_fit.Outcome.downscaled = 0; unfit = [] }
+        else (
+          let sent, outcome =
+            Image_fit.messages
+              ~env
+              ~cancel
+              ?search_path:image_tools
+              limit
+              !messages
+          in
+          sent, limit, outcome)
+      in
       let stream () =
+        let sent, _, _ = fit_images () in
         let request =
           { Provider.Request.model = config.model
           ; system = config.system
-          ; messages = !messages
+          ; messages = sent
           ; tools = Tools.specs config.tools
           ; thinking = config.thinking
           ; max_tokens = config.max_tokens
@@ -371,9 +416,42 @@ let run
       (* An overflowing request is masked, if there is anything to mask, or
          else compacted, and sent again, compacting up to
          [overflow_attempts] times; the failed reply is dropped. *)
-      let rec attempt n ~overflows =
+      let rec attempt ?(images = 0) n ~overflows =
         let assistant = stream () in
         match assistant.stop_reason with
+        (* An image refused as too large: what the provider said its limit
+           is (or a stricter one) is learned for the model, and the request
+           sent again with the images downscaled to it. *)
+        | Error message
+          when Image_limit.matches message
+               && not (Cancellation.is_cancelled cancel) ->
+          let _, current, _ = fit_images () in
+          Option.iter (Image_limit.of_error message ~current) ~f:(fun limit ->
+            Image_limit.learn config.model limit);
+          let _, limit, outcome = fit_images () in
+          (match outcome.unfit with
+           | reason :: _ ->
+             { assistant with
+               stop_reason = unfit_image message ~model:config.model ~reason
+             }
+           | [] when images >= image_attempts ->
+             { assistant with
+               stop_reason =
+                 refused_image message ~model:config.model ~limit:current
+             }
+           | [] ->
+             emit
+               (Retry
+                  { attempt = images + 2
+                  ; max_attempts = image_attempts + 1
+                  ; error =
+                      sprintf
+                        "%s; downsizing the images to %s"
+                        message
+                        (Image.Limit.describe limit)
+                  ; delay = 0.
+                  });
+             attempt ~images:(images + 1) n ~overflows)
         | Error message
           when Context_overflow.matches message
                && not (Cancellation.is_cancelled cancel) ->
@@ -425,7 +503,7 @@ let run
                (fun () ->
                   Cancellation.protect cancel ~f:(fun () -> sleep delay))
            with
-           | Some () -> attempt (n + 1) ~overflows
+           | Some () -> attempt ~images (n + 1) ~overflows
            | None -> { assistant with stop_reason = Aborted })
         | _ -> assistant
       in

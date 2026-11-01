@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models import compaction permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -499,6 +499,7 @@ let%expect_test "model matching" =
     ; max_output = 100
     ; supports_thinking = true
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
+    ; image_limit = None
     }
   in
   let models =
@@ -709,6 +710,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
+    /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)

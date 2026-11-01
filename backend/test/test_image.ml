@@ -132,6 +132,8 @@ let%expect_test "large images are downscaled" =
     $TMP/input[0] -auto-orient -resize 1000x1000> -strip -background white -flatten -quality 60 $TMP/output.jpg
     $TMP/input[0] -auto-orient -resize 768x768> -strip -background white -flatten -quality 85 $TMP/output.jpg
     $TMP/input[0] -auto-orient -resize 768x768> -strip -background white -flatten -quality 60 $TMP/output.jpg
+    $TMP/input[0] -auto-orient -resize 512x512> -strip -background white -flatten -quality 85 $TMP/output.jpg
+    $TMP/input[0] -auto-orient -resize 512x512> -strip -background white -flatten -quality 60 $TMP/output.jpg
     |}]
 ;;
 
@@ -160,6 +162,9 @@ let%expect_test "without a working downscaler" =
     $TMP/input[0] -auto-orient -resize 768x768> -strip $TMP/output.png
     $TMP/input[0] -auto-orient -resize 768x768> -strip -background white -flatten -quality 85 $TMP/output.jpg
     $TMP/input[0] -auto-orient -resize 768x768> -strip -background white -flatten -quality 60 $TMP/output.jpg
+    $TMP/input[0] -auto-orient -resize 512x512> -strip $TMP/output.png
+    $TMP/input[0] -auto-orient -resize 512x512> -strip -background white -flatten -quality 85 $TMP/output.jpg
+    $TMP/input[0] -auto-orient -resize 512x512> -strip -background white -flatten -quality 60 $TMP/output.jpg
     |}]
 ;;
 
