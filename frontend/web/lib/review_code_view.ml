@@ -479,7 +479,7 @@ let draft_view (m : App.Model.t) (d : Code_review.Draft.t) ~inject =
     ; div
         ~cls:"review-draft-actions"
         [ span
-            ~cls:"keys-hint"
+            ~cls:"keys-hint keyboard"
             ~attrs:
               [ Attr.title "Send then gives prigh every new comment at once" ]
             "Enter adds it · Shift+Enter a new line · Esc cancels"

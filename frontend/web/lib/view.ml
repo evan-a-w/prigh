@@ -168,7 +168,11 @@ let toasts (m : Model.t) ~inject =
 ;;
 
 let empty (m : Model.t) =
-  let hint key text = Node.li [ Node.kbd [ Node.text key ]; Node.text text ] in
+  let hint ?(keyboard = false) key text =
+    Node.li
+      ~attrs:(if keyboard then [ Attr.class_ "keyboard" ] else [])
+      [ Node.kbd [ Node.text key ]; Node.text text ]
+  in
   div
     ~cls:"empty"
     [ Node.h2 [ Node.text "What are we building?" ]
@@ -187,8 +191,8 @@ let empty (m : Model.t) =
         [ hint "/" " commands"
         ; hint "@" " mention a file"
         ; hint "!" " run a command"
-        ; hint "Ctrl+L" " switch model"
-        ; hint "Ctrl+K" " find a session"
+        ; hint ~keyboard:true "Ctrl+L" " switch model"
+        ; hint ~keyboard:true "Ctrl+K" " find a session"
         ]
     ]
 ;;

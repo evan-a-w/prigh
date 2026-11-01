@@ -85,14 +85,16 @@ let view (questions : Question_dialog.t list) ~utc_offset ~inject =
       ~on_close:(inject Decline)
       ~footer:
         [ span
-            ~cls:"keys-hint"
+            ~cls:"keys-hint keyboard"
             (String.concat
                ~sep:", "
-               ([ hint; "↑↓ choose"; "Enter accepts"; "Esc declines" ]
-                @
-                match rest with
-                | [] -> []
-                | rest -> [ sprintf "%d more waiting" (List.length rest) ]))
+               [ hint; "↑↓ choose"; "Enter accepts"; "Esc declines" ])
+        ; (match rest with
+           | [] -> Node.none
+           | rest ->
+             span
+               ~cls:"keys-hint"
+               (sprintf "%d more waiting" (List.length rest)))
         ; button ~title:"Esc" ~on_click:(inject Decline) [ Node.text "Decline" ]
         ; (if question > 0
            then button ~title:"←" ~on_click:(inject Prev) [ Node.text "Back" ]

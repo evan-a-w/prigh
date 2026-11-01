@@ -165,7 +165,7 @@ let%expect_test "the settings' row: one segment a style" =
     {|
     Status
     Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
-    (Island) (Send ring) (Status line) (Border meter) (Model chip) (Sidebar)
+    (Island A pill floating over the top of the chat) (Send ring A ring of context round send; thinking and mode by the model) (Status line One quiet line under the message box) (Border meter The message box's edge fills with context) (Model chip The model chip shows the context; its menu has the rest) (Sidebar A card at the sidebar's foot (a line under the box without it))
     <button class="on segment">
     <button class="segment">
     <button class="segment">

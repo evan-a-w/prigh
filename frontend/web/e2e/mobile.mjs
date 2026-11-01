@@ -70,6 +70,28 @@ const errors = [];
 const section = label => console.log(`=== ${engineName}: mobile: ${label} ===`);
 
 // What is wrong on the screen now, as stable lines (empty: nothing).
+// Every choice control fits its card, each choice whole (none clipped or
+// on top of another), and no row has a gap between its words and control.
+const choicesFit = page => page.evaluate(() => {
+  const bad = [];
+  for (const seg of document.querySelectorAll(".settings-panel .segmented")) {
+    const card = seg.closest(".settings-card").getBoundingClientRect();
+    const s = seg.getBoundingClientRect();
+    if (s.left < card.left - 0.5 || s.right > card.right + 0.5) bad.push(`${seg.getAttribute("aria-label")} past its card`);
+    for (const b of seg.querySelectorAll(".segment")) {
+      const r = b.getBoundingClientRect();
+      if (r.left < s.left - 0.5 || r.right > s.right + 0.5 || r.bottom > s.bottom + 0.5) bad.push(`${b.innerText.split("\n")[0]} clipped`);
+      if (b.scrollWidth > b.clientWidth + 1) bad.push(`${b.innerText.split("\n")[0]} overflows`);
+      if (r.height < 43.5) bad.push(`${b.innerText.split("\n")[0]} under 44px`);
+    }
+    const row = seg.closest(".setting");
+    const text = row.querySelector(".setting-text").getBoundingClientRect();
+    if (s.top - text.bottom > 24) bad.push(`${seg.getAttribute("aria-label")}: a ${Math.round(s.top - text.bottom)}px gap`);
+  }
+  const list = document.querySelector(".settings-panel .choice-list");
+  const one = list && new Set([...list.querySelectorAll(".segment")].map(b => Math.round(b.getBoundingClientRect().left))).size === 1;
+  return `choice controls fit: ${bad.length ? bad.join("; ") : "true"}` + (list ? `; the status styles a list: ${one}` : "");
+});
 const audit = page => page.evaluate(() => {
   const out = [];
   const W = innerWidth, H = innerHeight;
@@ -207,11 +229,13 @@ const visit = async (w, h, { safe = false } = {}) => {
   await page.locator(".settings-home-row[data-settings-tab=appearance]").tap();
   await step("settings: appearance");
   console.log(`title: ${await page.locator(".modal-head h2").innerText()}; back: ${await page.locator(".modal-back").getAttribute("title")}`);
+  console.log(await choicesFit(page));
   await page.locator(".modal-back").tap();
   await page.locator(".settings-home").waitFor();
   console.log(`back to the list: ${await page.locator(".settings-home-row").count() > 0}`);
   await page.locator(".settings-home-row[data-settings-tab=models]").tap();
   await step("settings: models");
+  console.log(await choicesFit(page));
   await page.getByRole("button", { name: "Close" }).first().tap();
   await page.waitForSelector(".modal", { state: "detached" });
 

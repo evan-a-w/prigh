@@ -117,3 +117,31 @@ let segmented ?(disabled = false) ~label choices =
            ]
          [ Node.text text ]))
 ;;
+
+(* A segmented control whose choices each carry a line about them: on a
+   desktop the line is only the tooltip, on a phone the choices are a list of
+   rows, the line under each name (too many, or too long, to sit side by
+   side). *)
+let choice_list ?(disabled = false) ~label choices =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "segmented choice-list"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" label
+      ]
+    (List.map choices ~f:(fun (text, about, title, current, on_click) ->
+       Node.button
+         ~attrs:
+           [ classes [ "segment" ] [ "on", current ]
+           ; Attr.type_ "button"
+           ; Attr.create "aria-pressed" (Bool.to_string current)
+           ; Attr.create "aria-label" text
+           ; Attr.title title
+           ; (if disabled
+              then Attr.disabled
+              else Attr.on_click (fun _ -> on_click))
+           ]
+         [ Node.span ~attrs:[ Attr.class_ "segment-name" ] [ Node.text text ]
+         ; Node.span ~attrs:[ Attr.class_ "segment-about" ] [ Node.text about ]
+         ]))
+;;
