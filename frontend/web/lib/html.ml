@@ -116,6 +116,11 @@ module Icon = struct
     | Image
     | Paperclip
     | Eraser
+    | Zoom_in
+    | Zoom_out
+    | Fit
+    | Download
+    | Prev
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -220,6 +225,14 @@ module Icon = struct
       {|<path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.6 8.6a2 2 0 0 1-2.8-2.8l8.5-8.5"/>|}
     | Eraser ->
       {|<path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21M22 21H7M5 11l9 9"/>|}
+    | Zoom_in ->
+      {|<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/>|}
+    | Zoom_out ->
+      {|<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/>|}
+    | Fit ->
+      {|<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>|}
+    | Download -> {|<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>|}
+    | Prev -> {|<path d="m14 7-5 5 5 5"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -241,6 +254,13 @@ module Icon = struct
         ]
       ~this_html_is_sanitized_and_is_totally_safe_trust_me:(paths t)
       ()
+  ;;
+
+  let svg ?(cls = "") t =
+    sprintf
+      {|<svg class="%s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">%s</svg>|}
+      (String.strip ("icon " ^ cls))
+      (paths t)
   ;;
 end
 

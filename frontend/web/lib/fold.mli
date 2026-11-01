@@ -10,9 +10,11 @@ open! Import
 type t [@@deriving sexp_of]
 
 (** [toggled]: keys ([key]) the user unfolded, or in verbose folded.
-    [filter]: everything, by default. *)
+    [filter]: everything, by default. [cards_open] (default false) opens
+    every tool call's card, as verbose does, without unfolding outputs. *)
 val create
-  :  ?filter:Transcript_filter.t
+  :  ?cards_open:bool
+  -> ?filter:Transcript_filter.t
   -> verbosity:Prigh_ui.Verbosity.t
   -> toggled:String.Set.t
   -> unit
@@ -32,6 +34,14 @@ val scoped : t -> string -> t
 val key : t -> string -> string
 
 val expanded : t -> string -> bool
+
+(** Whether the card [id] is open: verbose, [cards_open] or [by_default]
+    open it, toggling it flips that. *)
+val opened : by_default:bool -> t -> string -> bool
+
+(** The attribute that makes a click on an element toggle [id]. *)
+val toggle_attr : t -> string -> Attr.t
+
 val equal : t -> t -> bool
 
 (** The attribute holding the key a [button] toggles: the page listens for

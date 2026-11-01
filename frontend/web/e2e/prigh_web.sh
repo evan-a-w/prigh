@@ -13,7 +13,8 @@
 # background subagent from the composer, then subagent_paged.mjs, a
 # subagent whose call is in a page not loaded, then trim.mjs, trimming the
 # context before a message and undoing it, then filter.mjs, the transcript
-# filter's button, menu and note, on a desktop and a phone, then math.mjs,
+# filter's button, menu and note, on a desktop and a phone, then
+# viewer.mjs, the image viewer's fit, zoom and pan, then math.mjs,
 # TeX math drawn by KaTeX in the themes and on a phone, then card.mjs, the
 # session's card in the sidebar in each state, then status.mjs, the six
 # status styles and the floating chrome, then pwa.mjs, then
@@ -49,7 +50,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote steer subagent_paged trim filter math card status pwa compaction"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote steer subagent_paged trim filter viewer math card status pwa compaction"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

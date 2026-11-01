@@ -138,7 +138,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
   names ~within:".toasts " h;
   [%expect
     {|
-    button "Show all 30 lines"
+    button "bash seq 30"
     [img] span "Done"
     button "View or draw on [image: image/png, 8 B]" -- View it, or draw on it
     button "Remove image"

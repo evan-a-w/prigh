@@ -35,12 +35,13 @@ let%expect_test "bash: arguments streaming, then running with live output" =
   Chat_harness.show ~selector:".tool" chat;
   [%expect
     {|
-    <div class="running tool tool-bash">
-      <div class="tool-head">
+    <div class="open running tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && echo done </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="clipped from-end live output">
           <div class="earlier"> 6 earlier lines </div>
@@ -61,14 +62,15 @@ let%expect_test "bash: arguments streaming, then running with live output" =
        {|{"type":"event","event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"ls && echo done\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"app.ml.orig\nhome\nnotes.md\npic.png\npw\nscript.json\nscript-stream.json\nserver.log\nserve.sh\nshoot.sh\nshots\nsrc\ndone\n","is_error":false}}|});
   [%expect
     {|
-    <div class="ok tool tool-bash">
-      <div class="tool-head">
+    <div class="ok open tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && echo done </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="clipped from-start output">
           <pre> app.ml.orig
@@ -100,30 +102,32 @@ let%expect_test
     ];
   [%expect
     {|
-    <div class="error tool tool-bash">
-      <div class="tool-head">
+    <div class="error open tool tool-bash">
+      <button type="button" data-fold="c9#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> cat missing.txt </span>
         <span class="bad chip"> exit code 1 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="error output">
           <pre> cat: missing.txt: No such file or directory </pre>
         </div>
       </div>
     </div>
-    <div class="error tool tool-bash">
-      <div class="tool-head">
+    <div class="error open tool tool-bash">
+      <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> cd src … </span>
         <span class="bad chip"> timed out after 5s </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <pre class="command"> cd src
     make </pre>
@@ -147,7 +151,6 @@ let%expect_test "bash in the background: the job it started" =
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> sleep 1; echo bg finished </span>
-        <span class="chip"> background </span>
       </div>
     </div>
     |}];
@@ -175,17 +178,22 @@ let%expect_test "a foreground bash moved to the background: its job and output" 
     ];
   [%expect
     {|
-    <div class="ok tool tool-bash">
-      <div class="tool-head">
+    <div class="ok open tool tool-bash">
+      <button type="button"
+              data-fold="c11#open"
+              aria-expanded="true"
+              title="moved to the background after 30s"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> make all </span>
         <span class="chip job"> job j3 </span>
-        <span class="chip moved"> moved to the background after 30s </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
+        <span class="details"> moved to the background after 30s </span>
         <div class="output">
           <pre> building 39
     building 40 </pre>
@@ -204,14 +212,15 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-bash">
-      <div class="tool-head">
+    <div class="ok open tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> seq </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="clipped from-start output">
           <pre> line 0
@@ -243,14 +252,15 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-read">
-      <div class="tool-head">
+    <div class="ok open tool tool-read">
+      <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> notes.md </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="clipped from-start output">
           <button type="button" data-fold="c2" aria-expanded="false" class="fold">
@@ -264,62 +274,58 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         </div>
       </div>
     </div>
-    <div class="ok tool tool-read">
-      <div class="tool-head">
+    <div class="ok open tool tool-read">
+      <button type="button" data-fold="c3#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> pic.png </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
-        <div class="images">
-          <details class="image">
-            <summary title="[image: image/png, 8 B]">
-              <img src="data:image/png;base64,iVBORw0KGgo="
-                   alt="[image: image/png, 8 B]"
-                   class="thumb"/>
-              <span class="lightbox">
-                <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]"/>
-                <span class="lightbox-tools">
-                  <button type="button"
-                          title="Draw on this image"
-                          data-annotate="new"
-                          class="btn lightbox-annotate">
-                    <icon class="pencil"> </icon>
-                    Draw
-                  </button>
-                </span>
-              </span>
-            </summary>
-          </details>
+        <div data-viewer-group="" class="images">
+          <button type="button"
+                  title="[image: image/png, 8 B]"
+                  aria-label="View [image: image/png, 8 B]"
+                  data-viewer=""
+                  data-viewer-draw=""
+                  class="image">
+            <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+          </button>
         </div>
         <span class="caption"> Read image file [image/png, 320x200] </span>
       </div>
     </div>
-    <div class="ok tool tool-read">
-      <div class="tool-head">
+    <div class="ok open tool tool-read">
+      <button type="button"
+              data-fold="c4#open"
+              aria-expanded="true"
+              title="lines 10–29"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> big.ml </span>
-        <span class="chip"> lines 10–29 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
+        <span class="details"> lines 10–29 </span>
         <div class="output">
           <pre> x </pre>
         </div>
       </div>
     </div>
-    <div class="error tool tool-read">
-      <div class="tool-head">
+    <div class="error open tool tool-read">
+      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> nope.txt </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="error output">
           <pre> file not found: nope.txt </pre>
@@ -336,15 +342,16 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-write">
-      <div class="tool-head">
+    <div class="ok open tool tool-write">
+      <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> write </span>
         <span class="arg path"> hello.py </span>
         <span class="chip"> 3 lines </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> import sys
@@ -353,17 +360,22 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
         </div>
       </div>
     </div>
-    <div class="ok tool tool-write">
-      <div class="tool-head">
+    <div class="ok open tool tool-write">
+      <button type="button"
+              data-fold="c5#open"
+              aria-expanded="true"
+              title="overwrote the file"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> write </span>
         <span class="arg path"> a.txt </span>
         <span class="chip"> 1 line </span>
-        <span class="chip"> overwrote </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
+        <span class="details"> overwrote the file </span>
         <div class="output">
           <pre> x </pre>
         </div>
@@ -379,13 +391,14 @@ let%expect_test "write: content shown as it streams" =
     ];
   [%expect
     {|
-    <div class="running tool tool-write">
-      <div class="tool-head">
+    <div class="open running tool tool-write">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> write </span>
         <span class="arg path"> notes.txt </span>
         <span class="chip"> 3 lines </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="live output">
           <pre> one
@@ -404,14 +417,15 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
   show ~running:true [ sprintf {|{"event":"tool_start","call":%s}|} call ];
   [%expect
     {|
-    <div class="running tool tool-edit">
-      <div class="tool-head">
+    <div class="open running tool tool-edit">
+      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
         <span class="chip del"> −2 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="diff-view">
           <table class="diff">
@@ -469,8 +483,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-edit">
-      <div class="tool-head">
+    <div class="ok open tool tool-edit">
+      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -478,7 +492,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
         <span class="chip del"> −2 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="diff-view">
           <table class="diff">
@@ -560,8 +575,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     ];
   [%expect
     {|
-    <div class="error tool tool-edit">
-      <div class="tool-head">
+    <div class="error open tool tool-edit">
+      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -569,7 +584,8 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
         <span class="chip del"> −2 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="error output">
           <pre> edit 2: old_text not found in file </pre>
@@ -633,14 +649,15 @@ let%expect_test "ls, grep, find" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-ls">
-      <div class="tool-head">
+    <div class="ok open tool tool-ls">
+      <button type="button" data-fold="c6#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> ls </span>
         <span class="arg path"> . </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> hello.py
@@ -648,18 +665,21 @@ let%expect_test "ls, grep, find" =
         </div>
       </div>
     </div>
-    <div class="ok tool tool-grep">
-      <div class="tool-head">
+    <div class="ok open tool tool-grep">
+      <button type="button"
+              data-fold="c7#open"
+              aria-expanded="true"
+              title="in src · files *.ml · ignoring case"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> grep </span>
         <span class="arg pattern"> salute </span>
-        <span class="chip"> in src </span>
-        <span class="chip"> *.ml </span>
-        <span class="chip"> ignore case </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
+        <span class="details"> in src · files *.ml · ignoring case </span>
         <div class="output">
           <pre>
             src/app.ml:1:let salute name = "Hi, " ^ name
@@ -668,14 +688,15 @@ let%expect_test "ls, grep, find" =
         </div>
       </div>
     </div>
-    <div class="ok tool tool-find">
-      <div class="tool-head">
+    <div class="ok open tool tool-find">
+      <button type="button" data-fold="c8#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> find </span>
         <span class="arg pattern"> *.ml </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> src/app.ml </pre>
@@ -736,54 +757,14 @@ let%expect_test "subagent: running shows its latest step" =
   [%expect
     {|
     <div data-call="c12" class="running tool tool-subagent">
-      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
+      <div data-agent="a1"
+           title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
+           class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
-        <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
-        <span class="chip model"> deepseek-flash </span>
-        <span class="chip"> 1 turn </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
-      <div class="tool-body">
-        <details class="task">
-          <summary>
-            <span class="label"> Task </span>
-            <span class="preview"> Count the lines in src/app.ml and report back. … </span>
-          </summary>
-          <div class="task-text"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-        </details>
-        <div class="activity">
-          <span class="arrow"> ↳ </span>
-          <span class="text"> bash wc -l src/app.ml </span>
-        </div>
-        <details class="transcript">
-          <summary>
-            <span class="label"> Transcript </span>
-            <span class="preview"> 2 messages </span>
-          </summary>
-          <div class="entries">
-            <div data-entry="0" class="msg user">
-              <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-            </div>
-            <div class="assistant msg">
-              <div class="markdown">
-                <div class="md-part">
-                  <p dir="auto"> Counting. </p>
-                </div>
-              </div>
-              <div class="running tool tool-bash">
-                <div class="tool-head">
-                  <span aria-hidden="true" class="lamp"> </span>
-                  <span class="name"> bash </span>
-                  <span class="arg command"> wc -l src/app.ml </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-      </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     |}]
 ;;
@@ -795,34 +776,15 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
   Chat_harness.text ~selector:".tool-subagent .transcript" chat;
   [%expect
     {|
-    <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
+    <div data-agent="a1"
+         title="agent a1 · deepseek-flash · 2 turns · $0.01 · follow it in the agents panel"
+         class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
-      <span class="name"> subagent </span>
       <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
-      <span class="chip model"> deepseek-flash </span>
-      <span class="chip"> 2 turns </span>
-      <span class="chip"> $0.01 </span>
       <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
     </div>
-    <details class="report">
-      <summary>
-        <span class="label"> Report </span>
-        <span class="preview"> src/app.ml has 5 lines. </span>
-      </summary>
-      <div class="markdown">
-        <div class="md-part">
-          <p dir="auto">
-            src/app.ml has
-            <strong> 5 lines </strong>
-            .
-          </p>
-        </div>
-      </div>
-    </details>
-    Transcript 3 messages Count the lines in src/app.ml and report back.
-    Be brief. Counting. ✓ bash wc -l src/app.ml 5 src/app.ml src/app.ml has 5 lines .
     |}]
 ;;
 
@@ -839,55 +801,14 @@ let%expect_test
   [%expect
     {|
     <div data-call="c12" class="running tool tool-subagent">
-      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
+      <div data-agent="a1"
+           title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
+           class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
-        <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
-        <span class="chip job"> agent a1 </span>
-        <span class="chip model"> deepseek-flash </span>
-        <span class="chip"> 1 turn </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
-      <div class="tool-body">
-        <details class="task">
-          <summary>
-            <span class="label"> Task </span>
-            <span class="preview"> Count the lines in src/app.ml and report back. … </span>
-          </summary>
-          <div class="task-text"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-        </details>
-        <div class="activity">
-          <span class="arrow"> ↳ </span>
-          <span class="text"> bash wc -l src/app.ml </span>
-        </div>
-        <details class="transcript">
-          <summary>
-            <span class="label"> Transcript </span>
-            <span class="preview"> 2 messages </span>
-          </summary>
-          <div class="entries">
-            <div data-entry="0" class="msg user">
-              <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-            </div>
-            <div class="assistant msg">
-              <div class="markdown">
-                <div class="md-part">
-                  <p dir="auto"> Counting. </p>
-                </div>
-              </div>
-              <div class="running tool tool-bash">
-                <div class="tool-head">
-                  <span aria-hidden="true" class="lamp"> </span>
-                  <span class="name"> bash </span>
-                  <span class="arg command"> wc -l src/app.ml </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-      </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     |}]
 ;;
@@ -901,26 +822,16 @@ let%expect_test "subagent: failed" =
   [%expect
     {|
     <div data-call="c12" class="error tool tool-subagent">
-      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
+      <div data-agent="a1"
+           title="agent a1 · deepseek-flash · 1 turn · $0.00 · follow it in the agents panel"
+           class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
-        <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
-        <span class="chip model"> deepseek-flash </span>
-        <span class="chip"> 1 turn </span>
-        <span class="chip"> $0.00 </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
       <div class="tool-body">
-        <details class="task">
-          <summary>
-            <span class="label"> Task </span>
-            <span class="preview"> Count the lines in src/app.ml and report back. … </span>
-          </summary>
-          <div class="task-text"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-        </details>
         <div class="error output">
           <pre> subagent failed: 529 overloaded </pre>
         </div>
@@ -965,18 +876,9 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
-        <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       </div>
       <div class="tool-body">
-        <details class="task">
-          <summary>
-            <span class="label"> Task </span>
-            <span class="preview"> Count the lines in src/app.ml and report back. … </span>
-          </summary>
-          <div class="task-text"> Count the lines in src/app.ml and report back.
-    Be brief. </div>
-        </details>
         <details class="report">
           <summary>
             <span class="label"> Report </span>
@@ -1006,27 +908,29 @@ let%expect_test
     ];
   [%expect
     {|
-    <div class="ok tool tool-job_status">
-      <div class="tool-head">
+    <div class="ok open tool tool-job_status">
+      <button type="button" data-fold="c11#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> job_status </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> j1  running  0s  sleep 1; echo bg finished  (last: 0 B, no output) </pre>
         </div>
       </div>
     </div>
-    <div class="ok tool tool-job_wait">
-      <div class="tool-head">
+    <div class="ok open tool tool-job_wait">
+      <button type="button" data-fold="c13#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> job_wait </span>
         <span class="arg"> j1 j2 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre>
@@ -1038,35 +942,37 @@ let%expect_test
         </div>
       </div>
     </div>
-    <div class="ok tool tool-job_kill">
-      <div class="tool-head">
+    <div class="ok open tool tool-job_kill">
+      <button type="button" data-fold="c14#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> job_kill </span>
         <span class="arg"> j2 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="delivery">
           <div class="bad delivery-section">
-            <div class="delivery-head">
+            <div title="job j2" class="delivery-head">
               <span class="icon"> ↩ </span>
               <span class="kind"> job j2 </span>
-              <span class="bad chip"> killed </span>
               <span class="task"> sleep 100 </span>
+              <span class="bad chip"> killed </span>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div class="ok tool tool-job_output">
-      <div class="tool-head">
+    <div class="ok open tool tool-job_output">
+      <button type="button" data-fold="c15#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> job_output </span>
         <span class="arg"> j3 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> [job j3 running after 3s, 12 bytes; lines 1-2 of 2] make
@@ -1075,13 +981,14 @@ let%expect_test
         </div>
       </div>
     </div>
-    <div class="ok tool tool-job_wait">
-      <div class="tool-head">
+    <div class="ok open tool tool-job_wait">
+      <button type="button" data-fold="c16#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> job_wait </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> no jobs to wait for </pre>
@@ -1117,15 +1024,16 @@ let%expect_test "cancelled calls: what they did, not as errors" =
     ];
   [%expect
     {|
-    <div class="interrupted tool tool-bash">
-      <div class="tool-head">
+    <div class="interrupted open tool tool-bash">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
           <icon class="square"> </icon>
         </span>
         <span class="name"> bash </span>
         <span class="arg command"> for i in 1 2 3 4 5 6; do echo step $i; sleep 0.6; done </span>
         <span class="chip"> cancelled </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> step 1
@@ -1152,14 +1060,15 @@ let%expect_test "other tools: their main argument and output" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-web_fetch">
-      <div class="tool-head">
+    <div class="ok open tool tool-web_fetch">
+      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> web_fetch </span>
-        <a href="https://x" target="_blank" rel="noopener noreferrer" class="arg url"> https://x </a>
-      </div>
+        <span class="arg url"> https://x </span>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="output">
           <pre> fetched </pre>
@@ -1226,8 +1135,8 @@ let%expect_test "apply_patch: one file's diff, like edit" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-apply_patch">
-      <div class="tool-head">
+    <div class="ok open tool tool-apply_patch">
+      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1235,7 +1144,8 @@ let%expect_test "apply_patch: one file's diff, like edit" =
         <span class="arg path"> src/retry.ml </span>
         <span class="add chip"> +1 </span>
         <span class="chip del"> −1 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="diff-view">
           <table class="diff">
@@ -1302,8 +1212,8 @@ let%expect_test "apply_patch: several files, each named above its diff" =
     ];
   [%expect
     {|
-    <div class="ok tool tool-apply_patch">
-      <div class="tool-head">
+    <div class="ok open tool tool-apply_patch">
+      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1312,7 +1222,8 @@ let%expect_test "apply_patch: several files, each named above its diff" =
         <span class="chip"> 3 files </span>
         <span class="add chip"> +3 </span>
         <span class="chip del"> −1 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="add patch-file">
           <span class="kind"> A </span>
@@ -1401,8 +1312,8 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
     ];
   [%expect
     {|
-    <div class="error tool tool-apply_patch">
-      <div class="tool-head">
+    <div class="error open tool tool-apply_patch">
+      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -1411,7 +1322,8 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
         <span class="chip"> 3 files </span>
         <span class="add chip"> +3 </span>
         <span class="chip del"> −1 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="error output">
           <pre> Failed to find expected lines in src/a.ml:
@@ -1488,15 +1400,16 @@ let%expect_test "apply_patch: the files streamed so far" =
     ];
   [%expect
     {|
-    <div class="running tool tool-apply_patch">
-      <div class="tool-head">
+    <div class="open running tool tool-apply_patch">
+      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
         <span class="chip"> 2 files </span>
         <span class="add chip"> +1 </span>
         <span class="chip del"> −0 </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="add patch-file">
           <span class="kind"> A </span>
