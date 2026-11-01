@@ -334,6 +334,7 @@ try {
   // The click outside closed the ⋯ menu too: the button is in it; then
   // closed again, as it would be over the note.
   if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
+  await page.locator("#filter-toggle").waitFor();
   console.log(await button());
   const buttonInside = await page.evaluate(() => {
     const b = document.getElementById("filter-toggle").getBoundingClientRect();
@@ -351,6 +352,7 @@ try {
   console.log(fits);
   await screenshot("phone filtered");
   if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
+  await page.locator("#filter-toggle").waitFor();
   await page.locator("#filter-toggle").click();
   await page.locator(".filter-menu.placed").waitFor();
   await page.locator(".filter-menu .menu-item", { hasText: "Show all" }).click();
