@@ -41,8 +41,102 @@ let panel_toggles (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* On a phone: one round button for the panels' toggles, what applies and
-   the settings, which open in a small menu under it. *)
+(* On a phone: one button for the rest, which opens a sheet from the bottom
+   with a labelled row each: what applies, the jump list, the filter, the
+   panels and the settings (no row of bare icons to guess at). *)
+let sheet_row ?(on = false) ?id ?detail ?badge ~cls ~name ~glyph ~on_click () =
+  Node.button
+    ~attrs:
+      [ classes ("sheet-row" :: String.split cls ~on:' ') [ "on", on ]
+      ; Option.value_map id ~default:Attr.empty ~f:Attr.id
+      ; Attr.type_ "button"
+      ; (if on then Attr.create "aria-pressed" "true" else Attr.empty)
+      ; Attr.on_click (fun _ -> on_click)
+      ]
+    [ icon glyph
+    ; Node.span
+        ~attrs:[ Attr.class_ "sheet-row-text" ]
+        [ span ~cls:"sheet-row-name" name
+        ; (match detail with
+           | Some d -> span ~cls:"sheet-row-detail" d
+           | None -> Node.none)
+        ]
+    ; (match badge with
+       | Some b -> span ~cls:"badge" b
+       | None -> Node.none)
+    ]
+;;
+
+let sheet (m : App.Model.t) ~inject =
+  let go a = Effect.Many [ inject Action.Toggle_status_tray; inject a ] in
+  let hidden = List.length (Transcript_filter.hidden m.transcript_filter) in
+  let a = m.agents in
+  let running = Agents.running_agents a + Agents.running_jobs a in
+  Node.div
+    ~attrs:
+      [ Attr.class_ "chrome-menu menu-surface sheet"
+      ; Attr.id "chrome-menu"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" "Panels and settings"
+      ]
+    ([ div ~cls:"sheet-grip" []
+     ; Status_view.notes m ~inject
+     ; sheet_row
+        ~cls:"jump-row"
+        ~name:"Jump to a message"
+        ~glyph:Toc
+        ~on_click:(go Action.Open_jump_list)
+        ()
+    ; sheet_row
+        ~cls:"filter-row"
+        ~id:Filter_menu.anchor
+        ~name:"Filter the transcript"
+        ?detail:
+          (if hidden > 0
+           then Some ("Hiding " ^ Filter_view.hidden_names m.transcript_filter)
+           else None)
+        ~on:(hidden > 0)
+        ~glyph:Filter
+        ~on_click:(go Action.Open_filter)
+        ()
+    ; sheet_row
+        ~cls:"files-row files-toggle"
+        ~name:"Files"
+        ~on:m.files.open_
+        ~glyph:Folder
+        ~on_click:(go (Action.Files Toggle))
+        ()
+    ; sheet_row
+        ~cls:"terminal-row terminal-toggle"
+        ~name:"Terminal"
+        ~on:m.terminal.open_
+        ~glyph:Terminal
+        ~on_click:(go Action.Toggle_terminal)
+        ()
+    ]
+    @ (if (not a.open_) && List.is_empty a.agents && List.is_empty a.jobs
+       then []
+       else
+         [ sheet_row
+           ~cls:"agents-row"
+           ~name:"Subagents and jobs"
+           ?detail:
+             (if running > 0 then Some (sprintf "%d running" running) else None)
+           ?badge:(if running > 0 then Some (Int.to_string running) else None)
+           ~on:a.open_
+           ~glyph:Bot
+           ~on_click:(go Action.Toggle_subagents)
+           ()
+         ])
+    @ [ sheet_row
+          ~cls:"settings-row"
+          ~name:"Settings"
+          ~glyph:Gear
+          ~on_click:(go Action.Open_settings)
+          ()
+      ])
+;;
+
 let more (m : App.Model.t) ~inject =
   Node.div
     ~attrs:[ classes [ "chrome-more" ] [ "open", m.status_tray ] ]
@@ -66,13 +160,7 @@ let more (m : App.Model.t) ~inject =
                  ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
                  ]
                []
-           ; Node.div
-               ~attrs:
-                 [ Attr.class_ "chrome-menu menu-surface"; Attr.id "chrome-menu" ]
-               [ Status_view.notes m ~inject
-               ; panel_toggles m ~inject
-               ; Sidebar_view.settings ~inject
-               ]
+           ; sheet m ~inject
            ]
        else Node.none)
     ]
@@ -96,9 +184,15 @@ let chrome (m : App.Model.t) ~inject =
         [ icon Menu ]
   in
   let island =
-    match m.status_style with
-    | Island -> Status_style_view.island m ~inject
-    | Ring | Whisper | Border | Hub | Sidebar -> Node.none
+    match m.status_style, m.state with
+    | Island, _ -> Status_style_view.island m ~inject
+    (* A phone's strip has room for the session's name where the status
+       is elsewhere. *)
+    | (Ring | Whisper | Border | Hub | Sidebar), Some state when m.narrow ->
+      Node.h1
+        ~attrs:[ Attr.class_ "chrome-title" ]
+        [ Node.text (session_title m state) ]
+    | (Ring | Whisper | Border | Hub | Sidebar), _ -> Node.none
   in
   let tools =
     if m.narrow
@@ -117,7 +211,7 @@ let chrome (m : App.Model.t) ~inject =
         ~attrs:
           [ classes
               [ "chat-chrome" ]
-              [ "docked", docked ]
+              [ "docked", docked; "strip", m.narrow ]
           ]
         [ div ~cls:"chrome-left" [ toggle ]
         ; div ~cls:"chrome-center" [ island ]

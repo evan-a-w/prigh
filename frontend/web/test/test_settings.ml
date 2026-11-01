@@ -31,7 +31,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     Layout
     Status
     Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
-    (Island) (Send ring) (Status line) (Border meter) (Model chip) (Sidebar)
+    (Island A pill floating over the top of the chat) (Send ring A ring of context round send; thinking and mode by the model) (Status line One quiet line under the message box) (Border meter The message box's edge fills with context) (Model chip The model chip shows the context; its menu has the rest) (Sidebar A card at the sidebar's foot (a line under the box without it))
     Tabs
     The open sessions as tabs over the chat (not on a phone).
     (Turn session tabs on (/tabs on))
@@ -521,5 +521,41 @@ let%expect_test "/settings completes the sections" =
     models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
     git The hosts agents push branches to and open pull requests on.
     account Who you are on this backend.
+    |}]
+;;
+
+let%expect_test "a phone: the list of sections, one a level down, back to the list" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.act h Open_settings;
+  settings h;
+  (* A section, by tap: its page, with the way back. *)
+  H.click h ~selector:".settings-home-row[data-settings-tab=models]";
+  H.elements h ~selector:".settings-dialog .modal-head > *";
+  H.elements h ~selector:".settings-home";
+  H.click h ~selector:".modal-back";
+  H.elements h ~selector:".settings-home";
+  (* /settings SECTION goes straight to it. *)
+  H.key h "Escape" ~target:Page;
+  H.type_ h "/settings account";
+  H.act h Send;
+  H.text h ~selector:".settings-dialog .modal-head h2";
+  [%expect {|
+    (Focus dialog)
+    Settings
+    (Close (Esc))
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Settings_section Models)
+    <button class="btn ghost modal-back">
+    <h2 class="">
+    <button class="btn ghost icon">
+    Settings_home
+    <nav class="settings-home">
+    Close_dialog
+    (Focus editor)
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/settings account") (max 500))) (tag Ignore))
+    (Focus dialog)
+    Account
     |}]
 ;;

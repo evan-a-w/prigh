@@ -416,6 +416,7 @@ module Action = struct
     | Open_help
     | Open_settings
     | Settings_section of Settings_section.t
+    | Settings_home
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
@@ -671,6 +672,8 @@ module Model = struct
     ; nix_gc : Nix_gc.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
+    (* A phone's settings show the list of sections, not one of them. *)
+    ; settings_home : bool
     ; return_to_settings : bool
     ; theme : Theme.t
     ; theme_preview : Theme.t option
@@ -924,6 +927,7 @@ let init =
   ; nix_gc = Nix_gc.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
+  ; settings_home = true
   ; return_to_settings = false
   ; theme = Theme.default
   ; theme_preview = None
@@ -1649,7 +1653,11 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
   let settings_section = Option.value section ~default:m.settings_section in
   let m, cmds =
     open_dialog
-      { m with compact_at = Compact_at.empty; settings_section }
+      { m with
+        compact_at = Compact_at.empty
+      ; settings_section
+      ; settings_home = Option.is_none section
+      }
       Settings
   in
   if fetch && superuser m
@@ -7542,7 +7550,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     let m = { m with nix_gc = Nix_gc.status m.nix_gc result } in
     (match tag, result with
      | Nix_status { open_settings = true }, Ok _ ->
-       open_settings ~fetch:false { m with settings_section = Nix_store }
+       open_settings ~fetch:false ~section:Nix_store m
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
@@ -9229,8 +9237,10 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_settings -> open_settings m
   | Settings_section section ->
     (match m.dialog with
-     | Some Settings -> { m with settings_section = section }, []
+     | Some Settings ->
+       { m with settings_section = section; settings_home = false }, []
      | _ -> open_settings ~section m)
+  | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
     let section =
       Settings_section.move m.settings_section move ~superuser:(superuser m)

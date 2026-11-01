@@ -439,7 +439,7 @@ let toolbar (m : App.Model.t) ~inject =
       ~cls:"sessions-toolbar selecting"
       [ span ~cls:"sessions-label" "Select sessions"
       ; Node.span
-          ~attrs:[ Attr.class_ "sessions-hint" ]
+          ~attrs:[ Attr.class_ "sessions-hint keyboard" ]
           [ Node.kbd [ Node.text "Shift" ]; Node.text " for a range" ]
       ]
   else
@@ -589,7 +589,10 @@ let view (m : App.Model.t) ~inject =
             ~attrs:
               [ Attr.id "session-search"
               ; Attr.type_ "search"
-              ; Attr.placeholder "Search sessions (Ctrl+K)"
+              ; Attr.placeholder
+                  (if m.narrow
+                   then "Search sessions"
+                   else "Search sessions (Ctrl+K)")
               ; Attr.create "aria-label" "Search sessions"
               ; Attr.value m.session_query
               ; Attr.create "autocomplete" "off"
