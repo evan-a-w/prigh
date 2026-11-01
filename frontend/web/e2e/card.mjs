@@ -1,8 +1,8 @@
-// The session's card at the foot of the docked sidebar: its rows as they
-// stand idle, while the agent works with a subagent running, with only the
-// subagent left, and with a mode on (then in the narrowest sidebar), in the
-// dark and light themes, on a long branch; then the slim bar that stands in for it with the sidebar
-// closed and on a phone. For each it prints the card's rows (what sits on
+// The status over the chat (the island, and what applies beside it): its
+// rows as they stand idle, while the agent works with a subagent running,
+// with only the subagent left, and with a mode on (then in the narrowest
+// sidebar), in the dark and light themes, on a long branch; then with the
+// sidebar closed and on a phone. For each it prints the rows (what sits on
 // each line), how many lamps glow and what is in the accent colour, and
 // whether anything spills out. Run by prigh_web.sh; prints normalised
 // results (the expected output is in ENGINE.expected) and, with SHOTS,
@@ -142,14 +142,14 @@ const chips = () => page.evaluate(() => {
 // meter as [meter]), then the lamps lit, what is in the accent colour, and
 // anything outside the card or cut off without an ellipsis.
 const card = () => page.evaluate(() => {
-  const root = document.querySelector(".session-bar");
+  const root = document.querySelector(".chat-chrome");
   if (!root) return "(no card)";
   const shown = e => {
     const r = e.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
   };
-  const items = [...root.querySelectorAll(".status-item, .branch, .session-name")].filter(shown)
-    .filter(e => !e.parentElement.closest(".status-item, .branch"));
+  const items = [...root.querySelectorAll(".status-item")].filter(shown)
+    .filter(e => !e.parentElement.closest(".status-item"));
   const box = root.getBoundingClientRect();
   const rows = [];
   for (const e of items) {
@@ -197,7 +197,7 @@ const both = async label => {
   console.log(clean(await card()));
   for (const t of ["dark", "light"]) {
     await theme(t);
-    await screenshot(`${label} ${t}`, ".session-bar");
+    await screenshot(`${label} ${t}`, ".chat-chrome");
   }
   await screenshot(label);
   await theme("dark");
@@ -208,28 +208,28 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".session-bar .branch").waitFor();
+  await page.locator(".status-island").waitFor();
   await both("idle");
 
   // The agent at work, its subagent too.
   await command("survey the project");
-  await page.locator(".session-bar .status-item.background.active").waitFor();
+  // The subagent tool at work (its call written), as the card had it.
+  await page.locator(".status-island .activity", { hasText: "Running tools" }).waitFor();
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("main-go"));
   await both("working, a subagent running");
 
   // The agent done, its subagent still running.
   open("main-go");
-  await page.locator(".session-bar .activity.idle").waitFor();
+  await page.locator(".status-island .activity.idle").waitFor();
   await both("ready, a subagent running");
 
   // All done, and a mode on (the transcript's verbosity).
   open("sub-go");
-  await page.waitForFunction(() => !document.querySelector(".session-bar .status-item.background.active"));
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
-  await page.locator(".session-bar .activity.idle").waitFor();
+  await page.locator(".status-island .activity.idle").waitFor();
   await page.keyboard.press("Control+o");
-  await page.locator(".session-bar .status-item.mode").waitFor();
+  await page.locator(".chat-chrome .status-item.mode").waitFor();
   await both("idle, a mode on");
 
   // The sidebar at its narrowest: still one line for the activity and the
@@ -279,25 +279,25 @@ try {
   console.log(clean(await chips()));
 
   // The context opens the session's details.
-  await page.locator(".session-bar button.context").click();
+  await page.locator(".status-island button.context").click();
   await page.locator(".modal").waitFor();
   section("the context opens the session's details");
   console.log(clean(await page.locator(".modal h2, .modal .dialog-title").first().innerText()));
   await page.keyboard.press("Escape");
   await page.waitForSelector(".modal", { state: "detached" });
 
-  // The sidebar closed: the bar over the chat says it all.
+  // The sidebar closed: the chrome over the chat gains its ☰.
   await page.keyboard.press("Control+b");
-  await page.locator(".session-bar").waitFor();
+  await page.locator(".chat-chrome").waitFor();
   section("the sidebar closed");
   console.log(clean(await card()));
   await screenshot("the sidebar closed");
   await page.keyboard.press("Control+b");
-  await page.locator(".session-bar").waitFor();
+  await page.locator(".chat-chrome").waitFor();
 
-  // A phone: the bar again.
+  // A phone: ☰, the island and ⋯.
   await page.setViewportSize({ width: 390, height: 760 });
-  await page.locator(".session-bar").waitFor();
+  await page.locator(".chat-chrome").waitFor();
   section("a phone");
   console.log(clean(await card()));
   console.log(clean(await chips()));

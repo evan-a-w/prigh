@@ -318,8 +318,8 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Adding it"));
-  // In the header's tray, behind the glance.
-  await page.locator(".bar-tray-toggle").click();
+  // In the ⋯ menu, top right.
+  await page.locator(".more-toggle").click();
   await page.locator("#filter-toggle").click();
   await page.locator(".filter-menu.placed").waitFor();
   section("phone");
@@ -331,18 +331,26 @@ try {
   await page.mouse.click(200, 700);
   await closed();
   console.log(await shown());
+  // The click outside closed the ⋯ menu too: the button is in it; then
+  // closed again, as it would be over the note.
+  if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
   console.log(await button());
-  console.log(`note: ${await note()}`);
-  const fits = await page.evaluate(() => {
-    const n = document.querySelector(".filter-note").getBoundingClientRect();
+  const buttonInside = await page.evaluate(() => {
     const b = document.getElementById("filter-toggle").getBoundingClientRect();
+    return b.left >= 0 && b.right <= innerWidth;
+  });
+  await page.locator(".chrome-backdrop").click({ position: { x: 20, y: 300 } });
+  await page.waitForFunction(() => !document.querySelector("#chrome-menu"));
+  console.log(`note: ${await note()}`);
+  const fits = await page.evaluate(buttonInside => {
+    const n = document.querySelector(".filter-note").getBoundingClientRect();
     const all = document.querySelector(".filter-show-all").getBoundingClientRect();
     const top = document.elementFromPoint(all.left + all.width / 2, all.top + all.height / 2);
-    return `note inside the screen: ${n.left >= 0 && n.right <= innerWidth}; Show all ${top?.closest(".filter-show-all") ? "clickable" : "covered"}; button inside: ${b.left >= 0 && b.right <= innerWidth}`;
-  });
+    return `note inside the screen: ${n.left >= 0 && n.right <= innerWidth}; Show all ${top?.closest(".filter-show-all") ? "clickable" : "covered"}; button inside: ${buttonInside}`;
+  }, buttonInside);
   console.log(fits);
   await screenshot("phone filtered");
-  if (!(await page.locator(".bar-tray.open").count())) await page.locator(".bar-tray-toggle").click();
+  if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
   await page.locator("#filter-toggle").click();
   await page.locator(".filter-menu.placed").waitFor();
   await page.locator(".filter-menu .menu-item", { hasText: "Show all" }).click();
