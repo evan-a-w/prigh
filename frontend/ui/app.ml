@@ -3728,6 +3728,15 @@ let run_command m (cmd : Commands.Parsed.t) =
       ] )
   | "resume", [] ->
     with_state m ~f:(Loop_status.describe_resume ~utc_offset:m.utc_offset)
+  | "downsize-images", [] ->
+    ( m
+    , [ rpc
+          "downsize_images"
+          ~tag:
+            (Notice_on_success
+               "images will be sent smaller; retrying a failed reply")
+      ] )
+  | "downsize-images", _ -> error m "usage: /downsize-images", []
   | "resume", [ "now" ] ->
     m, [ rpc "resume_now" ~tag:(Notice_on_success "resuming now") ]
   | "resume", [ "cancel" ] ->

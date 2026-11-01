@@ -332,6 +332,23 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   overflow-wrap: anywhere;
 }
 .stop.error .hint { color: var(--muted); font-size: 12.5px; }
+.stop.error .stop-action {
+  align-self: flex-start;
+  margin-top: 4px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--brick-line);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--brick);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stop.error .stop-action:hover { background: var(--brick-wash); }
+.stop.error .stop-action:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+@media (pointer: coarse) { .stop.error .stop-action { min-height: 44px; } }
 .stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
 .stop.aborted > .mark, .stop.length > .mark { --mark-line: 18px; }
 

@@ -257,6 +257,7 @@ let%expect_test "help lists every key and command" =
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
+    /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run

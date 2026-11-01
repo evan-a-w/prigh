@@ -277,6 +277,10 @@ module Command = struct
     | Clear_text_selection
     | Place_popover
     | Pick_images
+    | Downsize_image of
+        { image : Image.t
+        ; target : Image_size.Target.t
+        }
     | Start_dictation of Dictation.Engine.t
     | Stop_dictation
     | Cancel_dictation
@@ -478,6 +482,15 @@ module Action = struct
     | Cycle_mode
     | Add_image of Image.t
     | Remove_image of int
+    | Downsize_image of int
+    | Downsized of
+        { original : Image.t
+        ; image : Image.t
+        }
+    | Downsize_failed of
+        { original : Image.t
+        ; reason : string
+        }
     | Dictate
     | Dictation_cancel
     | Dictation_progress of
@@ -602,6 +615,7 @@ module Model = struct
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list
+    ; downsizing : Image.t list
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t
     ; browser_speech : bool
@@ -730,6 +744,23 @@ module Model = struct
     | None -> false
   ;;
 
+  let image_limit t =
+    let model =
+      match t.pending.model, t.state with
+      | Some key, _ ->
+        List.find t.models ~f:(fun (m : Llm.t) -> String.equal m.key key)
+      | None, Some s -> Some s.model
+      | None, None -> None
+    in
+    Option.bind model ~f:(fun (m : Llm.t) -> m.image_limit)
+    |> Option.value ~default:Image_size.default_limit
+  ;;
+
+  let image_verdicts t =
+    let limit = image_limit t in
+    List.map t.images ~f:(Image_size.check limit)
+  ;;
+
   let popup t =
     Option.filter t.completion ~f:(fun c ->
       not (List.is_empty (Completion.items c)))
@@ -841,6 +872,7 @@ let init =
   ; completion = None
   ; history = History.empty
   ; images = []
+  ; downsizing = []
   ; dictation = Idle
   ; dictation_engine = Server
   ; browser_speech = false
@@ -3925,6 +3957,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; completion = None
     ; btw = None
     ; generate = Generate.empty
+    ; downsizing = []
     ; git_bar = Git_bar.empty
     ; images = []
     ; skills = Skills.empty
@@ -5723,6 +5756,13 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
         m
         (String.capitalize
            (Prigh_ui.Loop_status.describe_resume s ~utc_offset:m.utc_offset)))
+  | "downsize-images", _ ->
+    ( m
+    , [ rpc
+          "downsize_images"
+          []
+          ~tag:(Notice "Images will be sent smaller; retrying a failed reply")
+      ] )
   | "resume", "now" -> m, [ rpc "resume_now" [] ~tag:(Notice "Resuming now") ]
   | "resume", "cancel" ->
     ( m
@@ -9481,6 +9521,37 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Annotate_save ->
     annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_export ])
   | Annotated image -> annotated m image
+  | Downsize_image i ->
+    (match List.nth m.images i with
+     | Some image when not (List.mem m.downsizing image ~equal:phys_equal) ->
+       (match Image_size.target (Model.image_limit m) image with
+        | Some target ->
+          ( { m with downsizing = image :: m.downsizing }
+          , [ Command.Downsize_image { image; target } ] )
+        | None -> m, [])
+     | Some _ | None -> m, [])
+  | Downsized { original; image } ->
+    let downsizing =
+      List.filter m.downsizing ~f:(fun i -> not (phys_equal i original))
+    in
+    let images =
+      List.map m.images ~f:(fun i -> if phys_equal i original then image else i)
+    in
+    let m = { m with downsizing; images } in
+    toast
+      m
+      (sprintf
+         "Downsized the image: %s → %s"
+         (Image_size.size_hum original.bytes)
+         (Image_size.size_hum image.bytes))
+  | Downsize_failed { original; reason } ->
+    let downsizing =
+      List.filter m.downsizing ~f:(fun i -> not (phys_equal i original))
+    in
+    toast
+      { m with downsizing }
+      ~error:true
+      ("Could not downsize the image: " ^ reason)
   | Remove_image i ->
     { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
   | Show_toast { text; error } -> toast m ~error text

@@ -63,13 +63,20 @@ val tool_summary : name:string -> Json.t -> string
 
     A transient provider error ({!is_retryable_error}) is retried up to
     [config.retries] times, emitting [Retry] and then waiting with [sleep]
-    (default: the clock; cancellation ends the wait). *)
+    (default: the clock; cancellation ends the wait).
+
+    Images over the model's limit ({!Image_limit.for_request}) are sent
+    downscaled ({!Image_fit}, with the image tools found in [image_tools],
+    default [$PATH]); one the provider still refuses as too large teaches
+    the model a stricter limit and the request is sent again, up to twice,
+    before the run fails saying what to do. *)
 val run
   :  env:Env.t
   -> provider:Provider.t
   -> config:Config.t
   -> cwd:string
   -> ?cancel:Cancellation.t
+  -> ?image_tools:string list
   -> ?depth:int
   -> ?agent_id:string
   -> ?steer:(unit -> Message.t list)

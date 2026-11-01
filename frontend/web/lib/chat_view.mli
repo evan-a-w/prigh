@@ -65,5 +65,9 @@ val hidden_attribute : string
 
 val hidden_action_attribute : string
 
+(** On a button: the slash command a click runs ([Action.Run]), e.g. the
+    error card's [/downsize-images]. *)
+val run_attribute : string
+
 (** A [data:] URL. *)
 val image_src : Image.t -> string

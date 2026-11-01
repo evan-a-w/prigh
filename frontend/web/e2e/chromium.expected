@@ -2722,3 +2722,91 @@ compact_at_tokens=0 compaction_model=null mask_observations=false
 fits: true
 === chromium: compaction: errors ===
 (none)
+=== chromium: images (desktop): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== chromium: images (desktop): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== chromium: images (desktop): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== chromium: images (desktop): an image file opens in the drawing dialog ===
+Saving replaces the attached image.
+Cancel
+Save
+=== chromium: images (desktop): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== chromium: images (desktop): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== chromium: images (desktop): sent ===
+composer cleared: true
+843x3
+48x48
+=== chromium: images (desktop): errors ===
+none
+=== chromium: images (phone): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== chromium: images (phone): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== chromium: images (phone): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== chromium: images (phone): an image file opens in the drawing dialog ===
+Cancel
+Save
+=== chromium: images (phone): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== chromium: images (phone): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== chromium: images (phone): sent ===
+composer cleared: true
+843x3
+48x48
+=== chromium: images (phone): errors ===
+none
+=== chromium: images (small): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== chromium: images (small): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== chromium: images (small): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== chromium: images (small): an image file opens in the drawing dialog ===
+Cancel
+Save
+=== chromium: images (small): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== chromium: images (small): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== chromium: images (small): sent ===
+composer cleared: true
+843x3
+48x48
+=== chromium: images (small): errors ===
+none

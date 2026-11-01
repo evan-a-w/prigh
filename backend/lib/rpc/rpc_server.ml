@@ -61,6 +61,7 @@ let methods =
   ; "clear_reminders"
   ; "cancel_resume"
   ; "resume_now"
+  ; "downsize_images"
   ; "new_session"
   ; "switch_session"
   ; "list_sessions"
@@ -2572,6 +2573,14 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "clear_reminders" -> unit_result (Agent.clear_reminders agent)
   | "cancel_resume" -> unit_result (Agent.cancel_resume agent)
   | "resume_now" -> unit_result (Agent.resume_now agent)
+  | "downsize_images" ->
+    Or_error.map (Agent.downsize_images agent) ~f:(fun (limit, retried) ->
+      `Object
+        [ "max_bytes", `Number (Int.to_string (limit.max_base64_bytes * 3 / 4))
+        ; "max_dimension", `Number (Int.to_string limit.max_dimension)
+        ; "described", `String (Image.Limit.describe limit)
+        ; ("retried", if retried then `True else `False)
+        ])
   | "set_session_name" ->
     Or_error.map (string_param params "name") ~f:(fun name ->
       Agent.set_session_name agent name;
