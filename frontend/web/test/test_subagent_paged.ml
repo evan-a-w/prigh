@@ -139,7 +139,7 @@ let%expect_test "a subagent whose call is in a page not loaded" =
      (tag (Subagent a1)))
     Loading the transcript…
     Count the files
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 42
     42
     There are 3 files.

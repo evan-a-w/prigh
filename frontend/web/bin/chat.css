@@ -261,9 +261,9 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   color: var(--faint);
   background: var(--graphite);
 }
-.delivery-head .kind { font-family: var(--mono); font-size: 12.5px; flex-shrink: 0; color: var(--muted); }
+.delivery-head .kind { font-size: 13px; flex-shrink: 0; color: var(--muted); white-space: nowrap; }
 .delivery-head .task {
-  color: var(--muted);
+  color: var(--fg);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -731,6 +731,8 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
 /* A subagent: its lamp or outcome, its name and the way in. */
 .tool-subagent > .tool-head .arg.task { font-weight: 500; }
+/* "Subagent:" before the name: it stays, the name gives way. */
+.tool-subagent > .tool-head .kind { font-size: 13px; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
 
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }

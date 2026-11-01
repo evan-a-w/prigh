@@ -761,6 +761,7 @@ let%expect_test "subagent: running shows its latest step" =
            title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
            class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
+        <span class="kind"> Subagent: </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
@@ -782,6 +783,7 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
+      <span class="kind"> Subagent: </span>
       <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
     </div>
@@ -805,6 +807,7 @@ let%expect_test
            title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
            class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
+        <span class="kind"> Subagent: </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
@@ -828,6 +831,7 @@ let%expect_test "subagent: failed" =
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
+        <span class="kind"> Subagent: </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
@@ -876,6 +880,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
+        <span class="kind"> Subagent: </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       </div>
       <div class="tool-body">
@@ -956,7 +961,7 @@ let%expect_test
           <div class="bad delivery-section">
             <div title="job j2" class="delivery-head">
               <span class="icon"> ↩ </span>
-              <span class="kind"> job j2 </span>
+              <span class="kind"> Job j2: </span>
               <span class="task"> sleep 100 </span>
               <span class="bad chip"> killed </span>
             </div>

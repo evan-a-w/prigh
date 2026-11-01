@@ -83,7 +83,7 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     Thought Let me look first.
     Let me look first.
     (✓ bash ls)
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -148,7 +148,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Thought Let me look first.
     Let me look first.
     (✓ bash ls)
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -161,7 +161,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Thought Let me look first.
     Let me look first.
     (✓ bash ls)
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     And the tests?
@@ -171,7 +171,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Hiding thinking · 1 item hidden (Show all)
     Survey the repository
     (✓ bash ls)
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -184,7 +184,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -209,7 +209,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Thought Let me look first.
     Let me look first.
     (✓ bash ls)
-    ✓ Count the modules
+    ✓ Subagent: Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.

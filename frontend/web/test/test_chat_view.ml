@@ -379,6 +379,7 @@ let%expect_test "deliveries of background work: compact cards" =
                  title="subagent a1 · 2 turns, 0 in / 0 out tokens, $0.0000"
                  class="delivery-head">
               <span class="icon"> ↩ </span>
+              <span class="kind"> Report: </span>
               <span class="task"> Count the lines in src/app.ml and report back. </span>
               <span class="chip ok"> finished </span>
               <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
@@ -406,7 +407,7 @@ let%expect_test "deliveries of background work: compact cards" =
           <div class="delivery-section ok">
             <div title="job j2" class="delivery-head">
               <span class="icon"> ↩ </span>
-              <span class="kind"> job j2 </span>
+              <span class="kind"> Job j2: </span>
               <span class="task"> sleep 0.5; echo second </span>
               <span class="chip ok"> exited 0 </span>
             </div>
@@ -417,7 +418,7 @@ let%expect_test "deliveries of background work: compact cards" =
           <div class="bad delivery-section">
             <div title="job j3" class="delivery-head">
               <span class="icon"> ↩ </span>
-              <span class="kind"> job j3 </span>
+              <span class="kind"> Job j3: </span>
               <span class="task"> make </span>
               <span class="bad chip"> exited 2 </span>
             </div>
@@ -430,6 +431,7 @@ let%expect_test "deliveries of background work: compact cards" =
                  title="subagent a2 · 1 turns, 10 in / 0 out tokens, $0.0001"
                  class="delivery-head">
               <span class="icon"> ↩ </span>
+              <span class="kind"> Report: </span>
               <span class="task"> Fix the tests </span>
               <span class="bad chip"> failed </span>
               <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
@@ -566,7 +568,7 @@ let%expect_test "delivery of a subagent that ran out of turns" =
        [ {|{"type":"event","event":"message_start","message":{"role":"user","text":"[subagent a1 out of turns] Fix the parser\nsubagent hit the 1-turn limit without finishing\n[subagent: 1 turns, 20 in / 8 out tokens, $0.0000]\n[out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it]","origin":{"source":{"kind":"delivery","title":"Reports"}}}}|}
        ]);
   [%expect
-    {| ↩ Fix the parser out of turns Open › Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
+    {| ↩ Report: Fix the parser out of turns Open › Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
 ;;
 
 let%expect_test "an image the model refused as too large: downsize and retry" =
