@@ -28,6 +28,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Worktrees _ -> "Worktrees"
   | Themes -> "Themes"
   | Accents -> "Colours"
+  | Status_styles -> "Status"
   | Attach -> "Attach"
   | Compaction_models | Naming_models | Dictation_models -> "Models"
 ;;

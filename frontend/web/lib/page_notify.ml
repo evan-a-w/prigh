@@ -62,4 +62,11 @@ let describe t =
      localhost); the tab's title still counts what happened"
 ;;
 
-let title t = if t.unseen > 0 then sprintf "(%d) prigh" t.unseen else "prigh"
+let title ?session t =
+  let base =
+    match session with
+    | Some s when not (String.is_empty (String.strip s)) -> s ^ " · prigh"
+    | _ -> "prigh"
+  in
+  if t.unseen > 0 then sprintf "(%d) %s" t.unseen base else base
+;;

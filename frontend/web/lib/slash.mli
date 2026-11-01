@@ -21,6 +21,7 @@ module Argument : sig
     | Plan
     | Notify (** [on] or [off] *)
     | Tabs (** [on] or [off] *)
+    | Status_style (** {!Status_style.name}s *)
     | Settings (** a section of the settings page *)
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)

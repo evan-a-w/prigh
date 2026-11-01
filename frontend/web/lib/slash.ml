@@ -18,6 +18,7 @@ module Argument = struct
     | Plan
     | Notify
     | Tabs
+    | Status_style
     | Settings
     | Session
     | Path
@@ -139,6 +140,12 @@ let every =
       ~args:"[on|off]"
       "tabs"
       "show the open sessions as tabs over the chat (saved for your account)"
+  ; c
+      ~argument:Status_style
+      ~args:"[island|ring|whisper|border|hub|sidebar]"
+      "status-style"
+      "where the status sits: context, cost, thinking and mode (saved for \
+       your account)"
   ; c
       ~args:"[instructions]"
       "compact"

@@ -182,7 +182,8 @@ let pick_images () =
    edge on the chip's; below it when there is not room enough above and more
    below, as for the header's chips. The height it may take goes to
    style.css as [--popover-room]; [--popover-shift] moves it left as far as
-   it must to stay inside the composer (the header) and the window. *)
+   it must to stay inside what holds it ([data-popover-box]: the composer,
+   the status) and the window. *)
 let place_popover () =
   Browser.after_render (fun () ->
     Option.iter (Dom_html.getElementById_opt "chip-popover") ~f:(fun el ->
@@ -195,7 +196,7 @@ let place_popover () =
               (Js.Unsafe.meth_call
                  anchor
                  "closest"
-                 [| Js.Unsafe.inject (Js.string ".composer-stack, .session-bar") |]
+                 [| Js.Unsafe.inject (Js.string "[data-popover-box]") |]
                : Dom_html.element Js.t Js.opt)
           with
           | Some box -> box##getBoundingClientRect
@@ -459,6 +460,21 @@ let scroll_to_message n =
                n))))
 ;;
 
+(* The tab's title: the count of what happened unseen and the session's
+   name (there is no header over the chat to name it). *)
+let shown_title = ref ""
+
+let sync_title (m : App.Model.t) =
+  let session =
+    Option.map m.state ~f:(Prigh_web.Session_view.session_title m)
+  in
+  let title = Prigh_web.Page_notify.title ?session m.notifications in
+  if not (String.equal title !shown_title)
+  then (
+    shown_title := title;
+    Page_notifications.set_title title)
+;;
+
 let perform client settings ctx (model : App.Model.t) (command : App.Command.t) =
   let inject = Bonsai.Apply_action_context.inject ctx in
   let eff =
@@ -593,7 +609,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         Effect.of_deferred_fun Page_notifications.request_permission ()
       in
       inject (App.Action.Notification_permission permission)
-    | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
+    | Set_title _ -> Effect.of_sync_fun sync_title model
     | Files page -> Effect.of_sync_fun Files_widget.perform page
     | Cache_prefs changes ->
       Effect.of_sync_fun
@@ -687,6 +703,7 @@ let component client settings ~current (local_ graph) =
                   (layout model')
              && App.Connection.equal model.connection model'.connection)
         then autosize ();
+        sync_title model';
         List.iter commands ~f:(perform client settings ctx model');
         model')
       graph

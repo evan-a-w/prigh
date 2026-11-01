@@ -639,6 +639,7 @@ let view (m : App.Model.t) ~inject =
                   else [ delete_archived ~inject archived ]
                 else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
+    ; Status_style_view.sidebar_card m ~inject
     ; user_footer m ~inject
     ]
 ;;
