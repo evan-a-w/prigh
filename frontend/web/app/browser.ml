@@ -210,3 +210,8 @@ let input_value id =
   | Some input -> Js.to_string input##.value
   | None -> ""
 ;;
+
+let visual_height () =
+  Option.map (Viewport.visual ()) ~f:(fun vv ->
+    Js.float_of_number (Js.Unsafe.get vv (Js.string "height")))
+;;
