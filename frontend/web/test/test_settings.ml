@@ -29,6 +29,9 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
     Layout
+    Status
+    Where the activity, context, cost, thinking and mode show: a pill floating over the top of the chat.
+    (Island) (Send ring) (Status line) (Border meter) (Model chip) (Sidebar)
     Tabs
     The open sessions as tabs over the chat (not on a phone).
     (Turn session tabs on (/tabs on))
@@ -82,7 +85,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   [%expect
     {|
     <aside class="sidebar">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}]
 ;;
 
@@ -172,10 +175,10 @@ let%expect_test "notifications: the switch, and what the browser allows" =
 let%expect_test "transcript detail, default mode, providers, shortcuts" =
   let h = H.create () in
   H.quiet h (fun () -> H.act h Open_settings);
-  H.names h ~selector:".segment";
-  H.elements h ~selector:".segment";
-  H.click h ~selector:".segment";
-  H.elements h ~selector:".segment";
+  H.names h ~selector:".setting.verbosity .segment";
+  H.elements h ~selector:".setting.verbosity .segment";
+  H.click h ~selector:".setting.verbosity .segment";
+  H.elements h ~selector:".setting.verbosity .segment";
   print_s [%sexp ((H.model h).verbosity : Prigh_ui.Verbosity.t)];
   [%expect
     {|
@@ -286,6 +289,12 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
+    button "Island" -- a pill floating over the top of the chat (/status-style island)
+    button "Send ring" -- a ring of context round send; thinking and mode by the model (/status-style ring)
+    button "Status line" -- one quiet line under the message box (/status-style whisper)
+    button "Border meter" -- the message box's edge fills with context (/status-style border)
+    button "Model chip" -- the model chip shows the context; its menu has the rest (/status-style hub)
+    button "Sidebar" -- a card at the sidebar's foot (a line under the box without it) (/status-style sidebar)
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
@@ -302,6 +311,7 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
+    [group] div "Status"
     [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
     -- Sessions

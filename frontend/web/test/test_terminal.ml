@@ -212,10 +212,10 @@ let%expect_test "the panel follows the session, the host and the user" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
@@ -288,7 +288,7 @@ let%expect_test "an exited shell, a failure and what to do next" =
     {| laptop ~/proj reconnecting… (Close (Ctrl+`): the shell keeps running for 10 minutes) |}]
 ;;
 
-let%expect_test "/terminal, the top bar's button and the height" =
+let%expect_test "/terminal, the chrome's button and the height" =
   let h = H.create ~state:(state ()) () in
   H.act h (Set_narrow true);
   H.act h (Set_narrow false);

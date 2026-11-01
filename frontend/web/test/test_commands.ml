@@ -90,6 +90,7 @@ let%expect_test "every command does something (none is unknown)" =
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /tabs                      toast: Session tabs are off: /tabs on shows the open sessions as tabs
+    /status-style              picker: Where the status sits
     /compact                   toast: Compacting the conversation…
     /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
@@ -437,8 +438,8 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.show h ~selector:"#chat";
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   [%expect
     {|
     (Dialog_move -1)
@@ -473,14 +474,18 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (quiet)
     |}];
   H.key h "o" ~ctrl:true;
@@ -504,18 +509,22 @@ let%expect_test "/verbosity and Ctrl+O" =
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (verbose)
     |}]
 ;;
@@ -1752,10 +1761,10 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1807,10 +1816,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

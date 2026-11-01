@@ -6,7 +6,7 @@ module H = Harness
 let%expect_test "connecting: the chat, the composer and the status say so" =
   let h = H.connecting () in
   H.text h ~selector:".chat";
-  H.text h ~selector:".status";
+  H.text h ~selector:".status-island";
   H.show h ~selector:"button.send";
   [%expect
     {|
@@ -22,7 +22,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     </button>
     |}];
   H.elements h ~selector:".composer";
-  [%expect {| <footer class="composer offline"> |}];
+  [%expect {| <footer class="busy composer offline status-style-island"> |}];
   H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
   H.text h ~selector:".chat";
   [%expect {| Loading the session… |}];
@@ -35,14 +35,14 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     Scroll_to_bottom
     What are we building?
     Ready
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}]
 ;;
 
 let%expect_test "reconnecting: the composer is marked and does not send" =
   let h = H.create () in
   H.act h Backend_closed;
-  H.text h ~selector:".status";
+  H.text h ~selector:".status-island";
   H.elements h ~selector:".composer";
   H.type_ h "still here";
   H.act h Send;
@@ -51,8 +51,19 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Reconnecting…
-    <footer class="composer offline">
+    Reconnecting… (0%) $0.00
+    Status Reconnecting…
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    (on)
+    (auto)
+    <footer class="composer offline status-style-island">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
     |}]

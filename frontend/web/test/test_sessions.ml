@@ -126,12 +126,14 @@ let%expect_test
     (Focus dialog-input)
     true
     |}];
-  (* Without the sidebar, the bar names it after its first prompt until it
-     has a name. *)
-  H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.text h ~selector:".session-bar .session-name";
-  H.quiet h (fun () -> H.act h Toggle_sidebar);
-  [%expect {| (fix the parser bug) |}];
+  (* The tab's title names it after its first prompt until it has a name. *)
+  (let m = H.model h in
+   print_endline
+     (Prigh_web.Page_notify.title
+        ~session:
+          (Prigh_web.Session_view.session_title m (Option.value_exn m.state))
+        m.notifications));
+  [%expect {| fix the parser bug · prigh |}];
   (* The clock moves the ages on, and refreshes the list. *)
   H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_min 5.)));
   H.text h ~selector:".session-age";
@@ -153,18 +155,10 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     |}];
   H.act h (Set_session_query "lexr");
   H.text h ~selector:".session-title";
-  [%expect
-    {|
-    Refactor the lexer
-    (fix the parser bug) (main)
-    |}];
+  [%expect {| Refactor the lexer |}];
   H.act h (Set_session_query "docs");
   H.text h ~selector:".session-title";
-  [%expect
-    {|
-    Release notes
-    (fix the parser bug) (main)
-    |}];
+  [%expect {| Release notes |}];
   H.act h (Set_session_query "zzz");
   H.text h ~selector:".sessions";
   [%expect {| Nothing matches “zzz”. |}];
@@ -175,7 +169,6 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     fix the parser bug
     Release notes
     Refactor the lexer
-    (fix the parser bug) (main)
     |}]
 ;;
 
@@ -304,7 +297,7 @@ let%expect_test
     "get_pending"
     {|{"steer_texts":["a"],"follow_up_texts":["b","c"],"confirms":[{"call_id":"c1","name":"bash","summary":"rm -rf build"}]}|};
   H.text h ~selector:".modal";
-  H.text h ~selector:".status-extras .queued";
+  H.text h ~selector:".queue";
   [%expect
     {|
     (Focus confirm)
@@ -312,7 +305,12 @@ let%expect_test
     (Close (Esc))
     Run bash: rm -rf build?
     (y Allow once) (n Deny) (r Deny, saying why)
-    (3 queued)
+    Steers this turn a
+    (Edit) (Remove from the queue)
+    After this turn b
+    (Edit) (Remove from the queue)
+    After this turn c
+    (Edit) (Remove from the queue)
     |}];
   H.reply
     h
@@ -712,7 +710,6 @@ let%expect_test
     Release notes
     Refactor the lexer
     fix the parser bug
-    (fix the parser bug) (main)
     (Session_nav (from ()) (by 1))
     (Focus session-s2)
     (Session_nav (from (s2)) (by 1))
@@ -858,7 +855,8 @@ let%expect_test "~ in places is the home of the tool host they are on" =
   let h = H.create ~sessions ~state () in
   H.names h ~selector:".session-cwd";
   H.text h ~selector:".empty-where";
-  [%expect {|
+  [%expect
+    {|
     span "~/src" -- /Users/ann/src
     span "~/docs" -- /Users/ann/docs
     span "/home/ann/notes"
