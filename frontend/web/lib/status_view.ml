@@ -34,7 +34,9 @@ let context_level percent =
 let busy (m : App.Model.t) =
   match m.state, m.connection with
   | Some state, Connected -> state.running || m.pending.sending > 0
-  | _ -> true
+  | None, Connected -> true
+  (* Offline: nothing is at work here (the composer says it is offline). *)
+  | _, Reconnecting _ -> false
 ;;
 
 type doing =
@@ -122,7 +124,8 @@ let cost (state : State.t) ~inject =
 
 let fill percent =
   Css_gen.width
-    (`Percent (Percent.of_percentage (Float.clamp_exn percent ~min:0. ~max:100.)))
+    (`Percent
+        (Percent.of_percentage (Float.clamp_exn percent ~min:0. ~max:100.)))
 ;;
 
 let meter percent =
@@ -131,7 +134,9 @@ let meter percent =
       [ Attr.class_ (String.strip ("meter " ^ context_level percent))
       ; Attr.create "aria-hidden" "true"
       ]
-    [ Node.span ~attrs:[ Attr.class_ "meter-fill"; Attr.style (fill percent) ] []
+    [ Node.span
+        ~attrs:[ Attr.class_ "meter-fill"; Attr.style (fill percent) ]
+        []
     ]
 ;;
 
@@ -182,11 +187,13 @@ let details (m : App.Model.t) (state : State.t) =
            (tokens state.usage.input)
            (tokens state.usage.output)
            (tokens state.usage.cache_read))
-    ; line
-        "Cost"
-        (match Prigh_ui.Loop_status.budget_part state with
-         | None -> sprintf "$%.4f" state.cost_usd
-         | Some (text, _) -> sprintf "$%.4f · %s" state.cost_usd text)
+    ; (match Prigh_ui.Loop_status.budget_part state with
+       | None -> line "Cost" (sprintf "$%.4f" state.cost_usd)
+       | Some (text, level) ->
+         line
+           ~cls:("cost " ^ level_class level)
+           "Cost"
+           (sprintf "$%.4f · %s" state.cost_usd text))
     ; line
         "Thinking"
         (if state.model.supports_thinking then state.thinking else "none")
@@ -214,6 +221,7 @@ let context_button ?(cls = "") (state : State.t) ~inject children =
       ; Attr.type_ "button"
       ; Attr.create "aria-label" label
       ; Attr.create "aria-describedby" details_id
+      ; Attr.create "aria-haspopup" "dialog"
       ; Attr.on_click (fun _ -> inject (Action.Run "/session"))
       ]
     children
@@ -342,7 +350,11 @@ let modes (m : App.Model.t) ~inject =
        Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
      with
      | Some text ->
-       chip ~cls:"plan" ~title:"The model's plan (/todos)" ~command:"/todos" text
+       chip
+         ~cls:"plan"
+         ~title:"The model's plan (/todos)"
+         ~command:"/todos"
+         text
      | None -> Node.none)
   ]
 ;;
