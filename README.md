@@ -639,8 +639,8 @@ or the whole file with the changes inline, highlighted; any text file of
 the repository can be commented on.
 
 Files go into a message too: drop them on the composer, paste them, or
-pick them with its paperclip. Images (PNG, JPEG, GIF, WebP) go as images,
-as before; any other file is uploaded to `.prigh/uploads/` in the
+pick them with its paperclip. Images (PNG, JPEG, GIF, WebP, and others the
+browser can draw, recognised by content) go as images (see below); any other file is uploaded to `.prigh/uploads/` in the
 session's directory on its tool host (created with a `.gitignore` of `*`,
 so git ignores it; a name in use gets `-2`, `-3`…) and attached by path,
 like an `@file`: the model gets text files in `<file>` blocks and a
@@ -1828,6 +1828,32 @@ fail with a message saying how to shrink them. Anthropic and OpenAI models get
 the images; DeepSeek's cannot see them and are told one was left out. Images
 are stored in the session file.
 
+Each model has an image limit: Anthropic's (and custom
+models') 5 MB of base64, about 3.4 MB of image, and 8000 px a side (2000 px
+once a request has more than 20 images); OpenAI's about 18 MB and 8000 px.
+Every request sends the conversation's images fitted to the model's limit
+(downscaled for that request only: the session keeps the originals), so
+switching to a stricter model mid-session does not leave it stuck. When a
+provider still refuses an image as too large, prigh learns the limit it
+states (or a stricter one) for that model until the backend restarts, and
+sends the request again, twice at most; then the reply fails with what to
+do. Its error card in prigh-web offers **Downsize images and retry**, the
+same as `/downsize-images` (in prigh-web and the TUI): it halves the model's
+limit (to 2000 px or less) and sends a failed reply again. The prigh
+package puts ImageMagick on the backend's PATH for this.
+
+In prigh-web's composer an image larger than the selected model takes
+(by its size in bytes or pixels) shows **Too large · Downsize** on its
+tile: Downsize makes it smaller in the page (a canvas: PNG kept when it fits,
+else JPEG), and the toast says by how much. Left as it is, it is still sent
+and the backend downscales it. Image files picked with + → Files, dropped
+or pasted are images too, whatever type the browser gives them (sniffed by
+content: one with no type or `application/octet-stream` is fine; HEIC, AVIF
+and BMP become PNG where the browser can draw them), so they can be viewed,
+drawn on and downsized. To send an image file as a file, attach it with
+`@path` instead.
+
+
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start, and on the backend with your preferences
 (above), shared with prigh-web: the backend's history replaces this
@@ -2156,6 +2182,7 @@ it.
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |
+| `/downsize-images` | send the conversation's images smaller (the model refused one as too large) and retry a failed reply |
 | `/snippet [NAME\|add NAME [TEXT]\|rm NAME]` | insert a snippet at the cursor without sending it (alone: a picker, also Alt+N); `add` saves one (TEXT is the rest of the prompt, new lines included; without it, your last prompt), `rm` deletes one |
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
 | `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
