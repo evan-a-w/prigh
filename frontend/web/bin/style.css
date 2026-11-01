@@ -1635,12 +1635,12 @@ kbd {
 .text-dialog .text-block { max-height: none; overflow: visible; }
 
 /* Quiet: tool calls without their output, no thinking. Verbose: every fold
-   open (but not images, which open a lightbox). */
+   open (images open the viewer). */
 .chat.verbosity-quiet .tool-body,
 .chat.verbosity-quiet .thinking { display: none; }
-.chat.verbosity-verbose details:not(.image)::details-content { content-visibility: visible; display: block; }
-.chat.verbosity-verbose details:not(.image) > summary > .preview { visibility: hidden; }
-.chat.verbosity-verbose details:not(.image) > summary > .label::before { transform: translateY(-1px) rotate(45deg); }
+.chat.verbosity-verbose details::details-content { content-visibility: visible; display: block; }
+.chat.verbosity-verbose details > summary > .preview { visibility: hidden; }
+.chat.verbosity-verbose details > summary > .label::before { transform: translateY(-1px) rotate(45deg); }
 
 .saved-accounts { display: flex; flex-direction: column; gap: 6px; }
 .saved-title { margin: 0; color: var(--muted); font-size: 12.5px; font-weight: 600; }
@@ -2308,3 +2308,14 @@ kbd {
   .modal.annotate-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
   .annotate-hint { display: none; }
 }
+/* The drawing's zoom: − % + (app/annotate_widget.ml), the frame placed by a
+   transform; the stage clips it. */
+.annotate-zoom { display: inline-flex; align-items: center; padding: 2px; border-radius: 9px; background: var(--slate-2); box-shadow: inset 0 0 0 1px var(--rule); }
+.annotate-zoom-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: transparent; color: var(--chalk); font: 600 11.5px var(--mono); cursor: pointer; }
+.annotate-zoom-btn .icon { width: 15px; height: 15px; }
+.annotate-zoom-btn:hover:not(:disabled) { background: var(--panel-3); }
+.annotate-zoom-btn:disabled { color: var(--faint-line); cursor: default; }
+.annotate-zoom-btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.annotate-zoom-pct { min-width: 50px; font-variant-numeric: tabular-nums; }
+.annotate-frame { transform-origin: 50% 50%; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .annotate-frame { transition: none !important; } }

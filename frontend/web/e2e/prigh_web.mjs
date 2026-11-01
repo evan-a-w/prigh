@@ -679,18 +679,19 @@ try {
   await showImages("the read tool's image", page.locator(".tool img.thumb"));
   // Opened, it covers the whole page, the composer's chips too; a chip's
   // menu keeps the chips over its backdrop.
-  await page.locator(".tool details.image summary").first().click();
-  await page.locator(".tool details.image[open] .lightbox").waitFor();
+  await page.locator(".tool button.image").first().click();
+  await page.locator("dialog.viewer[open] .viewer-img").waitFor();
   await page.waitForTimeout(200); // its fade
-  await showChips("an image open: the chips", ".lightbox");
-  await page.locator(".tool details.image[open] .lightbox").click();
-  await page.locator(".tool details.image[open]").waitFor({ state: "detached" });
+  await showChips("an image open: the chips", "dialog.viewer");
+  // A click beside the image closes it.
+  await page.mouse.click(8, 400);
+  await page.locator("dialog.viewer").waitFor({ state: "detached" });
   // Its Draw opens the drawing dialog, whose drawing would be attached.
-  await page.locator(".tool details.image summary").first().click();
-  await page.locator(".tool details.image[open] .lightbox-annotate").click();
+  await page.locator(".tool button.image").first().click();
+  await page.locator("dialog.viewer[open] .viewer-draw").click();
   await page.locator(".annotate-dialog #annotate-canvas").waitFor();
   section("drawing on the read tool's image");
-  console.log(`viewer closed: ${await page.locator("details.image[open]").count() === 0}`);
+  console.log(`viewer closed: ${await page.locator("dialog.viewer").count() === 0}`);
   console.log(clean(await page.locator(".annotate-dialog .modal-buttons").innerText()));
   await page.keyboard.press("Escape");
   await page.waitForSelector(".annotate-dialog", { state: "detached" });
