@@ -52,5 +52,47 @@ val of_base64
   -> string
   -> t Or_error.t
 
+(** What a model accepts per image. *)
+module Limit : sig
+  type t =
+    { max_base64_bytes : int
+    ; max_dimension : int (** pixels, either way *)
+    }
+  [@@deriving sexp, equal, compare, hash]
+
+  (** Anthropic's, with a margin: 4.5 MB of base64, 8000 px. *)
+  val default : t
+
+  (** ["3.4 MB, 8000 px"] (the decoded size) *)
+  val describe : t -> string
+
+  (** Stricter, for when a provider refused images within [t]: half the
+      bytes, and at most 2000 px, then three quarters of it (never under
+      256 KB or 512 px). *)
+  val tighten : t -> t
+
+  val min : t -> t -> t
+end
+
+(** Whether [t] is over [limit] in bytes or pixels. *)
+val exceeds : Limit.t -> t -> bool
+
+module Fitted : sig
+  type nonrec t =
+    | Fits
+    | Downscaled of t
+    | Cannot of string (** why, and what to do *)
+  [@@deriving sexp_of]
+end
+
+(** [t] downscaled to within [limit] when it is over it, like [load]. *)
+val fit
+  :  env:Env.t
+  -> ?cancel:Cancellation.t
+  -> ?search_path:string list
+  -> Limit.t
+  -> t
+  -> Fitted.t
+
 (** ["image/png, 800x600"] *)
 val describe : Loaded.t -> string

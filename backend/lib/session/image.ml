@@ -133,8 +133,15 @@ module Attempt = struct
 
   (* PNG keeps screenshots and diagrams sharp; JPEG is the fallback when that
      is still too large, and photos start there. *)
-  let all ~mime_type =
-    let sizes = [ max_dimension; 1500; 1000; 768 ] in
+  let all ?(largest = max_dimension) ~mime_type () =
+    let sizes =
+      match
+        List.filter [ max_dimension; 1500; 1000; 768; 512 ] ~f:(fun s ->
+          s < largest)
+      with
+      | sizes when largest <= max_dimension -> largest :: sizes
+      | sizes -> sizes
+    in
     List.concat_map sizes ~f:(fun size ->
       (if String.equal mime_type "image/jpeg"
        then []
@@ -168,7 +175,15 @@ module Attempt = struct
   ;;
 end
 
-let downscale ~env ~cancel ~program:(name, path) bytes ~mime_type =
+let downscale
+      ?largest
+      ?(max_base64_bytes = max_base64_bytes)
+      ~env
+      ~cancel
+      ~program:(name, path)
+      bytes
+      ~mime_type
+  =
   let dir = Filename_unix.temp_dir "prigh-image" "" in
   Exn.protect
     ~finally:(fun () ->
@@ -178,7 +193,7 @@ let downscale ~env ~cancel ~program:(name, path) bytes ~mime_type =
     ~f:(fun () ->
       let input = Filename.concat dir "input" in
       Out_channel.write_all input ~data:bytes;
-      List.find_map (Attempt.all ~mime_type) ~f:(fun attempt ->
+      List.find_map (Attempt.all ?largest ~mime_type ()) ~f:(fun attempt ->
         let output =
           Filename.concat dir ("output." ^ Attempt.extension attempt)
         in
@@ -285,6 +300,98 @@ let load
              (describe_size ())
              (fst program)
              (mb (max_base64_bytes * 3 / 4))))
+;;
+
+module Limit = struct
+  type t =
+    { max_base64_bytes : int
+    ; max_dimension : int
+    }
+  [@@deriving sexp, equal, compare, hash]
+
+  let default = { max_base64_bytes; max_dimension = hard_max_dimension }
+
+  let describe t =
+    sprintf "%.1f MB, %d px" (mb (t.max_base64_bytes * 3 / 4)) t.max_dimension
+  ;;
+
+  let tighten t =
+    { max_base64_bytes = Int.max 262_144 (t.max_base64_bytes / 2)
+    ; max_dimension =
+        Int.max 512 (Int.min max_dimension (t.max_dimension * 3 / 4))
+    }
+  ;;
+
+  let min a b =
+    { max_base64_bytes = Int.min a.max_base64_bytes b.max_base64_bytes
+    ; max_dimension = Int.min a.max_dimension b.max_dimension
+    }
+  ;;
+end
+
+let exceeds (limit : Limit.t) (t : t) =
+  String.length t.data > limit.max_base64_bytes
+  ||
+  (* The header is near the start (a JPEG's frame after its EXIF, at most
+     64 KB): only that is decoded, as this runs for every request. *)
+  let prefix = String.prefix t.data 131_072 in
+  let prefix = String.prefix prefix (String.length prefix / 4 * 4) in
+  match Base64.decode ~pad:false prefix with
+  | Error _ -> false
+  | Ok bytes ->
+    (match dimensions bytes with
+     | Some (w, h) -> w > limit.max_dimension || h > limit.max_dimension
+     | None -> false)
+;;
+
+module Fitted = struct
+  type t =
+    | Fits
+    | Downscaled of image
+    | Cannot of string
+  [@@deriving sexp_of]
+end
+
+let fit
+      ~env
+      ?(cancel = Cancellation.never)
+      ?(search_path =
+        String.split (Option.value (Sys.getenv "PATH") ~default:"") ~on:':')
+      (limit : Limit.t)
+      (t : t)
+  : Fitted.t
+  =
+  if not (exceeds limit t)
+  then Fits
+  else (
+    match Base64.decode t.data with
+    | Error (`Msg msg) -> Cannot ("its data is not valid base64: " ^ msg)
+    | Ok bytes ->
+      (match find_program ~search_path [ "magick"; "convert"; "sips" ] with
+       | None ->
+         Cannot
+           "no image tool to downscale it with: install ImageMagick (magick) \
+            where the backend runs"
+       | Some program ->
+         let mime_type = Option.value (sniff bytes) ~default:t.mime_type in
+         (match
+            downscale
+              ~largest:limit.max_dimension
+              ~max_base64_bytes:limit.max_base64_bytes
+              ~env
+              ~cancel
+              ~program
+              bytes
+              ~mime_type
+          with
+          | Some (out, mime_type) ->
+            Downscaled { mime_type; data = Base64.encode_string out }
+          | None ->
+            Cannot
+              (sprintf
+                 "%s could not make it fit (%s)"
+                 (fst program)
+                 (Limit.describe limit)))))
 ;;
 
 let of_base64 ~env ?search_path ~mime_type data =
