@@ -145,9 +145,9 @@ const visit = async (viewport, tag) => {
   page.on("console", m => { if (m.type() === "error" && !/favicon\.ico/.test(m.text())) errors.push(`console: ${m.text()}`); });
   page.on("pageerror", e => errors.push(`page: ${e.message}`));
   if (sessionUrl) {
-    await page.goto(sessionUrl);
+    await page.goto(sessionUrl, { timeout: 60000 });
     await page.waitForSelector("form input[type=password]");
-  } else await page.goto(url);
+  } else await page.goto(url, { timeout: 60000 });
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
