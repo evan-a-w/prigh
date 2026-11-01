@@ -79,11 +79,12 @@ let status_style (m : App.Model.t) ~inject =
       ("Where the activity, context, cost, thinking and mode show: "
        ^ Status_style.describe m.status_style
        ^ ".")
-    [ segmented
+    [ choice_list
         ~label:"Status"
         (List.map Status_style.all ~f:(fun s ->
            let name = Status_style.name s in
            ( Status_style.title s
+           , String.capitalize (Status_style.describe s)
            , sprintf "%s (/status-style %s)" (Status_style.describe s) name
            , Status_style.equal s m.status_style
            , inject (Action.Run ("/status-style " ^ name)) )))
@@ -147,7 +148,7 @@ let default_model (m : App.Model.t) ~inject =
   let current =
     match m.config with
     | None -> None
-    | Some { default_model = None; _ } -> Some "The backend's default"
+    | Some { default_model = None; _ } -> Some "the backend's default"
     | Some { default_model = Some key; default_thinking; _ } ->
       Some
         (match default_thinking with
@@ -788,15 +789,67 @@ let nav (m : App.Model.t) ~current ~inject =
     (List.map (Section.available ~superuser:(App.superuser m)) ~f:tab)
 ;;
 
+
+(* On a phone: the settings fill the screen, a list of the sections (each
+   with what it is about) and a level down to one, with a way back, rather
+   than a strip of tabs over a page. *)
+let phone_home (m : App.Model.t) ~inject =
+  let row (section : Section.t) =
+    let face, about =
+      match section, Account_view.who m with
+      | Account, Some who ->
+        span ~cls:"avatar" (Account_view.initial who.name), who.name
+      | _ -> icon (section_icon section), Section.about section
+    in
+    Node.button
+      ~attrs:
+        [ classes [ "settings-home-row"; "settings-tab-" ^ Section.arg section ] []
+        ; Attr.type_ "button"
+        ; Attr.create "data-settings-tab" (Section.arg section)
+        ; Attr.title ("/settings " ^ Section.arg section)
+        ; Attr.on_click (fun _ -> inject (Action.Settings_section section))
+        ]
+      [ Node.span ~attrs:[ Attr.class_ "settings-home-icon" ] [ face ]
+      ; Node.span
+          ~attrs:[ Attr.class_ "settings-home-text" ]
+          [ span ~cls:"settings-home-name" (Section.name section)
+          ; span ~cls:"settings-home-about" about
+          ]
+      ; icon ~cls:"settings-home-chevron" Chevron
+      ]
+  in
+  Node.nav
+    ~attrs:
+      [ Attr.class_ "settings-home"; Attr.create "aria-label" "Settings sections" ]
+    (List.map (Section.available ~superuser:(App.superuser m)) ~f:row)
+;;
+
+let panel (m : App.Model.t) current ~inject =
+  Node.div
+    ~key:(Section.arg current)
+    ~attrs:
+      [ classes [ "settings-panel"; "settings-panel-" ^ Section.arg current ] []
+      ; Attr.id "settings-panel"
+      ; (if m.narrow
+         then Attr.create "aria-label" (Section.name current)
+         else Attr.many [ Attr.role "tabpanel"; Attr.create "aria-labelledby" (Section.tab_id current) ])
+      ]
+    (Node.header
+       ~attrs:[ Attr.class_ "settings-panel-head" ]
+       [ Node.h3 [ Node.text (Section.name current) ]
+       ; Node.p [ Node.text (Section.about current) ]
+       ]
+     :: content m current ~inject)
+;;
+
 let view (m : App.Model.t) ~inject =
   let current =
     Section.visible m.settings_section ~superuser:(App.superuser m)
   in
-  Modal.view
-    ~cls:"settings-dialog"
-    ~title:"Settings"
-    ~on_close:(inject Action.Close_dialog)
-    ~footer:
+  let footer =
+    if m.narrow
+    then []
+    else
       [ button
           ~cls:"ghost shortcuts"
           ~title:"/hotkeys"
@@ -807,22 +860,26 @@ let view (m : App.Model.t) ~inject =
           ~on_click:(inject Action.Close_dialog)
           [ Node.text "Done" ]
       ]
-    [ nav m ~current ~inject
-    ; Node.div
-        ~key:(Section.arg current)
-        ~attrs:
-          [ classes
-              [ "settings-panel"; "settings-panel-" ^ Section.arg current ]
-              []
-          ; Attr.id "settings-panel"
-          ; Attr.role "tabpanel"
-          ; Attr.create "aria-labelledby" (Section.tab_id current)
-          ]
-        (Node.header
-           ~attrs:[ Attr.class_ "settings-panel-head" ]
-           [ Node.h3 [ Node.text (Section.name current) ]
-           ; Node.p [ Node.text (Section.about current) ]
-           ]
-         :: content m current ~inject)
-    ]
+  in
+  match m.narrow, m.settings_home with
+  | true, true ->
+    Modal.view
+      ~cls:"settings-dialog phone-page settings-home-page"
+      ~title:"Settings"
+      ~on_close:(inject Action.Close_dialog)
+      [ phone_home m ~inject ]
+  | true, false ->
+    Modal.view
+      ~cls:"settings-dialog phone-page settings-section-page"
+      ~title:(Section.name current)
+      ~back:("Settings", inject Action.Settings_home)
+      ~on_close:(inject Action.Close_dialog)
+      [ panel m current ~inject ]
+  | false, _ ->
+    Modal.view
+      ~cls:"settings-dialog"
+      ~title:"Settings"
+      ~on_close:(inject Action.Close_dialog)
+      ~footer
+      [ nav m ~current ~inject; panel m current ~inject ]
 ;;

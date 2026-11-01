@@ -2,7 +2,7 @@ open! Core
 open! Import
 open Html
 
-let view ?(cls = "") ?(id = "dialog") ?(footer = []) ~title ~on_close body =
+let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body =
   Node.div
     ~attrs:
       [ Attr.class_ "modal-backdrop"
@@ -22,14 +22,23 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ~title ~on_close body =
           ]
         [ Node.header
             ~attrs:[ Attr.class_ "modal-head" ]
-            [ Node.h2 [ Node.text title ]
+            ((match back with
+              | Some (label, on_back) ->
+                [ button
+                    ~cls:"ghost modal-back"
+                    ~title:label
+                    ~on_click:on_back
+                    [ icon Back; span ~cls:"modal-back-label" label ]
+                ]
+              | None -> [])
+             @ [ Node.h2 [ Node.text title ]
             ; button
                 ~cls:"icon ghost"
                 ~title:"Close (Esc)"
                 ~label:"Close"
                 ~on_click:on_close
                 [ icon Close ]
-            ]
+            ])
         ; div ~cls:"modal-body" body
         ; (match footer with
            | [] -> Node.none

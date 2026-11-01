@@ -317,7 +317,9 @@ try {
   section("jump: on a phone");
   console.log(`marks: ${await page.locator(".rail .tick").count()}`);
   await screenshot("jump phone");
-  await page.locator(".jump-list").click();
+  // The ⋯ sheet's row: a phone has no rail.
+  await page.locator(".more-toggle").click();
+  await page.locator(".jump-row").click();
   await page.locator(".picker-dialog").waitFor();
   console.log(`the list: ${await page.locator(".picker-dialog .picker-item").count()} messages`);
   await page.waitForTimeout(300);

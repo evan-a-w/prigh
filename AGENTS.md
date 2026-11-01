@@ -116,6 +116,14 @@ idle machine is broken).
 - prigh-web: drive `App.update` through the `Harness` in
   `frontend/web/test` and print the rendered HTML/text; the Playwright e2e
   (`frontend/web/e2e`) checks real browsers.
+- prigh-web on phones: every change to prigh-web is tested and its
+  screenshots looked at on phones too, not just a desktop: at least 390x844
+  and 320x640, portrait, with `isMobile` and `hasTouch` (Firefox has no
+  `isMobile`: the viewport and `hasTouch`), and as an installed PWA
+  (standalone, so the safe-area insets for the notch and the home indicator
+  apply). Consider the on-screen keyboard (the visual viewport shrinks) and
+  touch (no hover: whatever a hover shows has a tap). `e2e/mobile.mjs` checks
+  no page overflows sideways and no control is off screen or covered.
 
 ## UI principles
 
@@ -126,10 +134,19 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 - Every error tells you what to do next (closest matches, the command to run).
 - State is always visible: the status line shows model, thinking, context,
   cost, user, queued messages, agents, and any mode the UI is in (prigh-web
-  spreads these over the composer's chips and the status card at the foot
-  of the sidebar, or a slim bar over the chat when the sidebar is closed or
-  on a phone, and shows the user under that card, with the settings gear,
-  and on its settings page).
+  has no header: the model and host are the composer's chips, and the
+  activity, context, cost, thinking and mode sit where the status style puts
+  them (Settings → Appearance → Layout, /status-style: an island over the
+  chat, the default, a ring round send, a line under the composer, the
+  composer's border, the model chip or the sidebar's foot), each with one
+  details card; on a phone they sit in one strip across the top, under the
+  safe area, with the sidebar's ☰ and a ⋯ sheet of the panels and settings;
+  the user is at the foot of the sidebar and on its settings page).
+- Phones are first class (prigh-web is used as an installed PWA): one
+  strip of chrome, never pieces floating over each other or the text; menus
+  and the ⋯ are sheets from the bottom; settings fill the screen, a list of
+  sections with a way back; 44px targets, inputs at 16px (no zoom on
+  focus); the notch, home indicator and keyboard never cover a control.
 - Dialogs own the keyboard until closed; Esc closes without side effects,
   Enter accepts. Every binding is in the keymap, `/help` and a test.
 - Every action is acknowledged within one frame.

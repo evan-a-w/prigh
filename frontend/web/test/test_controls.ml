@@ -726,8 +726,8 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   H.elements h ~selector:".main > [inert]";
   [%expect
     {|
-    <div class="chat-chrome">
-    <div class="chat-chrome">
+    <div class="chat-chrome strip">
+    <div class="chat-chrome strip">
     <div class="chrome-anchor">
     <div class="chat-frame">
     <footer class="composer status-style-island">

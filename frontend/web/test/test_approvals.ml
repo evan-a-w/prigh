@@ -899,7 +899,7 @@ let%expect_test
     (Close (Esc))
     Ready?
     []
-    type your answer, ↑↓ choose, Enter accepts, Esc declines, 1 more waiting (Decline) (Send)
+    type your answer, ↑↓ choose, Enter accepts, Esc declines 1 more waiting (Decline) (Send)
     |}];
   H.key h "Escape" ~target:Page;
   modal h;

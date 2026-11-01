@@ -22,6 +22,10 @@ val rendered : unit -> unit
 (** Runs [f] whenever the window or visible viewport resizes or moves. *)
 val on_viewport_change : (unit -> unit) -> unit
 
+(** The visual viewport's height (what the user sees, over the on-screen
+    keyboard), if the browser has one. *)
+val visual_height : unit -> float option
+
 val href_with_backend
   :  pathname:string
   -> search:string

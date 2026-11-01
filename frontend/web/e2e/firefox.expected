@@ -521,7 +521,7 @@ Done waiting.
 model: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === firefox: phone: a chip's menu ===
-attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+attach's menu: a sheet across the bottom; focus in it: true
 === firefox: archived, folded ===
 one more
 <AGE>
@@ -782,7 +782,7 @@ ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-mo
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
 desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
-phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
+phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
 chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .chat-chrome: Ready, 0%, $<COST>; 44px high
@@ -2228,7 +2228,7 @@ transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed 
 transcript: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5, Step 6, Noted after the trim
 === firefox: trim: phone ===
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Cancel | Trim
 === firefox: trim: errors ===
 none
 === firefox: filter: opened ===
@@ -2281,9 +2281,9 @@ Filter the transcript; plain; badge none; next: Files
 === firefox: filter: image viewer ===
 #filter-toggle: under the image; .composer-controls .chip-button: under the image
 === firefox: filter: phone ===
-below the button: true; inside the window: true; focused: true
+a sheet across the bottom: true; inside the window: true; focused: true
 user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
-Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+Filter the transcript Hiding thinking, tool calls; on
 note: Hiding thinking, tool calls · 2 items hidden | Show all
 note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
@@ -2510,6 +2510,70 @@ sidebar card: Running tools | $<COST> | Context 36% full: the session's details 
 chrome buttons: Filter the transcript, Files, Terminal
 fits
 details cards: 1; header bar: none
+=== firefox: mobile: 390x844: the chat ===
+ok
+=== firefox: mobile: 390x844: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== firefox: mobile: 390x844: the ⋯ sheet ===
+ok
+=== firefox: mobile: 390x844: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== firefox: mobile: 390x844: the settings' list ===
+ok
+=== firefox: mobile: 390x844: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== firefox: mobile: 390x844: settings: appearance ===
+ok
+title: Appearance; back: Settings
+choice controls fit: true; the status styles a list: true
+back to the list: true
+=== firefox: mobile: 390x844: settings: models ===
+ok
+choice controls fit: true
+=== firefox: mobile: 390x844: the drawer ===
+ok
+=== firefox: mobile: 390x844: the model menu ===
+ok
+=== firefox: mobile: 390x844: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== firefox: mobile: 390x844: / completion ===
+ok
+=== firefox: mobile: 390x844: the files ===
+ok
+=== firefox: mobile: 320x640: the chat ===
+ok
+=== firefox: mobile: 320x640: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== firefox: mobile: 320x640: the ⋯ sheet ===
+ok
+=== firefox: mobile: 320x640: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== firefox: mobile: 320x640: the settings' list ===
+ok
+=== firefox: mobile: 320x640: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== firefox: mobile: 320x640: settings: appearance ===
+ok
+title: Appearance; back: Settings
+choice controls fit: true; the status styles a list: true
+back to the list: true
+=== firefox: mobile: 320x640: settings: models ===
+ok
+choice controls fit: true
+=== firefox: mobile: 320x640: the drawer ===
+ok
+=== firefox: mobile: 320x640: the model menu ===
+ok
+=== firefox: mobile: 320x640: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== firefox: mobile: 320x640: / completion ===
+ok
+=== firefox: mobile: 320x640: the files ===
+ok
 === firefox: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200

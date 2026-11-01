@@ -56,3 +56,12 @@ val segmented
   -> label:string
   -> (string * string * bool * unit Effect.t) list
   -> Node.t
+
+(** A segmented control whose choices are (name, a line about it, tooltip,
+    current, on click): on a phone a list of rows, the line under each name;
+    elsewhere the line is hidden. *)
+val choice_list
+  :  ?disabled:bool
+  -> label:string
+  -> (string * string * string * bool * unit Effect.t) list
+  -> Node.t

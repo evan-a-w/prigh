@@ -1,0 +1,422 @@
+/* prigh-web on a phone (.app.narrow: a window under 760px wide, or a phone
+   on its side), most often an installed PWA: no browser chrome, so the page
+   meets the status bar or notch at the top, the home indicator at the
+   bottom and, on its side, the notch at a side. The rules:
+
+   - One strip of chrome across the top, in the page's flow (not pieces
+     floating over the transcript or each other): the sidebar's ☰, the
+     status (or the session's name) and a ⋯ that opens a sheet.
+   - Menus, pickers and dialogs come up from the bottom as sheets, in reach
+     of a thumb; settings and the panels fill the screen.
+   - 44px targets, 16px inputs (iOS zooms into a smaller one), and nothing
+     under the notch, the home indicator or the keyboard (the app is as tall
+     as the visual viewport: --vvh, set by web_main.ml).
+   - No hover: what a hover shows has a tap (the status's details are the
+     session's dialog). */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --strip-h: 48px;
+  --tap: 44px;
+}
+
+/* The keyboard shrinks the visual viewport: the app shrinks with it, so the
+   composer stays on top of the keyboard (iOS ignores interactive-widget). */
+.app.narrow { height: var(--vvh, 100dvh); }
+.app.narrow .main { padding-left: var(--safe-l); padding-right: var(--safe-r); }
+
+/* {1 The strip} */
+
+.app.narrow .chrome-anchor { height: auto; flex: none; z-index: var(--z-tools); }
+.app.narrow .chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
+.app.narrow .chat-chrome.strip {
+  position: relative;
+  grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap);
+  align-items: center;
+  gap: 4px;
+  height: calc(var(--strip-h) + var(--safe-t));
+  padding: var(--safe-t) 4px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+}
+.app.narrow .chat-chrome.strip::before { display: none; }
+.app.narrow .main:has(.chat-chrome) .chat { padding-top: 12px; }
+/* Flat in the strip: no bubbles. */
+.app.narrow .chat-chrome.strip .chrome-button.round {
+  width: var(--tap);
+  height: var(--tap);
+  background: none;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: var(--r-control);
+}
+.app.narrow .chat-chrome.strip .chrome-button.round .icon { width: 20px; height: 20px; }
+.app.narrow .chat-chrome.strip .chrome-left:empty { visibility: hidden; }
+
+/* The session's name, where the status is not in the strip. */
+.chrome-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--chalk);
+  text-align: center;
+}
+
+/* The island, flat in the middle of the strip: the activity, the context,
+   the thinking and the mode, each its own target. */
+.app.narrow .chat-chrome.strip .status-island {
+  height: var(--tap);
+  max-width: 100%;
+  padding: 0;
+  gap: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: 13px;
+}
+.app.narrow .chat-chrome.strip .status-island.busy { box-shadow: none; }
+.app.narrow .chat-chrome.strip .status-island > .status-gauge { height: 100%; min-width: 0; }
+.app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity { width: 11ch; max-width: none; flex: none; padding-right: 10px; }
+.app.narrow .chat-chrome.strip .status-island .status-item.context { height: 100%; padding: 0 10px; }
+.app.narrow .chat-chrome.strip .status-island .island-chips { height: 100%; align-items: center; gap: 0; }
+.app.narrow .chat-chrome.strip .status-island .island-chips .chip-button { height: 36px; min-width: 36px; padding: 0 8px; justify-content: center; }
+.app.narrow .chat-chrome.strip .status-island > .status-gauge > * + :not(.status-details),
+.app.narrow .chat-chrome.strip .status-island .island-chips { border-left-color: var(--rule); }
+@media (max-width: 359px) {
+  .app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity > .label { display: none; }
+}
+
+/* No hover on a phone: the details card would stick after a tap. Tapping
+   the context opens the session's details, which has it all. */
+@media (hover: none) {
+  .status-details { display: none !important; }
+}
+
+/* The jump list is in the ⋯ sheet; the marks are a desktop's. */
+.app.narrow .chat-frame > .jump-nav { display: none; }
+
+/* {1 Sheets}
+
+   Whatever opens from a button on a phone comes up from the bottom, full
+   width, with a grip and room for the home indicator. */
+
+.app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover) {
+  position: fixed !important;
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: min(78dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 24px)) !important;
+  margin: 0;
+  translate: none !important;
+  transform: none;
+  border-radius: 16px 16px 0 0 !important;
+  border-width: 1px 0 0;
+  padding-bottom: max(8px, var(--safe-b));
+  padding-left: max(8px, var(--safe-l));
+  padding-right: max(8px, var(--safe-r));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-menu-surface);
+  animation: sheet-up 0.18s ease-out;
+  box-shadow: 0 -12px 40px -12px var(--edge-shadow);
+}
+.app.narrow .chip-popover { display: flex; }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) {
+  .app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover) { animation: none; }
+}
+/* What is behind a sheet dims. */
+.app.narrow :is(.chrome-backdrop, .menu-backdrop) { background: var(--scrim); }
+.app.narrow .chip-anchor.open::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-menu);
+  background: var(--scrim);
+}
+.app.narrow .menu-item,
+.app.narrow .chip-popover :is(.popover-item, .menu-item, .picker-item) { min-height: var(--tap); }
+.app.narrow .chip-popover input,
+.app.narrow .popover-filter input { font-size: 16px; }
+
+/* The ⋯ sheet: what applies, then a labelled row each. */
+.sheet-grip { display: none; }
+.app.narrow .sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto 6px; border-radius: 2px; background: var(--rule-2); flex: none; }
+.app.narrow .chrome-menu.sheet { gap: 0; padding-top: 8px; min-width: 0; }
+.app.narrow .chrome-menu.sheet > .status-notes { flex-direction: column; align-items: stretch; gap: 0; padding: 0 0 6px; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid var(--rule); }
+.app.narrow .chrome-menu.sheet > .status-notes > * { min-height: var(--tap); display: flex; align-items: center; padding: 0 12px; max-width: none; }
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--chalk);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.sheet-row:active, .sheet-row:hover { background: var(--slate-2); }
+.sheet-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted); }
+.sheet-row.on > .icon { color: var(--sodium); }
+.sheet-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sheet-row-detail { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-row .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--sodium); color: var(--on-sodium, #000); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.sheet-row.settings-row { border-top: 1px solid var(--rule); border-radius: 0; margin-top: 6px; padding-top: 2px; }
+
+/* {1 The composer} */
+
+.app.narrow .composer { padding-bottom: max(8px, var(--safe-b)); padding-left: max(8px, var(--safe-l)); padding-right: max(8px, var(--safe-r)); }
+/* 16px: iOS zooms the page into a field under that, and stays zoomed. */
+.app.narrow :is(textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select) { font-size: 16px; }
+.app.narrow .composer :is(.chip-button, .btn.icon) { min-height: 40px; }
+.app.narrow .composer .btn.icon { min-width: 40px; }
+.app.narrow .composer .chip-button { padding-left: 10px; padding-right: 10px; }
+/* The / and @ completions: as tall as the room over the keyboard allows. */
+.app.narrow .popup-items { max-height: min(300px, calc(var(--vvh, 100dvh) * 0.42)); }
+.app.narrow .popup-item { min-height: var(--tap); align-items: center; }
+.app.narrow .popup-keys { display: none; }
+
+.app.narrow .toasts { bottom: calc(100% + 8px); }
+/* Over the jump to the bottom, not on it. */
+.app.narrow:has(.jump-to-bottom) .toasts { bottom: calc(100% + 56px); }
+
+/* {1 Dialogs: full-screen pages}
+
+   A phone's dialog fills the screen, its title in a bar like the strip, its
+   buttons at the foot over the home indicator. Small confirmations stay a
+   sheet from the bottom. */
+
+.app.narrow .modal-backdrop { padding: 0; align-items: flex-end; }
+.app.narrow .modal {
+  width: 100%;
+  max-width: none;
+  max-height: calc(var(--vvh, 100dvh) - var(--safe-t) - 12px);
+  border-radius: 16px 16px 0 0;
+  border-width: 1px 0 0;
+  animation: sheet-up 0.18s ease-out;
+}
+.app.narrow .modal-head { min-height: var(--strip-h); padding: 4px 4px 4px 16px; gap: 4px; }
+.app.narrow .modal-head h2 { font-size: 16px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app.narrow .modal-head > .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .modal-body { padding-left: max(16px, var(--safe-l)); padding-right: max(16px, var(--safe-r)); scrollbar-gutter: auto; overscroll-behavior: contain; }
+.app.narrow .modal-buttons { padding: 10px max(16px, var(--safe-r)) max(10px, var(--safe-b)) max(16px, var(--safe-l)); flex-wrap: wrap; }
+.app.narrow .modal-buttons .btn { min-height: var(--tap); }
+.app.narrow .modal-body:last-child { padding-bottom: max(14px, var(--safe-b)); }
+.app.narrow .picker-item { min-height: var(--tap); }
+
+/* Pickers, help, the session's details and the settings: the whole screen. */
+.app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) {
+  height: var(--vvh, 100dvh);
+  max-height: none;
+  border-radius: 0;
+  border: 0;
+  padding-top: var(--safe-t);
+  animation: page-in 0.18s ease-out;
+}
+@keyframes page-in { from { transform: translateX(16px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .app.narrow .modal { animation: none !important; } }
+.app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) > .modal-head { border-bottom: 1px solid var(--rule); }
+.app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) > .modal-body { flex: 1 1 auto; }
+
+/* A level down: back at the left, the title, the close at the right. */
+.modal-back { display: none; }
+.app.narrow .modal-head:has(.modal-back) { padding-left: 4px; }
+.app.narrow .modal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--tap);
+  padding: 0 10px 0 6px;
+  margin-right: 2px;
+  color: var(--sodium);
+  font-size: 15px;
+  flex: none;
+}
+.app.narrow .modal-back .icon { width: 20px; height: 20px; }
+@media (max-width: 359px) { .app.narrow .modal-back-label { display: none; } }
+
+/* {1 Settings} */
+
+.app.narrow .settings-dialog .modal-body { display: block; padding: 0; overflow-y: auto; }
+.app.narrow .settings-dialog .settings-nav { display: none; }
+.app.narrow .settings-panel { overflow: visible; padding: 16px max(16px, var(--safe-r)) max(24px, var(--safe-b)) max(16px, var(--safe-l)); animation: none; }
+/* The title is in the bar; the page's own head says what it is about. */
+.app.narrow .settings-section-page .settings-panel-head h3 { display: none; }
+.app.narrow .settings-panel-head p { margin-top: 0; font-size: 14px; }
+
+.settings-home { display: flex; flex-direction: column; padding: 12px max(12px, var(--safe-r)) max(16px, var(--safe-b)) max(12px, var(--safe-l)); gap: 0; }
+.settings-home-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 10px 8px 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: none;
+  color: var(--chalk);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-home-row:first-child { border-top: 0; }
+.settings-home-row:active, .settings-home-row:hover { background: var(--slate-2); border-radius: var(--r-control); }
+.settings-home-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; border-radius: var(--r-control); }
+.settings-home-row.settings-tab-account { margin-top: 18px; border-top: 0; background: var(--well); border-radius: var(--r-surface); }
+.settings-home-icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--slate-2);
+  color: var(--sodium);
+}
+.settings-home-icon .icon { width: 18px; height: 18px; }
+.settings-home-icon .avatar { width: 34px; height: 34px; font-size: 15px; }
+.settings-home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-home-name { font-size: 16px; font-weight: 600; }
+.settings-home-about { font-size: 13px; color: var(--muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.settings-home-chevron { width: 18px; height: 18px; flex: none; color: var(--faint); transform: rotate(-90deg); }
+
+/* Rows: the words over the control, the control the full width. */
+.app.narrow .settings-card { padding: 0 14px; }
+.app.narrow .setting { padding: 14px 0; }
+.app.narrow .setting:not(.setting-wide) .setting-text { flex-basis: 100%; }
+.app.narrow .setting .segmented { display: grid; grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); width: 100%; min-width: 0; }
+.app.narrow .setting .setting-control { min-width: 0; max-width: 100%; }
+.app.narrow .setting .segmented > * { min-height: 40px; font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
+.app.narrow .setting :is(.btn, select, .chip-button) { min-height: 40px; }
+.app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
+.app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
+.app.narrow .settings-group h4 { font-size: 12px; }
+/* A wide row is the words, then the control: neither grows into a gap. */
+.app.narrow .setting-wide { flex-wrap: nowrap; }
+.app.narrow .setting-wide .setting-text { flex: none; }
+/* A segmented control takes the row's width, its choices an even grid. */
+.app.narrow .setting .setting-control:has(> .segmented) { flex: 1 1 100%; margin-left: 0; }
+.app.narrow .setting .segmented > .segment { min-height: 44px; padding: 6px 8px; }
+/* Many or long choices (the status styles): a list of rows, each its name
+   over a line about it, a radio's ring before them. */
+.choice-list .segment-about { display: none; }
+.app.narrow .setting .segmented.choice-list { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 3px; }
+.app.narrow .segmented.choice-list > .segment {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+  justify-content: stretch;
+  text-align: left;
+  padding: 9px 12px;
+  min-height: 52px;
+  white-space: normal;
+}
+.app.narrow .segmented.choice-list > .segment::before {
+  content: "";
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--rule-2);
+}
+.app.narrow .segmented.choice-list > .segment.on::before { border: 5px solid var(--sodium); }
+.app.narrow .choice-list .segment-name { font-size: 15px; font-weight: 600; color: var(--chalk); }
+.app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
+/* Compaction's threshold field: one line, the number and its unit centred. */
+.app.narrow .segmented:has(.compact-at-field) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.app.narrow .compact-at-field { justify-content: center; white-space: nowrap; padding: 0 8px; }
+.app.narrow .compact-at-input { width: 6ch; font-size: 16px; }
+.app.narrow .compact-at-unit { white-space: nowrap; }
+/* Tabs never show on a phone: their switch is for the desktop. */
+.app.narrow .setting.tabs { display: none; }
+
+/* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
+.app.narrow .keyboard { display: none !important; }
+@media (hover: none) and (pointer: coarse) { .keyboard { display: none !important; } }
+
+/* {1 The drawer} */
+
+.app.narrow .sidebar {
+  width: min(86vw, 340px);
+  padding-top: var(--safe-t);
+  padding-bottom: var(--safe-b);
+  padding-left: max(10px, var(--safe-l));
+  padding-right: 10px;
+  overscroll-behavior: contain;
+}
+.app.narrow .sidebar-head { min-height: var(--strip-h); }
+.app.narrow .sidebar :is(.btn, .session-row, .sidebar-footer button) { min-height: var(--tap); }
+.app.narrow .sidebar .btn.icon { min-width: var(--tap); }
+.app.narrow .sidebar input { font-size: 16px; min-height: var(--tap); }
+/* No gutter for an overlay scrollbar: the rows line up with the search. */
+.app.narrow .sessions { margin: 0; padding: 0 0 8px; scrollbar-gutter: auto; }
+
+/* {1 Panels: full screen, under the safe area} */
+
+.app.narrow :is(.files-panel, .agents-panel, .terminal-panel) { padding-top: var(--safe-t); padding-bottom: var(--safe-b); padding-left: var(--safe-l); padding-right: var(--safe-r); }
+.app.narrow :is(.files-head, .agents-head, .terminal-head, .files-preview-head) .btn.icon { min-width: 40px; min-height: 40px; }
+
+/* {1 The image viewer and drawing} */
+
+.app.narrow .modal.annotate-dialog { height: var(--vvh, 100dvh); padding-top: var(--safe-t); padding-bottom: var(--safe-b); border-radius: 0; border: 0; }
+
+/* {1 Long words} */
+
+.app.narrow :is(.message, .tool, .modal-body, .settings-panel) { overflow-wrap: anywhere; }
+/* A code block scrolls sideways in its own box; nothing else does. */
+.app.narrow .code pre { overflow-wrap: normal; }
+
+/* {1 The composer's row on a phone}
+
+   The model's name has the room: the thinking and mode chips beside it (the
+   ring's and the border's styles) show only their marks. */
+.app.narrow .row-chips .chip-label { display: none; }
+.app.narrow .row-chips .chip-button { min-width: 36px; padding: 0 8px; justify-content: center; }
+.app.narrow .status-whisper { padding-left: max(14px, var(--safe-l)); padding-right: max(14px, var(--safe-r)); }
+/* A tool's line is the toggle for its output: a thumb's height. */
+.app.narrow .tool-head { min-height: 36px; }
+
+/* {1 Thumb-sized, the rest of the way} */
+.app.narrow .composer-buttons .send { width: 40px; height: 40px; }
+.app.narrow .chip-anchor.host > .host-chip { min-width: 40px; }
+.app.narrow button.copy { min-height: 36px; padding: 0 12px; }
+.app.narrow .accent-choice { min-width: 40px; min-height: 40px; justify-content: center; }
+.app.narrow .modal-back { min-width: 44px; justify-content: center; }
+/* A group's title and its note, one over the other on a narrow page. */
+.app.narrow .settings-group-head { flex-wrap: wrap; row-gap: 2px; }
+.app.narrow .settings-group-note { flex-basis: 100%; }
+/* The files: the head's buttons and the path's parts a thumb's height. */
+.app.narrow .files-head .btn.icon { width: 44px; height: 44px; }
+.app.narrow .files-crumb { min-height: 36px; display: inline-flex; align-items: center; padding: 0 6px; }
+.app.narrow .account-button { margin-left: 0; min-height: 44px; }
+.app.narrow .files-sort { min-height: 36px; }
+
+/* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
+.app.narrow :is(.help-table, .help-table tbody, .help-table tr) { display: block; width: auto; }
+.app.narrow .help-table td { display: block; width: auto; padding: 0; overflow-wrap: normal; }
+.app.narrow .help-table td:first-child { width: auto; padding: 8px 0 2px; white-space: normal; }
+.app.narrow .help-table td + td { padding-bottom: 8px; border-top: 0; }
+.app.narrow .help-table kbd { white-space: normal; overflow-wrap: normal; }
