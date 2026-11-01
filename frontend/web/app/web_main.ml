@@ -1072,6 +1072,7 @@ let install_listeners ~schedule ~current =
         else read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ~schedule;
+  Gesture_listeners.install ~schedule;
   Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;
   Downsize.install ~schedule;

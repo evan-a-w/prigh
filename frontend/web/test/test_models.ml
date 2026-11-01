@@ -213,7 +213,7 @@ let%expect_test
      user"
   =
   let h = H.create () in
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   [%expect
     {|
@@ -227,8 +227,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     |}];
   H.act
     h
@@ -242,7 +240,7 @@ let%expect_test
   H.event
     h
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   H.text h ~selector:".card-where";
   [%expect
@@ -263,8 +261,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     |}];
   H.show h ~selector:".context";
   [%expect
@@ -319,6 +315,16 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
+    Working (75%) $1.23
+    Status Working
+    Context 150k / 200k · 75%
+    Tokens 123k in · 7.9k out · 100k cached
+    Cost $1.2345
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
     (Dictate (speak, then click again to stop)) (Stop (Esc))
     |}];
   H.type_ h "half-written";

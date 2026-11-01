@@ -95,6 +95,7 @@ module Icon : sig
     | Fit
     | Download
     | Prev
+    | Lines (** the transcript's verbosity *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

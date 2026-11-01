@@ -72,7 +72,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     <aside class="sidebar">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}];
   H.key h "Escape" ~target:Page;
   inert ();
@@ -93,7 +93,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     <aside class="sidebar">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     <aside class="agents-panel">
     |}];
   H.key h "Escape" ~target:Page;
@@ -220,7 +220,6 @@ let%expect_test "help lists every key and command" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /tabs [on|off] show the open sessions as tabs over the chat (saved for your account)
-    /status-style [island|ring|whisper|border|hub|sidebar] where the status sits: context, cost, thinking and mode (saved for your account)
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
@@ -598,10 +597,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.open-tabs web.review history
+         web.migrated web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -681,7 +680,7 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     <aside class="sidebar">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}];
   H.act h Toggle_subagents;
   inert ();

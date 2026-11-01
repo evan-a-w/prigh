@@ -7,6 +7,7 @@ let title : Chip.t -> string = function
   | Model -> "Model"
   | Thinking -> "Thinking"
   | Mode -> "When tools ask first"
+  | Verbosity -> "Transcript"
   | Host -> "Where tools run"
   | Attach -> "Add to your message"
 ;;
@@ -15,6 +16,7 @@ let shortcut : Chip.t -> string = function
   | Model -> "Ctrl+L"
   | Thinking -> "Alt+T cycles"
   | Mode -> "Alt+M cycles"
+  | Verbosity -> "Ctrl+O cycles"
   | Host -> "/host"
   | Attach -> "or paste, or drop"
 ;;
@@ -51,7 +53,7 @@ let row
   let model =
     match (chip : Chip.t) with
     | Model -> List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    | Thinking | Mode | Host | Attach -> None
+    | Thinking | Mode | Verbosity | Host | Attach -> None
   in
   let detail =
     match model with
@@ -103,7 +105,7 @@ let row
            ~attrs:[ Attr.title "Context window, in tokens" ]
            (App.compact_tokens l.context_window)
        | Thinking, _ -> meter item.id
-       | (Model | Mode | Host | Attach), _ -> Node.none)
+       | (Model | Mode | Verbosity | Host | Attach), _ -> Node.none)
     ]
 ;;
 
@@ -168,26 +170,34 @@ let host_note (m : App.Model.t) =
   | _ -> None
 ;;
 
-(* The model chip's menu with the status as the hub ({!Status_style.Hub}):
-   under the models, the thinking level, the mode and the usage, each a row
-   of choices that leaves the menu open. *)
-let hub_sections (m : App.Model.t) ~inject =
+(* The session's settings as rows of choices, each leaving the rest open:
+   the thinking level, the mode, the transcript's verbosity, and the usage.
+   On a phone they are in the ⋯ sheet (the composer's row has no room for
+   their chips). *)
+let session_sections (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
   | Some state ->
-    let section name ?(note = "") body =
+    let section name ~glyph ?(note = "") body =
       Node.div
-        ~attrs:[ Attr.class_ "hub-section"; Attr.role "group"; Attr.create "aria-label" name ]
+        ~attrs:
+          [ Attr.class_ "session-section"
+          ; Attr.role "group"
+          ; Attr.create "aria-label" name
+          ]
         [ div
-            ~cls:"hub-head"
-            [ span ~cls:"hub-title" name; span ~cls:"popover-shortcut" note ]
+            ~cls:"session-section-head"
+            [ icon glyph
+            ; span ~cls:"session-section-title" name
+            ; span ~cls:"session-section-note" note
+            ]
         ; body
         ]
     in
     let choice ~current ~label ~title ~on_click =
       Node.button
         ~attrs:
-          [ classes [ "hub-choice" ] [ "on", current ]
+          [ classes [ "session-choice" ] [ "on", current ]
           ; Attr.type_ "button"
           ; Attr.title title
           ; Attr.create "aria-pressed" (Bool.to_string current)
@@ -202,9 +212,10 @@ let hub_sections (m : App.Model.t) ~inject =
         let level = Option.value m.pending.thinking ~default:state.thinking in
         section
           "Thinking"
-          ~note:"Alt+T"
+          ~glyph:Brain
+          ~note:level
           (div
-             ~cls:"hub-choices"
+             ~cls:"session-choices"
              (List.map App.thinking_levels ~f:(fun l ->
                 choice
                   ~current:(String.equal l level)
@@ -218,9 +229,10 @@ let hub_sections (m : App.Model.t) ~inject =
       in
       section
         "Mode"
-        ~note:"Alt+M"
+        ~glyph:Shield
+        ~note:(Session_mode.describe current)
         (div
-           ~cls:"hub-choices"
+           ~cls:"session-choices"
            (List.map (Session_mode.choices ~current) ~f:(fun mode ->
               choice
                 ~current:(Session_mode.equal mode current)
@@ -228,19 +240,34 @@ let hub_sections (m : App.Model.t) ~inject =
                 ~title:(Session_mode.describe mode)
                 ~on_click:(inject (Action.Set_mode mode)))))
     in
+    let verbosity =
+      section
+        "Transcript"
+        ~glyph:Lines
+        (div
+           ~cls:"session-choices"
+           (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
+              let name = Prigh_ui.Verbosity.name v in
+              choice
+                ~current:(Prigh_ui.Verbosity.equal v m.verbosity)
+                ~label:name
+                ~title:(sprintf "Transcript: %s (/verbosity %s)" name name)
+                ~on_click:(inject (Action.Run ("/verbosity " ^ name))))))
+    in
     let usage =
       section
         "Usage"
+        ~glyph:Ring
         (div
-           ~cls:"hub-usage"
+           ~cls:"session-usage"
            [ (match Status_view.context_percent state with
               | Some percent ->
                 Node.span
-                  ~attrs:[ Attr.class_ "hub-context" ]
+                  ~attrs:[ Attr.class_ "session-context" ]
                   [ Status_view.meter percent
                   ; span ~cls:"percent" (sprintf "%.0f%%" percent)
                   ; span
-                      ~cls:"hub-of"
+                      ~cls:"session-of"
                       (sprintf
                          "%s / %s"
                          (Status_view.tokens state.context_tokens)
@@ -248,15 +275,9 @@ let hub_sections (m : App.Model.t) ~inject =
                   ]
               | None -> Node.none)
            ; Status_view.cost state ~inject
-           ; span
-               ~cls:"hub-tokens"
-               (sprintf
-                  "%s in · %s out"
-                  (Status_view.tokens state.usage.input)
-                  (Status_view.tokens state.usage.output))
            ])
     in
-    div ~cls:"hub-sections" [ thinking; mode; usage ]
+    div ~cls:"session-sections" [ thinking; mode; verbosity; usage ]
 ;;
 
 let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
@@ -289,7 +310,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ])
+           | Thinking | Mode | Verbosity | Attach -> [ Attr.tabindex 0; active ])
         (rows m ~chip p ~inject)
   in
   Node.div
@@ -302,6 +323,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            | Model -> "model"
            | Thinking -> "thinking"
            | Mode -> "mode"
+           | Verbosity -> "verbosity"
            | Host -> "host"
            | Attach -> "attach")
       ; Attr.role "dialog"
@@ -312,7 +334,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           let what =
             match chip with
             | Host -> "hosts"
-            | Model | Thinking | Mode | Attach -> "models"
+            | Model | Thinking | Mode | Verbosity | Attach -> "models"
           in
           div
             ~cls:"popover-search"
@@ -337,7 +359,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
                 ()
             ; span ~cls:"popover-shortcut" (shortcut chip)
             ]
-        | Thinking | Mode | Attach ->
+        | Thinking | Mode | Verbosity | Attach ->
           div
             ~cls:"popover-head"
             [ span ~cls:"popover-title" (title chip)
@@ -348,16 +370,13 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
      @ Option.to_list
          (match chip with
           | Host -> host_note m
-          | Model | Thinking | Mode | Attach -> None)
-     @ (match chip, m.status_style with
-        | Model, Hub -> [ hub_sections m ~inject ]
-        | _ -> [])
+          | Model | Thinking | Mode | Verbosity | Attach -> None)
      @ [ div
            ~cls:"menu-keys"
            [ Node.text
                (match chip with
                 | Attach -> "Enter chooses, Esc closes"
-                | Model | Thinking | Mode | Host ->
+                | Model | Thinking | Mode | Verbosity | Host ->
                   "Enter chooses, ← → the next setting, Esc closes")
            ]
        ])

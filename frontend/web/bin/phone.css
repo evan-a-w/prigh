@@ -58,43 +58,19 @@
 .app.narrow .chat-chrome.strip .chrome-button.round .icon { width: 20px; height: 20px; }
 .app.narrow .chat-chrome.strip .chrome-left:empty { visibility: hidden; }
 
-/* The session's name, where the status is not in the strip. */
+/* The session's name, between the strip's buttons. */
 .chrome-title {
   margin: 0;
   min-width: 0;
+  padding: 0 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.005em;
   color: var(--chalk);
   text-align: center;
-}
-
-/* The island, flat in the middle of the strip: the activity, the context,
-   the thinking and the mode, each its own target. */
-.app.narrow .chat-chrome.strip .status-island {
-  height: var(--tap);
-  max-width: 100%;
-  padding: 0;
-  gap: 0;
-  background: none;
-  border: 0;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  font-size: 13px;
-}
-.app.narrow .chat-chrome.strip .status-island.busy { box-shadow: none; }
-.app.narrow .chat-chrome.strip .status-island > .status-gauge { height: 100%; min-width: 0; }
-.app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity { width: 11ch; max-width: none; flex: none; padding-right: 10px; }
-.app.narrow .chat-chrome.strip .status-island .status-item.context { height: 100%; padding: 0 10px; }
-.app.narrow .chat-chrome.strip .status-island .island-chips { height: 100%; align-items: center; gap: 0; }
-.app.narrow .chat-chrome.strip .status-island .island-chips .chip-button { height: 36px; min-width: 36px; padding: 0 8px; justify-content: center; }
-.app.narrow .chat-chrome.strip .status-island > .status-gauge > * + :not(.status-details),
-.app.narrow .chat-chrome.strip .status-island .island-chips { border-left-color: var(--rule); }
-@media (max-width: 359px) {
-  .app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity > .label { display: none; }
 }
 
 /* No hover on a phone: the details card would stick after a tap. Tapping
@@ -141,13 +117,12 @@
 }
 /* What is behind a sheet dims. */
 .app.narrow :is(.chrome-backdrop, .menu-backdrop) { background: var(--scrim); }
-.app.narrow .chip-anchor.open::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-menu);
-  background: var(--scrim);
-}
+/* A chip's sheet dims the page itself (below), chips and all. */
+.app.narrow .popover-backdrop { background: none; }
+/* The chips over the backdrop dim with the rest. A shadow, not a layer:
+   a tap outside the sheet goes through it to the backdrop, which closes
+   the menu (a layer of the chip's own swallowed it). */
+.app.narrow .chip-anchor.open > .chip-popover { box-shadow: 0 0 0 100vmax var(--scrim), 0 -12px 40px -12px var(--edge-shadow) !important; }
 .app.narrow .menu-item,
 .app.narrow .chip-popover :is(.popover-item, .menu-item, .picker-item) { min-height: var(--tap); }
 .app.narrow .chip-popover input,
@@ -391,11 +366,17 @@
 
 /* {1 The composer's row on a phone}
 
-   The model's name has the room: the thinking and mode chips beside it (the
-   ring's and the border's styles) show only their marks. */
-.app.narrow .row-chips .chip-label { display: none; }
-.app.narrow .row-chips .chip-button { min-width: 36px; padding: 0 8px; justify-content: center; }
-.app.narrow .status-whisper { padding-left: max(14px, var(--safe-l)); padding-right: max(14px, var(--safe-r)); }
+   + · the model (its name has the room) · the host's mark | the status's
+   ring and percent · the microphone · send. The thinking level, the mode
+   and the verbosity are in the ⋯ sheet's sections. */
+.app.narrow .row-chips { display: none; }
+.app.narrow .composer-controls { flex: 1 1 auto; }
+.app.narrow .composer-status { margin-left: auto; }
+.app.narrow .composer-status .status-item.cost,
+.app.narrow .composer-status.busy .status-item.activity > .label { display: none; }
+.app.narrow .composer-status > .status-gauge { height: 40px; padding: 0 2px 0 10px; font-size: 12px; }
+.app.narrow .composer-status .status-item.link { height: 40px; padding: 0 8px 0 4px; }
+.app.narrow .composer-status .ring.mini { width: 15px; height: 15px; }
 /* A tool's line is the toggle for its output: a thumb's height. */
 .app.narrow .tool-head { min-height: 36px; }
 
@@ -420,3 +401,65 @@
 .app.narrow .help-table td:first-child { width: auto; padding: 8px 0 2px; white-space: normal; }
 .app.narrow .help-table td + td { padding-bottom: 8px; border-top: 0; }
 .app.narrow .help-table kbd { white-space: normal; overflow-wrap: normal; }
+
+/* {1 Drags}
+
+   What a finger can drag says so: sheets have a grip, and the page lets the
+   browser scroll only the way the drag is not. */
+
+.session-swipe { display: none; }
+.app.narrow .session { position: relative; overflow: hidden; }
+.app.narrow .session > :not(.session-swipe) { transform: translateX(var(--swipe-x, 0px)); transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.app.narrow .session.swiping > :not(.session-swipe) { transition: none; }
+.app.narrow .session:is(.swiping, .swiped) > .session-swipe {
+  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  overflow: hidden;
+  justify-content: flex-end;
+}
+.app.narrow .session.swiped > .session-swipe { width: 148px; transition: width 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.session-swipe-action {
+  flex: none;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  font: 12px var(--sans);
+  color: var(--ink);
+  background: var(--slate-2);
+}
+.session-swipe-action .icon { width: 18px; height: 18px; }
+.session-swipe-action.delete { background: var(--brick); color: #fff; }
+.app.narrow .sidebar { touch-action: pan-y; }
+.app.narrow .scrim { touch-action: none; }
+.app.narrow .pending-image { touch-action: pan-x; }
+@media (prefers-reduced-motion: reduce) {
+  .app.narrow .session > :not(.session-swipe), .app.narrow .session.swiped > .session-swipe { transition: none; }
+}
+
+/* Every sheet has the ⋯ sheet's grip: drag it down to close. */
+.app.narrow :is(.chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover)::before {
+  content: "";
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 6px;
+  border-radius: 2px;
+  background: var(--rule-2);
+}
+.app.narrow .session:is(.swiping, .swiped) > :is(.session-actions, .fold) { visibility: hidden; }
+/* The narrowest phones: the percent says it, the ring goes; the model's
+   name gets the room. */
+@media (max-width: 359px) {
+  .app.narrow .composer-status .ring.mini { display: none; }
+  .app.narrow .composer-status > .status-gauge { padding-left: 4px; }
+  .app.narrow .composer-status .status-item.link { padding: 0 4px; }
+}

@@ -584,8 +584,8 @@ kbd {
 .scrim { display: none; }
 
 
-/* The thinking level and the mode: figures like the status's, not buttons,
-   until pointed at; their menus open below them. A mode where nothing asks
+/* The thinking level, the mode and the verbosity: quiet words, not buttons,
+   until pointed at; their menus open over them. A mode where nothing asks
    is lit, as is plan. */
 .session-chips { display: flex; align-items: center; gap: 2px; flex-shrink: 0; position: relative; }
 .session-chips .chip-button {
@@ -600,12 +600,6 @@ kbd {
 .session-chips .chip-button:not(.awaiting):is(:hover, :focus-visible),
 .session-chips .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
 .session-chips .chip-button .icon { width: 12px; height: 12px; }
-.session-chips .thinking-chip .thinking-meter { height: 10px; }
-.session-chips .thinking-chip .thinking-meter > .bar.on { background: currentColor; }
-.session-chips .thinking-chip .thinking-meter > .bar:nth-child(1) { height: 3px; }
-.session-chips .thinking-chip .thinking-meter > .bar:nth-child(2) { height: 5px; }
-.session-chips .thinking-chip .thinking-meter > .bar:nth-child(3) { height: 7.5px; }
-.session-chips .thinking-chip .thinking-meter > .bar:nth-child(4) { height: 10px; }
 .session-chips .thinking-chip.unsupported { color: var(--faint); }
 .session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode { color: var(--sodium); }
 

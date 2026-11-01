@@ -80,6 +80,7 @@ let sheet (m : App.Model.t) ~inject =
       ; Attr.create "aria-label" "Panels and settings"
       ]
     ([ div ~cls:"sheet-grip" []
+     ; Chip_popover_view.session_sections m ~inject
      ; Status_view.notes m ~inject
      ; sheet_row
         ~cls:"jump-row"
@@ -167,9 +168,9 @@ let more (m : App.Model.t) ~inject =
 ;;
 
 (* Over the top of the chat, with no bar of its own: the sidebar's toggle
-   (when it is not docked) at the left, the status's island in the middle
-   (where the style puts it there), and what applies and the panels'
-   toggles at the right (on a phone, in a menu). *)
+   (when it is not docked) at the left, and what applies and the panels'
+   toggles at the right (on a phone, a strip with the session's name and a
+   sheet). *)
 let chrome (m : App.Model.t) ~inject =
   let docked = App.Model.docked m in
   let toggle =
@@ -183,16 +184,14 @@ let chrome (m : App.Model.t) ~inject =
         ~on_click:(inject Action.Toggle_sidebar)
         [ icon Menu ]
   in
-  let island =
-    match m.status_style, m.state with
-    | Island, _ -> Status_style_view.island m ~inject
-    (* A phone's strip has room for the session's name where the status
-       is elsewhere. *)
-    | (Ring | Whisper | Border | Hub | Sidebar), Some state when m.narrow ->
+  (* A phone's strip has the session's name between its buttons. *)
+  let title =
+    match m.state with
+    | Some state when m.narrow ->
       Node.h1
         ~attrs:[ Attr.class_ "chrome-title" ]
         [ Node.text (session_title m state) ]
-    | (Ring | Whisper | Border | Hub | Sidebar), _ -> Node.none
+    | _ -> Node.none
   in
   let tools =
     if m.narrow
@@ -214,7 +213,7 @@ let chrome (m : App.Model.t) ~inject =
               [ "docked", docked; "strip", m.narrow ]
           ]
         [ div ~cls:"chrome-left" [ toggle ]
-        ; div ~cls:"chrome-center" [ island ]
+        ; div ~cls:"chrome-center" [ title ]
         ; div ~cls:"chrome-right" [ tools ]
         ]
     ]

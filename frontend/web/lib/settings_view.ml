@@ -69,28 +69,6 @@ let tabs (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* Where the status sits, now that the chat has no header. *)
-let status_style (m : App.Model.t) ~inject =
-  row
-    ~cls:"status-style"
-    ~wide:true
-    ~name:"Status"
-    ~about:
-      ("Where the activity, context, cost, thinking and mode show: "
-       ^ Status_style.describe m.status_style
-       ^ ".")
-    [ choice_list
-        ~label:"Status"
-        (List.map Status_style.all ~f:(fun s ->
-           let name = Status_style.name s in
-           ( Status_style.title s
-           , String.capitalize (Status_style.describe s)
-           , sprintf "%s (/status-style %s)" (Status_style.describe s) name
-           , Status_style.equal s m.status_style
-           , inject (Action.Run ("/status-style " ^ name)) )))
-    ]
-;;
-
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
@@ -706,7 +684,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     [ group ~title:"Look" (Theme_view.rows m ~inject)
     ; group
         ~title:"Layout"
-        [ status_style m ~inject; tabs m ~inject; verbosity m ~inject ]
+        [ tabs m ~inject; verbosity m ~inject ]
     ]
   | Sessions ->
     [ group

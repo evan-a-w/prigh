@@ -633,7 +633,6 @@ module Model = struct
     ; sidebar_open : bool
     ; review_drawer : bool
     ; status_tray : bool
-    ; status_style : Status_style.t
     ; scrolled_up : bool
     ; session_query : string
     ; archived_open : bool
@@ -889,7 +888,6 @@ let init =
   ; update_ready = false
   ; sidebar_open = true
   ; status_tray = false
-  ; status_style = Status_style.default
   ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
@@ -2228,14 +2226,6 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
           m.tabs
           (Option.exists value ~f:(Json.equal `True))
     }
-  else if String.equal key Key.status_style
-  then
-    { m with
-      status_style =
-        Option.value
-          (Option.bind string ~f:Status_style.of_name)
-          ~default:Status_style.default
-    }
   else if String.equal key Key.open_tabs
   then
     if startup || not m.tabs.loaded
@@ -2874,19 +2864,19 @@ let filter_press (m : Model.t) row =
   | _ -> m, []
 ;;
 
+let verbosity_list (m : Model.t) =
+  Picker.create
+    ~title:"Transcript verbosity (Ctrl+O cycles)"
+    (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
+       Picker.Item.create
+         ~id:(Prigh_ui.Verbosity.name v)
+         ~detail:(verbosity_detail v)
+         ~marked:(Prigh_ui.Verbosity.equal v m.verbosity)
+         (String.capitalize (Prigh_ui.Verbosity.name v))))
+;;
+
 let verbosity_picker (m : Model.t) =
-  Dialog.Picker
-    { kind = Verbosity
-    ; picker =
-        Picker.create
-          ~title:"Transcript verbosity"
-          (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
-             Picker.Item.create
-               ~id:(Prigh_ui.Verbosity.name v)
-               ~detail:(verbosity_detail v)
-               ~marked:(Prigh_ui.Verbosity.equal v m.verbosity)
-               (String.capitalize (Prigh_ui.Verbosity.name v))))
-    }
+  Dialog.Picker { kind = Verbosity; picker = verbosity_list m }
 ;;
 
 (* The default mode for new sessions, which the backend applies to this
@@ -2970,13 +2960,14 @@ let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Model -> Models
   | Thinking -> Thinking
   | Mode -> Modes
+  | Verbosity -> Verbosity
   | Host -> Hosts
   | Attach -> Attach
 ;;
 
 let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
   | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Host | Attach -> false
+  | Model | Mode | Verbosity | Host | Attach -> false
 ;;
 
 (* The composer's +: what can go with the message. *)
@@ -2996,27 +2987,16 @@ let attach_menu =
     ]
 ;;
 
-(* The chips that sit together, which ← → and Tab go along: the model and
-   the host; the thinking level and the mode beside them where the status
-   style puts them in the composer's row (the ring, the border meter),
-   elsewhere a group of their own; the + stands alone. *)
-let chip_row (m : Model.t) : Chip.t -> int = function
-  | Model | Host -> 0
-  | Thinking | Mode ->
-    (match m.status_style with
-     | Ring | Border -> 0
-     | Island | Whisper | Hub | Sidebar -> 1)
-  | Attach -> 2
+(* The chips that sit together, which ← → and Tab go along: the model, the
+   host, the thinking level, the mode and the verbosity in the composer's
+   row; the + stands alone. *)
+let chip_row : Chip.t -> int = function
+  | Model | Host | Thinking | Mode | Verbosity -> 0
+  | Attach -> 1
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
 let open_chip (m : Model.t) (chip : Chip.t) =
-  (* The hub has the thinking level and the mode in the model's menu. *)
-  let chip : Chip.t =
-    match chip, m.status_style with
-    | (Thinking | Mode), Hub -> Model
-    | chip, _ -> chip
-  in
   match m.dialog with
   | Some (Popover { chip = shown; _ }) when Chip.equal shown chip ->
     close_dialog m
@@ -3030,6 +3010,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
           | Model -> models_picker m
           | Thinking -> thinking_levels_picker m
           | Mode -> modes_picker state
+          | Verbosity -> verbosity_list m
           | Host -> hosts_list m state
           | Attach -> attach_menu
         in
@@ -3039,16 +3020,15 @@ let open_chip (m : Model.t) (chip : Chip.t) =
             ~focus:
               (match chip with
                | Model | Host -> "popover-filter"
-               | Thinking | Mode | Attach -> "popover-list")
+               | Thinking | Mode | Verbosity | Attach -> "popover-list")
             (Popover { chip; picker })
         in
         m, cmds @ [ Command.Place_popover ]))
 ;;
 
-(* A choice in the hub's menu (the model's, with the thinking level and the
-   mode) keeps the menu open, and the keyboard in it: Esc still closes it,
-   arrows still move (the clicked button is redrawn, leaving the focus
-   nowhere). *)
+(* A choice made in the model's menu keeps the keyboard in it: Esc still
+   closes it, arrows still move (the clicked button is redrawn, leaving the
+   focus nowhere). *)
 let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
   match before.dialog with
   | Some (Popover { chip = Model; _ }) -> m, cmds @ [ Command.Focus "popover-filter" ]
@@ -3060,11 +3040,11 @@ let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
   | Some (Popover { chip = Attach; _ }), _ -> m, []
   | Some (Popover { chip; _ }), Some state ->
-    let row = chip_row m chip in
+    let row = chip_row chip in
     open_chip
       m
       (Chip.step chip delta ~skip:(fun c ->
-         chip_opens_nothing state c || chip_row m c <> row))
+         chip_opens_nothing state c || chip_row c <> row))
   | _ -> m, []
 ;;
 
@@ -4893,37 +4873,6 @@ let set_tabs (m : Model.t) enabled =
   m, save_pref m Key.tabs (Option.some_if enabled `True) @ cmds
 ;;
 
-(* Where the status sits: the setting's choice, said in a toast. *)
-let set_status_style (m : Model.t) style =
-  let m, cmds =
-    toast
-      { m with status_style = style }
-      ~replaces:[ "Status: " ]
-      (sprintf
-         "Status: %s, %s (/status-style)"
-         (Status_style.title style)
-         (Status_style.describe style))
-  in
-  ( m
-  , save_pref m Key.status_style (Some (`String (Status_style.name style)))
-    @ cmds )
-;;
-
-let status_style_picker (m : Model.t) =
-  Dialog.Picker
-    { kind = Status_styles
-    ; picker =
-        Picker.create
-          ~title:"Where the status sits"
-          (List.map Status_style.all ~f:(fun s ->
-             Picker.Item.create
-               ~id:(Status_style.name s)
-               ~detail:(Status_style.describe s)
-               ~marked:(Status_style.equal s m.status_style)
-               (Status_style.title s)))
-    }
-;;
-
 let close_tab (m : Model.t) id =
   let current = current_session m in
   let id = Option.first_some id current in
@@ -5815,19 +5764,6 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          "Unknown /notify argument “%s”: /notify on or /notify off (/notify \
           alone says what is on)"
          other)
-  | "status-style", "" -> open_picker m (status_style_picker m)
-  | "status-style", name ->
-    (match Status_style.of_name name with
-     | Some s -> set_status_style m s
-     | None ->
-       error
-         m
-         (sprintf
-            "Unknown status style “%s”: use %s."
-            name
-            (String.concat
-               ~sep:", "
-               (List.map Status_style.all ~f:Status_style.name))))
   | "tabs", "" ->
     toast
       m
@@ -8723,10 +8659,6 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        | Some v -> set_verbosity m v
        | None -> m, [])
     | Confirm_tools -> set_confirm m (String.equal item.id "on")
-    | Status_styles ->
-      (match Status_style.of_name item.id with
-       | Some s -> set_status_style m s
-       | None -> m, [])
     | Themes -> theme_named m item.id
     | Accents -> accent_named m item.id
     | Compaction_models ->

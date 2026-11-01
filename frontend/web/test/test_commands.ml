@@ -79,7 +79,7 @@ let%expect_test "every command does something (none is unknown)" =
     /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     /thinking                  picker: Thinking level
     /change_default            rpc change_default
-    /verbosity                 picker: Transcript verbosity
+    /verbosity                 picker: Transcript verbosity (Ctrl+O cycles)
     /filter                    transcript filter menu
     /theme                     picker: Theme
     /accent                    picker: Accent colour (or type #rrggbb)
@@ -90,7 +90,6 @@ let%expect_test "every command does something (none is unknown)" =
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /tabs                      toast: Session tabs are off: /tabs on shows the open sessions as tabs
-    /status-style              picker: Where the status sits
     /compact                   toast: Compacting the conversation…
     /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
@@ -439,7 +438,7 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.show h ~selector:"#chat";
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   [%expect
     {|
@@ -485,9 +484,6 @@ let%expect_test "/verbosity and Ctrl+O" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
-    (quiet)
     |}];
   H.key h "o" ~ctrl:true;
   H.key h "o" ~ctrl:true;
@@ -510,7 +506,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   [%expect
     {|
@@ -524,9 +520,6 @@ let%expect_test "/verbosity and Ctrl+O" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
-    (verbose)
     |}]
 ;;
 
@@ -1762,10 +1755,10 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.open-tabs web.review history
+         web.migrated web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1817,10 +1810,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.open-tabs web.review history
+         web.migrated web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

@@ -40,9 +40,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10))
-    (Release notes 2m ago /work) (More (right-click, Shift+F10))
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10))
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Archived 2)
     |}];
   H.elements h ~selector:".session";
@@ -81,12 +81,12 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
       <span class="chev"> </span>
     </button>
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10))
-    (Release notes 2m ago /work) (More (right-click, Shift+F10))
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10))
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Archived 2)
-    (Old lexer 2m ago /work) (More (right-click, Shift+F10))
-    (Older docs 2m ago /work) (More (right-click, Shift+F10))
+    (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (Older docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Delete archived)
     <button class="sessions-divider">
     |}];
@@ -99,9 +99,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     (Focus session-s4)
     (Session_nav (from (s3)) (by 1))
     (Focus session-s3)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10))
-    (Release notes 2m ago /work) (More (right-click, Shift+F10))
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10))
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Archived 2)
     |}];
   (* A search shows the archived sessions that match, folded or not. *)
@@ -109,8 +109,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.text h ~selector:".sessions";
   [%expect {|
     (Archived 2)
-    (Old lexer 2m ago /work) (More (right-click, Shift+F10))
-    (Older docs 2m ago /work) (More (right-click, Shift+F10))
+    (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (Older docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Delete archived)
     |}]
 ;;
@@ -177,8 +177,8 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   [%expect
     {|
     Sessions (Select)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10))
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10))
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Archived 3)
     |}];
   H.reply h "set_archived" "{}";
@@ -374,9 +374,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Select_sessions false)
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10))
-    (Release notes 2m ago /work) (More (right-click, Shift+F10))
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10))
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
