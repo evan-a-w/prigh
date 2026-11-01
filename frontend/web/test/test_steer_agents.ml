@@ -262,7 +262,6 @@ let%expect_test
       (agent_queues
          [ "a1", [ "use the tests"; "and the docs" ], [ "then summarise" ] ]));
   H.text h ~selector:".queue";
-  H.text h ~selector:".status-extras .queued";
   H.show h ~selector:".queue li:nth-child(2)";
   [%expect
     {|
@@ -274,7 +273,6 @@ let%expect_test
     (Edit) (Remove from the queue)
     To a1, after its turn then summarise
     (Edit) (Remove from the queue)
-    (3 queued for a1)
     <li class="queued steer to-agent">
       <span title="Reaches subagent a1 after its current tool calls" class="queued-tag"> To a1, next step </span>
       <span dir="auto" class="queued-text"> use the tests </span>

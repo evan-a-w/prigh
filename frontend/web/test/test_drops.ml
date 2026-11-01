@@ -22,7 +22,7 @@ let session () =
 let show h =
   let m = Harness.model h in
   Harness.text h ~selector:".banner";
-  Harness.text h ~selector:".status";
+  Harness.text h ~selector:".status-island";
   Harness.text h ~selector:".toasts";
   print_s
     [%message
@@ -76,7 +76,18 @@ let%expect_test
   [%expect
     {|
     Connection lost: reconnecting (attempt 6, next in 4.0s)… (Retry now)
-    Reconnecting…
+    Reconnecting… (0%) $0.00
+    Status Reconnecting…
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    (on)
+    (auto)
     ((connection (Reconnecting (attempt 5) (generation 6))) (lost 5))
     |}];
   (* Once more: it stops, and says what to do. *)
@@ -85,7 +96,18 @@ let%expect_test
   [%expect
     {|
     The backend keeps dropping the connection while loading this session: open another session, or reload. (Retry now) (Another session) (Reload)
-    Stopped reconnecting
+    Stopped reconnecting (0%) $0.00
+    Status Stopped reconnecting
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    (on)
+    (auto)
     ((connection (Reconnecting (attempt 6) (generation 7))) (lost 6))
     |}];
   (* It does not start again by itself. *)
@@ -118,14 +140,18 @@ let%expect_test
   show h;
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     Reconnecting now…
     ((connection Connected) (lost 5))
     |}];
@@ -134,14 +160,18 @@ let%expect_test
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 2500))
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     Reconnecting now…
     Reconnected
     ((connection Connected) (lost 0))
@@ -167,7 +197,18 @@ let%expect_test "failing to connect keeps trying" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     (Reconnect (generation 1) (delay_ms 30000) (session (s1)))
     Connection lost: reconnecting (attempt 22, next in 30.0s)… (Retry now)
-    Reconnecting…
+    Reconnecting… (0%) $0.00
+    Status Reconnecting…
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    (on)
+    (auto)
     ((connection (Reconnecting (attempt 21) (generation 1))) (lost 0))
     |}]
 ;;

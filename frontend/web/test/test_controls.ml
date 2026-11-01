@@ -233,13 +233,14 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="sidebar-footer">
-    <header class="docked session-bar">
+    <div class="chrome-anchor">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}];
   H.show h ~selector:".session-card";
   [%expect {| |}];
@@ -482,35 +483,36 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     build-runner /srv
     Enter chooses, ← → the next setting, Esc closes
     |}];
-  (* The card and the bar no longer name it: the chip does. *)
+  (* The card and the chrome do not name it: the chip does. *)
   H.key h "Escape" ~target:Field;
   H.elements h ~selector:".composer .host-chip";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.elements h ~selector:".session-bar .host";
-  H.text h ~selector:".session-bar";
+  H.elements h ~selector:".chat-chrome .host";
+  H.text h ~selector:".chat-chrome";
   [%expect
     {|
     Close_dialog
     (Focus editor)
     <button class="btn chip-button host-chip">
     (Sessions (Ctrl+B))
-    (New session) (main)
-    (on)
-    (auto)
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;
 
-let%expect_test "without the docked sidebar, a slim bar over the chat" =
+let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   let h =
     H.create
       ~state:
@@ -526,102 +528,48 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   H.elements h ~selector:".session-card";
   H.elements h ~selector:".chat-tools";
   H.elements h ~selector:".main > *";
-  H.show h ~selector:".session-bar";
+  H.show h ~selector:".chat-chrome";
   [%expect
     {|
     Toggle_sidebar
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
-    <footer class="composer">
-    <header class="session-bar">
-      <button type="button"
-              title="Sessions (Ctrl+B)"
-              aria-label="Sessions"
-              class="btn ghost icon toggle-sidebar"
-              @on_click>
-        <icon class="menu"> </icon>
-      </button>
-      <div class="session-title">
-        <button type="button" title="Rename (/name)" class="session-name" @on_click>
-          <span dir="auto"> New session </span>
-          <icon class="pencil"> </icon>
-        </button>
+    <footer class="composer status-style-island">
+    <div class="chat-chrome">
+      <div class="chrome-left">
         <button type="button"
-                title="On branch main, in /home/ada/projects/prigh/tui: pull requests (/pr)"
-                aria-haspopup="dialog"
-                class="branch"
+                title="Sessions (Ctrl+B)"
+                aria-label="Sessions"
+                class="btn chrome-button ghost icon round toggle-sidebar"
                 @on_click>
-          <icon class="branch"> </icon>
-          <span class="branch-name"> main </span>
+          <icon class="menu"> </icon>
         </button>
       </div>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <div id="bar-tray" class="bar-tray">
-        <div class="status-extras">
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-        <div role="group" aria-label="Thinking and mode" class="session-chips">
-          <div class="chip-anchor thinking">
-            <button type="button"
-                    title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-                    aria-label="Thinking on"
-                    aria-haspopup="dialog"
-                    aria-expanded="false"
-                    class="btn chip-button thinking-chip"
-                    @on_click>
-              <span aria-hidden="true" class="thinking-meter">
-                <span class="bar on"> </span>
-                <span class="bar on"> </span>
-                <span class="bar"> </span>
-                <span class="bar"> </span>
-              </span>
-              <span class="chip-label"> on </span>
-            </button>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-          <div class="chip-anchor mode">
-            <button type="button"
-                    title="Tools run without asking (Alt+M cycles, /mode picks)"
-                    aria-label="Auto: never asks"
-                    aria-haspopup="dialog"
-                    aria-expanded="false"
-                    class="btn chip-button mode-chip never-asks"
-                    @on_click>
-              <icon class="shield"> </icon>
-              <span class="chip-label"> auto </span>
-            </button>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-        </div>
-        <div class="status">
-          <span role="status" aria-atomic="true" class="activity idle status-item">
-            <span class="idle-dot"> </span>
-            <span class="label"> Ready </span>
-          </span>
-          <span class="status-gauge">
+      <div class="chrome-center">
+        <div data-popover-box="" role="group" aria-label="Session status" class="status-island">
+          <span class="below status-gauge">
+            <span title="Ready" role="status" aria-atomic="true" class="activity idle status-item">
+              <span class="idle-dot"> </span>
+              <span class="label"> Ready </span>
+            </span>
             <button type="button"
                     aria-label="Context 0% full: the session's details"
                     aria-describedby="status-details"
                     aria-haspopup="dialog"
-                    class=" context link status-item"
+                    class="context link status-item"
                     @on_click>
-              <span class="meter">
-                <span class="meter-fill" style={ width: 0.00%; }> </span>
-              </span>
+              <span class="mini ring" custom-css-vars=((--pct 0.0))> </span>
               <span class="percent"> 0% </span>
             </button>
+            <span title="Session cost: $0.0000" class="cost status-item"> $0.00 </span>
             <div role="tooltip" id="status-details" class="status-details">
+              <div class="status-detail">
+                <span class="status-detail-key"> Status </span>
+                <span class="status-detail-value"> Ready </span>
+              </div>
               <div class="context status-detail">
                 <span class="status-detail-key"> Context </span>
                 <span class="status-detail-value"> 0 / 200k · 0% </span>
@@ -635,6 +583,14 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
                 <span class="status-detail-value"> $0.0000 </span>
               </div>
               <div class="status-detail">
+                <span class="status-detail-key"> Thinking </span>
+                <span class="status-detail-value"> on </span>
+              </div>
+              <div class="status-detail">
+                <span class="status-detail-key"> Mode </span>
+                <span class="status-detail-value"> Auto: never asks </span>
+              </div>
+              <div class="status-detail">
                 <span class="status-detail-key"> Model </span>
                 <span class="status-detail-value"> Claude Opus 5.5 </span>
               </div>
@@ -645,91 +601,136 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
               <div class="status-detail-hint"> Click for the session’s details · /compact frees context </div>
             </div>
           </span>
-          <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
-        </div>
-        <div class="panel-toggles">
-          <button type="button"
-                  title="Filter the transcript (/filter)"
-                  aria-label="Filter the transcript"
-                  id="filter-toggle"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  class="btn filter-toggle ghost icon"
-                  @on_click>
-            <icon class="filter"> </icon>
-          </button>
-          <button type="button"
-                  title="Files (Ctrl+Shift+F)"
-                  aria-label="Files"
-                  aria-expanded="false"
-                  class="btn files-toggle ghost icon"
-                  @on_click>
-            <icon class="folder"> </icon>
-          </button>
-          <button type="button"
-                  title="Terminal (Ctrl+`)"
-                  aria-label="Terminal"
-                  aria-expanded="false"
-                  class="btn ghost icon terminal-toggle"
-                  @on_click>
-            <icon class="terminal"> </icon>
-          </button>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <div role="group" aria-label="Thinking and mode" class="island-chips session-chips">
+            <div class="chip-anchor thinking">
+              <button type="button"
+                      title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+                      aria-label="Thinking on"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                      class="btn chip-button thinking-chip"
+                      @on_click>
+                <span aria-hidden="true" class="thinking-meter">
+                  <span class="bar on"> </span>
+                  <span class="bar on"> </span>
+                  <span class="bar"> </span>
+                  <span class="bar"> </span>
+                </span>
+                <span class="chip-label"> on </span>
+              </button>
+              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            </div>
+            <div class="chip-anchor mode">
+              <button type="button"
+                      title="Tools run without asking (Alt+M cycles, /mode picks)"
+                      aria-label="Auto: never asks"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                      class="btn chip-button mode-chip never-asks"
+                      @on_click>
+                <icon class="shield"> </icon>
+                <span class="chip-label"> auto </span>
+              </button>
+              <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            </div>
+          </div>
         </div>
       </div>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <button type="button"
-              title="Settings (Ctrl+, or /settings)"
-              aria-label="Settings"
-              aria-haspopup="dialog"
-              class="btn ghost icon settings-toggle"
-              @on_click>
-        <icon class="gear"> </icon>
-      </button>
-    </header>
+      <div class="chrome-right">
+        <div class="chrome-tools">
+          <div class="status-notes">
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+          <div class="panel-toggles">
+            <button type="button"
+                    title="Filter the transcript (/filter)"
+                    aria-label="Filter the transcript"
+                    id="filter-toggle"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    class="btn filter-toggle ghost icon"
+                    @on_click>
+              <icon class="filter"> </icon>
+            </button>
+            <button type="button"
+                    title="Files (Ctrl+Shift+F)"
+                    aria-label="Files"
+                    aria-expanded="false"
+                    class="btn files-toggle ghost icon"
+                    @on_click>
+              <icon class="folder"> </icon>
+            </button>
+            <button type="button"
+                    title="Terminal (Ctrl+`)"
+                    aria-label="Terminal"
+                    aria-expanded="false"
+                    class="btn ghost icon terminal-toggle"
+                    @on_click>
+              <icon class="terminal"> </icon>
+            </button>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+          <button type="button"
+                  title="Settings (Ctrl+, or /settings)"
+                  aria-label="Settings"
+                  aria-haspopup="dialog"
+                  class="btn ghost icon settings-toggle"
+                  @on_click>
+            <icon class="gear"> </icon>
+          </button>
+        </div>
+      </div>
+    </div>
     |}];
-  H.text h ~selector:".session-bar";
+  H.text h ~selector:".chat-chrome";
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (New session) (main)
-    (on)
-    (auto)
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
   (* Its toggle brings the sidebar back, and the card with it. *)
-  H.click h ~selector:".session-bar .toggle-sidebar";
-  H.elements h ~selector:".session-bar";
+  H.click h ~selector:".chat-chrome .toggle-sidebar";
+  H.elements h ~selector:".chat-chrome";
   H.elements h ~selector:".session-card";
   [%expect
     {|
     Toggle_sidebar
-    <header class="docked session-bar">
+    <div class="chat-chrome docked">
     |}];
-  (* A phone: the sidebar is a drawer, the bar stays (under the drawer). *)
+  (* A phone: the sidebar is a drawer, the chrome stays (under the drawer). *)
   H.quiet h (fun () -> H.act h (Set_narrow true));
-  H.elements h ~selector:".session-bar";
+  H.elements h ~selector:".chat-chrome";
   H.elements h ~selector:".session-card";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.elements h ~selector:".session-bar";
+  H.elements h ~selector:".chat-chrome";
   H.elements h ~selector:".session-card";
   H.elements h ~selector:".main > [inert]";
   [%expect
     {|
-    <header class="session-bar">
-    <header class="session-bar">
-    <header class="session-bar">
+    <div class="chat-chrome">
+    <div class="chat-chrome">
+    <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}]
 ;;
 
@@ -751,6 +752,7 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <textarea class="editor">
     <div class="composer-row">
+    <Vdom.Node.none-widget class="">
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
@@ -1147,7 +1149,7 @@ let%expect_test "narrow: the same menu" =
     |}]
 ;;
 
-let%expect_test "the status in the card: idle, running, and what applies" =
+let%expect_test "the status in the island: idle, running, and what applies" =
   let h =
     H.create
       ~state:
@@ -1162,18 +1164,22 @@ let%expect_test "the status in the card: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".session-bar .status" in
+  let status () = H.text h ~selector:".status-island" in
   status ();
   [%expect
     {|
-    Ready (65%)
+    Ready (65%) $0.42
+    Status Ready
     Context 130k / 200k · 65%
     Tokens 120k in · 9.0k out · 0 cached
     Cost $0.4200
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.42
+    (on)
+    (auto)
     |}];
   H.event
     h
@@ -1193,46 +1199,56 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".session-bar .status .status-item";
+  H.elements h ~selector:".status-island .status-item";
+  (* The context nearly full: its ring is hot; the goal is a note. *)
+  H.elements h ~selector:".status-island .ring";
+  H.text h ~selector:".status-notes";
   (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".session-bar .status > .activity";
+  H.show h ~selector:".status-island .activity";
   [%expect
     {|
-    Working (90%)
+    Working (90%) $0.00
+    Status Working
     Context 180k / 200k · 90%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     <span class="activity running status-item">
-    <button class="context hot link status-item">
+    <button class="context link status-item">
     <span class="cost status-item">
+    <span class="hot mini ring">
+    (Goal 2/20)
     <span title="Working" role="status" aria-atomic="true" class="activity running status-item">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="label"> Working </span>
     </span>
     |}];
   (* The context opens the session's details, with the counters. *)
-  H.click h ~selector:".session-bar .status .context";
+  H.click h ~selector:".status-island .context";
   [%expect
     {|
     (Run /session)
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     |}];
-  (* Waiting for the backend, the card and the bar say so where the status
-     goes. *)
+  (* Waiting for the backend, the card and the island say so where the
+     status goes. *)
   let h = H.connecting () in
   H.text h ~selector:".session-card";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.text h ~selector:".session-bar";
+  H.text h ~selector:".chat-chrome";
   [%expect
     {|
     (Sessions (Ctrl+B))
     Connecting…
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;
@@ -1255,6 +1271,7 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
             class="btn chip-button model-chip"
             @on_click>
       <span class="chip-label"> Claude Opus 5.5 </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <icon class="chevron"> </icon>
     </button>
     <textarea id="editor"
@@ -1270,9 +1287,9 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
     |}]
 ;;
 
-(* ← → go along the chips that sit together: the header's thinking and mode,
+(* ← → go along the chips that sit together: the island's thinking and mode,
    the composer's model and host; never from one group into the other. *)
-let%expect_test "← → stay within the header's chips and the composer's" =
+let%expect_test "← → stay within the island's chips and the composer's" =
   let h = H.create () in
   let shown () = H.text h ~selector:"#chip-popover .popover-head" in
   H.quiet h (fun () -> H.click h ~selector:".thinking-chip");
@@ -1286,7 +1303,8 @@ let%expect_test "← → stay within the header's chips and the composer's" =
   shown ();
   H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
   shown ();
-  [%expect {|
+  [%expect
+    {|
     (Open_chip Thinking)
     (Chip_step 1)
     When tools ask first Alt+M cycles

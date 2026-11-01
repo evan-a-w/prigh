@@ -30,11 +30,9 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
-    button "New session" -- Rename (/name)
-    button "main" -- On branch main, in /work: pull requests (/pr)
+    button "Context 0% full: the session's details"
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Context 0% full: the session's details"
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
@@ -46,9 +44,10 @@ let%expect_test "the names of the controls" =
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
-    [group] div "Thinking and mode"
+    [group] div "Session status"
     [status] span "Ready"
-    [tooltip] div "Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
+    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
+    [group] div "Thinking and mode"
     [region] div "Transcript"
     [group] div "Model and host"
     |}];
@@ -196,8 +195,8 @@ let%expect_test "the closed drawer on a phone is inert" =
   [%expect
     {|
     <aside class="sidebar">
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}]
 ;;

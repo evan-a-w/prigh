@@ -74,11 +74,9 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     |}];
-  H.text h ~selector:".status-extras .background";
   H.show h ~selector:".agents-toggle";
   [%expect
     {|
-    (2 agents running)
     <button type="button"
             title="Subagents and jobs (/agents)"
             aria-label="Subagents and jobs: 2 running"
@@ -200,7 +198,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     ];
   H.act h (Clock (at 80.));
   H.text h ~selector:".agents-panel";
-  H.text h ~selector:".status-extras .background";
+  H.names h ~selector:".agents-toggle";
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
   [%expect
     {|
@@ -214,7 +212,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (✓ Done Survey the repository 1m 45s Survey)
     (✓ Done Count the modules 1m 14s There are 42 modules.)
     (✕ Failed Draft the docs rate limited (429))
-    (3 agents)
+    button "Subagents and jobs" -- Subagents and jobs (/agents)
     false
     |}]
 ;;
@@ -585,13 +583,13 @@ let%expect_test "jobs: listed, their output polled, killed" =
     h
     "list_jobs"
     (sprintf "[%s]" (job "j1" "make test" ~elapsed:3. ~last_line:"ok 12 tests"));
-  H.text h ~selector:".status-extras .background";
+  H.names h ~selector:".agents-toggle";
   H.act h (Focus_agent 1);
   H.act h (Focus_agent 1);
   [%expect
     {|
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (1 job running)
+    button "Subagents and jobs: 1 running" -- Subagents and jobs (/agents)
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     |}];
