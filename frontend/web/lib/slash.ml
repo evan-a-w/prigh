@@ -302,6 +302,10 @@ let every =
       ~args:"[now|cancel]"
       "resume"
       "show, run now or cancel the automatic resume after a usage limit"
+  ; c
+      "downsize-images"
+      "send the conversation's images smaller (after the model refused one as \
+       too large) and retry a failed reply"
   ; c "copy" "copy the last reply to the clipboard"
   ; c
       ~args:"<question>"

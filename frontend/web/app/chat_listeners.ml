@@ -136,6 +136,13 @@ let hidden_action ~schedule (ev : Dom_html.mouseEvent Js.t) =
           | _ -> ()))
 ;;
 
+(* A button with [run_attribute]: its command. *)
+let run ~schedule (ev : Dom_html.mouseEvent Js.t) =
+  Option.iter
+    (clicked ev Prigh_web.Chat_view.run_attribute)
+    ~f:(fun (_, command) -> schedule (Prigh_web.App.Action.Run command))
+;;
+
 let install ~schedule =
   let listen event handler =
     ignore
@@ -151,5 +158,6 @@ let install ~schedule =
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
   listen (Dom.Event.make "contextmenu") (context_menu ~schedule);
-  listen Dom_html.Event.click (hidden_action ~schedule)
+  listen Dom_html.Event.click (hidden_action ~schedule);
+  listen Dom_html.Event.click (run ~schedule)
 ;;

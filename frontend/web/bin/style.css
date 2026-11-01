@@ -1064,6 +1064,35 @@ kbd {
 }
 .attach-icon { --mark-size: 15px; color: var(--muted); }
 
+/* An image too large for the model: a brick ring, and beside it the way
+   out (two short lines, a finger-sized target even on a 320px phone). */
+.pending-image.too-large { display: flex; align-items: stretch; border-radius: var(--r-control); background: var(--brick-wash); box-shadow: inset 0 0 0 1px var(--brick-line); }
+.pending-image.too-large .pending-thumb { border-color: var(--brick-line); }
+.downsize-image {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 var(--r-control) var(--r-control) 0;
+}
+.downsize-image:hover:not(:disabled) { background: var(--brick-wash); }
+.downsize-image:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.downsize-image:disabled { cursor: progress; }
+.downsize-image .downsize-icon { width: 14px; height: 14px; color: var(--brick); flex: none; }
+.downsize-text { display: flex; flex-direction: column; line-height: 1.25; }
+.downsize-why { font-size: 11px; color: var(--brick); font-weight: 600; letter-spacing: 0.02em; }
+.downsize-label { font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.downsize-image:hover:not(:disabled) .downsize-label { text-decoration: underline; text-underline-offset: 2px; }
+.pending-image.downsizing .downsize-label { color: var(--muted); font-weight: 500; }
+.pending-image.downsizing .pending-thumb img { opacity: 0.6; }
+
 /* / and @ completion: attached to the top of the card, as wide, the card's
    top corners squared while it is open, so the two read as one. */
 .popup {

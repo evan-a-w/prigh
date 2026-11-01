@@ -127,6 +127,7 @@ let%expect_test "every command does something (none is unknown)" =
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     /remind                    toast: No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
     /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
+    /downsize-images           rpc downsize_images
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
