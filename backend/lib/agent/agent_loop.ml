@@ -66,7 +66,11 @@ let tool_summary ~name (args : Json.t) =
          | _ -> []
        in
        String.concat ~sep:" " (text "action" @ text "branch" @ text "path")
-     | _ when String.equal name "pull_request" ->
+     | _
+       when List.mem
+              [ "pull_request"; "issue"; "repo" ]
+              name
+              ~equal:String.equal ->
        let text key =
          match find key with
          | Some (`String s) -> [ s ]
@@ -75,7 +79,13 @@ let tool_summary ~name (args : Json.t) =
        let number =
          match Option.bind (find "number") ~f:Json.int with
          | Some n -> [ sprintf "#%d" n ]
-         | None -> []
+         | None ->
+           (match Option.bind (find "run") ~f:Json.int with
+            | Some n -> [ sprintf "run %d" n ]
+            | None ->
+              (match Option.bind (find "job") ~f:Json.int with
+               | Some n -> [ sprintf "job %d" n ]
+               | None -> []))
        in
        String.concat
          ~sep:" "

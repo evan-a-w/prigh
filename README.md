@@ -2209,16 +2209,17 @@ Setting up the sign-in (once per backend):
   asks for the `repo` scope. GitHub Enterprise: `"ghe.example.com": {"kind":
   "github", "client_id": "…"}` (API at `https://HOST/api/v3`). Without a
   client id, `/login github` asks for a personal access token instead
-  (classic with `repo`, or fine-grained with Contents and Pull requests
-  read/write).
+  (classic with `repo`, or fine-grained with Contents, Pull requests and
+  Issues read/write, plus Actions, Checks and Commit statuses read for CI).
 - **Forgejo / Gitea** sign in with OAuth's authorization code flow with PKCE
   as a public client. Every stock Forgejo and Gitea instance pre-registers
   git-credential-oauth's public client (redirect `http://127.0.0.1`, any
   port), so this works with no setup, but the consent page names
   git-credential-oauth, and on Forgejo the token is not limited to scopes
   (Forgejo does not implement OAuth scopes yet; Gitea limits it to the
-  requested `read:user write:repository`). An instance whose admin disabled
-  the default applications, or to see your own app's name, needs a public
+  requested `read:user write:repository write:issue`). An instance whose
+  admin disabled the default applications, or to see your own app's name,
+  needs a public
   OAuth2 application (Settings → Applications, untick "Confidential client",
   redirect URI `http://127.0.0.1`) and `"git.example.com": {"kind":
   "forgejo", "client_id": "…"}` in `forges`. The browser is sent back to a
@@ -2228,8 +2229,9 @@ Setting up the sign-in (once per backend):
   `https://HOST`. Unknown hosts are taken for Forgejo; `"kind"` says
   otherwise.
 - Either: `token` after the host (`/login forgejo codeberg.org token`) asks
-  for a personal access token (Forgejo: scopes `read:user` and
-  `write:repository`).
+  for a personal access token (Forgejo: scopes `read:user`,
+  `write:repository` and `write:issue`). A sign-in from before issues
+  were supported may lack `write:issue`: a 403 says to sign in again.
 
 Sign-ins are stored with the model credentials, in `auth.json` under
 `forge:HOST` (0600, written atomically under the same lock; per user with
@@ -2257,6 +2259,31 @@ tool's errors tell the model what to do next: an unknown number lists the
 closest pull requests, a missing sign-in says to ask you to sign in
 (Settings → Git hosting, or `/login github`). The system prompt tells the
 model to use it rather than `gh`.
+
+It does most of what `gh pr` does, on GitHub and Forgejo alike:
+`comments` (the conversation, reviews and line comments), `comment`,
+`edit` (title, body, base), `merge` (`method` merge, squash or rebase;
+`delete_branch`; `title`/`body` for the commit), `close`, `reopen`,
+`ready` and `draft` (GraphQL on GitHub, the `WIP:` title on Forgejo),
+`review` (`event` approve, request_changes or comment, a `body` and line
+`comments` of `path`, `line`, `body`), `reply` to a line comment (GitHub
+only: Forgejo has no threads, so it says to comment instead) and
+`request_reviewers`. `closes: [12, 13]` on `create` or `edit` adds
+`Closes #12` lines, so merging resolves those issues.
+
+**The `issue` and `repo` tools.** `issue` lists (`state`, `labels`,
+`assignee`, `author`, `search`, `limit`; pull requests left out), views
+(with comments), creates, comments on, edits, closes (`reason` completed or
+not_planned on GitHub, with an optional closing comment), reopens, labels,
+unlabels, assigns and unassigns issues. Forgejo's labels are ids: names are
+looked up in the repository's and its organisation's labels, and an unknown
+one is refused with the list. `repo` is `view` (description, default
+branch, counts, README), `runs` (CI runs, `branch`/`commit`), `run` (its
+jobs and steps), `logs` (a job's log, the tail) and `rerun` (the failed
+jobs). On Forgejo, `runs` lists its Actions tasks; it has no API for jobs,
+logs or re-runs, so those say to look at `pull_request checks`' commit
+statuses and their links. Lists follow the hosts' pages (`Link: rel=next`)
+up to `limit`.
 
 `/pr` works on the repository of the session's directory on its tool host
 (found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
@@ -2438,12 +2465,13 @@ beside the model, along the composer's bottom edge) and switched with
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
-  `worktree`'s `create` and `remove` (not `list`), `pull_request`'s
-  `create` and `checkout`, and MCP tools that are not read-only) wait for
-  your answer.
+  `worktree`'s `create` and `remove` (not `list`), whatever changes the
+  git host (`pull_request` other than `list`/`view`/`checks`/`diff`/
+  `comments`, `issue` other than `list`/`view`, `repo rerun`), and MCP
+  tools that are not read-only) wait for your answer.
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
-  `worktree create`/`remove`, `pull_request create`/`checkout` and MCP
-  tools still ask.
+  `worktree create`/`remove`, the git-host changes and MCP tools still
+  ask.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its

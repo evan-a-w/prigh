@@ -484,8 +484,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   other entries untouched). `Authorization` is `Bearer`, except Forgejo's
   personal access tokens (`token`).
 - `Forge_http` — the HTTP the forge code uses as a value (`real` is
-  `Http_client`), so tests answer with a fake host; errors never carry
-  headers.
+  `Http_client.request`), so tests answer with a fake host: GET, POST,
+  PATCH, PUT and DELETE, and the response's headers (`Link` for pages,
+  `Location` for redirects, `X-Accepted-OAuth-Scopes` for a 403); errors
+  never carry headers.
 - `Forge_login` — the sign-ins as `Auth_interaction` flows: GitHub's device
   flow (`/login/device/code`, then polling `/login/oauth/access_token` at
   `interval`, slower on `slow_down`, until the code's `expires_in`; the
@@ -501,7 +503,28 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the default branch and creating a pull request (a Forgejo draft is a
   `WIP:` title). HTTP failures become messages that say what to do: 401
   signs in again, 404 on the repository checks the remote, a 422 about the
-  head pushes the branch first; a 404 on `/user` suggests the other kind.
+  head pushes the branch first; a 404 on `/user` suggests the other kind;
+  a 403 names the scope GitHub wanted. It also has the generic requests the
+  modules below use: `send`/`send_json`/`get_json`, `get_list` (follows
+  `Link: rel="next"` on both hosts, up to a `limit`), `graphql` (GitHub
+  only: draft/ready) and `get_following` (follows a redirect without the
+  `Authorization` header: GitHub's job logs live in signed storage).
+- `Forge_pulls`, `Forge_issues`, `Forge_ci` — the rest of what `gh` does,
+  with the hosts' differences inside (`Forge_json` reads their JSON
+  leniently). Pulls: edit, comment (the issue comments), merge (GitHub
+  `PUT …/merge` plus a ref delete; Forgejo `POST …/merge` with `Do`),
+  draft/ready (GitHub GraphQL; Forgejo's `WIP:` title), reviews and their
+  line comments (Forgejo's are per review), replies (GitHub only), review
+  requests, and `with_closes` (the `Closes #N` lines that close issues on
+  merge). Issues: list (GitHub's `/issues` drops pull requests, `search` goes
+  to `/search/issues`; Forgejo's `type=issues` and `q`), view with comments,
+  create, edit, comment, close (GitHub's `state_reason`), reopen, labels
+  (names on GitHub; ids on Forgejo, looked up in the repository's and the
+  organisation's labels) and assignees (GitHub's endpoints; Forgejo edits
+  the issue). CI: the repository (and its README), runs, a run's jobs and
+  steps, a job's log (the tail) and re-running failed jobs on GitHub;
+  Forgejo has only its Actions task list, so a run's jobs, logs and re-runs
+  say to use commit statuses and their links.
 - `Forge_remote` (a remote URL's host, owner and name: HTTPS keeps its
   port, SSH drops it), `Forge_repo`, `Pull_request`, `Pr_checks`.
 - `Git_forge` (`host/`) — the pseudo-tool `$git_forge` on the session's
@@ -797,7 +820,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the next step for the model: `Forges`' slash-command hints are rewritten
   (`/login` → ask the user to sign in), and a number that is not one of the
   repository's pull requests gets the closest ones. A checkout's worktree
-  goes out as `Worktrees_changed`, like `Tool_worktree`'s.
+  goes out as `Worktrees_changed`, like `Tool_worktree`'s. The other
+  actions (comments, comment, edit, merge, close, reopen, ready, draft,
+  review, reply, request_reviewers; `closes` on create and edit) are
+  `Pr_actions`; only list, view, checks, diff and comments are not
+  `destructive`.
+- `Tool_issue`, `Tool_repo` — the `issue` tool (list, view, create, comment,
+  edit, close, reopen, label, unlabel, assign, unassign) and the `repo` tool
+  (view, runs, run, logs, rerun), on `Forges.with_repo`; `Tool_forge` has
+  what the three share (the session's repository through the host's git,
+  numbers, error rewriting). Reads never ask; changes are `destructive` and
+  refused in plan mode (`Plan_mode.changes_work`).
 - `Worktree_watch` — the safety net for `git worktree add`/`remove`/`move`/
   `prune` run in `bash`: `Agent.executor` wraps the call that actually runs
   a matching command (not the backend-side wrapper of a job) in

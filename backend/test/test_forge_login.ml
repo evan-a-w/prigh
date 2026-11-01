@@ -251,17 +251,17 @@ let%expect_test
   show_store t;
   [%expect
     {|
-    [secret] No OAuth app is configured for github.com (forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID). Paste a GitHub personal access token for github.com: create one at https://github.com/settings/tokens/new?scopes=repo&description=prigh (classic, scope repo; or a fine-grained token with Contents and Pull requests: read and write)
+    [secret] No OAuth app is configured for github.com (forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID). Paste a GitHub personal access token for github.com: create one at https://github.com/settings/tokens/new?scopes=repo&description=prigh (classic, scope repo; or a fine-grained token with Contents, Pull requests and Issues: read and write, and Actions, Checks and Commit statuses: read)
     [progress] Checking the sign-in with github.com...
     ("signed in" (user (octocat)) (method_ Token) (expires_ms ()))
     GET https://api.github.com/user
       Authorization: Bearer ghp_pasted
-    [secret] Paste a Forgejo personal access token for codeberg.org: create one at https://codeberg.org/user/settings/applications (scopes read:user and write:repository)
+    [secret] Paste a Forgejo personal access token for codeberg.org: create one at https://codeberg.org/user/settings/applications (scopes read:user, write:repository and write:issue)
     [progress] Checking the sign-in with codeberg.org...
     ("signed in" (user (octocat)) (method_ Token) (expires_ms ()))
     GET https://codeberg.org/api/v1/user
       Authorization: token fj_token
-    [secret] Paste a Forgejo personal access token for git.lan: create one at https://git.lan/user/settings/applications (scopes read:user and write:repository)
+    [secret] Paste a Forgejo personal access token for git.lan: create one at https://git.lan/user/settings/applications (scopes read:user, write:repository and write:issue)
     [progress] Checking the sign-in with git.lan...
     error: git.lan refused the sign-in (HTTP 401: Bad credentials): sign in again with /login forgejo git.lan
     error: cannot sign in to github.com with OAuth: no OAuth app for github.com: set forges."github.com".client_id in ~/.prigh/config.json or $PRIGH_GITHUB_CLIENT_ID (README: Git hosting), or sign in with a token
@@ -337,17 +337,18 @@ let%expect_test "Forgejo: authorization code with PKCE, the redirect URL pasted"
     | _ -> no_answer ());
   [%expect
     {|
-    [url] https://codeberg.org/login/oauth/authorize?client_id=a4792ccc-144e-407e-86c9-5e7d8d9c3269&redirect_uri=http://127.0.0.1/&response_type=code&scope=read:user%20write:repository&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
+    [url] https://codeberg.org/login/oauth/authorize?client_id=a4792ccc-144e-407e-86c9-5e7d8d9c3269&redirect_uri=http://127.0.0.1/&response_type=code&scope=read:user%20write:repository%20write:issue&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
       Open this page and authorize git-credential-oauth to sign in to codeberg.org. If the browser then cannot load 127.0.0.1 (prigh runs on another machine), paste that page's address here.
     ((client_id a4792ccc-144e-407e-86c9-5e7d8d9c3269)
-     (redirect_uri http://127.0.0.1/) (scope "read:user write:repository")
+     (redirect_uri http://127.0.0.1/)
+     (scope "read:user write:repository write:issue")
      (code_challenge_method S256))
     [paste] Complete login in your browser, or paste the authorization code / redirect URL here: (http://127.0.0.1/?code=...&state=...)
     [progress] Exchanging the authorization code...
     (exchange: code=the-code, redirect_uri=http://127.0.0.1/, verifier matches the challenge: true)
     [progress] Checking the sign-in with codeberg.org...
     ("signed in" (user (lloyd)) (method_ Oauth) (expires_ms (4600000)))
-    [url] https://codeberg.org/login/oauth/authorize?client_id=a4792ccc-144e-407e-86c9-5e7d8d9c3269&redirect_uri=http://127.0.0.1/&response_type=code&scope=read:user%20write:repository&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
+    [url] https://codeberg.org/login/oauth/authorize?client_id=a4792ccc-144e-407e-86c9-5e7d8d9c3269&redirect_uri=http://127.0.0.1/&response_type=code&scope=read:user%20write:repository%20write:issue&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
       Open this page and authorize git-credential-oauth to sign in to codeberg.org. If the browser then cannot load 127.0.0.1 (prigh runs on another machine), paste that page's address here.
     [paste] Complete login in your browser, or paste the authorization code / redirect URL here: (http://127.0.0.1/?code=...&state=...)
     error: OAuth state mismatch
@@ -396,7 +397,7 @@ let%expect_test "Forgejo: the browser comes back to the loopback server" =
    | Some (Error e) -> printf "(browser: %s)\n" (Http_client.Error.to_string e));
   [%expect
     {|
-    [url] https://git.lan/login/oauth/authorize?client_id=prigh-app&redirect_uri=http://127.0.0.1:<port>/&response_type=code&scope=read:user%20write:repository&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
+    [url] https://git.lan/login/oauth/authorize?client_id=prigh-app&redirect_uri=http://127.0.0.1:<port>/&response_type=code&scope=read:user%20write:repository%20write:issue&code_challenge=<challenge>&code_challenge_method=S256&state=<state>
       Open this page and authorize the app to sign in to git.lan. If the browser then cannot load 127.0.0.1 (prigh runs on another machine), paste that page's address here.
     [paste] Complete login in your browser, or paste the authorization code / redirect URL here: (http://127.0.0.1:<port>/?code=...&state=...)
     [progress] Exchanging the authorization code...

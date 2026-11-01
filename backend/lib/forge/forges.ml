@@ -336,6 +336,8 @@ let with_api t ~git ~f =
   f api repo info
 ;;
 
+let with_repo t ~git ~f = with_api t ~git ~f:(fun api repo _ -> f api repo)
+
 let list_pulls t ~git ~state =
   let%bind.Or_error state =
     match state with

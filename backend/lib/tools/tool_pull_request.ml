@@ -2,9 +2,12 @@ open! Core
 open! Import
 
 let name = "pull_request"
+let reads = [ "list"; "view"; "checks"; "diff"; "comments" ]
+let changes action = not (List.mem reads action ~equal:String.equal)
 
-let changes action =
-  List.mem [ "create"; "checkout" ] action ~equal:String.equal
+let actions =
+  "list, view, checks, diff, comments, create, checkout, comment, edit, merge, \
+   close, reopen, ready, draft, review, reply or request_reviewers"
 ;;
 
 let spec =
@@ -30,25 +33,41 @@ let spec =
        the branch first unless push is false; draft marks it a draft. checkout \
        fetches one into the branch pr-N in a worktree at the standard location \
        and records it on the session: work there by giving its path (cd <path> \
-       in bash, paths under it in file tools, a subagent's cwd)."
+       in bash, paths under it in file tools, a subagent's cwd). comments \
+       shows its conversation, reviews and line comments (with their ids). \
+       comment adds body as a comment. edit changes title, body and/or base. \
+       merge merges it (method merge, squash or rebase; delete_branch). close \
+       and reopen; ready marks a draft ready for review, draft makes it a \
+       draft again. review submits a review (event approve, request_changes or \
+       comment; body; comments: [{path, line, body}] on lines of the new \
+       version). reply answers a line comment in its thread (comment_id; \
+       GitHub only). request_reviewers asks reviewers (logins). closes (issue \
+       numbers) on create and edit adds Closes #N lines, so merging closes \
+       them. Labels and assignees of a pull request: the issue tool, with its \
+       number."
   ; parameters =
       Tool_args.schema
         ~required:[ "action" ]
-        [ "action", `String, "list, view, checks, diff, create or checkout"
+        [ "action", `String, actions
         ; "state", `String, "list: open (default), closed or all"
-        ; "number", `Integer, "view, checks, diff, checkout: the pull request"
+        ; ( "number"
+          , `Integer
+          , "every action but list and create: the pull request" )
         ; ( "title"
           , `String
           , "create: its title (default: from the branch's commits: the \
-             subject of a single one, else the branch name)" )
+             subject of a single one, else the branch name); edit: the new \
+             title; merge: the merge commit's title" )
         ; ( "body"
           , `String
           , "create: its description (Markdown): what changed, why, how it was \
-             tested (when the title is left out too: from the commits)" )
+             tested (when the title is left out too: from the commits); edit: \
+             the new description; comment, review, reply, close: the comment; \
+             merge: the merge commit's message" )
         ; ( "base"
           , `String
           , "create: the branch to merge into (default: the repository's \
-             default branch)" )
+             default branch); edit: a new one" )
         ; ( "head"
           , `String
           , "create: the branch to merge (default: the current branch; \
@@ -57,6 +76,33 @@ let spec =
         ; ( "push"
           , `Boolean
           , "create: push head to the remote first (default true)" )
+        ; ( "closes"
+          , `Array (`Object [ "type", `String "integer" ])
+          , "create, edit: issues that merging it closes" )
+        ; "method", `String, "merge: merge (default), squash or rebase"
+        ; ( "delete_branch"
+          , `Boolean
+          , "merge: delete its branch afterwards (default false)" )
+        ; "event", `String, "review: approve, request_changes or comment"
+        ; ( "comments"
+          , `Array
+              (`Object
+                  [ "type", `String "object"
+                  ; ( "properties"
+                    , `Object
+                        [ "path", `Object [ "type", `String "string" ]
+                        ; "line", `Object [ "type", `String "integer" ]
+                        ; "body", `Object [ "type", `String "string" ]
+                        ] )
+                  ; ( "required"
+                    , `Array [ `String "path"; `String "line"; `String "body" ]
+                    )
+                  ])
+          , "review: line comments" )
+        ; "comment_id", `Integer, "reply: the line comment (from comments)"
+        ; ( "reviewers"
+          , `Array (`Object [ "type", `String "string" ])
+          , "request_reviewers: logins" )
         ; ( "cwd"
           , `String
           , "A directory in the repository, e.g. another worktree (default: \
@@ -65,52 +111,16 @@ let spec =
   }
 ;;
 
-(* On the session's tool host, through the context's executor. *)
-let host_op op ~run =
-  { Tool.spec =
-      { Tool_spec.name = op
-      ; description = "git hosting"
-      ; parameters = `Object []
-      ; parallel_safe = true
-      ; destructive = Never
-      ; on_host = true
-      ; freeform = None
-      }
-  ; run
-  }
-;;
-
-let git_forge =
-  host_op Git_forge.op ~run:(fun (context : Tool.Context.t) arguments ->
-    Git_forge.run
-      ~env:context.env
-      ~cancel:context.cancel
-      ~cwd:context.cwd
-      ~arguments)
-;;
-
-let git_location =
-  host_op Git_location.op ~run:(fun (context : Tool.Context.t) _ ->
-    Git_location.run ~cwd:context.cwd)
-;;
-
-let on_host (context : Tool.Context.t) ~cwd tool arguments =
-  Tool.execute_via { context with cwd; on_output = ignore } tool arguments
-;;
+let git_location = Tool_forge.git_location
+let on_host = Tool_forge.on_host
 
 let number args =
-  match Tool_args.int_opt args "number" with
-  | Some n -> n
-  | None ->
-    raise
-      (Tool_args.Invalid
-         "missing \"number\": the pull request's number (action=list shows \
-          them)")
+  Tool_forge.number
+    ~what:"the pull request's number (action=list shows them)"
+    args
 ;;
 
-let repo_name (repo : Forge_repo.t) =
-  sprintf "%s/%s on %s" repo.owner repo.name repo.instance.host
-;;
+let repo_name = Tool_forge.repo_name
 
 let flags (pr : Pull_request.t) =
   String.concat
@@ -269,19 +279,7 @@ let checkout context ~forges ~cwd ~git ~worktrees_dir number =
     (Filename.quote checkout.path)
 ;;
 
-(* {!Forges}' errors point users at slash commands; the model has this
-   tool's actions instead, and only the user can sign in. *)
-let for_the_model error =
-  List.fold
-    [ "/pr lists", "action=list lists"
-    ; "/cd into one", "cwd names one"
-    ; ": sign in under", ": ask the user to sign in under"
-    ; ": sign in again with", ": ask the user to sign in again with"
-    ]
-    ~init:error
-    ~f:(fun error (pattern, with_) ->
-      String.substr_replace_all error ~pattern ~with_)
-;;
+let for_the_model = Tool_forge.for_the_model
 
 (* When [number] fails and is not one of the repository's pull requests, the
    nearest numbers that are. *)
@@ -325,14 +323,8 @@ let with_defaults forges ~git ~title ~body =
 
 let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
   let run (context : Tool.Context.t) args =
-    let cwd =
-      match Tool_args.string_opt args "cwd" with
-      | None -> context.cwd
-      | Some cwd -> Tool.resolve_path context cwd
-    in
-    let git request =
-      on_host context ~cwd git_forge (Git_forge.Request.to_json request)
-    in
+    let cwd = Tool_forge.cwd context args in
+    let git = Tool_forge.git context ~cwd in
     let action = Tool_args.string args "action" in
     let result =
       match action with
@@ -371,7 +363,8 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
           forges
           ~git
           ~title
-          ~body
+          ~body:
+            (Forge_pulls.with_closes body (Tool_forge.int_list args "closes"))
           ~base:(Tool_args.string_opt args "base")
           ~head:(Tool_args.string_opt args "head")
           ~draft:(Option.value (Tool_args.bool_opt args "draft") ~default:false)
@@ -386,22 +379,21 @@ let create ~forges ?(worktrees_dir = fun () -> "~/.prigh/worktrees") () =
           ~worktrees_dir:(worktrees_dir ())
           (number args)
       | other ->
-        raise
-          (Tool_args.Invalid
-             (sprintf
-                "unknown action %S: use list, view, checks, diff, create or \
-                 checkout"
-                other))
+        (match Pr_actions.run ~forges ~git ~args other with
+         | Some result -> result
+         | None ->
+           raise
+             (Tool_args.Invalid
+                (sprintf "unknown action %S: use %s" other actions)))
     in
     match result with
     | Ok text -> Tool.Result.ok text
     | Error e ->
       let hint =
         if
-          List.mem
-            [ "view"; "checks"; "diff"; "checkout" ]
-            action
-            ~equal:String.equal
+          (not (List.mem [ "list"; "create" ] action ~equal:String.equal))
+          && Option.is_some (Tool_args.int_opt args "number")
+          && String.is_substring (Error.to_string_hum e) ~substring:"not found"
         then
           Option.value_map
             (closest forges ~git (number args))
