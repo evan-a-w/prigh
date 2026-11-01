@@ -373,7 +373,7 @@
 .app.narrow .composer-controls { flex: 1 1 auto; }
 .app.narrow .composer-status { margin-left: auto; }
 .app.narrow .composer-status .status-item.cost,
-.app.narrow .composer-status.busy .status-item.activity > .label { display: none; }
+.app.narrow .composer-status:is(.busy, *) .status-item.activity > .label { display: none; }
 .app.narrow .composer-status > .status-gauge { height: 40px; padding: 0 2px 0 10px; font-size: 12px; }
 .app.narrow .composer-status .status-item.link { height: 40px; padding: 0 8px 0 4px; }
 .app.narrow .composer-status .ring.mini { width: 15px; height: 15px; }
