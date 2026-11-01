@@ -7,6 +7,7 @@ let message_attribute = "data-message-entry"
 let message_id n = sprintf "msg-%d" n
 let hidden_attribute = "data-hidden"
 let hidden_action_attribute = "data-hidden-action"
+let run_attribute = "data-run"
 
 module Divider = struct
   type t =
@@ -212,10 +213,26 @@ let stopped (message : Message.Assistant.t) =
   | Error e ->
     div
       "stop error"
-      [ span "title" "The model returned an error"
-      ; div "detail" [ Node.text e ]
-      ; span "hint" "Send a message to retry, or switch model."
-      ]
+      ([ span "title" "The model returned an error"
+       ; div "detail" [ Node.text e ]
+       ]
+       @
+       if Prigh_ui.Image_error.too_large e
+       then
+         [ span
+             "hint"
+             "An image is too large for the model. prigh can send the \
+              conversation's images smaller and try again (the originals stay \
+              in the session)."
+         ; Node.button
+             ~attrs:
+               [ Attr.class_ "stop-action"
+               ; Attr.type_ "button"
+               ; Attr.create run_attribute "/downsize-images"
+               ]
+             [ Node.text "Downsize images and retry" ]
+         ]
+       else [ span "hint" "Send a message to retry, or switch model." ])
   | Aborted ->
     div
       "stop aborted"

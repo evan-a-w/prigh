@@ -185,7 +185,8 @@ let install ~schedule:s ~backend =
         let dest : Files.Dest.t option =
           match Js.to_string input##.id with
           | "files-upload-input" -> Some Here
-          | "chat-attach-input" -> Some Chat
+          (* chat-attach-input: web_main's [read_images], as its images
+             are images *)
           | _ -> None
         in
         Option.iter dest ~f:(fun dest ->

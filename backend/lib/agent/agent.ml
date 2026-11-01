@@ -3599,6 +3599,34 @@ let resume_now t =
     Ok ()
 ;;
 
+(* The last reply failed: a run with no new prompt sends the conversation
+   again (the failed reply has no content to send). *)
+let last_reply_failed t =
+  List.find_map
+    (List.rev (Session.messages t.session))
+    ~f:(function
+      | Message.Assistant a ->
+        Some
+          (match a.stop_reason with
+           | Error _ -> true
+           | Aborted | End_turn | Tool_use | Length -> false)
+      | User _ | Tool_result _ -> None)
+  |> Option.value ~default:false
+;;
+
+let downsize_images t =
+  if not t.model.supports_images
+  then
+    Or_error.errorf
+      "%s cannot see images: its requests leave them out"
+      t.model.name
+  else (
+    let limit = Image_limit.tighten t.model in
+    let retried = (not (is_running t)) && last_reply_failed t in
+    if retried then start_run t [];
+    Ok (limit, retried))
+;;
+
 let btw t ~question ~cancel ~on_delta =
   let session = t.session in
   let model = t.model in

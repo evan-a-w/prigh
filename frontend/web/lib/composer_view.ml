@@ -99,38 +99,84 @@ let images (m : App.Model.t) ~inject =
   match m.images with
   | [] -> Node.none
   | list ->
+    let verdicts = App.Model.image_verdicts m in
     div
       ~cls:"pending-images"
-      (List.mapi list ~f:(fun i image ->
-         div
-           ~cls:"pending-image"
-           [ Node.button
-               ~attrs:
-                 [ Attr.type_ "button"
-                 ; Attr.class_ "pending-thumb"
-                 ; Attr.title "View it, or draw on it"
-                 ; Attr.create
-                     "aria-label"
-                     ("View or draw on " ^ Image.to_string_hum image)
-                 ; Attr.on_click (fun _ ->
-                     inject (Action.Annotate { image; target = Pending i }))
+      (List.mapi (List.zip_exn list verdicts) ~f:(fun i (image, verdict) ->
+         let downsizing = List.mem m.downsizing image ~equal:phys_equal in
+         let too_large =
+           match verdict with
+           | Fits -> None
+           | Too_large why -> Some why
+         in
+         Node.div
+           ~attrs:
+             [ classes
+                 [ "pending-image" ]
+                 [ "too-large", Option.is_some too_large
+                 ; "downsizing", downsizing
                  ]
-               [ Node.img
-                   ~attrs:
-                     [ Attr.class_ "thumb"
-                     ; Attr.src (Image_view.src image)
-                     ; Attr.alt (Image.to_string_hum image)
-                     ]
-                   ()
-               ; icon ~cls:"draw-hint" Pencil
-               ]
-           ; button
-               ~cls:"remove-image"
-               ~title:"Remove image"
-               ~label:"Remove image"
-               ~on_click:(inject (Action.Remove_image i))
-               [ icon Close ]
-           ]))
+             ]
+           ([ Node.button
+                ~attrs:
+                  [ Attr.type_ "button"
+                  ; Attr.class_ "pending-thumb"
+                  ; Attr.title "View it, or draw on it"
+                  ; Attr.create
+                      "aria-label"
+                      ("View or draw on " ^ Image.to_string_hum image)
+                  ; Attr.on_click (fun _ ->
+                      inject (Action.Annotate { image; target = Pending i }))
+                  ]
+                [ Node.img
+                    ~attrs:
+                      [ Attr.class_ "thumb"
+                      ; Attr.src (Image_view.src image)
+                      ; Attr.alt (Image.to_string_hum image)
+                      ]
+                    ()
+                ; icon ~cls:"draw-hint" Pencil
+                ]
+            ; button
+                ~cls:"remove-image"
+                ~title:"Remove image"
+                ~label:"Remove image"
+                ~on_click:(inject (Action.Remove_image i))
+                [ icon Close ]
+            ]
+            @
+            match too_large with
+            | None -> []
+            | Some why ->
+              [ Node.button
+                  ~attrs:
+                    [ Attr.type_ "button"
+                    ; Attr.class_ "downsize-image"
+                    ; Attr.title
+                        (sprintf
+                           "Too large for the model (%s). Downsize it here, or \
+                            send it as it is and prigh tries to send it smaller"
+                           why)
+                    ; Attr.create
+                        "aria-label"
+                        (sprintf
+                           "Downsize the image: too large for the model, %s"
+                           why)
+                    ; (if downsizing then Attr.disabled else Attr.empty)
+                    ; Attr.on_click (fun _ -> inject (Action.Downsize_image i))
+                    ]
+                  [ (if downsizing
+                     then Html.lamp ()
+                     else icon ~cls:"downsize-icon" Warning)
+                  ; Node.span
+                      ~attrs:[ Attr.class_ "downsize-text" ]
+                      [ span ~cls:"downsize-why" "Too large"
+                      ; span
+                          ~cls:"downsize-label"
+                          (if downsizing then "Downsizing" else "Downsize")
+                      ]
+                  ]
+              ])))
 ;;
 
 let pending_chip = Session_chips_view.pending_chip
@@ -472,7 +518,9 @@ let view (m : App.Model.t) ~inject =
                   (match m.dictation with
                    | Idle ->
                      Node.fragment
-                       [ chips m ~inject; Status_style_view.row_chips m ~inject ]
+                       [ chips m ~inject
+                       ; Status_style_view.row_chips m ~inject
+                       ]
                    | Starting _ | Recording _ | Transcribing ->
                      rest (dictation m ~inject))
                 ; rest
@@ -492,41 +540,41 @@ let view (m : App.Model.t) ~inject =
                            m
                            ~inject
                            (if sending
-                          then
-                            button
-                              ~cls:"primary round send busy"
-                              ~title:"Sending…"
-                              ~label:"Sending"
-                              ~disabled:true
-                              ~attrs:[ Attr.create "aria-busy" "true" ]
-                              ~on_click:Effect.Ignore
-                              [ Html.lamp () ]
-                          else if stops
-                          then
-                            (* Nothing to steer with: the one button stops. *)
-                            button
-                              ~cls:"primary round stop"
-                              ~title:"Stop (Esc)"
-                              ~label:"Stop"
-                              ~on_click:(inject Action.Abort)
-                              [ icon Stop ]
-                          else
-                            button
-                              ~cls:"primary round send"
-                              ~title:
-                                (match steered m with
-                                 | _ when not connected ->
-                                   "Not connected to the backend"
-                                 | Some id -> sprintf "Steer %s (Enter)" id
-                                 | None when running -> "Steer (Enter)"
-                                 | None -> "Send (Enter)")
-                              ~label:
-                                (if running || Option.is_some (steered m)
-                                 then "Steer"
-                                 else "Send")
-                              ~disabled:((not has_input) || not connected)
-                              ~on_click:(inject Action.Send)
-                              [ icon Send ])
+                            then
+                              button
+                                ~cls:"primary round send busy"
+                                ~title:"Sending…"
+                                ~label:"Sending"
+                                ~disabled:true
+                                ~attrs:[ Attr.create "aria-busy" "true" ]
+                                ~on_click:Effect.Ignore
+                                [ Html.lamp () ]
+                            else if stops
+                            then
+                              (* Nothing to steer with: the one button stops. *)
+                              button
+                                ~cls:"primary round stop"
+                                ~title:"Stop (Esc)"
+                                ~label:"Stop"
+                                ~on_click:(inject Action.Abort)
+                                [ icon Stop ]
+                            else
+                              button
+                                ~cls:"primary round send"
+                                ~title:
+                                  (match steered m with
+                                   | _ when not connected ->
+                                     "Not connected to the backend"
+                                   | Some id -> sprintf "Steer %s (Enter)" id
+                                   | None when running -> "Steer (Enter)"
+                                   | None -> "Send (Enter)")
+                                ~label:
+                                  (if running || Option.is_some (steered m)
+                                   then "Steer"
+                                   else "Send")
+                                ~disabled:((not has_input) || not connected)
+                                ~on_click:(inject Action.Send)
+                                [ icon Send ])
                        ]
                 ]
             ; Status_style_view.in_composer m ~inject

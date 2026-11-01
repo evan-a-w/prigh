@@ -156,7 +156,9 @@
             # Worktrees, diffs, review and the git hosts run git: fall back
             # to ours when PATH has none (a systemd service's PATH rarely
             # includes the user's profile). Appended, so the user's git wins.
-            export PATH="''${PATH:+$PATH:}${pkgs.git}/bin"
+            # ImageMagick likewise: images too large for a model are
+            # downscaled with it (on upload and before each request).
+            export PATH="''${PATH:+$PATH:}${pkgs.git}/bin:${pkgs.imagemagick}/bin"
             if [ "''${1:-}" = "-web" ]; then
               shift
               for arg in "$@"; do
@@ -192,6 +194,7 @@
           printf '%s\n' "$@" > "$ARGS_OUT"
           printf '%s\n' "$PRIGH_WEB_ROOT" > "$ROOT_OUT"
           command -v git > "$ARGS_OUT.git" || true
+          command -v magick > "$ARGS_OUT.magick" || true
           EOF
           chmod +x fake-backend
           ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
@@ -210,6 +213,8 @@
           test "$(cat root)" = "${prighWebRoot}"
           # git is found even with no git on PATH
           test "$(cat args.git)" = "${pkgs.git}/bin/git"
+          # and ImageMagick, to downscale images
+          test "$(cat args.magick)" = "${pkgs.imagemagick}/bin/magick"
           ARGS_OUT="$PWD/default-args" ROOT_OUT="$PWD/default-root" \
             PRIGH_BACKEND="$PWD/fake-backend" \
             ${prigh}/bin/prigh -web
