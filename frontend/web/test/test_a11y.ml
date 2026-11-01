@@ -27,29 +27,32 @@ let%expect_test "the names of the controls" =
     button "Select" -- Select sessions to delete (/delete)
     button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
+    button "Archive"
+    button "Delete"
     button "Archived 1" -- Show the archived sessions
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
-    button "Context 0% full: the session's details"
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
+    button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
+    [region] div "Transcript"
+    [group] div "Model and host"
+    [group] div "Thinking, mode and transcript"
     [group] div "Session status"
     [status] span "Ready"
     [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
-    [group] div "Thinking and mode"
-    [region] div "Transcript"
-    [group] div "Model and host"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -145,10 +148,18 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
+    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
+    button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     textarea "Message"
     [group] div "Model and host"
+    [group] div "Thinking, mode and transcript"
+    [group] div "Session status"
+    [status] span "Ready"
+    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];
@@ -197,6 +208,6 @@ let%expect_test "the closed drawer on a phone is inert" =
     <aside class="sidebar">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}]
 ;;

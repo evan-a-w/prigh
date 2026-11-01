@@ -10,7 +10,7 @@ let run h command =
 ;;
 
 let status h =
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes"
 ;;
 
@@ -162,8 +162,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto-edit)
     |}]
 ;;
 
@@ -289,8 +287,6 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (plan 1/3: change it)
     |}];
   H.click h ~selector:".status-notes .plan";
@@ -333,8 +329,6 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
      (tag Ignore))
     (Focus dialog)
@@ -672,7 +666,7 @@ let%expect_test "a question dialog: keys" =
     <aside class="sidebar">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}];
   H.show h ~selector:".question-choices";
   [%expect
@@ -972,10 +966,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.open-tabs web.review history
+         web.migrated web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -999,8 +993,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");

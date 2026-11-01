@@ -212,6 +212,38 @@ end
 
 let rows : (Session_summary.t, Row.t) View_cache.t = View_cache.create ()
 
+(* On a phone, behind the row: what a swipe to the left shows (the same as
+   its menu's Archive and Delete). Out of the tab order: the menu has them. *)
+let swipe_actions ~inject (s : Session_summary.t) =
+  let action ~cls ~label ~icon:glyph on_click =
+    Node.button
+      ~attrs:
+        [ Attr.class_ ("session-swipe-action " ^ cls)
+        ; Attr.type_ "button"
+        ; Attr.tabindex (-1)
+        ; Attr.on_click (fun _ -> Effect.Many [ Effect.Stop_propagation; inject on_click ])
+        ]
+      [ icon glyph; Node.span [ Node.text label ] ]
+  in
+  Node.span
+    ~attrs:[ Attr.class_ "session-swipe"; Attr.create "aria-hidden" "true" ]
+    [ (if s.archived
+       then
+         action
+           ~cls:"archive"
+           ~label:"Unarchive"
+           ~icon:Unarchive
+           (Action.Set_archived { path = s.path; archived = false })
+       else
+         action
+           ~cls:"archive"
+           ~label:"Archive"
+           ~icon:Archive
+           (Action.Set_archived { path = s.path; archived = true }))
+    ; action ~cls:"delete" ~label:"Delete" ~icon:Trash (Action.Ask_delete s.path)
+    ]
+;;
+
 let row ~inject (s : Session_summary.t) (row : Row.t) =
   let { Row.selected
       ; running
@@ -374,6 +406,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                ~attrs:[ Attr.class_ "session-actions" ]
                [ more_button ~inject ~id:("more-" ^ dom_id) ~label:title target
                ])
+        ; (if selecting then Node.none else swipe_actions ~inject s)
         ]
     ; (if folded || selecting || List.is_empty worktrees
        then Node.none
@@ -642,7 +675,6 @@ let view (m : App.Model.t) ~inject =
                   else [ delete_archived ~inject archived ]
                 else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
-    ; Status_style_view.sidebar_card m ~inject
     ; user_footer m ~inject
     ]
 ;;

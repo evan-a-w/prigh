@@ -1,11 +1,10 @@
 open! Core
 open! Import
 
-(** The session's status, in pieces that each {!Status_style} lays out where
-    it puts the status ({!Status_style_view}): what the agent is doing, how
-    full the context is, the cost, and one card of details (the tokens, the
-    exact cost, the thinking level, the mode, the model, the branch) that
-    shows over whatever holds it while pointed at or focused. *)
+(** The session's status: what the agent is doing, how full the context is,
+    the cost, and one card of details (the tokens, the exact cost, the
+    thinking level, the mode, the model, the branch) that shows over the
+    composer's status chip while pointed at or focused ({!composer_status}). *)
 
 (** ["12k"], ["1.2M"]. *)
 val tokens : int -> string
@@ -17,8 +16,8 @@ val context_percent : State.t -> float option
 (** [""], ["warm"] from 60%, ["hot"] from 85%. *)
 val context_level : float -> string
 
-(** The agent is working, a prompt is on its way, or the backend is out of
-    reach: what the styles animate (a lamp, the ring's turn, a shimmer). *)
+(** The agent is working or a prompt is on its way: what lights the status
+    chip's lamp. *)
 val busy : App.Model.t -> bool
 
 (** What the agent is doing, in a word or two: ["Ready"], ["Running
@@ -65,6 +64,11 @@ val context_button
 val gauge : ?cls:string -> App.Model.t -> State.t -> Node.t list -> Node.t
 
 (** What applies, only while it does: the goal, reminders, a resume after a
-    usage limit, a Nix collection, transfers, a verbosity other than normal
-    and the model's plan; each opens its command. *)
+    usage limit, a Nix collection, transfers and the model's plan; each opens its command. *)
 val notes : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+
+(** The composer's status chip, at the right of its row by the microphone:
+    the activity's lamp (its word while the agent works), the context's ring
+    and percent (a click opens the session's details, [/session]) and the
+    cost, under the details' card while pointed at or focused. *)
+val composer_status : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
