@@ -3441,12 +3441,27 @@ let set_dictation (m : Model.t) action =
 ;;
 
 (* OpenAI's transcription models, and the configured one if it is another
-   (a custom provider's, set with /dictation model PROVIDER/ID). *)
+   (a custom provider's, set with /dictation model PROVIDER/ID). Groq's
+   free Whisper is suggested once a custom provider named groq exists (never
+   a model nothing could run). *)
+let groq_dictation = "groq/whisper-large-v3-turbo"
+
+let has_groq (m : Model.t) =
+  List.exists m.auth ~f:(fun s ->
+    String.equal s.provider "groq" && Option.is_some s.custom)
+;;
+
 let dictation_models_picker (m : Model.t) =
   with_config m ~f:(fun config ->
     let current = config.dictation_model in
+    let suggestions =
+      Prigh_ui.Dictation_command.suggestions
+      @ if has_groq m
+        then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
+        else []
+    in
     let suggested =
-      List.map Prigh_ui.Dictation_command.suggestions ~f:(fun (key, detail) ->
+      List.map suggestions ~f:(fun (key, detail) ->
         Picker.Item.create
           ~id:key
           ~detail
@@ -3459,7 +3474,7 @@ let dictation_models_picker (m : Model.t) =
       | Some key
         when not
                (List.Assoc.mem
-                  Prigh_ui.Dictation_command.suggestions
+                  suggestions
                   ~equal:String.equal
                   key) ->
         [ Picker.Item.create
