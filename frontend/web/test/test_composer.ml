@@ -12,6 +12,8 @@ let%expect_test
     {|
     []
     (Add files or images (or paste, or drop them here))
+    (Claude Opus 5.5)
+    (backend)
     (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.show h ~selector:".send";

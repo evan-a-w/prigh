@@ -39,10 +39,10 @@ let%expect_test "the names of the controls" =
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Dictate" -- Dictate (speak, then click again to stop)
-    button "Send" -- Send (Enter)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Dictate" -- Dictate (speak, then click again to stop)
+    button "Send" -- Send (Enter)
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
@@ -144,10 +144,10 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "View or draw on [image: image/png, 8 B]" -- View it, or draw on it
     button "Remove image"
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Dictate" -- Dictate (speak, then click again to stop)
-    button "Send" -- Send (Enter)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
+    button "Dictate" -- Dictate (speak, then click again to stop)
+    button "Send" -- Send (Enter)
     textarea "Message"
     [group] div "Model and host"
     button "Dismiss"
