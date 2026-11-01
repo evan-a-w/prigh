@@ -121,6 +121,9 @@ const waitSettled = async () => {
 const settled = () => page.waitForFunction(() => {
   const img = document.querySelector("dialog.viewer img");
   if (!img) return true;
+  // A loaded machine can stall a transition's frames: a rect that has not
+  // moved for a while can still be mid-way.
+  if (img.getAnimations().some(a => a.playState === "running")) return false;
   const r = img.getBoundingClientRect();
   const key = [r.left, r.top, r.width, r.height].join(",");
   const w = window;
@@ -226,6 +229,14 @@ try {
       await page.mouse.wheel(0, -15);
       await page.keyboard.up("Control");
     }
+    // mouse.wheel returns before the page has handled the event: on a busy
+    // machine the steps land later. Wait for both (each scales by
+    // exp(15 × 0.01)) before measuring.
+    const zoomed = fit.w * Math.exp(2 * 15 * 0.01);
+    await page.waitForFunction(w => {
+      const img = document.querySelector("dialog.viewer img");
+      return img && Math.abs(img.getBoundingClientRect().width - w) < 2;
+    }, zoomed, { polling: 50, timeout: 10000 }).catch(() => {});
     await waitSettled();
     p = await placed();
     const still = Math.abs(p.r.left + under.u * p.r.width - px) < 2 && Math.abs(p.r.top + under.v * p.r.height - py) < 2;
