@@ -83,6 +83,12 @@
   (copy ../status.css status.css)))
 
 (rule
+ (target phone.css)
+ (deps ../phone.css)
+ (action
+  (copy ../phone.css phone.css)))
+
+(rule
  (target forge.css)
  (deps ../forge.css)
  (action
@@ -206,6 +212,7 @@
   jump.css
   forge.css
   status.css
+  phone.css
   recursive-sans.woff2
   recursive-mono.woff2
   terminal.js
@@ -247,6 +254,7 @@
   (jump.css as web/jump.css)
   (forge.css as web/forge.css)
   (status.css as web/status.css)
+  (phone.css as web/phone.css)
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)
   (recursive-OFL.txt as web/recursive-OFL.txt)

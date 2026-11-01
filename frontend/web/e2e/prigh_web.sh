@@ -17,7 +17,8 @@
 # viewer.mjs, the image viewer's fit, zoom and pan, then math.mjs,
 # TeX math drawn by KaTeX in the themes and on a phone, then card.mjs, the
 # session's card in the sidebar in each state, then status.mjs, the six
-# status styles and the floating chrome, then pwa.mjs, then
+# status styles and the floating chrome, then mobile.mjs, phones by touch
+# and as an installed PWA, then pwa.mjs, then
 # compaction.mjs, the settings page's Compaction section) in each
 # browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected). The scripts all run at once (JOBS at a time, default:
@@ -50,7 +51,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote steer subagent_paged trim filter viewer math card status pwa compaction"
+scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote steer subagent_paged trim filter viewer math card status mobile pwa compaction"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {

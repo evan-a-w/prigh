@@ -523,3 +523,39 @@ let%expect_test "/settings completes the sections" =
     account Who you are on this backend.
     |}]
 ;;
+
+let%expect_test "a phone: the list of sections, one a level down, back to the list" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.act h Open_settings;
+  settings h;
+  (* A section, by tap: its page, with the way back. *)
+  H.click h ~selector:".settings-home-row[data-settings-tab=models]";
+  H.elements h ~selector:".settings-dialog .modal-head > *";
+  H.elements h ~selector:".settings-home";
+  H.click h ~selector:".modal-back";
+  H.elements h ~selector:".settings-home";
+  (* /settings SECTION goes straight to it. *)
+  H.key h "Escape" ~target:Page;
+  H.type_ h "/settings account";
+  H.act h Send;
+  H.text h ~selector:".settings-dialog .modal-head h2";
+  [%expect {|
+    (Focus dialog)
+    Settings
+    (Close (Esc))
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Settings_section Models)
+    <button class="btn ghost modal-back">
+    <h2 class="">
+    <button class="btn ghost icon">
+    Settings_home
+    <nav class="settings-home">
+    Close_dialog
+    (Focus editor)
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/settings account") (max 500))) (tag Ignore))
+    (Focus dialog)
+    Account
+    |}]
+;;

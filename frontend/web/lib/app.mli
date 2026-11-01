@@ -488,6 +488,7 @@ module Action : sig
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
     | Settings_section of Settings_section.t
+    | Settings_home
     (** a section of the settings page, from its list; opens the page there
         when it is closed *)
     | Settings_move of Settings_section.Move.t
@@ -819,6 +820,8 @@ module Model : sig
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t
+    (* A phone's settings show the list of sections, not one of them. *)
+    ; settings_home : bool
     (** the section the settings page shows (kept while the page is shut) *)
     ; return_to_settings : bool
     (** the login dialog showing was opened from the settings page: closing

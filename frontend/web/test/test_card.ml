@@ -362,9 +362,13 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
       <icon class="more"> </icon>
     </button>
     Toggle_status_tray
+    <div class="sheet-grip">
     <div class="status-notes">
-    <div class="panel-toggles">
-    <button class="btn ghost icon settings-toggle">
+    <button class="jump-row sheet-row">
+    <button class="filter-row sheet-row">
+    <button class="files-row sheet-row">
+    <button class="sheet-row terminal-row">
+    <button class="settings-row sheet-row">
     button "Panels and settings"
     Toggle_status_tray
     Toggle_status_tray

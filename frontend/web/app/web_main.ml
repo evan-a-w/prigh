@@ -931,7 +931,27 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
         true))
 ;;
 
-let narrow () = Dom_html.window##.innerWidth < 760
+(* A phone: a narrow window, or a phone on its side (short, and touched). *)
+let narrow () =
+  Dom_html.window##.innerWidth < 760
+  || (Dom_html.window##.innerHeight < 500
+      && Js.to_bool
+           (Dom_html.window##matchMedia (Js.string "(pointer: coarse)"))##.matches)
+;;
+
+(* The app is as tall as what the user sees: the on-screen keyboard shrinks
+   the visual viewport, and the composer stays over it (phone.css). *)
+let set_visual_height () =
+  Option.iter (Browser.visual_height ()) ~f:(fun h ->
+    ignore
+      (Js.Unsafe.meth_call
+         (Js.Unsafe.get Dom_html.document##.documentElement (Js.string "style"))
+         "setProperty"
+         [| Js.Unsafe.inject (Js.string "--vvh")
+          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx" h))
+         |]
+       : unit))
+;;
 
 let install_listeners ~schedule ~current =
   let document = Dom_html.document in
@@ -988,7 +1008,9 @@ let install_listeners ~schedule ~current =
         schedule action;
         reveal_selected ();
         Js._false));
+  set_visual_height ();
   Browser.on_viewport_change (fun () ->
+    set_visual_height ();
     autosize ();
     schedule (App.Action.Set_narrow (narrow ()));
     schedule (Resize_widget.viewport ()));
