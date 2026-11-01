@@ -32,7 +32,7 @@ let section
          [ span "icon" "↩"
          ; span
              "kind"
-             (if job then sprintf "Job %s:" section.id else "Report:")
+             (if job then sprintf "Job %s:" section.id else "Subagent:")
          ; span
              "task"
              (Option.value
