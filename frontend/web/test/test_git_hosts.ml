@@ -49,6 +49,7 @@ let%expect_test
     {|
     Git hosting
     The hosts agents push branches to and open pull requests on.
+    Hosts
     GitHub github.com
     Not signed in.
     (Use a token) (Connect)
@@ -58,7 +59,8 @@ let%expect_test
     Forgejo git.example.com
     Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    Another Forgejo host
+    A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
     |}];
   H.click h ~selector:".git-host .btn.primary";
@@ -99,6 +101,7 @@ let%expect_test
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     Git hosting
     The hosts agents push branches to and open pull requests on.
+    Hosts
     GitHub github.com
     Signed in as octo (oauth).
     (Disconnect)
@@ -108,7 +111,8 @@ let%expect_test
     Forgejo git.example.com
     Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    Another Forgejo host
+    A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
     |}];
   H.text h ~selector:".toast";
@@ -434,7 +438,8 @@ let%expect_test "/auth lists the git hosts with the providers" =
     Forgejo git.example.com
     Not signed in. No OAuth client id for git.example.com: set forges.git.example.com.client_id in ~/.prigh/config.json
     (Connect with a token)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    Another Forgejo host
+    A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
     |}];
   (* Disconnecting from it keeps it open. *)
@@ -503,7 +508,9 @@ let%expect_test "a backend without git hosting; switching user asks again" =
     ((accounts Loading) (signing_out ()))
     Git hosting
     The hosts agents push branches to and open pull requests on.
-    Git hosts This backend can't sign in to git hosts. Unknown method forge_status
+    Hosts
+    Git hosts
+    This backend can't sign in to git hosts. Unknown method forge_status
     |}];
   switch ();
   H.reply h "forge_status" (forges ~github_user:"octo" ());

@@ -2,44 +2,7 @@ open! Core
 open! Import
 open Html
 module Action = App.Action
-
-(* A setting: its name, what it does in a line, and its control. *)
-let row ?(cls = "") ?note ~name ~about controls =
-  div
-    ~cls:(String.strip ("setting " ^ cls))
-    [ div
-        ~cls:"setting-text"
-        [ span ~cls:"setting-name" name
-        ; span ~cls:"setting-about" about
-        ; (match note with
-           | Some (level, text) -> span ~cls:("setting-note " ^ level) text
-           | None -> Node.none)
-        ]
-    ; div ~cls:"setting-control" controls
-    ]
-;;
-
-let group ?title rows =
-  Node.section
-    ~attrs:[ Attr.class_ "settings-group" ]
-    (match title with
-     | Some title -> Node.h4 [ Node.text title ] :: rows
-     | None -> rows)
-;;
-
-let switch ?(disabled = false) ~label ~title ~on ~on_click () =
-  Node.button
-    ~attrs:
-      [ classes [ "switch" ] [ "on", on ]
-      ; Attr.type_ "button"
-      ; Attr.role "switch"
-      ; Attr.create "aria-checked" (Bool.to_string on)
-      ; Attr.create "aria-label" label
-      ; Attr.title title
-      ; (if disabled then Attr.disabled else Attr.on_click (fun _ -> on_click))
-      ]
-    [ Node.span ~attrs:[ Attr.class_ "switch-knob" ] [] ]
-;;
+open Settings_row
 
 let notifications (m : App.Model.t) ~inject =
   let n = m.notifications in
@@ -62,6 +25,7 @@ let notifications (m : App.Model.t) ~inject =
   in
   row
     ~cls:"notify"
+    ~scope:Browser
     ?note
     ~name:"Notifications"
     ~about:
@@ -92,9 +56,7 @@ let tabs (m : App.Model.t) ~inject =
   row
     ~cls:"tabs"
     ~name:"Tabs"
-    ~about:
-      "Show the open sessions as tabs over the chat (not on a phone). Saved \
-       for your account."
+    ~about:"The open sessions as tabs over the chat (not on a phone)."
     [ switch
         ~label:"Tabs"
         ~title:
@@ -110,62 +72,142 @@ let tabs (m : App.Model.t) ~inject =
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
+    ~scope:Browser
     ~name:"Transcript detail"
-    ~about:
-      "How much of tool calls and thinking the transcript shows (Ctrl+O \
-       cycles)."
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "segmented"
-          ; Attr.role "group"
-          ; Attr.create "aria-label" "Transcript detail"
-          ]
+    ~about:"How much of tool calls and thinking the transcript shows (Ctrl+O)."
+    [ segmented
+        ~label:"Transcript detail"
         (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
            let name = Prigh_ui.Verbosity.name v in
-           let current = Prigh_ui.Verbosity.equal v m.verbosity in
-           Node.button
-             ~attrs:
-               [ classes [ "segment" ] [ "on", current ]
-               ; Attr.type_ "button"
-               ; Attr.create "aria-pressed" (Bool.to_string current)
-               ; Attr.title ("/verbosity " ^ name)
-               ; Attr.on_click (fun _ ->
-                   inject (Action.Run ("/verbosity " ^ name)))
-               ]
-             [ Node.text (String.capitalize name) ]))
+           ( String.capitalize name
+           , "/verbosity " ^ name
+           , Prigh_ui.Verbosity.equal v m.verbosity
+           , inject (Action.Run ("/verbosity " ^ name)) )))
     ]
 ;;
 
-let confirm (m : App.Model.t) ~inject =
-  let on =
-    Option.map m.config ~f:(fun c ->
-      not (Approval_mode.equal c.approval_mode Auto))
+let waiting = "muted", "Waiting for the backend's settings…"
+
+let model_name (m : App.Model.t) key =
+  match
+    List.find m.models ~f:(fun (model : Llm.t) -> String.equal model.key key)
+  with
+  | Some model -> model.name
+  | None -> key
+;;
+
+(* What new sessions ask before they act; the backend applies it to this
+   session too. Plan is a session's, not a default: the composer's chip. *)
+let default_mode (m : App.Model.t) ~inject =
+  let current = Option.map m.config ~f:(fun c -> c.approval_mode) in
+  row
+    ~cls:"default-mode"
+    ~name:"Mode"
+    ~about:
+      "What asks before it runs: everything (Ask), all but file edits \
+       (Auto-edit) or nothing (Auto). This session changes too."
+    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
+    [ segmented
+        ~disabled:(Option.is_none current)
+        ~label:"Default mode"
+        (List.map Approval_mode.all ~f:(fun mode ->
+           let arg = Approval_mode.to_string mode in
+           ( (match mode with
+              | Ask -> "Ask"
+              | Auto_edit -> "Auto-edit"
+              | Auto -> "Auto")
+           , "/confirm " ^ arg
+           , Option.equal Approval_mode.equal current (Some mode)
+           , inject (Action.Run ("/confirm " ^ arg)) )))
+    ]
+;;
+
+let default_model (m : App.Model.t) ~inject =
+  let current =
+    match m.config with
+    | None -> None
+    | Some { default_model = None; _ } -> Some "The backend's default"
+    | Some { default_model = Some key; default_thinking; _ } ->
+      Some
+        (match default_thinking with
+         | Some level when not (String.equal level "off") ->
+           sprintf "%s · thinking %s" (model_name m key) level
+         | _ -> model_name m key)
+  in
+  let this =
+    Option.map m.state ~f:(fun s ->
+      if s.model.supports_thinking && not (String.equal s.thinking "off")
+      then sprintf "%s · thinking %s" s.model.name s.thinking
+      else s.model.name)
   in
   row
-    ~cls:"confirm"
-    ~name:"Tool confirmation"
+    ~cls:"default-model"
+    ~name:"Model"
     ~about:
-      "Ask before bash, edits and MCP tools run, in this session and new ones."
-    ?note:
-      (match on with
-       | None -> Some ("muted", "Waiting for the backend's settings…")
-       | Some _ -> None)
-    [ switch
-        ~disabled:(Option.is_none on)
-        ~label:"Tool confirmation"
+      (match current with
+       | Some current -> "New sessions start with " ^ current ^ "."
+       | None -> "The model and thinking level new sessions start with.")
+    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
+    [ button
+        ~cls:"small"
         ~title:
-          (if Option.value on ~default:false
-           then "Run tools without asking (/confirm off)"
-           else "Ask before tools run (/confirm on)")
-        ~on:(Option.value on ~default:false)
-        ~on_click:
-          (inject
-             (Action.Run
-                (if Option.value on ~default:false
-                 then "/confirm off"
-                 else "/confirm on")))
-        ()
+          (match this with
+           | Some this ->
+             sprintf "Start new sessions with %s (/change_default)" this
+           | None -> "/change_default")
+        ~disabled:(Option.is_none m.config || Option.is_none m.state)
+        ~on_click:(inject (Action.Run "/change_default"))
+        [ Node.text "Use this session’s" ]
     ]
+;;
+
+let default_dir (m : App.Model.t) ~inject =
+  let current = Option.bind m.config ~f:(fun c -> c.default_cwd) in
+  row
+    ~cls:"default-dir"
+    ~name:"Starting directory"
+    ~about:
+      (match current with
+       | Some dir -> "New sessions start in " ^ dir ^ "."
+       | None ->
+         "New sessions start in the tool host's home. /default-dir PATH sets \
+          one.")
+    (match current with
+     | Some _ ->
+       [ button
+           ~cls:"small"
+           ~title:"Start in the home directory again (/default-dir off)"
+           ~on_click:(inject (Action.Run "/default-dir off"))
+           [ Node.text "Reset" ]
+       ]
+     | None -> [])
+;;
+
+let fallback (m : App.Model.t) ~inject =
+  let models =
+    Option.value_map m.config ~default:[] ~f:(fun c -> c.fallback_models)
+  in
+  row
+    ~cls:"fallback"
+    ~name:"Fallback models"
+    ~about:
+      (match models with
+       | [] ->
+         "When a model's usage runs out, the session stops. /fallback MODEL… \
+          names models to take over, in order."
+       | models ->
+         "When a model's usage runs out: "
+         ^ String.concat ~sep:", then " (List.map models ~f:(model_name m))
+         ^ ".")
+    (match models with
+     | [] -> []
+     | _ ->
+       [ button
+           ~cls:"small"
+           ~title:"No fallback (/fallback off)"
+           ~on_click:(inject (Action.Run "/fallback off"))
+           [ Node.text "Clear" ]
+       ])
 ;;
 
 module Compaction_command = Prigh_ui.Compaction_command
@@ -248,27 +290,21 @@ let summary_model (m : App.Model.t) (config : Config.t option) ~inject =
   let current =
     match Option.bind config ~f:(fun c -> c.compaction_model) with
     | None -> "The conversation's model"
-    | Some key ->
-      (match
-         List.find m.models ~f:(fun (model : Llm.t) ->
-           String.equal model.key key)
-       with
-       | Some model -> model.name
-       | None -> key)
+    | Some key -> model_name m key
   in
   row
     ~cls:"summary-model"
-    ~name:"Summary model"
+    ~name:"Summaries"
     ~about:
-      "The model that writes the summaries: a cheaper one costs less, but \
-       cannot reuse the conversation's prompt cache."
-    [ button
-        ~cls:"small summary-model-choice"
+      "Writes the summary when a conversation is compacted: a cheaper model \
+       costs less, but cannot reuse the conversation's prompt cache."
+    [ select
+        ~cls:"summary-model-choice"
         ~title:"Choose the model (/compaction model)"
         ~label:("Summary model: " ^ current)
         ~disabled:(Option.is_none config)
         ~on_click:(inject (Action.Run "/compaction model"))
-        [ Node.text current ]
+        current
     ]
 ;;
 
@@ -300,35 +336,48 @@ let naming_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.naming_model) with
     | None -> "Default"
-    | Some key ->
-      (match
-         List.find m.models ~f:(fun (model : Llm.t) ->
-           String.equal model.key key)
-       with
-       | Some model -> model.name
-       | None -> key)
+    | Some key -> model_name m key
   in
   row
     ~cls:"naming-model"
-    ~name:"Naming model"
+    ~name:"Naming"
     ~about:
-      "The model that titles sessions and names subagents: a small, fast one \
-       is plenty. Default: the generate model, else the session's."
-    [ button
-        ~cls:"small naming-model-choice"
+      "Titles sessions and names subagents: a small, fast model is plenty. \
+       Default: the generate model, else the session's."
+    [ select
+        ~cls:"naming-model-choice"
         ~title:"Choose the model (/naming model)"
         ~label:("Naming model: " ^ current)
         ~disabled:(Option.is_none m.config)
         ~on_click:(inject (Action.Run "/naming model"))
-        [ Node.text current ]
+        current
+    ]
+;;
+
+let dictation_model (m : App.Model.t) ~inject =
+  let current =
+    Option.bind m.config ~f:(fun c -> c.dictation_model)
+    |> Option.value ~default:Config.default_dictation_model
+  in
+  row
+    ~cls:"dictation-model"
+    ~name:"Dictation"
+    ~about:
+      "Turns what you say into text (the composer's microphone): an OpenAI \
+       or OpenAI-compatible transcription model. Without one, the browser's \
+       own speech recognition, where it has one."
+    [ select
+        ~cls:"dictation-model-choice"
+        ~title:"Choose the model (/dictation model)"
+        ~label:("Dictation model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/dictation model"))
+        current
     ]
 ;;
 
 let compaction (m : App.Model.t) ~inject =
-  [ compact_at m m.config ~inject
-  ; summary_model m m.config ~inject
-  ; mask m.config ~inject
-  ]
+  [ compact_at m m.config ~inject; mask m.config ~inject ]
 ;;
 
 let providers (m : App.Model.t) ~inject =
@@ -610,26 +659,44 @@ let account (m : App.Model.t) ~inject =
 
 module Section = Settings_section
 
-(* A section's settings, in groups: a new setting is a row in its list. *)
+(* A section's settings, in groups: a new setting is a row in its list.
+   Where a setting is kept is its section's (Section.about) unless its row
+   says otherwise. *)
 let content (m : App.Model.t) (section : Section.t) ~inject =
   match section with
   | Appearance ->
-    [ group (Theme_view.rows m ~inject @ [ tabs m ~inject; verbosity m ~inject ])
+    [ group ~title:"Look" (Theme_view.rows m ~inject)
+    ; group ~title:"Layout" [ tabs m ~inject; verbosity m ~inject ]
     ]
-  | Behaviour -> [ group [ confirm m ~inject; notifications m ~inject ] ]
+  | Sessions ->
+    [ group
+        ~title:"New sessions"
+        [ default_model m ~inject
+        ; default_mode m ~inject
+        ; default_dir m ~inject
+        ; fallback m ~inject
+        ]
+    ; group ~title:"Notifications" [ notifications m ~inject ]
+    ]
   | Models ->
     [ group ~title:"Providers" [ providers m ~inject ]
-    ; group ~title:"Naming" [ naming_model m ~inject ]
+    ; group
+        ~title:"Models prigh uses"
+        ~note:"Besides the conversation's"
+        [ naming_model m ~inject
+          ; summary_model m m.config ~inject
+          ; dictation_model m ~inject
+          ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
-  | Git_hosting -> [ group (git_hosts m ~inject) ]
+  | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
   | Account -> [ group (account m ~inject) ]
 ;;
 
 let section_icon : Section.t -> Icon.t = function
   | Appearance -> Palette
-  | Behaviour -> Shield
+  | Sessions -> Bot
   | Models -> Brain
   | Git_hosting -> Repo
   | Nix_store -> Package

@@ -112,6 +112,10 @@ module Icon = struct
     | Scissors
     | Palette
     | Package
+    | Mic
+    | Image
+    | Paperclip
+    | Eraser
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -208,6 +212,14 @@ module Icon = struct
       {|<path d="M12 3a9 9 0 0 0 0 18c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.9.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10" cy="7.5" r="1" fill="currentColor"/><circle cx="14.5" cy="7.5" r="1" fill="currentColor"/>|}
     | Package ->
       {|<path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7 12 12l8.7-5M12 22V12M7.5 4.3l9 5.1"/>|}
+    | Mic ->
+      {|<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/>|}
+    | Image ->
+      {|<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>|}
+    | Paperclip ->
+      {|<path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.6 8.6a2 2 0 0 1-2.8-2.8l8.5-8.5"/>|}
+    | Eraser ->
+      {|<path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21M22 21H7M5 11l9 9"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

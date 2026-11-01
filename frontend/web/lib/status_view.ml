@@ -41,60 +41,96 @@ let chip ?label ~cls ~title ~command ~inject children =
     children
 ;;
 
-(* The bar says how full the context is; the card, with no room for the
-   tokens, has them in its title too. *)
-let context ?(usage = false) (state : State.t) ~inject =
+let context_percent (state : State.t) =
+  100.
+  *. Float.of_int state.context_tokens
+  /. Float.of_int state.model.context_window
+;;
+
+let context_level percent =
+  if Float.(percent >= 85.)
+  then "hot"
+  else if Float.(percent >= 60.)
+  then "warm"
+  else ""
+;;
+
+(* The details of the gauge, shown while the pointer is over it or it has
+   the focus: what the header has no room for. A click has them all
+   (/session). *)
+let details (state : State.t) ~percent =
+  let line ?(cls = "") k v =
+    div
+      ~cls:(String.strip ("status-detail " ^ cls))
+      [ span ~cls:"status-detail-key" k; span ~cls:"status-detail-value" v ]
+  in
+  Node.div
+    ~attrs:
+      [ Attr.class_ "status-details"
+      ; Attr.role "tooltip"
+      ; Attr.id "status-details"
+      ]
+    [ line
+        ~cls:("context " ^ context_level percent)
+        "Context"
+        (sprintf
+           "%s / %s · %.0f%%"
+           (tokens state.context_tokens)
+           (tokens state.model.context_window)
+           percent)
+    ; line
+        "Tokens"
+        (sprintf
+           "%s in · %s out · %s cached"
+           (tokens state.usage.input)
+           (tokens state.usage.output)
+           (tokens state.usage.cache_read))
+    ; line "Cost" (sprintf "$%.4f" state.cost_usd)
+    ; line "Model" state.model.name
+    ; (match state.git_branch with
+       | Some branch -> line ~cls:"branch-line" "Branch" branch
+       | None -> Node.none)
+    ; div
+        ~cls:"status-detail-hint"
+        [ Node.text "Click for the session’s details · /compact frees context" ]
+    ]
+;;
+
+(* How full the context is: a short thin bar and the percent, its details
+   over it on hover; a click opens the session's details (/session). *)
+let context (state : State.t) ~inject =
   if state.model.context_window <= 0
   then Node.none
   else (
-    let percent =
-      100.
-      *. Float.of_int state.context_tokens
-      /. Float.of_int state.model.context_window
-    in
-    let level =
-      if Float.(percent >= 85.)
-      then "hot"
-      else if Float.(percent >= 60.)
-      then "warm"
-      else ""
-    in
-    chip
-      ~cls:("context " ^ level)
-      ~title:
-        (if usage
-         then
-           sprintf
-             "%s tokens in, %s out, %s cache read; %.0f%% of a %s context \
-              (/compact frees some). Click for the session's details \
-              (/session)"
-             (tokens state.usage.input)
-             (tokens state.usage.output)
-             (tokens state.usage.cache_read)
-             percent
-             (tokens state.model.context_window)
-         else
-           sprintf
-             "Context: %s of %s tokens (/compact frees some). Click for the \
-              session's details (/session)"
-             (tokens state.context_tokens)
-             (tokens state.model.context_window))
-      ~command:"/session"
-      ~label:(sprintf "Context %.0f%% full" percent)
-      ~inject
-      [ Node.span
-          ~attrs:[ Attr.class_ "meter" ]
+    let percent = context_percent state in
+    Node.span
+      ~attrs:[ Attr.class_ "status-gauge" ]
+      [ Node.button
+          ~attrs:
+            [ Attr.class_ ("status-item link context " ^ context_level percent)
+            ; Attr.type_ "button"
+            ; Attr.create
+                "aria-label"
+                (sprintf "Context %.0f%% full: the session's details" percent)
+            ; Attr.create "aria-describedby" "status-details"
+            ; Attr.create "aria-haspopup" "dialog"
+            ; Attr.on_click (fun _ -> inject (Action.Run "/session"))
+            ]
           [ Node.span
-              ~attrs:
-                [ Attr.class_ "meter-fill"
-                ; Attr.style
-                    (Css_gen.width
-                       (`Percent
-                           (Percent.of_percentage (Float.min 100. percent))))
-                ]
-              []
+              ~attrs:[ Attr.class_ "meter" ]
+              [ Node.span
+                  ~attrs:
+                    [ Attr.class_ "meter-fill"
+                    ; Attr.style
+                        (Css_gen.width
+                           (`Percent
+                               (Percent.of_percentage (Float.min 100. percent))))
+                    ]
+                  []
+              ]
+          ; span ~cls:"percent" (sprintf "%.0f%%" percent)
           ]
-      ; span ~cls:"percent" (sprintf "%.0f%%" percent)
+      ; details state ~percent
       ])
 ;;
 
@@ -289,39 +325,38 @@ let activity (m : App.Model.t) =
         [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; label "Ready" ]
 ;;
 
-let counters (m : App.Model.t) ~inject =
-  match m.state, m.connection with
-  | Some state, Connected ->
-    [ context state ~inject
-    ; item
-        ~cls:"tokens"
-        ~title:
-          (sprintf
-             "Tokens: %d in, %d out, %d cache read"
-             state.usage.input
-             state.usage.output
-             state.usage.cache_read)
-        [ Node.textf
-            "↑%s ↓%s"
-            (tokens state.usage.input)
-            (tokens state.usage.output)
-        ]
-    ; cost state ~inject
-    ]
-  | _ -> []
+let glance (m : App.Model.t) =
+  let dot =
+    match m.state, m.connection with
+    | Some state, Connected when state.running || m.pending.sending > 0 ->
+      Html.lamp ()
+    | Some _, Connected -> Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
+    | _ -> Html.lamp ()
+  in
+  let percent =
+    match m.state, m.connection with
+    | Some state, Connected ->
+      let percent = context_percent state in
+      let level = context_level percent in
+      Node.span
+        ~attrs:
+          [ classes [ "glance-percent" ] [ level, not (String.is_empty level) ] ]
+        [ Node.text (sprintf "%.0f%%" percent) ]
+    | _ -> Node.none
+  in
+  Node.span
+    ~attrs:[ Attr.class_ "status-glance"; Attr.create "aria-hidden" "true" ]
+    [ dot; percent ]
 ;;
-
-let connected (m : App.Model.t) f =
-  match m.state, m.connection with
-  | Some state, Connected -> f state
-  | _ -> Node.none
-;;
-
-let meter m ~inject = connected m (context ~usage:true ~inject)
-let cost m ~inject = connected m (cost ~inject)
 
 let view (m : App.Model.t) ~inject =
-  div ~cls:"status" (counters m ~inject @ [ activity m ])
+  div
+    ~cls:"status"
+    (activity m
+     ::
+     (match m.state, m.connection with
+      | Some state, Connected -> [ context state ~inject; cost state ~inject ]
+      | _ -> []))
 ;;
 
 let extras (m : App.Model.t) ~plan ~inject =

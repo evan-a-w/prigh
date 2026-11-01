@@ -237,7 +237,9 @@ let%expect_test "search: by repository, branch and worktree" =
   [%expect
     {|
     Main work
+    (New session) (main)
     New hero
+    (New session) (main)
     |}]
 ;;
 

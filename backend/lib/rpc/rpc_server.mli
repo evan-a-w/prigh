@@ -59,6 +59,8 @@ val create
   -> ?forges:Forges.t
        (** git hosts (default: real HTTP, sign-ins in [login]'s store,
            settings in [home]'s config) *)
+  -> ?transcription_http:Transcription.Http.t
+       (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t
        (** for superusers' [nix_store_status] and [nix_store_gc] (without
            it they fail) *)

@@ -92,6 +92,7 @@ let%expect_test "every command does something (none is unknown)" =
     /tabs                      toast: Session tabs are off: /tabs on shows the open sessions as tabs
     /compact                   toast: Compacting the conversation…
     /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
+    /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     /diff                      toast: Reading the changes…
     /review                    rpc git_diff, rpc git_status
@@ -354,7 +355,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (default_model ()) (default_thinking ()) (fallback_models ())
       (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
       (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-      (mask_observations true) (naming_model ())))
+      (mask_observations true) (naming_model ()) (dictation_model ())))
     |}]
 ;;
 
@@ -472,10 +473,14 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready $0.00
-    (quiet)
-    (0%)
-    (main)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (quiet)
     |}];
   H.key h "o" ~ctrl:true;
@@ -503,10 +508,14 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".status-extras";
   [%expect
     {|
-    Ready $0.00
-    (verbose)
-    (0%)
-    (main)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (verbose)
     |}]
 ;;
@@ -538,19 +547,18 @@ let%expect_test "/confirm" =
     (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
      (tag
       (Config_saved
-       "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
-    (Expire_toast (id 0) (after_ms 5580))
-    (Asks: edits & commands)
+       "Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first")))
+    (Expire_toast (id 0) (after_ms 4660))
+    (ask)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag
-      (Config_saved
-       "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
+      (Config_saved "Mode auto, also for new sessions: tools run without asking")))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm maybe") (max 500))) (tag Ignore))
-    Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first
-    Unknown setting “maybe”: use on or off. (Dismiss)
+    Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first
+    Unknown setting “maybe”: use on, off, ask, auto-edit or auto. (Dismiss)
     |}]
 ;;
 

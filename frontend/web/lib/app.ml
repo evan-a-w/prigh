@@ -166,6 +166,8 @@ module Reply_tag = struct
     | Default_dir_saved
     | Compaction_saved
     | Naming_saved
+    | Dictation_saved
+    | Transcribed
     | Default_saved
     | Session_stats
     | Trace
@@ -274,6 +276,14 @@ module Command = struct
     | Focus of string
     | Clear_text_selection
     | Place_popover
+    | Pick_images
+    | Start_dictation of Dictation.Engine.t
+    | Stop_dictation
+    | Cancel_dictation
+    | Annotate_setup
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_export
     | Place_menu of Context_menu.Anchor.t
     | Open_tab of string
     | Set_caret of int
@@ -453,6 +463,7 @@ module Action = struct
     | Remove_worktree of { force : bool }
     | Open_menu of Context_menu.t
     | Toggle_sidebar
+    | Toggle_status_tray
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -465,6 +476,30 @@ module Action = struct
     | Cycle_mode
     | Add_image of Image.t
     | Remove_image of int
+    | Dictate
+    | Dictation_cancel
+    | Dictation_progress of
+        { elapsed_ms : int
+        ; level : float
+        }
+    | Dictation_audio of
+        { mime_type : string
+        ; data : string
+        }
+    | Dictation_text of string
+    | Dictation_failed of string
+    | Browser_speech of bool
+    | Annotate of
+        { image : Image.t
+        ; target : Annotate.Target.t
+        }
+    | Annotate_color of string
+    | Annotate_size of int
+    | Annotate_strokes of int
+    | Annotate_undo
+    | Annotate_clear
+    | Annotate_save
+    | Annotated of Image.t
     | Show_toast of
         { text : string
         ; error : bool
@@ -565,6 +600,9 @@ module Model = struct
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list
+    ; dictation : Dictation.t
+    ; dictation_engine : Dictation.Engine.t
+    ; browser_speech : bool
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
     ; recipient : Recipient.t
@@ -578,6 +616,7 @@ module Model = struct
     ; update_ready : bool
     ; sidebar_open : bool
     ; review_drawer : bool
+    ; status_tray : bool
     ; scrolled_up : bool
     ; session_query : string
     ; archived_open : bool
@@ -797,6 +836,9 @@ let init =
   ; completion = None
   ; history = History.empty
   ; images = []
+  ; dictation = Idle
+  ; dictation_engine = Server
+  ; browser_speech = false
   ; queue = Queued.empty
   ; agent_queues = []
   ; recipient = Main
@@ -809,6 +851,7 @@ let init =
   ; next_toast = 0
   ; update_ready = false
   ; sidebar_open = true
+  ; status_tray = false
   ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
@@ -944,11 +987,20 @@ let field json name =
 ;;
 
 let close_dialog (m : Model.t) =
+  (* The filter's menu hangs from its button in a phone's header tray: done
+     with it, the tray goes too. *)
+  let m =
+    match m.dialog with
+    | Some (Filter _) when m.status_tray -> { m with status_tray = false }
+    | _ -> m
+  in
   match m.return_to_settings, m.dialog with
   | ( true
     , Some
         ( Login _ | Forge_host _ | Nix_gc_confirm _
-        | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
+        | Picker
+            { kind = Compaction_models | Naming_models | Dictation_models; _ }
+          ) ) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -2788,8 +2840,8 @@ let verbosity_picker (m : Model.t) =
 
 (* The default mode for new sessions, which the backend applies to this
    session too. *)
-let set_confirm (m : Model.t) enabled =
-  let approval_mode : Approval_mode.t = if enabled then Ask else Auto in
+(* The default mode, which the backend also gives this session. *)
+let set_default_mode (m : Model.t) (approval_mode : Approval_mode.t) =
   let m =
     { m with
       state =
@@ -2797,18 +2849,20 @@ let set_confirm (m : Model.t) enabled =
           { s with approval_mode; plan_mode = false })
     }
   in
+  let mode : Session_mode.t = { approval = approval_mode; plan = false } in
   save_config
     m
     { (config m) with approval_mode }
     ~fields:[ "approval_mode" ]
     ~notice:
-      (if enabled
-       then
-         "Tool confirmation on (mode ask, also for new sessions): "
-         ^ Session_mode.describe { approval = Ask; plan = false }
-       else
-         "Tool confirmation off (mode auto, also for new sessions): "
-         ^ Session_mode.describe { approval = Auto; plan = false })
+      (sprintf
+         "Mode %s, also for new sessions: %s"
+         (Approval_mode.to_string approval_mode)
+         (Session_mode.describe mode))
+;;
+
+let set_confirm (m : Model.t) enabled =
+  set_default_mode m (if enabled then Ask else Auto)
 ;;
 
 let mode_text (mode : Session_mode.t) =
@@ -2866,11 +2920,40 @@ let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Thinking -> Thinking
   | Mode -> Modes
   | Host -> Hosts
+  | Attach -> Attach
 ;;
 
 let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
   | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Host -> false
+  | Model | Mode | Host | Attach -> false
+;;
+
+(* The composer's +: what can go with the message. *)
+let attach_menu =
+  Picker.create
+    ~title:"Add to your message"
+    [ Picker.Item.create
+        ~id:"files"
+        ~detail:"uploaded to the tool host; the agent gets their paths"
+        ~search:"files attach upload"
+        "Files…"
+    ; Picker.Item.create
+        ~id:"image"
+        ~detail:"shown to the model; draw on it before sending"
+        ~search:"image photo picture screenshot"
+        "Images…"
+    ]
+;;
+
+(* Along the composer's lower tier, in this order; ← → step between them.
+   The others open from elsewhere. *)
+(* The chips that sit together, which ← → and Tab go along: the composer's
+   lower tier (model, host) and the chat header's (thinking, mode); the +
+   stands alone. *)
+let chip_row : Chip.t -> int = function
+  | Model | Host -> 0
+  | Thinking | Mode -> 1
+  | Attach -> 2
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
@@ -2889,6 +2972,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
           | Thinking -> thinking_levels_picker m
           | Mode -> modes_picker state
           | Host -> hosts_list m state
+          | Attach -> attach_menu
         in
         let m, cmds =
           open_dialog
@@ -2896,7 +2980,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
             ~focus:
               (match chip with
                | Model | Host -> "popover-filter"
-               | Thinking | Mode -> "popover-list")
+               | Thinking | Mode | Attach -> "popover-list")
             (Popover { chip; picker })
         in
         m, cmds @ [ Command.Place_popover ]))
@@ -2905,8 +2989,79 @@ let open_chip (m : Model.t) (chip : Chip.t) =
 (* ← → and Tab: the neighbouring chip's menu, as in a menu bar. *)
 let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
+  | Some (Popover { chip = Attach; _ }), _ -> m, []
   | Some (Popover { chip; _ }), Some state ->
-    open_chip m (Chip.step chip delta ~skip:(chip_opens_nothing state))
+    let row = chip_row chip in
+    open_chip
+      m
+      (Chip.step chip delta ~skip:(fun c ->
+         chip_opens_nothing state c || chip_row c <> row))
+  | _ -> m, []
+;;
+
+(* Dictation: the microphone records (or the browser listens) until pressed
+   again, then the text goes in at the caret. *)
+let no_dictation_model =
+  "Dictation needs a transcription model: pick one in Settings → Models (an \
+   OpenAI key, or a custom provider with /audio/transcriptions)."
+;;
+
+let dictate (m : Model.t) =
+  match m.dictation with
+  | Idle ->
+    let engine = m.dictation_engine in
+    { m with dictation = Starting engine }, [ Command.Start_dictation engine ]
+  | Starting _ -> { m with dictation = Idle }, [ Command.Cancel_dictation ]
+  | Recording _ ->
+    { m with dictation = Transcribing }, [ Command.Stop_dictation ]
+  | Transcribing -> m, []
+;;
+
+let dictated (m : Model.t) text =
+  let m = { m with dictation = Idle } in
+  if String.is_empty (String.strip text)
+  then toast m "Nothing was heard."
+  else (
+    let draft, cursor = Dictation.insert ~draft:m.draft ~cursor:m.cursor text in
+    edit_at_caret m ~cursor draft)
+;;
+
+(* The backend cannot transcribe: the browser's recognition, where there is
+   one, listens from the next press. *)
+let dictation_failed (m : Model.t) e =
+  let m = { m with dictation = Idle } in
+  if Dictation.no_provider e
+  then
+    if m.browser_speech
+    then
+      toast
+        { m with dictation_engine = Browser }
+        "No transcription model is set up, so the browser's speech recognition \
+         listens instead: press the microphone again (Settings → Models sets \
+         one up)."
+    else error m no_dictation_model
+  else error m (String.capitalize e)
+;;
+
+let annotate_dialog (m : Model.t) ~f =
+  match m.dialog with
+  | Some (Annotate a) ->
+    let a, cmds = f a in
+    { m with dialog = Some (Annotate a) }, cmds
+  | _ -> m, []
+;;
+
+(* The drawing, saved: over the attachment it was made on, or attached. *)
+let annotated (m : Model.t) (image : Image.t) =
+  match m.dialog with
+  | Some (Annotate { target; _ }) ->
+    let images =
+      match target with
+      | Pending i when i < List.length m.images ->
+        List.mapi m.images ~f:(fun j old -> if j = i then image else old)
+      | Pending _ | New -> m.images @ [ image ]
+    in
+    { m with dialog = None; images }, [ focus_editor ]
   | _ -> m, []
 ;;
 
@@ -3248,6 +3403,79 @@ let naming_command (m : Model.t) rest =
   | Show -> with_config m ~f:(fun c -> toast m (naming_summary c))
   | Error e -> error m (String.capitalize e)
   | Set_model _ as action -> set_naming m action
+;;
+
+let dictation_summary config =
+  String.capitalize (Prigh_ui.Dictation_command.summary config)
+;;
+
+(* The backend says when the model's provider cannot transcribe. *)
+let set_dictation (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Dictation_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:(List.map (Prigh_ui.Dictation_command.fields action) ~f:fst)
+          ~tag:Dictation_saved
+      ] ))
+;;
+
+(* OpenAI's transcription models, and the configured one if it is another
+   (a custom provider's, set with /dictation model PROVIDER/ID). *)
+let dictation_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    let current = config.dictation_model in
+    let suggested =
+      List.map Prigh_ui.Dictation_command.suggestions ~f:(fun (key, detail) ->
+        Picker.Item.create
+          ~id:key
+          ~detail
+          ~search:(key ^ " " ^ detail)
+          ~marked:(Option.equal String.equal current (Some key))
+          key)
+    in
+    let configured =
+      match current with
+      | Some key
+        when not
+               (List.Assoc.mem
+                  Prigh_ui.Dictation_command.suggestions
+                  ~equal:String.equal
+                  key) ->
+        [ Picker.Item.create
+            ~id:key
+            ~detail:"configured"
+            ~search:key
+            ~marked:true
+            key
+        ]
+      | Some _ | None -> []
+    in
+    open_picker
+      m
+      (Picker
+         { kind = Dictation_models
+         ; picker =
+             Picker.create
+               ~title:"Dictation model"
+               (Picker.Item.create
+                  ~id:"off"
+                  ~detail:Config.default_dictation_model
+                  ~search:"off default"
+                  ~marked:(Option.is_none current)
+                  "Default"
+                :: (configured @ suggested))
+         }))
+;;
+
+let dictation_command (m : Model.t) rest =
+  match Prigh_ui.Dictation_command.parse rest with
+  | Error _ when String.equal (String.strip rest) "model" ->
+    dictation_models_picker m
+  | Show -> with_config m ~f:(fun c -> toast m (dictation_summary c))
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_dictation m action
 ;;
 
 let commit_compact_at (m : Model.t) =
@@ -5364,7 +5592,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "confirm", ("on" | "true") -> set_confirm m true
   | "confirm", ("off" | "false") -> set_confirm m false
   | "confirm", other ->
-    error m (sprintf "Unknown setting “%s”: use on or off." other)
+    (match Approval_mode.of_string other with
+     | Some mode -> set_default_mode m mode
+     | None ->
+       error
+         m
+         (sprintf
+            "Unknown setting “%s”: use on, off, ask, auto-edit or auto."
+            other))
   | "budget", "" ->
     current_state m ~f:(fun s ->
       toast m (String.capitalize (Prigh_ui.Loop_status.describe_budget s)))
@@ -5572,6 +5807,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
   | "naming", rest -> naming_command m rest
+  | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -6942,6 +7178,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Dictation_saved, Error e ->
+    let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->
     (* The change shown at once did not happen: show the backend's. *)
     let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
@@ -6963,6 +7202,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | Transcribed, Error e ->
+    (match m.dictation with
+     | Transcribing -> dictation_failed m e
+     | Idle | Starting _ | Recording _ -> m, [])
   | (Dequeued | Unqueued _), Error e ->
     (* Shown removed at once: the backend's queue is the truth. *)
     let m, cmds = error m (String.capitalize e) in
@@ -7458,6 +7701,17 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
+  | Dictation_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      (* The backend may transcribe now: it is asked again. *)
+      toast
+        { m with config = Some config; dictation_engine = Server }
+        (dictation_summary config))
+  | Transcribed, Ok json ->
+    (match m.dictation, field json "text" with
+     | Transcribing, Some (`String text) -> dictated m text
+     | Transcribing, _ -> dictated m ""
+     | (Idle | Starting _ | Recording _), _ -> m, [])
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -8308,6 +8562,10 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     match (kind : Dialog.Picker_kind.t) with
     | Models -> set_model m item.id
     | Thinking -> set_thinking m item.id
+    | Attach ->
+      (match item.id with
+       | "image" -> m, [ Command.Pick_images ]
+       | _ -> with_files m (Files.update m.files (Pick Chat)))
     | Login ->
       (match String.chop_prefix item.id ~prefix:"forge ", item.id with
        | Some host, _ -> forge_account_login m host
@@ -8334,6 +8592,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     | Compaction_models ->
       let m, cmds =
         set_compaction
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
+    | Dictation_models ->
+      let m, cmds =
+        set_dictation
           m
           (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
       in
@@ -8627,9 +8896,11 @@ let dialog_accept (m : Model.t) =
            ~again:("forgejo " ^ host)
        in
        { m with return_to_settings = back }, cmds)
+  | Some (Annotate a) ->
+    if a.strokes > 0 then m, [ Command.Annotate_export ] else m, []
 ;;
 
-(* Following new output again: the jump button, or sending something. *)
+(* Following new output again): the jump button, or sending something. *)
 let to_bottom (m : Model.t) =
   { m with scrolled_up = false }, [ Command.Scroll_to_bottom ]
 ;;
@@ -9039,6 +9310,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Toggle_sidebar when Model.focused m ->
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
+  | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _
@@ -9067,6 +9339,45 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Question action -> question m action
   | Cycle_mode -> cycle_mode m
   | Add_image image -> { m with images = m.images @ [ image ] }, []
+  | Dictate -> dictate m
+  | Dictation_cancel ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing ->
+       { m with dictation = Idle }, [ Command.Cancel_dictation ])
+  | Dictation_progress { elapsed_ms; level } ->
+    (match m.dictation with
+     | Starting engine | Recording { engine; _ } ->
+       { m with dictation = Recording { engine; elapsed_ms; level } }, []
+     | Idle | Transcribing -> m, [])
+  | Dictation_audio { mime_type; data } ->
+    (match m.dictation with
+     | Transcribing ->
+       m, [ call (Transcribe { mime_type; data }) ~tag:Transcribed ]
+     | Idle | Starting _ | Recording _ -> m, [])
+  | Dictation_text text ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing -> dictated m text)
+  | Dictation_failed e ->
+    (match m.dictation with
+     | Idle -> m, []
+     | Starting _ | Recording _ | Transcribing -> dictation_failed m e)
+  | Browser_speech b -> { m with browser_speech = b }, []
+  | Annotate { image; target } ->
+    let m, cmds = open_dialog m (Annotate (Annotate.create image target)) in
+    m, cmds @ [ Command.Annotate_setup ]
+  | Annotate_color color -> annotate_dialog m ~f:(fun a -> { a with color }, [])
+  | Annotate_size size -> annotate_dialog m ~f:(fun a -> { a with size }, [])
+  | Annotate_strokes strokes ->
+    annotate_dialog m ~f:(fun a -> { a with strokes }, [])
+  | Annotate_undo ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_undo ])
+  | Annotate_clear ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_clear ])
+  | Annotate_save ->
+    annotate_dialog m ~f:(fun a -> a, [ Command.Annotate_export ])
+  | Annotated image -> annotated m image
   | Remove_image i ->
     { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
   | Show_toast { text; error } -> toast m ~error text
@@ -9147,8 +9458,10 @@ let update_connected (m : Model.t) (action : Action.t) =
         | ( Some Settings
           , Some
               ( Login _ | Forge_host _ | Nix_gc_confirm _
-              | Picker { kind = Compaction_models | Naming_models; _ } ) ) ->
-          { m' with return_to_settings = true }, cmds
+              | Picker
+                  { kind = Compaction_models | Naming_models | Dictation_models
+                  ; _
+                  } ) ) -> { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)
      | None -> m, [])
   | Toggle_terminal ->

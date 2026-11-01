@@ -11,11 +11,8 @@ let%expect_test
   [%expect
     {|
     []
-    (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
-    (backend)
-    (Attach files (or drop them here)) (Send (Enter))
+    (Add files or images (or paste, or drop them here))
+    (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect
@@ -24,7 +21,7 @@ let%expect_test
             title="Send (Enter)"
             aria-label="Send"
             disabled=""
-            class="btn primary send"
+            class="btn primary round send"
             @on_click>
       <icon class="send"> </icon>
     </button>
@@ -124,9 +121,14 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
     {|
     <div class="pending-images">
       <div class="pending-image">
-        <img src="data:image/png;base64,iVBORw0KGgo="
-             alt="[image: image/png, 8 B]"
-             title="[image: image/png, 8 B]"/>
+        <button type="button"
+                title="View it, or draw on it"
+                aria-label="View or draw on [image: image/png, 8 B]"
+                class="pending-thumb"
+                @on_click>
+          <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+          <icon class="pencil"> </icon>
+        </button>
         <button type="button"
                 title="Remove image"
                 aria-label="Remove image"
@@ -136,9 +138,14 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
         </button>
       </div>
       <div class="pending-image">
-        <img src="data:image/jpeg;base64,iVBORw0KGgo="
-             alt="[image: image/jpeg, 8 B]"
-             title="[image: image/jpeg, 8 B]"/>
+        <button type="button"
+                title="View it, or draw on it"
+                aria-label="View or draw on [image: image/jpeg, 8 B]"
+                class="pending-thumb"
+                @on_click>
+          <img src="data:image/jpeg;base64,iVBORw0KGgo=" alt="[image: image/jpeg, 8 B]" class="thumb"/>
+          <icon class="pencil"> </icon>
+        </button>
         <button type="button"
                 title="Remove image"
                 aria-label="Remove image"
@@ -377,7 +384,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -397,6 +404,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /tabs [on|off] show the open sessions as tabs over the chat (saved for your account)
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
@@ -424,7 +432,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /import [path] import a session from a JSONL file on the backend
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /skills pick a skill to invoke (/skill:name)
-    /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

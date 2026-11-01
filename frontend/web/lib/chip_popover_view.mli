@@ -14,3 +14,6 @@ val view
 (** Under the menu and the chips, over the rest of the page: a click on it
     closes the menu. *)
 val backdrop : inject:(App.Action.t -> unit Effect.t) -> Node.t
+
+(** How hard the model thinks at a level: rising bars, lit up to it. *)
+val meter : string -> Node.t

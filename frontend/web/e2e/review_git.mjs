@@ -146,10 +146,17 @@ try {
 
   // 2b. x selects files (Shift+X every one from the last), for the
   //     selection's bar; Esc lets go of them.
+  // Each key's effect waited on before the next, so that Shift+X counts
+  // from the file ← moved to.
+  const current = () => page.evaluate(() => document.querySelector(".review-file-row.current")?.textContent);
   await page.keyboard.press("x");
+  await page.locator(".review-file-row.marked").waitFor();
+  const before = await current();
   await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction(b => document.querySelector(".review-file-row.current")?.textContent !== b, before);
   await page.keyboard.press("Shift+X");
   await page.locator(".review-selection").waitFor();
+  await page.waitForFunction(() => document.querySelectorAll(".review-file-row.marked").length === 2);
   await show("two selected", ".review-selection");
   section("selected");
   console.log(await rows());

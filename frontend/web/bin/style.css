@@ -583,88 +583,125 @@ kbd {
 
 .scrim { display: none; }
 
-/* The session: in the docked sidebar a card of its status, with the
-   panels' toggles floating over the chat's corner; else a slim bar over the
-   chat (one of them at a time). The bar steps down with the chat column's
-   width, not the window's (see the container queries at the end). Its
-   height is fixed: what the status says never moves the page. */
-.session-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0 -10px;
-  padding: 12px 14px 12px 18px;
-  border-top: 1px solid var(--rule);
-}
-/* One left edge, and the figures on one right edge. The headline is what
-   the agent is doing, with the cost across from it (under it when the
-   sidebar is too narrow for both: the activity keeps a slot of its usual
-   words, so that the cost never moves as the agent starts and stops); then
-   what applies, muted, when anything does; the context's meter across the
-   card, the one thing coloured by how full it is; the branch. Tokens are
-   the meter's title. While the agent works its lamp is the one lit: the
-   background agents are told quietly. */
-.card-status.status {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 0;
-  overflow: visible;
-  font-size: 12px;
-  color: var(--muted);
-}
-.session-card .card-status.status .status-item { font: inherit; }
-.card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; font-weight: 560; color: var(--chalk); }
-.card-head > .activity { flex: 1 1 0; width: auto; min-width: min(8.5em, 100%); align-self: center; }
-.card-head > .activity:is(.idle, .running) { color: var(--chalk); }
-.card-head > .activity.retrying { color: var(--brick); }
-.card-status .card-head > .cost { margin-left: auto; color: var(--chalk); }
-.card-status .card-head > .cost.warm { color: var(--sodium); }
-.card-status .card-head > .cost.hot { color: var(--brick); }
-.card-status > .status-extras { flex-wrap: wrap; contain: none; gap: 4px 12px; padding: 0; overflow: visible; }
-.card-status .status-item.mode { color: var(--muted); }
-.card-status .status-item.mode:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background.active { color: var(--muted); }
-.card-status:has(.activity.running) .background.active:hover { color: var(--chalk); }
-.card-status:has(.activity.running) .background .lamp, .card-status .background > .icon { display: none; }
-.card-status > .context { display: flex; gap: 10px; margin-top: 2px; }
-.card-status > .context > .meter { flex: 1; width: auto; height: 3px; border-radius: 2px; background: var(--rule-2); }
-.card-status > .context .meter-fill { background: var(--sodium); border-radius: inherit; }
-.card-status > .context.hot .meter-fill { background: var(--brick); }
-.card-status > .context > .percent { min-width: 4ch; text-align: right; }
-.card-where { display: flex; min-width: 0; color: var(--faint); }
-.card-where > .branch { flex: 0 1 auto; min-width: 0; color: var(--faint); }
-
-.chat-tools {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: var(--z-tools);
-  padding: 2px;
-  border-radius: var(--r-control);
-  background: var(--bg);
-}
-.chat-tools > .panel-toggles { gap: 2px; }
-.chat-tools .btn.icon { width: 30px; height: 30px; }
-.chat-frame:has(> .chat-tools) > .jump-nav { top: 50px; }
-
+/* The session: one slim header over the chat, docked sidebar or not. The
+   title on the left with its branch in a quiet mono beside it; at the right
+   the status, the panels' toggles after a hairline. The status is three
+   figures and no words while all is well: a dot, a short meter with its
+   percent, the cost. Words only while the agent works or the backend is out
+   of reach. The bar steps down with the chat column's width, not the
+   window's (see the container queries at the end). Its height is fixed:
+   what the status says never moves the page. */
 .session-bar {
   container: bar / inline-size;
+  position: relative;
+  z-index: var(--z-tools);
   display: flex;
   align-items: center;
   gap: 12px;
   height: 44px;
-  padding: 0 8px;
+  padding: 0 8px 0 10px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--rule);
+  background: var(--bg);
 }
+.session-bar.docked { padding-left: 16px; }
 .session-bar > .toggle-sidebar { margin-right: -6px; color: var(--muted); }
-.session-bar > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--muted); font-size: 13.5px; }
-.session-bar > .session-name:hover { color: var(--chalk); }
-.session-bar > .status-extras { flex: 1 1 0; justify-content: flex-end; }
-.session-bar > .status { flex-shrink: 0; margin-left: auto; }
+.session-title { display: flex; align-items: baseline; gap: 10px; flex: 0 1 auto; min-width: 6ch; overflow: hidden; }
+.session-title > .session-name { flex: 0 1 auto; min-width: 6ch; color: var(--chalk); font-size: 13.5px; font-weight: 560; }
+.session-title > .branch {
+  flex: 0 10 auto;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 11.5px var(--mono);
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: var(--r-chip);
+}
+.session-title > .branch:hover { color: var(--chalk); }
+.session-title > .branch:hover .branch-name { text-decoration: underline; text-underline-offset: 2px; }
+.session-title > .branch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.bar-tray > .status-extras { flex: 0 0 auto; contain: none; justify-content: flex-end; margin-left: auto; }
+.bar-tray > .status { flex-shrink: 0; margin-left: auto; overflow: visible; }
+.bar-tray > .status-extras + .status { margin-left: 0; }
+.bar-tray > .panel-toggles { gap: 2px; padding-left: 8px; border-left: 1px solid var(--rule); }
+.session-bar .panel-toggles .btn.icon { width: 30px; height: 30px; }
 .session-bar > .settings-toggle { color: var(--faint); }
+/* Wide, the tray is no box at all: its parts sit in the header's row. On a
+   phone's narrow header it folds under the glance (see the bar's steps). */
+.bar-tray { display: contents; }
+.bar-tray-toggle, .bar-tray-backdrop { display: none; }
 .session-bar > .settings-toggle:hover { color: var(--chalk); }
+
+/* The thinking level and the mode: figures like the status's, not buttons,
+   until pointed at; their menus open below them. A mode where nothing asks
+   is lit, as is plan. */
+.session-chips { display: flex; align-items: center; gap: 2px; flex-shrink: 0; position: relative; }
+.session-bar:has(.session-chips.menu-open) { z-index: var(--z-menu-anchor); }
+.session-chips .chip-button {
+  height: 26px;
+  padding: 0 7px;
+  gap: 6px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  font: 12px var(--sans);
+}
+.session-chips .chip-button:not(.awaiting):is(:hover, :focus-visible),
+.session-chips .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
+.session-chips .chip-button .icon { width: 12px; height: 12px; }
+.session-chips .thinking-chip .thinking-meter { height: 10px; }
+.session-chips .thinking-chip .thinking-meter > .bar.on { background: currentColor; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(1) { height: 3px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(2) { height: 5px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(3) { height: 7.5px; }
+.session-chips .thinking-chip .thinking-meter > .bar:nth-child(4) { height: 10px; }
+.session-chips .thinking-chip.unsupported { color: var(--faint); }
+.session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode { color: var(--sodium); }
+
+/* The context's gauge and its details, over it on hover (to the keyboard
+   they are its description): what the
+   header has no room for, in two columns, figures in mono. */
+.status-gauge { position: relative; display: inline-flex; }
+.status-details {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -8px;
+  z-index: var(--z-menu-surface);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 12px;
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out, visibility 0s 0.12s;
+  pointer-events: none;
+}
+.status-gauge:hover > .status-details {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.15s, 0.15s, 0s;
+}
+.status-detail { display: contents; }
+.status-detail-key { color: var(--faint); }
+.status-detail-value { color: var(--chalk); font: 11.5px var(--mono); text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.status-detail.context.warm .status-detail-value { color: var(--sodium); }
+.status-detail.context.hot .status-detail-value { color: var(--brick); }
+.status-detail-hint { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .status-details { transition: none; } }
+@media (hover: none) { .status-details { display: none; } }
 
 /* Session tabs (/tabs on): the open sessions over the chat. The current one
    is cut from the chat's own ground with the sidebar's sodium edge; the
@@ -850,28 +887,41 @@ kbd {
 .composer {
   container: composer / inline-size;
   position: relative;
-  padding: 8px 16px 10px;
+  padding: 8px 16px 12px;
   max-width: 892px;
   width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  --composer-inset: 14px; /* one left edge: the text, the +, the chips */
 }
-/* One instrument: what you write on top, and along its bottom edge what it
-   goes to (model, thinking, mode) and what to do with it (attach, stop,
-   send). */
-.composer-box {
+/* One card, two zones under one outline. Above: what you write and what to
+   do with it (+ on the left; the microphone and send on the right). Below a
+   hairline, recessed: where it goes (model, host). The accent is spent on
+   send alone; focus brightens the edge rather than painting it. */
+.composer-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--slate);
   border: 1px solid var(--rule-2);
   border-radius: var(--r-surface);
-  padding: 6px;
+  box-shadow: 0 8px 24px -14px var(--edge-shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.composer-stack:focus-within {
+  border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2));
+  box-shadow: 0 0 0 3px var(--sodium-wash), 0 8px 24px -14px var(--edge-shadow);
+}
+.composer-box {
+  position: relative;
+  padding: 8px calc(var(--composer-inset) - 6px) 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  transition: border-color 0.12s;
+  gap: 4px;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
 }
-.composer-box:focus-within { border-color: var(--sodium); }
 .editor {
   resize: none;
   border: 0;
@@ -879,21 +929,107 @@ kbd {
   background: transparent;
   font-size: 15px;
   line-height: 1.5;
-  padding: 6px 8px 4px;
-  min-height: 34px;
+  padding: 6px 6px 2px;
+  min-height: 48px;
   max-height: 40vh;
   overflow-y: auto;
+  caret-color: var(--sodium);
 }
-.composer-bar { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.editor::placeholder { color: var(--faint); }
+/* The placeholder is one line, cut rather than wrapped. */
+.editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer-row { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.composer-plus { position: relative; display: flex; flex-shrink: 0; }
+.composer-plus.menu-open { z-index: var(--z-menu-anchor); }
+/* One size of control: 32px circles, 18px icons of one weight. + and the
+   microphone are quiet until pointed at; send is filled. */
+.round.btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.round.btn .icon { width: 18px; height: 18px; stroke-width: 1.9; }
+.btn.ghost.round { color: var(--muted); }
+@media (hover: hover) {
+  .btn.ghost.round:not(:disabled):hover { background: var(--slate-2); color: var(--chalk); }
+}
+.chip-anchor.open > .btn.plus { background: var(--slate-2); color: var(--chalk); }
+.chip-anchor.open > .btn.plus .icon { transform: rotate(45deg); }
+.btn.plus .icon { transition: transform 0.15s ease-out; }
+.composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+/* Send: a sodium disc; with nothing to send, an empty ring. Running with
+   nothing typed, the disc stops. */
+.composer-buttons .send .icon { color: var(--sodium-ink); stroke-width: 2.4; }
+.composer-buttons .send:disabled {
+  background: transparent;
+  border: 1.5px solid var(--rule-2);
+  opacity: 1;
+}
+.composer-buttons .send:disabled .icon { color: var(--faint); }
+.composer-buttons .stop .icon { width: 12px; height: 12px; }
+.composer-buttons .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
+.composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
+/* Listening: the microphone is a brick disc; the row says how long and how
+   loud, at the buttons' height, on no surface of its own. */
+.btn.mic.on { background: var(--brick); border-color: var(--brick); }
+.btn.mic.on .icon { color: var(--graphite); }
+.btn.mic:disabled { opacity: 0.6; }
+.dictation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 32px;
+  padding: 0 4px 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  animation: popover-rise 0.12s ease-out;
+}
+.dictation-dot {
+  --level: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brick);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--brick-line);
+  transition: box-shadow 0.1s linear;
+}
+.dictation-time { font-variant-numeric: tabular-nums; color: var(--chalk); }
+.dictation-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dictation .lamp { flex-shrink: 0; }
+.dictation-cancel.btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--faint); margin-left: auto; }
+.dictation-cancel .icon { width: 12px; height: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .dictation-dot { transition: none; box-shadow: none; }
+  .btn.plus .icon { transition: none; }
+  .composer-stack { transition: none; }
+}
+
+/* The lower zone: where the message goes, recessed under a hairline, as
+   wide as the card. */
+.composer-tier {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px calc(var(--composer-inset) - 8px);
+  background: var(--well);
+  border-top: 1px solid var(--rule);
+  border-radius: 0 0 calc(var(--r-surface) - 1px) calc(var(--r-surface) - 1px);
+}
 .composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
-/* Settings of the message, written in the box's own voice: plain words
-   that line up with the text above them, until pointed at. Their chevrons
+/* Settings of the message, quiet words until pointed at. Their chevrons
    (and a hover's wash) say they open something; the pickers are the
    commands' own. */
 .chip-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 28px;
   min-width: 0;
   flex-shrink: 0;
@@ -913,10 +1049,11 @@ kbd {
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
 .composer-controls .chip-button > .icon:first-child { display: none; }
-.chip-button .chevron { width: 11px; height: 11px; opacity: 0; transition: opacity 0.12s; }
+.chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s, transform 0.15s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
-.composer-box:focus-within .chip-button:not(:hover, :focus-visible) { color: var(--muted); }
 .model-chip { color: var(--muted); }
+.composer-tier .model-chip { color: var(--chalk); font-weight: 500; }
+.composer-tier .host-chip { color: var(--muted); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
@@ -925,55 +1062,86 @@ kbd {
 .composer-controls .host-chip > .icon:first-child { display: inline-block; }
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
-.composer-controls .host-chip.warm, .composer-box:focus-within .host-chip.warm:not(:hover) { color: var(--sodium); }
+.composer-controls .host-chip.warm { color: var(--sodium); }
 /* A disconnected host keeps its name; its server is struck through in
    brick and "offline" follows, which the name gives way to first. */
 .host-chip.offline > .icon:first-child { color: var(--brick); }
 .host-chip.offline .chip-label { min-width: 3ch; }
 .host-chip .chip-state { flex-shrink: 0; color: var(--brick); font-size: 11.5px; white-space: nowrap; }
-.editor::placeholder { color: var(--faint); }
-/* The placeholder is one line, cut rather than wrapped. */
-.editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Send is the one bold thing: a sodium disc, unlit until there is
-   something to send. */
-.composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.composer-buttons .btn { width: 32px; height: 32px; padding: 0; border-radius: 50%; transition: none; }
-.composer-buttons .send .icon { color: var(--sodium-ink); width: 17px; height: 17px; stroke-width: 2.5; }
-.composer-buttons .send:disabled { background: var(--slate-2); border-color: var(--slate-2); opacity: 1; }
-.composer-buttons .send:disabled .icon { color: var(--faint); }
-.composer-buttons .stop { background: var(--brick-wash); }
-.composer-buttons .stop .icon { width: 12px; height: 12px; }
 
-.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 2px 0; }
-.pending-image { position: relative; }
-.pending-image img { display: block; height: 64px; max-width: 120px; object-fit: contain; background: var(--well); border-radius: var(--r-control); border: 1px solid var(--rule); }
-.remove-image {
+/* Images going with the message: square tiles, each opening where it can
+   be drawn on (the pencil says so), removed from its own corner. */
+.pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 6px 4px; }
+.pending-image { position: relative; animation: popover-rise 0.12s ease-out; }
+.pending-thumb {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  background: var(--well);
+  cursor: pointer;
+  border-radius: var(--r-control);
+  overflow: hidden;
+}
+.pending-thumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.pending-image img.thumb { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pending-thumb .draw-hint {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  left: 4px;
+  bottom: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.remove-image.btn {
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  right: 4px;
   width: 20px;
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  background: var(--slate-2);
-  border-color: var(--rule-2);
+  background: rgb(0 0 0 / 0.55);
+  border-color: transparent;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s, background-color 0.12s;
 }
-.remove-image:hover { color: var(--brick); }
-.remove-image .icon { width: 11px; height: 11px; }
+.remove-image .icon { width: 10px; height: 10px; stroke-width: 2.5; }
+.remove-image.btn:hover { background: var(--brick); color: #fff; }
+.pending-image:is(:hover, :focus-within) :is(.draw-hint, .remove-image.btn) { opacity: 1; }
+@media (hover: none) {
+  .pending-image :is(.draw-hint, .remove-image.btn) { opacity: 1; }
+}
+.attach-icon { --mark-size: 15px; color: var(--muted); }
 
+/* / and @ completion: attached to the top of the card, as wide, the card's
+   top corners squared while it is open, so the two read as one. */
 .popup {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: calc(100% - 4px);
+  left: -1px;
+  right: -1px;
+  bottom: 100%;
   background: var(--slate);
   border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
+  border-bottom: 0;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  box-shadow: 0 -10px 28px -16px var(--edge-shadow);
   overflow: hidden;
   z-index: var(--z-float);
-  animation: rise 0.12s ease-out;
+  animation: popover-rise 0.12s ease-out;
 }
+.composer-stack.completing { border-top-left-radius: 0; border-top-right-radius: 0; }
+.composer-stack.completing > .composer-box { border-top: 1px solid var(--rule); border-radius: 0; }
+.composer-stack.completing:focus-within > .popup { border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2)); }
 .popup-title {
   display: flex;
   justify-content: space-between;
@@ -1025,13 +1193,17 @@ kbd {
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); }
-.status-item.activity { width: 20ch; flex-shrink: 0; gap: 7px; }
+/* A slot of its own, so that the meter and the cost never move as the
+   agent starts and stops; its words start at the slot's left. */
+.status-item.activity { width: 14ch; flex-shrink: 0; gap: 7px; justify-content: flex-start; }
+/* Idle says nothing: the dot, its word for screen readers and the title. */
+.status-item.activity.idle { color: var(--faint); }
 .status-item.activity > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status .context > .percent { min-width: 3ch; text-align: right; }
 .status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
-.idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--faint-line); }
-.meter { width: 40px; height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; }
+.idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--sage, var(--faint-line)); opacity: 0.8; }
+.meter { width: 28px; height: 3px; border-radius: 2px; background: var(--rule-2); overflow: hidden; }
 .meter-fill { display: block; height: 100%; background: var(--muted); }
 .context.warm { color: var(--sodium); }
 .context.warm .meter-fill { background: var(--sodium); }
@@ -1268,8 +1440,7 @@ kbd {
 
 @media (max-width: 760px) {
   .session-bar { gap: 8px; }
-  .composer { padding: 6px 8px 8px; }
-  .popup { left: 8px; right: 8px; }
+  .composer { padding: 6px 8px 8px; --composer-inset: 12px; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
   .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
   .main:has(.jump-to-bottom) .toast { max-width: none; }
@@ -1549,7 +1720,7 @@ kbd {
 .session.opening .session-title { color: var(--muted); }
 .composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
 
-.composer.offline .composer-box { border-style: dashed; }
+.composer.offline .composer-stack { border-style: dashed; }
 .status-item.connecting { color: var(--muted); }
 .status-item.connecting.offline { color: var(--brick); }
 .loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
@@ -1660,25 +1831,93 @@ kbd {
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
 }
 
-/* The bar's steps. A narrower bar drops the counters (the context's link
-   has them, in the session's details), then says what applies with icons
-   alone (their tooltips and names say the rest), then the activity is a
-   dot. */
+/* The bar's steps. A narrower bar drops the branch, then says what applies
+   with icons alone (their tooltips and names say the rest), then the meter
+   (its percent stays) and the running words (the lamp stays). */
 @container bar (width < 760px) {
   .status { gap: 0 12px; }
-  .status .tokens, .status .cost:not(.budget) { display: none; }
+  .session-title > .branch { display: none; }
 }
 @container bar (width < 600px) {
   .status-extras .status-text, .status-extras .status-item.mode { display: none; }
-  .status-item.activity { width: 14ch; }
-}
-@container bar (width < 480px) {
-  .status, .status-extras { gap: 0 10px; padding: 4px 0; }
   .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
   .status-item.activity:is(.running, .idle) > .label { display: none; }
-  /* Not working but out of touch: that is worth the room. */
   .status-item.activity:is(.connecting, .offline) { width: auto; }
-  .status .meter { display: none; }
+  .session-chips .chip-label { display: none; }
+}
+/* A phone's header: the title, the glance (a dot, the context's percent)
+   and the settings. The glance opens the tray under the header: the
+   thinking level and the mode, the status in full, what applies, then the
+   panels' toggles on a row of their own. */
+@container bar (width < 480px) {
+  .session-bar { gap: 6px; }
+  .session-title { flex: 1 1 auto; min-width: 4ch; }
+  .bar-tray-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 6px 0 8px;
+    color: var(--muted);
+    font: 12px var(--mono);
+    flex-shrink: 0;
+  }
+  .bar-tray-toggle[aria-expanded="true"] { background: var(--slate-2); color: var(--chalk); }
+  .bar-tray-toggle .tray-chevron { width: 12px; height: 12px; transition: transform 0.12s ease-out; }
+  .bar-tray-toggle[aria-expanded="true"] .tray-chevron { transform: rotate(180deg); }
+  .status-glance { display: inline-flex; align-items: center; gap: 6px; }
+  .status-glance .glance-percent.warm { color: var(--sodium); }
+  .status-glance .glance-percent.hot { color: var(--brick); }
+  .bar-tray { display: none; }
+  .bar-tray.open {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 8px;
+    right: 8px;
+    z-index: var(--z-menu-surface);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 10px 12px;
+    background: var(--slate);
+    border: 1px solid var(--rule-2);
+    border-radius: var(--r-surface);
+    box-shadow: var(--float-shadow);
+    animation: popover-rise 0.12s ease-out;
+  }
+  .bar-tray.open > .session-chips { order: 1; margin-left: -7px; }
+  .bar-tray.open > .status { order: 2; margin-left: auto; padding: 0; gap: 0 12px; }
+  .bar-tray.open > .status-extras { order: 3; flex: 1 1 100%; justify-content: flex-start; margin: 0; }
+  .bar-tray.open > .panel-toggles {
+    order: 4;
+    flex: 1 1 100%;
+    justify-content: space-around;
+    padding: 8px 0 0;
+    border-top: 1px solid var(--rule);
+  }
+  .bar-tray.open .session-chips .chip-label,
+  .bar-tray.open .status-extras .status-text { display: inline; }
+  .bar-tray.open .status .meter { display: block; }
+  .bar-tray.open .status .cost { display: inline-flex; }
+  .bar-tray.open .status-item.activity:is(.running, .idle) { width: 14ch; justify-content: flex-start; }
+  .bar-tray.open .status-item.activity > .label { display: inline; }
+  .bar-tray.open .chip-popover[data-chip] { left: 0; right: 0; }
+  .bar-tray-backdrop {
+    display: block;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 100dvh;
+    z-index: var(--z-menu-surface);
+    background: rgb(0 0 0 / 0.25);
+  }
+  .bar-tray.open { z-index: calc(var(--z-menu-surface) + 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-tray.open { animation: none; }
+  .bar-tray-toggle .tray-chevron { transition: none; }
 }
 
 /* Settings: a row per setting, its name, a line on what it does, and its
@@ -1724,19 +1963,30 @@ kbd {
 .settings-panel-head { margin-bottom: 6px; }
 .settings-panel-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .settings-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 62ch; }
-.settings-group { margin-top: 14px; }
-.settings-group h4 { margin: 0; padding: 6px 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-.settings-group > .setting:first-child { border-top: 0; }
-.settings-group > h4 + .setting { border-top: 0; }
+/* A group: a small heading, then its rows on a card, rules between them. */
+.settings-group { margin-top: 18px; }
+.settings-group-head { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 7px; }
+.settings-group h4 { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.settings-group-note { color: var(--faint); font-size: 12px; }
+.settings-card { background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-surface); padding: 0 14px; }
+.settings-card > .setting:first-child { border-top: 0; }
 @media (prefers-reduced-motion: reduce) { .settings-panel { animation: none; } }
-.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--rule); }
 .setting-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setting-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .setting-name { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
-.setting-about { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+/* Where a setting is kept, when not where its section's are. */
+.setting-scope { font-size: 10.5px; letter-spacing: 0.02em; color: var(--faint); border: 1px solid var(--rule-2); border-radius: 999px; padding: 0 6px; line-height: 15px; cursor: help; }
+.setting-about { color: var(--muted); font-size: 12.5px; line-height: 1.45; max-width: 60ch; }
 .setting-about.host { font: 11.5px var(--mono); color: var(--faint); }
 .setting-note { font-size: 12.5px; line-height: 1.45; }
 .setting-note.warm { color: var(--sodium); }
 .setting-note.muted { color: var(--faint); }
+/* A choice made in a picker: reads as a select box. */
+.setting-select { gap: 6px; max-width: 240px; }
+.setting-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setting-select > .chevron { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
+.setting-select:hover > .chevron { color: var(--chalk); }
 .setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
 .account-setting { flex-wrap: nowrap; }
 .account-setting .setting-text { flex-basis: 0; }
@@ -1873,10 +2123,11 @@ kbd {
   .btn.icon { min-width: 36px; min-height: 36px; }
 }
 
-/* A composer chip's menu: a small surface standing on its chip, opening
-   upward over the chat (below the chip only when there is no room above:
-   web_main's place_popover, which also gives the height it may take). Its
-   chip stays lit while it is open, and only the chips stay above the
+/* A chip's menu (and the + menu): a small surface standing on what opened
+   it, left edges aligned, 6px clear: upward over the composer and the chat,
+   below only when there is no room above (web_main's place_popover, which
+   also gives the height it may take and shifts it in from the right edge).
+   Its chip stays lit while it is open, and only the chips stay above the
    backdrop, so a click on another chip opens that one's menu. Only then:
    the rest of the time, what covers the page (a dialog, the image viewer,
    a phone's drawer) covers the chips too. */
@@ -1887,8 +2138,8 @@ kbd {
 .chip-anchor.open > .chip-button .chevron { opacity: 1; transform: rotate(180deg); }
 .chip-popover {
   position: absolute;
-  left: calc(var(--popover-shift, 0px) - 2px);
-  bottom: calc(100% + var(--popover-lift, 0px) + 8px);
+  left: var(--popover-shift, 0px);
+  bottom: calc(100% + 6px);
   width: 300px;
   max-width: calc(100vw - 24px);
   max-height: min(26rem, var(--popover-room, 70vh));
@@ -1900,7 +2151,7 @@ kbd {
 }
 .chip-popover[data-placement="below"] {
   bottom: auto;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   border-bottom-left-radius: var(--r-surface);
   border-top-left-radius: 4px;
 }
@@ -1967,20 +2218,12 @@ kbd {
   .chip-popover { animation: none; }
   .chip-anchor.open > .chip-button .chevron { transition: none; }
 }
-/* A phone: the menu is as wide as the composer's box, over it, the page
-   behind dimmed. */
+/* A phone: the menus stay on what opened them, as wide as the screen
+   allows (place_popover shifts them in); the header's span the header. */
 @media (max-width: 760px) {
-  .composer-box { position: relative; }
-  .composer-controls, .chip-anchor { position: static; }
-  .chip-popover { z-index: var(--z-menu-surface); bottom: calc(100% + 8px); }
-  .chip-popover,
-  .chip-popover[data-chip] {
-    left: 0;
-    right: 0;
-    width: auto;
-    max-width: none;
-    border-radius: var(--r-surface);
-  }
+  .session-chips { position: static; }
+  .session-bar .chip-popover[data-chip] { left: 8px; right: 8px; width: auto; max-width: none; }
+  .chip-popover { z-index: var(--z-menu-surface); max-width: calc(100vw - 16px); }
   .chip-popover { max-height: min(70dvh, var(--popover-room, 70dvh)); }
   .popover-item { padding-top: 10px; padding-bottom: 10px; }
 }
@@ -2012,3 +2255,59 @@ kbd {
 .compact-at-field:focus-within { outline: 2px solid var(--sodium); outline-offset: 0; }
 .compact-at-field:has(.compact-at-input[aria-invalid="true"]) { box-shadow: inset 0 0 0 1px var(--brick); }
 .summary-model-choice { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Drawing on an image: the image as large as the dialog lets it be, the
+   canvas exactly over it, and above them the pen (colours, then widths, as
+   dots of that colour) with undo and clear. */
+.modal-backdrop:has(> .annotate-dialog) { padding: 16px; align-items: center; }
+.modal.annotate-dialog { width: min(1100px, calc(100vw - 32px)); max-width: none; height: min(860px, 100%); max-height: none; }
+.annotate-dialog .modal-body { display: flex; flex-direction: column; gap: 10px; overflow: hidden; scrollbar-gutter: auto; flex: 1; }
+.annotate-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.annotate-swatches, .annotate-sizes { display: flex; align-items: center; gap: 6px; }
+.annotate-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px #0000003d;
+  cursor: pointer;
+}
+.annotate-swatch.on { border-color: var(--chalk); box-shadow: 0 0 0 2px var(--slate), inset 0 0 0 1px #0000003d; }
+.annotate-size {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+.annotate-size:hover { background: var(--slate-2); }
+.annotate-size.on { background: var(--slate-2); border-color: var(--rule-2); }
+.annotate-dot { width: var(--pen); height: var(--pen); max-width: 18px; max-height: 18px; border-radius: 50%; background: var(--swatch); }
+.annotate-sep { width: 1px; height: 22px; background: var(--rule); }
+.annotate-spacer { flex: 1; }
+.annotate-toolbar .btn.small { gap: 6px; }
+.annotate-toolbar .btn .icon { width: 14px; height: 14px; }
+.annotate-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  background: var(--well) repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  overflow: hidden;
+}
+.annotate-frame { position: relative; display: inline-block; max-width: 100%; max-height: 100%; line-height: 0; }
+.annotate-frame img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: auto; user-select: none; -webkit-user-drag: none; }
+.annotate-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.annotate-hint { flex: 1; color: var(--faint); font-size: 12px; }
+@media (max-width: 760px) {
+  .modal-backdrop:has(> .annotate-dialog) { padding: 0; }
+  .modal.annotate-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
+  .annotate-hint { display: none; }
+}

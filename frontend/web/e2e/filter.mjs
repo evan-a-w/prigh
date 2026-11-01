@@ -318,6 +318,8 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Adding it"));
+  // In the header's tray, behind the glance.
+  await page.locator(".bar-tray-toggle").click();
   await page.locator("#filter-toggle").click();
   await page.locator(".filter-menu.placed").waitFor();
   section("phone");
@@ -340,6 +342,7 @@ try {
   });
   console.log(fits);
   await screenshot("phone filtered");
+  if (!(await page.locator(".bar-tray.open").count())) await page.locator(".bar-tray-toggle").click();
   await page.locator("#filter-toggle").click();
   await page.locator(".filter-menu.placed").waitFor();
   await page.locator(".filter-menu .menu-item", { hasText: "Show all" }).click();

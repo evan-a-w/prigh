@@ -66,6 +66,8 @@ module Reply_tag = struct
     | Compaction_saved of string
     | Naming_shown
     | Naming_saved of string
+    | Dictation_shown
+    | Dictation_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -1659,8 +1661,8 @@ let job_output m id =
 (* ---- skills and MCP servers ------------------------------------------ *)
 
 let skills_hint =
-  "add one as .prigh/skills/<name>/SKILL.md (or .claude/skills/<name>/) in \
-   the project, or under ~/.prigh/skills/"
+  "add one as .prigh/skills/<name>/SKILL.md (or .claude/skills/<name>/) in the \
+   project, or under ~/.prigh/skills/"
 ;;
 
 (* [/abs/proj/.claude/skills/x/SKILL.md] as [~/proj/.claude/skills/x]. *)
@@ -1696,8 +1698,8 @@ let skills_picker m (skills : P.Skill.t list) =
 let open_skills m = m, [ call List_skills ~tag:Skills_picker ]
 
 let mcp_config_hint =
-  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a \
-   project's .mcp.json"
+  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a project's \
+   .mcp.json"
 ;;
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
@@ -2713,13 +2715,18 @@ let notify m (e : P.Event.t) =
 
 (* The default mode for new sessions, which the backend applies to this
    one too. *)
-let set_confirm m enabled =
-  let approval_mode : P.Approval_mode.t = if enabled then Ask else Auto in
+let set_default_mode m ?enabled (approval_mode : P.Approval_mode.t) =
   let label =
-    sprintf
-      "tool confirmation %s (approval mode %s, also for new sessions)"
-      (if enabled then "on" else "off")
-      (P.Approval_mode.to_string approval_mode)
+    match enabled with
+    | Some enabled ->
+      sprintf
+        "tool confirmation %s (approval mode %s, also for new sessions)"
+        (if enabled then "on" else "off")
+        (P.Approval_mode.to_string approval_mode)
+    | None ->
+      sprintf
+        "approval mode %s, also for new sessions"
+        (P.Approval_mode.to_string approval_mode)
   in
   ( { m with
       config =
@@ -2731,6 +2738,10 @@ let set_confirm m enabled =
         [ "approval_mode", str (P.Approval_mode.to_string approval_mode) ]
     ] )
 ;;
+let set_confirm m enabled =
+  set_default_mode m ~enabled (if enabled then Ask else Auto)
+;;
+
 
 (* Shown at once; the backend's state follows. *)
 let set_mode m (mode : Session_mode.t) =
@@ -2932,6 +2943,20 @@ let naming_command m (cmd : Commands.Parsed.t) =
           (Naming_command.fields action)
       ] )
 ;;
+let dictation_command m (cmd : Commands.Parsed.t) =
+  match Dictation_command.parse cmd.rest with
+  | Show ->
+    show_config m ~tag:Dictation_shown ~summary:Dictation_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/dictation " ^ cmd.rest))) e, []
+  | Set_model _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Dictation_saved ("/dictation " ^ cmd.rest))
+          (Dictation_command.fields action)
+      ] )
+;;
+
 
 (* ---- snippets ---------------------------------------------------------- *)
 
@@ -3631,7 +3656,15 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", ("on" | "true") :: _ -> set_confirm m true
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
-    error m (sprintf "unknown argument %S; use on or off" other), []
+    (match P.Approval_mode.of_string other with
+     | Some mode -> set_default_mode m mode
+     | None ->
+       ( error
+           m
+           (sprintf
+              "unknown argument %S; use on, off, ask, auto-edit or auto"
+              other)
+       , [] ))
   | "notify", [] -> notice m (notify_summary m), []
   | "notify", [ word ] when Option.is_some (Notify.Mode.of_string word) ->
     let mode = Option.value_exn (Notify.Mode.of_string word) in
@@ -3653,6 +3686,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
   | "compaction", _ -> compaction_command m cmd
+  | "dictation", _ -> dictation_command m cmd
   | "naming", _ -> naming_command m cmd
   | "auth", _ ->
     ( m
@@ -6446,7 +6480,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
-         notice { m with config = Some config } (Naming_command.summary config), [])
+         ( notice { m with config = Some config } (Naming_command.summary config)
+         , [] ))
+     | Dictation_shown | Dictation_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Dictation_command.summary config)
+         , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])
@@ -6482,13 +6523,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(fun json -> P.Json.string_field json "job_id")
          (fun id ->
-           ( notice
-               m
-               (sprintf
-                  "started job %s; /jobs shows it, and its exit is reported to \
-                   the agent"
-                  id)
-           , [] ))
+            ( notice
+                m
+                (sprintf
+                   "started job %s; /jobs shows it, and its exit is reported \
+                    to the agent"
+                   id)
+            , [] ))
      | Sessions_picker ->
        decode
          json

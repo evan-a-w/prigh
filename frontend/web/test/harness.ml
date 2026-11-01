@@ -18,6 +18,14 @@ let act t action =
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
      | Reconnect _
      | Place_popover
+     | Pick_images
+     | Start_dictation _
+     | Stop_dictation
+     | Cancel_dictation
+     | Annotate_setup
+     | Annotate_undo
+     | Annotate_clear
+     | Annotate_export
      | Place_menu _
      | Open_tab _
      | Set_url_session _

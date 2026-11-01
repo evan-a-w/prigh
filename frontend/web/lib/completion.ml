@@ -260,6 +260,7 @@ let argument_items
   | Remind
   | Compaction
   | Naming
+  | Dictation
   | Worktree
   | Review -> []
 ;;
@@ -385,13 +386,15 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | (Remind | Compaction | Naming | Worktree | Review) as kind ->
+             | (Remind | Compaction | Naming | Dictation | Worktree | Review) as
+               kind ->
                let rest = String.lstrip rest in
                Option.bind
                  (match kind with
                   | Compaction ->
                     Prigh_ui.Compaction_command.complete ~models rest
                   | Naming -> Prigh_ui.Naming_command.complete ~models rest
+                  | Dictation -> Prigh_ui.Dictation_command.complete rest
                   | Worktree ->
                     Prigh_ui.Worktree_command.complete ~worktrees rest
                     |> Option.map ~f:(fun (offset, candidates) ->

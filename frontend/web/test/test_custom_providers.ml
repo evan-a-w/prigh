@@ -345,7 +345,8 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     Forgejo codeberg.org
     Not signed in.
     (Use a token) (Connect)
-    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    Another Forgejo host
+    A self-hosted Forgejo or Gitea, by its host name.
     (Add host…)
     /login and /logout pick a provider (Add a custom provider) (Done)
     |}];

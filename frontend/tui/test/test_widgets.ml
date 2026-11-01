@@ -698,7 +698,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
-    /confirm [on|off]                  ask before destructive tools (approval mode ask or auto, also for new sessions)
+    /confirm [on|off|mode]             ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, auto
     /mode [ask|auto-edit|auto|plan]    pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /todos                             show the model's plan (its update_plan steps)
@@ -712,6 +712,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /dictation [model MODEL|off]       show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
     /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)

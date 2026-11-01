@@ -40,20 +40,20 @@ let rename (m : App.Model.t) (state : State.t) ~inject =
 ;;
 
 let panel_toggles (m : App.Model.t) ~inject =
+  (* A panel opened from a phone's tray: the tray gets out of its way (the
+     filter's menu hangs from its button, so that one keeps it). *)
+  let opening a =
+    if m.narrow && m.status_tray
+    then Effect.Many [ inject Action.Toggle_status_tray; inject a ]
+    else inject a
+  in
   div
     ~cls:"panel-toggles"
     [ Filter_view.button m ~inject
-    ; Files_view.toggle m ~inject
-    ; Terminal_view.toggle m ~inject
-    ; Agents_view.toggle m ~inject
+    ; Files_view.toggle m ~inject:opening
+    ; Terminal_view.toggle m ~inject:opening
+    ; Agents_view.toggle m ~inject:opening
     ]
-;;
-
-(* Over the chat's top right corner, quietly: no bar under them. *)
-let tools (m : App.Model.t) ~inject =
-  match m.state with
-  | None -> Node.none
-  | Some _ -> div ~cls:"chat-tools" [ panel_toggles m ~inject ]
 ;;
 
 (* It opens the pull requests ([/pr]). *)
@@ -76,54 +76,82 @@ let branch (state : State.t) ~inject =
   | None -> Node.none
 ;;
 
-(* What the agent is doing, with the cost across from it; whatever applies,
-   when anything does; the context's meter across the card; the branch.
-   Where tools run is the composer's, and the plan is the bar's and
-   [/todos]': the card has no room to say them calmly. *)
-let card (m : App.Model.t) ~inject =
-  Node.section
-    ~attrs:
-      [ Attr.class_ "session-card"; Attr.create "aria-label" "This session" ]
-    [ div
-        ~cls:"card-status status"
-        ([ div
-             ~cls:"card-head"
-             [ Status_view.activity m; Status_view.cost m ~inject ]
-         ; Status_view.extras m ~plan:false ~inject
-         ; Status_view.meter m ~inject
-         ]
-         @
-         match m.state with
-         | Some ({ git_branch = Some _; _ } as state) ->
-           [ div ~cls:"card-where" [ branch state ~inject ] ]
-         | Some { git_branch = None; _ } | None -> [])
-    ]
+(* A phone's header has room for the title: the thinking level, the mode,
+   the status and the panels' toggles fold into a tray under it, opened by a
+   glance at the status (a dot and the context's percent). Only on a phone,
+   and CSS shows it only where the header is narrow (under 480px); wider,
+   the tray is laid out in the header as ever. *)
+let tray_button (m : App.Model.t) ~inject =
+  if not m.narrow
+  then Node.none
+  else
+    Node.button
+      ~attrs:
+        [ Attr.class_ "btn ghost bar-tray-toggle"
+        ; Attr.type_ "button"
+        ; Attr.title "Status, thinking, mode and panels"
+        ; Attr.create "aria-label" "Status and controls"
+        ; Attr.create "aria-controls" "bar-tray"
+        ; Attr.create
+            "aria-expanded"
+            (Bool.to_string m.status_tray)
+        ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+        ]
+      [ Status_view.glance m; icon ~cls:"tray-chevron" Chevron ]
 ;;
 
+(* The chat's header, docked or not: the title (with the branch beside it
+   where there is room), then what applies and the status at the right, then
+   the panels' toggles. The sidebar's toggle and the settings only when the
+   sidebar, which has its own, is not docked. *)
 let bar (m : App.Model.t) ~inject =
+  let docked = App.Model.docked m in
   let toggle =
-    button
-      ~cls:"icon ghost toggle-sidebar"
-      ~title:"Sessions (Ctrl+B)"
-      ~label:"Sessions"
-      ~on_click:(inject Action.Toggle_sidebar)
-      [ icon Menu ]
+    if docked
+    then Node.none
+    else
+      button
+        ~cls:"icon ghost toggle-sidebar"
+        ~title:"Sessions (Ctrl+B)"
+        ~label:"Sessions"
+        ~on_click:(inject Action.Toggle_sidebar)
+        [ icon Menu ]
   in
+  let settings = if docked then Node.none else Sidebar_view.settings ~inject in
   Node.header
-    ~attrs:[ Attr.class_ "session-bar" ]
+    ~attrs:[ classes [ "session-bar" ] [ "docked", docked ] ]
     (match m.state with
      | None ->
        [ toggle
        ; Status_view.extras m ~plan:true ~inject
        ; Status_view.view m ~inject
-       ; Sidebar_view.settings ~inject
+       ; settings
        ]
      | Some state ->
        [ toggle
-       ; rename m state ~inject
-       ; Status_view.extras m ~plan:true ~inject
-       ; Status_view.view m ~inject
-       ; panel_toggles m ~inject
-       ; Sidebar_view.settings ~inject
+       ; div
+           ~cls:"session-title"
+           [ rename m state ~inject; branch state ~inject ]
+       ; tray_button m ~inject
+       ; Node.div
+           ~attrs:
+             [ classes [ "bar-tray" ] [ "open", m.narrow && m.status_tray ]
+             ; Attr.id "bar-tray"
+             ]
+           [ Status_view.extras m ~plan:true ~inject
+           ; Session_chips_view.view m ~inject
+           ; Status_view.view m ~inject
+           ; panel_toggles m ~inject
+           ]
+       ; (if m.narrow && m.status_tray
+          then
+            Node.div
+              ~attrs:
+                [ Attr.class_ "bar-tray-backdrop"
+                ; Attr.on_click (fun _ -> inject Action.Toggle_status_tray)
+                ]
+              []
+          else Node.none)
+       ; settings
        ])
 ;;
