@@ -844,7 +844,7 @@ let%expect_test "a forked subagent runs out of turns and is continued" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    ✕ subagent Fix the parser agent a1 forked deepseek-flash 1 turn $0.01 (Open ›)
+    ✕ Fix the parser (Open ›)
     (✕ Failed Fix the parser subagent hit the 1-turn limit without finishing)
     |}];
   events
@@ -859,7 +859,7 @@ let%expect_test "a forked subagent runs out of turns and is continued" =
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    subagent Fix the parser agent a1 forked deepseek-flash 2 turns (Open ›)
+    Fix the parser (Open ›)
     (Running Fix the parser 0s bash make test a1  deepseek-flash  2 turns  1 tool call)
     |}];
   events
@@ -872,7 +872,7 @@ let%expect_test "a forked subagent runs out of turns and is continued" =
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    ✓ subagent Fix the parser agent a1 forked deepseek-flash 2 turns $0.01 (Open ›)
+    ✓ Fix the parser (Open ›)
     (✓ Done Fix the parser Parser fixed.)
     |}]
 ;;

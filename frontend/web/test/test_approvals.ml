@@ -1108,20 +1108,22 @@ let%expect_test "update_plan and ask_user in the transcript" =
   Chat_harness.text chat;
   [%expect
     {|
-    ✓ update_plan 1/3 done first pass ✓ read the code ▸ change it ○ test ✓ ask_user Q: Which database?
+    ✓ update_plan test 1/3 done first pass ✓ read the code ▸ change it ○ test ✓ ask_user answered Q: Which database?
     A: Postgres ✕ ask_user no answer The user declined to answer. ask_user waiting for your answer Ready? Sure?
     |}];
   Chat_harness.show ~selector:".tool-update_plan" chat;
   [%expect
     {|
-    <div class="ok tool tool-update_plan">
-      <div class="tool-head">
+    <div class="ok open tool tool-update_plan">
+      <button type="button" data-fold="t1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> update_plan </span>
+        <span class="arg step"> test </span>
         <span class="chip"> 1/3 done </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="plan">
           <p class="plan-explanation"> first pass </p>

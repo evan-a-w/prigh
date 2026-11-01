@@ -678,6 +678,43 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .chip.job { color: var(--muted); }
 .chip.waiting { color: var(--sodium); }
 
+/* A call at rest is one line, and the line opens it: a button, reset to
+   look like the line it was, with a chevron that shows on hover, focus and
+   while open. Calls in a row pack tighter than prose. */
+button.tool-head {
+  width: 100%;
+  margin: 0;
+  padding: 0 4px 0 0;
+  border: 0;
+  border-radius: var(--r-control, 6px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.tool-head:hover { background: var(--slate-2); }
+button.tool-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: 1px; }
+button.tool-head > .chev {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin: 0 4px 2px 2px;
+  border-right: 1.5px solid var(--faint);
+  border-bottom: 1.5px solid var(--faint);
+  transform: rotate(-45deg);
+  opacity: 0;
+  transition: transform 0.15s, opacity 0.15s;
+}
+button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-head > .chev { opacity: 1; }
+.tool.open > button.tool-head > .chev { transform: translateY(-1px) rotate(45deg); }
+.msg.assistant > .tool:not(.open) + .tool:not(.open) { margin-top: -8px; }
+.tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
+.tool-body > .url-link { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
+.tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
+/* A subagent: its lamp or outcome, its name and the way in. */
+.tool-subagent > .tool-head .arg.task { font-weight: 500; }
+
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
 .plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
@@ -899,7 +936,7 @@ details.image[open] .lightbox {
 
 @media (prefers-reduced-motion: reduce) {
   .msg.assistant.streaming > .markdown *::after, .output.expanded > pre { animation: none; }
-  summary > .label::before { transition: none; }
+  summary > .label::before, button.tool-head > .chev { transition: none; }
 }
 
 @media (max-width: 760px) {
@@ -908,7 +945,7 @@ details.image[open] .lightbox {
   .msg.user { padding: 9px 12px 10px; }
   .markdown { font-size: 15px; }
   .tool-head { gap: 7px; }
-  .tool-head .chip:not(.bad):not(.add):not(.del):not(.job) { display: none; }
+  .tool-head .chip.waiting { display: none; }
   .delivery-head .stats { display: none; }
   .code pre { padding: 8px 12px 10px; }
 }
@@ -1010,3 +1047,15 @@ details.image[open] .lightbox {
 .filter-show-all:hover { text-decoration: underline; }
 .filter-show-all:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: var(--r-chip); }
 .entries > .filtered { height: 0; }
+
+/* A delivered subagent's report opens it as its call's line does: the same
+   quiet "Open ›", not a button among the message's. */
+.delivery-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
+.delivery-head[data-agent]:hover { background: var(--slate-2); }
+.delivery-head .open-agent {
+  margin-left: 0; padding: 0 4px; border: 0; border-radius: var(--r-chip);
+  background: none; color: var(--muted); font: inherit; font-size: 12.5px;
+  white-space: nowrap; cursor: pointer;
+}
+.delivery-head[data-agent]:hover .open-agent { color: var(--chalk); }
+.delivery-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
