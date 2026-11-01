@@ -21,7 +21,7 @@ module Scope = struct
   ;;
 end
 
-let row ?(cls = "") ?note ?scope ?(wide = false) ~name ~about controls =
+let row ?(cls = "") ?note ?scope ?(wide = false) ?keys ~name ~about controls =
   Node.div
     ~attrs:
       [ classes
@@ -45,7 +45,24 @@ let row ?(cls = "") ?note ?scope ?(wide = false) ~name ~about controls =
                    [ Node.text (Scope.tag scope) ]
                | None -> Node.none)
             ]
-        ; span ~cls:"setting-about" about
+        ; (match keys with
+           | None -> span ~cls:"setting-about" about
+           | Some keys ->
+             let extra cls text =
+               Node.span ~attrs:[ Attr.class_ cls ] [ Node.text text ]
+             in
+             (* The shortcut goes before the sentence's full stop. *)
+             let about, stop =
+               match String.chop_suffix about ~suffix:"." with
+               | Some about -> about, "."
+               | None -> about, ""
+             in
+             Node.span
+               ~attrs:[ Attr.class_ "setting-about" ]
+               [ Node.text about
+               ; extra "keyboard" (sprintf " (%s)" keys)
+               ; Node.text stop
+               ])
         ; (match note with
            | Some (level, text) -> span ~cls:("setting-note " ^ level) text
            | None -> Node.none)
