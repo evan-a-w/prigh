@@ -336,7 +336,8 @@
 /* {1 Long words} */
 
 .app.narrow :is(.message, .tool, .modal-body, .settings-panel) { overflow-wrap: anywhere; }
-.app.narrow :is(pre, code) { overflow-wrap: normal; }
+/* A code block scrolls sideways in its own box; nothing else does. */
+.app.narrow .code pre { overflow-wrap: normal; }
 
 /* {1 The composer's row on a phone}
 

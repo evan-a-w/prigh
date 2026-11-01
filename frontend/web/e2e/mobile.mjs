@@ -75,6 +75,10 @@ const audit = page => page.evaluate(() => {
   const W = innerWidth, H = innerHeight;
   const sw = document.scrollingElement.scrollWidth;
   if (sw > W + 1) out.push(`overflows sideways: ${sw} > ${W}`);
+  // Nor do the transcript and the dialogs' bodies (a long line in them
+  // scrolls in its own box, a code block's, or wraps).
+  for (const box of document.querySelectorAll("#chat, .modal-body, .settings-panel"))
+    if (box.scrollWidth > box.clientWidth + 1) out.push(`${box.id ? "#" + box.id : box.className.split(" ")[0]} scrolls sideways`);
   const name = e => (e.getAttribute("aria-label") || e.innerText || e.getAttribute("title") || e.className || e.tagName)
     .toString().trim().replace(/\s+/g, " ").slice(0, 32);
   const visible = e => {
