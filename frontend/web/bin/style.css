@@ -920,6 +920,7 @@ kbd {
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-buttons .stop .icon { width: 12px; height: 12px; }
 .composer-buttons .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
+.composer-buttons .stop.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
 .composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
 /* Listening: the microphone is a brick disc; the row says how long and how
    loud, at the buttons' height, on no surface of its own. */
