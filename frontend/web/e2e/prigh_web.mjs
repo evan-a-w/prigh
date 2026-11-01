@@ -225,16 +225,16 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".session-bar :is(.session-chips, .status-extras:not(:empty), .status)")]
+    [...document.querySelectorAll(".chat-chrome :is(.status-island, .status-notes:not(:empty))")]
       .map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
-// The session's card (or bar), with each select showing its chosen option.
+// The chrome over the chat, with each select showing its chosen option.
 const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".session-bar *")]
+    [...document.querySelectorAll(".chat-chrome *")]
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
         || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where, .status-details")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
@@ -358,17 +358,20 @@ const controlsShown = () => page.evaluate(() => {
   }).join(", ");
 });
 
-// Where a chip's menu stands: above the composer's box or below its chip,
-// at the chip's left edge (or as wide as the box), inside the window.
+// Where a chip's menu stands: below its chip, above the composer's box or
+// over it, at the chip's left edge (or as wide as the box it is placed in:
+// the composer, or the island for its chips), inside the window.
 const popoverPlace = () => page.evaluate(() => {
   const menu = document.querySelector("#chip-popover");
   const r = menu.getBoundingClientRect();
   const chip = menu.parentNode.querySelector(".chip-button, .plus").getBoundingClientRect();
-  const box = document.querySelector(".composer-box").getBoundingClientRect();
+  const own = menu.closest("[data-popover-box]");
+  const inComposer = !own || own.matches(".composer-stack");
+  const box = (inComposer ? document.querySelector(".composer-box") : own).getBoundingClientRect();
   const near = (a, b) => Math.abs(a - b) <= 4;
-  const where = r.bottom <= box.top ? "above the composer" : r.top >= chip.bottom ? "below the chip" : "over the composer";
+  const where = r.top >= chip.bottom ? "below the chip" : r.bottom <= box.top ? "above the composer" : "over the composer";
   const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
-    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? "shifted inside the composer" : "out of line";
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? `shifted inside the ${inComposer ? "composer" : "island"}` : "out of line";
   const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
   return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
@@ -604,8 +607,8 @@ try {
   await composer().fill("/remind every 5 Check the disk space.");
   await composer().press("Control+Enter");
   await remindToast("Reminder r2 added");
-  await page.locator(".status-extras .reminders").waitFor();
-  console.log(`status: ${clean(await page.locator(".status-extras .reminders").innerText())}`);
+  await page.locator(".status-notes .reminders").waitFor();
+  console.log(`status: ${clean(await page.locator(".status-notes .reminders").innerText())}`);
   await composer().fill("/remind");
   await composer().press("Control+Enter");
   await page.locator(".modal .picker-item").first().waitFor();
@@ -619,7 +622,7 @@ try {
   await composer().fill("/remind rm r2");
   await composer().press("Control+Enter");
   await remindToast("Reminder r2 removed");
-  await page.waitForSelector(".status-extras .reminders", { state: "detached" });
+  await page.waitForSelector(".status-notes .reminders", { state: "detached" });
   console.log("status: no reminders");
   await composer().fill("");
   await dismissToasts();
@@ -634,10 +637,10 @@ try {
 
   // A budget shows in the status line as spend against it.
   await send("/budget 5");
-  await page.locator(".status .budget").waitFor();
-  await show("a budget in the status line", ".status");
+  await page.locator(".status-island .budget").waitFor();
+  await show("a budget in the status line", ".status-island");
   await send("/budget off");
-  await page.locator(".status .budget").waitFor({ state: "detached" });
+  await page.locator(".status-island .budget").waitFor({ state: "detached" });
   // 2b. Long output folds to its first and last lines; its toggle shows it
   //     all, and folds it again.
   await send("count to thirty");
@@ -800,7 +803,7 @@ try {
   await send("survey it");
   await bodyHas("Started a survey and a job.");
   await idle();
-  await page.locator(".status-extras .background").click();
+  await page.locator(".chat-chrome .agents-toggle").click();
   await page.waitForFunction(() =>
     document.querySelectorAll(".agents-row").length === 3 && !document.querySelector(".agents-row.running"));
   await showPanel("agents panel");
@@ -1143,7 +1146,7 @@ try {
   await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
   // Its drawer is over the composer, chips and all.
-  await page.locator(".session-bar .toggle-sidebar").click();
+  await page.locator(".chat-chrome .toggle-sidebar").click();
   await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open"));
   await page.waitForTimeout(400); // the drawer's slide
   await showChips("phone: the drawer open: the chips", ".sidebar, .scrim");
@@ -1344,9 +1347,9 @@ try {
       new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
   });
   await page.locator("#chat-attach-input").setInputFiles({ name: "data.bin", mimeType: "application/octet-stream", buffer: Buffer.from([0, 1, 2, 3, 255, 0, 7]) });
-  await page.waitForFunction(() => /^Uploading 2 files/.test(document.querySelector(".status-extras .transfers")?.textContent ?? ""));
+  await page.waitForFunction(() => /^Uploading 2 files/.test(document.querySelector(".status-notes .transfers")?.textContent ?? ""));
   section("files: uploads in the status line");
-  console.log(clean(await page.locator(".status-extras .transfers").innerText()).replace(/ \d+%$| …$|…$/, ""));
+  console.log(clean(await page.locator(".status-notes .transfers").innerText()).replace(/ \d+%$| …$|…$/, ""));
   await screenshot("files: uploads in the status line");
   release();
   await page.waitForFunction(() => document.querySelectorAll(".attach-chip.ready").length === 3);
@@ -1372,8 +1375,8 @@ try {
   await page.waitForFunction(() => !document.querySelector(".toast"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
-  // The panels' toggles are in the header's tray, behind the glance.
-  await page.locator(".bar-tray-toggle").click();
+  // The panels' toggles are in the ⋯ menu, top right.
+  await page.locator(".more-toggle").click();
   await page.locator(".files-toggle").click();
   await row("todo.md").waitFor();
   await page.waitForTimeout(400); // the sheet's slide
@@ -1533,11 +1536,10 @@ try {
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
 
-  // 15. The session's card (or, without the sidebar, its bar) and the
-  //     composer fit, however wide the panels around the chat make it: the
-  //     composer's chips take shorter labels, the bar's status drops its
-  //     counters, then its words; the title keeps some room. Nothing
-  //     overlaps or is cut off.
+  // 15. The chrome floating over the chat (the status island and the
+  //     panels' toggles) and the composer fit, however wide the panels
+  //     around the chat make it: the composer's chips take shorter labels.
+  //     Nothing overlaps or is cut off.
   const chatWidth = () => width(".main");
   // Drags the file browser's edge until the chat column is [target] wide.
   const chatAt = async target => {
@@ -1547,24 +1549,22 @@ try {
   const showTopBar = async label => {
     section(label);
     const where = await page.evaluate(() => {
-      const at = ".session-bar";
+      const at = ".chat-chrome";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
+      const status = [...document.querySelectorAll(`${at} :is(.status-island .status-gauge, .status-notes) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
-      const title = document.querySelector(`${at} .session-name > span`);
-      const titleFits = !title ? "none" : title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
-      return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
+      return { at, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; ${where.at}: ${clean(where.status)}; ${where.titleFits === "none" ? "" : `title whole or at least 100px: ${where.titleFits}; `}${where.height}px high`);
-    for (const s of [".session-bar", ".composer"]) {
+    console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; ${where.at}: ${clean(where.status)}; ${where.height}px high`);
+    for (const s of [".chat-chrome", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
-    // With the card, the panels' toggles float in the chat's top right
-    // corner, clear of the jump list's button.
+    // The panels' toggles float in the chat's top right corner, clear of
+    // the jump list's button.
     const tools = await page.evaluate(() => {
-      const t = document.querySelector(".chat-tools");
+      const t = document.querySelector(".chrome-tools");
       if (!t) return null;
       const r = t.getBoundingClientRect(), main = document.querySelector(".main").getBoundingClientRect();
       const list = document.querySelector(".jump-list")?.getBoundingClientRect();

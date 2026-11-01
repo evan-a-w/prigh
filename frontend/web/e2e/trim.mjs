@@ -187,7 +187,7 @@ const signIn = async () => {
   await page.locator(".composer textarea").waitFor();
   // On a phone the sessions are in a drawer.
   if (await page.evaluate(() => document.querySelector(".app.narrow:not(.sidebar-open)") !== null))
-    await page.locator(".session-bar .toggle-sidebar").click();
+    await page.locator(".chat-chrome .toggle-sidebar").click();
   await page.locator(`[data-session="${id}"]`).click();
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Module 5 is fixed."));
   // The drawer slid away.
