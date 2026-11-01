@@ -284,26 +284,15 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="chev">  </span>
       </button>
       <div class="tool-body">
-        <div class="images">
-          <details class="image">
-            <summary title="[image: image/png, 8 B]">
-              <img src="data:image/png;base64,iVBORw0KGgo="
-                   alt="[image: image/png, 8 B]"
-                   class="thumb"/>
-              <span class="lightbox">
-                <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]"/>
-                <span class="lightbox-tools">
-                  <button type="button"
-                          title="Draw on this image"
-                          data-annotate="new"
-                          class="btn lightbox-annotate">
-                    <icon class="pencil"> </icon>
-                    Draw
-                  </button>
-                </span>
-              </span>
-            </summary>
-          </details>
+        <div data-viewer-group="" class="images">
+          <button type="button"
+                  title="[image: image/png, 8 B]"
+                  aria-label="View [image: image/png, 8 B]"
+                  data-viewer=""
+                  data-viewer-draw=""
+                  class="image">
+            <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+          </button>
         </div>
         <span class="caption"> Read image file [image/png, 320x200] </span>
       </div>

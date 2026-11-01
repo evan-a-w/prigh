@@ -254,7 +254,13 @@ let%expect_test
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/gone)))
      (tag (Files (Previewed /home/me/proj/gone))))
     <div class="files-image">
-      <img src="http://box:7790/files/download?ticket=abc" alt="shot.png (image/png)"/>
+      <button type="button"
+              title="View full size"
+              aria-label="View shot.png"
+              data-viewer="shot.png"
+              class="files-image-open">
+        <img src="http://box:7790/files/download?ticket=abc" alt="shot.png (image/png)"/>
+      </button>
     </div>
     |}];
   H.act h (Files (Select "big.bin"));

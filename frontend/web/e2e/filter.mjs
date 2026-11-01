@@ -292,18 +292,18 @@ try {
 
   // 9. The image viewer covers the button and the composer's chips.
   await page.locator('[data-entry="0"] img.thumb').click();
-  await page.locator("details.image[open] .lightbox").waitFor();
+  await page.locator("dialog.viewer[open] .viewer-img").waitFor();
   const covered = await page.evaluate(() =>
     ["#filter-toggle", ".composer-controls .chip-button"].map(sel => {
       const r = document.querySelector(sel).getBoundingClientRect();
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return `${sel}: ${top?.closest(".lightbox") ? "under the image" : "on top"}`;
+      return `${sel}: ${top?.closest("dialog.viewer") ? "under the image" : "on top"}`;
     }).join("; "));
   section("image viewer");
   console.log(covered);
   await screenshot("image viewer");
   await page.keyboard.press("Escape");
-  await page.locator("details.image[open]").waitFor({ state: "detached" });
+  await page.locator("dialog.viewer").waitFor({ state: "detached" });
 
   const sessionUrl = page.url();
   // 10. On a phone: the button in the slim bar, the menu inside the screen.

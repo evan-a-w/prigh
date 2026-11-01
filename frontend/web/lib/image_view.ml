@@ -5,39 +5,27 @@ let src (image : Image.t) =
   sprintf "data:%s;base64,%s" image.mime_type image.data
 ;;
 
-(* The viewer's own button, over its top right corner. Drawing is the
-   page's ([data-annotate], app/chat_listeners.ml): it takes the image in
-   this viewer. *)
-let tools ~target =
-  Node.span
-    ~attrs:[ Attr.class_ "lightbox-tools" ]
-    [ Node.button
-        ~attrs:
-          [ Attr.type_ "button"
-          ; Attr.class_ "btn lightbox-annotate"
-          ; Attr.title "Draw on this image"
-          ; Attr.create "data-annotate" (Annotate.Target.to_string target)
-          ]
-        [ Html.icon Pencil; Node.text "Draw" ]
-    ]
-;;
+let viewer_attribute = "data-viewer"
+let group_attribute = "data-viewer-group"
 
+(* The viewer is the page's (app/viewer_widget.ml): it opens on a click on
+   [data-viewer], shows the [img] inside at full size with zoom and pan,
+   and steps through the other [data-viewer]s of its [data-viewer-group].
+   [data-viewer-draw] offers Draw. *)
 let thumb (image : Image.t) =
-  let src = src image in
   let label = Image.to_string_hum image in
-  Node.details
-    ~attrs:[ Attr.class_ "image" ]
-    [ Node.summary
-        ~attrs:[ Attr.title label ]
-        [ Node.img
-            ~attrs:[ Attr.class_ "thumb"; Attr.src src; Attr.alt label ]
-            ()
-        ; Node.span
-            ~attrs:[ Attr.class_ "lightbox" ]
-            [ Node.img ~attrs:[ Attr.src src; Attr.alt label ] ()
-            ; tools ~target:New
-            ]
-        ]
+  Node.button
+    ~attrs:
+      [ Attr.type_ "button"
+      ; Attr.class_ "image"
+      ; Attr.title label
+      ; Attr.create "aria-label" ("View " ^ label)
+      ; Attr.create viewer_attribute ""
+      ; Attr.create "data-viewer-draw" ""
+      ]
+    [ Node.img
+        ~attrs:[ Attr.class_ "thumb"; Attr.src (src image); Attr.alt label ]
+        ()
     ]
 ;;
 
@@ -46,6 +34,6 @@ let thumbs images =
   | [] -> Node.none
   | images ->
     Node.div
-      ~attrs:[ Attr.class_ "images" ]
-      (List.map images ~f:(fun image -> thumb image))
+      ~attrs:[ Attr.class_ "images"; Attr.create group_attribute "" ]
+      (List.map images ~f:thumb)
 ;;
