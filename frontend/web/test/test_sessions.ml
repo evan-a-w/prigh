@@ -153,10 +153,18 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     |}];
   H.act h (Set_session_query "lexr");
   H.text h ~selector:".session-title";
-  [%expect {| Refactor the lexer |}];
+  [%expect
+    {|
+    Refactor the lexer
+    (fix the parser bug) (main)
+    |}];
   H.act h (Set_session_query "docs");
   H.text h ~selector:".session-title";
-  [%expect {| Release notes |}];
+  [%expect
+    {|
+    Release notes
+    (fix the parser bug) (main)
+    |}];
   H.act h (Set_session_query "zzz");
   H.text h ~selector:".sessions";
   [%expect {| Nothing matches “zzz”. |}];
@@ -167,6 +175,7 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     fix the parser bug
     Release notes
     Refactor the lexer
+    (fix the parser bug) (main)
     |}]
 ;;
 
@@ -703,6 +712,7 @@ let%expect_test
     Release notes
     Refactor the lexer
     fix the parser bug
+    (fix the parser bug) (main)
     (Session_nav (from ()) (by 1))
     (Focus session-s2)
     (Session_nav (from (s2)) (by 1))

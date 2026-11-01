@@ -2,9 +2,9 @@ open! Core
 open Prigh_web
 module H = Harness
 
-(* The model, the thinking level and the approval mode beside each other
-   along the bottom of the composer's box: always shown, each opening the
-   picker its command opens. The session's status is in the docked
+(* The model and the host along the strip under the composer's box: always
+   shown, each opening the picker its command opens (the thinking level and
+   the approval mode are set from the keyboard and their commands). The session's status is in the docked
    sidebar's card, with the panels' toggles over the chat's corner, else in
    a slim bar over the chat. *)
 
@@ -17,19 +17,21 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking on"
             aria-haspopup="dialog"
             aria-expanded="false"
             class="btn chip-button thinking-chip"
             @on_click>
-      <icon class="brain"> </icon>
-      <span class="chip-key"> Thinking </span>
+      <span aria-hidden="true" class="thinking-meter">
+        <span class="bar on"> </span>
+        <span class="bar on"> </span>
+        <span class="bar"> </span>
+        <span class="bar"> </span>
+      </span>
       <span class="chip-label"> on </span>
-      <icon class="chevron"> </icon>
     </button>
     |}];
   (* Its menu: the levels, the current one checked, the keyboard's on the
@@ -79,15 +81,19 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     </div>
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking on"
             aria-haspopup="dialog"
             aria-expanded="true"
             aria-controls="chip-popover"
             class="btn chip-button thinking-chip"
             @on_click>
-      <icon class="brain"> </icon>
-      <span class="chip-key"> Thinking </span>
+      <span aria-hidden="true" class="thinking-meter">
+        <span class="bar on"> </span>
+        <span class="bar on"> </span>
+        <span class="bar"> </span>
+        <span class="bar"> </span>
+      </span>
       <span class="chip-label"> on </span>
-      <icon class="chevron"> </icon>
     </button>
     |}];
   (* Esc closes it without a change. *)
@@ -98,8 +104,6 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     Close_dialog
     (Focus editor)
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   (* Alt+T: the next level shows at once, waiting on the backend. *)
@@ -112,13 +116,11 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     (Claude Opus 5.5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     <button class="awaiting btn chip-button thinking-chip">
     |}];
   H.text h ~selector:".thinking-chip .chip-label";
-  [%expect {| Thinking high |}];
+  [%expect {| high |}];
   H.reply h "set_thinking" "{}";
   H.event
     h
@@ -129,8 +131,6 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     |}]
 ;;
@@ -157,8 +157,6 @@ let%expect_test "a model without thinking says so, and the chip tells why" =
   [%expect
     {|
     (DeepSeek Chat)
-    (No thinking)
-    (Auto: never asks)
     (backend)
     |}];
   H.click h ~selector:".thinking-chip";
@@ -190,13 +188,13 @@ let%expect_test "every approval mode, as the chip names it" =
       H.elements h ~selector:".mode-chip");
   [%expect
     {|
-    (Asks: edits & commands)
+    (ask)
     <button class="btn chip-button mode-chip">
-    (Asks: commands)
+    (auto-edit)
     <button class="btn chip-button mode-chip">
-    (Auto: never asks)
-    <button class="btn chip-button mode-chip">
-    (Plan mode)
+    (auto)
+    <button class="btn chip-button mode-chip never-asks">
+    (plan)
     <button class="btn chip-button mode-chip plan-mode">
     |}]
 ;;
@@ -235,99 +233,18 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
-    <section class="session-card">
     <div class="sidebar-footer">
-    <Vdom.Node.none-widget class="">
+    <header class="docked session-bar">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
     <footer class="composer">
-    <div class="chat-tools">
-      <div class="panel-toggles">
-        <button type="button"
-                title="Filter the transcript (/filter)"
-                aria-label="Filter the transcript"
-                id="filter-toggle"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                class="btn filter-toggle ghost icon"
-                @on_click>
-          <icon class="filter"> </icon>
-        </button>
-        <button type="button"
-                title="Files (Ctrl+Shift+F)"
-                aria-label="Files"
-                aria-expanded="false"
-                class="btn files-toggle ghost icon"
-                @on_click>
-          <icon class="folder"> </icon>
-        </button>
-        <button type="button"
-                title="Terminal (Ctrl+`)"
-                aria-label="Terminal"
-                aria-expanded="false"
-                class="btn ghost icon terminal-toggle"
-                @on_click>
-          <icon class="terminal"> </icon>
-        </button>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
-    </div>
     |}];
   H.show h ~selector:".session-card";
-  [%expect
-    {|
-    <section aria-label="This session" class="session-card">
-      <div class="card-status status">
-        <div class="card-head">
-          <span role="status" aria-atomic="true" class="activity idle status-item">
-            <span class="idle-dot"> </span>
-            <span class="label"> Ready </span>
-          </span>
-          <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
-        </div>
-        <div class="status-extras">
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-        <button type="button"
-                title="0 tokens in, 0 out, 0 cache read; 0% of a 200k context (/compact frees some). Click for the session's details (/session)"
-                aria-label="Context 0% full"
-                class="context link status-item"
-                @on_click>
-          <span class="meter">
-            <span class="meter-fill" style={ width: 0.00%; }> </span>
-          </span>
-          <span class="percent"> 0% </span>
-        </button>
-        <div class="card-where">
-          <button type="button"
-                  title="On branch feature/narrow-top-bar, in /home/ada/projects/prigh/tui: pull requests (/pr)"
-                  aria-haspopup="dialog"
-                  class="branch"
-                  @on_click>
-            <icon class="branch"> </icon>
-            <span class="branch-name"> feature/narrow-top-bar </span>
-          </button>
-        </div>
-      </div>
-    </section>
-    |}];
+  [%expect {| |}];
   H.text h ~selector:".session-card";
-  [%expect
-    {|
-    Ready $0.00
-    (0%)
-    (feature/narrow-top-bar)
-    |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test
@@ -521,8 +438,6 @@ let%expect_test "with one host the chip still names it, and says how to add one"
   [%expect
     {|
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (container)
     (Open_chip Host)
     (Focus popover-filter)
@@ -568,7 +483,7 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     |}];
   (* The card and the bar no longer name it: the chip does. *)
   H.key h "Escape" ~target:Field;
-  H.elements h ~selector:".session-card .host";
+  H.elements h ~selector:".composer .host-chip";
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.elements h ~selector:".session-bar .host";
   H.text h ~selector:".session-bar";
@@ -576,8 +491,19 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     {|
     Close_dialog
     (Focus editor)
-    (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.00 Ready
+    <button class="btn chip-button host-chip">
+    (Sessions (Ctrl+B))
+    (New session) (main)
+    (on)
+    (auto)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}]
@@ -617,68 +543,140 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
               @on_click>
         <icon class="menu"> </icon>
       </button>
-      <button type="button" title="Rename (/name)" class="session-name" @on_click>
-        <span dir="auto"> New session </span>
-        <icon class="pencil"> </icon>
-      </button>
-      <div class="status-extras">
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
-      <div class="status">
+      <div class="session-title">
+        <button type="button" title="Rename (/name)" class="session-name" @on_click>
+          <span dir="auto"> New session </span>
+          <icon class="pencil"> </icon>
+        </button>
         <button type="button"
-                title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
-                aria-label="Context 0% full"
-                class="context link status-item"
+                title="On branch main, in /home/ada/projects/prigh/tui: pull requests (/pr)"
+                aria-haspopup="dialog"
+                class="branch"
                 @on_click>
-          <span class="meter">
-            <span class="meter-fill" style={ width: 0.00%; }> </span>
+          <icon class="branch"> </icon>
+          <span class="branch-name"> main </span>
+        </button>
+      </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <div id="bar-tray" class="bar-tray">
+        <div class="status-extras">
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+        <div role="group" aria-label="Thinking and mode" class="session-chips">
+          <div class="chip-anchor thinking">
+            <button type="button"
+                    title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+                    aria-label="Thinking on"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    class="btn chip-button thinking-chip"
+                    @on_click>
+              <span aria-hidden="true" class="thinking-meter">
+                <span class="bar on"> </span>
+                <span class="bar on"> </span>
+                <span class="bar"> </span>
+                <span class="bar"> </span>
+              </span>
+              <span class="chip-label"> on </span>
+            </button>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+          <div class="chip-anchor mode">
+            <button type="button"
+                    title="Tools run without asking (Alt+M cycles, /mode picks)"
+                    aria-label="Auto: never asks"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    class="btn chip-button mode-chip never-asks"
+                    @on_click>
+              <icon class="shield"> </icon>
+              <span class="chip-label"> auto </span>
+            </button>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+        </div>
+        <div class="status">
+          <span role="status" aria-atomic="true" class="activity idle status-item">
+            <span class="idle-dot"> </span>
+            <span class="label"> Ready </span>
           </span>
-          <span class="percent"> 0% </span>
-        </button>
-        <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
-        <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
-        <span role="status" aria-atomic="true" class="activity idle status-item">
-          <span class="idle-dot"> </span>
-          <span class="label"> Ready </span>
-        </span>
+          <span class="status-gauge">
+            <button type="button"
+                    aria-label="Context 0% full: the session's details"
+                    aria-describedby="status-details"
+                    aria-haspopup="dialog"
+                    class=" context link status-item"
+                    @on_click>
+              <span class="meter">
+                <span class="meter-fill" style={ width: 0.00%; }> </span>
+              </span>
+              <span class="percent"> 0% </span>
+            </button>
+            <div role="tooltip" id="status-details" class="status-details">
+              <div class="context status-detail">
+                <span class="status-detail-key"> Context </span>
+                <span class="status-detail-value"> 0 / 200k · 0% </span>
+              </div>
+              <div class="status-detail">
+                <span class="status-detail-key"> Tokens </span>
+                <span class="status-detail-value"> 0 in · 0 out · 0 cached </span>
+              </div>
+              <div class="status-detail">
+                <span class="status-detail-key"> Cost </span>
+                <span class="status-detail-value"> $0.0000 </span>
+              </div>
+              <div class="status-detail">
+                <span class="status-detail-key"> Model </span>
+                <span class="status-detail-value"> Claude Opus 5.5 </span>
+              </div>
+              <div class="branch-line status-detail">
+                <span class="status-detail-key"> Branch </span>
+                <span class="status-detail-value"> main </span>
+              </div>
+              <div class="status-detail-hint"> Click for the session’s details · /compact frees context </div>
+            </div>
+          </span>
+          <span title="Session cost: $0.0000 (/session)" class="cost status-item"> $0.00 </span>
+        </div>
+        <div class="panel-toggles">
+          <button type="button"
+                  title="Filter the transcript (/filter)"
+                  aria-label="Filter the transcript"
+                  id="filter-toggle"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  class="btn filter-toggle ghost icon"
+                  @on_click>
+            <icon class="filter"> </icon>
+          </button>
+          <button type="button"
+                  title="Files (Ctrl+Shift+F)"
+                  aria-label="Files"
+                  aria-expanded="false"
+                  class="btn files-toggle ghost icon"
+                  @on_click>
+            <icon class="folder"> </icon>
+          </button>
+          <button type="button"
+                  title="Terminal (Ctrl+`)"
+                  aria-label="Terminal"
+                  aria-expanded="false"
+                  class="btn ghost icon terminal-toggle"
+                  @on_click>
+            <icon class="terminal"> </icon>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
       </div>
-      <div class="panel-toggles">
-        <button type="button"
-                title="Filter the transcript (/filter)"
-                aria-label="Filter the transcript"
-                id="filter-toggle"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                class="btn filter-toggle ghost icon"
-                @on_click>
-          <icon class="filter"> </icon>
-        </button>
-        <button type="button"
-                title="Files (Ctrl+Shift+F)"
-                aria-label="Files"
-                aria-expanded="false"
-                class="btn files-toggle ghost icon"
-                @on_click>
-          <icon class="folder"> </icon>
-        </button>
-        <button type="button"
-                title="Terminal (Ctrl+`)"
-                aria-label="Terminal"
-                aria-expanded="false"
-                class="btn ghost icon terminal-toggle"
-                @on_click>
-          <icon class="terminal"> </icon>
-        </button>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <button type="button"
               title="Settings (Ctrl+, or /settings)"
               aria-label="Settings"
@@ -692,8 +690,18 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   H.text h ~selector:".session-bar";
   [%expect
     {|
-    (Sessions (Ctrl+B)) (New session)
-    (0%) ↑0 ↓0 $0.00 Ready
+    (Sessions (Ctrl+B))
+    (New session) (main)
+    (on)
+    (auto)
+    Ready (0%)
+    Context 0 / 200k · 0%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -704,7 +712,7 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
   [%expect
     {|
     Toggle_sidebar
-    <section class="session-card">
+    <header class="docked session-bar">
     |}];
   (* A phone: the sidebar is a drawer, the bar stays (under the drawer). *)
   H.quiet h (fun () -> H.act h (Set_narrow true));
@@ -725,35 +733,65 @@ let%expect_test "without the docked sidebar, a slim bar over the chat" =
 ;;
 
 let%expect_test
-    "the composer is one box: the editor, then the chips and the buttons along \
-     its bottom"
+    "the composer in two tiers: the box with + , the microphone and send; the \
+     chips under it"
   =
   let h = H.create () in
+  H.elements h ~selector:".composer-stack > *";
   H.elements h ~selector:".composer-box > *";
-  H.elements h ~selector:".composer-bar > *";
-  H.elements h ~selector:".composer-bar .btn";
+  H.names h ~selector:".composer-row .btn";
+  H.names h ~selector:".composer-tier .chip-button";
   [%expect
     {|
+    <Vdom.Node.none-widget class="">
+    <div class="composer-box">
+    <div class="composer-controls composer-tier">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <textarea class="editor">
-    <div class="composer-bar">
-    <div class="composer-controls">
-    <div class="composer-buttons">
-    <button class="btn chip-button model-chip">
-    <button class="btn chip-button thinking-chip">
-    <button class="btn chip-button mode-chip">
-    <button class="btn chip-button host-chip">
-    <button class="attach btn ghost icon">
-    <button class="btn primary send">
+    <div class="composer-row">
+    button "Add files or images" -- Add files or images (or paste, or drop them here)
+    button "Dictate" -- Dictate (speak, then click again to stop)
+    button "Send" -- Send (Enter)
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "backend" -- Tools run on the backend (/host switches)
     |}];
-  (* The model's chip opens its menu; so does the mode's. *)
+  (* The +: a menu of what can go with the message. *)
+  H.click h ~selector:".composer-plus .plus";
+  H.text h ~selector:"#chip-popover";
+  [%expect
+    {|
+    (Open_chip Attach)
+    (Focus popover-list)
+    Place_popover
+    Add to your message or paste, or drop
+    Files… uploaded to the tool host; the agent gets their paths
+    Images… shown to the model; draw on it before sending
+    Enter chooses, Esc closes
+    |}];
+  H.key h "ArrowDown" ~target:Field;
+  H.key h "Enter" ~target:Field;
+  [%expect
+    {|
+    (Dialog_move 1)
+    Dialog_accept
+    (Focus editor)
+    Pick_images
+    |}];
+  H.click h ~selector:".composer-plus .plus";
+  H.quiet h (fun () -> H.key h "Enter" ~target:Field);
+  [%expect
+    {|
+    (Open_chip Attach)
+    (Focus popover-list)
+    Place_popover
+    Dialog_accept
+    |}];
+  (* The model's chip opens its menu. *)
   H.click h ~selector:".model-chip";
   H.text h ~selector:"#chip-popover .popover-search";
   H.key h "Escape" ~target:Field;
-  H.click h ~selector:".mode-chip";
-  H.text h ~selector:"#chip-popover .popover-head";
   [%expect
     {|
     (Open_chip Model)
@@ -762,28 +800,24 @@ let%expect_test
     [] Ctrl+L
     Close_dialog
     (Focus editor)
-    (Open_chip Mode)
-    (Focus popover-list)
-    Place_popover
-    When tools ask first Alt+M cycles
     |}];
-  (* Running: stop beside steer. *)
+  (* Running with nothing typed: the disc stops; typing, it steers. *)
   H.event
     h
     (sprintf
        {|{"event":"state","state":%s}|}
        (H.state_json ~fields:[ "running", `True ] ()));
-  H.key h "Escape" ~target:Field;
-  H.names h ~selector:".composer-buttons .btn";
+  H.names h ~selector:".composer-row .send";
+  H.type_ h "also this";
+  H.names h ~selector:".composer-row .btn";
   [%expect
     {|
-    Close_dialog
-    (Focus editor)
-    button "Attach files" -- Attach files (or drop them here)
+    button "Add files or images" -- Add files or images (or paste, or drop them here)
+    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Stop" -- Stop (Esc)
     button "Steer" -- Steer (Enter)
     |}];
-  (* Nothing is left under the box. *)
+  (* Nothing else is left under the box. *)
   H.elements h ~selector:".composer .status";
   H.elements h ~selector:".composer .notify";
   [%expect {| |}]
@@ -794,11 +828,7 @@ let%expect_test
   =
   let h = H.create () in
   List.iter
-    [ ".model-chip", "/model"
-    ; ".thinking-chip", "/thinking"
-    ; ".mode-chip", "/mode"
-    ; ".host-chip", "/host"
-    ]
+    [ ".model-chip", "/model"; ".host-chip", "/host" ]
     ~f:(fun (chip, command) ->
       H.quiet h (fun () -> H.click h ~selector:chip);
       let clicked = (H.model h).dialog in
@@ -827,14 +857,6 @@ let%expect_test
     Close_dialog
     .model-chip: Model's menu, the same choices as /model: true
     Close_dialog
-    (Open_chip Thinking)
-    Close_dialog
-    .thinking-chip: Thinking's menu, the same choices as /thinking: true
-    Close_dialog
-    (Open_chip Mode)
-    Close_dialog
-    .mode-chip: Mode's menu, the same choices as /mode: true
-    Close_dialog
     (Open_chip Host)
     Close_dialog
     .host-chip: Host's menu, the same choices as /host: true
@@ -860,8 +882,6 @@ let%expect_test
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.click h ~selector:".mode-chip";
@@ -880,8 +900,6 @@ let%expect_test
     Close_dialog
     (Focus editor)
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   (* Clicking a choice takes it. *)
@@ -897,8 +915,6 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     (Claude Sonnet 5)
-    (Thinking high)
-    (Auto: never asks)
     (backend)
     |}]
 ;;
@@ -1008,29 +1024,29 @@ let%expect_test
     (Focus popover-filter)
     Place_popover
     (Chip_step 1)
-    (Focus popover-list)
+    (Focus popover-filter)
     Place_popover
-    Thinking
+    Host
     (Chip_step 1)
-    (Focus popover-list)
+    (Focus popover-filter)
     Place_popover
-    Mode
+    Model
     (Chip_step 1)
     (Focus popover-filter)
     Place_popover
     Host
     (Chip_step -1)
-    (Focus popover-list)
+    (Focus popover-filter)
     Place_popover
-    Mode
+    Model
     (Chip_step 1)
     (Focus popover-filter)
     Place_popover
     Host
     (Chip_step -1)
-    (Focus popover-list)
+    (Focus popover-filter)
     Place_popover
-    Mode
+    Model
     (Chip_step 1)
     (Focus popover-filter)
     Place_popover
@@ -1040,11 +1056,22 @@ let%expect_test
     Model
     |}];
   (* In the model's filter, once something is typed, ← → move the caret. *)
+  H.key h "Escape" ~target:Field;
   H.click h ~selector:".model-chip";
   H.input h ~selector:"#popover-filter" "gp";
   H.key h "ArrowLeft" ~target:Field;
   shown ();
-  [%expect.unreachable];
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    (Picker_query gp)
+    (browser default)
+    Model
+    |}];
   (* Only the open chip says so; the other chips stay live, the rest of the
      composer is inert, under the menu. The chips are lifted over the
      menu's backdrop (menu-open) only while it is open: the rest of the
@@ -1053,46 +1080,44 @@ let%expect_test
   H.elements h ~selector:".composer [inert]";
   H.elements h ~selector:".composer-controls";
   H.elements h ~selector:".chip-anchor";
-  [%expect.unreachable];
-  H.click h ~selector:".mode-chip";
+  [%expect
+    {|
+    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    <textarea class="editor">
+    <div class="composer-buttons">
+    <div class="composer-controls composer-tier menu-open">
+    <div class="chip-anchor thinking">
+    <div class="chip-anchor mode">
+    <div class="attach-menu chip-anchor">
+    <div class="chip-anchor model open">
+    <div class="chip-anchor host">
+    |}];
+  H.click h ~selector:".host-chip";
   shown ();
-  H.click h ~selector:".mode-chip";
+  H.click h ~selector:".host-chip";
   shown ();
-  H.click h ~selector:".thinking-chip";
+  H.click h ~selector:".model-chip";
   H.click h ~selector:".popover-backdrop";
   shown ();
   H.elements h ~selector:".composer-controls";
-  [%expect.unreachable];
-  (* A model without thinking levels: ← → pass over its chip. *)
-  H.event
-    h
-    (sprintf
-       {|{"event":"state","state":%s}|}
-       (H.state_json
-          ~fields:
-            [ ( "model"
-              , Jsonaf.of_string
-                  (H.model_json
-                     ~thinking:false
-                     ~provider:"deepseek"
-                     ~id:"deepseek-chat"
-                     ~name:"DeepSeek Chat"
-                     ()) )
-            ; "thinking", `String "off"
-            ]
-          ()));
-  H.quiet h (fun () -> H.click h ~selector:".model-chip");
-  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
-  shown ();
-  [%expect.unreachable]
-[@@expect.uncaught_exn
-  {|
-  ("nothing matches" #popover-filter (nth 0))
-  Trailing output
-  ---------------
-  (Open_chip Model)
-  (Focus editor)
-  |}]
+  [%expect
+    {|
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    Host
+    (Open_chip Host)
+    (Focus editor)
+    closed
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    Close_dialog
+    (Focus editor)
+    closed
+    <div class="composer-controls composer-tier">
+    |}];
+  ()
 ;;
 
 (* A phone: the menu is as wide as the composer (style.css); what it shows
@@ -1100,27 +1125,23 @@ let%expect_test
 let%expect_test "narrow: the same menu" =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
-  H.click h ~selector:".mode-chip";
+  H.click h ~selector:".composer-plus .plus";
   H.text h ~selector:"#chip-popover";
   H.names h ~selector:"#chip-popover";
   H.names h ~selector:"#chip-popover [role]";
   [%expect
     {|
-    (Open_chip Mode)
+    (Open_chip Attach)
     (Focus popover-list)
     Place_popover
-    When tools ask first Alt+M cycles
-    Asks: edits & commands bash, job_input, edits and MCP tools ask first
-    Asks: commands file edits run; bash, job_input and MCP tools ask first
-    ✓ Auto: never asks tools run without asking
-    Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-    Enter chooses, ← → the next setting, Esc closes
-    [dialog] div "When tools ask first"
-    [listbox] div "When tools ask first"
-    [option] div "Asks: edits & commands bash, job_input, edits and MCP tools ask first"
-    [option] div "Asks: commands file edits run; bash, job_input and MCP tools ask first"
-    [option] div "Auto: never asks tools run without asking"
-    [option] div "Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first"
+    Add to your message or paste, or drop
+    Files… uploaded to the tool host; the agent gets their paths
+    Images… shown to the model; draw on it before sending
+    Enter chooses, Esc closes
+    [dialog] div "Add to your message"
+    [listbox] div "Add to your message"
+    [option] div "Files\226\128\166 uploaded to the tool host; the agent gets their paths"
+    [option] div "Images\226\128\166 shown to the model; draw on it before sending"
     |}]
 ;;
 
@@ -1139,13 +1160,18 @@ let%expect_test "the status in the card: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".session-card .card-status" in
+  let status () = H.text h ~selector:".session-bar .status" in
   status ();
   [%expect
     {|
-    Ready $0.42
-    (65%)
-    (main)
+    Ready (65%)
+    Context 130k / 200k · 65%
+    Tokens 120k in · 9.0k out · 0 cached
+    Cost $0.4200
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.42
     |}];
   H.event
     h
@@ -1165,28 +1191,30 @@ let%expect_test "the status in the card: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".session-card .card-status .status-item";
+  H.elements h ~selector:".session-bar .status .status-item";
   (* First, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".session-card .card-head > .activity";
+  H.show h ~selector:".session-bar .status > .activity";
   [%expect
     {|
-    Working $0.00
-    (Goal 2/20) (1 queued)
-    (90%)
-    (main)
+    Working (90%)
+    Context 180k / 200k · 90%
+    Tokens 0 in · 0 out · 0 cached
+    Cost $0.0000
+    Model Claude Opus 5.5
+    Branch main
+    Click for the session’s details · /compact frees context
+    $0.00
     <span class="activity running status-item">
-    <span class="cost status-item">
-    <button class="goal link status-item warm">
-    <button class="link queued status-item">
     <button class="context hot link status-item">
+    <span class="cost status-item">
     <span title="Working" role="status" aria-atomic="true" class="activity running status-item">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="label"> Working </span>
     </span>
     |}];
   (* The context opens the session's details, with the counters. *)
-  H.click h ~selector:".session-card .context";
+  H.click h ~selector:".session-bar .status .context";
   [%expect
     {|
     (Run /session)
@@ -1201,7 +1229,6 @@ let%expect_test "the status in the card: idle, running, and what applies" =
   H.text h ~selector:".session-bar";
   [%expect
     {|
-    Connecting…
     (Sessions (Ctrl+B))
     Connecting…
     (Settings (Ctrl+, or /settings))
@@ -1214,20 +1241,18 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.elements h ~selector:".app";
-  H.show h ~selector:".mode-chip";
+  H.show h ~selector:".model-chip";
   H.show h ~selector:"#editor";
   [%expect
     {|
     <div class="app narrow">
     <button type="button"
-            title="Tools run without asking (Alt+M cycles, /mode picks)"
-            data-short="auto"
+            title="Claude Opus 5.5: switch model (Ctrl+L)"
             aria-haspopup="dialog"
             aria-expanded="false"
-            class="btn chip-button mode-chip"
+            class="btn chip-button model-chip"
             @on_click>
-      <icon class="shield"> </icon>
-      <span class="chip-label"> Auto: never asks </span>
+      <span class="chip-label"> Claude Opus 5.5 </span>
       <icon class="chevron"> </icon>
     </button>
     <textarea id="editor"
@@ -1240,5 +1265,34 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
               class="editor"
               #value=""
               @on_input> </textarea>
+    |}]
+;;
+
+(* ← → go along the chips that sit together: the header's thinking and mode,
+   the composer's model and host; never from one group into the other. *)
+let%expect_test "← → stay within the header's chips and the composer's" =
+  let h = H.create () in
+  let shown () = H.text h ~selector:"#chip-popover .popover-head" in
+  H.quiet h (fun () -> H.click h ~selector:".thinking-chip");
+  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
+  shown ();
+  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
+  shown ();
+  H.quiet h (fun () -> H.key h "Escape" ~target:Field);
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
+  shown ();
+  H.quiet h (fun () -> H.key h "ArrowRight" ~target:Field);
+  shown ();
+  [%expect {|
+    (Open_chip Thinking)
+    (Chip_step 1)
+    When tools ask first Alt+M cycles
+    (Chip_step 1)
+    Thinking Alt+T cycles
+    Close_dialog
+    (Open_chip Model)
+    (Chip_step 1)
+    (Chip_step 1)
     |}]
 ;;

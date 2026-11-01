@@ -90,8 +90,6 @@ let%expect_test
     {|
     Main
     textarea "Message"
-    button "Steer" -- Steer (Enter)
-    icon "(no name)"
     draft:
     |}];
   (* Shown in the panel, a nested one takes no messages. *)
@@ -112,8 +110,6 @@ let%expect_test
     {|
     Main
     textarea "Message"
-    button "Steer" -- Steer (Enter)
-    icon "(no name)"
     draft:
     <button type="button"
             title="Write to a1 from the composer (/agents steer)"
@@ -206,8 +202,6 @@ let%expect_test
     (Focus editor)
     Main
     textarea "Message"
-    button "Steer" -- Steer (Enter)
-    icon "(no name)"
     draft:
     button "Steer" -- Write to a1 from the composer (/agents steer)
     |}];

@@ -16,7 +16,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
             title="Not connected to the backend"
             aria-label="Send"
             disabled=""
-            class="btn primary send"
+            class="btn primary round send"
             @on_click>
       <icon class="send"> </icon>
     </button>
@@ -52,7 +52,6 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Reconnecting…
-    (main)
     <footer class="composer offline">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
@@ -80,7 +79,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
             aria-label="Sending"
             disabled=""
             aria-busy="true"
-            class="btn busy primary send"
+            class="btn busy primary round send"
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
     </button>
@@ -98,7 +97,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
   [%expect
     {|
     <div class="msg user">
-    <button class="btn primary send">
+    <button class="btn primary round send">
     |}]
 ;;
 
@@ -159,8 +158,6 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   [%expect
     {|
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   H.elements h ~selector:".chip-button.awaiting";
@@ -174,10 +171,8 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   [%expect
     {|
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
-    (Thinking max)
+    (max)
     (Claude Sonnet 5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     No such level (Dismiss)
     |}]

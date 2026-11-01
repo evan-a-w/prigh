@@ -348,11 +348,10 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
+    (Add files or images (or paste, or drop them here))
+    (Dictate (speak, then click again to stop)) (Send (Enter))
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
-    (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event
@@ -383,6 +382,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     {|
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
+    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /default-dir [path|off] show or set the directory new sessions start in
     /mkdir [path] create a directory (and its parents) and change to it
     /delete-archived delete every archived session, after a confirmation
@@ -410,11 +410,12 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
-    /settings [section] appearance, behaviour, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /unarchive [session] unarchive a session (this one without an argument)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)

@@ -60,7 +60,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
      (tag Ignore))
     (Expire_toast (id 0) (after_ms 5780))
@@ -91,7 +91,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5)) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   (* After a hand-over the status line's model moves on, and so does
      /fallback's "now on". *)
@@ -137,7 +137,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}]
 ;;
 
@@ -165,7 +165,7 @@ let%expect_test
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
   let m, cmds = App.update { App.init with draft = "/fallback gpt-6" } Send in
@@ -294,7 +294,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
       (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))
       (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ())))
+      (naming_model ()) (dictation_model ())))
     |}];
   run h "/default-dir";
   H.text h ~selector:".toast:last-child";
@@ -510,8 +510,6 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   [%expect
     {|
     (GPT-6)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     (Expire_toast (id 0) (after_ms 5260))
     fix the build
@@ -519,8 +517,6 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
     [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
     openai/gpt-6: HTTP 429: quota (usage limit reached); handing over to anthropic/claude-opus-5-5
     (Claude Opus 5.5)
-    (Thinking on)
-    (Auto: never asks)
     (backend)
     |}];
   run h "/fallback";

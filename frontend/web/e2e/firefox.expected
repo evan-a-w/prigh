@@ -12,9 +12,6 @@ prigh
 web
 New session
 No sessions yet: send a message to start one.
-Ready
-$<COST>
-0%
 T
 token
 === firefox: signed in: chat ===
@@ -26,9 +23,12 @@ What are we building?
 Ctrl+L switch model
 Ctrl+K find a session
 === firefox: signed in: the session's card ===
+New session
+on
+auto
 Ready
-$<COST>
 0%
+$<COST>
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -111,13 +111,16 @@ three
 three lines
 <TIME>
 === firefox: the session's card after a run ===
+count some lines
+on
+auto
 Ready
-$<COST>
 0%
+$<COST>
 === firefox: a budget in the status line ===
 Ready
-$<COST>/$<COST>
 0%
+$<COST>/$<COST>
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -144,15 +147,21 @@ a red flag with a blue stripe
 data:image/png;base64, 24x16
 === firefox: an image open: the chips ===
 model: under .lightbox
-thinking: under .lightbox
-mode: under .lightbox
 host: under .lightbox
+=== firefox: drawing on the read tool's image ===
+viewer closed: true
+Saving attaches the drawing to your next message.
+Cancel
+Attach
 === firefox: a chip's menu open: the chips ===
 model: the chip, on top
-thinking: the chip, on top
-mode: the chip, on top
 host: the chip, on top
 === firefox: attached in the composer ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+=== firefox: drawing: nothing drawn, nothing to save ===
+save enabled: false
+=== firefox: drawn on, in the composer ===
 data:image/png;base64, 20x10
 data:image/png;base64, 12x30
 composer cleared: true
@@ -174,9 +183,6 @@ Select
 count some lines
 <AGE>
 <CWD>
-Ready
-$<COST>
-0%
 T
 token
 === firefox: new session ===
@@ -204,9 +210,6 @@ hello again
 count some lines
 <AGE>
 <CWD>
-Ready
-$<COST>
-0%
 T
 token
 === firefox: switching ===
@@ -368,17 +371,24 @@ anything new?
 === firefox: the model saw the note ===
 [Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 anything new?
-=== firefox: the model, thinking and mode controls ===
+=== firefox: the model and host controls ===
 DeepSeek V4.1 Flash
-Thinking
-on
-Auto: never asks
 <HOSTNAME>
 === firefox: the host picker ===
 Where tools run
 <HOSTNAME>
 <CWD>/sub
 ↑↓ to move, Enter to choose, Esc to close
+=== firefox: the + menu ===
+Add to your message
+or paste, or drop
+Files…
+uploaded to the tool host; the agent gets their paths
+Images…
+shown to the model; draw on it before sending
+Enter chooses, Esc closes
+attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
 === firefox: the thinking chip's menu ===
 Thinking
 Alt+T cycles
@@ -395,30 +405,21 @@ as much as the model allows
 Enter chooses, ← → the next setting, Esc closes
 thinking's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
 closed: true; focus: editor
-model's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
+model's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: the model chip's menu, filtered ===
 DeepSeek V4.1 Flash
 DeepSeek, not logged in
 1M
-=== firefox: the mode chip's menu, from the model's with → → ===
-When tools ask first
-Alt+M cycles
-Asks: edits & commands
-bash, job_input, edits and MCP tools ask first
-Asks: commands
-file edits run; bash, job_input and MCP tools ask first
-Auto: never asks
-tools run without asking
-Plan mode
-read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-Enter chooses, ← → the next setting, Esc closes
-mode's menu: above the composer, at the chip's left edge, inside the window; focus in it: true
-=== firefox: mode ask ===
-DeepSeek V4.1 Flash
-Thinking
-high
-Asks: edits & commands
+=== firefox: the host chip's menu, from the model's with → ===
+/host
 <HOSTNAME>
+<CWD>/sub
+The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
+Enter chooses, ← → the next setting, Esc closes
+host's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+=== firefox: mode ask ===
+high
+ask
 === firefox: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -459,16 +460,14 @@ A: SQLite
 SQLite it is.
 <TIME>
 === firefox: plan mode (Alt+M) ===
-DeepSeek V4.1 Flash
-Thinking
 high
-Plan mode
-<HOSTNAME>
+plan
 === firefox: plan mode: the status line ===
+high
+plan
 Ready
-$<COST>
 0%
-main
+$<COST>
 === firefox: plan mode: the composer's placeholder ===
 Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
 === firefox: the plan, in plan mode ===
@@ -485,16 +484,15 @@ Write the schema
 Test it
 <TIME>
 === firefox: plan mode off ===
-DeepSeek V4.1 Flash
-Thinking
 high
-Auto: never asks
-<HOSTNAME>
+auto
 === firefox: plan mode off: the status line ===
+plan 0/2: Write the schema
+high
+auto
 Ready
-$<COST>
 0%
-main
+$<COST>
 === firefox: implementing ===
 ◇
 Plan mode off: the model was told it can change files
@@ -529,11 +527,9 @@ Done waiting.
 <TIME>
 === firefox: phone: the drawer open: the chips ===
 model: under .sidebar, .scrim
-thinking: under .sidebar, .scrim
-mode: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === firefox: phone: a chip's menu ===
-thinking's menu: above the composer, as wide as the composer, inside the window; focus in it: true
+attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 === firefox: archived, folded ===
 one more
 <AGE>
@@ -732,42 +728,42 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
+chat 520; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-card: Ready, $<COST>, 0%; 100px high
-.session-card, .session-bar: fits
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
-the panels' toggles: 3 buttons 8px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: settings ===
 Settings
 Appearance
-Behaviour
+Sessions
 Models
 Git hosting
 T
 token
 Appearance
-How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+LOOK
 Theme
-Follows you to every browser you sign in on.
+The page's colours.
 Original
 Dark
 Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+LAYOUT
 Tabs
-Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+The open sessions as tabs over the chat (not on a phone).
 Transcript detail
-How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
 Quiet
 Normal
 Verbose
@@ -775,12 +771,10 @@ Keyboard shortcuts
 Done
 === firefox: a dialog open: the chips ===
 model: under .modal-backdrop
-thinking: under .modal-backdrop
-mode: under .modal-backdrop
 host: under .modal-backdrop
 a choice keeps it open: true
 === firefox: settings: the sections ===
-clicked Behaviour: tab Behaviour, focus Behaviour, showing Behaviour (labelled by settings-tab-behaviour)
+clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
 ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
@@ -788,16 +782,16 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks, <HOSTNAME>; .session-bar: 0%, ↑0 ↓0, $<COST>, Ready; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
 === firefox: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, Ready; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
+chat 600; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: icon, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto, <HOSTNAME>; .session-bar: 0%, icon; title whole or at least 100px: true; 44px high
-.session-card, .session-bar: fits
+chat 400; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .session-bar: Ready, $<COST>; title whole or at least 100px: true; 44px high
+.session-bar: fits
 .composer: fits
 === firefox: errors ===
 none
@@ -841,7 +835,7 @@ Back to alice
 I am bob
 === firefox: accounts: bob's settings ===
 Appearance
-Behaviour
+Sessions
 Models
 Git hosting
 B
@@ -1059,7 +1053,7 @@ frames empty but still tall: 0
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
-=== firefox: stability: a turn starts and ends on a phone: the status in the bar ===
+=== firefox: stability: a turn starts and ends on a phone: the status in the tray ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
@@ -1070,20 +1064,23 @@ none
 === firefox: themes: settings ===
 Appearance
 
-How this page looks. The theme, accent and tabs follow you to every browser you sign in on; the transcript's detail is this browser's.
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
 
+LOOK
 Theme
-Follows you to every browser you sign in on.
+The page's colours.
 Original
 Dark
 Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+LAYOUT
 Tabs
-Show the open sessions as tabs over the chat (not on a phone). Saved for your account.
+The open sessions as tabs over the chat (not on a phone).
 Transcript detail
-How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
 Quiet
 Normal
 Verbose
@@ -1947,7 +1944,7 @@ files beside: true
 agents beside: true
 === firefox: review: focus: the review closed ===
 sidebar: shown
-session bar over the chat: false
+session bar over the chat: true
 terminal from the chat's left to the chat's right: true
 terminal under them: true
 files beside: true
@@ -2165,7 +2162,7 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === firefox: trim: keyboard ===
-under the message: 0,-199
+under the message: 0,2
 highlighted: Trim everything before this
 === firefox: trim: trimmed ===
 divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
@@ -2311,65 +2308,48 @@ markdown fits: true; page fits: true; scrolling display math: 1, auto
 === firefox: math: errors ===
 none
 === firefox: card: idle ===
-row 1: Ready | $<COST>
-row 2: [meter] 0%
-row 3: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 100px high
+row 1: New session | feature/a-rather-long-branch-for-the-sidebar-card | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: nothing; 44px high
 fits
 === firefox: card: working, a subagent running ===
-row 1: Running tools | $<COST>
-row 2: 1 agent running
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent running | Running tools | [meter] 0% | $<COST>
+lamps: 2; accented: 1 agent running, Running tools; 44px high
 fits
 === firefox: card: ready, a subagent running ===
-row 1: Ready | $<COST>
-row 2: 1 agent running
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 1; accented: 1 agent running; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent running | Ready | [meter] 0% | $<COST>
+lamps: 1; accented: 1 agent running; 44px high
 fits
 === firefox: card: idle, a mode on ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
 === firefox: card: the sidebar at its narrowest ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
 === firefox: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | <HOSTNAME>
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME>
 chip problems: none
 === firefox: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === firefox: card: on a host with a long name ===
-row 1: Ready | $<COST>
-row 2: 1 agent | verbose
-row 3: [meter] 0%
-row 4: feature/a-rather-long-branch-for-the-sidebar-card
-lamps: 0; accented: nothing; 127px high
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
+lamps: 0; accented: verbose; 44px high
 fits
-chips 1: DeepSeek V4.1 Flash | Thinking on | Auto: never asks | build-runner-eu-west-a-long-hostname
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
 === firefox: card: the context opens the session's details ===
 Session
 === firefox: card: the sidebar closed ===
-row 1: survey the project | 1 agent | verbose | [meter] 0% | ↑0 ↓0 | $<COST> | Ready
+row 1: survey the project | feature/a-rather-long-branch-for-the-sidebar-card | 1 agent | verbose | Ready | [meter] 0% | $<COST>
 lamps: 0; accented: verbose; 44px high
 fits
 === firefox: card: a phone ===
-row 1: survey the project | icon | 0% | icon
+row 1: survey the project
 lamps: 0; accented: nothing; 44px high
 fits
-chips 1: DeepSeek V4.1 Flash | on | icon | build-runner-eu-west-a-long-hostname
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname
 chip problems: none (host name truncated)
 === firefox: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
@@ -2436,9 +2416,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "200k" (placeholder 200k); Off pressed: false; mask: true
@@ -2451,9 +2428,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "150k" (placeholder 200k); Off pressed: false; mask: false
@@ -2467,9 +2441,6 @@ Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "150k" (placeholder 200k); Off pressed: false; mask: false
@@ -2482,9 +2453,6 @@ Also summarise once the context passes this many tokens (default 200k), not only
 Off: only at 80% of the window. Type a number to set one.
 tokens
 Off
-Summary model
-The model that writes the summaries: a cheaper one costs less, but cannot reuse the conversation's prompt cache.
-The conversation's model
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
 field: "" (placeholder 150k); Off pressed: true; mask: false

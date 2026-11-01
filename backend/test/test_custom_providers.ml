@@ -331,6 +331,7 @@ let%expect_test
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
+      "dictation_model": null,
       "trace": "default"
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)

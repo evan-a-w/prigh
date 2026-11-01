@@ -478,7 +478,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
      (snippets ()) (auto_background_seconds 30) (generate_model ())
      (mask_observations true) (compact_at_tokens 200000) (compaction_model ())
-     (naming_model ()) (trace Default))
+     (naming_model ()) (dictation_model ()) (trace Default))
     {
       "scoped_models": [
         "a"
@@ -502,6 +502,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
+      "dictation_model": null,
       "trace": "default"
     }
     (default deepseek/deepseek-flash (On (High)))

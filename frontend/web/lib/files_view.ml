@@ -1001,5 +1001,18 @@ let pickers =
   in
   Node.div
     ~attrs:[ Attr.class_ "file-pickers" ]
-    [ picker "files-upload-input"; picker "chat-attach-input" ]
+    [ picker "files-upload-input"
+    ; picker "chat-attach-input"
+    ; Node.input
+        ~attrs:
+          [ Attr.id "image-attach-input"
+          ; Attr.class_ "hidden-file-input"
+          ; Attr.type_ "file"
+          ; Attr.create "accept" "image/png,image/jpeg,image/gif,image/webp"
+          ; Attr.create "multiple" ""
+          ; Attr.tabindex (-1)
+          ; Attr.create "aria-hidden" "true"
+          ]
+        ()
+    ]
 ;;

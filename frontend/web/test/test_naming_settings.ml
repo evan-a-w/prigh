@@ -29,7 +29,8 @@ let%expect_test "naming model: shown, picked, back to the default" =
   H.text h ~selector:".modal";
   [%expect
     {|
-    Naming model The model that titles sessions and names subagents: a small, fast one is plenty. Default: the generate model, else the session's.
+    Naming
+    Titles sessions and names subagents: a small, fast model is plenty. Default: the generate model, else the session's.
     (Default)
     button "Naming model: Default" -- Choose the model (/naming model)
     (Run "/naming model")
@@ -57,7 +58,8 @@ let%expect_test "naming model: shown, picked, back to the default" =
      (params ((config ((naming_model anthropic/claude-sonnet-5)))))
      (tag Naming_saved))
     (Expire_toast (id 0) (after_ms 4980))
-    Naming model The model that titles sessions and names subagents: a small, fast one is plenty. Default: the generate model, else the session's.
+    Naming
+    Titles sessions and names subagents: a small, fast model is plenty. Default: the generate model, else the session's.
     (Claude Sonnet 5)
     Sessions and subagents are named by anthropic/claude-sonnet-5 (/naming model MODEL|off)
     |}];

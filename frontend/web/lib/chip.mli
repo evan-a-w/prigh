@@ -1,13 +1,14 @@
 open! Core
 
 (** The composer's chips: each opens its menu over the composer (a popover,
-    not the command's dialog). *)
+    not the command's dialog). [Attach] is the composer's + button. *)
 
 type t =
   | Model
   | Thinking
   | Mode
   | Host
+  | Attach
 [@@deriving sexp_of, equal, enumerate]
 
 (** The chip [delta] places along, wrapping round; [skip] passes over those

@@ -116,21 +116,6 @@ let accents (m : App.Model.t) ~inject =
     (presets @ [ custom ])
 ;;
 
-let row ~cls ~name ~about ?note control =
-  div
-    ~cls:("setting setting-wide " ^ cls)
-    [ div
-        ~cls:"setting-text"
-        [ span ~cls:"setting-name" name
-        ; span ~cls:"setting-about" about
-        ; (match note with
-           | Some text -> span ~cls:"setting-note warm" text
-           | None -> Node.none)
-        ]
-    ; div ~cls:"setting-control" [ control ]
-    ]
-;;
-
 let rows (m : App.Model.t) ~inject =
   let note =
     match Option.bind m.hello ~f:Hello_reply.acting_as with
@@ -138,19 +123,22 @@ let rows (m : App.Model.t) ~inject =
       Some
         (sprintf
            "Acting as %s: changes stay in this browser until you are back."
-           other)
+           other
+         |> fun text -> "warm", text)
     | None -> None
   in
-  [ row
+  [ Settings_row.row
       ~cls:"theme"
+      ~wide:true
       ~name:"Theme"
-      ~about:"Follows you to every browser you sign in on."
+      ~about:"The page's colours."
       ?note
-      (themes m ~inject)
-  ; row
+      [ themes m ~inject ]
+  ; Settings_row.row
       ~cls:"accent"
+      ~wide:true
       ~name:"Accent"
       ~about:"Your turns, the selection, focus and work in progress."
-      (accents m ~inject)
+      [ accents m ~inject ]
   ]
 ;;

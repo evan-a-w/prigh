@@ -154,6 +154,10 @@ module Method = struct
         ; task : string option
         }
     | Generate_cancel of { gen_id : string }
+    | Transcribe of
+        { mime_type : string
+        ; data : string
+        }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
   [@@deriving sexp_of, equal]
@@ -213,6 +217,7 @@ module Method = struct
     | Git_push _ -> "git_push"
     | Generate_text _ -> "generate_text"
     | Generate_cancel _ -> "generate_cancel"
+    | Transcribe _ -> "transcribe"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
   ;;
@@ -366,6 +371,8 @@ module Method = struct
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
       @ Option.value_map task ~default:[] ~f:(fun t -> [ "task", Json.str t ])
     | Generate_cancel { gen_id } -> [ "gen_id", Json.str gen_id ]
+    | Transcribe { mime_type; data } ->
+      [ "mime_type", Json.str mime_type; "data", Json.str data ]
   ;;
 end
 
