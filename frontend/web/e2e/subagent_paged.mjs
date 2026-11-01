@@ -107,7 +107,8 @@ try {
 
   await composer.fill("count the files");
   await composer.press("Enter");
-  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("There are 3 files."));
+  // The subagent done: its line settles to a tick (its report is in the panel).
+  await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"));
   writeFileSync(join(cwd, "main-go"), "");
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Waiting."));
 
