@@ -22,7 +22,7 @@ let session () =
 let show h =
   let m = Harness.model h in
   Harness.text h ~selector:".banner";
-  Harness.text h ~selector:".status-island";
+  Harness.text h ~selector:".composer-status";
   Harness.text h ~selector:".toasts";
   print_s
     [%message
@@ -86,8 +86,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     ((connection (Reconnecting (attempt 5) (generation 6))) (lost 5))
     |}];
   (* Once more: it stops, and says what to do. *)
@@ -106,8 +104,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     ((connection (Reconnecting (attempt 6) (generation 7))) (lost 6))
     |}];
   (* It does not start again by itself. *)
@@ -150,8 +146,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     Reconnecting now…
     ((connection Connected) (lost 5))
     |}];
@@ -170,8 +164,6 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     Reconnecting now…
     Reconnected
     ((connection Connected) (lost 0))
@@ -207,8 +199,6 @@ let%expect_test "failing to connect keeps trying" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     ((connection (Reconnecting (attempt 21) (generation 1))) (lost 0))
     |}]
 ;;

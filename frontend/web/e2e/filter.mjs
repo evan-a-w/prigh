@@ -351,7 +351,8 @@ try {
     const b = document.getElementById("filter-toggle").getBoundingClientRect();
     return b.left >= 0 && b.right <= innerWidth;
   });
-  await page.locator(".chrome-backdrop").click({ position: { x: 20, y: 300 } });
+  // Above the sheet (with the session's choices in it, it reaches high).
+  await page.locator(".chrome-backdrop").click({ position: { x: 20, y: 20 } });
   await page.waitForFunction(() => !document.querySelector("#chrome-menu"));
   console.log(`note: ${await note()}`);
   const fits = await page.evaluate(buttonInside => {
