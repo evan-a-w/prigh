@@ -62,6 +62,14 @@ type git = Git_forge.Request.t -> Tool_result.t
     [origin], else the first remote on a known host. *)
 val repo : t -> git:git -> (Forge_repo.t * Git_forge.Info.t) Or_error.t
 
+(** Runs [f] with the API, as the signed-in user, for the session's
+    repository ({!repo}). *)
+val with_repo
+  :  t
+  -> git:git
+  -> f:(Forge_api.t -> Forge_repo.t -> 'a Or_error.t)
+  -> 'a Or_error.t
+
 module Pulls : sig
   type t =
     { repo : Forge_repo.t

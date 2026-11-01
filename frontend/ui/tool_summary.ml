@@ -77,6 +77,39 @@ let pull_request args =
     String.concat ~sep:" " (action :: target))
 ;;
 
+let issue args =
+  let str = Tool_args.string args in
+  Option.map (str "action") ~f:(fun action ->
+    let target =
+      match action with
+      | "list" ->
+        Option.to_list (str "state")
+        @ Option.to_list (Option.map (str "search") ~f:quoted)
+      | "create" -> Option.to_list (Option.map (str "title") ~f:quoted)
+      | _ ->
+        Option.to_list
+          (Option.map (Tool_args.int args "number") ~f:(sprintf "#%d"))
+    in
+    String.concat ~sep:" " (action :: target))
+;;
+
+let repo args =
+  let str = Tool_args.string args in
+  Option.map (str "action") ~f:(fun action ->
+    let target =
+      match action with
+      | "runs" -> Option.to_list (str "branch")
+      | "run" | "rerun" ->
+        Option.to_list
+          (Option.map (Tool_args.int args "run") ~f:(sprintf "run %d"))
+      | "logs" ->
+        Option.to_list
+          (Option.map (Tool_args.int args "job") ~f:(sprintf "job %d"))
+      | _ -> []
+    in
+    String.concat ~sep:" " (action :: target))
+;;
+
 let as_call (s : P.Content.Server_tool.t) =
   let call = { P.Tool_call.id = s.id; name = s.name; arguments = s.input } in
   ( call

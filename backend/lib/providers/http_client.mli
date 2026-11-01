@@ -83,3 +83,16 @@ val get
   -> headers:(string * string) list
   -> unit
   -> (Response.t * string, Error.t) Result.t
+
+(** Any method, e.g. [`PATCH] or [`DELETE]; [body] is sent as is (none for
+    a [GET]). Redirects are not followed: a 3xx is the response. *)
+val request
+  :  env:Env.t
+  -> ?cancel:Cancellation.t
+  -> ?timeout:Time_ns.Span.t
+  -> meth:Http.Method.t
+  -> url:string
+  -> headers:(string * string) list
+  -> ?body:string
+  -> unit
+  -> (Response.t * string, Error.t) Result.t

@@ -91,6 +91,8 @@ let arg (call : P.Tool_call.t) =
     | "job_input" -> Tool_summary.job_input args
     | "worktree" -> Tool_summary.worktree args
     | "pull_request" -> Tool_summary.pull_request args
+    | "issue" -> Tool_summary.issue args
+    | "repo" -> Tool_summary.repo args
     | "apply_patch" ->
       (match
          Patch.parse

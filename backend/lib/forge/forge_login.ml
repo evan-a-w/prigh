@@ -18,7 +18,7 @@ module Listen = struct
 end
 
 let github_scope = "repo"
-let forgejo_scope = "read:user write:repository"
+let forgejo_scope = "read:user write:repository write:issue"
 
 let form fields =
   Uri.encoded_of_query (List.map fields ~f:(fun (k, v) -> k, [ v ]))
@@ -39,7 +39,7 @@ let post_form ~(http : Forge_http.t) ~cancel ~url ~what fields =
       }
   with
   | Error e -> Error e
-  | Ok { status; body } ->
+  | Ok { status; body; headers = _ } ->
     (match Json.parse body with
      | Ok json
        when status / 100 = 2 || Option.is_some (Json.member "error" json) ->
@@ -283,12 +283,13 @@ let token_page (instance : Forge_instance.t) =
   | Github ->
     sprintf
       "%s/settings/tokens/new?scopes=repo&description=prigh (classic, scope \
-       repo; or a fine-grained token with Contents and Pull requests: read and \
-       write)"
+       repo; or a fine-grained token with Contents, Pull requests and Issues: \
+       read and write, and Actions, Checks and Commit statuses: read)"
       instance.web_url
   | Forgejo ->
     sprintf
-      "%s/user/settings/applications (scopes read:user and write:repository)"
+      "%s/user/settings/applications (scopes read:user, write:repository and \
+       write:issue)"
       instance.web_url
 ;;
 
