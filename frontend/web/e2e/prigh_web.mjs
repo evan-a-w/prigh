@@ -365,6 +365,9 @@ const popoverPlace = () => page.evaluate(() => {
   const menu = document.querySelector("#chip-popover");
   const r = menu.getBoundingClientRect();
   const chip = menu.parentNode.querySelector(".chip-button, .plus").getBoundingClientRect();
+  // A phone's: a sheet across the bottom of the screen.
+  if (document.querySelector(".app.narrow") && r.left <= 1 && r.right >= innerWidth - 1 && Math.abs(r.bottom - innerHeight) <= 1)
+    return `${menu.dataset.chip}'s menu: a sheet across the bottom; focus in it: ${menu.contains(document.activeElement)}`;
   const own = menu.closest("[data-popover-box]");
   const inComposer = !own || own.matches(".composer-stack");
   const box = (inComposer ? document.querySelector(".composer-box") : own).getBoundingClientRect();
@@ -1636,10 +1639,16 @@ try {
 sections ${getComputedStyle(nav).flexDirection === "row" ? "across the top" : "down the side"}; panel fits: ${[...document.querySelectorAll(".settings-panel")].every(p => p.scrollWidth <= p.clientWidth)}`;
   });
   console.log(`desktop: ${await settingsFits()}`);
+  // On a phone: the section it was on, a level down, back to the list of
+  // sections, and another (mobile.mjs has the rest).
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator(".settings-tab", { hasText: "Sessions" }).click();
+  await page.locator(".settings-dialog .modal-back").click();
+  await page.locator(".settings-home-row", { hasText: "Sessions" }).click();
   await page.locator(".settings-panel-sessions").waitFor();
-  console.log(`phone: ${await settingsFits()}`);
+  console.log(`phone: ${await page.evaluate(() => {
+    const d = document.querySelector(".settings-dialog").getBoundingClientRect();
+    return `dialog ${Math.round(d.width)}x${Math.round(d.height)}, the screen: ${d.left === 0 && d.right === innerWidth && d.top === 0 && d.bottom === innerHeight}; back: ${document.querySelector(".modal-back")?.title}; panel fits: ${[...document.querySelectorAll(".settings-panel")].every(p => p.scrollWidth <= p.clientWidth)}`;
+  })}`);
   await screenshot("settings: a phone");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.locator(".settings-tab", { hasText: "Appearance" }).click();
