@@ -38,26 +38,15 @@ let%expect_test "user messages: text, pasted images" =
     {|
     <div class="entries">
       <div data-entry="0" class="msg user">
-        <div class="images">
-          <details class="image">
-            <summary title="[image: image/png, 8 B]">
-              <img src="data:image/png;base64,iVBORw0KGgo="
-                   alt="[image: image/png, 8 B]"
-                   class="thumb"/>
-              <span class="lightbox">
-                <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]"/>
-                <span class="lightbox-tools">
-                  <button type="button"
-                          title="Draw on this image"
-                          data-annotate="new"
-                          class="btn lightbox-annotate">
-                    <icon class="pencil"> </icon>
-                    Draw
-                  </button>
-                </span>
-              </span>
-            </summary>
-          </details>
+        <div data-viewer-group="" class="images">
+          <button type="button"
+                  title="[image: image/png, 8 B]"
+                  aria-label="View [image: image/png, 8 B]"
+                  data-viewer=""
+                  data-viewer-draw=""
+                  class="image">
+            <img src="data:image/png;base64,iVBORw0KGgo=" alt="[image: image/png, 8 B]" class="thumb"/>
+          </button>
         </div>
         <div dir="auto" class="bubble"> Give me a tour of the project. </div>
       </div>
@@ -386,12 +375,13 @@ let%expect_test "deliveries of background work: compact cards" =
       <div class="msg">
         <div class="delivery">
           <div class="delivery-section ok">
-            <div class="delivery-head">
+            <div data-agent="a1"
+                 title="subagent a1 · 2 turns, 0 in / 0 out tokens, $0.0000"
+                 class="delivery-head">
               <span class="icon"> ↩ </span>
-              <span class="kind"> subagent a1 </span>
-              <span class="chip ok"> finished </span>
               <span class="task"> Count the lines in src/app.ml and report back. </span>
-              <span class="stats"> 2 turns, 0 in / 0 out tokens, $0.0000 </span>
+              <span class="chip ok"> finished </span>
+              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>
@@ -414,34 +404,35 @@ let%expect_test "deliveries of background work: compact cards" =
       <div class="msg">
         <div class="delivery">
           <div class="delivery-section ok">
-            <div class="delivery-head">
+            <div title="job j2" class="delivery-head">
               <span class="icon"> ↩ </span>
               <span class="kind"> job j2 </span>
-              <span class="chip ok"> exited 0 </span>
               <span class="task"> sleep 0.5; echo second </span>
+              <span class="chip ok"> exited 0 </span>
             </div>
             <div class="output">
               <pre> second </pre>
             </div>
           </div>
           <div class="bad delivery-section">
-            <div class="delivery-head">
+            <div title="job j3" class="delivery-head">
               <span class="icon"> ↩ </span>
               <span class="kind"> job j3 </span>
-              <span class="bad chip"> exited 2 </span>
               <span class="task"> make </span>
+              <span class="bad chip"> exited 2 </span>
             </div>
             <div class="error output">
               <pre> Error: no rule </pre>
             </div>
           </div>
           <div class="bad delivery-section">
-            <div class="delivery-head">
+            <div data-agent="a2"
+                 title="subagent a2 · 1 turns, 10 in / 0 out tokens, $0.0001"
+                 class="delivery-head">
               <span class="icon"> ↩ </span>
-              <span class="kind"> subagent a2 </span>
-              <span class="bad chip"> failed </span>
               <span class="task"> Fix the tests </span>
-              <span class="stats"> 1 turns, 10 in / 0 out tokens, $0.0001 </span>
+              <span class="bad chip"> failed </span>
+              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>
@@ -575,5 +566,5 @@ let%expect_test "delivery of a subagent that ran out of turns" =
        [ {|{"type":"event","event":"message_start","message":{"role":"user","text":"[subagent a1 out of turns] Fix the parser\nsubagent hit the 1-turn limit without finishing\n[subagent: 1 turns, 20 in / 8 out tokens, $0.0000]\n[out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it]","origin":{"source":{"kind":"delivery","title":"Reports"}}}}|}
        ]);
   [%expect
-    {| ↩ subagent a1 out of turns Fix the parser Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
+    {| ↩ Fix the parser out of turns Open › Report subagent hit the 1-turn limit without finishing subagent hit the 1-turn limit without finishing [subagent: 1 turns, 20 in / 8 out tokens, $0.0000] [out of turns: call subagent_continue with id a1 (optionally max_turns, default 1, and a message) to give it more turns: it carries on from where it stopped; or subagent_cancel it, or leave it] |}]
 ;;

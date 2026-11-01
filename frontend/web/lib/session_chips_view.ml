@@ -118,19 +118,27 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       [ icon Shield; span ~cls:"chip-label" (Session_mode.label mode) ]
 ;;
 
-let view (m : App.Model.t) ~inject =
+let view ?(cls = "") ?(quiet_ask = false) (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
   | Some state ->
+    let asks =
+      Option.is_none m.pending.mode
+      && Session_mode.equal
+           (Session_mode.of_state state)
+           { approval = Ask; plan = false }
+    in
     Node.div
       ~attrs:
         [ classes
-            [ "session-chips" ]
+            (List.filter [ "session-chips"; cls ] ~f:(Fn.non String.is_empty))
             [ "menu-open", menu_open m [ Thinking; Mode ] ]
         ; Attr.role "group"
         ; Attr.create "aria-label" "Thinking and mode"
         ]
       [ anchor m Thinking (thinking_chip m state ~inject) ~inject
-      ; anchor m Mode (mode_chip m state ~inject) ~inject
+      ; (if quiet_ask && asks && not (menu_open m [ Mode ])
+         then Node.none
+         else anchor m Mode (mode_chip m state ~inject) ~inject)
       ]
 ;;

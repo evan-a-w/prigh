@@ -170,7 +170,7 @@ const screenshot = async label => {
 };
 const opened = () => page.evaluate(() => window.__wsOpened);
 const banner = () => page.evaluate(() => document.querySelector(".banner")?.innerText.replace(/\s+/g, " ") ?? "none");
-const status = () => page.evaluate(() => document.querySelector(".status")?.innerText.split("\n")[0] ?? "");
+const status = () => page.evaluate(() => document.querySelector(".status-island .status-item.activity")?.textContent.trim() ?? "");
 const lastAnswer = () => page.evaluate(() =>
   [...document.querySelectorAll("#chat .msg")].some(el => el.innerText.includes(`Answer ${400}.`)));
 const back = async () => {

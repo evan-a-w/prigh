@@ -36,11 +36,11 @@ let with_reminders () =
 
 let%expect_test "the status line counts the reminders; clicked, it lists them" =
   let h = H.create () in
-  H.text h ~selector:".status-extras .reminders";
+  H.text h ~selector:".status-notes .reminders";
   H.quiet h (fun () -> H.act h (Reply (State, Ok (state ()))));
-  H.text h ~selector:".status-extras .reminders";
-  H.names h ~selector:".status-extras .reminders";
-  H.click h ~selector:".status-extras .reminders";
+  H.text h ~selector:".status-notes .reminders";
+  H.names h ~selector:".status-notes .reminders";
+  H.click h ~selector:".status-notes .reminders";
   H.text h ~selector:".modal";
   [%expect
     {|
@@ -284,7 +284,7 @@ let%expect_test
   H.quiet h (fun () ->
     H.act h (Reply (State, Ok (state ~session:"s2" ~reminders:"[]" ()))));
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
-  H.text h ~selector:".status-extras .reminders";
+  H.text h ~selector:".status-notes .reminders";
   [%expect
     {|
     (Rpc (method_ push_pref) (params ((key history) (value /remind) (max 500)))

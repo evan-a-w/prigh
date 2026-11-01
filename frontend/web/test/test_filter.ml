@@ -82,9 +82,8 @@ let%expect_test "everything shows at first; the button is left of the files'" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ bash ls
-    README.md
-    ✓ subagent Count the modules
+    (✓ bash ls)
+    ✓ Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -148,9 +147,8 @@ let%expect_test "each kind toggled from the menu, alone" =
     Hiding your messages · 2 items hidden (Show all)
     Thought Let me look first.
     Let me look first.
-    ✓ bash ls
-    README.md
-    ✓ subagent Count the modules
+    (✓ bash ls)
+    ✓ Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -162,9 +160,8 @@ let%expect_test "each kind toggled from the menu, alone" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ bash ls
-    README.md
-    ✓ subagent Count the modules
+    (✓ bash ls)
+    ✓ Count the modules
     Report 12 modules
     12 modules
     And the tests?
@@ -173,9 +170,8 @@ let%expect_test "each kind toggled from the menu, alone" =
     button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
     Hiding thinking · 1 item hidden (Show all)
     Survey the repository
-    ✓ bash ls
-    README.md
-    ✓ subagent Count the modules
+    (✓ bash ls)
+    ✓ Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -188,7 +184,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ subagent Count the modules
+    ✓ Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.
@@ -201,8 +197,7 @@ let%expect_test "each kind toggled from the menu, alone" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ bash ls
-    README.md
+    (✓ bash ls)
     Twelve modules and a README.
     And the tests?
     Looking
@@ -213,9 +208,8 @@ let%expect_test "each kind toggled from the menu, alone" =
     Survey the repository
     Thought Let me look first.
     Let me look first.
-    ✓ bash ls
-    README.md
-    ✓ subagent Count the modules
+    (✓ bash ls)
+    ✓ Count the modules
     Report 12 modules
     12 modules
     Twelve modules and a README.

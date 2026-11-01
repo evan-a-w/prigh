@@ -1,0 +1,429 @@
+/* The chat's chrome and the session's status.
+
+   No bar over the chat: the sidebar's toggle, the island (where the status
+   is one) and the panels' toggles float over the top of the transcript,
+   which leaves them room. Where the status sits is the user's choice
+   (Settings → Appearance → Layout, /status-style): an island over the chat,
+   a ring round send, a whisper under the composer, the composer's border, the
+   model chip, or a card in the sidebar. Every one shares the same pieces:
+   the activity, the context's ring or meter, the cost and one details card
+   (status_view.ml). */
+
+/* {1 The chrome} */
+
+.chrome-anchor { position: relative; height: 0; z-index: var(--z-tools); }
+.chat-chrome {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 14px 0;
+  pointer-events: none;
+}
+.chat-chrome > * { pointer-events: none; display: flex; align-items: center; min-width: 0; }
+.chat-chrome > * > * { pointer-events: auto; }
+.chrome-left { justify-content: flex-start; }
+.chrome-center { justify-content: center; }
+.chrome-right { justify-content: flex-end; }
+/* While a menu of the island's is open, the chrome is over its backdrop. */
+.chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
+
+/* The transcript starts under the chrome, and fades out under it as it
+   scrolls (the floating buttons never sit on legible text). A veil rather
+   than a mask on the chat: a mask would clip, and stack under the chrome,
+   what the chat opens full screen (the image viewer). */
+.main:has(.chat-chrome) .chat { padding-top: 58px; }
+.chat-chrome::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 14px;
+  height: 52px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  pointer-events: none;
+}
+/* The jump list's button and marks start under the chrome's buttons. */
+.main:has(.chat-chrome) .jump-nav { top: 56px; }
+.app.narrow .main:has(.chat-chrome) .chat-frame > .jump-nav { top: 58px; right: 12px; }
+
+/* One frosted surface for whatever floats over the chat. */
+.chrome-button.round,
+.chrome-tools,
+.status-island {
+  background: color-mix(in srgb, var(--slate) 78%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--rule-2) 70%, transparent);
+  box-shadow: 0 8px 22px -14px var(--edge-shadow);
+}
+.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted); }
+.chrome-button.round:hover, .chrome-button.round[aria-expanded="true"] { color: var(--chalk); background: var(--slate-2); }
+.chrome-button.round .icon { width: 17px; height: 17px; }
+
+.chrome-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 3px;
+  border-radius: 999px;
+}
+.chrome-tools > .status-notes:not(:empty) { padding: 0 8px 0 6px; margin-right: 2px; border-right: 1px solid var(--rule); }
+.chrome-tools .btn.icon { width: 28px; height: 28px; border-radius: 50%; color: var(--faint); }
+.chrome-tools .btn.icon:hover { color: var(--chalk); }
+.chrome-tools .btn.icon.active,
+.chrome-tools .btn.icon[aria-pressed="true"] { color: var(--sodium); }
+.chrome-tools .btn.icon .icon { width: 16px; height: 16px; }
+
+/* What applies (a goal, reminders, a resume, a transfer, the plan). */
+.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted); }
+.status-notes:empty { display: none; }
+.status-notes .status-item.mode.plan { max-width: 22ch; }
+
+/* A phone: the ⋯ opens a small menu of the toggles, the notes, the gear. */
+.chrome-more { position: relative; }
+.chrome-backdrop { position: fixed; inset: 0; z-index: var(--z-menu); }
+.chrome-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--z-menu-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 200px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+}
+.chrome-menu > .status-notes { flex-wrap: wrap; padding: 2px 4px 8px; border-bottom: 1px solid var(--rule); }
+.chrome-menu > .panel-toggles { justify-content: space-between; }
+.chrome-menu .btn.icon { width: 40px; height: 40px; }
+.chrome-menu > .settings-toggle { width: 100%; justify-content: center; border-top: 1px solid var(--rule); border-radius: 0; padding-top: 8px; height: auto; }
+
+/* {1 Shared pieces} */
+
+/* The context as a ring: a conic fill of [--pct], warm and hot as the
+   meter is. */
+.ring {
+  --ring-color: color-mix(in srgb, var(--chalk) 60%, transparent);
+  --ring-w: 2.5px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), var(--rule-2) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
+  pointer-events: none;
+}
+.ring.warm { --ring-color: var(--sodium); }
+.ring.hot { --ring-color: var(--brick); }
+.ring.mini { width: 13px; height: 13px; }
+
+/* The details card: under what it describes at the top of the page, over
+   it at the bottom. */
+.status-gauge { align-items: center; gap: 10px; }
+.status-gauge.below > .status-details { top: calc(100% + 10px); bottom: auto; left: 50%; right: auto; translate: -50% 0; }
+.status-gauge.above > .status-details { top: auto; bottom: calc(100% + 10px); transform: translateY(2px); }
+.status-gauge.above:is(:hover, :focus-within) > .status-details { transform: none; }
+.status-details { min-width: 240px; text-align: left; }
+.status-gauge:not(:hover):not(:has(:focus-visible)) > .status-details { visibility: hidden; opacity: 0; }
+
+/* The figures, quiet; their words never move the rest. */
+.status-gauge .status-item.activity { width: auto; max-width: 24ch; }
+.status-item.context .percent { font-variant-numeric: tabular-nums; }
+
+/* {1 E: the island} */
+
+.status-island {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+.status-island > .status-gauge { gap: 0; /* the details hang from the island, centred */ position: static; }
+/* One width whatever it is doing: the pill never jumps as the activity
+   changes (a longer one ends in an ellipsis; the details have it whole). */
+.status-island > .status-gauge > .status-item.activity { width: 13ch; max-width: none; }
+.status-island > .status-gauge > .status-item,
+.status-island > .status-gauge > .status-gauge > .status-item { padding: 0 10px; }
+.status-island > .status-gauge > :first-child { padding-left: 0; }
+.status-island > .status-gauge > * + :not(.status-details) { border-left: 1px solid var(--rule-2); }
+.status-island .status-item.context { gap: 6px; color: var(--chalk); }
+.status-island .status-item.cost { color: var(--chalk); }
+.status-island .island-chips { padding-left: 4px; border-left: 1px solid var(--rule-2); }
+.status-island .island-chips .chip-button { height: 26px; border-radius: 999px; }
+.status-island.busy {
+  border-color: var(--sodium-line);
+  color: var(--chalk);
+  box-shadow: 0 0 0 4px var(--sodium-wash), 0 10px 30px -10px color-mix(in srgb, var(--sodium) 50%, transparent);
+}
+.status-island.busy .status-item.activity { color: var(--sodium); }
+
+/* {1 A: the ring round send} */
+
+.send-gauge { position: relative; }
+.send-ring { --ring-w: 2.5px; padding: 4px; }
+.send-ring::before { z-index: 1; }
+.composer.busy .send-ring { --ring-color: color-mix(in srgb, var(--sodium) 45%, transparent); }
+.composer.busy .send-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 70%, var(--sodium) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
+  animation: status-spin 1.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes status-spin { to { transform: rotate(1turn); } }
+.composer.status-style-ring .composer-buttons { gap: 6px; }
+.send-gauge > .status-details { right: -4px; }
+
+/* The level and the mode by the model, as in the composer's row. */
+.composer-controls:has(+ .row-chips) { flex: 0 1 auto; }
+.row-chips { margin-right: auto; min-width: 0; }
+.composer.status-style-border .row-chips { padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--rule-2); }
+.row-chips .chip-button { height: 28px; font-size: 12.5px; }
+.composer.status-style-ring .row-chips .mode-chip {
+  height: 22px;
+  padding: 0 7px 0 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--sodium);
+  background: var(--sodium-wash);
+  border: 1px solid var(--sodium-line);
+}
+
+/* {1 B: the whisper} */
+
+.status-whisper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px calc(var(--composer-inset) - 4px) 0;
+  font: 11.5px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.status-whisper .status-item,
+.status-whisper .status-item.link,
+.status-whisper .chip-button {
+  height: 22px;
+  padding: 0 5px;
+  font: 11.5px/1 var(--mono);
+  color: var(--faint);
+  border-radius: 5px;
+}
+.status-whisper .status-item.link:hover,
+.status-whisper .chip-button:hover { color: var(--chalk); background: var(--slate); text-decoration: none; }
+.status-whisper .status-item.activity { padding-left: 2px; }
+.status-whisper.busy .status-item.activity { color: var(--sodium); }
+.status-whisper .status-item.context { gap: 6px; }
+.status-whisper .meter { width: 32px; }
+.status-whisper .whisper-of { color: var(--faint); opacity: 0.75; }
+.status-whisper .whisper-sep { color: var(--rule-2); padding: 0 1px; }
+.status-whisper .whisper-chips { gap: 0; }
+.status-whisper .mode-chip.never-asks,
+.status-whisper .mode-chip.plan-mode { color: var(--sodium); }
+.status-whisper .whisper-branch { margin-left: auto; padding-left: 12px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.status-whisper .status-gauge.above > .status-details { left: 0; right: auto; }
+.composer:has(> .composer-footer .status-whisper),
+.composer:has(.status-whisper) { padding-bottom: 6px; }
+@container composer (max-width: 560px) {
+  .status-whisper .whisper-of,
+  .status-whisper .meter,
+  .status-whisper .whisper-branch,
+  .status-whisper .whisper-chips .chip-label { display: none; }
+  /* The card spans the line, not the gauge, so it stays on the screen. */
+  .status-whisper > .status-gauge { position: static; }
+  .status-whisper .status-gauge.above > .status-details { left: 4px; right: 4px; min-width: 0; }
+}
+
+/* {1 C: the border} */
+
+.border-meter {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.border-fill { display: block; height: 100%; border-radius: 2px; background: color-mix(in srgb, var(--chalk) 50%, transparent); transition: width 0.3s ease-out; }
+.border-meter.warm .border-fill { background: var(--sodium); }
+.border-meter.hot .border-fill { background: var(--brick); }
+.composer.busy .border-meter { background: var(--sodium-line); }
+.composer.busy .border-fill { background: var(--sodium); }
+.composer.busy .border-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--sodium) 40%, white) 50%, transparent 100%);
+  width: 30%;
+  animation: status-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes status-shimmer { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.composer.status-style-border.busy .composer-stack { box-shadow: 0 10px 28px -12px color-mix(in srgb, var(--sodium) 45%, transparent); }
+
+.border-tag {
+  position: absolute;
+  right: 22px;
+  bottom: -10px;
+  z-index: 2;
+  height: 18px;
+  gap: 0;
+  padding: 0 4px;
+  border-radius: 999px;
+  font: 11px/1 var(--mono);
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--rule-2);
+}
+.border-tag > .status-item,
+.border-tag > .status-item.link { padding: 0 5px; font: 11px/1 var(--mono); color: inherit; }
+.border-tag > .status-item.activity { display: none; }
+.composer.busy .border-tag { color: var(--sodium); border-color: var(--sodium-line); }
+.composer.busy .border-tag > .status-item.activity { display: inline-flex; }
+.border-tag > .status-item + .status-item:not(.activity) { border-left: 1px solid var(--rule-2); }
+.composer.status-style-border { padding-bottom: 18px; }
+
+/* {1 D: the hub} */
+
+.hub-badge { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; color: var(--faint); font: 11.5px var(--mono); }
+.hub-badge .percent { font-variant-numeric: tabular-nums; }
+.hub-badge .hub-mode { display: inline-flex; color: var(--muted); }
+.hub-badge .hub-mode.loud { color: var(--sodium); }
+.hub-badge .hub-mode .icon { width: 12px; height: 12px; }
+
+.hub-sections { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px 6px; border-top: 1px solid var(--rule); }
+.hub-section { padding: 4px 4px 2px; }
+.hub-head { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 2px 6px; }
+.hub-title { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.hub-choices { display: flex; gap: 2px; padding: 2px; background: var(--well); border-radius: 7px; }
+.hub-choice {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+  font: 12.5px var(--sans);
+  text-transform: lowercase;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hub-choice:hover { color: var(--chalk); }
+.hub-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset; }
+.hub-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.hub-usage { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; padding: 0 2px; font-size: 12.5px; color: var(--muted); }
+.hub-context { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.hub-context .meter { flex: 1; height: 5px; }
+.hub-context .percent { color: var(--chalk); font-variant-numeric: tabular-nums; }
+.hub-of, .hub-tokens { color: var(--faint); font: 11.5px var(--mono); }
+.hub-usage > .status-item.cost { justify-self: end; grid-column: 2; grid-row: 2; }
+.hub-usage > .hub-tokens { grid-column: 1; grid-row: 2; }
+
+/* {1 F: the sidebar's card} */
+
+.status-card {
+  position: relative;
+  margin: 0 10px 8px;
+  padding: 9px 10px 6px;
+  border-radius: 8px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--muted);
+  transition: border-color 0.2s;
+}
+.status-card.busy { border-color: var(--sodium-line); }
+.status-card.busy .status-item.activity { color: var(--sodium); }
+.status-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.status-card-head .status-item.cost { color: var(--chalk); }
+.status-card > .status-gauge { display: flex; margin-top: 8px; }
+.status-card > .status-gauge > .status-item.context { flex: 1; gap: 8px; width: 100%; }
+.status-card .status-item.context .meter { flex: 1; width: auto; height: 3px; }
+.status-card .status-item.context .percent { font: 11px var(--mono); color: var(--faint); }
+.status-card .status-gauge.above > .status-details { left: 0; right: auto; }
+.status-card .card-chips { margin: 4px -6px 0; }
+.status-card .card-chips .chip-button { height: 24px; font-size: 12px; }
+
+/* {1 A narrow chat column} (the sidebar, a panel or a small window beside it)
+
+   The chrome's sides shrink to their buttons and the island gives up its
+   cost and its chips' words, then its activity's word (the lamp stays; the
+   details, the chips' menus, Alt+T and Alt+M have the rest). */
+
+.main { container: main / inline-size; }
+@container main (width < 680px) {
+  .chat-chrome { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .status-island > .status-gauge > .status-item.cost,
+  .status-island .island-chips .chip-label { display: none; }
+  .status-island .island-chips .chip-button { padding: 0 6px; }
+  .status-island > .status-gauge > .status-item.activity { width: 11ch; }
+}
+@container main (width < 480px) {
+  .app:not(.narrow) .status-island > .status-gauge > .status-item.activity { width: auto; padding-right: 8px; }
+  .app:not(.narrow) .status-island > .status-gauge > .status-item.activity > .label { display: none; }
+  .chrome-tools > .status-notes .status-text { display: none; }
+}
+
+/* {1 A phone} */
+
+@media (max-width: 760px) {
+  .chat-chrome { padding: 10px 12px 0; }
+  .chrome-button.round { width: 38px; height: 38px; }
+  .main:has(.chat-chrome) .chat { padding-top: 60px; }
+  .status-island { height: 32px; padding: 0 8px 0 10px; }
+  .status-island > .status-gauge > .status-item.cost,
+  .status-island .island-chips .chip-label { display: none; }
+  .status-island > .status-gauge > .status-item.activity { width: 11ch; }
+  .status-island .island-chips .chip-button { padding: 0 6px; }
+}
+
+/* {1 Still} */
+
+@media (prefers-reduced-motion: reduce) {
+  .composer.busy .send-ring::after { animation: none; background: none; }
+  .composer.busy .border-meter::after { animation: none; display: none; }
+  .status-island, .status-card, .border-fill { transition: none; }
+}
+
+/* The border's tag shows while the agent works, or pointed at. */
+.composer.status-style-border:not(.busy):not(:hover) .border-tag:not(:has(:focus-visible)) { opacity: 0; }
+.border-tag { transition: opacity 0.15s; }
+@media (prefers-reduced-motion: reduce) { .border-tag { transition: none; } }
+.border-tag > .status-details { right: -4px; left: auto; }
+/* On a narrow screen the card's hint wraps rather than leaving it. */
+.status-detail-hint { white-space: normal; }

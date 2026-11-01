@@ -803,44 +803,56 @@ is as wide as the composer. The commands themselves open the larger
 picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
 other two; in a narrow composer the labels get short
 (`high`, `ask`, `plan`, after an icon), and the model's and the host's
-names are cut short with an ellipsis, the host's first. There is no bar over the chat
-while the sidebar is open: the files, terminal and agents buttons sit
-quietly in the chat's top right corner (lit while their panel is open),
-and the session's status is in a card at the foot of the sidebar, above
-the account, under the tree of projects. The tree marks which session it
-is (its row has the cwd as it is now, relative to its project or worktree,
-and a rename button). The card's headline is what the agent is doing
-(`● Ready`, `Thinking`…) with the session's cost across from it, to the
-cent (its tooltip has it exactly; or the budget); under it, only when
-anything applies, a muted line of it (the goal, reminders, a scheduled
-resume, queued messages to take back, background agents and jobs (click
-for the agents panel), transfers, the verbosity when not the default);
-then the context's meter across the card, in the accent colour (its
-percent too from 60%, both brick from 85%), with its percent under the
-cost: its tooltip
-has the tokens in and out, and a click opens `/session`'s details. While
-the agent works its background agents are muted, without a lamp, so that
-one thing at a time is lit. Under them, in a git repository, the branch
-(click for the pull requests, `/pr`). Where tools run is the composer's
-chip, and the model's plan is not on the card: `/todos` shows it, and so
-does the transcript as it changes. The activity keeps a slot wide enough
-for its usual words, so the cost never moves as a turn starts and ends
-(in a narrow sidebar it goes under the activity). Your
-account is under it, with the settings gear; the account menu also has
-Settings and Commands and keys (`/help`). With the sidebar closed, and
-always on a phone (where the sidebar is a drawer), a slim bar over the
-chat keeps the essentials on one line: the sidebar's button and the
-title, what applies (with the plan chip `plan 2/5: step` that runs
-`/todos`), the status, the panel toggles and the settings gear. What applies comes before the status, and
-the activity has a slot of its own width, so that nothing moves the
-status; a narrower chat column drops the tokens and cost, then says what
-applies with icons alone, then shows the activity as a dot; the bar never
-changes height.
+names are cut short with an ellipsis, the host's first.
+
+There is no bar over the chat. The session's title is in the sidebar's tree
+(its row has the cwd as it is now, relative to its project or worktree, and
+a rename button) and in the browser tab's title. A few round, translucent
+buttons float over the chat's top corners: in the top right the filter,
+files, terminal and agents toggles (lit while their panel is open), with,
+before them, what applies, only when it does (the goal, reminders, a
+scheduled resume, transfers, the verbosity when not the default, the plan
+chip `plan 2/5: step` that runs `/todos`); with the sidebar closed, its
+button in the top left and the settings gear after the toggles. On a phone
+the top right is a single ⋯ that opens all of these in a small menu. The
+chat starts under them and fades out beneath them as it scrolls.
+
+The session's status (what the agent is doing, `Ready`, `Thinking`…; how
+full the context is; the cost, to the cent, or against the budget; the
+thinking level and the mode) has one of six places, your choice in Settings
+→ Appearance → Layout or with `/status-style NAME`, saved for your account:
+
+- `island` (the default): a frosted pill at the top centre of the chat,
+  between the corners' buttons, glowing in the accent colour while the agent
+  works;
+- `ring`: the context as a ring round the send button, turning while the
+  agent works, the thinking and the mode (when it is not Ask) beside the
+  composer's chips;
+- `whisper`: one muted line in monospace under the composer, each part a
+  link (shorter on a phone);
+- `border`: the composer's bottom edge is the context's meter, shimmering
+  while the agent works, with the activity and cost at its end, the
+  thinking and the mode after the host;
+- `hub`: the model's chip carries a small ring with the percent and the
+  mode's icon, and its menu gains Thinking, Mode and Usage sections;
+- `sidebar`: a small card at the foot of the sidebar, above the account (as
+  `whisper` with the sidebar closed and on a phone).
+
+In every place the same details card opens on pointing at the status or
+focusing it (the tokens in and out, the cost, the thinking, the mode, the
+model and the git branch), and a click on the context opens `/session`'s
+details. The context is in the accent colour from 60%, brick from 85%; so is
+a cost near or over its budget. The activity keeps a width of its own, so
+nothing moves as a turn starts and ends; the animations stop with the
+system's reduced motion. Your account is at the foot of the sidebar, with
+the settings gear; the account menu also has Settings and Commands and keys
+(`/help`).
 
 The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
-phone): **Appearance** (the theme and accent, session tabs (`/tabs`),
+phone): **Appearance** (the theme and accent, where the status shows
+(`/status-style`), session tabs (`/tabs`),
 transcript detail (`/verbosity`)), **Behaviour** (tool confirmation
 (`/confirm`); notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
@@ -1372,6 +1384,18 @@ list says (or add models it does not list); unlisted fields default to a
 - Ollama: `ollama serve`, then `/login custom` with name `ollama`, base URL
   `http://localhost:11434/v1`, chat completions and no key;
   `/model ollama/llama3.2`.
+- Free dictation with Groq: get a key at
+  [console.groq.com](https://console.groq.com) (free tier, no card;
+  rate-limited, about 20 requests a minute, 2,000 a day and 25 MB an
+  upload), then `/login custom` with name `groq`, base URL
+  `https://api.groq.com/openai/v1`, chat completions and the key, and
+  `/dictation model groq/whisper-large-v3-turbo` (or `groq/whisper-large-v3`,
+  slower and more accurate). Groq's chat models then show in `/model` too. A
+  self-hosted OpenAI-compatible Whisper server (such as
+  [speaches](https://github.com/speaches-ai/speaches)) works the same way,
+  with an empty key. Without a provider that can transcribe, prigh-web falls
+  back to the browser's own speech recognition (Chrome, Edge and Safari;
+  Chrome sends the audio to Google; Firefox has none).
 
 `api` is `chat` (default), `responses` or `anthropic`; `headers` are sent
 with every request; `cost` is in dollars per million tokens. A context
@@ -1834,7 +1858,8 @@ prigh-web's settings page),
 `dictation_model` (the speech-to-text model of the `transcribe` method,
 `provider/id` on OpenAI or an OpenAI-compatible custom provider; default
 `openai/gpt-4o-mini-transcribe`; `/dictation model` picks it, also on
-prigh-web's settings page),
+prigh-web's settings page; free with Groq, see "Free dictation with
+Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
@@ -2106,6 +2131,7 @@ it.
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/tabs [on\|off]` (prigh-web) | show the open sessions as tabs over the chat, saved for your account; alone, says whether they are on |
+| `/status-style [island\|ring\|whisper\|border\|hub\|sidebar]` (prigh-web) | where the session's status shows (see "prigh-web"), saved for your account; alone, a picker |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |

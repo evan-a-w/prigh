@@ -39,16 +39,6 @@ let copy (ev : Dom_html.mouseEvent Js.t) =
      : unit option)
 ;;
 
-let close_image (ev : Dom_html.keyboardEvent Js.t) =
-  if String.equal (Js.Optdef.case ev##.key (fun () -> "") Js.to_string) "Escape"
-  then
-    Js.Opt.iter
-      (Dom_html.document##querySelector (Js.string "details.image[open]"))
-      (fun details ->
-         details##removeAttribute (Js.string "open");
-         Dom_html.stopPropagation ev)
-;;
-
 let toggle_fold ~schedule (ev : Dom_html.mouseEvent Js.t) =
   Option.iter
     (Option.bind
@@ -146,38 +136,6 @@ let hidden_action ~schedule (ev : Dom_html.mouseEvent Js.t) =
           | _ -> ()))
 ;;
 
-(* The lightbox's Draw: the image it shows, drawn on (the viewer closes;
-   the click does not reach its [<summary>], which would only close it). *)
-let annotate ~schedule (ev : Dom_html.mouseEvent Js.t) =
-  Option.iter (clicked ev "data-annotate") ~f:(fun (button, target) ->
-    Dom.preventDefault ev;
-    Dom_html.stopPropagation ev;
-    let open Option.Let_syntax in
-    ignore
-      (let%bind target = Prigh_web.Annotate.Target.of_string target in
-       let%bind details = closest button "details" in
-       let%bind img =
-         Js.Opt.to_option (details##querySelector (Js.string ".lightbox img"))
-       in
-       let%bind src = attribute img "src" in
-       let%bind header, data = String.lsplit2 src ~on:',' in
-       let%map mime_type =
-         String.chop_prefix header ~prefix:"data:"
-         |> Option.bind ~f:(String.chop_suffix ~suffix:";base64")
-       in
-       details##removeAttribute (Js.string "open");
-       schedule
-         (Prigh_web.App.Action.Annotate
-            { image =
-                { mime_type
-                ; data
-                ; bytes = Prigh_protocol.Image.decoded_size data
-                }
-            ; target
-            })
-       : unit option))
-;;
-
 let install ~schedule =
   let listen event handler =
     ignore
@@ -193,7 +151,5 @@ let install ~schedule =
   listen Dom_html.Event.click copy;
   listen Dom_html.Event.click (toggle_fold ~schedule);
   listen (Dom.Event.make "contextmenu") (context_menu ~schedule);
-  listen Dom_html.Event.click (annotate ~schedule);
-  listen Dom_html.Event.click (hidden_action ~schedule);
-  listen Dom_html.Event.keydown close_image
+  listen Dom_html.Event.click (hidden_action ~schedule)
 ;;

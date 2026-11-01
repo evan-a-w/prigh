@@ -1,15 +1,16 @@
 open! Core
 open! Import
 
-(** The current session at a glance: the chat's header. *)
+(** The current session's controls over the chat, which has no header: they
+    float over its top. *)
 
-(** Over the chat, docked sidebar or not: one slim line with the title
-    (renaming it) and the branch (opening the pull requests), then what
-    applies and the status ({!Status_view}: the activity, the context's
-    meter, the cost) at the right, then the panels' toggles. Without the
-    docked sidebar, the sidebar's toggle and the settings too. The session
-    list marks which session it is. *)
-val bar : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+(** Over the top of the chat: the sidebar's toggle at the left (when the
+    sidebar is not docked), the status's island in the middle (with
+    {!Status_style.Island}), and at the right what applies
+    ({!Status_view.notes}) and the panels' toggles (with the settings when
+    the sidebar is not docked); on a phone those are in a menu behind one
+    button. The session's name is the sidebar's and the tab's title. *)
+val chrome : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** The session's name, else its description or first prompt, else
     ["New session"]. *)

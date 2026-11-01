@@ -339,6 +339,12 @@ let view (m : Model.t) ~inject ~terminal =
     [ (* A closed drawer is only out of sight. *)
       (if (m.narrow || Model.focused m) && not (Model.sidebar_shown m)
        then inert
+       else if
+         (not modal_composer)
+         && Option.is_some m.dialog
+         && Status_style_view.chips_in_sidebar m
+       then (* The status card's chip menus are live in it. *)
+         inert_if sheet
        else under_sheet)
         (Sidebar_view.view m ~inject)
     ; (if Model.docked m
@@ -373,7 +379,7 @@ let view (m : Model.t) ~inject ~terminal =
             (List.map
                ~f:under_drawer
                (Option.to_list (Session_tabs_view.view m ~inject))
-             @ [ layered modal_composer (Session_view.bar m ~inject) ]
+             @ [ layered modal_composer (Session_view.chrome m ~inject) ]
              @ List.map
                  ~f:under_drawer
                  [ banner m ~inject

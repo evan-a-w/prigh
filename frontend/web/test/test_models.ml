@@ -213,18 +213,22 @@ let%expect_test
      user"
   =
   let h = H.create () in
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     |}];
   H.act
     h
@@ -238,8 +242,8 @@ let%expect_test
   H.event
     h
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   H.text h ~selector:".card-where";
   [%expect
     {|
@@ -249,15 +253,18 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    Working (75%)
+    Working (75%) $1.23
+    Status Working
     Context 150k / 200k · 75%
     Tokens 123k in · 7.9k out · 100k cached
     Cost $1.2345
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $1.23
-    (3 queued)
+    (on)
+    (auto)
     |}];
   H.show h ~selector:".context";
   [%expect
@@ -266,11 +273,9 @@ let%expect_test
             aria-label="Context 75% full: the session's details"
             aria-describedby="status-details"
             aria-haspopup="dialog"
-            class="context link status-item warm"
+            class="context link status-item"
             @on_click>
-      <span class="meter">
-        <span class="meter-fill" style={ width: 75.00%; }> </span>
-      </span>
+      <span class="mini ring warm" custom-css-vars=((--pct 75.0))> </span>
       <span class="percent"> 75% </span>
     </button>
     <div class="context status-detail warm">

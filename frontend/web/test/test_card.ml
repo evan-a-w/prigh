@@ -2,11 +2,11 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's status in the chat's header, docked sidebar or not: what
-   the agent is doing (a dot alone while idle), the context's short meter
-   (its details over it) and the cost; what applies before it, when
-   anything does; the branch beside the title when there is one. Where tools
-   run is the composer's chip. Each [card] prints the lines as the user reads
+(* The session's status over the chat (the island, the default style):
+   what the agent is doing (a dot alone while idle), the context's ring
+   (its details under it) and the cost; what applies at the right of the
+   chrome, when anything does; the branch in the details. Where tools run
+   is the composer's chip. Each [card] prints the lines as the user reads
    them, then what is lit: the lamps, and what is in the accent colour (by
    its class). *)
 
@@ -57,43 +57,42 @@ let thinking h =
     {|{"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"thinking","text":""}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},"delta":{"type":"thinking_delta","text":""}}|}
 ;;
 
-(* The header's status as it stands. *)
+(* The status as it stands. *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".session-bar .status";
+  H.text h ~selector:".status-island";
   print_endline "applies:";
-  H.text h ~selector:".session-bar .bar-tray > .status-extras";
+  H.text h ~selector:".chrome-tools .status-notes";
   print_endline "context:";
-  H.text h ~selector:".session-bar .status .context";
+  H.text h ~selector:".status-island .context";
   print_endline "where:";
-  H.text h ~selector:".session-bar .session-title > .branch";
+  H.text h ~selector:".status-island .status-details .branch-line";
   print_endline "lit:";
   List.iter
-    [ "lamp"
-    ; "running"
-    ; "queued"
-    ; "status-item.mode"
-    ; "background.active"
-    ; "warm"
-    ; "hot"
-    ]
-    ~f:(fun cls -> H.elements h ~selector:(".session-bar ." ^ cls))
+    [ "lamp"; "running"; "status-item.mode"; "warm"; "hot" ]
+    ~f:(fun cls -> H.elements h ~selector:(".chat-chrome ." ^ cls))
 ;;
 
-let%expect_test "the card idle, thinking, with a subagent and a mode" =
+let%expect_test
+    "the island idle, thinking, with a subagent and a quiet transcript"
+  =
   let h = H.create ~state:(H.state_json ~fields:(fields ()) ()) () in
   (* Idle, out of git, the backend the only host: two lines, nothing lit. *)
   card h;
   [%expect
     {|
     now:
-    Ready (5%)
+    Ready (5%) $1.30
+    Status Ready
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
     applies:
     context:
     (5%)
@@ -103,13 +102,14 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     |}];
   (* The cost to the cent, its title has it exactly; the context's title has
      the tokens. *)
-  H.names h ~selector:".session-bar .status > *";
-  H.names h ~selector:".session-bar .status .context";
+  H.names h ~selector:".status-island .status-gauge > *";
+  H.names h ~selector:".status-island .context";
   [%expect
     {|
     [status] span "Ready"
-    span "5% Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
-    span "$1.30" -- Session cost: $1.3021 (/session)
+    button "Context 5% full: the session's details"
+    span "$1.30" -- Session cost: $1.3021
+    [tooltip] div "Status Ready Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
     button "Context 5% full: the session's details"
     div "Context 10k / 200k \194\183 5%"
     |}];
@@ -120,13 +120,17 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
   [%expect
     {|
     now:
-    Thinking (5%)
+    Thinking (5%) $1.30
+    Status Thinking
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
     applies:
     context:
     (5%)
@@ -136,9 +140,8 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     <span class="lamp">
     <span class="activity running status-item">
     |}];
-  (* The agent runs a subagent in the background, and the transcript is
-     quiet: across from the activity, both unlit (style.css hides the
-     agents' lamp while the activity's glows). *)
+  (* The agent runs a subagent in the background (the agents' toggle
+     counts it; the status does not), and the transcript is quiet: a note. *)
   List.iter
     ~f:(H.event h)
     [ call ~id:"s1" ~name:"subagent" {|{"task":"Survey"}|}
@@ -153,27 +156,29 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     now:
-    Running tools (5%)
+    Running tools (5%) $1.30
+    Status Running tools
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
     applies:
-    (1 agent running) (quiet)
+    (quiet)
     context:
     (5%)
     Context 10k / 200k · 5%
     where:
     lit:
     <span class="lamp">
-    <span class="lamp">
     <span class="activity running status-item">
     <button class="link mode status-item">
-    <button class="active background link status-item">
     |}];
-  (* The agent done, the subagent still at work: now its lamp is lit. *)
+  (* The agent done: nothing is lit but the note. *)
   state h ();
   card h;
   [%expect
@@ -183,39 +188,39 @@ let%expect_test "the card idle, thinking, with a subagent and a mode" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     now:
-    Ready (5%)
+    Ready (5%) $1.30
+    Status Ready
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
     applies:
-    (1 agent running) (quiet)
+    (quiet)
     context:
     (5%)
     Context 10k / 200k · 5%
     where:
     lit:
-    <span class="lamp">
     <button class="link mode status-item">
-    <button class="active background link status-item">
     |}];
-  (* Clicking the agents opens them, the context the session's details. *)
-  H.click h ~selector:".session-bar .background";
-  H.click h ~selector:".session-bar .context";
+  (* Clicking the context opens the session's details. *)
+  H.click h ~selector:".status-island .context";
   [%expect
     {|
-    (Open_subagents ())
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Run /session)
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     |}]
 ;;
 
-let%expect_test "the branch; the host in the composer, the plan in the bar" =
+let%expect_test
+    "the branch in the details; the host in the composer, the plan a note"
+  =
   let others =
     {|[{"id":"backend","name":"container","cwd":"/work"},{"id":"c7","name":"build-runner-eu-west-a-long-hostname","cwd":"/srv/work"}]|}
   in
@@ -223,34 +228,30 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
   let h =
     H.create ~state:(H.state_json ~fields:(fields ~branch ~plan ()) ()) ()
   in
-  (* A branch: a third line, the branch only, whatever the hosts; the plan
-     is not on the card. *)
-  H.elements h ~selector:".session-bar > *";
-  H.elements h ~selector:".bar-tray > *";
-  H.names h ~selector:".session-bar .session-title > .branch";
-  H.elements h ~selector:".session-bar .plan";
+  (* A branch: a line of the details, whatever the hosts; the plan is a
+     note at the right of the chrome. *)
+  H.elements h ~selector:".chat-chrome > *";
+  H.elements h ~selector:".chrome-tools > *";
+  H.text h ~selector:".status-details .branch-line";
+  H.elements h ~selector:".status-notes .plan";
   state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
-  H.names h ~selector:".session-bar .session-title > .branch";
+  H.text h ~selector:".status-details .branch-line";
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
-    <Vdom.Node.none-widget class="">
-    <div class="session-title">
-    <Vdom.Node.none-widget class="">
-    <div class="bar-tray">
-    <Vdom.Node.none-widget class="">
-    <Vdom.Node.none-widget class="">
-    <div class="status-extras">
-    <div class="session-chips">
-    <div class="status">
+    <div class="chrome-left">
+    <div class="chrome-center">
+    <div class="chrome-right">
+    <div class="status-notes">
     <div class="panel-toggles">
-    button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
+    <Vdom.Node.none-widget class="">
+    Branch feature/a-rather-long-branch-for-the-sidebar-card
     <button class="link mode plan status-item">
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    button "feature/a-rather-long-branch-for-the-sidebar-card" -- On branch feature/a-rather-long-branch-for-the-sidebar-card, in /work: pull requests (/pr)
+    Branch feature/a-rather-long-branch-for-the-sidebar-card
     button "build-runner-eu-west-a-long-hostname" -- Tools run on build-runner-eu-west-a-long-hostname, in /srv/work (/host switches)
     |}];
   (* No host at all: the chip says so, lit, and the card has nothing lit. *)
@@ -264,13 +265,17 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
     now:
-    Ready (5%)
+    Ready (5%) $1.30
+    Status Ready
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
     applies:
     context:
     (5%)
@@ -279,35 +284,23 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
     lit:
     <button class="btn chip-button host-chip warm">
     |}];
-  (* Out of git: no third line. *)
+  (* Out of git: no branch line. *)
   state h ();
-  H.elements h ~selector:".session-bar > *";
-  H.elements h ~selector:".bar-tray > *";
+  H.elements h ~selector:".status-details .branch-line";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 4)))))
-    <Vdom.Node.none-widget class="">
-    <div class="session-title">
-    <Vdom.Node.none-widget class="">
-    <div class="bar-tray">
-    <Vdom.Node.none-widget class="">
-    <Vdom.Node.none-widget class="">
-    <div class="status-extras">
-    <div class="session-chips">
-    <div class="status">
-    <div class="panel-toggles">
     |}];
-  (* Without the sidebar the bar keeps the rest on one line, with the plan
-     (opening /todos); the host stays the composer's alone. *)
+  (* Without the sidebar the chrome has its toggle and the settings, the
+     plan opens /todos; the host stays the composer's alone. *)
   state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
   H.quiet h (fun () -> H.act h Toggle_sidebar);
-  H.text h ~selector:".session-bar";
-  H.elements h ~selector:".session-bar .host";
-  H.elements h ~selector:".session-bar .host-chip";
-  H.click h ~selector:".session-bar .plan";
+  H.text h ~selector:".chat-chrome";
+  H.elements h ~selector:".chat-chrome .host-chip";
+  H.click h ~selector:".status-notes .plan";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -315,18 +308,19 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B))
-    (New session) (feature/a-rather-long-branch-for-the-sidebar-card)
-    (plan 1/2: Final nix GC)
-    (on)
-    (auto)
-    Ready (5%)
+    Ready (5%) $1.30
+    Status Ready
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch feature/a-rather-long-branch-for-the-sidebar-card
     Click for the session’s details · /compact frees context
-    $1.30
+    (on)
+    (auto)
+    (plan 1/2: Final nix GC)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     (Run /todos)
@@ -334,39 +328,44 @@ let%expect_test "the branch; the host in the composer, the plan in the bar" =
     |}]
 ;;
 
-(* A phone: the header keeps its title, the rest folds into a tray that a
-   glance at the status (a dot, the percent) opens; Esc or the scrim close
-   it. Wider, there is no glance and the tray is laid out in the header. *)
-let%expect_test "a phone's header: the glance opens the tray" =
+(* A phone: the ☰ at the left, the island in the middle, and one ⋯ for
+   the rest (what applies, the panels, the settings), which opens a menu;
+   Esc or the backdrop close it. Wider, the rest is laid out at the right. *)
+let%expect_test "a phone's chrome: the ⋯ opens the menu" =
   let h = H.create () in
-  H.elements h ~selector:".bar-tray-toggle";
+  H.elements h ~selector:".chrome-more";
+  H.elements h ~selector:".chrome-tools";
   H.quiet h (fun () -> H.act h (Set_narrow true));
-  H.show h ~selector:".bar-tray-toggle";
-  H.click h ~selector:".bar-tray-toggle";
-  H.elements h ~selector:".bar-tray.open";
-  H.names h ~selector:".bar-tray-toggle";
+  H.elements h ~selector:".chat-chrome > * > *";
+  H.show h ~selector:".chrome-more .more-toggle";
+  H.click h ~selector:".chrome-more .more-toggle";
+  H.elements h ~selector:"#chrome-menu > *";
+  H.names h ~selector:".chrome-more .more-toggle";
   H.key h "Escape" ~target:Page;
-  H.elements h ~selector:".bar-tray.open";
-  H.click h ~selector:".bar-tray-toggle";
-  H.click h ~selector:".bar-tray-backdrop";
-  H.elements h ~selector:".bar-tray-backdrop";
-  [%expect {|
+  H.elements h ~selector:"#chrome-menu";
+  H.click h ~selector:".chrome-more .more-toggle";
+  H.click h ~selector:".chrome-backdrop";
+  H.elements h ~selector:".chrome-backdrop";
+  [%expect
+    {|
+    <div class="chrome-tools">
+    <button class="btn chrome-button ghost icon round toggle-sidebar">
+    <div class="status-island">
+    <div class="chrome-more">
     <button type="button"
-            title="Status, thinking, mode and panels"
-            aria-label="Status and controls"
-            aria-controls="bar-tray"
+            title="Panels and settings"
+            aria-label="Panels and settings"
+            aria-controls="chrome-menu"
             aria-expanded="false"
-            class="bar-tray-toggle btn ghost"
+            class="btn chrome-button ghost icon more-toggle round"
             @on_click>
-      <span aria-hidden="true" class="status-glance">
-        <span class="idle-dot"> </span>
-        <span class="glance-percent"> 0% </span>
-      </span>
-      <icon class="chevron"> </icon>
+      <icon class="more"> </icon>
     </button>
     Toggle_status_tray
-    <div class="bar-tray open">
-    button "Status and controls" -- Status, thinking, mode and panels
+    <div class="status-notes">
+    <div class="panel-toggles">
+    <button class="btn ghost icon settings-toggle">
+    button "Panels and settings"
     Toggle_status_tray
     Toggle_status_tray
     Toggle_status_tray

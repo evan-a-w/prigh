@@ -3,6 +3,7 @@ open! Import
 
 type t =
   { verbose : bool
+  ; cards_open : bool
   ; toggled : String.Set.t
   ; scope : string
   ; filter : Transcript_filter.t
@@ -10,6 +11,7 @@ type t =
 [@@deriving sexp_of]
 
 let create
+      ?(cards_open = false)
       ?(filter = Transcript_filter.all)
       ~(verbosity : Prigh_ui.Verbosity.t)
       ~toggled
@@ -19,6 +21,7 @@ let create
       (match verbosity with
        | Verbose -> true
        | Quiet | Normal -> false)
+  ; cards_open
   ; toggled
   ; scope = ""
   ; filter
@@ -32,9 +35,16 @@ let scoped t agent_id = { t with scope = agent_id ^ "/" }
 let key t id = t.scope ^ id
 let expanded t id = Bool.( <> ) t.verbose (Set.mem t.toggled (key t id))
 
+let opened ~by_default t id =
+  Bool.( <> )
+    (t.verbose || t.cards_open || by_default)
+    (Set.mem t.toggled (key t id))
+;;
+
 let equal a b =
   phys_equal a b
   || (Bool.equal a.verbose b.verbose
+      && Bool.equal a.cards_open b.cards_open
       && String.equal a.scope b.scope
       && Transcript_filter.equal a.filter b.filter
       && (phys_equal a.toggled b.toggled || Set.equal a.toggled b.toggled))

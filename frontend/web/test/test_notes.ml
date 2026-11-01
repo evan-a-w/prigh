@@ -349,9 +349,9 @@ let%expect_test
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
     (Add files or images (or paste, or drop them here))
-    (Dictate (speak, then click again to stop)) (Send (Enter))
     (Claude Opus 5.5)
     (backend)
+    (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event

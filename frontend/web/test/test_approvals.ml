@@ -10,8 +10,8 @@ let run h command =
 ;;
 
 let status h =
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras"
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes"
 ;;
 
 let modal h = H.text h ~selector:".modal"
@@ -152,14 +152,18 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   status h;
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Asks: commands
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto-edit)
     |}]
 ;;
 
@@ -255,7 +259,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     |}]
 ;;
 
-let%expect_test "the plan: its chip in the bar, /todos" =
+let%expect_test "the plan: its chip in the chrome, /todos" =
   let h = H.create () in
   run h "/todos";
   toasts h;
@@ -267,25 +271,29 @@ let%expect_test "the plan: its chip in the bar, /todos" =
     No plan: the model has not made one (it makes one with update_plan).
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
-  (* The card has no room for the plan: its chip is the bar's, with the
-     sidebar closed (and always on a phone). *)
-  H.elements h ~selector:".session-bar .plan";
+  (* The plan's chip is a note at the chrome's right (in the ⋯ menu on a
+     phone). *)
+  H.elements h ~selector:".status-notes .plan";
   [%expect {| <button class="link mode plan status-item"> |}];
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   status h;
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (plan 1/3: change it)
     |}];
-  H.click h ~selector:".status-extras .plan";
+  H.click h ~selector:".status-notes .plan";
   modal h;
   [%expect
     {|
@@ -315,14 +323,18 @@ let%expect_test "the plan: its chip in the bar, /todos" =
   [%expect
     {|
     (Focus editor)
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
      (tag Ignore))
     (Focus dialog)
@@ -658,9 +670,9 @@ let%expect_test "a question dialog: keys" =
     []
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     <aside class="sidebar">
-    <header class="docked session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}];
   H.show h ~selector:".question-choices";
   [%expect
@@ -960,10 +972,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -977,15 +989,18 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
-    (1 queued)
+    (on)
+    (auto)
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");
@@ -1108,20 +1123,22 @@ let%expect_test "update_plan and ask_user in the transcript" =
   Chat_harness.text chat;
   [%expect
     {|
-    ✓ update_plan 1/3 done first pass ✓ read the code ▸ change it ○ test ✓ ask_user Q: Which database?
+    ✓ update_plan test 1/3 done first pass ✓ read the code ▸ change it ○ test ✓ ask_user answered Q: Which database?
     A: Postgres ✕ ask_user no answer The user declined to answer. ask_user waiting for your answer Ready? Sure?
     |}];
   Chat_harness.show ~selector:".tool-update_plan" chat;
   [%expect
     {|
-    <div class="ok tool tool-update_plan">
-      <div class="tool-head">
+    <div class="ok open tool tool-update_plan">
+      <button type="button" data-fold="t1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
         <span class="name"> update_plan </span>
+        <span class="arg step"> test </span>
         <span class="chip"> 1/3 done </span>
-      </div>
+        <span class="chev">  </span>
+      </button>
       <div class="tool-body">
         <div class="plan">
           <p class="plan-explanation"> first pass </p>

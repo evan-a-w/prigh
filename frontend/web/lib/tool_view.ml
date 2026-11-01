@@ -3,6 +3,7 @@ open! Import
 open Chat_html
 
 let chip ?(cls = "") text = span (String.strip ("chip " ^ cls)) text
+let open_key id = id ^ "#open"
 
 (* The first line of a multi-line argument, marked as continuing. *)
 let first_line s =
@@ -139,47 +140,35 @@ let report text =
       (Markdown_view.render text)
 ;;
 
-let subagent_body ~nested ~fold (s : Chat.Subagent.t) =
-  let transcript =
-    match Chat.entries s.chat with
-    | [] -> Node.none
-    | entries ->
-      folded
-        ~cls:"transcript"
-        ~label:"Transcript"
-        ~preview:(plural (List.length entries) "message")
-        (nested s)
-  in
-  let activity =
-    match s.result with
-    | Some _ -> Node.none
-    | None ->
-      div
-        "activity"
-        [ span "arrow" "↳"
-        ; span "text" (Option.value (last_activity s.chat) ~default:"starting…")
-        ]
-  in
-  let result =
-    match s.result with
-    | Some { text; is_error = false } ->
-      report (Subagent_report.of_string text).text
-    | Some { text; is_error = true } ->
-      output ~fold ~error:true (Subagent_report.of_string text).text
-    | None -> Node.none
-  in
-  [ activity; result; transcript ]
+(* A subagent's short name, else its task's first line. *)
+let subagent_title (call : Tool_call.t) =
+  let args = Tool_args.of_call call in
+  match Tool_args.string args "name" with
+  | Some name when not (String.is_empty (String.strip name)) ->
+    String.strip name
+  | _ -> first_line (Option.value (Tool_args.string args "task") ~default:"")
 ;;
 
-let task_details task =
-  if String.mem (String.strip task) '\n'
-  then
-    folded
-      ~cls:"task"
-      ~label:"Task"
-      ~preview:(first_line task)
-      (div "task-text" [ Node.text task ])
-  else Node.none
+let agent_name chat id =
+  List.find_map (Chat.entries chat) ~f:(fun (entry : Chat.Entry.t) ->
+    match entry with
+    | Assistant { message; _ } ->
+      List.find_map message.content ~f:(fun (content : Content.t) ->
+        match content with
+        | Tool_call call when String.equal call.name "subagent" ->
+          let started =
+            Option.bind (Chat.tool chat call.id) ~f:(fun (t : Chat.Tool.t) ->
+              match t.subagent, t.result with
+              | Some s, _ -> Some s.agent_id
+              | None, Some { is_error = false; text; _ } ->
+                Subagent_report.started text
+              | None, _ -> None)
+          in
+          Option.some_if
+            (Option.exists started ~f:(String.equal id))
+            (subagent_title call)
+        | Tool_call _ | Text _ | Thinking _ | Server_tool _ -> None)
+    | User _ | Compaction _ | Shell _ -> None)
 ;;
 
 (* The report of a job or subagent stopped by [job_kill] or
@@ -270,14 +259,18 @@ let plan_list (plan : Plan.t) =
     ]
 ;;
 
+(* A call at rest is one line: its argument and the chips saying how it
+   went; [details] (what it was asked, beyond its argument) are in the line's
+   tooltip and atop its opened body. *)
 type presentation =
   { arg : Node.t option
   ; chips : Node.t list
+  ; details : string list
   ; body : Node.t list
   }
 
 let present
-      ~nested
+      ~nested:_
       ~fold
       ~streaming
       ~(tool : Chat.Tool.t option)
@@ -320,16 +313,15 @@ let present
       | None -> Option.bind result ~f:(fun r -> job_started r.text)
     in
     { arg = Some (span "arg command" (first_line command))
+    ; details =
+        List.filter_opt
+          [ Option.some_if (background && Option.is_none job) "background"
+          ; Option.map moved ~f:(fun m ->
+              sprintf "moved to the background after %s" m.after)
+          ]
     ; chips =
         List.filter_opt
-          [ Option.some_if
-              (background && Option.is_none job)
-              (chip "background")
-          ; Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
-          ; Option.map moved ~f:(fun m ->
-              chip
-                ~cls:"moved"
-                (sprintf "moved to the background after %s" m.after))
+          [ Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
           ; Option.map outcome ~f:(fun outcome ->
               chip
                 ~cls:(if String.equal outcome "cancelled" then "" else "bad")
@@ -354,9 +346,9 @@ let present
     let range =
       match Tool_args.int args "offset", Tool_args.int args "limit" with
       | None, None -> []
-      | Some o, None -> [ chip (sprintf "from line %d" o) ]
-      | None, Some l -> [ chip (plural l "line") ]
-      | Some o, Some l -> [ chip (sprintf "lines %d–%d" o (o + l - 1)) ]
+      | Some o, None -> [ sprintf "from line %d" o ]
+      | None, Some l -> [ plural l "line" ]
+      | Some o, Some l -> [ sprintf "lines %d–%d" o (o + l - 1) ]
     in
     let body =
       match result with
@@ -366,7 +358,11 @@ let present
         [ Image_view.thumbs images; span "caption" text ]
       | Some { text; elided; _ } -> [ output ~fold ~lines:0 ?elided text ]
     in
-    { arg = Some (span "arg path" (str "path")); chips = range; body }
+    { arg = Some (span "arg path" (str "path"))
+    ; chips = []
+    ; details = range
+    ; body
+    }
   | "write" ->
     let content = str "content" in
     let overwrote =
@@ -376,11 +372,8 @@ let present
       | _ -> false
     in
     { arg = Some (span "arg path" (str "path"))
-    ; chips =
-        List.filter_opt
-          [ Some (chip (plural (Output_view.line_count content) "line"))
-          ; Option.some_if overwrote (chip "overwrote")
-          ]
+    ; chips = [ chip (plural (Output_view.line_count content) "line") ]
+    ; details = (if overwrote then [ "overwrote the file" ] else [])
     ; body =
         [ error_body
         ; (if String.is_empty content
@@ -411,6 +404,7 @@ let present
            [ chip ~cls:"add" (sprintf "+%d" added)
            ; chip ~cls:"del" (sprintf "−%d" removed)
            ])
+    ; details = []
     ; body =
         [ error_body
         ; (match diff with
@@ -478,6 +472,7 @@ let present
            [ chip ~cls:"add" (sprintf "+%d" added)
            ; chip ~cls:"del" (sprintf "−%d" removed)
            ])
+    ; details = []
     ; body =
         (match result with
          | Some { is_error = false; text; _ }
@@ -496,16 +491,16 @@ let present
       else str "pattern"
     in
     { arg = Some (span (if ls then "arg path" else "arg pattern") arg)
-    ; chips =
+    ; chips = []
+    ; details =
         List.filter_opt
           [ (if ls
              then None
              else
-               Option.map (Tool_args.string args "path") ~f:(fun p ->
-                 chip ("in " ^ p)))
-          ; Option.map (Tool_args.string args "glob") ~f:chip
+               Option.map (Tool_args.string args "path") ~f:(fun p -> "in " ^ p))
+          ; Option.map (Tool_args.string args "glob") ~f:(fun g -> "files " ^ g)
           ; Option.bind (Tool_args.bool args "ignore_case") ~f:(fun b ->
-              Option.some_if b (chip "ignore case"))
+              Option.some_if b "ignoring case")
           ]
     ; body =
         (match result with
@@ -513,7 +508,6 @@ let present
          | Some r -> [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
   | "subagent" ->
-    let task = str "task" in
     let model =
       match subagent with
       | Some (s : Chat.Subagent.t) -> Some s.model
@@ -524,29 +518,38 @@ let present
       | Some { is_error = false; text; _ } -> Subagent_report.started text
       | _ -> None
     in
-    { arg = Some (span "arg task" (first_line task))
-    ; chips =
+    (* Its name, how it stands and the way into the agents panel: the task,
+       its log and its report are there. *)
+    let name = subagent_title call in
+    let agent_id =
+      Option.first_some
+        (Option.map subagent ~f:(fun (s : Chat.Subagent.t) -> s.agent_id))
+        started
+    in
+    { arg = Some (span "arg task" name)
+    ; chips = []
+    ; details =
         List.filter_opt
-          [ Option.map started ~f:(fun id -> chip ~cls:"job" ("agent " ^ id))
+          [ Option.map agent_id ~f:(fun id -> "agent " ^ id)
           ; Option.some_if
               (Option.exists subagent ~f:(fun s -> s.forked)
                || Option.value (Tool_args.bool args "fork") ~default:false)
-              (chip "forked")
-          ; Option.map model ~f:(chip ~cls:"model")
+              "forked"
+          ; model
           ; Option.bind subagent ~f:(fun s ->
-              Option.some_if (s.turns > 0) (chip (plural s.turns "turn")))
+              Option.some_if (s.turns > 0) (plural s.turns "turn"))
           ; Option.bind subagent ~f:(fun s ->
-              Option.map s.cost_usd ~f:(fun c -> chip (sprintf "$%.2f" c)))
+              Option.map s.cost_usd ~f:(fun c -> sprintf "$%.2f" c))
           ]
     ; body =
-        task_details task
-        ::
         (match subagent, result with
-         | Some s, _ -> subagent_body ~nested ~fold s
+         | Some { result = Some { text; is_error = true }; _ }, _ ->
+           [ output ~fold ~error:true (Subagent_report.of_string text).text ]
          | None, Some { is_error = true; _ } -> [ error_body ]
          | None, Some { text; _ } when Option.is_none started ->
+           (* Ran in the foreground: its report is its result. *)
            [ report (Subagent_report.of_string text).text ]
-         | None, _ -> [])
+         | _ -> [])
     }
   | "web_search" ->
     let results =
@@ -562,6 +565,7 @@ let present
         (match results with
          | [] -> []
          | results -> [ chip (plural (List.length results) "result") ])
+    ; details = []
     ; body =
         (match result, results with
          | None, _ -> []
@@ -576,25 +580,24 @@ let present
       | Some { is_error = false; text; _ } -> Tool_summary.Fetched.parse text
       | _ -> None
     in
-    { arg =
-        Some
-          (if safe_url url
-           then link ~cls:"arg url" url url
-           else span "arg url" url)
-    ; chips =
+    (* The line is the card's toggle: the link is in the opened body. *)
+    { arg = Some (span "arg url" url)
+    ; chips = []
+    ; details =
         (match fetched with
          | None -> []
          | Some fetched ->
-           (if String.equal fetched.url url
-            then []
-            else [ chip ("→ " ^ fetched.url) ])
-           @ [ chip fetched.details ])
+           (if String.equal fetched.url url then [] else [ "→ " ^ fetched.url ])
+           @ [ fetched.details ])
     ; body =
         (match result, fetched with
          | None, _ -> [ running_output () ]
          | Some { elided = Some elided; text; _ }, _ ->
            [ output ~fold ~elided text ]
-         | Some _, Some fetched -> [ output ~fold fetched.body ]
+         | Some _, Some fetched ->
+           [ (if safe_url url then link ~cls:"url-link" url url else Node.none)
+           ; output ~fold fetched.body
+           ]
          | Some r, None ->
            [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
@@ -602,8 +605,9 @@ let present
     { arg =
         Option.map (Tool_summary.job_input args) ~f:(fun arg ->
           span "arg input" arg)
-    ; chips =
-        (if Tool_summary.closes_stdin args then [ chip "close stdin" ] else [])
+    ; chips = []
+    ; details =
+        (if Tool_summary.closes_stdin args then [ "closes its stdin" ] else [])
     ; body =
         (match result with
          | None -> []
@@ -616,6 +620,7 @@ let present
           (not (List.is_empty ids))
           (span "arg" (String.concat ~sep:" " ids))
     ; chips = []
+    ; details = []
     ; body =
         (match result with
          | None -> []
@@ -627,6 +632,7 @@ let present
      | None ->
        { arg = None
        ; chips = []
+       ; details = []
        ; body =
            [ (match result with
               | Some r -> output ~fold ~error:r.is_error ?elided:r.elided r.text
@@ -634,7 +640,20 @@ let present
            ]
        }
      | Some plan ->
-       { arg = None
+       (* The step it is on, else the next to do: the list opens. *)
+       let now =
+         List.find plan.steps ~f:(fun s ->
+           match s.status with
+           | In_progress -> true
+           | Completed | Pending -> false)
+         |> Option.first_some
+              (List.find plan.steps ~f:(fun s ->
+                 match s.status with
+                 | Pending -> true
+                 | Completed | In_progress -> false))
+       in
+       { arg = Option.map now ~f:(fun s -> span "arg step" s.step)
+       ; details = []
        ; chips =
            [ chip
                (sprintf
@@ -648,7 +667,8 @@ let present
     (match result with
      | Some { is_error = false; text; _ } ->
        { arg = None
-       ; chips = []
+       ; chips = [ chip ~cls:"ok" "answered" ]
+       ; details = []
        ; body =
            [ output
                ~fold
@@ -659,9 +679,14 @@ let present
            ]
        }
      | Some { is_error = true; _ } ->
-       { arg = None; chips = [ chip "no answer" ]; body = [ error_body ] }
+       { arg = None
+       ; chips = [ chip "no answer" ]
+       ; details = []
+       ; body = [ error_body ]
+       }
      | None ->
        { arg = None
+       ; details = []
        ; chips = [ chip ~cls:"waiting" "waiting for your answer" ]
        ; body =
            [ Node.ul
@@ -680,6 +705,7 @@ let present
     ; chips =
         ((if List.is_empty edits then [] else [ chip "proposes a change" ])
          @ if resolve then [ chip ~cls:"ok" "resolved" ] else [])
+    ; details = []
     ; body =
         [ div "comment-reply" [ Markdown_view.render ~streaming (str "text") ]
         ; (if List.is_empty edits
@@ -692,6 +718,7 @@ let present
     let arg = first_line (summary call) in
     { arg = Option.some_if (not (String.is_empty arg)) (span "arg" arg)
     ; chips = []
+    ; details = []
     ; body =
         (match result with
          | None -> [ running_output () ]
@@ -739,7 +766,7 @@ let card
     | None, _ ->
       if streaming then Preparing else if running then Running else Interrupted
   in
-  let { arg; chips; body } =
+  let { arg; chips; details; body } =
     present ~nested ~fold ~streaming ~tool call ~result ~subagent
   in
   let arg = Option.first_some arg_override arg in
@@ -759,29 +786,27 @@ let card
     | None, Some { is_error = false; text; _ } -> Subagent_report.started text
     | None, _ -> None
   in
-  let head =
-    [ Status.icon status; span "name" call.name ] @ Option.to_list arg @ chips
+  let tooltip =
+    match details with
+    | [] -> None
+    | details -> Some (String.concat ~sep:" · " details)
   in
   let cls =
     String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ]
   in
-  let body =
-    match body with
-    | [] -> Node.none
-    | body -> div "tool-body" body
-  in
   if String.equal call.name "subagent"
-  then
+  then (
+    let head = (Status.icon status :: Option.to_list arg) @ chips in
     Node.div
       ~attrs:[ Attr.class_ cls; Attr.create "data-call" call.id ]
       [ (match agent with
          | Some id ->
            Node.div
              ~attrs:
-               [ Attr.class_ "tool-head"
-               ; Attr.create "data-agent" id
-               ; Attr.title "Follow it in the agents panel"
-               ]
+               ([ Attr.class_ "tool-head"; Attr.create "data-agent" id ]
+                @ Option.to_list
+                    (Option.map tooltip ~f:(fun t ->
+                       Attr.title (t ^ " · follow it in the agents panel"))))
              (head
               @ [ (* The page opens the agent from a click on [data-agent]:
                      this button is the head's way in from the keyboard. *)
@@ -794,9 +819,55 @@ let card
                     [ Node.text "Open ›" ]
                 ])
          | None -> div "tool-head" head)
-      ; body
-      ]
-  else div cls [ div "tool-head" head; body ]
+      ; (match body with
+         | [] -> Node.none
+         | body -> div "tool-body" body)
+      ])
+  else (
+    (* One line at rest; the line opens the rest. A failure, a call still
+       showing its live output, an image and a question waiting for an answer
+       start open. *)
+    let by_default =
+      match status with
+      | Failed -> true
+      | Preparing | Running -> not (List.is_empty body)
+      | Done | Interrupted ->
+        Option.exists result ~f:(fun r -> not (List.is_empty r.images))
+        || String.equal call.name "reply_to_comment"
+    in
+    let key = open_key call.id in
+    let opened = Fold.opened ~by_default fold key in
+    let line =
+      [ Status.icon status; span "name" call.name ] @ Option.to_list arg
+    in
+    match body with
+    | [] -> div cls [ div "tool-head" (line @ chips) ]
+    | body ->
+      Node.div
+        ~attrs:
+          [ Attr.classes
+              (String.split cls ~on:' ' @ if opened then [ "open" ] else [])
+          ]
+        (Node.button
+           ~attrs:
+             ([ Attr.class_ "tool-head"
+              ; Attr.type_ "button"
+              ; Fold.toggle_attr fold key
+              ; Attr.create "aria-expanded" (Bool.to_string opened)
+              ]
+              @ Option.to_list (Option.map tooltip ~f:Attr.title))
+           (line @ chips @ [ span "chev" "" ])
+         ::
+         (if opened
+          then
+            [ div
+                "tool-body"
+                ((match tooltip with
+                  | Some t -> span "details" t
+                  | None -> Node.none)
+                 :: body)
+            ]
+          else [])))
 ;;
 
 let view ~nested ~fold ~streaming ~running call tool =
