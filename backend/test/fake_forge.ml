@@ -5,23 +5,30 @@ open! Prigh
    them. *)
 
 type t =
-  { handler : Forge_http.Request.t -> int * string
+  { handler : Forge_http.Request.t -> Forge_http.Response.t
   ; requests : Forge_http.Request.t Queue.t
   }
 
-let create handler = { handler; requests = Queue.create () }
+(* [handler] answers with a status and a body (no headers). *)
+let create handler =
+  { handler =
+      (fun r ->
+        let status, body = handler r in
+        { Forge_http.Response.status; headers = []; body })
+  ; requests = Queue.create ()
+  }
+;;
+
+(* [handler] answers with whole responses (headers too). *)
+let create_full handler = { handler; requests = Queue.create () }
 
 let http t : Forge_http.t =
   fun ?cancel:_ request ->
   Queue.enqueue t.requests request;
-  let status, body = t.handler request in
-  Ok { Forge_http.Response.status; body }
+  Ok (t.handler request)
 ;;
 
-let meth_string : Forge_http.Meth.t -> string = function
-  | Get -> "GET"
-  | Post -> "POST"
-;;
+let meth_string = Forge_http.Meth.to_string
 
 (* What was asked: method, URL, Authorization and Accept when not the
    usual, and the body. *)
@@ -56,14 +63,27 @@ let pr_json
       ?(merged = false)
       ?(draft = false)
       ?(head_owner = "o")
+      ?(head_name = "r")
+      ?(head_deleted = false)
       ?(head = "feat/x")
       ~host
       ~number
       ~title
       ()
   =
+  let head_repo =
+    if head_deleted
+    then "null"
+    else
+      sprintf
+        {|{"name":%S,"full_name":"%s/%s","owner":{"login":%S}}|}
+        head_name
+        head_owner
+        head_name
+        head_owner
+  in
   sprintf
-    {|{"number":%d,"title":%S,"state":%S,"merged":%b,"merged_at":%s,"draft":%b,"user":{"login":"alice"},"head":{"ref":%S,"sha":"abc123","repo":{"owner":{"login":%S}}},"base":{"ref":"main","repo":{"owner":{"login":"o"}}},"html_url":"https://%s/o/r/pull/%d","body":"Does x.","created_at":"2026-10-20T10:00:00Z","updated_at":"2026-10-21T10:00:00Z"}|}
+    {|{"number":%d,"title":%S,"state":%S,"merged":%b,"merged_at":%s,"draft":%b,"user":{"login":"alice"},"head":{"ref":%S,"sha":"abc123","repo":%s},"base":{"ref":"main","repo":{"name":"r","full_name":"o/r","owner":{"login":"o"}}},"html_url":"https://%s/o/r/pull/%d","body":"Does x.","created_at":"2026-10-20T10:00:00Z","updated_at":"2026-10-21T10:00:00Z"}|}
     number
     title
     state
@@ -71,7 +91,7 @@ let pr_json
     (if merged then {|"2026-10-22T10:00:00Z"|} else "null")
     draft
     head
-    head_owner
+    head_repo
     host
     number
 ;;

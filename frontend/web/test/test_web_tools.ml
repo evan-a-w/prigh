@@ -519,3 +519,29 @@ let%expect_test "pull_request: the action and what it acts on" =
     ✓ pull_request create "Add x" (draft)
     |}]
 ;;
+
+let%expect_test "issue and repo: the action and what it acts on" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_end
+           ~name:"issue"
+           ~arguments:{|{"action":"list","state":"open","search":"crash"}|}
+           "1 open issue"
+       ; tool_end
+           ~id:"c2"
+           ~name:"issue"
+           ~arguments:{|{"action":"close","number":12}|}
+           "closed #12"
+       ; tool_end
+           ~id:"c3"
+           ~name:"repo"
+           ~arguments:{|{"action":"logs","job":200}|}
+           "line 1"
+       ]);
+  [%expect {|
+    ✓ issue list open "crash"
+    ✓ issue close #12
+    ✓ repo logs job 200
+    |}]
+;;
