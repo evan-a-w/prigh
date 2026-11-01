@@ -118,7 +118,9 @@ end
 let mb bytes = sprintf "%.1f MB" (Float.of_int bytes /. 1_048_576.)
 
 let size_hum bytes =
-  if bytes < 1_048_576
+  if bytes < 1024
+  then sprintf "%d B" bytes
+  else if bytes < 1_048_576
   then sprintf "%.0f KB" (Float.of_int bytes /. 1024.)
   else mb bytes
 ;;
