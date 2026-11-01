@@ -646,8 +646,8 @@ kbd {
 .status-detail { display: contents; }
 .status-detail-key { color: var(--faint); }
 .status-detail-value { color: var(--chalk); font: 11.5px var(--mono); text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.status-detail.context.warm .status-detail-value { color: var(--sodium); }
-.status-detail.context.hot .status-detail-value { color: var(--brick); }
+.status-detail:is(.context, .cost).warm .status-detail-value { color: var(--sodium); }
+.status-detail:is(.context, .cost).hot .status-detail-value { color: var(--brick); }
 .status-detail-hint { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 11.5px; }
 @media (prefers-reduced-motion: reduce) { .status-details { transition: none; } }
 @media (hover: none) { .status-gauge:not(:focus-within) > .status-details { display: none; } }
