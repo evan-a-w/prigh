@@ -181,7 +181,7 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
   [%expect {| <div class="app reviewing"> |}];
   (* The chat is still there, beside it. *)
   H.elements h ~selector:".main .composer";
-  [%expect {| <footer class="composer status-style-island"> |}]
+  [%expect {| <footer class="composer"> |}]
 ;;
 
 (* The page's layout: what [.app] and the desk (the chat, the terminal and
@@ -232,7 +232,7 @@ let%expect_test
     <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     |}];
@@ -256,7 +256,7 @@ let%expect_test
     <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
@@ -268,18 +268,6 @@ let%expect_test
   [%expect
     {|
     (Sessions (Ctrl+B))
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking on
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -305,7 +293,7 @@ let%expect_test
     <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
@@ -338,7 +326,7 @@ let%expect_test
     <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
@@ -352,7 +340,7 @@ let%expect_test
     <section class="terminal-panel">
     <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}];
   H.key h "Escape";
   H.elements h ~selector:".app";
@@ -383,7 +371,7 @@ let%expect_test
     <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer status-style-island">
+    <footer class="composer">
     sidebar-width=265px files-width=377px agents-width=397px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-terminal">

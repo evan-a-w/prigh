@@ -48,6 +48,7 @@ let anchor (m : App.Model.t) chip button ~inject =
              | Model -> "model"
              | Thinking -> "thinking"
              | Mode -> "mode"
+             | Verbosity -> "verbosity"
              | Host -> "host"
              | Attach -> "attach-menu")
           ]
@@ -56,7 +57,9 @@ let anchor (m : App.Model.t) chip button ~inject =
     [ button; Option.value menu ~default:Node.none ]
 ;;
 
-(* The level's bars and its word; a model without levels says so, muted. *)
+(* The family of the session's chips: an icon and a word or two. The
+   thinking level: a brain and the level; a model without levels says so,
+   muted. *)
 let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.thinking with
   | Some level ->
@@ -75,16 +78,14 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
       ~label:(sprintf "Thinking %s" state.thinking)
       ~attrs:(menu_attrs m Thinking)
       ~on_click:(inject (Action.Open_chip Thinking))
-      [ Chip_popover_view.meter state.thinking
-      ; span ~cls:"chip-label" state.thinking
-      ]
+      [ icon Brain; span ~cls:"chip-label" state.thinking ]
   | None ->
     button
       ~cls:"chip-button thinking-chip unsupported"
       ~title:(sprintf "%s has no thinking levels" state.model.name)
       ~label:"No thinking"
       ~on_click:(inject (Action.Open_chip Thinking))
-      [ Chip_popover_view.meter "off"; span ~cls:"chip-label" "no thinking" ]
+      [ icon Brain; span ~cls:"chip-label" "none" ]
 ;;
 
 (* What asks first, by its short name (ask, auto-edit, auto, plan); the
@@ -118,27 +119,36 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       [ icon Shield; span ~cls:"chip-label" (Session_mode.label mode) ]
 ;;
 
-let view ?(cls = "") ?(quiet_ask = false) (m : App.Model.t) ~inject =
+(* How much of the transcript shows (Ctrl+O cycles): lines and the level;
+   lit when it is not the usual. *)
+let verbosity_chip (m : App.Model.t) ~inject =
+  let name = Prigh_ui.Verbosity.name m.verbosity in
+  button
+    ~cls:
+      (match m.verbosity with
+       | Normal -> "chip-button verbosity-chip"
+       | Quiet | Verbose -> "chip-button verbosity-chip unusual")
+    ~title:(sprintf "Transcript: %s (Ctrl+O cycles, /verbosity)" name)
+    ~label:(sprintf "Transcript %s" name)
+    ~attrs:(menu_attrs m Verbosity)
+    ~on_click:(inject (Action.Open_chip Verbosity))
+    [ icon Lines; span ~cls:"chip-label" name ]
+;;
+
+let view ?(cls = "") (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
   | Some state ->
-    let asks =
-      Option.is_none m.pending.mode
-      && Session_mode.equal
-           (Session_mode.of_state state)
-           { approval = Ask; plan = false }
-    in
     Node.div
       ~attrs:
         [ classes
             (List.filter [ "session-chips"; cls ] ~f:(Fn.non String.is_empty))
-            [ "menu-open", menu_open m [ Thinking; Mode ] ]
+            [ "menu-open", menu_open m [ Thinking; Mode; Verbosity ] ]
         ; Attr.role "group"
-        ; Attr.create "aria-label" "Thinking and mode"
+        ; Attr.create "aria-label" "Thinking, mode and transcript"
         ]
       [ anchor m Thinking (thinking_chip m state ~inject) ~inject
-      ; (if quiet_ask && asks && not (menu_open m [ Mode ])
-         then Node.none
-         else anchor m Mode (mode_chip m state ~inject) ~inject)
+      ; anchor m Mode (mode_chip m state ~inject) ~inject
+      ; anchor m Verbosity (verbosity_chip m ~inject) ~inject
       ]
 ;;

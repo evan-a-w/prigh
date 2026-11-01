@@ -37,9 +37,9 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (More (right-click, Shift+F10))
-    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10))
-    (Refactor the lexer 15d ago ~/src/compiler) (More (right-click, Shift+F10))
+    (fix the parser bug just now /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Refactor the lexer 15d ago ~/src/compiler) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -78,6 +78,16 @@ let%expect_test
                 class="btn ghost icon more"
                 @on_click>
           <icon class="more"> </icon>
+        </button>
+      </span>
+      <span aria-hidden="true" class="session-swipe">
+        <button type="button" tabindex="-1" class="archive session-swipe-action" @on_click>
+          <icon class="archive"> </icon>
+          <span> Archive </span>
+        </button>
+        <button type="button" tabindex="-1" class="delete session-swipe-action" @on_click>
+          <icon class="trash"> </icon>
+          <span> Delete </span>
         </button>
       </span>
     </div>
@@ -436,8 +446,8 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (More (right-click, Shift+F10))
-    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10))
+    (fix the parser bug just now /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 

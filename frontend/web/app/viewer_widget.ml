@@ -49,6 +49,9 @@ type t =
   ; mutable moved : float (* how far the pointer went since it went down *)
   ; mutable pinch : float option (* the two pointers' distance *)
   ; mutable last_tap : (float * float * float) option (* time, x, y *)
+  ; mutable swipe : (float * float * float) option
+  (* A finger down on the image at fit: where and when (a swipe between
+     images, or down to close) *)
   ; restore : Dom_html.element Js.t option
   }
 
@@ -394,6 +397,30 @@ let distance v =
   | _ -> None
 ;;
 
+let now () = Js.to_float (new%js Js.date_now)##getTime
+
+(* The image follows the finger; the page behind fades as it goes down. *)
+let swiped v ~dx ~dy =
+  let style = v.img##.style in
+  if Float.(dx = 0. && dy = 0.)
+  then (
+    ignore (meth style "removeProperty" [| Js.Unsafe.inject (Js.string "translate") |] : Js.Unsafe.any);
+    ignore (meth v.dialog##.style "removeProperty" [| Js.Unsafe.inject (Js.string "--swipe") |] : Js.Unsafe.any))
+  else (
+    ignore
+      (meth style "setProperty"
+         [| Js.Unsafe.inject (Js.string "translate")
+          ; Js.Unsafe.inject (Js.string (sprintf "%.0fpx %.0fpx" dx (Float.max 0. dy)))
+         |]
+       : Js.Unsafe.any);
+    ignore
+      (meth v.dialog##.style "setProperty"
+         [| Js.Unsafe.inject (Js.string "--swipe")
+          ; Js.Unsafe.inject (Js.string (sprintf "%.3f" (Float.min 1. (Float.max 0. dy /. 400.))))
+         |]
+       : Js.Unsafe.any))
+;;
+
 let pointer_down v ev =
   let target : Dom_html.element Js.t = get ev "target" in
   if Option.is_none (closest target ".viewer-bar, .viewer-nav")
@@ -412,6 +439,17 @@ let pointer_down v ev =
     Hashtbl.set v.pointers ~key:(get ev "pointerId") ~data:{ px = x; py = y };
     if Hashtbl.length v.pointers = 1 then v.moved <- 0.;
     v.pinch <- Option.map (distance v) ~f:fst;
+    (* One finger at fit drags the image itself: aside to the next, down
+       to close. *)
+    v.swipe
+    <- (if
+          Hashtbl.length v.pointers = 1
+          && String.equal (Js.to_string (get ev "pointerType")) "touch"
+          && Option.value_map v.zoom ~default:false ~f:Zoom.at_fit
+        then Some (x, y, now ())
+        else (
+          swiped v ~dx:0. ~dy:0.;
+          None));
     v.dialog##.classList##add (Js.string "dragging"))
 ;;
 
@@ -427,6 +465,13 @@ let pointer_move v ev =
     p.px <- x;
     p.py <- y;
     v.moved <- v.moved +. Float.abs dx +. Float.abs dy;
+    match v.swipe with
+    | Some (x0, y0, _) when Hashtbl.length v.pointers = 1 ->
+      let dx = x -. x0
+      and dy = y -. y0 in
+      (* Locked to the way it started: aside, or down. *)
+      if Float.(abs dx > abs dy) then swiped v ~dx ~dy:0. else swiped v ~dx:0. ~dy
+    | _ ->
     (match before, distance v with
      | Some (d0, (mx0, my0)), Some (d1, (mx1, my1)) ->
        let d0 = Option.value v.pinch ~default:d0 in
@@ -442,8 +487,6 @@ let pointer_move v ev =
      | _ -> update v (fun z -> Zoom.pan z ~dx ~dy))
 ;;
 
-let now () = Js.to_float (new%js Js.date_now)##getTime
-
 let pointer_up v ev =
   match Hashtbl.find v.pointers (get ev "pointerId") with
   | None -> ()
@@ -455,7 +498,31 @@ let pointer_up v ev =
       v.dialog##.classList##remove (Js.string "dragging");
       let x = float_of ev "clientX"
       and y = float_of ev "clientY" in
-      if
+      let swipe = v.swipe in
+      v.swipe <- None;
+      swiped v ~dx:0. ~dy:0.;
+      let flung =
+        match swipe with
+        | Some (x0, y0, t0)
+          when not (String.equal (get ev "type" |> Js.to_string) "pointercancel") ->
+          let dx = x -. x0
+          and dy = y -. y0 in
+          let speed d = Float.abs d /. Float.max 1. (now () -. t0) in
+          if Float.(abs dy > abs dx && dy > 0. && (dy > 120. || (dy > 30. && speed dy > 0.5)))
+          then (
+            close ();
+            true)
+          else if Float.(abs dx > abs dy && (abs dx > 70. || (abs dx > 30. && speed dx > 0.4)))
+                  && Array.length v.items > 1
+          then (
+            act v (if Float.(dx < 0.) then "next" else "prev");
+            true)
+          else false
+        | _ -> false
+      in
+      if flung
+      then v.last_tap <- None
+      else if
         Float.(v.moved < 6.)
         && not (String.equal (get ev "type" |> Js.to_string) "pointercancel")
       then (
@@ -528,6 +595,7 @@ let open_ (items : item array) index =
       ; moved = 0.
       ; pinch = None
       ; last_tap = None
+      ; swipe = None
       ; restore
       }
     in

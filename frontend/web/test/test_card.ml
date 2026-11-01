@@ -2,7 +2,7 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's status over the chat (the island, the default style):
+(* The session's status at the composer's right (activity, context, cost):
    what the agent is doing (a dot alone while idle), the context's ring
    (its details under it) and the cost; what applies at the right of the
    chrome, when anything does; the branch in the details. Where tools run
@@ -60,21 +60,21 @@ let thinking h =
 (* The status as it stands. *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   print_endline "applies:";
   H.text h ~selector:".chrome-tools .status-notes";
   print_endline "context:";
-  H.text h ~selector:".status-island .context";
+  H.text h ~selector:".composer-status .context";
   print_endline "where:";
-  H.text h ~selector:".status-island .status-details .branch-line";
+  H.text h ~selector:".composer-status .status-details .branch-line";
   print_endline "lit:";
   List.iter
-    [ "lamp"; "running"; "status-item.mode"; "warm"; "hot" ]
-    ~f:(fun cls -> H.elements h ~selector:(".chat-chrome ." ^ cls))
+    [ "lamp"; "running"; "mode-chip.never-asks"; "warm"; "hot" ]
+    ~f:(fun cls -> H.elements h ~selector:(".composer ." ^ cls))
 ;;
 
 let%expect_test
-    "the island idle, thinking, with a subagent and a quiet transcript"
+    "the status idle, thinking, with a subagent and a quiet transcript"
   =
   let h = H.create ~state:(H.state_json ~fields:(fields ()) ()) () in
   (* Idle, out of git, the backend the only host: two lines, nothing lit. *)
@@ -91,19 +91,18 @@ let%expect_test
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     applies:
     context:
     (5%)
     Context 10k / 200k · 5%
     where:
     lit:
+    <button class="btn chip-button mode-chip never-asks">
     |}];
   (* The cost to the cent, its title has it exactly; the context's title has
      the tokens. *)
-  H.names h ~selector:".status-island .status-gauge > *";
-  H.names h ~selector:".status-island .context";
+  H.names h ~selector:".composer-status .status-gauge > *";
+  H.names h ~selector:".composer-status .context";
   [%expect
     {|
     [status] span "Ready"
@@ -129,8 +128,6 @@ let%expect_test
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     applies:
     context:
     (5%)
@@ -139,6 +136,7 @@ let%expect_test
     lit:
     <span class="lamp">
     <span class="activity running status-item">
+    <button class="btn chip-button mode-chip never-asks">
     |}];
   (* The agent runs a subagent in the background (the agents' toggle
      counts it; the status does not), and the transcript is quiet: a note. *)
@@ -165,10 +163,7 @@ let%expect_test
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     applies:
-    (quiet)
     context:
     (5%)
     Context 10k / 200k · 5%
@@ -176,7 +171,7 @@ let%expect_test
     lit:
     <span class="lamp">
     <span class="activity running status-item">
-    <button class="link mode status-item">
+    <button class="btn chip-button mode-chip never-asks">
     |}];
   (* The agent done: nothing is lit but the note. *)
   state h ();
@@ -197,19 +192,16 @@ let%expect_test
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     applies:
-    (quiet)
     context:
     (5%)
     Context 10k / 200k · 5%
     where:
     lit:
-    <button class="link mode status-item">
+    <button class="btn chip-button mode-chip never-asks">
     |}];
   (* Clicking the context opens the session's details. *)
-  H.click h ~selector:".status-island .context";
+  H.click h ~selector:".composer-status .context";
   [%expect
     {|
     (Run /session)
@@ -274,14 +266,14 @@ let%expect_test
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     applies:
     context:
     (5%)
     Context 10k / 200k · 5%
     where:
     lit:
+    <button class="btn chip-button mode-chip never-asks">
+    <button class="btn chip-button host-chip warm">
     <button class="btn chip-button host-chip warm">
     |}];
   (* Out of git: no branch line. *)
@@ -308,18 +300,6 @@ let%expect_test
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B))
-    Ready (5%) $1.30
-    Status Ready
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking on
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch feature/a-rather-long-branch-for-the-sidebar-card
-    Click for the session’s details · /compact frees context
-    (on)
-    (auto)
     (plan 1/2: Final nix GC)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
@@ -328,8 +308,9 @@ let%expect_test
     |}]
 ;;
 
-(* A phone: the ☰ at the left, the island in the middle, and one ⋯ for
-   the rest (what applies, the panels, the settings), which opens a menu;
+(* A phone: the ☰ at the left, the session's name in the middle, and one ⋯
+   for the rest (the thinking level, the mode, the transcript's verbosity and
+   the usage, what applies, the panels, the settings), which opens a menu;
    Esc or the backdrop close it. Wider, the rest is laid out at the right. *)
 let%expect_test "a phone's chrome: the ⋯ opens the menu" =
   let h = H.create () in
@@ -350,7 +331,7 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     {|
     <div class="chrome-tools">
     <button class="btn chrome-button ghost icon round toggle-sidebar">
-    <div class="status-island">
+    <h1 class="chrome-title">
     <div class="chrome-more">
     <button type="button"
             title="Panels and settings"
@@ -363,6 +344,7 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     </button>
     Toggle_status_tray
     <div class="sheet-grip">
+    <div class="session-sections">
     <div class="status-notes">
     <button class="jump-row sheet-row">
     <button class="filter-row sheet-row">

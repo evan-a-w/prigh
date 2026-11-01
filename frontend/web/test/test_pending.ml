@@ -6,12 +6,11 @@ module H = Harness
 let%expect_test "connecting: the chat, the composer and the status say so" =
   let h = H.connecting () in
   H.text h ~selector:".chat";
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.show h ~selector:"button.send";
   [%expect
     {|
     Connecting to the backend…
-    Connecting…
     <button type="button"
             title="Not connected to the backend"
             aria-label="Send"
@@ -22,7 +21,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     </button>
     |}];
   H.elements h ~selector:".composer";
-  [%expect {| <footer class="busy composer offline status-style-island"> |}];
+  [%expect {| <footer class="busy composer offline"> |}];
   H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
   H.text h ~selector:".chat";
   [%expect {| Loading the session… |}];
@@ -35,14 +34,14 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     Scroll_to_bottom
     What are we building?
     Ready
-    <footer class="composer status-style-island">
+    <footer class="composer">
     |}]
 ;;
 
 let%expect_test "reconnecting: the composer is marked and does not send" =
   let h = H.create () in
   H.act h Backend_closed;
-  H.text h ~selector:".status-island";
+  H.text h ~selector:".composer-status";
   H.elements h ~selector:".composer";
   H.type_ h "still here";
   H.act h Send;
@@ -61,9 +60,7 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (on)
-    (auto)
-    <footer class="composer offline status-style-island">
+    <footer class="composer offline">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
     |}]
