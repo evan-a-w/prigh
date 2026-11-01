@@ -348,7 +348,7 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     <div class="status-notes">
     <button class="jump-row sheet-row">
     <button class="filter-row sheet-row">
-    <button class="files-row files-toggle sheet-row">
+    <button class="files-sheet-row files-toggle sheet-row">
     <button class="sheet-row terminal-row terminal-toggle">
     <button class="settings-row sheet-row">
     button "Panels and settings"

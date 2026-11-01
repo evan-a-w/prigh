@@ -101,7 +101,7 @@ let sheet (m : App.Model.t) ~inject =
         ~on_click:(go Action.Open_filter)
         ()
     ; sheet_row
-        ~cls:"files-row files-toggle"
+        ~cls:"files-sheet-row files-toggle"
         ~name:"Files"
         ~on:m.files.open_
         ~glyph:Folder
