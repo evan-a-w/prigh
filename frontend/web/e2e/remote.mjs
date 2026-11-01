@@ -116,6 +116,8 @@ try {
   await page.locator(".btn.send").click();
   await page.waitForFunction(() => document.body.innerText.includes("found it"));
   await idle();
+  // The call's line opens its output.
+  await page.locator(".tool button.tool-head").last().click();
   await page.getByText("on-the-laptop.txt").first().waitFor();
   section("the tool ran on the laptop");
   const chat = await page.locator("#chat").innerText();

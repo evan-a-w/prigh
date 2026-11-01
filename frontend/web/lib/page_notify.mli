@@ -38,5 +38,6 @@ val on_event : t -> Event.t -> where:string -> t * Prigh_ui.Notify.t option
 (** What [/notify] says. *)
 val describe : t -> string
 
-(** The page's title with the count, e.g. [(2) prigh]. *)
-val title : t -> string
+(** The page's title with the count and the session's name, e.g. [(2) Fix
+    the build · prigh]. *)
+val title : ?session:string -> t -> string

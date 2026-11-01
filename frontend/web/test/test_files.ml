@@ -254,7 +254,13 @@ let%expect_test
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/gone)))
      (tag (Files (Previewed /home/me/proj/gone))))
     <div class="files-image">
-      <img src="http://box:7790/files/download?ticket=abc" alt="shot.png (image/png)"/>
+      <button type="button"
+              title="View full size"
+              aria-label="View shot.png"
+              data-viewer="shot.png"
+              class="files-image-open">
+        <img src="http://box:7790/files/download?ticket=abc" alt="shot.png (image/png)"/>
+      </button>
     </div>
     |}];
   H.act h (Files (Select "big.bin"));
@@ -282,7 +288,7 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
   let h = opened () in
   H.act h (Files (Download "README.md"));
   H.text h ~selector:".files-transfers";
-  H.text h ~selector:".status-extras .transfers";
+  H.text h ~selector:".status-notes .transfers";
   H.reply
     h
     "fs_download"
@@ -366,7 +372,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
   H.act h (Files (Upload_progress { file = 1; sent = 400 }));
   H.text h ~selector:".files-transfers";
   (* Visible outside the panel too: in the status line. *)
-  H.text h ~selector:".status-extras .transfers";
+  H.text h ~selector:".status-notes .transfers";
   [%expect
     {|
     new.txt 400 B of 1000 B
@@ -398,7 +404,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
               Error {|{"error":"no space left for /home/me/proj/README.md"}|}
           }));
   H.text h ~selector:".toasts";
-  H.elements h ~selector:".status-extras .transfers";
+  H.elements h ~selector:".status-notes .transfers";
   [%expect
     {|
     Uploaded "new.txt"
@@ -621,7 +627,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     "the file browser needs a newer prigh on tool host laptop: update prigh \
      there and restart its TUI or tool-host";
   H.act h (Files (Upload_progress { file = 1; sent = 500_000 }));
-  H.text h ~selector:".status-extras .transfers";
+  H.text h ~selector:".status-notes .transfers";
   H.show h ~selector:".attach-chip.uploading";
   H.text h ~selector:".attach-chips";
   [%expect

@@ -678,6 +678,43 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .chip.job { color: var(--muted); }
 .chip.waiting { color: var(--sodium); }
 
+/* A call at rest is one line, and the line opens it: a button, reset to
+   look like the line it was, with a chevron that shows on hover, focus and
+   while open. Calls in a row pack tighter than prose. */
+button.tool-head {
+  width: 100%;
+  margin: 0;
+  padding: 0 4px 0 0;
+  border: 0;
+  border-radius: var(--r-control, 6px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.tool-head:hover { background: var(--slate-2); }
+button.tool-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: 1px; }
+button.tool-head > .chev {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin: 0 4px 2px 2px;
+  border-right: 1.5px solid var(--faint);
+  border-bottom: 1.5px solid var(--faint);
+  transform: rotate(-45deg);
+  opacity: 0;
+  transition: transform 0.15s, opacity 0.15s;
+}
+button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-head > .chev { opacity: 1; }
+.tool.open > button.tool-head > .chev { transform: translateY(-1px) rotate(45deg); }
+.msg.assistant > .tool:not(.open) + .tool:not(.open) { margin-top: -8px; }
+.tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
+.tool-body > .url-link { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
+.tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
+/* A subagent: its lamp or outcome, its name and the way in. */
+.tool-subagent > .tool-head .arg.task { font-weight: 500; }
+
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
 .plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
@@ -852,12 +889,18 @@ table.diff tr.hunk .hunk-context { color: var(--muted); margin-left: 0.5ch; }
 .patch-file.add .kind { color: var(--sage); }
 .patch-file.del .kind { color: var(--brick); }
 
-/* Images: a thumbnail opens full size; clicking anywhere closes it */
+/* Images: a thumbnail opens the viewer (app/viewer_widget.ml) */
 
 .images { display: flex; flex-wrap: wrap; gap: 8px; }
-details.image > summary { list-style: none; cursor: zoom-in; }
-details.image > summary::-webkit-details-marker { display: none; }
-details.image > summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: var(--r-control); }
+button.image {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: zoom-in;
+  border-radius: var(--r-control);
+}
+button.image:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .thumb {
   display: block;
   max-width: min(260px, 100%);
@@ -870,36 +913,137 @@ details.image > summary:focus-visible { outline: 2px solid var(--sodium); outlin
   background: repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
 }
 .thumb:hover { border-color: var(--rule-2); }
-.lightbox { display: none; }
-details.image[open] .lightbox {
-  display: grid;
-  place-items: center;
+
+/* The viewer: a modal <dialog> in the top layer, the whole screen (dvh: the
+   phone's browser bars), a bar on top and the stage under it. The image is
+   laid out at its natural size at the stage's centre and placed by a
+   transform (Zoom.transform): at fit it is all inside the stage, never
+   cropped. */
+dialog.viewer {
   position: fixed;
   inset: 0;
-  z-index: var(--z-viewer);
-  padding: 24px;
-  background: var(--lightbox);
-  cursor: zoom-out;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: color-mix(in srgb, #07080a 90%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #e6e6e6;
+  overflow: hidden;
   animation: fade 0.15s;
 }
-.lightbox img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--r-control);
+dialog.viewer::backdrop { background: transparent; }
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: linear-gradient(#000000b0, #00000000);
+  z-index: 1;
 }
-/* The viewer's own button, top right: draw on what it shows. */
-.lightbox-tools { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; cursor: default; }
-.lightbox-annotate.btn { gap: 6px; background: var(--slate); border-color: var(--rule-2); color: var(--chalk); box-shadow: var(--float-shadow); }
-.lightbox-annotate.btn:hover { border-color: var(--sodium); }
-.lightbox-annotate .icon { width: 14px; height: 14px; }
+.viewer-caption { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; font: 12px var(--mono); }
+.viewer-count { color: #e6e6e6; font-weight: 600; white-space: nowrap; }
+.viewer-count:empty { display: none; }
+.viewer-name { color: #ffffffa0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.viewer-group {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 10px;
+  background: #ffffff14;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.viewer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 34px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6e6e6;
+  font: 600 12px var(--mono);
+  text-decoration: none;
+  cursor: pointer;
+}
+.viewer-btn .icon { width: 17px; height: 17px; }
+.viewer-btn:hover:not(:disabled) { background: #ffffff1f; }
+.viewer-btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.viewer-btn:disabled { color: #ffffff4d; cursor: default; }
+.viewer-pct { min-width: 56px; font-variant-numeric: tabular-nums; }
+.viewer-draw span { font-family: var(--sans); font-size: 12.5px; }
+.viewer-draw[hidden] { display: none; }
+.viewer-close { min-width: 36px; height: 36px; border-radius: 50%; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff14; }
+.viewer-stage {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+  user-select: none;
+}
+.viewer.zoomed .viewer-stage { cursor: grab; }
+.viewer.zoomed.dragging .viewer-stage { cursor: grabbing; }
+.viewer-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  opacity: 0;
+  /* Transparency shows as a checkerboard. */
+  background: repeating-conic-gradient(#ffffff0d 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  box-shadow: 0 12px 48px #00000080;
+  image-rendering: auto;
+}
+.viewer.ready .viewer-img { opacity: 1; }
+.viewer.animate .viewer-img { transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #00000080;
+  box-shadow: inset 0 0 0 1px #ffffff1f;
+  z-index: 1;
+}
+.viewer-prev { left: max(12px, env(safe-area-inset-left)); }
+.viewer-next { right: max(12px, env(safe-area-inset-right)); }
+.viewer-nav .icon { width: 22px; height: 22px; }
+@media (max-width: 600px) {
+  .viewer-bar { gap: 8px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  .viewer-sizes, .viewer-caption .viewer-name { display: none; }
+  .viewer-draw span { display: none; }
+  .viewer-tools { gap: 4px; margin-left: auto; }
+  .viewer-btn { min-width: 36px; height: 36px; padding: 0 6px; }
+  .viewer-pct { min-width: 48px; }
+  .viewer-nav { width: 38px; height: 38px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.viewer { animation: none; }
+  .viewer.animate .viewer-img { transition: none; }
+}
 
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .msg.assistant.streaming > .markdown *::after, .output.expanded > pre { animation: none; }
-  summary > .label::before { transition: none; }
+  summary > .label::before, button.tool-head > .chev { transition: none; }
 }
 
 @media (max-width: 760px) {
@@ -908,7 +1052,7 @@ details.image[open] .lightbox {
   .msg.user { padding: 9px 12px 10px; }
   .markdown { font-size: 15px; }
   .tool-head { gap: 7px; }
-  .tool-head .chip:not(.bad):not(.add):not(.del):not(.job) { display: none; }
+  .tool-head .chip.waiting { display: none; }
   .delivery-head .stats { display: none; }
   .code pre { padding: 8px 12px 10px; }
 }
@@ -1010,3 +1154,15 @@ details.image[open] .lightbox {
 .filter-show-all:hover { text-decoration: underline; }
 .filter-show-all:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: var(--r-chip); }
 .entries > .filtered { height: 0; }
+
+/* A delivered subagent's report opens it as its call's line does: the same
+   quiet "Open ›", not a button among the message's. */
+.delivery-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
+.delivery-head[data-agent]:hover { background: var(--slate-2); }
+.delivery-head .open-agent {
+  margin-left: 0; padding: 0 4px; border: 0; border-radius: var(--r-chip);
+  background: none; color: var(--muted); font: inherit; font-size: 12.5px;
+  white-space: nowrap; cursor: pointer;
+}
+.delivery-head[data-agent]:hover .open-agent { color: var(--chalk); }
+.delivery-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }

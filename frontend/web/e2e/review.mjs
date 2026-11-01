@@ -682,10 +682,10 @@ try {
   }, selector);
   const layout = async () => {
     const [sidebar, review, main, terminal, files, agents, bar] = await Promise.all(
-      [".sidebar", ".review-page", ".main", ".terminal-panel", ".files-panel", ".agents-panel", ".session-bar"].map(box));
+      [".sidebar", ".review-page", ".main", ".terminal-panel", ".files-panel", ".agents-panel", ".chat-chrome"].map(box));
     const lines = [
       `sidebar: ${sidebar ? "shown" : "hidden"}`,
-      `session bar over the chat: ${!!bar && !!main && bar.left >= main.left && bar.right <= main.right && bar.top <= main.top + 1}`,
+      `the chrome over the chat: ${!!bar && !!main && bar.left >= main.left && bar.right <= main.right && bar.top <= main.top + 1}`,
     ];
     if (review && main) {
       lines.push(`review from the left edge: ${review.left === 0}`);

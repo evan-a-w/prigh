@@ -69,6 +69,27 @@ let tabs (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* Where the status sits, now that the chat has no header. *)
+let status_style (m : App.Model.t) ~inject =
+  row
+    ~cls:"status-style"
+    ~wide:true
+    ~name:"Status"
+    ~about:
+      ("Where the activity, context, cost, thinking and mode show: "
+       ^ Status_style.describe m.status_style
+       ^ ".")
+    [ segmented
+        ~label:"Status"
+        (List.map Status_style.all ~f:(fun s ->
+           let name = Status_style.name s in
+           ( Status_style.title s
+           , sprintf "%s (/status-style %s)" (Status_style.describe s) name
+           , Status_style.equal s m.status_style
+           , inject (Action.Run ("/status-style " ^ name)) )))
+    ]
+;;
+
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
@@ -359,7 +380,23 @@ let dictation_model (m : App.Model.t) ~inject =
     Option.bind m.config ~f:(fun c -> c.dictation_model)
     |> Option.value ~default:Config.default_dictation_model
   in
+  let groq =
+    List.exists m.auth ~f:(fun s ->
+      String.equal s.provider "groq" && Option.is_some s.custom)
+  in
+  let note =
+    if String.is_prefix current ~prefix:"groq/"
+    then None
+    else if groq
+    then Some ("muted", "Free: groq/whisper-large-v3-turbo, in the list")
+    else
+      Some
+        ( "muted"
+        , "Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom \
+           (README: Free dictation with Groq)" )
+  in
   row
+    ?note
     ~cls:"dictation-model"
     ~name:"Dictation"
     ~about:
@@ -666,7 +703,9 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   match section with
   | Appearance ->
     [ group ~title:"Look" (Theme_view.rows m ~inject)
-    ; group ~title:"Layout" [ tabs m ~inject; verbosity m ~inject ]
+    ; group
+        ~title:"Layout"
+        [ status_style m ~inject; tabs m ~inject; verbosity m ~inject ]
     ]
   | Sessions ->
     [ group

@@ -27,6 +27,7 @@ module Picker_kind = struct
     | Worktrees of Worktree.Listing.t
     | Themes
     | Accents
+    | Status_styles
     | Compaction_models
     | Naming_models
     | Dictation_models
@@ -167,6 +168,7 @@ let per_session = function
           | Accounts
           | Themes
           | Accents
+          | Status_styles
           | Compaction_models
           | Naming_models
           | Dictation_models

@@ -273,7 +273,7 @@ try {
   await page.locator("form button[type=submit]").click();
   await composer().waitFor();
   if (await page.evaluate(() => document.querySelector(".app.narrow:not(.sidebar-open)") !== null))
-    await page.locator(".session-bar .toggle-sidebar").click();
+    await page.locator(".chat-chrome .toggle-sidebar").click();
   await page.locator(`[data-session="${id}"]`).click();
   await page.waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0
     || !document.querySelector(".app.narrow"));

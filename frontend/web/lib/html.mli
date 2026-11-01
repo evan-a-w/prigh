@@ -90,9 +90,17 @@ module Icon : sig
     | Image
     | Paperclip
     | Eraser
+    | Zoom_in
+    | Zoom_out
+    | Fit
+    | Download
+    | Prev
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t
+
+  (** The same SVG as markup, for the page's own DOM (the image viewer). *)
+  val svg : ?cls:string -> t -> string
 end
 
 val icon : ?cls:string -> Icon.t -> Node.t

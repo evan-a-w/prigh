@@ -551,14 +551,12 @@ let%expect_test "outside a repository the create dialog says what to do" =
 ;;
 
 let%expect_test
-    "the session card's branch opens the list; switching session closes it and \
-     ignores its answers"
+    "/pr opens the list; switching session closes it and ignores its answers"
   =
   let h = H.create () in
-  H.click h ~selector:".session-bar .branch";
+  H.act h (Run "/pr");
   [%expect
     {|
-    (Run /pr)
     (Focus picker-input)
     (Rpc (method_ pr_list) (params ((state open)))
      (tag (Forge (List (session s1) (filter Open)))))

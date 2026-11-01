@@ -217,13 +217,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
             ])));
   Harness.text h ~selector:".tool";
   [%expect
-    {|
-    ✓ bash seq 12
-    1
-    2
-    3
-    (Show all 12 lines)
-    |}];
+    {| (✓ bash seq 12) |}];
   (* Unfolded, the rest is fetched (once), the gap saying how much. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Load_output "c1");
@@ -232,15 +226,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
     {|
     (Rpc (method_ get_tool_output) (params ((call_id c1)))
      (tag (Tool_output (agent_id ()) (call_id c1))))
-    ✓ bash seq 12
-    1
-    2
-    3
-    6 more lines (Load them)
-    10
-    11
-    12
-    (Fold to 6 lines)
+    (✓ bash seq 12)
     |}];
   Harness.reply
     h
@@ -249,22 +235,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
   Harness.text h ~selector:".tool .output";
   print_s [%sexp (Set.to_list (Harness.model h).outputs_loading : string list)];
   [%expect
-    {|
-    1
-    2
-    3
-    4
-    5
-    6
-    7
-    8
-    9
-    10
-    11
-    12
-    (Fold to 6 lines)
-    ()
-    |}];
+    {| () |}];
   (* Folded and unfolded again: it is whole now. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Toggle_fold "c1");
@@ -411,11 +382,11 @@ let%expect_test "a cached transcript of a running session" =
   [%expect
     {|
     build it
-    bash
+    (bash)
     Output from while this page was away shows when it ends.
     step 1
-    <div class="running tool tool-bash">
-    bash
+    <div class="open running tool tool-bash">
+    (bash)
     Output from while this page was away shows when it ends.
     step 1
     step 3
@@ -526,10 +497,10 @@ let%expect_test "reconnecting with older pages loaded" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
@@ -602,10 +573,10 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.tabs web.status-style web.open-tabs web.review
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))

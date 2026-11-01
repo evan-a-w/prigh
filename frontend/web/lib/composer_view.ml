@@ -37,6 +37,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
       | Argument Tabs -> "Session tabs"
+      | Argument Status_style -> "Where the status sits"
       | Argument Settings -> "Settings sections"
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
@@ -146,10 +147,20 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     button
       ~cls:"chip-button model-chip"
-      ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
+      ~title:
+        (match m.status_style, Status_view.context_percent state with
+         | Hub, Some p ->
+           sprintf
+             "%s, context %.0f%% full: model, thinking, mode and usage (Ctrl+L)"
+             state.model.name
+             p
+         | _ -> sprintf "%s: switch model (Ctrl+L)" state.model.name)
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ span ~cls:"chip-label" state.model.name; icon ~cls:"chevron" Chevron ]
+      [ span ~cls:"chip-label" state.model.name
+      ; Status_style_view.model_badge m
+      ; icon ~cls:"chevron" Chevron
+      ]
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
@@ -160,7 +171,7 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     | Connected h ->
       ( ""
       , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
-      , None
+      , Some h.name
       , [ icon Server; span ~cls:"chip-label" h.name ] )
     | Disconnected { name; _ } ->
       ( " offline"
@@ -173,7 +184,7 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     | Unset when String.equal state.active_host Host.backend_id ->
       ( ""
       , "Tools run on the backend (/host switches)"
-      , None
+      , Some "backend"
       , [ icon Server; span ~cls:"chip-label" "backend" ] )
     | Unset ->
       ( " warm"
@@ -190,17 +201,18 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
-(* The lower tier, under the box: what the message goes to, each chip
-   opening its menu over itself (the command's choices). The thinking level
-   and the mode are the chat header's ({!Session_chips_view}). *)
-let tier (m : App.Model.t) ~inject =
+(* What the message goes to, in the row under the text beside the +, each
+   chip opening its menu over itself (the command's choices). The thinking
+   level and the mode are where the status style puts them
+   ({!Status_style_view}). *)
+let chips (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
   | Some state ->
     Node.div
       ~attrs:
         [ classes
-            [ "composer-tier"; "composer-controls" ]
+            [ "composer-controls" ]
             [ "menu-open", Session_chips_view.menu_open m [ Model; Host ] ]
         ; Attr.role "group"
         ; Attr.create "aria-label" "Model and host"
@@ -399,7 +411,10 @@ let view (m : App.Model.t) ~inject =
   in
   Node.footer
     ~attrs:
-      [ classes [ "composer" ] [ "offline", not connected; "sending", sending ]
+      [ classes
+          [ "composer" ]
+          ([ "offline", not connected; "sending", sending ]
+           @ Status_style_view.composer_classes m)
       ]
     [ rest (Queue_view.view m ~inject)
     ; Node.div
@@ -407,6 +422,7 @@ let view (m : App.Model.t) ~inject =
           [ classes
               [ "composer-stack" ]
               [ "completing", Option.is_some (App.Model.popup m) ]
+          ; Attr.create "data-popover-box" ""
           ]
         [ rest (popup m ~inject)
         ; div
@@ -452,7 +468,13 @@ let view (m : App.Model.t) ~inject =
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject
-                ; rest (dictation m ~inject)
+                ; (* While dictating, the recording takes the chips' place. *)
+                  (match m.dictation with
+                   | Idle ->
+                     Node.fragment
+                       [ chips m ~inject; Status_style_view.row_chips m ~inject ]
+                   | Starting _ | Recording _ | Transcribing ->
+                     rest (dictation m ~inject))
                 ; rest
                   @@ div
                        ~cls:"composer-buttons"
@@ -466,7 +488,10 @@ let view (m : App.Model.t) ~inject =
                               ~on_click:(inject Action.Abort)
                               [ icon Stop ]
                           else Node.none)
-                       ; (if sending
+                       ; Status_style_view.around_send
+                           m
+                           ~inject
+                           (if sending
                           then
                             button
                               ~cls:"primary round send busy"
@@ -504,8 +529,9 @@ let view (m : App.Model.t) ~inject =
                               [ icon Send ])
                        ]
                 ]
+            ; Status_style_view.in_composer m ~inject
             ]
-        ; tier m ~inject
         ]
+    ; Status_style_view.under_composer m ~inject
     ]
 ;;

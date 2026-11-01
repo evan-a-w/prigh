@@ -34,12 +34,12 @@ let%expect_test
      resume; each opens its command"
   =
   let h = H.create () in
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   H.event h (state [ "budget_usd", `Number "5"; "cost_usd", `Number "4.2" ]);
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
-  H.elements h ~selector:".status .budget";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
+  H.elements h ~selector:".status-island .budget";
   H.event
     h
     (state
@@ -48,41 +48,53 @@ let%expect_test
        ; "goal", goal "all tests pass"
        ; "resume_at_ms", `Number "1791295500000"
        ]);
-  H.text h ~selector:".status";
-  H.text h ~selector:".status-extras";
+  H.text h ~selector:".status-island";
+  H.text h ~selector:".status-notes";
   List.iter
-    [ ".status .budget"; ".status-extras .goal"; ".status-extras .resume" ]
+    [ ".status-island .budget"; ".status-notes .goal"; ".status-notes .resume" ]
     ~f:(fun selector -> H.elements h ~selector);
   (* In the page's time zone. *)
   H.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
-  H.text h ~selector:".status-extras .resume";
+  H.text h ~selector:".status-notes .resume";
   [%expect
     {|
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
-    Ready (0%)
+    (on)
+    (auto)
+    Ready (0%) ($4.20/$5.00)
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
-    Cost $4.2000
+    Cost $4.2000 · $4.20/$5.00
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    ($4.20/$5.00)
+    (on)
+    (auto)
     <button class="budget cost link status-item warm">
-    Ready (0%)
+    Ready (0%) ($5.50/$5.00)
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
-    Cost $5.5000
+    Cost $5.5000 · $5.50/$5.00
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    ($5.50/$5.00)
+    (on)
+    (auto)
     (Goal 3/20) (Resumes 14:05)
     <button class="budget cost hot link status-item">
     <button class="goal link status-item warm">

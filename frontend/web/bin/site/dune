@@ -77,6 +77,12 @@
   (copy ../jump.css jump.css)))
 
 (rule
+ (target status.css)
+ (deps ../status.css)
+ (action
+  (copy ../status.css status.css)))
+
+(rule
  (target forge.css)
  (deps ../forge.css)
  (action
@@ -199,6 +205,7 @@
   paging.css
   jump.css
   forge.css
+  status.css
   recursive-sans.woff2
   recursive-mono.woff2
   terminal.js
@@ -239,6 +246,7 @@
   (paging.css as web/paging.css)
   (jump.css as web/jump.css)
   (forge.css as web/forge.css)
+  (status.css as web/status.css)
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)
   (recursive-OFL.txt as web/recursive-OFL.txt)

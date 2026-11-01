@@ -181,7 +181,7 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
   [%expect {| <div class="app reviewing"> |}];
   (* The chat is still there, beside it. *)
   H.elements h ~selector:".main .composer";
-  [%expect {| <footer class="composer"> |}]
+  [%expect {| <footer class="composer status-style-island"> |}]
 ;;
 
 (* The page's layout: what [.app] and the desk (the chat, the terminal and
@@ -229,10 +229,10 @@ let%expect_test
     -- the desk:
     <main class="main">
     -- the chat column:
-    <header class="docked session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     |}];
@@ -253,32 +253,33 @@ let%expect_test
     <div class="resizer resizer-review-chat">
     <main class="main">
     -- the chat column:
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     |}];
   (* The session's status, which the docked sidebar's card showed, is over
      the chat. *)
-  H.text h ~selector:".session-bar";
+  H.text h ~selector:".chat-chrome";
   H.elements h ~selector:".session-card";
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (New session) (main)
-    (on)
-    (auto)
-    Ready (0%)
+    Ready (0%) $0.00
+    Status Ready
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
+    Thinking on
+    Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    $0.00
+    (on)
+    (auto)
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
     (Settings (Ctrl+, or /settings))
     |}];
@@ -301,10 +302,10 @@ let%expect_test
     <main class="main">
     <section class="terminal-panel">
     -- the chat column:
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
@@ -334,10 +335,10 @@ let%expect_test
     <main class="main">
     <section class="terminal-panel">
     -- the chat column:
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
@@ -349,9 +350,9 @@ let%expect_test
     <aside class="agents-panel">
     <section class="review-page">
     <section class="terminal-panel">
-    <header class="session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     |}];
   H.key h "Escape";
   H.elements h ~selector:".app";
@@ -379,10 +380,10 @@ let%expect_test
     <main class="main">
     <section class="terminal-panel">
     -- the chat column:
-    <header class="docked session-bar">
+    <div class="chrome-anchor">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <footer class="composer">
+    <footer class="composer status-style-island">
     sidebar-width=265px files-width=377px agents-width=397px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-terminal">

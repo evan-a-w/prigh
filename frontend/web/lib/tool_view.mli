@@ -17,6 +17,12 @@ val view
   -> Chat.Tool.t option
   -> Node.t
 
+(** The short name of the subagent [id] started in [chat], if it is there. *)
+val agent_name : Chat.t -> string -> string option
+
+(** The fold key that opens the call [id]'s card (its line toggles it). *)
+val open_key : string -> string
+
 (** A tool the provider ran (web search) as a card like a tool call's.
     [running]: its message is still streaming, so a missing output is still
     to come. *)

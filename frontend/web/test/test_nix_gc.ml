@@ -87,10 +87,10 @@ let%expect_test
     {|{"type":"event","event":"nix_gc_progress","paths_deleted":12,
        "generations_deleted":0,"message":"deleting unused links..."}|};
   section h;
-  H.text h ~selector:".status-extras .nix-gc";
+  H.text h ~selector:".status-notes .nix-gc";
   H.reply h "nix_store_gc" report_json;
   section h;
-  H.elements h ~selector:".status-extras .nix-gc";
+  H.elements h ~selector:".status-notes .nix-gc";
   [%expect
     {|
     (Run "/nix-gc run")

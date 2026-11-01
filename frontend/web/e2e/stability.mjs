@@ -97,8 +97,8 @@ await page.addInitScript(() => {
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) {
         const where = (entry.sources || []).map(s => s.node).filter(n => n && n.nodeType === 1);
-        if (where.some(n => n.closest("#chat, .session-bar"))) window.__shifts.push(entry.value);
-        if (where.some(n => n.closest(".session-bar .status"))) window.__statusShifts?.push(entry.value);
+        if (where.some(n => n.closest("#chat, .chat-chrome"))) window.__shifts.push(entry.value);
+        if (where.some(n => n.closest(".status-island"))) window.__statusShifts?.push(entry.value);
       }
     }).observe({ type: "layout-shift" });
   } catch {}
@@ -111,22 +111,23 @@ await page.addInitScript(() => {
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
       });
-    // Where the status's items are (the card has the activity and the cost
-    // in its headline, the context under them; the bar has them directly).
-    const status = document.querySelector(".session-bar .status");
+    // Where the status's items are, in the island over the chat (from its
+    // left edge: the pill is centred, so it grows both ways).
+    const status = document.querySelector(".status-island > .status-gauge");
+    const left = status?.closest(".status-island").getBoundingClientRect().left ?? 0;
     if (status && window.__status)
       window.__status.push({
         activity: status.querySelector(".activity")?.textContent.trim(),
-        at: [...status.querySelectorAll(".status > :is(.context, .cost, .activity)")]
+        at: [...status.querySelectorAll(":scope > :is(.context, .cost, .activity)")]
           .filter(e => getComputedStyle(e).display !== "none")
           .map(e => {
             const r = e.getBoundingClientRect();
             const name = ["context", "tokens", "cost"].find(c => e.classList.contains(c)) ?? "activity";
-            return `${name}@${Math.round(r.left)}`;
+            return `${name}@${Math.round(r.left - left)}`;
           })
           .concat([...status.querySelectorAll(".activity > .label")]
             .filter(e => e.offsetWidth > 0)
-            .map(e => `label@${Math.round(e.getBoundingClientRect().left)}`))
+            .map(e => `label@${Math.round(e.getBoundingClientRect().left - left)}`))
           .join(" "),
       });
     setTimeout(() => requestAnimationFrame(sample), 0);
@@ -147,12 +148,9 @@ const screenshot = async label => {
 const composer = () => page.locator(".composer textarea");
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
-// With a phone's header tray open, its backdrop takes taps: Enter sends.
-let sendByKey = false;
 const send = async text => {
   await composer().fill(text);
-  if (sendByKey) await composer().press("Enter");
-  else await page.locator(".btn.send").click();
+  await page.locator(".btn.send").click();
 };
 
 // Remembers the nodes on show that must stay, and counts the nodes removed
@@ -161,7 +159,7 @@ const watch = () => page.evaluate(() => {
   const stable = [
     ...document.querySelectorAll("#chat .entries > *"),
     ...document.querySelectorAll("#chat .entries .md-part, #chat .entries p, #chat .tool"),
-    document.querySelector(".session-bar"),
+    document.querySelector(".chat-chrome"),
     document.querySelector(".composer"),
     document.getElementById("editor"),
     document.querySelector(".sidebar"),
@@ -266,9 +264,9 @@ try {
   const turn = async (label, reply) => {
     await page.evaluate(() => { window.__status = []; window.__statusShifts = []; });
     await send("check it");
-    await page.locator(".session-bar .status > *", { hasText: "Running tools" }).waitFor();
+    await page.locator(".status-island .activity", { hasText: "Running tools" }).waitFor();
     await send("and the rest");
-    await page.locator(".status-extras .queued").waitFor();
+    await page.locator(".queued-tag").first().waitFor();
     await bodyHas(reply);
     await idle();
     await page.waitForTimeout(300);
@@ -285,16 +283,12 @@ try {
     console.log(`layout shift in the status: ${r.shift < 0.0001 ? "none" : r.shift.toFixed(4)}`);
     await screenshot(label);
   };
-  await turn("a turn starts and ends: the status in the sidebar", "Checked.");
+  await turn("a turn starts and ends: the status in the island", "Checked.");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400);
-  // The status is in the header's tray, behind the glance: open, it is
-  // measured there.
-  await page.locator(".bar-tray-toggle").click();
-  await page.locator(".bar-tray.open").waitFor();
-  sendByKey = true;
-  await turn("a turn starts and ends on a phone: the status in the tray", "Checked again.");
+  // The island sits between ☰ and ⋯.
+  await turn("a turn starts and ends on a phone: the status in the island", "Checked again.");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

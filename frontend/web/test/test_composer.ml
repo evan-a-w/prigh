@@ -12,6 +12,8 @@ let%expect_test
     {|
     []
     (Add files or images (or paste, or drop them here))
+    (Claude Opus 5.5)
+    (backend)
     (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
@@ -402,6 +404,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /tabs [on|off] show the open sessions as tabs over the chat (saved for your account)
+    /status-style [island|ring|whisper|border|hub|sidebar] where the status sits: context, cost, thinking and mode (saved for your account)
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
@@ -431,7 +434,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /skills pick a skill to invoke (/skill:name)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

@@ -575,12 +575,22 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
        | Image { url = Some url; mime } ->
          [ div
              ~cls:"files-image"
-             [ Node.img
+             [ (* Opens in the image viewer, to zoom into. *)
+               Node.button
                  ~attrs:
-                   [ Attr.src (Files.link t url)
-                   ; Attr.alt (sprintf "%s (%s)" p.name mime)
+                   [ Attr.type_ "button"
+                   ; Attr.class_ "files-image-open"
+                   ; Attr.title "View full size"
+                   ; Attr.create "aria-label" ("View " ^ p.name)
+                   ; Attr.create Image_view.viewer_attribute p.name
                    ]
-                 ()
+                 [ Node.img
+                     ~attrs:
+                       [ Attr.src (Files.link t url)
+                       ; Attr.alt (sprintf "%s (%s)" p.name mime)
+                       ]
+                     ()
+                 ]
              ]
          ]
        | Image { url = None; _ } ->
