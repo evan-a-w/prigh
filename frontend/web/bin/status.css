@@ -184,6 +184,8 @@
 .composer-status.busy > .status-gauge { color: var(--muted); background: var(--sodium-wash); }
 .composer-status.busy .status-item.activity { color: var(--sodium); }
 .composer-status.busy .status-item.activity > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+/* Offline, the status says so too (the banner says more). */
+.composer-status .status-item.activity.offline > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 .composer-status .status-gauge.above > .status-details { top: auto; bottom: calc(100% + 10px); right: -40px; transform: translateY(2px); }
 .composer-status .status-gauge.above:is(:hover, :focus-within) > .status-details { transform: none; }
 .status-details { min-width: 240px; text-align: left; }
