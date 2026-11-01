@@ -111,7 +111,23 @@ const placed = () => page.evaluate(() => {
   return { r, s, inside, clear, covers, w: Math.round(r.width), h: Math.round(r.height) };
 });
 const pct = () => page.locator("dialog.viewer .viewer-pct").innerText();
-const waitSettled = () => page.waitForTimeout(250);
+// Until the image stops moving (its transitions and any pending zoom frames
+// are done), not a fixed wait: a loaded machine can take longer than any.
+const waitSettled = async () => {
+  await page.evaluate(() => { delete window.__settleKey; });
+  await page.waitForTimeout(100);
+  await settled();
+};
+const settled = () => page.waitForFunction(() => {
+  const img = document.querySelector("dialog.viewer img");
+  if (!img) return true;
+  const r = img.getBoundingClientRect();
+  const key = [r.left, r.top, r.width, r.height].join(",");
+  const w = window;
+  const now = performance.now();
+  if (w.__settleKey !== key) { w.__settleKey = key; w.__settleAt = now; return false; }
+  return now - w.__settleAt >= 150;
+}, null, { polling: 50, timeout: 10000 });
 const describe = async () => {
   const p = await placed();
   const name = await page.locator("dialog.viewer .viewer-count").innerText();
