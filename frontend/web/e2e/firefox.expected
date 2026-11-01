@@ -105,9 +105,6 @@ count some lines
 let me look
 bash
 printf 'one\ntwo\nthree\n'
-one
-two
-three
 three lines
 <TIME>
 === firefox: the session's card after a run ===
@@ -121,6 +118,9 @@ $<COST>
 Ready
 0%
 $<COST>/$<COST>
+=== firefox: long output, at rest ===
+bash
+seq 1 30
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -256,7 +256,7 @@ Count the files
 Show in chat
 Done
 deepseek-flash  1 turn  $<COST>
-the nested card is in view in the chat
+its top-level card is in view in the chat
 === firefox: a background job ===
 Job j1
 built
@@ -273,13 +273,8 @@ Done
 Count the files
 There are 3 files.
 asking a helper
-subagent
 Count the files
 Open ›
-Report
-There are 3 files.
-Transcript
-2 messages
 The survey: 3 files.
 <TIME>
 Survey the project
@@ -437,7 +432,6 @@ build it
 building
 bash
 echo built-ok
-built-ok
 Built.
 <TIME>
 === firefox: a question ===
@@ -455,8 +449,7 @@ ask me
 <TIME>
 one question
 ask_user
-Q: Which database?
-A: SQLite
+answered
 SQLite it is.
 <TIME>
 === firefox: plan mode (Alt+M) ===
@@ -477,9 +470,8 @@ plan it
 <TIME>
 here is the plan
 update_plan
-0/2 done
 Write the schema
-Test it
+0/2 done
 Write the schema
 Test it
 <TIME>
@@ -1512,6 +1504,11 @@ Space
 →
 File 2 of 3
 === firefox: review: chat: what the agent did ===
+c1
+Doubling is intended: v12 feeds the scale.
+reply_to_comment
+c2
+proposes a change
 Agreed, a clearer name:
 -	let twice f x
 +	let apply_twice f x
@@ -1519,11 +1516,6 @@ edit
 README.md
 +1
 −1
-@@ -1,3 +1,3 @@
-1		# Demo
-2
-3	-	A small project.
-3	+	A small project, reviewed.
 Replied to both comments and updated the README.
 <TIME>
 === firefox: review: page: a proposed change ===
@@ -2109,7 +2101,6 @@ a1 has finished: you are writing to the main agent again
 Looking around.
 bash
 timeout 300 sh -c 'until [ -f sub-go ]; do sleep 0.1; done'; echo sub-go
-sub-go
 →
 You (steer)
 [The user sends you this while you work: take it into account and carry on.]
