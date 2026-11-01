@@ -521,7 +521,7 @@ Done waiting.
 model: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
-attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+attach's menu: a sheet across the bottom; focus in it: true
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -782,7 +782,7 @@ ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-mo
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
 desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
-phone: dialog 374x828, in the window: true; sections across the top; panel fits: true
+phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
 chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>; .chat-chrome: Ready, 0%, $<COST>; 44px high
@@ -2281,9 +2281,9 @@ Filter the transcript; plain; badge none; next: Files
 === chromium: filter: image viewer ===
 #filter-toggle: under the image; .composer-controls .chip-button: under the image
 === chromium: filter: phone ===
-below the button: true; inside the window: true; focused: true
+a sheet across the bottom: true; inside the window: true; focused: true
 user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
-Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+Filter the transcript Hiding thinking, tool calls; on
 note: Hiding thinking, tool calls · 2 items hidden | Show all
 note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
@@ -2510,6 +2510,102 @@ sidebar card: Running tools | $<COST> | Context 36% full: the session's details 
 chrome buttons: Filter the transcript, Files, Terminal
 fits
 details cards: 1; header bar: none
+=== chromium: mobile: 390x844: the chat ===
+ok
+=== chromium: mobile: 390x844: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== chromium: mobile: 390x844: the ⋯ sheet ===
+ok
+=== chromium: mobile: 390x844: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== chromium: mobile: 390x844: the settings' list ===
+ok
+=== chromium: mobile: 390x844: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== chromium: mobile: 390x844: settings: appearance ===
+ok
+title: Appearance; back: Settings
+back to the list: true
+=== chromium: mobile: 390x844: settings: models ===
+ok
+=== chromium: mobile: 390x844: the drawer ===
+ok
+=== chromium: mobile: 390x844: the model menu ===
+ok
+=== chromium: mobile: 390x844: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== chromium: mobile: 390x844: / completion ===
+ok
+=== chromium: mobile: 390x844: the files ===
+ok
+=== chromium: mobile: 390x844: the keyboard ===
+the composer in view: true
+=== chromium: mobile: 320x640: the chat ===
+ok
+=== chromium: mobile: 320x640: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== chromium: mobile: 320x640: the ⋯ sheet ===
+ok
+=== chromium: mobile: 320x640: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== chromium: mobile: 320x640: the settings' list ===
+ok
+=== chromium: mobile: 320x640: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== chromium: mobile: 320x640: settings: appearance ===
+ok
+title: Appearance; back: Settings
+back to the list: true
+=== chromium: mobile: 320x640: settings: models ===
+ok
+=== chromium: mobile: 320x640: the drawer ===
+ok
+=== chromium: mobile: 320x640: the model menu ===
+ok
+=== chromium: mobile: 320x640: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== chromium: mobile: 320x640: / completion ===
+ok
+=== chromium: mobile: 320x640: the files ===
+ok
+=== chromium: mobile: 320x640: the keyboard ===
+the composer in view: true
+=== chromium: mobile: 390x844-pwa: the chat ===
+ok
+=== chromium: mobile: 390x844-pwa: the chrome ===
+strip: 0 to 95; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== chromium: mobile: 390x844-pwa: the ⋯ sheet ===
+ok
+=== chromium: mobile: 390x844-pwa: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== chromium: mobile: 390x844-pwa: the settings' list ===
+ok
+=== chromium: mobile: 390x844-pwa: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== chromium: mobile: 390x844-pwa: settings: appearance ===
+ok
+title: Appearance; back: Settings
+back to the list: true
+=== chromium: mobile: 390x844-pwa: settings: models ===
+ok
+=== chromium: mobile: 390x844-pwa: the drawer ===
+ok
+=== chromium: mobile: 390x844-pwa: the model menu ===
+ok
+=== chromium: mobile: 390x844-pwa: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== chromium: mobile: 390x844-pwa: / completion ===
+ok
+=== chromium: mobile: 390x844-pwa: the files ===
+ok
+=== chromium: mobile: 390x844-pwa: the keyboard ===
+the composer in view: true
 === chromium: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200

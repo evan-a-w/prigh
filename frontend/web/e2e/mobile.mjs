@@ -165,7 +165,7 @@ const visit = async (w, h, { safe = false } = {}) => {
     const cdp = await context.newCDPSession(page);
     await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
   }
-  await page.goto(sessionUrl ?? url);
+  await page.goto(sessionUrl ?? url, { timeout: 60000 });
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").tap();
   const editor = page.locator(".composer textarea");

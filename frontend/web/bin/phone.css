@@ -87,7 +87,7 @@
 }
 .app.narrow .chat-chrome.strip .status-island.busy { box-shadow: none; }
 .app.narrow .chat-chrome.strip .status-island > .status-gauge { height: 100%; min-width: 0; }
-.app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity { width: auto; max-width: 12ch; padding-right: 10px; }
+.app.narrow .chat-chrome.strip .status-island > .status-gauge > .status-item.activity { width: 11ch; max-width: none; flex: none; padding-right: 10px; }
 .app.narrow .chat-chrome.strip .status-island .status-item.context { height: 100%; padding: 0 10px; }
 .app.narrow .chat-chrome.strip .status-island .island-chips { height: 100%; align-items: center; gap: 0; }
 .app.narrow .chat-chrome.strip .status-island .island-chips .chip-button { height: 36px; min-width: 36px; padding: 0 8px; justify-content: center; }
@@ -197,6 +197,8 @@
 .app.narrow .popup-keys { display: none; }
 
 .app.narrow .toasts { bottom: calc(100% + 8px); }
+/* Over the jump to the bottom, not on it. */
+.app.narrow:has(.jump-to-bottom) .toasts { bottom: calc(100% + 56px); }
 
 /* {1 Dialogs: full-screen pages}
 
@@ -363,3 +365,10 @@
 .app.narrow .files-crumb { min-height: 36px; display: inline-flex; align-items: center; padding: 0 6px; }
 .app.narrow .account-button { margin-left: 0; min-height: 44px; }
 .app.narrow .files-sort { min-height: 36px; }
+
+/* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
+.app.narrow :is(.help-table, .help-table tbody, .help-table tr) { display: block; width: auto; }
+.app.narrow .help-table td { display: block; width: auto; padding: 0; overflow-wrap: normal; }
+.app.narrow .help-table td:first-child { width: auto; padding: 8px 0 2px; white-space: normal; }
+.app.narrow .help-table td + td { padding-bottom: 8px; border-top: 0; }
+.app.narrow .help-table kbd { white-space: normal; overflow-wrap: normal; }
