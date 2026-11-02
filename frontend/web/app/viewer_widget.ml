@@ -49,6 +49,7 @@ type t =
   ; mutable moved : float (* how far the pointer went since it went down *)
   ; mutable pinch : float option (* the two pointers' distance *)
   ; mutable last_tap : (float * float * float) option (* time, x, y *)
+  ; mutable mouse : bool (* the last pointer down was a mouse's *)
   ; mutable swipe : (float * float * float) option
   (* A finger down on the image at fit: where and when (a swipe between
      images, or down to close) *)
@@ -430,6 +431,7 @@ let pointer_down v ev =
     (* A first finger or the mouse: forget any pointer whose up was lost
        (outside the window). *)
     if Js.to_bool (get ev "isPrimary") then Hashtbl.clear v.pointers;
+    v.mouse <- String.equal (Js.to_string (get ev "pointerType")) "mouse";
     (try
        ignore
          (meth v.stage "setPointerCapture" [| get ev "pointerId" |]
@@ -538,20 +540,37 @@ let pointer_up v ev =
         in
         ignore target;
         let t = now () in
-        match v.last_tap with
-        | Some (t0, x0, y0)
-          when Float.(
-                 t -. t0 < 350. && abs (x -. x0) < 30. && abs (y -. y0) < 30.)
-          ->
-          v.last_tap <- None;
-          update ~animate:true v (fun z -> Zoom.toggle ~at:(at v ~x ~y) z)
-        | _ ->
-          if on_image
-          then v.last_tap <- Some (t, x, y)
-          else (
-            (* A tap beside the image closes, as before. *)
+        (* A mouse's double-click is the browser's [dblclick] (its own timing,
+           however late its events are handled under load); a
+           finger's double tap is timed here. *)
+        if v.mouse
+        then (if not on_image then close ())
+        else (
+          match v.last_tap with
+          | Some (t0, x0, y0)
+            when Float.(
+                   t -. t0 < 350. && abs (x -. x0) < 30. && abs (y -. y0) < 30.)
+            ->
             v.last_tap <- None;
-            close ())))
+            update ~animate:true v (fun z -> Zoom.toggle ~at:(at v ~x ~y) z)
+          | _ ->
+            if on_image
+            then v.last_tap <- Some (t, x, y)
+            else (
+              (* A tap beside the image closes, as before. *)
+              v.last_tap <- None;
+              close ()))))
+;;
+
+let double_click v ev =
+  let target : Dom_html.element Js.t = get ev "target" in
+  (* Two taps make a [dblclick] too: the taps are already timed. *)
+  if v.mouse && Option.is_none (closest target ".viewer-bar, .viewer-nav")
+  then (
+    ignore (meth ev "preventDefault" [||] : Js.Unsafe.any);
+    let x = float_of ev "clientX"
+    and y = float_of ev "clientY" in
+    update ~animate:true v (fun z -> Zoom.toggle ~at:(at v ~x ~y) z))
 ;;
 
 let resize v =
@@ -595,6 +614,7 @@ let open_ (items : item array) index =
       ; moved = 0.
       ; pinch = None
       ; last_tap = None
+      ; mouse = false
       ; swipe = None
       ; restore
       }
@@ -618,6 +638,7 @@ let open_ (items : item array) index =
     listen stage "pointermove" (fun ev -> pointer_move v ev);
     listen stage "pointerup" (fun ev -> pointer_up v ev);
     listen stage "pointercancel" (fun ev -> pointer_up v ev);
+    listen stage "dblclick" (fun ev -> double_click v ev);
     ignore (meth dialog "showModal" [||] : Js.Unsafe.any);
     Option.iter (query dialog ".viewer-close") ~f:(fun el -> el##focus);
     show v index

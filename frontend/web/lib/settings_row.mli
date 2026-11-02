@@ -22,6 +22,8 @@ val row
   -> ?note:string * string
   -> ?scope:Scope.t
   -> ?wide:bool
+  -> ?keys:string
+       (** A shortcut after [about], hidden on phones and touch screens. *)
   -> name:string
   -> about:string
   -> Node.t list

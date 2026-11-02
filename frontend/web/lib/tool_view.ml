@@ -796,7 +796,11 @@ let card
   in
   if String.equal call.name "subagent"
   then (
-    let head = (Status.icon status :: Option.to_list arg) @ chips in
+    (* "Subagent: its name": what the line is, then which one. *)
+    let head =
+      (Status.icon status :: span "kind" "Subagent:" :: Option.to_list arg)
+      @ chips
+    in
     Node.div
       ~attrs:[ Attr.class_ cls; Attr.create "data-call" call.id ]
       [ (match agent with
