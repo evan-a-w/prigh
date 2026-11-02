@@ -2212,7 +2212,7 @@ transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed 
 === firefox: trim: trim after undone ===
 transcript: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5, Step 6, Noted after the trim
 === firefox: trim: phone ===
-Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
+Reply — Module 3 is fixed. | Copy | Select text | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Cancel | Trim
 === firefox: trim: errors ===
 none
@@ -2380,7 +2380,7 @@ fits
 row 1: 0%
 lamps: 0; accented: nothing; 40px high
 fits
-chips 1: DeepSeek V4.1 Flash | icon
+chips 1: V4.1 Flash | icon
 chip problems: none
 === firefox: status: desktop 1280: the status ===
 shows: true; clear of the mic and send: true
@@ -2410,7 +2410,7 @@ on keyboard focus (Context 36% full): true
 the context opens: Session
 === firefox: status: 390x844: the composer's row ===
 the row fits: true
-it shows: Add files or images, DeepSeek V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
 === firefox: status: 390x844: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask
@@ -2432,7 +2432,7 @@ the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
 === firefox: status: 320x640: the composer's row ===
 the row fits: true
-it shows: Add files or images, DeepSeek V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
 === firefox: status: 320x640: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask
@@ -2516,6 +2516,39 @@ full width: true; at the bottom: true
 ok
 === firefox: mobile: 320x640: the files ===
 ok
+=== firefox: long press: held on your message ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+the release clicked nothing: true
+selected: ""
+=== firefox: long press: held on a reply ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+=== firefox: long press: held on a tool line ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+the release did not open it: false
+=== firefox: long press: a short tap ===
+no menu
+=== firefox: long press: a scroll ===
+no menu
+=== firefox: long press: the browser's own long press, with a word selected ===
+cancelled: true; the word unselected: true
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+menus: 1
+=== firefox: long press: Select text ===
+selected: "Done. The port is a literal; it should come from the environment."
+selectable: text
+=== firefox: long press: then a dragged selection's end (no press of its own) ===
+left to the browser: true
+no menu
+=== firefox: long press: then a long press there is the browser's ===
+no menu
+=== firefox: long press: Delete ===
+your messages: make the port configurable
+=== firefox: long press: a session in the drawer ===
+menu: open_tab, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+=== firefox: long press: a worktree in the drawer ===
+menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
+=== firefox: long press: a file of the review ===
+menu: approve_files, unapprove_files, stage_files, unstage_files, commit_files, select_files, copy_paths; a sheet at the bottom: true
 === firefox: pwa: manifest ===
 {"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
 status: 200

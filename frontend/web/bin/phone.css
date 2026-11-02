@@ -470,3 +470,30 @@
 @container composer (min-width: 640px) {
   .app.narrow .row-chips { display: flex; }
 }
+
+/* Long press (Menu_listeners): a touch held on a message or row opens its
+   menu, so the press selects nothing and calls out nothing of the
+   browser's; Select text in the menu gives a message's text back. */
+@media (pointer: coarse) {
+  .msg[tabindex], .msg[tabindex] img, .session, .worktree, .review-file-row {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .msg[tabindex][data-selectable], .msg[tabindex][data-selectable] * {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+  .msg[tabindex], .session-open, .worktree, .review-file-row {
+    transition: background-color 220ms ease-out;
+  }
+  .msg[tabindex].pressing, .session-open.pressing, .worktree.pressing, .review-file-row.pressing {
+    background-color: color-mix(in srgb, var(--chalk) 6%, transparent);
+  }
+}
+
+/* The narrowest phones: the model's chip without its chevron. */
+@media (max-width: 359px) {
+  .composer-controls .model-chip > .chevron { display: none; }
+}
