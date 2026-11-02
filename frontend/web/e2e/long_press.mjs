@@ -256,6 +256,8 @@ try {
   await touch(user(1).locator(".bubble"));
   await page.locator(".context-menu [data-item=delete]").tap();
   await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("and a second question"));
+  await page.locator(".toast", { hasText: "Message deleted" }).waitFor({ state: "attached" });
+  await page.waitForFunction(() => document.querySelectorAll("#chat .msg.user[tabindex] .bubble").length === 1);
   console.log(`your messages: ${await page.locator("#chat .msg.user[tabindex] .bubble").evaluateAll(es => es.map(e => e.innerText.trim()).join(" | "))}`);
 
   section("a session in the drawer");
