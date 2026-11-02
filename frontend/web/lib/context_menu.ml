@@ -50,6 +50,7 @@ module Item = struct
     | Delete
     | Remove
     | Copy_message
+    | Select_text
     | Trim_before
     | Trim_after
     | Approve_files
@@ -84,6 +85,7 @@ module Item = struct
     | Archive
     | Unarchive
     | Copy_message
+    | Select_text
     | Trim_before
     | Trim_after
     | Approve_files
@@ -176,6 +178,7 @@ module Message = struct
     ; first : bool
     ; newest : bool
     ; running : bool
+    ; select : bool
     }
   [@@deriving sexp_of, equal]
 
@@ -197,15 +200,18 @@ let message_picker (msg : Message.t) =
       ~dimmed:disabled
       label
   in
-  Picker.create
-    ~title:(Message.title msg)
-    [ item
-        Copy_message
-        "Copy"
-        ~command:""
-        ~unless:
-          (String.is_empty (String.strip msg.text), "No text: only tool calls")
-    ; item
+  Picker.create ~title:(Message.title msg)
+  @@ [ item
+         Copy_message
+         "Copy"
+         ~command:""
+         ~unless:
+           (String.is_empty (String.strip msg.text), "No text: only tool calls")
+     ]
+  @ (if msg.select
+     then [ item Select_text "Select text" ~command:"" ~unless:(false, "") ]
+     else [])
+  @ [ item
         Trim_before
         "Trim everything before this"
         ~command:"/trim"

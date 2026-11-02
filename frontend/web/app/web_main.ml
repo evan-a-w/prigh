@@ -579,6 +579,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
     | Copy text -> Effect.of_sync_fun Browser.copy_to_clipboard text
+    | Select_message n -> Effect.of_sync_fun Menu_listeners.select_message n
     | Switch_account account -> Effect.of_sync_fun switch_account account
     | Add_account -> Effect.of_sync_fun add_account ()
     | Scroll_chat pages -> Effect.of_sync_fun scroll_chat pages
