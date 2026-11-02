@@ -523,3 +523,36 @@ let%expect_test "under a filter: only what shows has a menu, acting as before" =
      (tag (Message_points (Trim_before (index 5) (at ())))))
     |}]
 ;;
+
+let%expect_test "on a phone, Select text: a long press opens the menu, not \
+                 the browser's selection" =
+  let h = session () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  right_click h 2;
+  H.text h ~selector:".context-menu";
+  H.click h ~selector:".context-menu [data-item=select_text]";
+  [%expect {|
+    (Focus dialog)
+    (Place_menu (Point (x 300) (y 120)))
+    Your message question 2
+    Copy
+    Select text
+    Trim everything before this /trim
+    Trim everything after this /trim after
+    Delete /delete
+    (Picker_choose select_text)
+    (Select_message 2)
+    |}];
+  (* Not on a computer: the mouse selects. *)
+  H.quiet h (fun () -> H.act h (Set_narrow false));
+  right_click h 2;
+  items h;
+  [%expect {|
+    (Focus dialog)
+    (Place_menu (Point (x 300) (y 120)))
+    [menuitem] div "Copy"
+    [menuitem] div "Trim everything before this /trim"
+    [menuitem] div "Trim everything after this /trim after"
+    [menuitem] div "Delete /delete"
+    |}]
+;;

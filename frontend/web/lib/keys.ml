@@ -85,7 +85,8 @@ let help =
   ; ( "Shift+F10 / ContextMenu (on a message)"
     , "its menu: copy, trim everything before or after it, delete it (also \
        right-click or a long press, at the pointer; with text selected, \
-       right-click is the browser's, to copy it)" )
+       right-click is the browser's, to copy it; on a phone, its Select \
+       text selects its words)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )

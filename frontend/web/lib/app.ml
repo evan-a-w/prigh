@@ -298,6 +298,7 @@ module Command = struct
     (** scroll the main chat to a subagent's card: the call ids from the
         top-level one down *)
     | Copy of string
+    | Select_message of int
     | Switch_account of Accounts.Account.t
     | Add_account
     | Scroll_chat of int
@@ -795,6 +796,7 @@ module Model = struct
         ; first = n <= context_start t
         ; newest = [%equal: int option] (Message_index.newest index) (Some n)
         ; running = running t
+        ; select = t.narrow
         }
     in
     match
@@ -8468,6 +8470,7 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
          else "Copied the message to the clipboard")
     in
     m, Command.Copy msg.text :: cmds
+  | Select_text, Some _ -> m, [ Command.Select_message n ]
   | Trim_before, Some _ -> ask_trim m (Entry n)
   | Trim_after, Some _ -> ask_trim_after m n
   | Delete, Some _ -> ask_delete_message m n
@@ -8546,6 +8549,7 @@ let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
     | Delete
     | Remove
     | Copy_message
+    | Select_text
     | Trim_before
     | Trim_after -> m, []
   in
@@ -8616,6 +8620,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Delete -> ask_delete m [ s.path ]
      | Remove -> ask_remove_session_worktree m dir
      | Copy_message
+     | Select_text
      | Trim_before
      | Trim_after
      | Approve_files
@@ -8787,6 +8792,8 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
   let refocus =
     match kind with
     | Menu { target = Review_files _; _ } -> false
+    (* A phone's keyboard would come up over what was long-pressed. *)
+    | Menu _ when m.narrow -> false
     | _ -> Option.is_none m.dialog
   in
   m, (if refocus then [ focus_editor ] else []) @ cmds
