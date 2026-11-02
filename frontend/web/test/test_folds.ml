@@ -353,7 +353,7 @@ let%expect_test "a delivered job's output: its last lines, unfolded on demand" =
   H.text h ~selector:".delivery-section";
   [%expect
     {|
-    ↩ job j1 make exited 0
+    ↩ Job j1: make exited 0
     line 8
     line 9
     line 10
