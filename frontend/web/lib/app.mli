@@ -348,6 +348,9 @@ module Command : sig
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
     | Copy of string (** to the clipboard *)
+    | Select_message of int
+    (** the text of the message of this entry, selected and left
+        selectable (a phone's long press opens its menu instead) *)
     | Switch_account of Accounts.Account.t (** reload signed in as it *)
     | Add_account (** the sign-in form, keeping the saved accounts *)
     | Scroll_chat of int (** by pages *)

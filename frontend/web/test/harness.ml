@@ -39,6 +39,7 @@ let act t action =
      | Sign_out
      | Reveal _
      | Copy _
+     | Select_message _
      | Switch_account _
      | Add_account
      | Scroll_chat _

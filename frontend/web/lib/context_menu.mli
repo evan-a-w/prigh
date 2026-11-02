@@ -62,6 +62,8 @@ module Item : sig
     | Delete
     | Remove (** the worktree *)
     | Copy_message (** its text (a reply's markdown) *)
+    | Select_text
+    (** its text, selectable (a touch's long press opens the menu instead) *)
     | Trim_before
     | Trim_after
     | Approve_files
@@ -101,6 +103,9 @@ module Message : sig
     ; first : bool (** the context starts with it: nothing before to trim *)
     ; newest : bool (** nothing after it to trim *)
     ; running : bool (** a run is in progress: it cannot change *)
+    ; select : bool
+    (** offer Select text: on a phone, where a long press opens the menu
+        rather than selecting *)
     }
   [@@deriving sexp_of, equal]
 
@@ -108,9 +113,10 @@ module Message : sig
   val title : t -> string
 end
 
-(** Copy; Trim everything before this, Trim everything after this; Delete.
-    Those that do not apply are [dimmed]: disabled, their detail says why
-    (otherwise it is the slash command that does the same). *)
+(** Copy; Select text (when [select]); Trim everything before this, Trim
+    everything after this; Delete. Those that do not apply are [dimmed]:
+    disabled, their detail says why (otherwise it is the slash command that
+    does the same). *)
 val message_picker : Message.t -> Picker.t
 
 (** What a review files' menu offers ({!files_picker}). *)

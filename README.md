@@ -842,7 +842,9 @@ shows Archive and Delete behind it; every sheet (a chip's menu, ⋯, a context
 menu) has a grip and closes when dragged down, as when tapped beside; a
 settings page goes back on a swipe in from the left edge; a pending image's
 tile swiped up is removed; in the image viewer, at fit, a swipe aside goes
-to the next image and a swipe down closes it. A long press is a right-click.
+to the next image and a swipe down closes it. A long press is a right-click:
+a message's, a session's, a worktree's or a review file's menu, as a sheet
+(with a buzz); a message's menu has Select text, for its words.
 Each drag is locked to the way it starts, so scrolling is never taken
 over. Your account is at the foot of the sidebar, with
 the settings gear; the account menu also has Settings and Commands and keys
