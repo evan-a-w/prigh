@@ -167,6 +167,28 @@ and the window passing, `set_active_host` or a cancel ends the wait with
 `[cancelled]`; the run continues and the model sees the error). A host not
 seen since the backend started is not waited for, and calls from frontends
 (file reads, path completion, `/cd`) fail at once.
+A host that goes without closing its connection (a network dropped, a
+laptop asleep, a frozen or `kill -9`ed process behind a NAT) is noticed by
+heartbeats: `prigh tool-host` says `heartbeat` in its `features` and pings
+the backend every 10s (`Backend_socket.heartbeat`, which also gives up on a
+backend silent for 30s and reconnects with backoff; `prigh web -connect`'s
+proxy watches its remote the same way), and `Rpc_server` gives up on such a
+host once nothing came from it for `host_timeout` (30s, measured by
+`heartbeat_clock`, a mock clock in `test_host_heartbeat.ml`): its connection
+is closed, it leaves `hosts` (prigh-web's Host menu keeps the session's own
+host, dimmed as offline; choosing it says why), and its in-flight calls fail
+at once, with no `host_grace`: `[the tool host "NAME" stopped responding (no
+reply for 30s), so it was disconnected ...: pick another host with /host, or
+wait for it to reconnect and run it again]`. No wall-clock limit applies to
+a call itself (a long build is fine while the host keeps answering pings).
+TCP keepalive (idle 30s, 3 probes 10s apart) and `TCP_USER_TIMEOUT` (60s of
+unacknowledged data) back this up for every connection, also hosts and
+frontends that do not send heartbeats.
+A run records its prompts in the session before it asks the host anything
+(the system prompt's instructions files, attachments), and those requests
+follow the run's cancellation: a host that never answers no longer keeps
+the session unwritten (and so missing from the list once the user went to
+another one) or the run unstoppable.
 When the same host id connects again the session resumes on it in the cwd
 it had there (a `Notice` "tools run on NAME again in CWD", a state change,
 and no environment note for the model). Only `set_active_host` moves a

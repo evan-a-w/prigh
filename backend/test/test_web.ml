@@ -639,14 +639,18 @@ let%expect_test
     {|
     terminal: event state active_host=client-2 hosts=<host>,laptop
     terminal: event sessions_changed
+    terminal: event agent_start
+    terminal: event message_start
+    terminal: event message_end
+    terminal: event sessions_changed
     terminal: event tool_exec
     browser: event state active_host=client-2 hosts=<host>,laptop
     browser: event sessions_changed
-    browser: response b2 ok=true
     browser: event agent_start
     browser: event message_start
     browser: event message_end
     browser: event sessions_changed
+    browser: response b2 ok=true
     browser: event turn_start
     browser: event message_start
     browser: event message_update
@@ -654,10 +658,6 @@ let%expect_test
     browser: event turn_end
     browser: event agent_end
     terminal: response t-exec ok=true
-    terminal: event agent_start
-    terminal: event message_start
-    terminal: event message_end
-    terminal: event sessions_changed
     terminal: event turn_start
     terminal: event message_start
     terminal: event message_update
