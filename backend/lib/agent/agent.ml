@@ -107,6 +107,7 @@ module State = struct
     ; trim : Session.Trim.t option [@sexp.option]
     ; hidden : Session.Hidden.t list [@sexp.list]
     ; transcript_filter : string option [@sexp.option]
+    ; temporary : bool [@sexp.bool]
     }
   [@@deriving sexp_of]
 end
@@ -256,6 +257,10 @@ type t =
   ; sleep_until : float -> unit
   ; trace_clock : Trace.Clock.t
   ; mutable tracer : Trace.t (** the session's: replaced with it *)
+  ; mutable on_noted : unit -> unit
+  ; mutable noted : Leftover.t list
+    (** uploads, and what an earlier run of a temporary session left, see
+        {!leftovers} *)
   }
 
 let tracer_for ~clock ~(config : Config.t) session =
@@ -501,6 +506,7 @@ let state t =
   ; trim = Session.trim t.session
   ; hidden = Session.hidden t.session
   ; transcript_filter = Session.transcript_filter t.session
+  ; temporary = Session.temporary t.session
   }
 ;;
 
@@ -2616,6 +2622,7 @@ and auto_describe t =
   let session = t.session in
   if
     t.auto_describe
+    && (not (Session.temporary session))
     && Option.is_none t.describing
     && Session_description.wanted session
   then (
@@ -2891,6 +2898,8 @@ let create
     ; sleep_until
     ; trace_clock
     ; tracer = tracer_for ~clock:trace_clock ~config session
+    ; noted = []
+    ; on_noted = ignore
     }
   in
   restore_settings t;
@@ -4080,4 +4089,152 @@ let session_stats t =
   ; masks
   ; duration_seconds = Session.duration_seconds t.session
   }
+;;
+(* ---- temporary sessions --------------------------------------------- *)
+
+let temporary t = Session.temporary t.session
+
+let keep t =
+  if temporary t
+  then (
+    Session.keep t.session;
+    Subagent_log.save_all t.subagent_log;
+    t.noted <- [];
+    state_changed t;
+    auto_describe t)
+;;
+
+let note_leftover t (leftover : Leftover.t) =
+  if temporary t && not (List.mem t.noted leftover ~equal:Leftover.equal)
+  then (
+    t.noted <- leftover :: t.noted;
+    t.on_noted ())
+;;
+
+let on_noted t ~f = t.on_noted <- f
+
+let note_upload t ~path =
+  note_leftover
+    t
+    { host = t.active_host
+    ; kind = Upload
+    ; path
+    ; root = Filename.dirname path
+    }
+;;
+
+(* Outputs are found in the results that quote them, its subagents' too. *)
+let leftovers t =
+  let results messages =
+    List.filter_map messages ~f:(function
+      | Message.Tool_result r -> Some r.text
+      | User _ | Assistant _ -> None)
+  in
+  let texts =
+    results (List.map (Session.entries t.session) ~f:(fun (e : Session.Entry.t) ->
+      e.payload)
+             |> List.filter_map ~f:(function
+               | Session.Entry.Payload.Message m -> Some m
+               | _ -> None))
+    @ List.concat_map (subagents t) ~f:(fun s ->
+      match subagent t s.id with
+      | None -> []
+      | Some (_, messages) ->
+        results (List.map messages ~f:(fun (m : Timed_message.t) -> m.message)))
+  in
+  let outputs =
+    List.concat_map texts ~f:Tool_bash.output_paths
+    |> List.map ~f:(fun path ->
+      { Leftover.host = t.active_host
+      ; kind = Output
+      ; path
+      ; root = Filename.dirname path
+      })
+  in
+  let worktrees =
+    List.filter_map (Session.worktrees t.session) ~f:(fun w ->
+      match w.source with
+      | Entered -> None
+      | Created | Pull_request _ | Agent _ ->
+        Some
+          { Leftover.host = t.active_host
+          ; kind = Worktree
+          ; path = w.path
+          ; root = w.root
+          })
+  in
+  List.dedup_and_sort (t.noted @ outputs @ worktrees) ~compare:Leftover.compare
+;;
+
+let host_call_on t ~host ~cwd ~name arguments =
+  match find_host t host with
+  | None -> Tool.Result.error (sprintf "tool host %S is not connected" host)
+  | Some h ->
+    host_exec_on
+      t
+      h
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"leftover"
+      ~cwd
+      ~name
+      ~arguments
+;;
+
+let remove_leftover t (leftover : Leftover.t) =
+  match leftover.kind with
+  | Upload | Output ->
+    (* web_fetch saves its outputs in the backend, whichever host ran *)
+    if
+      Tool_bash.is_own_output leftover.path
+      && Sys_unix.file_exists_exn leftover.path
+    then (try Sys_unix.remove leftover.path with _ -> ());
+    (match
+       host_call_on
+         t
+         ~host:leftover.host
+         ~cwd:leftover.root
+         ~name:Host_files.delete_op
+         (`Object [ "path", `String leftover.path ])
+     with
+     | { is_error = false; _ } -> Ok ()
+     | { is_error = true; text; _ } ->
+       if
+         String.is_substring text ~substring:"No such file"
+         || String.is_substring text ~substring:"not found"
+         || String.is_substring text ~substring:"does not exist"
+       then Ok ()
+       else Error text)
+  | Worktree ->
+    (match
+       host_call_on
+         t
+         ~host:leftover.host
+         ~cwd:leftover.root
+         ~name:Worktree.remove_op
+         (Worktree.remove_args
+            ~dir:t.config.worktrees_dir
+            ~path:leftover.path
+            ~force:false
+            ())
+       |> Worktree.removed_of_result
+     with
+     | Ok (_ : Worktree.t) -> Ok ()
+     | Error e -> Error (Error.to_string_hum e))
+;;
+
+let remove_leftovers t leftovers =
+  List.filter_map leftovers ~f:(fun leftover ->
+    match remove_leftover t leftover with
+    | Ok () -> None
+    | Error why -> Some (leftover, why))
+;;
+
+let note_leftovers t leftovers = List.iter leftovers ~f:(note_leftover t)
+
+(* Ends with nothing running: its run, subagents and jobs are stopped. *)
+let stop_everything t =
+  if resume_pending t then ignore (cancel_resume t : unit Or_error.t);
+  shutdown t;
+  wait_idle t
 ;;
