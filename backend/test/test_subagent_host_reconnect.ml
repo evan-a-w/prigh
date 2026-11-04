@@ -171,9 +171,9 @@ let%expect_test "a subagent's tool calls wait while its host reconnects" =
     {|
     laptop hello: client_id=client-2 host_id=host-laptop
     state: running=true subagents=[]
-    {"type":"response","id":"r1","ok":true,"result":{}}
     agent_start
     user: go
+    {"type":"response","id":"r1","ok":true,"result":{}}
     assistant:  subagent{"task":"run the tests"}
     state: running=true subagents=[a1 running]
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile

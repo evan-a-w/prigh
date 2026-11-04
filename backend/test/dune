@@ -15,6 +15,7 @@
   jsonaf
   prigh
   eio
+  eio.mock
   eio.unix
   eio_main
   eio_posix
