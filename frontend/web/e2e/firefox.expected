@@ -2382,6 +2382,15 @@ lamps: 0; accented: nothing; 40px high
 fits
 chips 1: V4.1 Flash | icon
 chip problems: none
+=== firefox: card: the host stopped answering ===
+chips 1: V4.1 Flash | icon
+chip problems: none
+<HOSTNAME> <CWD>
+✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
+build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh tool-host -connect there to bring it back.
+=== firefox: card: the host is back ===
+chips 1: V4.1 Flash | icon
+chip problems: none
 === firefox: status: desktop 1280: the status ===
 shows: true; clear of the mic and send: true
 the row fits: true

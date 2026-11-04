@@ -50,6 +50,13 @@ val create
   -> ?host_grace:float
        (** seconds the in-flight executions of a tool host whose connection
            dropped wait for it to come back with them (default: 60) *)
+  -> ?host_timeout:float
+       (** seconds after which a tool host that sends heartbeats (its
+           [features] have [heartbeat]: [prigh tool-host] pings every 10s)
+           and is silent is given up on: its connection is closed and what
+           it was running fails at once (default: 30) *)
+  -> ?heartbeat_clock:float Eio.Time.clock_ty Eio.Resource.t
+       (** what [host_timeout] is measured by (default: [env]'s clock) *)
   -> ?namespace:string
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)

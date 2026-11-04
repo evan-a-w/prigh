@@ -419,6 +419,8 @@ let features = [ "exec_input"; "terminal_kill"; "git_location" ]
    backend rejected the credentials, else why it did not. The [worker] and
    what it runs outlive it. *)
 let serve_connection
+      ~clock
+      ~heartbeat:(interval, timeout)
       ~worker
       ~link
       ~log
@@ -467,7 +469,9 @@ let serve_connection
                  ; Some ("host_id", `String host_id)
                  ; Some
                      ( "features"
-                     , `Array (List.map features ~f:(fun f -> `String f)) )
+                     , `Array
+                         (List.map (features @ [ "heartbeat" ]) ~f:(fun f ->
+                            `String f)) )
                  ; Some
                      ( "running_execs"
                      , `Array
@@ -541,12 +545,32 @@ let serve_connection
       in
       if continue then loop ()
   in
-  Exn.protect ~f:loop ~finally:(fun () ->
-    Link.disconnect link;
-    Hashtbl.to_alist pending
-    |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
-    |> List.iter ~f:(fun (_, reply) -> Link.hold link reply);
-    Worker.close_viewers worker);
+  let watch () =
+    Backend_socket.heartbeat
+      socket
+      ~clock
+      ~interval
+      ~timeout
+      ~on_silent:(fun seconds ->
+        let message =
+          sprintf
+            "no reply from %s for %gs: giving up on the connection"
+            address
+            seconds
+        in
+        match !outcome with
+        | `Served -> log message
+        | `Failed _ | `Refused _ -> outcome := `Failed message)
+      ()
+  in
+  Exn.protect
+    ~f:(fun () -> Fiber.first loop watch)
+    ~finally:(fun () ->
+      Link.disconnect link;
+      Hashtbl.to_alist pending
+      |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+      |> List.iter ~f:(fun (_, reply) -> Link.hold link reply);
+      Worker.close_viewers worker);
   Outbox.close outbox;
   !outcome
 ;;
@@ -557,6 +581,8 @@ let connect
       ?(log = fun line -> eprintf "prigh tool-host: %s\n%!" line)
       ?(initial_backoff = Time_ns.Span.of_sec 0.5)
       ?(max_backoff = Time_ns.Span.of_sec 10.)
+      ?(heartbeat_interval = 10.)
+      ?(heartbeat_timeout = 30.)
       ?(on_connect = fun () -> ())
       ~backend
       ~token
@@ -591,6 +617,8 @@ let connect
         ~finally:(fun () -> Backend_socket.close socket)
         ~f:(fun () ->
           serve_connection
+            ~clock:(Eio.Stdenv.clock env)
+            ~heartbeat:(heartbeat_interval, heartbeat_timeout)
             ~worker
             ~link
             ~log
