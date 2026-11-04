@@ -55,6 +55,13 @@ val create
            before it ends (default: 120) *)
   -> ?sleep:(float -> unit)
        (** how the grace periods are waited for (default: the clock) *)
+  -> ?host_timeout:float
+       (** seconds after which a tool host that sends heartbeats (its
+           [features] have [heartbeat]: [prigh tool-host] pings every 10s)
+           and is silent is given up on: its connection is closed and what
+           it was running fails at once (default: 30) *)
+  -> ?heartbeat_clock:float Eio.Time.clock_ty Eio.Resource.t
+       (** what [host_timeout] is measured by (default: [env]'s clock) *)
   -> ?namespace:string
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)

@@ -309,6 +309,11 @@ module Client = struct
     ; generations : Cancellation.t String.Table.t
       (** in-flight [generate_text] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
+    ; mutable heard : float
+      (** when its last line came, by [heartbeat_clock]: a tool host that
+          promised heartbeats ([features] has [heartbeat]) and is silent for
+          [host_timeout] is given up on *)
+    ; mutable silent : bool (** given up on for that *)
     }
 
   let id t = t.id
@@ -361,6 +366,9 @@ type t =
   ; mutable generate_seq : int
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
+  ; host_timeout : float
+    (** how long a tool host that sends heartbeats may be silent *)
+  ; heartbeat_clock : float Eio.Time.clock_ty Eio.Resource.t
     (** how long the executions of a host that dropped its connection wait
         for it to come back with them, and new calls for it to come back *)
   ; returning : float String.Table.t
@@ -482,6 +490,27 @@ let forget_session t id =
   List.iter t.on_session_deleted ~f:(fun f -> f ~key)
 ;;
 
+(* Removes [leftovers] where their host is connected; the rest (and what a
+   host failed at while going away) stay in the session's ledger, for when
+   it connects. Answers what a connected host could not remove (worktrees
+   with uncommitted changes). *)
+let remove_leftovers t agent ~id leftovers =
+  let reachable (l : Leftover.t) =
+    if String.equal l.host Agent.Host.backend_id
+    then t.backend_host
+    else Option.is_some (host_client t l.host)
+  in
+  let now, later = List.partition_tf leftovers ~f:reachable in
+  let failed = Agent.remove_leftovers agent now in
+  let lost, kept =
+    List.partition_tf failed ~f:(fun ((l : Leftover.t), _) -> not (reachable l))
+  in
+  (match later @ List.map lost ~f:fst with
+   | [] -> Temporary_ledger.remove ~dir:t.ledger_dir ~id
+   | leftovers -> Temporary_ledger.write ~dir:t.ledger_dir { id; leftovers });
+  kept
+;;
+
 (* Leaving a temporary session ends it: nobody can reach it any more, what
    runs in it stops, and what it made goes (but worktrees with uncommitted
    changes, which [notify] hear of). What could not be deleted on a host
@@ -496,22 +525,8 @@ let end_temporary t agent ~notify =
     Fiber.fork ~sw:t.sw (fun () ->
       Guarded.run ~what:"ending a temporary session" (fun () ->
         Agent.stop_everything agent;
-        let failed = Agent.remove_leftovers agent (Agent.leftovers agent) in
         forget_session t id;
-        let retry, kept =
-          List.partition_tf failed ~f:(fun ((l : Leftover.t), _) ->
-            match l.kind with
-            | Worktree -> false
-            | Upload | Output ->
-              (not (String.equal l.host Agent.Host.backend_id))
-              && Option.is_none (host_client t l.host))
-        in
-        (match retry with
-         | [] -> Temporary_ledger.remove ~dir:t.ledger_dir ~id
-         | retry ->
-           Temporary_ledger.write
-             ~dir:t.ledger_dir
-             { id; leftovers = List.map retry ~f:fst });
+        let kept = remove_leftovers t agent ~id (Agent.leftovers agent) in
         let event = temporary_ended_event ~session:id ~kept in
         List.iter notify ~f:(fun (c : Client.t) ->
           if Hashtbl.mem t.clients c.id then c.send event))))
@@ -627,6 +642,15 @@ let host_restarted =
    again if you still need it]"
 ;;
 
+let host_silent t (client : Client.t) =
+  sprintf
+    "[the tool host %S stopped responding (no reply for %gs), so it was \
+     disconnected and this call's result is lost: pick another host with \
+     /host, or wait for it to reconnect and run it again]"
+    client.name
+    t.host_timeout
+;;
+
 (* The connection running an execution: the one it was sent on, which may
    have handed its host id to a newer one ([claim_host_id]). *)
 let exec_client t ~host exec_id =
@@ -709,6 +733,8 @@ let create
       ?(host_grace = 60.)
       ?(temporary_grace = 120.)
       ?sleep
+      ?(host_timeout = 30.)
+      ?heartbeat_clock
       ?namespace
       ?(backend_host = true)
       ?home
@@ -754,6 +780,12 @@ let create
     ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
+    ; host_timeout
+    ; heartbeat_clock =
+        Option.value
+          heartbeat_clock
+          ~default:
+            (Eio.Stdenv.clock env :> float Eio.Time.clock_ty Eio.Resource.t)
     ; returning = String.Table.create ()
     ; sleep =
         Option.value_or_thunk sleep ~default:(fun () ->
@@ -987,6 +1019,8 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; btws = String.Table.create ()
     ; generations = String.Table.create ()
     ; told = String.Set.empty
+    ; heard = Eio.Time.now t.heartbeat_clock
+    ; silent = false
     }
   in
   Hashtbl.set t.clients ~key:client.id ~data:client;
@@ -1060,12 +1094,20 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.iter client.generations ~f:Cancellation.cancel;
-  if client.tools then await_host t client;
-  if client.tools && not (String.equal client.host_id client.id)
-  then (
-    Hashtbl.set t.returning ~key:client.host_id ~data:(t.now () +. t.host_grace);
-    Terminal_relay.host_gone t.terminals ~host:client.host_id)
-  else release_host_id t client ~text:host_disconnected;
+  (* A host that went silent is not waited for: whatever it was given fails
+     now, and so do new calls until it is back. *)
+  if client.tools && client.silent
+  then release_host_id t client ~text:(host_silent t client)
+  else (
+    if client.tools then await_host t client;
+    if client.tools && not (String.equal client.host_id client.id)
+    then (
+      Hashtbl.set
+        t.returning
+        ~key:client.host_id
+        ~data:(t.now () +. t.host_grace);
+      Terminal_relay.host_gone t.terminals ~host:client.host_id)
+    else release_host_id t client ~text:host_disconnected);
   hand_over_host_id t client;
   if client.tools then publish_hosts t;
   maybe_evict t client.agent
@@ -1464,11 +1506,6 @@ let clean_leftovers t =
   in
   if not (List.is_empty ledgers)
   then (
-    let reachable (l : Leftover.t) =
-      if String.equal l.host Agent.Host.backend_id
-      then t.backend_host
-      else Option.is_some (host_client t l.host)
-    in
     let agent =
       t.new_agent
         ~session:(Session.create ~dir:t.sessions_dir ~cwd:t.cwd ~temporary:true ())
@@ -1476,27 +1513,11 @@ let clean_leftovers t =
         ()
     in
     Agent.set_hosts agent (hosts t) ~returning:String.Map.empty;
-    Agent.subscribe agent ~f:(route t agent);
     List.iter ledgers ~f:(fun (ledger : Temporary_ledger.t) ->
-      let now, later = List.partition_tf ledger.leftovers ~f:reachable in
-      let failed = Agent.remove_leftovers agent now in
-      List.iter failed ~f:(fun ((l : Leftover.t), why) ->
-        eprintf
-          "prigh: temporary session %s left %s: %s\n%!"
-          ledger.id
-          l.path
-          why);
-      let retry =
-        later
-        @ List.filter_map failed ~f:(fun ((l : Leftover.t), _) ->
-          match l.kind with
-          | Worktree -> None
-          | Upload | Output -> Option.some_if (not (reachable l)) l)
-      in
-      match retry with
-      | [] -> Temporary_ledger.remove ~dir:t.ledger_dir ~id:ledger.id
-      | leftovers ->
-        Temporary_ledger.write ~dir:t.ledger_dir { ledger with leftovers });
+      List.iter
+        (remove_leftovers t agent ~id:ledger.id ledger.leftovers)
+        ~f:(fun ((l : Leftover.t), why) ->
+          eprintf "prigh: temporary session %s left %s: %s\n%!" ledger.id l.path why));
     Agent.shutdown agent)
 ;;
 
@@ -3072,6 +3093,29 @@ let respond_or_log t (client : Client.t) request =
       (Exn.to_string exn)
 ;;
 
+let sends_heartbeats (client : Client.t) =
+  client.tools && List.mem client.features "heartbeat" ~equal:String.equal
+;;
+
+(* A tool host gone without closing its connection (a network dropped, a
+   machine asleep, a frozen process) would be sent tool calls nobody
+   answers: one that sends heartbeats is given up on once it is silent for
+   [host_timeout]. *)
+let watch_heartbeats t (client : Client.t) ~give_up =
+  let rec loop () =
+    Eio.Time.sleep t.heartbeat_clock (Float.min 5. (t.host_timeout /. 3.));
+    if
+      sends_heartbeats client
+      && Float.(
+           Eio.Time.now t.heartbeat_clock -. client.heard >= t.host_timeout)
+    then (
+      client.silent <- true;
+      give_up (sprintf "no reply for %gs" t.host_timeout))
+    else loop ()
+  in
+  loop ()
+;;
+
 let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
@@ -3083,10 +3127,14 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
       (fun () -> Outbox.run outbox ~write:write_line)
       (fun () -> ignore (Promise.await (Outbox.failed outbox) : string)));
   let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
+  Fiber.fork_daemon ~sw (fun () ->
+    watch_heartbeats t client ~give_up:(Outbox.fail outbox);
+    `Stop_daemon);
   let rec loop requests =
     match read_line () with
     | None -> None
     | Some line ->
+      client.heard <- Eio.Time.now t.heartbeat_clock;
       if String.is_empty (String.strip line)
       then loop requests
       else (

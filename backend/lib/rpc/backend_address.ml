@@ -101,7 +101,7 @@ let normalize text =
   | Ok _ | Error _ -> String.strip text
 ;;
 
-let connect ~env ~sw t =
+let connect_abortable ~env ~sw t =
   let net = Eio.Stdenv.net env in
   match
     Eio.Net.getaddrinfo_stream net t.host ~service:(Int.to_string t.port)
@@ -110,17 +110,23 @@ let connect ~env ~sw t =
   | addr :: _ ->
     let socket = Eio.Net.connect ~sw net addr in
     Web_server.keepalive socket;
+    let abort () =
+      try Eio.Flow.shutdown socket `All with
+      | _ -> ()
+    in
     if t.tls
     then
-      (Http_client.tls_client ~host:t.host socket
-        :> Eio.Flow.two_way_ty Eio.Resource.t)
-    else (socket :> Eio.Flow.two_way_ty Eio.Resource.t)
+      ( (Http_client.tls_client ~host:t.host socket
+          :> Eio.Flow.two_way_ty Eio.Resource.t)
+      , abort )
+    else (socket :> Eio.Flow.two_way_ty Eio.Resource.t), abort
 ;;
+
+let connect ~env ~sw t = fst (connect_abortable ~env ~sw t)
 
 exception Not_upgraded of string
 
-let websocket ~env ~sw t ~path ~query =
-  let flow = connect ~env ~sw t in
+let websocket_over flow t ~path ~query =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   let target =
     Uri.to_string
@@ -139,4 +145,8 @@ let websocket ~env ~sw t ~path ~query =
             (authority t)
             (t.prefix ^ path)
             answer))
+;;
+
+let websocket ~env ~sw t ~path ~query =
+  websocket_over (connect ~env ~sw t) t ~path ~query
 ;;
