@@ -308,6 +308,11 @@ module Client = struct
     ; generations : Cancellation.t String.Table.t
       (** in-flight [generate_text] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
+    ; mutable heard : float
+      (** when its last line came, by [heartbeat_clock]: a tool host that
+          promised heartbeats ([features] has [heartbeat]) and is silent for
+          [host_timeout] is given up on *)
+    ; mutable silent : bool (** given up on for that *)
     }
 
   let id t = t.id
@@ -348,6 +353,9 @@ type t =
   ; mutable generate_seq : int
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
+  ; host_timeout : float
+    (** how long a tool host that sends heartbeats may be silent *)
+  ; heartbeat_clock : float Eio.Time.clock_ty Eio.Resource.t
     (** how long the executions of a host that dropped its connection wait
         for it to come back with them, and new calls for it to come back *)
   ; returning : float String.Table.t
@@ -499,6 +507,15 @@ let host_restarted =
    again if you still need it]"
 ;;
 
+let host_silent t (client : Client.t) =
+  sprintf
+    "[the tool host %S stopped responding (no reply for %gs), so it was \
+     disconnected and this call's result is lost: pick another host with \
+     /host, or wait for it to reconnect and run it again]"
+    client.name
+    t.host_timeout
+;;
+
 (* The connection running an execution: the one it was sent on, which may
    have handed its host id to a newer one ([claim_host_id]). *)
 let exec_client t ~host exec_id =
@@ -576,6 +593,8 @@ let create
       ~sw
       ?token
       ?(host_grace = 60.)
+      ?(host_timeout = 30.)
+      ?heartbeat_clock
       ?namespace
       ?(backend_host = true)
       ?home
@@ -621,6 +640,12 @@ let create
     ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
+    ; host_timeout
+    ; heartbeat_clock =
+        Option.value
+          heartbeat_clock
+          ~default:
+            (Eio.Stdenv.clock env :> float Eio.Time.clock_ty Eio.Resource.t)
     ; returning = String.Table.create ()
     ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
     ; sw
@@ -845,6 +870,8 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; btws = String.Table.create ()
     ; generations = String.Table.create ()
     ; told = String.Set.empty
+    ; heard = Eio.Time.now t.heartbeat_clock
+    ; silent = false
     }
   in
   Hashtbl.set t.clients ~key:client.id ~data:client;
@@ -918,12 +945,20 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.iter client.generations ~f:Cancellation.cancel;
-  if client.tools then await_host t client;
-  if client.tools && not (String.equal client.host_id client.id)
-  then (
-    Hashtbl.set t.returning ~key:client.host_id ~data:(t.now () +. t.host_grace);
-    Terminal_relay.host_gone t.terminals ~host:client.host_id)
-  else release_host_id t client ~text:host_disconnected;
+  (* A host that went silent is not waited for: whatever it was given fails
+     now, and so do new calls until it is back. *)
+  if client.tools && client.silent
+  then release_host_id t client ~text:(host_silent t client)
+  else (
+    if client.tools then await_host t client;
+    if client.tools && not (String.equal client.host_id client.id)
+    then (
+      Hashtbl.set
+        t.returning
+        ~key:client.host_id
+        ~data:(t.now () +. t.host_grace);
+      Terminal_relay.host_gone t.terminals ~host:client.host_id)
+    else release_host_id t client ~text:host_disconnected);
   hand_over_host_id t client;
   if client.tools then publish_hosts t;
   maybe_evict t client.agent
@@ -2832,6 +2867,29 @@ let respond_or_log t (client : Client.t) request =
       (Exn.to_string exn)
 ;;
 
+let sends_heartbeats (client : Client.t) =
+  client.tools && List.mem client.features "heartbeat" ~equal:String.equal
+;;
+
+(* A tool host gone without closing its connection (a network dropped, a
+   machine asleep, a frozen process) would be sent tool calls nobody
+   answers: one that sends heartbeats is given up on once it is silent for
+   [host_timeout]. *)
+let watch_heartbeats t (client : Client.t) ~give_up =
+  let rec loop () =
+    Eio.Time.sleep t.heartbeat_clock (Float.min 5. (t.host_timeout /. 3.));
+    if
+      sends_heartbeats client
+      && Float.(
+           Eio.Time.now t.heartbeat_clock -. client.heard >= t.host_timeout)
+    then (
+      client.silent <- true;
+      give_up (sprintf "no reply for %gs" t.host_timeout))
+    else loop ()
+  in
+  loop ()
+;;
+
 let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
@@ -2843,10 +2901,14 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
       (fun () -> Outbox.run outbox ~write:write_line)
       (fun () -> ignore (Promise.await (Outbox.failed outbox) : string)));
   let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
+  Fiber.fork_daemon ~sw (fun () ->
+    watch_heartbeats t client ~give_up:(Outbox.fail outbox);
+    `Stop_daemon);
   let rec loop requests =
     match read_line () with
     | None -> None
     | Some line ->
+      client.heard <- Eio.Time.now t.heartbeat_clock;
       if String.is_empty (String.strip line)
       then loop requests
       else (

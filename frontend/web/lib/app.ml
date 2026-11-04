@@ -672,7 +672,7 @@ module Model = struct
     ; nix_gc : Nix_gc.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
-    (* A phone's settings show the list of sections, not one of them. *)
+      (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool
     ; return_to_settings : bool
     ; theme : Theme.t
@@ -1415,7 +1415,22 @@ let host_label (m : Model.t) (h : Host.t) =
     | _ -> h.name)
 ;;
 
+(* The session's host stays in the list while it is offline (gone, or given
+   up on when it stopped answering), dimmed: choosing it says why not. *)
 let hosts_list (m : Model.t) (state : State.t) =
+  let offline =
+    match Active_host.of_state state with
+    | Disconnected { id; name } ->
+      [ Picker.Item.create
+          ~id
+          ~detail:"offline: waiting for it to reconnect"
+          ~search:(name ^ " " ^ id ^ " offline")
+          ~marked:true
+          ~dimmed:true
+          name
+      ]
+    | Connected _ | Unset -> []
+  in
   Picker.create
     ~title:"Where tools run"
     (List.map state.hosts ~f:(fun h ->
@@ -1424,7 +1439,8 @@ let hosts_list (m : Model.t) (state : State.t) =
          ~detail:h.cwd
          ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
          ~marked:(String.equal h.id state.active_host)
-         (host_label m h)))
+         (host_label m h))
+     @ offline)
 ;;
 
 (* The hosts' menu follows hosts coming and going, keeping what is typed. *)
@@ -3033,7 +3049,8 @@ let open_chip (m : Model.t) (chip : Chip.t) =
    focus nowhere). *)
 let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
   match before.dialog with
-  | Some (Popover { chip = Model; _ }) -> m, cmds @ [ Command.Focus "popover-filter" ]
+  | Some (Popover { chip = Model; _ }) ->
+    m, cmds @ [ Command.Focus "popover-filter" ]
   | _ -> m, cmds
 ;;
 
@@ -3488,9 +3505,10 @@ let dictation_models_picker (m : Model.t) =
     let current = config.dictation_model in
     let suggestions =
       Prigh_ui.Dictation_command.suggestions
-      @ if has_groq m
-        then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
-        else []
+      @
+      if has_groq m
+      then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
+      else []
     in
     let suggested =
       List.map suggestions ~f:(fun (key, detail) ->
@@ -3503,12 +3521,8 @@ let dictation_models_picker (m : Model.t) =
     in
     let configured =
       match current with
-      | Some key
-        when not
-               (List.Assoc.mem
-                  suggestions
-                  ~equal:String.equal
-                  key) ->
+      | Some key when not (List.Assoc.mem suggestions ~equal:String.equal key)
+        ->
         [ Picker.Item.create
             ~id:key
             ~detail:"configured"
@@ -8728,7 +8742,15 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some host -> host_prompt m host
        | None ->
-         error m (sprintf "Tool host %s has gone: /host lists them." item.id))
+         error
+           m
+           (if item.dimmed
+            then
+              sprintf
+                "%s is offline: pick another host, or run prigh tool-host \
+                 -connect there to bring it back."
+                item.label
+            else sprintf "Tool host %s has gone: /host lists them." item.label))
     | Users -> act_as m item.id
     | Accounts -> account_chosen m item.id
     | Skills -> edit m ("/skill:" ^ item.id ^ " ")

@@ -1541,11 +1541,11 @@ let executor t : Tool.executor =
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
-let instructions t ~cwd =
+let instructions t ~cancel ~cwd =
   Host_ops.instructions_of_result
     (host_exec
        t
-       ~cancel:Cancellation.never
+       ~cancel
        ~on_output:ignore
        ~call_id:"instructions"
        ~cwd
@@ -1558,9 +1558,9 @@ let instructions t ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (t.tools @ t.mcp_tools)
 
-let build_system_prompt t =
+let build_system_prompt ?(cancel = Cancellation.never) t =
   let { Host_ops.Instructions.files; nix; skills } =
-    instructions t ~cwd:t.cwd
+    instructions t ~cancel ~cwd:t.cwd
   in
   System_prompt.build
     ~instructions:files
@@ -1683,13 +1683,16 @@ let approve_mcp t ~source ~server =
         listing)
 ;;
 
-let system_prompt t =
+let system_prompt ?(cancel = Cancellation.never) t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text = build_system_prompt t in
-    ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
-    tell t { (environment t) with plan_mode = t.told.plan_mode };
+    let text = build_system_prompt ~cancel t in
+    (* Without its instructions: the next run builds it again. *)
+    if not (Cancellation.is_cancelled cancel)
+    then (
+      ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
+      tell t { (environment t) with plan_mode = t.told.plan_mode });
     text
 ;;
 
@@ -1872,10 +1875,10 @@ let summary_model t =
   Compaction_settings.summary_model (compaction_settings t) t.model
 ;;
 
-let loop_config t =
+let loop_config ?cancel t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
-  ; system = Some (system_prompt t)
+  ; system = Some (system_prompt ?cancel t)
   ; tools = tools t @ goal_tools t @ reply_tools t
   ; max_turns = None
   ; max_tokens = None
@@ -1887,7 +1890,7 @@ let loop_config t =
 
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
-let with_attachments t text attachments =
+let with_attachments t ~cancel text attachments =
   match attachments with
   | [] -> text, [], []
   | _ ->
@@ -1895,7 +1898,7 @@ let with_attachments t text attachments =
       let result =
         host_exec
           t
-          ~cancel:Cancellation.never
+          ~cancel
           ~on_output:ignore
           ~call_id:"attachment"
           ~cwd:t.cwd
@@ -1937,10 +1940,12 @@ let take_notes t =
   notes
 ;;
 
-let user_message t (q : Queued.t) =
+let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
   Reminder.Tracker.user_spoke t.reminder_tracker;
   let text = Option.value q.expanded ~default:q.text in
-  let text, attachments, attached = with_attachments t text q.attachments in
+  let text, attachments, attached =
+    with_attachments t ~cancel text q.attachments
+  in
   let notes = take_notes t in
   let origin = { Injected.notes; attachments; source = q.source } in
   Message.user
@@ -2252,7 +2257,12 @@ let name_subagent t ~task ~siblings ~cancel =
   |> Result.ok
 ;;
 
-let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
+let rec start_run
+          ?(tried = String.Set.empty)
+          ?(then_ = fun ~cancel:_ -> [])
+          t
+          prompts
+  =
   refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
@@ -2278,7 +2288,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        @@ fun () ->
        (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
-       let prompts = prompts @ then_ () in
+       let prompts = prompts @ then_ ~cancel in
        let prompts = prompts @ due_reminders t in
        let session = t.session in
        let finish ~idle =
@@ -2288,7 +2298,17 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        in
        refresh_mcp t ~cancel;
        let halted = ref None in
-       let config = loop_config t in
+       (* The prompts are in the session (and its file made) before the
+          system prompt is built: that asks the tool host, which may take
+          long to answer or never do. *)
+       let context = Session.messages session in
+       broadcast t (Loop Agent_start);
+       List.iter prompts ~f:(fun m ->
+         ignore (Session.append_message session m : Session.Entry.t);
+         broadcast t (Loop (Message_start m));
+         broadcast t (Loop (Message_end m)));
+       let recorded m = List.mem prompts m ~equal:phys_equal in
+       let config = loop_config ~cancel t in
        let added =
          match
            Agent_loop.run
@@ -2346,6 +2366,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                account t event;
                track_plan t event;
                match event with
+               | Agent_start -> ()
+               | (Message_start m | Message_end m) when recorded m -> ()
                | Turn_end _ ->
                  if phys_equal session t.session
                  then Reminder.Tracker.turn_ended t.reminder_tracker;
@@ -2359,7 +2381,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)
                | _ -> broadcast t (Loop event))
-             ~context:(Session.messages session)
+             ~context
              ~prompts
              ()
          with
@@ -2923,8 +2945,9 @@ let prompt ?(attachments = []) ?(images = []) t text =
       then running ()
       else
         Ok
-          (start_run t [] ~then_:(fun () ->
+          (start_run t [] ~then_:(fun ~cancel ->
              [ user_message
+                 ~cancel
                  t
                  { text; expanded = skill; source = None; attachments; images }
              ])))
@@ -2935,7 +2958,7 @@ let enqueue_queued t kind queued =
   then (
     Steer_queue.push t.queue kind queued;
     queue_update t)
-  else start_run t [] ~then_:(fun () -> [ user_message t queued ])
+  else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
 
 let enqueue t kind ?(attachments = []) ?(images = []) text =
@@ -3633,7 +3656,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt t
+    | None -> build_system_prompt ~cancel t
   in
   let request =
     Btw.request
