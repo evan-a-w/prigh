@@ -53,7 +53,10 @@ module Client = struct
       c.server
       c.client
       (`Object
-          [ "id", `String "r"; "method", `String meth; "params", `Object params ])
+          [ "id", `String "r"
+          ; "method", `String meth
+          ; "params", `Object params
+          ])
   ;;
 
   let result json =
@@ -122,8 +125,7 @@ let print_sessions_dir t ~sessions_dir =
   match walk sessions_dir with
   | [] -> print_endline "sessions dir: empty"
   | files ->
-    List.iter files ~f:(fun file ->
-      printf "sessions dir: %s\n" (mask t file))
+    List.iter files ~f:(fun file -> printf "sessions dir: %s\n" (mask t file))
 ;;
 
 let print_listed t (c : Client.t) =
@@ -132,7 +134,10 @@ let print_listed t (c : Client.t) =
   | Ok (`Array []) -> print_endline "listed: none"
   | Ok (`Array sessions) ->
     List.iter sessions ~f:(fun s ->
-      printf "listed: %s (%s)\n" (mask t (field "id" s)) (field "first_prompt" s))
+      printf
+        "listed: %s (%s)\n"
+        (mask t (field "id" s))
+        (field "first_prompt" s))
   | Ok json -> print_endline (Jsonaf.to_string json)
 ;;
 
@@ -254,11 +259,25 @@ let%expect_test "unlisted, unreachable without its key, nothing written" =
     In_channel.read_all
       (Filename.concat sessions_dir (sprintf ".temporary/%s.json" id))
   in
-  printf "ledger mentions the prompt: %b\n" (String.is_substring ledger ~substring:"secret");
+  printf
+    "ledger mentions the prompt: %b\n"
+    (String.is_substring ledger ~substring:"secret");
   [%expect {| ledger mentions the prompt: false |}];
   let b, _ = Client.connect server in
   print_listed t b;
-  (match Client.result (Client.request b "switch_session" [ "path", `String id ]) with
+  (* its messages, asked for by id: its own client has them, no other *)
+  let page (c : Client.t) =
+    match
+      Client.result
+        (Client.request c "get_messages_page" [ "session", `String id ])
+    with
+    | Ok _ -> "a page"
+    | Error e -> mask t e
+  in
+  printf "own client: %s; another: %s\n" (page a) (page b);
+  (match
+     Client.result (Client.request b "switch_session" [ "path", `String id ])
+   with
    | Ok _ -> print_endline "switched (wrong)"
    | Error e -> print_endline (mask t e));
   (match Client.connect server ~hello:[ "session", `String id ] with
@@ -274,6 +293,7 @@ let%expect_test "unlisted, unreachable without its key, nothing written" =
   [%expect
     {|
     listed: none
+    own client: a page; another: no session "<id>"
     no session "<id>"
     no session "<id>"
     temporary session "<id>" is gone: it was deleted when it was left
@@ -288,8 +308,9 @@ let%expect_test "unlisted, unreachable without its key, nothing written" =
   [%expect {| hello with the key: attached |}]
 ;;
 
-let%expect_test "a client that goes comes back within the grace period, \
-                 not after" =
+let%expect_test
+    "a client that goes comes back within the grace period, not after"
+  =
   with_server ~main:[ Reply.text "hello" ]
   @@ fun t ~sessions_dir ~repo:_ ~trees:_ ~clock ~make_server ->
   let server = make_server () in
@@ -305,7 +326,8 @@ let%expect_test "a client that goes comes back within the grace period, \
        "reattached: %d messages\n"
        (List.length (Agent.messages (Client.agent b)))
    | Error e -> print_endline (mask t e));
-  [%expect {|
+  [%expect
+    {|
     new temporary session: temporary=true key=<32 hex>
     reattached: 2 messages
     |}];
@@ -370,7 +392,9 @@ let%expect_test "leaving deletes everything it made, but dirty worktrees" =
   let leftovers =
     List.map (Agent.leftovers agent) ~f:(fun (l : Leftover.t) ->
       let path =
-        if List.mem outputs l.path ~equal:String.equal then "<output>" else mask t l.path
+        if List.mem outputs l.path ~equal:String.equal
+        then "<output>"
+        else mask t l.path
       in
       sprintf "%s %s" (Sexp.to_string (Leftover.Kind.sexp_of_t l.kind)) path)
     |> List.sort ~compare:String.compare
@@ -394,10 +418,12 @@ let%expect_test "leaving deletes everything it made, but dirty worktrees" =
   ignore (Client.request a "new_session" [] : Jsonaf.t);
   Client.await_ended t a;
   [%expect
-    {| {"type":"event","event":"temporary_ended","session":"<id>","kept":[{"path":"$DIR/trees/repo/feat-dirty","kind":"worktree","why":"$DIR/trees/repo/feat-dirty has uncommitted changes (1 file): commit or stash them first, or force the removal"}]} |}];
+    {| {"type":"event","event":"temporary_ended","session":"<id>","messages":14,"kept":[{"path":"$DIR/trees/repo/feat-dirty","kind":"worktree","why":"$DIR/trees/repo/feat-dirty has uncommitted changes (1 file): commit or stash them first, or force the removal"}]} |}];
   printf "running jobs: %d\n" (Agent.running_background agent);
   List.iter outputs ~f:(fun path ->
-    printf "output: %s\n" (if Sys_unix.file_exists_exn path then "exists" else "gone"));
+    printf
+      "output: %s\n"
+      (if Sys_unix.file_exists_exn path then "exists" else "gone"));
   exists t upload;
   exists t (Filename.concat trees "repo/feat-clean");
   exists t (Filename.concat trees "repo/feat-dirty/new.txt");
@@ -436,7 +462,7 @@ let%expect_test "leaving stops a running turn" =
     {|
     new temporary session: temporary=true key=<32 hex>
     running: true
-    {"type":"event","event":"temporary_ended","session":"<id>","kept":[]}
+    {"type":"event","event":"temporary_ended","session":"<id>","messages":2,"kept":[]}
     running: false
     sessions dir: empty
     |}]
@@ -520,7 +546,9 @@ let%expect_test "a backend that stopped mid-session: the next one cleans up" =
   Rpc_server.clean_leftovers next;
   print_sessions_dir t ~sessions_dir;
   exists t upload;
-  printf "output: %s\n" (if Sys_unix.file_exists_exn output then "exists" else "gone");
+  printf
+    "output: %s\n"
+    (if Sys_unix.file_exists_exn output then "exists" else "gone");
   exists t (Filename.concat trees "repo/feat-clean");
   let b, _ = Client.connect next in
   print_listed t b;

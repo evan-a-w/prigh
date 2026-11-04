@@ -3432,6 +3432,11 @@ terminal frontend and `web/` prigh-web, the browser one.
   stop, status, attrs}`; listed with the session's `files`, so deleted and
   counted with it; not copied by fork, clone or import.
 - `~/.prigh/sessions/exports/` — default `/export` output.
+- `~/.prigh/sessions/.temporary/<id>.json` — a live temporary session's
+  ledger (`Temporary_ledger`): no transcript, only what it made on its
+  hosts (uploads, saved command outputs, worktrees), so that a backend
+  that stopped before deleting them deletes them when it starts (or when
+  their host connects).
 - `~/.prigh/history` — the TUI's prompt history on its machine (one JSON
   string per line, last 500).
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the

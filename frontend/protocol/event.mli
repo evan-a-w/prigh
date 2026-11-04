@@ -145,6 +145,13 @@ type t =
       } (** streamed text of our own [generate_text] request *)
   | Sessions_changed
   (** something [list_sessions] shows changed, in any session *)
+  | Temporary_ended of
+      { session : string
+      ; messages : int (** it had: none, and nothing was lost *)
+      ; kept : (string * string) list
+        (** what could not be deleted (worktrees with uncommitted
+            changes): paths, and why *)
+      } (** the temporary session this client left is deleted *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
   | Nix_gc_progress of Nix_gc_progress.t

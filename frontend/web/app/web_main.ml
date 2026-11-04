@@ -51,7 +51,9 @@ module Settings = struct
     @ Option.value_map t.prefer_host ~default:[] ~f:(fun host ->
       [ "prefer_host", `String host ])
     @ Option.value_map session ~default:[] ~f:(fun s ->
-      [ "session", `String s ])
+      [ "session", `String s ]
+      @ Option.value_map (Tab_memory.temporary_key_of s) ~default:[] ~f:(fun key ->
+        [ "temporary_key", `String key ]))
   ;;
 end
 
@@ -524,6 +526,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         ()
     | Auth_failed message -> Effect.of_sync_fun auth_failed message
     | Apply_update -> Effect.of_sync_fun Service_worker.apply_update ()
+    | Remember_temporary temporary ->
+      Effect.of_sync_fun Tab_memory.remember_temporary temporary
     | Set_url_session session ->
       Effect.of_sync_fun
         (fun () ->
@@ -533,7 +537,9 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
              ( model.account
              , Option.bind model.hello ~f:Prigh_protocol.Hello_reply.acting_as )
            with
-           | Some account, None -> Accounts.set_session storage account session
+           | Some account, None
+             when not (Option.exists model.state ~f:(fun s -> s.temporary)) ->
+             Accounts.set_session storage account session
            | _ -> ())
         ()
     | Expire_toast { id; after_ms } ->

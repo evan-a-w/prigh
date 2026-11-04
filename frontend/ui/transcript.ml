@@ -589,7 +589,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Config_changed _
   | P.Event.Review _
   | P.Event.Generate_delta _
-  | P.Event.Agent_queues _ -> t
+  | P.Event.Agent_queues _
+  | P.Event.Temporary_ended _ -> t
 ;;
 
 let gray = Style.fg Gray
