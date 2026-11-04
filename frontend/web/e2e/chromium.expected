@@ -16,12 +16,6 @@ T
 token
 === chromium: signed in: chat ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === chromium: signed in: the session's card ===
 on
 auto
@@ -184,12 +178,6 @@ T
 token
 === chromium: new session ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === chromium: sending ===
 hello again
 Sending…

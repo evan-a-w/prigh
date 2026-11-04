@@ -51,8 +51,6 @@
   overflow: hidden;
 }
 .app:not(.narrow) .main.fresh > .composer { flex: 1.3 1 0; justify-content: flex-start; padding-top: 0; }
-/* What is about the session's work, not its question, waits for the chat. */
-.main.fresh .composer-status :is(.context, .cost) { display: none; }
 
 /* {1 The tray} */
 
