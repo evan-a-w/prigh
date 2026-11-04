@@ -121,6 +121,7 @@ type t =
   ; mutable persisted : bool
     (** whether the file exists: it is only written once the session has
         something worth keeping (a message or a name) *)
+  ; mutable temporary : bool (** never written, until {!keep} *)
   ; unreadable : string option String.Table.t
     (** the parents of entries [load] could not read, by id, so that the
         entries after them stay on the path *)
@@ -214,10 +215,25 @@ let worth_saving (line : Line.t) =
 ;;
 
 let persisted t = t.persisted
+let temporary t = t.temporary
 let gone t = t.persisted && not (Sys_unix.file_exists_exn t.path)
 
+let create_file t =
+  Core_unix.mkdir_p (Filename.dirname t.path);
+  Out_channel.with_file t.path ~f:(fun oc ->
+    output_line oc (header t);
+    let entries = List.rev t.entries in
+    List.iter entries ~f:(fun e -> output_line oc (Entry e));
+    match t.head, List.last entries with
+    | Some head, Some last when not (String.equal head last.id) ->
+      output_line oc (Head head)
+    | _ -> ());
+  t.persisted <- true
+;;
+
 (* The file is created on the first line worth saving, with everything
-   recorded in memory so far; before that nothing touches the disk. *)
+   recorded in memory so far; before that nothing touches the disk. A
+   temporary session never creates it. *)
 (* Once the file exists, a line is only appended to it, never creates it: a
    session deleted while something still holds it (e.g. its description
    being written) stays deleted. *)
@@ -234,18 +250,16 @@ let write_line t (line : Line.t) =
           t.torn <- false;
           output_line oc line)
         ~finally:(fun () -> Out_channel.close oc))
-  else if worth_saving line
+  else if worth_saving line && not t.temporary
+  then create_file t
+;;
+
+let keep t =
+  if t.temporary
   then (
-    Core_unix.mkdir_p (Filename.dirname t.path);
-    Out_channel.with_file t.path ~f:(fun oc ->
-      output_line oc (header t);
-      let entries = List.rev t.entries in
-      List.iter entries ~f:(fun e -> output_line oc (Entry e));
-      match t.head, List.last entries with
-      | Some head, Some last when not (String.equal head last.id) ->
-        output_line oc (Head head)
-      | _ -> ());
-    t.persisted <- true)
+    t.temporary <- false;
+    if List.exists t.entries ~f:(fun e -> worth_saving (Entry e))
+    then create_file t)
 ;;
 
 let default_dir ~home = Filename.concat home ".prigh/sessions"
@@ -285,7 +299,7 @@ let next_created_at () =
       bump (Time_float.max now last))
 ;;
 
-let create ~dir ~cwd ?parent () =
+let create ~dir ~cwd ?parent ?(temporary = false) () =
   let id = new_id () in
   let created_at = next_created_at () in
   last_created_at := Some created_at;
@@ -308,6 +322,7 @@ let create ~dir ~cwd ?parent () =
     ; head = None
     ; by_id = String.Table.create ()
     ; persisted = false
+    ; temporary
     ; unreadable = String.Table.create ()
     ; skipped = []
     ; torn = false
@@ -455,6 +470,7 @@ let load ?(yield = fun () -> ()) path =
            ; head = None
            ; by_id = String.Table.create ()
            ; persisted = true
+           ; temporary = false
            ; unreadable = String.Table.create ()
            ; skipped = []
            ; torn =

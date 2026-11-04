@@ -167,35 +167,7 @@ let toasts (m : Model.t) ~inject =
     ]
 ;;
 
-let empty (m : Model.t) =
-  let hint ?(keyboard = false) key text =
-    Node.li
-      ~attrs:(if keyboard then [ Attr.class_ "keyboard" ] else [])
-      [ Node.kbd [ Node.text key ]; Node.text text ]
-  in
-  div
-    ~cls:"empty"
-    [ Node.h2 [ Node.text "What are we building?" ]
-    ; (match m.state with
-       | Some state ->
-         div
-           ~cls:"empty-where"
-           [ Node.text
-               (Sidebar_view.home_relative
-                  ?host_home:(Sidebar_view.state_host_home m)
-                  state.cwd)
-           ]
-       | None -> Node.none)
-    ; Node.ul
-        ~attrs:[ Attr.class_ "empty-hints" ]
-        [ hint "/" " commands"
-        ; hint "@" " mention a file"
-        ; hint "!" " run a command"
-        ; hint ~keyboard:true "Ctrl+L" " switch model"
-        ; hint ~keyboard:true "Ctrl+K" " find a session"
-        ]
-    ]
-;;
+let empty (m : Model.t) = div ~cls:"empty" [ Temporary_view.hero m ]
 
 (* Until the backend has answered: what we wait for, over the shape of a
    transcript. *)
@@ -215,6 +187,11 @@ let loading (m : Model.t) =
   match m.state, m.connection, m.pending with
   | None, Connected, _ -> Some "Connecting to the backend…"
   | None, Reconnecting _, _ -> Some "Reconnecting…"
+  (* The new-session screen stays while another empty session replaces it
+     (the Temporary chip). *)
+  | Some _, _, { session = Some Starting; _ } when App.fresh m -> None
+  | Some s, _, { session = None; messages = true; _ } when s.message_count = 0
+    -> None
   | Some _, _, { session = Some Starting; _ } -> Some "Starting a session…"
   | Some _, _, { session = Some (Switching _); _ }
   | Some _, _, { messages = true; _ } -> Some "Loading the session…"
@@ -373,7 +350,14 @@ let view (m : Model.t) ~inject ~terminal =
            then Resize_view.handle m ~inject Review_chat
            else Node.none)
         ; Node.main
-            ~attrs:[ Attr.class_ "main" ]
+            ~attrs:
+              [ classes
+                  [ "main" ]
+                  [ "fresh", App.fresh m && Option.is_none (loading m)
+                  ; "temporary", App.temporary_shown m
+                  ; "landing", m.landing
+                  ]
+              ]
             (List.map
                ~f:under_drawer
                (Option.to_list (Session_tabs_view.view m ~inject))

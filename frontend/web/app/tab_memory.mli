@@ -19,3 +19,11 @@ val save_draft : string -> unit
 
 (** The draft the URL's session had before the page loaded. *)
 val saved_draft : unit -> string option
+
+(** The temporary session this tab is in and its key
+    ([prigh-web.temporary]): only this tab's sessionStorage has it, so that
+    a reload gets back in, and nothing else does; [None] forgets it. *)
+val remember_temporary : (string * string) option -> unit
+
+(** The key of [session], if it is the temporary session remembered. *)
+val temporary_key_of : string -> string option

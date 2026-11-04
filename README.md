@@ -934,6 +934,31 @@ backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
 across the reconnect: their results wait for the backend to be back.
 
+### Temporary sessions
+
+A new session opens on a screen of its own: "What are we building?" over
+the composer, and under it a tray with the folder and branch it starts in
+(click either to change it) and a **◌ Temporary** chip (or Ctrl+Shift+O,
+or `/temporary`). A temporary session is not saved and not listed
+anywhere (the sidebar, search, `prigh sessions`, ACP's `session/list`,
+other users, other tabs), is never named by the naming model, sends no
+system notifications and keeps its prompts out of the prompt history.
+Inside one, the **◌ Temporary ▾** pill at the top of the chat (on a phone,
+the top strip's title) has **Keep this session**, which makes it a normal
+saved session, and **Delete it now**.
+
+Leaving it for another session or a new one deletes it (closing the tab
+or signing out: 2 minutes later): its
+transcript, its subagents, its running turn and background jobs (stopped
+first), the files attached in it (`.prigh/uploads/`), its saved long
+command outputs, and the worktrees it made, unless they have uncommitted
+changes (a toast says which were kept and where). Leaving while it still
+works asks first. A reload, or a phone closing the app, does not end it: the
+tab remembers it (in its sessionStorage only) and has 2 minutes to come
+back. A backend that stops mid-session deletes what is left when it next
+starts. The model provider's own retention, and the effects of what it ran
+(edits, commits, pull requests), are not prigh's to delete.
+
 ### Reviewing the changes
 
 `/review` (or Alt+R, or the Review button of the file browser and of
@@ -2163,6 +2188,7 @@ it.
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
+| `/temporary` (prigh-web) | a temporary session (Ctrl+Shift+O): not saved or listed, deleted when you leave it; in one, its menu (keep it, delete it) |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
 | `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |

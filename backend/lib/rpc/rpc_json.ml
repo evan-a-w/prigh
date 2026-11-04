@@ -474,6 +474,7 @@ let state (s : Agent.State.t) =
        @ Option.value_map s.trim ~default:[] ~f:(fun t -> [ "trim", trim t ])
        @ Option.value_map s.transcript_filter ~default:[] ~f:(fun f ->
          [ "transcript_filter", str f ])
+       @ (if s.temporary then [ "temporary", `True ] else [])
        @
        if List.is_empty s.hidden
        then []

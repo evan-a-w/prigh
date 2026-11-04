@@ -365,6 +365,7 @@ let%expect_test
     Branch main
     Click for the session’s details · /compact frees context
     (Dictate (speak, then click again to stop)) (Send (Enter))
+    (/work work) (main) (Temporary)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event

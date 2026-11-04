@@ -1,0 +1,218 @@
+/* The new-session screen and temporary sessions.
+
+   A new session is a question and a place to answer it: the heading, with
+   a block caret (the prompt waiting), and the composer right under it, in
+   the middle of the page; under the composer a lighter tray says where the
+   work starts (folder, branch) and holds the Temporary chip. A temporary
+   session spends no accent: its caret, the edge of its prompts and of its
+   composer are chalk-grey, never sodium, and never dashed (dashed is
+   offline's). After the first message the composer goes down to its place
+   and the chat is as any other. On a phone the composer stays at the foot
+   (in reach of the thumb), the heading in the middle, the tray over the
+   composer. */
+
+/* {1 The heading} */
+
+.empty:has(.hero) { padding-top: 0; }
+.hero { text-align: center; padding: 0 12px; }
+.hero h2 {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--chalk);
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.hero-caret {
+  display: inline-block;
+  width: 0.45em;
+  height: 0.9em;
+  margin-left: 8px;
+  vertical-align: -0.1em;
+  border-radius: 2px;
+  background: var(--sodium);
+  transition: background 0.2s;
+}
+.hero.temporary .hero-caret { background: var(--rule-2); }
+.hero-sub { margin: 10px 0 0; color: var(--muted); font-size: 14px; animation: appear 0.16s ease-out; }
+
+/* {1 Centred: the heading over the composer, a little above the middle} */
+
+.app:not(.narrow) .main.fresh .chat-frame { flex: 1 1 0; }
+.app:not(.narrow) .main.fresh .chat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 26px;
+  overflow: hidden;
+}
+.app:not(.narrow) .main.fresh > .composer { flex: 1.3 1 0; justify-content: flex-start; padding-top: 0; }
+
+/* {1 The tray} */
+
+.tray {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.app:not(.narrow) .tray {
+  position: relative;
+  margin: -16px 14px 0;
+  padding: 12px 6px 2px 8px;
+  background: color-mix(in srgb, var(--slate) 50%, var(--bg));
+  border: 1px solid var(--rule);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+}
+.main.fresh .composer-stack { z-index: 1; }
+.tray-where {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  gap: 6px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  font: 12.5px var(--mono);
+}
+.tray-where:hover { background: var(--slate-2); color: var(--chalk); }
+.tray-where .icon { width: 15px; height: 15px; flex: none; }
+.tray-where .icon.chevron { width: 13px; height: 13px; margin-left: -2px; }
+.tray-where > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray-where:first-child { flex: 0 1 auto; }
+
+.temporary-chip {
+  margin-left: auto;
+  flex: none;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  gap: 7px;
+  border-radius: 999px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.temporary-chip:hover { background: var(--slate-2); color: var(--chalk); }
+.temporary-chip .icon { width: 16px; height: 16px; }
+.temporary-chip.on {
+  color: var(--chalk);
+  background: color-mix(in srgb, var(--chalk) 9%, transparent);
+  border-color: color-mix(in srgb, var(--chalk) 30%, transparent);
+}
+.temporary-chip:focus-visible, .tray-where:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.main.temporary .temporary-chip:focus-visible { outline-color: var(--chalk); }
+
+/* {1 The sodium goes out} */
+
+.main.temporary .msg.user { border-left-color: var(--rule-2); }
+.main.temporary .composer-stack:focus-within {
+  border-color: color-mix(in srgb, var(--chalk) 45%, var(--rule-2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chalk) 7%, transparent), 0 8px 24px -14px var(--edge-shadow);
+}
+.main.temporary .editor { caret-color: var(--chalk); }
+
+/* {1 The pill, at the top of a temporary session} */
+
+.temporary-pill {
+  height: 30px;
+  padding: 0 10px 0 10px;
+  gap: 6px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--chalk) 22%, transparent);
+  background: color-mix(in srgb, var(--slate) 85%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 550;
+}
+.temporary-pill:hover, .temporary-pill.open { background: var(--slate-2); }
+.temporary-pill .icon { width: 15px; height: 15px; color: var(--muted); }
+.temporary-pill .icon.chevron { width: 13px; height: 13px; margin-right: -2px; }
+.app.narrow .chat-chrome.strip .temporary-pill {
+  height: var(--tap, 44px);
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 10px;
+  border-color: transparent;
+  background: none;
+  backdrop-filter: none;
+  font-size: 15px;
+  font-weight: 600;
+}
+.app.narrow .temporary-pill .pill-label { overflow: hidden; text-overflow: ellipsis; }
+
+/* Its menu hangs from it: under the top of the chat, in its middle. */
+.app:not(.narrow) .modal-backdrop:has(> .temporary-menu) { padding-top: 50px; background: transparent; }
+.app:not(.narrow).sidebar-open:not(.sidebar-drawer) .modal-backdrop:has(> .temporary-menu) { padding-left: calc(var(--sidebar-width, 280px) + 12px); }
+.app:not(.narrow) .temporary-menu { width: 300px; background: var(--slate-2); }
+.app:not(.narrow) .temporary-menu .modal-head { display: none; }
+.temporary-menu .modal-body { padding: 6px; }
+.temporary-menu p { margin: 10px 10px 8px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.temporary-actions { display: flex; flex-direction: column; gap: 2px; }
+.temporary-actions .btn {
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: none;
+  color: var(--chalk);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.temporary-actions .btn:hover, .temporary-actions .btn:focus-visible { background: var(--panel-3); }
+.temporary-actions .btn .icon { color: var(--muted); }
+.temporary-actions .temporary-delete, .temporary-actions .temporary-delete .icon { color: var(--brick); }
+.app.narrow .temporary-menu .modal-body { padding: 4px max(10px, var(--safe-l)) max(14px, var(--safe-b)); }
+.app.narrow .temporary-menu p { font-size: 14px; margin: 0 6px 10px; }
+.app.narrow .temporary-actions .btn { min-height: var(--tap, 44px); font-size: 15px; }
+
+/* {1 Leaving while it works} */
+
+.leave-temporary { width: min(440px, 100%); }
+.leave-temporary .modal-head h2 { font-size: 16px; }
+.leave-temporary .modal-body p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.leave-temporary .modal-buttons { border-top: 0; flex-wrap: wrap; }
+.leave-temporary .leave-keep { margin-right: auto; padding-left: 4px; border-color: transparent; background: none; color: var(--muted); }
+.leave-temporary .leave-keep:hover { color: var(--chalk); }
+.app.narrow .leave-temporary .modal-buttons { flex-direction: column-reverse; align-items: stretch; }
+.app.narrow .leave-temporary .modal-buttons .btn { width: 100%; margin: 0; }
+
+/* {1 The first message: the composer goes down to its place} */
+
+@keyframes composer-land { from { transform: translateY(calc(140px - 50vh)); } }
+@keyframes land-in { from { opacity: 0; transform: translateY(10px); } }
+.app:not(.narrow) .main.landing:not(.fresh) > .composer { animation: composer-land 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.main.landing:not(.fresh) :is(.entries, .echoes) > .msg.user:first-child { animation: land-in 0.32s 0.08s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .main.landing > .composer, .main.landing .msg.user, .hero-sub { animation: none !important; }
+  .hero-caret { transition: none; }
+}
+
+/* {1 Phones} */
+
+.app.narrow .main.fresh .chat { display: flex; flex-direction: column; justify-content: center; padding-bottom: 12vh; }
+.app.narrow .hero h2 { font-size: 25px; }
+.app.narrow .hero-sub { font-size: 14px; }
+.app.narrow .main.fresh .tray { order: -1; padding: 0 2px 4px; }
+.app.narrow .tray-where { height: 36px; }
+.app.narrow .temporary-chip { height: 36px; }
+@media (max-width: 359px) {
+  .app.narrow .tray-where .icon.chevron { display: none; }
+  .app.narrow .temporary-chip { padding: 0 10px; }
+}
+
+/* A phone's tray names the folder, not its path (the label has it all). */
+.tray-folder-short, .app.narrow .tray-folder { display: none; }
+.app.narrow .tray-folder-short { display: inline; overflow: hidden; text-overflow: ellipsis; }

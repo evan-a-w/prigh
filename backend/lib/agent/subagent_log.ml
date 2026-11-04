@@ -412,3 +412,31 @@ let find t key =
   in
   Option.map entry ~f:(fun e -> summary t e, Queue.to_list e.messages)
 ;;
+
+let save_all t =
+  if t.runs > 0 then write t (Run { run = t.runs });
+  Queue.iter t.entries ~f:(fun (e : Entry.t) ->
+    write
+      t
+      (Start
+         { id = e.id
+         ; call_id = e.call_id
+         ; parent = e.parent
+         ; task = e.task
+         ; name = e.name
+         ; model = e.model
+         ; at = e.started_at
+         ; run = t.runs
+         });
+    Queue.iter e.messages ~f:(fun (m : Timed_message.t) ->
+      write
+        t
+        (Message
+           { id = e.id
+           ; at = Option.value m.at ~default:e.updated_at
+           ; turns = e.turns
+           ; tool_calls = e.tool_calls
+           ; message = m.message
+           }));
+    write_end t e)
+;;
