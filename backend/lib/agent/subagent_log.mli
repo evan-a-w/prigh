@@ -97,3 +97,7 @@ val take_interrupted : t -> (Summary.t * Timed_message.t list) list
 (** Stops writing (the backend is stopping): the subagents still running
     load as interrupted next time, rather than as cancelled by the stop. *)
 val detach : t -> unit
+
+(** Writes everything recorded so far to [dir ()], for a log that was not
+    written while its session was temporary ({!Session.keep}). *)
+val save_all : t -> unit
