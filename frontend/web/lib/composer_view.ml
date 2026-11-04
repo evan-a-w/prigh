@@ -580,5 +580,8 @@ let view (m : App.Model.t) ~inject =
                 ]
             ]
         ]
+    ; (if App.fresh m
+       then rest (Temporary_view.tray m ~inject)
+       else Node.none)
     ]
 ;;

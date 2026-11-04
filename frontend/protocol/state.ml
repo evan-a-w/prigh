@@ -70,6 +70,7 @@ type t =
   ; trim : Trim.t option [@sexp.option]
   ; hidden : Hidden.t list [@sexp.list]
   ; transcript_filter : string option [@sexp.option]
+  ; temporary : bool [@sexp.bool]
   }
 [@@deriving sexp_of, equal]
 
@@ -147,7 +148,8 @@ let of_json j =
   in
   let%bind trim = Trim.field j in
   let%bind hidden = Hidden.field j in
-  let%map transcript_filter = Json.string_opt_field j "transcript_filter" in
+  let%bind transcript_filter = Json.string_opt_field j "transcript_filter" in
+  let%map temporary = Json.bool_default_field j "temporary" ~default:false in
   { session_id
   ; session_path
   ; session_name
@@ -178,5 +180,6 @@ let of_json j =
   ; trim
   ; hidden
   ; transcript_filter
+  ; temporary
   }
 ;;

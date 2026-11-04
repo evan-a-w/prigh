@@ -1050,6 +1050,7 @@ let%expect_test
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     <textarea class="editor">
     <div class="composer-buttons">
+    <div class="tray">
     <div class="composer-controls menu-open">
     <div class="attach-menu chip-anchor">
     <div class="chip-anchor model open">

@@ -142,8 +142,22 @@ end
 type t
 
 (** Nothing is written until the session has a message or a name; an
-    abandoned empty session leaves no file. *)
-val create : dir:string -> cwd:string -> ?parent:string -> unit -> t
+    abandoned empty session leaves no file. A [temporary] one (default:
+    false) writes nothing at all, until {!keep}. *)
+val create
+  :  dir:string
+  -> cwd:string
+  -> ?parent:string
+  -> ?temporary:bool
+  -> unit
+  -> t
+
+val temporary : t -> bool
+
+(** Makes a temporary session a normal one: its file is written now, with
+    everything so far, if it has anything worth saving (else on the first
+    such line, as for any session). *)
+val keep : t -> unit
 
 (** Lines it cannot read (a torn last line, kinds of entries from a newer
     prigh) are skipped, with a warning each in {!skipped}; the entries after

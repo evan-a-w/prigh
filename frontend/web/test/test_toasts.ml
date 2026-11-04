@@ -170,6 +170,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     <div class="chat-frame">
     <textarea class="editor">
     <div class="composer-buttons">
+    <div class="tray">
     <div class="toast">
     |}]
 ;;

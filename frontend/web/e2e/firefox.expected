@@ -16,12 +16,6 @@ T
 token
 === firefox: signed in: chat ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === firefox: signed in: the session's card ===
 on
 auto
@@ -184,12 +178,6 @@ T
 token
 === firefox: new session ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === firefox: sending ===
 hello again
 Sending…
@@ -793,6 +781,122 @@ chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: errors ===
+none
+=== firefox: temporary: desktop: the new-session screen ===
+heading: What are we building?
+tray: <cwd> | Temporary
+chip: false
+composer under the heading: true
+tray: under the composer
+centred: true
+controls: all in view
+=== firefox: temporary: desktop: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== firefox: temporary: desktop: the first message ===
+pill: Temporary
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== firefox: temporary: desktop: reloaded ===
+still there: true
+saved: 0
+=== firefox: temporary: desktop: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: under the pill: true
+controls: all in view
+=== firefox: temporary: desktop: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== firefox: temporary: desktop: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== firefox: temporary: desktop: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== firefox: temporary: 390x844: the new-session screen ===
+heading: What are we building?
+tray: cwd | Temporary
+chip: false
+composer under the heading: true
+tray: over the composer
+composer at the foot: true
+controls: all in view
+=== firefox: temporary: 390x844: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== firefox: temporary: 390x844: the first message ===
+pill: Temporary session
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== firefox: temporary: 390x844: reloaded ===
+still there: true
+saved: 0
+=== firefox: temporary: 390x844: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: a sheet across the bottom: true
+controls: all in view
+=== firefox: temporary: 390x844: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== firefox: temporary: 390x844: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== firefox: temporary: 390x844: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== firefox: temporary: 320x640: the new-session screen ===
+heading: What are we building?
+tray: cwd | Temporary
+chip: false
+composer under the heading: true
+tray: over the composer
+composer at the foot: true
+controls: all in view
+=== firefox: temporary: 320x640: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== firefox: temporary: 320x640: the first message ===
+pill: Temporary session
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== firefox: temporary: 320x640: reloaded ===
+still there: true
+saved: 0
+=== firefox: temporary: 320x640: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: a sheet across the bottom: true
+controls: all in view
+=== firefox: temporary: 320x640: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== firefox: temporary: 320x640: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== firefox: temporary: 320x640: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== firefox: temporary: errors ===
 none
 === firefox: accounts: sessions ===
 I am alice

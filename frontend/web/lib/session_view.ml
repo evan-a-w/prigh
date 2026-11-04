@@ -187,6 +187,8 @@ let chrome (m : App.Model.t) ~inject =
   (* A phone's strip has the session's name between its buttons. *)
   let title =
     match m.state with
+    | Some _ when App.temporary m && not (App.fresh m) ->
+      Temporary_view.pill m ~inject
     | Some state when m.narrow ->
       Node.h1
         ~attrs:[ Attr.class_ "chrome-title" ]

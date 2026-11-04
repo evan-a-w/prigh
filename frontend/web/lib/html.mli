@@ -96,6 +96,8 @@ module Icon : sig
     | Download
     | Prev
     | Lines (** the transcript's verbosity *)
+    | Ghost (** a dashed circle: a temporary session *)
+    | Keep (** a ticked circle: keeping a temporary session *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t
