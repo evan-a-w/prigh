@@ -74,6 +74,7 @@ let%expect_test "every command does something (none is unknown)" =
     /hotkeys                   Hotkeys
     /settings                  Settings
     /new                       rpc new_session
+    /temporary                 rpc new_session
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
     /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
@@ -215,6 +216,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     → / ← (reviewing; also ] [, n p, j k) the next / previous changed file
@@ -1862,12 +1864,6 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (tag Ignore))
     (Expire_toast (id 2) (after_ms 4780))
     What are we building?
-    /work
-    / commands
-    @ mention a file
-    ! run a command
-    Ctrl+L switch model
-    Ctrl+K find a session
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
     (Expire_toast (id 3) (after_ms 4620))

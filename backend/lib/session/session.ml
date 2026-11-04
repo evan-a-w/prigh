@@ -214,7 +214,6 @@ let worth_saving (line : Line.t) =
   | Header _ | Head _ -> false
 ;;
 
-
 let persisted t = t.persisted
 let temporary t = t.temporary
 let gone t = t.persisted && not (Sys_unix.file_exists_exn t.path)

@@ -459,11 +459,12 @@ let write_ledger t agent =
           (Exn.to_string exn)))
 ;;
 
-let temporary_ended_event ~session ~kept =
+let temporary_ended_event ~session ~messages ~kept =
   `Object
     [ "type", `String "event"
     ; "event", `String "temporary_ended"
     ; "session", `String session
+    ; "messages", `Number (Int.to_string messages)
     ; ( "kept"
       , `Array
           (List.map kept ~f:(fun ((l : Leftover.t), why) ->
@@ -527,7 +528,12 @@ let end_temporary t agent ~notify =
         Agent.stop_everything agent;
         forget_session t id;
         let kept = remove_leftovers t agent ~id (Agent.leftovers agent) in
-        let event = temporary_ended_event ~session:id ~kept in
+        let event =
+          temporary_ended_event
+            ~session:id
+            ~messages:(List.length (Agent.messages agent))
+            ~kept
+        in
         List.iter notify ~f:(fun (c : Client.t) ->
           if Hashtbl.mem t.clients c.id then c.send event))))
 ;;
@@ -838,8 +844,9 @@ let preferred_host t (client : Client.t) =
 
 let attach t (client : Client.t) agent =
   let previous = client.agent in
-  Option.iter (Hashtbl.find t.temporaries (session_id agent)) ~f:(fun temp ->
-    temp.away <- None);
+  Option.iter
+    (Hashtbl.find t.temporaries (session_id agent))
+    ~f:(fun temp -> temp.away <- None);
   if not (phys_equal previous agent)
   then (
     client.agent <- agent;
@@ -1189,8 +1196,14 @@ let find_agent t (client : Client.t) key =
 
 (* A session's messages to read: the live session's, else from disk without
    opening it (kept in [t.loaded] for when it is opened). *)
-let session_to_read t key =
-  match find_live t key with
+let session_to_read ?(client : Client.t option) t key =
+  let own =
+    Option.map client ~f:(fun (c : Client.t) -> c.agent)
+    |> Option.filter ~f:(fun agent ->
+      String.equal (session_id agent) key
+      || String.equal (Session.path (Agent.session agent)) key)
+  in
+  match Option.first_some own (find_live t key) with
   | Some agent -> Ok (Agent.session agent)
   | None ->
     Or_error.bind (saved_path t key) ~f:(fun path ->
@@ -1215,7 +1228,7 @@ let messages_page t (client : Client.t) params =
   let%bind session =
     match%bind string_param_opt params "session" with
     | None -> Ok (Agent.session client.agent)
-    | Some key -> session_to_read t key
+    | Some key -> session_to_read ~client t key
   in
   let%map page =
     Message_page.create
@@ -1230,7 +1243,7 @@ let messages_page t (client : Client.t) params =
 let read_session t (client : Client.t) params =
   match%bind.Or_error string_param_opt params "session" with
   | None -> Ok (Agent.session client.agent)
-  | Some key -> session_to_read t key
+  | Some key -> session_to_read ~client t key
 ;;
 
 let outline t client params =
@@ -1277,7 +1290,7 @@ let tool_output t (client : Client.t) params =
       let%map session =
         match key with
         | None -> Ok (Agent.session client.agent)
-        | Some key -> session_to_read t key
+        | Some key -> session_to_read ~client t key
       in
       List.filter_map (Session.entries session) ~f:(fun (e : Session.Entry.t) ->
         match e.payload with
@@ -1288,7 +1301,11 @@ let tool_output t (client : Client.t) params =
         match key with
         | None -> Ok client.agent
         | Some key ->
-          (match find_live t key with
+          (match
+             if String.equal key (session_id client.agent)
+             then Some client.agent
+             else find_live t key
+           with
            | Some agent -> Ok agent
            | None ->
              Or_error.errorf
@@ -1364,7 +1381,6 @@ let credentials_ok t ?user given =
 ;;
 
 let namespace t = t.namespace
-
 let on_session_deleted t ~f = t.on_session_deleted <- f :: t.on_session_deleted
 
 let terminal_target t ~session =
@@ -1508,7 +1524,8 @@ let clean_leftovers t =
   then (
     let agent =
       t.new_agent
-        ~session:(Session.create ~dir:t.sessions_dir ~cwd:t.cwd ~temporary:true ())
+        ~session:
+          (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ~temporary:true ())
         ~cwd:t.cwd
         ()
     in
@@ -1517,7 +1534,11 @@ let clean_leftovers t =
       List.iter
         (remove_leftovers t agent ~id:ledger.id ledger.leftovers)
         ~f:(fun ((l : Leftover.t), why) ->
-          eprintf "prigh: temporary session %s left %s: %s\n%!" ledger.id l.path why));
+          eprintf
+            "prigh: temporary session %s left %s: %s\n%!"
+            ledger.id
+            l.path
+            why));
     Agent.shutdown agent)
 ;;
 
@@ -1578,8 +1599,7 @@ let hello t (client : Client.t) params =
             | _ -> []);
         let agent =
           match param params "session", string "temporary_key" with
-          | Some (`String session), Some key ->
-            find_temporary t ~session ~key
+          | Some (`String session), Some key -> find_temporary t ~session ~key
           | Some (`String key), None -> find_agent t client key
           | _ -> Ok (first_session t client)
         in
@@ -2302,9 +2322,7 @@ let new_session t (client : Client.t) ~temporary =
     | None -> (Agent.state client.agent).cwd
   in
   let session = Session.create ~dir:t.sessions_dir ~cwd ~temporary () in
-  let key =
-    Option.some_if temporary (Pkce.random_hex 16)
-  in
+  let key = Option.some_if temporary (Pkce.random_hex 16) in
   Option.iter key ~f:(fun key ->
     Hashtbl.set
       t.temporaries
@@ -2316,17 +2334,21 @@ let new_session t (client : Client.t) ~temporary =
         { id = Session.id session; leftovers = [] }
     with
     | exn ->
-      eprintf "prigh: the ledger of a temporary session: %s\n%!" (Exn.to_string exn));
+      eprintf
+        "prigh: the ledger of a temporary session: %s\n%!"
+        (Exn.to_string exn));
   start_agent t session start |> attach t client;
   match attached_state client, key with
-  | `Object fields, Some key -> `Object (fields @ [ "temporary_key", `String key ])
+  | `Object fields, Some key ->
+    `Object (fields @ [ "temporary_key", `String key ])
   | state, _ -> state
 ;;
 
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
-  then Or_error.error_string "this session is not temporary: it is saved already"
+  then
+    Or_error.error_string "this session is not temporary: it is saved already"
   else (
     let id = session_id agent in
     Hashtbl.remove t.temporaries id;

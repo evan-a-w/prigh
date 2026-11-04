@@ -227,7 +227,7 @@ let%expect_test
     <div class="resizer resizer-sidebar">
     <div class="desk">
     -- the desk:
-    <main class="main">
+    <main class="fresh main">
     -- the chat column:
     <div class="chrome-anchor">
     <div class="chat-frame">
@@ -251,7 +251,7 @@ let%expect_test
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
-    <main class="main">
+    <main class="fresh main">
     -- the chat column:
     <div class="chrome-anchor">
     <div class="chat-frame">
@@ -287,7 +287,7 @@ let%expect_test
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
-    <main class="main">
+    <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
     <div class="chrome-anchor">
@@ -320,7 +320,7 @@ let%expect_test
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
-    <main class="main">
+    <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
     <div class="chrome-anchor">
@@ -365,7 +365,7 @@ let%expect_test
     <aside class="files-panel">
     <aside class="agents-panel">
     -- the desk:
-    <main class="main">
+    <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
     <div class="chrome-anchor">
@@ -406,7 +406,7 @@ let%expect_test "on a phone the review is a sheet, the sidebar its drawer" =
     <aside class="sidebar">
     <div class="desk">
     <section class="review-page">
-    <main class="main">
+    <main class="fresh landing main">
     |}];
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.elements h ~selector:".app";

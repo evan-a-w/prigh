@@ -401,6 +401,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /hotkeys show the keyboard shortcuts
     /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
+    /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
     /fallback [model...|off] show or set the models that take over, in order, when one's usage runs out
@@ -446,7 +447,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /skills pick a skill to invoke (/skill:name)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

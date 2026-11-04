@@ -107,6 +107,9 @@ let help =
        button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
+  ; ( "Ctrl+Shift+O"
+    , "a new temporary session (/temporary): not saved or listed, deleted \
+       when you leave it; on the new-session screen, its Temporary chip" )
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
@@ -593,6 +596,11 @@ let handle (m : App.Model.t) t : App.Action.t option =
               ~ctrl:t.ctrl
               ~alt:t.alt
               ~meta:t.meta -> Some (Files Toggle)
+     | _
+       when (t.ctrl || t.meta)
+            && t.shift
+            && (not t.alt)
+            && String.equal t.code "KeyO" -> Some New_temporary
      | _
        when Code_review.toggle_key
               ~code:t.code

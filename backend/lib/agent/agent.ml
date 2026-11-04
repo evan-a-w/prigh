@@ -4113,6 +4113,7 @@ let session_stats t =
   ; duration_seconds = Session.duration_seconds t.session
   }
 ;;
+
 (* ---- temporary sessions --------------------------------------------- *)
 
 let temporary t = Session.temporary t.session
@@ -4139,11 +4140,7 @@ let on_noted t ~f = t.on_noted <- f
 let note_upload t ~path =
   note_leftover
     t
-    { host = t.active_host
-    ; kind = Upload
-    ; path
-    ; root = Filename.dirname path
-    }
+    { host = t.active_host; kind = Upload; path; root = Filename.dirname path }
 ;;
 
 (* Outputs are found in the results that quote them, its subagents' too. *)
@@ -4154,11 +4151,12 @@ let leftovers t =
       | User _ | Assistant _ -> None)
   in
   let texts =
-    results (List.map (Session.entries t.session) ~f:(fun (e : Session.Entry.t) ->
-      e.payload)
-             |> List.filter_map ~f:(function
-               | Session.Entry.Payload.Message m -> Some m
-               | _ -> None))
+    results
+      (List.map (Session.entries t.session) ~f:(fun (e : Session.Entry.t) ->
+         e.payload)
+       |> List.filter_map ~f:(function
+         | Session.Entry.Payload.Message m -> Some m
+         | _ -> None))
     @ List.concat_map (subagents t) ~f:(fun s ->
       match subagent t s.id with
       | None -> []
@@ -4211,7 +4209,9 @@ let remove_leftover t (leftover : Leftover.t) =
     if
       Tool_bash.is_own_output leftover.path
       && Sys_unix.file_exists_exn leftover.path
-    then (try Sys_unix.remove leftover.path with _ -> ());
+    then (
+      try Sys_unix.remove leftover.path with
+      | _ -> ());
     (match
        host_call_on
          t
