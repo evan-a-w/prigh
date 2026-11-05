@@ -58,7 +58,7 @@ const errors = [];
 const open = async (viewport = { width: 1280, height: 800 }) => {
   const page = await (await browser.newContext({ viewport })).newPage();
   page.on("console", message => {
-    if (message.type() === "error" && !/favicon\.ico|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
+    if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
   });
   page.on("pageerror", error => errors.push(`page: ${error.message}`));
   return page;

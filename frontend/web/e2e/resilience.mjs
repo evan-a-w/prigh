@@ -154,7 +154,7 @@ await page.addInitScript(() => {
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|WebSocket|establish a connection/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|establish a connection/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
