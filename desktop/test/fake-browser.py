@@ -8,6 +8,8 @@ then, by $FAKE_BROWSER_MODE:
   close        its window is closed at once (exits 0) (default)
   stay         stays open until SIGTERM
   close-later  stays open until $FAKE_BROWSER_CLOSE exists
+With $FAKE_BROWSER_TITLE=1 its command line becomes one string joined with
+spaces, as Chromium's does when it rewrites its process title.
 What happens is appended to $FAKE_BROWSER_LOG, one event per line.
 """
 
@@ -27,7 +29,11 @@ def log(event):
         f.write("browser: " + event + "\n")
 
 
-args = sys.argv[1:]
+if os.environ.get("FAKE_BROWSER_TITLE") == "1":
+    os.environ["FAKE_BROWSER_TITLE"] = "done"
+    os.environ["FAKE_BROWSER_ARGS"] = "\n".join(sys.argv[1:])
+    os.execv(sys.executable, [" ".join(["chrome"] + sys.argv[1:]), __file__])
+args = os.environ["FAKE_BROWSER_ARGS"].split("\n") if "FAKE_BROWSER_ARGS" in os.environ else sys.argv[1:]
 log("args " + " ".join(args))
 url = next(a[len("--app="):] for a in args if a.startswith("--app="))
 profile = next(a[len("--user-data-dir="):] for a in args if a.startswith("--user-data-dir="))

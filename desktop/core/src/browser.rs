@@ -174,6 +174,20 @@ pub fn singleton_pid(lock_target: &str) -> Option<i32> {
     lock_target.rsplit_once('-').and_then(|(_, pid)| pid.parse().ok()).filter(|p| *p > 0)
 }
 
+/// Whether a process's command line (`/proc/PID/cmdline`) runs on `profile`.
+/// Its arguments are NUL-separated, until Chromium rewrites its process
+/// title: then they are one string, joined with spaces.
+pub fn names_profile(cmdline: &[u8], profile: &str) -> bool {
+    let wanted = format!("--user-data-dir={profile}");
+    let wanted = wanted.as_bytes();
+    let separator = |b: u8| b == 0 || b == b' ';
+    (0..cmdline.len().saturating_sub(wanted.len() - 1)).any(|i| {
+        cmdline[i..].starts_with(wanted)
+            && (i == 0 || separator(cmdline[i - 1]))
+            && cmdline.get(i + wanted.len()).is_none_or(|b| separator(*b))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,5 +322,30 @@ mod tests {
         assert_eq!(singleton_pid("my-laptop-7"), Some(7));
         assert_eq!(singleton_pid("laptop"), None);
         assert_eq!(singleton_pid("laptop-0"), None);
+    }
+
+    #[test]
+    fn profile_in_cmdline() {
+        let p = "/home/me/.local/share/io.github.evan-a-w.prigh/browser";
+        let check = |c: &str| names_profile(c.as_bytes(), p);
+        // As launched.
+        assert!(check("chrome\0--app=x\0--user-data-dir=/home/me/.local/share/io.github.evan-a-w.prigh/browser\0"));
+        // Its title rewritten (Google Chrome through nixpkgs' wrapper).
+        assert!(check(
+            "/nix/store/x-google-chrome/share/google/chrome/chrome --ozone-platform-hint=auto \
+             --user-data-dir=/home/me/.local/share/io.github.evan-a-w.prigh/browser --no-first-run\0\0\0"
+        ));
+        assert!(check("chrome --user-data-dir=/home/me/.local/share/io.github.evan-a-w.prigh/browser"));
+        // Another profile, or none.
+        assert!(!check("chrome\0--user-data-dir=/home/me/.local/share/io.github.evan-a-w.prigh/browser2\0"));
+        assert!(!check("chrome\0--user-data-dir=/x/home/me/.local/share/io.github.evan-a-w.prigh/browser\0"));
+        assert!(!check("chrome\0x--user-data-dir=/home/me/.local/share/io.github.evan-a-w.prigh/browser\0"));
+        assert!(!check("chrome\0--app=x\0"));
+        assert!(!check(""));
+        // A profile with a space, in either form.
+        let q = "/home/a b/prof";
+        assert!(names_profile(b"chrome\0--user-data-dir=/home/a b/prof\0", q));
+        assert!(names_profile(b"chrome --user-data-dir=/home/a b/prof --app=x", q));
+        assert!(!names_profile(b"chrome --user-data-dir=/home/a b/profile", q));
     }
 }
