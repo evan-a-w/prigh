@@ -1099,6 +1099,8 @@ let%expect_test
   let post ?headers what =
     ignore (Desktop.post ?headers t ~sw d what [] : string option)
   in
+  (* Once connected (the check is under way). *)
+  post "status";
   (* Another page's WebSocket (no CORS for those), or under another name
      (DNS rebinding). *)
   let origin o = sprintf "Origin: %s\r\n" o in
@@ -1170,6 +1172,7 @@ let%expect_test
   [%expect
     {|
     url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":"<code>"}
     HTTP/1.1 403 Forbidden
     HTTP/1.1 403 Forbidden
     HTTP/1.1 421 Misdirected Request
