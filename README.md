@@ -922,7 +922,8 @@ models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
 lists them (Delete there trims the context before one); `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
-and what to use instead, and `/quit` says to close the tab.
+and what to use instead, and `/quit` says to close the tab (in the desktop app it quits, as Ctrl+Q
+does: see "Desktop app").
 
 The account at the bottom of the sidebar (also in the settings page) opens the
 account menu: switch to another saved account in one click (the page
@@ -1155,6 +1156,38 @@ prigh serve -web 0.0.0.0:7790 -token sekrit
 Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
 the backend's ports carries the RPC, but the terminal and file transfers
 need its `-web` port.
+
+### Desktop app
+
+`prigh desktop` is the process the desktop app runs: its window shows the
+page it serves. It is `prigh web` (above) for a backend elsewhere, with this
+machine's tool host in-process, but it also starts without a working
+connection, and it lives exactly as long as its window.
+
+```
+prigh desktop                                # the saved connection, else a connect form
+prigh desktop -connect server:7790 -token sekrit -cwd ~/proj
+```
+
+- It prints one JSON line on stdout once it is listening,
+  `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`, for the window to open;
+  everything else goes to stderr. It serves on `127.0.0.1:7780`, else the
+  next free port, else any (`-listen HOST:PORT` to choose).
+- The backend is `-connect`/`-token`/`-user`, else `$PRIGH_CONNECT`/`_TOKEN`/
+  `_USER`, else the saved connection, by the TUI's rules, as for `prigh
+  web`. When there is none, or it cannot be reached, refuses the login or
+  has no prigh-web, the page is a connect form (the backend's address, the
+  user name and the token as the password), prefilled and saying what went
+  wrong and what to do. What the backend accepts is saved for next time,
+  and the page goes on signed in.
+- It stops (and its tool host with it) when its stdin reaches its end, the
+  window gone, or when the page quits: `/quit`, Ctrl+Q (⌘Q), Quit prigh in
+  the account menu, or on a phone at the foot of the ⋯ sheet. In a browser,
+  outside the desktop app, `/quit` still says to close the tab.
+- `#desktop=KEY` is a per-run key that the page keeps for the tab and
+  sends with its requests to the sidecar's `/desktop/` endpoints, so no
+  other page or local process can point this machine's tool host at
+  another backend or stop the app.
 
 ## Editors (ACP)
 
