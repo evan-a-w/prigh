@@ -159,6 +159,8 @@ let help =
   ; ( "↑↓ ←→ Home End (settings' sections)"
     , "show the previous / next section, or the first / last (/settings \
        SECTION opens at one)" )
+  ; ( "Ctrl+click / ⌘-click / middle click (a session in the sidebar)"
+    , "open it in a new window (its menu's Open in new window)" )
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
     , "allow once, always allow (its rules, this session), deny, deny saying \
