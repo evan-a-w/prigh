@@ -1173,7 +1173,8 @@ try {
   // A chip's menu is as wide as the composer's box there.
   await page.locator(".composer-plus .plus").click();
   await page.locator("#chip-popover").waitFor();
-  await page.waitForTimeout(300);
+  // Its rise from the bottom over.
+  await page.locator("#chip-popover").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
   section("phone: a chip's menu");
   console.log(await popoverPlace());
   await screenshot("phone: a chip's menu");

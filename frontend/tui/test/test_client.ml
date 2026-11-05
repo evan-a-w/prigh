@@ -83,6 +83,71 @@ let%expect_test "call/response correlation, events, errors, close" =
   return ()
 ;;
 
+let%expect_test "send: the reply in its place among the events" =
+  let transport, backend = Transport.In_memory.create () in
+  let client =
+    Client.create ~connect:(fun () -> Deferred.Or_error.return transport)
+  in
+  print_s [%sexp (Client.send client "ping" [] : int Or_error.t)];
+  [%expect {| (Error "not connected") |}];
+  let%bind () = Deferred.Or_error.ok_exn (Client.connect client) in
+  let requests = Transport.In_memory.Backend.requests backend in
+  let incoming = Client.incoming client in
+  let read n =
+    Deferred.repeat_until_finished n (fun n ->
+      if n = 0
+      then return (`Finished ())
+      else (
+        let%map incoming = Pipe.read_exn incoming in
+        print_s [%sexp (incoming : Client.Incoming.t)];
+        `Repeat (n - 1)))
+  in
+  let page = Client.send client "get_messages_page" [] |> ok_exn in
+  let prompt = Client.send client "prompt" [ "text", `String "hi" ] |> ok_exn in
+  let%bind r1 = Pipe.read_exn requests in
+  let%bind r2 = Pipe.read_exn requests in
+  print_endline r1;
+  print_endline r2;
+  print_s [%message (page : int) (prompt : int) (Client.waiting client : int)];
+  [%expect
+    {|
+    {"id":1,"method":"get_messages_page","params":{}}
+    {"id":2,"method":"prompt","params":{"text":"hi"}}
+    ((page                    1)
+     (prompt                  2)
+     ("Client.waiting client" 2))
+    |}];
+  (* All at once, as a browser may hand them over: the empty page first,
+     then the turn it does not have. *)
+  List.iter
+    [ {|{"type":"response","id":1,"ok":true,"result":{"messages":[]}}|}
+    ; {|{"type":"event","event":"notice","text":"the turn"}|}
+    ; {|{"type":"response","id":2,"ok":false,"error":"busy"}|}
+    ]
+    ~f:(Transport.In_memory.Backend.send backend);
+  let%bind () = read 3 in
+  [%expect
+    {|
+    (Reply (id 1) (result (Ok ((messages ())))))
+    (Event (Notice "the turn"))
+    (Reply (id 2) (result (Error busy)))
+    |}];
+  (* Unanswered when the backend goes: an error each, before [Closed]. *)
+  let (_ : int) = Client.send client "get_state" [] |> ok_exn in
+  let (_ : int) = Client.send client "list_sessions" [] |> ok_exn in
+  Transport.In_memory.Backend.close backend;
+  let%bind () = read 3 in
+  [%expect
+    {|
+    (Reply (id 3) (result (Error "backend closed")))
+    (Reply (id 4) (result (Error "backend closed")))
+    Closed
+    |}];
+  print_s [%sexp (Client.waiting client : int)];
+  [%expect {| 0 |}];
+  Client.close client
+;;
+
 let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
                  failures reported"
   =
