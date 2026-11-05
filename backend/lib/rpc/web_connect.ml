@@ -272,6 +272,7 @@ let serve ~env ~sw ~log ~handoff (config : Config.t) ~addr ~port =
   Web_server.listen
     ~env
     ~sw
+    ~local:true
     ~routes:(fun request ->
       match Signin_handoff.route handoff request with
       | Some handler -> Some handler

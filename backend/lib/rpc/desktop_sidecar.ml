@@ -33,6 +33,7 @@ module Ended = struct
   type t =
     | Quit
     | Stdin_closed
+    | Stopped
   [@@deriving sexp_of]
 end
 
@@ -125,36 +126,92 @@ let connected t ~remote ~(credentials : Web_connect.Credentials.t) ~save =
 
 (* Says hello to [remote]; a refusal goes back to the form, with what to do
    ([prefix] says which connection it was when not typed in). *)
-let connect ?(prefix = "") t ~remote ~credentials ~source ~save =
+let connect ?(prefix = "") t ~remote ~credentials ~save =
   let settled, settle = Promise.create () in
   t.state <- Checking settled;
-  let result =
-    match
-      Web_connect.Check.run
-        ~env:t.env
-        ~timeout:t.check_timeout
-        remote
-        credentials
-    with
-    | Ok () ->
-      let c = connected t ~remote ~credentials ~save in
-      t.state <- Connected c;
-      Ok (Signin_handoff.code c.handoff)
-    | Error error ->
-      let explained =
-        prefix ^ Web_connect.Check.explain error remote ~source credentials
-      in
-      t.log explained;
-      t.state
-      <- Form
-           { address = Some (Backend_address.to_string remote)
-           ; user = credentials.user
-           ; error = Some explained
-           };
-      Error explained
+  let back_to_form error =
+    t.log error;
+    t.state
+    <- Form
+         { address = Some (Backend_address.to_string remote)
+         ; user = credentials.Web_connect.Credentials.user
+         ; error = Some error
+         };
+    Error error
   in
-  Promise.resolve settle ();
-  result
+  (* Whatever happens, the page waiting on [/desktop/status] is answered. *)
+  Exn.protect
+    ~finally:(fun () ->
+      (match t.state with
+       | Checking _ ->
+         t.state
+         <- Form
+              { address = Some (Backend_address.to_string remote)
+              ; user = credentials.user
+              ; error = Some "Connecting was interrupted: connect again."
+              }
+       | Form _ | Connected _ -> ());
+      Promise.resolve settle ())
+    ~f:(fun () ->
+      match
+        Web_connect.Check.run
+          ~env:t.env
+          ~timeout:t.check_timeout
+          remote
+          credentials
+      with
+      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+      | exception exn ->
+        back_to_form
+          (sprintf
+             "%sconnecting to %s failed: %s"
+             prefix
+             (Backend_address.to_string remote)
+             (Exn.to_string exn))
+      | Error error ->
+        (* Explained for the form, where it is shown, whatever [prefix]
+           says the address came from. *)
+        back_to_form
+          (prefix
+           ^ Web_connect.Check.explain error remote ~source:Form credentials)
+      | Ok () ->
+        (match connected t ~remote ~credentials ~save with
+         | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+         | exception exn ->
+           back_to_form
+             (sprintf
+                "%sconnected to %s, but starting failed: %s"
+                prefix
+                (Backend_address.to_string remote)
+                (Exn.to_string exn))
+         | c ->
+           t.state <- Connected c;
+           Ok (Signin_handoff.code c.handoff)))
+;;
+
+(* Tokens and everything else would cross the network in the clear. *)
+let plaintext (remote : Backend_address.t) =
+  let host =
+    String.chop_prefix_if_exists remote.host ~prefix:"["
+    |> String.chop_suffix_if_exists ~suffix:"]"
+  in
+  let loopback =
+    String.Caseless.equal host "localhost"
+    || String.is_prefix host ~prefix:"127."
+    || String.equal host "::1"
+  in
+  (not remote.tls) && not loopback
+;;
+
+let plaintext_warning remote =
+  sprintf
+    "%s is not encrypted: the password and everything prigh sends would \
+     cross the network in the clear, and anyone on the way could run \
+     commands on this computer. Use the backend's HTTPS address \
+     (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L \
+     7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on \
+     a network you trust."
+    (Backend_address.to_string remote)
 ;;
 
 let respond_json flow ?(status = 200) ?(reason = "OK") json =
@@ -219,9 +276,22 @@ let rec status t flow =
           ])
 ;;
 
+let confirmed json name =
+  match json with
+  | `Object fields ->
+    (match List.Assoc.find fields ~equal:String.equal name with
+     | Some `True -> true
+     | _ -> false)
+  | _ -> false
+;;
+
 let form_connect t flow json =
-  let failed error =
-    respond_json flow (`Object [ "ok", `False; "error", `String error ])
+  let failed ?(plaintext = false) error =
+    respond_json
+      flow
+      (`Object
+          ([ "ok", `False; "error", `String error ]
+           @ if plaintext then [ "plaintext", `True ] else []))
   in
   match t.state with
   | Checking _ -> failed "Already connecting: wait for it to finish."
@@ -245,13 +315,14 @@ let form_connect t flow json =
           let error = Error.to_string_hum e in
           t.state <- Form { address = Some typed; user; error = Some error };
           failed error
+        | Ok remote when plaintext remote && not (confirmed json "plaintext") ->
+          failed ~plaintext:true (plaintext_warning remote)
         | Ok remote ->
           (match
              connect
                t
                ~remote
                ~credentials:{ token; user }
-               ~source:Form
                ~save:(Some { Saved_connection.connect = address; token; user })
            with
            | Ok code ->
@@ -267,7 +338,21 @@ let handle t (request : Web_server.Request.t) ~reader flow =
       (Web_server.Request.header request "Content-Length")
       ~f:(fun n -> Int.of_string_opt (String.strip n))
   in
+  let json_body =
+    match Web_server.Request.header request "Content-Type" with
+    | Some content_type ->
+      String.Caseless.equal
+        (String.strip (List.hd_exn (String.split content_type ~on:';')))
+        "application/json"
+    | None -> false
+  in
   match request.meth, length with
+  | "POST", _ when not json_body ->
+    respond_text
+      flow
+      ~status:415
+      ~reason:"Unsupported Media Type"
+      "a JSON body (Content-Type: application/json) expected\n"
   | "POST", Some length when length > 0 && length <= max_body ->
     let json =
       match Json.parse (Eio.Buf_read.take length reader) with
@@ -347,12 +432,13 @@ let new_key () =
   Ohex.encode (Mirage_crypto_rng.generate 16)
 ;;
 
+(* Until stdin ends, or fails (the shell is gone either way). *)
 let drain stdin =
   let buf = Cstruct.create 4096 in
   let rec loop () =
     match Eio.Flow.single_read stdin buf with
     | (_ : int) -> loop ()
-    | exception End_of_file -> ()
+    | exception (End_of_file | Eio.Io _) -> ()
   in
   loop ()
 ;;
@@ -361,6 +447,7 @@ let run
       ~env
       ?(tool_host_wait = Time_ns.Span.of_sec 10.)
       ?(check_timeout = Time_ns.Span.of_sec 15.)
+      ?(stopped = Fiber.await_cancel)
       ~log
       ~on_url
       ~stdin
@@ -387,6 +474,7 @@ let run
              Web_server.listen
                ~env
                ~sw
+               ~local:true
                ~routes:(routes t)
                ~addr
                ~port
@@ -401,32 +489,37 @@ let run
           | Form { address; user; error } ->
             t.state <- Form { address; user; error }
           | Check { remote; credentials; source; save } ->
-            let settled, settle = Promise.create () in
-            t.state <- Checking settled;
+            let prefix =
+              match source with
+              | Flag -> "-connect did not work: "
+              | Env -> "$PRIGH_CONNECT did not work: "
+              | Saved file ->
+                sprintf "The saved connection (%s) did not work: " file
+              | Form -> ""
+            in
+            (* [connect] is [Checking] before it first waits, so before the
+               page can ask. *)
             Fiber.fork ~sw (fun () ->
-              let prefix =
-                match source with
-                | Flag -> "-connect did not work: "
-                | Env -> "$PRIGH_CONNECT did not work: "
-                | Saved file ->
-                  sprintf "The saved connection (%s) did not work: " file
-                | Form -> ""
-              in
               ignore
-                (connect t ~prefix ~remote ~credentials ~source:Form ~save
-                 : (string, string) Result.t);
-              Promise.resolve settle ()));
-         on_url
-           (Web_server.browser_url ~host:(Web_connect.browser_host addr) ~port
-            ^ "#desktop="
-            ^ t.key);
+                (connect t ~prefix ~remote ~credentials ~save
+                 : (string, string) Result.t)));
+         let url =
+           Web_server.browser_url ~host:(Web_connect.browser_host addr) ~port
+         in
+         (* The key only to the shell: logs end up in files. *)
+         log (sprintf "prigh-web on %s" url);
+         on_url (url ^ "#desktop=" ^ t.key);
          Fiber.await_cancel ()))
     (fun () ->
-       Fiber.first
-         (fun () ->
-            Promise.await quit;
-            Ended.Quit)
-         (fun () ->
-            drain stdin;
-            Ended.Stdin_closed))
+       Fiber.any
+         [ (fun () ->
+             Promise.await quit;
+             Ended.Quit)
+         ; (fun () ->
+             drain stdin;
+             Ended.Stdin_closed)
+         ; (fun () ->
+             stopped ();
+             Ended.Stopped)
+         ])
 ;;
