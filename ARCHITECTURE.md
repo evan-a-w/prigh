@@ -2153,12 +2153,7 @@ terminal frontend and `web/` prigh-web, the browser one.
   reconnectable: correlates responses by id, fans out events, stderr and
   `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
   with "not connected" in between; `received` and `waiting` count the lines
-  received and the calls waiting, for prigh-web's probe). `call` answers
-  with a deferred; `send` (prigh-web's requests) answers with a `Reply` on
-  the pipe, in its place among the events, so that a reply reflecting some
-  events (an empty first page, then the turn's events) is never overtaken by
-  them, as a deferred's continuation can be when several lines arrive at once
-  (WebKit hands them over so). The TUI still uses `call`. `client/unix/` (`prigh_client_unix`)
+  received and the calls waiting, for prigh-web's probe). `client/unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
   spawns the backend, `Tcp_transport` connects to `-listen`,
   `Websocket_transport` to a prigh-web URL's `/ws` (the RFC 6455 client
