@@ -5,8 +5,8 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 Run every suite with `./test` (about a minute warm: it builds both projects,
 runs their dune tests and prigh-web's browser e2e in Chromium, in parallel);
-`./test --full` adds the browser e2e in Firefox, the whole matrix the flake
-checks run: run it before merging. Both work from any shell (outside the dev
+`./test --full` adds the browser e2e in Firefox and WebKit (the desktop
+app's engine on Linux and macOS), the whole matrix the flake checks run: run it before merging. Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -119,7 +119,7 @@ idle machine is broken).
 - prigh-web on phones: every change to prigh-web is tested and its
   screenshots looked at on phones too, not just a desktop: at least 390x844
   and 320x640, portrait, with `isMobile` and `hasTouch` (Firefox has no
-  `isMobile`: the viewport and `hasTouch`), and as an installed PWA
+  `isMobile`: the viewport and `hasTouch`; WebKit has both), and as an installed PWA
   (standalone, so the safe-area insets for the notch and the home indicator
   apply). Consider the on-screen keyboard (the visual viewport shrinks) and
   touch (no hover: whatever a hover shows has a tap). `e2e/mobile.mjs` checks

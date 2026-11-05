@@ -475,26 +475,20 @@ let sync_title (m : App.Model.t) =
     Page_notifications.set_title title)
 ;;
 
-(* What each request sent is for: its reply comes in order with the events
-   (see [Client.send]), as [Reply_tag.t]'s answer. *)
-let reply_tags : App.Reply_tag.t Int.Table.t = Int.Table.create ()
-
-let reply ~id result =
-  Option.map (Hashtbl.find_and_remove reply_tags id) ~f:(fun tag ->
-    App.Action.Reply (tag, Result.map_error result ~f:Error.to_string_hum))
-;;
-
 let perform client settings ctx (model : App.Model.t) (command : App.Command.t) =
   let inject = Bonsai.Apply_action_context.inject ctx in
   let eff =
     match command with
     | Rpc { method_; params; tag } ->
-      (match Client.send client method_ params with
-       | Ok id ->
-         Hashtbl.set reply_tags ~key:id ~data:tag;
-         Effect.Ignore
-       | Error e ->
-         inject (App.Action.Reply (tag, Error (Error.to_string_hum e))))
+      let%bind.Effect result =
+        Effect.of_deferred_fun
+          (fun () ->
+             Deferred.map
+               (Client.call client method_ params)
+               ~f:(Result.map_error ~f:Error.to_string_hum))
+          ()
+      in
+      inject (App.Action.Reply (tag, result))
     | Reconnect { generation; delay_ms; session } ->
       let%bind.Effect reply =
         Effect.of_deferred_fun
@@ -1481,15 +1475,13 @@ let run_app (settings : Settings.t) =
          (Pipe.iter_without_pushback
             (Client.incoming client)
             ~f:(fun incoming ->
-              match incoming with
-              | Event e ->
-                schedule
-                  (Event (Prigh_web.Chat.received e ~at:(Time_ns.now ())))
-              | Protocol_error e -> schedule (Protocol_error e)
-              | Stderr text -> schedule (Show_toast { text; error = true })
-              | Reply { id; result } ->
-                Option.iter (reply ~id result) ~f:schedule
-              | Closed -> schedule Backend_closed));
+              schedule
+                (match incoming with
+                 | Event e ->
+                   Event (Prigh_web.Chat.received e ~at:(Time_ns.now ()))
+                 | Protocol_error e -> Protocol_error e
+                 | Stderr text -> Show_toast { text; error = true }
+                 | Closed -> Backend_closed)));
        Deferred.unit)
 ;;
 

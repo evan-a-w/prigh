@@ -7,10 +7,6 @@ module Incoming = struct
     | Event of Event.t
     | Protocol_error of string
     | Stderr of string
-    | Reply of
-        { id : int
-        ; result : Json.t Or_error.t
-        }
     | Closed
   [@@deriving sexp_of]
 end
@@ -21,7 +17,6 @@ type t =
   ; mutable connecting : unit Deferred.Or_error.t option
   ; mutable detached : unit Ivar.t (** filled once [transport] is gone *)
   ; pending : Json.t Or_error.t Ivar.t Int.Table.t
-  ; in_order : Int.Hash_set.t (** sent: their replies come on [incoming] *)
   ; mutable next_id : int
   ; mutable received : int
   ; incoming_w : Incoming.t Pipe.Writer.t
@@ -31,13 +26,7 @@ type t =
 let fail_pending t message =
   Hashtbl.iteri t.pending ~f:(fun ~key:_ ~data ->
     Ivar.fill_if_empty data (Or_error.error_string message));
-  Hashtbl.clear t.pending;
-  let ids = Hash_set.to_list t.in_order |> List.sort ~compare:Int.compare in
-  Hash_set.clear t.in_order;
-  List.iter ids ~f:(fun id ->
-    Pipe.write_without_pushback_if_open
-      t.incoming_w
-      (Reply { id; result = Or_error.error_string message }))
+  Hashtbl.clear t.pending
 ;;
 
 let push t incoming = Pipe.write_without_pushback_if_open t.incoming_w incoming
@@ -54,11 +43,6 @@ let handle_line t line =
       (match Hashtbl.find_and_remove t.pending id with
        | Some ivar ->
          Ivar.fill_if_empty ivar (Result.map_error result ~f:Error.of_string)
-       | None when Hash_set.mem t.in_order id ->
-         Hash_set.remove t.in_order id;
-         push
-           t
-           (Reply { id; result = Result.map_error result ~f:Error.of_string })
        | None ->
          push
            t
@@ -119,7 +103,6 @@ let create ~connect =
   ; connecting = None
   ; detached = Ivar.create_full ()
   ; pending = Int.Table.create ()
-  ; in_order = Int.Hash_set.create ()
   ; next_id = 1
   ; received = 0
   ; incoming_w
@@ -139,20 +122,9 @@ let call t method_ params =
     Ivar.read ivar
 ;;
 
-let send t method_ params =
-  match t.transport with
-  | None -> Or_error.error_string "not connected"
-  | Some transport ->
-    let id = t.next_id in
-    t.next_id <- id + 1;
-    Hash_set.add t.in_order id;
-    transport.send_line (Request.to_line { id; method_; params });
-    Ok id
-;;
-
 let is_connected t = Option.is_some t.transport
 let received t = t.received
-let waiting t = Hashtbl.length t.pending + Hash_set.length t.in_order
+let waiting t = Hashtbl.length t.pending
 
 let disconnect t =
   Option.iter t.transport ~f:(fun transport -> transport.close ())

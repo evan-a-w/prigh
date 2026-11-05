@@ -1332,11 +1332,9 @@ Since latest
 (comment · <TIME>)
 Send 1 comment
 === webkit: review: page: the files ===
-src/
 main.ml
 1
 +2 −1
-src/
 util.ml
 +3 −0
 2 files changed, +5 −1
@@ -1907,8 +1905,7 @@ Read-only
 Check out into a worktree
 === webkit: review: compare: read-only, what is reviewed ===
 Reviewing feat/old (not checked out) against main (merge base <SHA>)
-files: src/
-old.ml
+files: old.ml
 +1 −0
 1 file changed, +1 −0
 edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
@@ -2452,9 +2449,6 @@ a settings section, from the left edge: back to the list: true
 a pending image's tile up: removed: true
 the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
-=== webkit: status: 390x844 pwa: the safe areas ===
-the strip under the notch: true; the composer over the home indicator: true
-the row fits: true
 === webkit: mobile: 390x844: the chat ===
 ok
 === webkit: mobile: 390x844: the chrome ===
@@ -2522,40 +2516,6 @@ ok
 === webkit: mobile: 320x640: the files ===
 ok
 === webkit: mobile: 320x640: the keyboard ===
-the composer in view: true
-=== webkit: mobile: 390x844-pwa: the chat ===
-ok
-=== webkit: mobile: 390x844-pwa: the chrome ===
-strip: 0 to 95; its pieces overlap: false
-the transcript starts under it: true
-the composer ends at 0px from the bottom
-=== webkit: mobile: 390x844-pwa: the ⋯ sheet ===
-ok
-=== webkit: mobile: 390x844-pwa: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Settings
-=== webkit: mobile: 390x844-pwa: the settings' list ===
-ok
-=== webkit: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
-=== webkit: mobile: 390x844-pwa: settings: appearance ===
-ok
-title: Appearance; back: Settings
-choice controls fit: true
-back to the list: true
-=== webkit: mobile: 390x844-pwa: settings: models ===
-ok
-choice controls fit: true
-=== webkit: mobile: 390x844-pwa: the drawer ===
-ok
-=== webkit: mobile: 390x844-pwa: the model menu ===
-ok
-=== webkit: mobile: 390x844-pwa: the model menu is a sheet ===
-full width: true; at the bottom: true
-=== webkit: mobile: 390x844-pwa: / completion ===
-ok
-=== webkit: mobile: 390x844-pwa: the files ===
-ok
-=== webkit: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true
 === webkit: long press: held on your message ===
 menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true

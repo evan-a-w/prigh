@@ -6192,7 +6192,14 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
       m, resync_rpc m state :: prefetch
     | true, Some _, _
       when phys_equal entry.chat m.chat && not m.pending.messages -> m, prefetch
-    | true, Some _, (`Unchanged | `Changed | `New) ->
+    | true, Some state, (`Unchanged | `Changed | `New) ->
+      (* Events overtook the first page (a turn begun as it came): it may
+         not have them, so again what came since. *)
+      let overtaken =
+        m.pending.messages
+        && (not (phys_equal entry.chat m.chat))
+        && not (List.is_empty (Chat.entries m.chat))
+      in
       let m, shown =
         refetch_shown
           { m with
@@ -6207,6 +6214,7 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
       , (Command.Scroll_to_bottom
          :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
         @ shown
+        @ (if overtaken then [ resync_rpc m state ] else [])
         @ prefetch ))
 ;;
 

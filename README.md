@@ -31,7 +31,7 @@ nix develop -c sh -c 'cd frontend && dune build @runtest'
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
 
 ./test                  # builds both, runs every suite, the browser e2e in Chromium (~1 min)
-./test --full           # ... and in Firefox: the full matrix, before merging
+./test --full           # ... and in Firefox and WebKit: the full matrix, before merging
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
@@ -2634,7 +2634,7 @@ off.
 
 `./test` runs everything below (the dune tests one project after the other,
 prigh-web's browser e2e in Chromium alongside); `./test --full` runs the
-browser e2e in Firefox as well, like the flake's checks. Run the quick one
+browser e2e in Firefox and WebKit as well, like the flake's checks. Run the quick one
 before pushing and the full one before merging.
 
 Four layers, cheapest first; `dune build @runtest` in each project runs all
@@ -2672,7 +2672,7 @@ costs money) has a model write the summaries (`compaction_model`, or
 `-compaction-model`, when set) and answer questions about what is left. It only reads the session files.
 
 prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
-and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
+and the Playwright e2e (`frontend/web/e2e`) drives Chromium, Firefox and WebKit
 against the real backend, its scripts all at once; the flake runs it as a
 check.
 
