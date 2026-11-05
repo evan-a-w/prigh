@@ -740,6 +740,7 @@ let serve_command =
              ()
          in
          Rpc_server.restore_resumes server;
+         Rpc_server.clean_leftovers server;
          server
        in
        let router =

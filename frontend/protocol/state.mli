@@ -67,6 +67,9 @@ type t =
     (** what prigh-web shows of the session's transcript
         ([Transcript_filter.to_string]); [None]: everything, also from
         backends without it *)
+  ; temporary : bool
+    (** not saved or listed, deleted when left: [new_session] with
+        [temporary] made it, and only its [temporary_key] reaches it *)
   }
 [@@deriving sexp_of, equal]
 

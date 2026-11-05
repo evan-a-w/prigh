@@ -152,6 +152,11 @@ type t =
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
   | Sessions_changed
+  | Temporary_ended of
+      { session : string
+      ; messages : int
+      ; kept : (string * string) list
+      }
   | Prefs_changed of Prefs.Change.t list
   | Nix_gc_progress of Nix_gc_progress.t
 [@@deriving sexp_of, equal]
@@ -221,6 +226,16 @@ let rec of_json j =
   | "review" ->
     Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
   | "sessions_changed" -> Ok Sessions_changed
+  | "temporary_ended" ->
+    let%bind session = Json.string_field j "session" in
+    let%bind messages = Json.int_field j "messages" in
+    let%map kept =
+      Json.optional_list_field j "kept" ~f:(fun k ->
+        let%bind path = Json.string_field k "path" in
+        let%map why = Json.string_field k "why" in
+        path, why)
+    in
+    Temporary_ended { session; messages; kept }
   | "nix_gc_progress" ->
     Nix_gc_progress.of_json j >>| fun p -> Nix_gc_progress p
   | "prefs_changed" ->

@@ -107,6 +107,7 @@ module State = struct
     ; trim : Session.Trim.t option [@sexp.option]
     ; hidden : Session.Hidden.t list [@sexp.list]
     ; transcript_filter : string option [@sexp.option]
+    ; temporary : bool [@sexp.bool]
     }
   [@@deriving sexp_of]
 end
@@ -256,6 +257,10 @@ type t =
   ; sleep_until : float -> unit
   ; trace_clock : Trace.Clock.t
   ; mutable tracer : Trace.t (** the session's: replaced with it *)
+  ; mutable on_noted : unit -> unit
+  ; mutable noted : Leftover.t list
+    (** uploads, and what an earlier run of a temporary session left, see
+        {!leftovers} *)
   }
 
 let tracer_for ~clock ~(config : Config.t) session =
@@ -501,6 +506,7 @@ let state t =
   ; trim = Session.trim t.session
   ; hidden = Session.hidden t.session
   ; transcript_filter = Session.transcript_filter t.session
+  ; temporary = Session.temporary t.session
   }
 ;;
 
@@ -1541,11 +1547,11 @@ let executor t : Tool.executor =
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
-let instructions t ~cwd =
+let instructions t ~cancel ~cwd =
   Host_ops.instructions_of_result
     (host_exec
        t
-       ~cancel:Cancellation.never
+       ~cancel
        ~on_output:ignore
        ~call_id:"instructions"
        ~cwd
@@ -1558,9 +1564,9 @@ let instructions t ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (t.tools @ t.mcp_tools)
 
-let build_system_prompt t =
+let build_system_prompt ?(cancel = Cancellation.never) t =
   let { Host_ops.Instructions.files; nix; skills } =
-    instructions t ~cwd:t.cwd
+    instructions t ~cancel ~cwd:t.cwd
   in
   System_prompt.build
     ~instructions:files
@@ -1683,13 +1689,16 @@ let approve_mcp t ~source ~server =
         listing)
 ;;
 
-let system_prompt t =
+let system_prompt ?(cancel = Cancellation.never) t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text = build_system_prompt t in
-    ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
-    tell t { (environment t) with plan_mode = t.told.plan_mode };
+    let text = build_system_prompt ~cancel t in
+    (* Without its instructions: the next run builds it again. *)
+    if not (Cancellation.is_cancelled cancel)
+    then (
+      ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
+      tell t { (environment t) with plan_mode = t.told.plan_mode });
     text
 ;;
 
@@ -1872,10 +1881,10 @@ let summary_model t =
   Compaction_settings.summary_model (compaction_settings t) t.model
 ;;
 
-let loop_config t =
+let loop_config ?cancel t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
-  ; system = Some (system_prompt t)
+  ; system = Some (system_prompt ?cancel t)
   ; tools = tools t @ goal_tools t @ reply_tools t
   ; max_turns = None
   ; max_tokens = None
@@ -1887,7 +1896,7 @@ let loop_config t =
 
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
-let with_attachments t text attachments =
+let with_attachments t ~cancel text attachments =
   match attachments with
   | [] -> text, [], []
   | _ ->
@@ -1895,7 +1904,7 @@ let with_attachments t text attachments =
       let result =
         host_exec
           t
-          ~cancel:Cancellation.never
+          ~cancel
           ~on_output:ignore
           ~call_id:"attachment"
           ~cwd:t.cwd
@@ -1937,10 +1946,12 @@ let take_notes t =
   notes
 ;;
 
-let user_message t (q : Queued.t) =
+let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
   Reminder.Tracker.user_spoke t.reminder_tracker;
   let text = Option.value q.expanded ~default:q.text in
-  let text, attachments, attached = with_attachments t text q.attachments in
+  let text, attachments, attached =
+    with_attachments t ~cancel text q.attachments
+  in
   let notes = take_notes t in
   let origin = { Injected.notes; attachments; source = q.source } in
   Message.user
@@ -2252,7 +2263,12 @@ let name_subagent t ~task ~siblings ~cancel =
   |> Result.ok
 ;;
 
-let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
+let rec start_run
+          ?(tried = String.Set.empty)
+          ?(then_ = fun ~cancel:_ -> [])
+          t
+          prompts
+  =
   refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
@@ -2278,7 +2294,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        @@ fun () ->
        (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
-       let prompts = prompts @ then_ () in
+       let prompts = prompts @ then_ ~cancel in
        let prompts = prompts @ due_reminders t in
        let session = t.session in
        let finish ~idle =
@@ -2288,7 +2304,17 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
        in
        refresh_mcp t ~cancel;
        let halted = ref None in
-       let config = loop_config t in
+       (* The prompts are in the session (and its file made) before the
+          system prompt is built: that asks the tool host, which may take
+          long to answer or never do. *)
+       let context = Session.messages session in
+       broadcast t (Loop Agent_start);
+       List.iter prompts ~f:(fun m ->
+         ignore (Session.append_message session m : Session.Entry.t);
+         broadcast t (Loop (Message_start m));
+         broadcast t (Loop (Message_end m)));
+       let recorded m = List.mem prompts m ~equal:phys_equal in
+       let config = loop_config ~cancel t in
        let added =
          match
            Agent_loop.run
@@ -2346,6 +2372,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                account t event;
                track_plan t event;
                match event with
+               | Agent_start -> ()
+               | (Message_start m | Message_end m) when recorded m -> ()
                | Turn_end _ ->
                  if phys_equal session t.session
                  then Reminder.Tracker.turn_ended t.reminder_tracker;
@@ -2359,7 +2387,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)
                | _ -> broadcast t (Loop event))
-             ~context:(Session.messages session)
+             ~context
              ~prompts
              ()
          with
@@ -2616,6 +2644,7 @@ and auto_describe t =
   let session = t.session in
   if
     t.auto_describe
+    && (not (Session.temporary session))
     && Option.is_none t.describing
     && Session_description.wanted session
   then (
@@ -2891,6 +2920,8 @@ let create
     ; sleep_until
     ; trace_clock
     ; tracer = tracer_for ~clock:trace_clock ~config session
+    ; noted = []
+    ; on_noted = ignore
     }
   in
   restore_settings t;
@@ -2923,8 +2954,9 @@ let prompt ?(attachments = []) ?(images = []) t text =
       then running ()
       else
         Ok
-          (start_run t [] ~then_:(fun () ->
+          (start_run t [] ~then_:(fun ~cancel ->
              [ user_message
+                 ~cancel
                  t
                  { text; expanded = skill; source = None; attachments; images }
              ])))
@@ -2935,7 +2967,7 @@ let enqueue_queued t kind queued =
   then (
     Steer_queue.push t.queue kind queued;
     queue_update t)
-  else start_run t [] ~then_:(fun () -> [ user_message t queued ])
+  else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
 
 let enqueue t kind ?(attachments = []) ?(images = []) text =
@@ -3633,7 +3665,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt t
+    | None -> build_system_prompt ~cancel t
   in
   let request =
     Btw.request
@@ -4080,4 +4112,152 @@ let session_stats t =
   ; masks
   ; duration_seconds = Session.duration_seconds t.session
   }
+;;
+
+(* ---- temporary sessions --------------------------------------------- *)
+
+let temporary t = Session.temporary t.session
+
+let keep t =
+  if temporary t
+  then (
+    Session.keep t.session;
+    Subagent_log.save_all t.subagent_log;
+    t.noted <- [];
+    state_changed t;
+    auto_describe t)
+;;
+
+let note_leftover t (leftover : Leftover.t) =
+  if temporary t && not (List.mem t.noted leftover ~equal:Leftover.equal)
+  then (
+    t.noted <- leftover :: t.noted;
+    t.on_noted ())
+;;
+
+let on_noted t ~f = t.on_noted <- f
+
+let note_upload t ~path =
+  note_leftover
+    t
+    { host = t.active_host; kind = Upload; path; root = Filename.dirname path }
+;;
+
+(* Outputs are found in the results that quote them, its subagents' too. *)
+let leftovers t =
+  let results messages =
+    List.filter_map messages ~f:(function
+      | Message.Tool_result r -> Some r.text
+      | User _ | Assistant _ -> None)
+  in
+  let texts =
+    results
+      (List.map (Session.entries t.session) ~f:(fun (e : Session.Entry.t) ->
+         e.payload)
+       |> List.filter_map ~f:(function
+         | Session.Entry.Payload.Message m -> Some m
+         | _ -> None))
+    @ List.concat_map (subagents t) ~f:(fun s ->
+      match subagent t s.id with
+      | None -> []
+      | Some (_, messages) ->
+        results (List.map messages ~f:(fun (m : Timed_message.t) -> m.message)))
+  in
+  let outputs =
+    List.concat_map texts ~f:Tool_bash.output_paths
+    |> List.map ~f:(fun path ->
+      { Leftover.host = t.active_host
+      ; kind = Output
+      ; path
+      ; root = Filename.dirname path
+      })
+  in
+  let worktrees =
+    List.filter_map (Session.worktrees t.session) ~f:(fun w ->
+      match w.source with
+      | Entered -> None
+      | Created | Pull_request _ | Agent _ ->
+        Some
+          { Leftover.host = t.active_host
+          ; kind = Worktree
+          ; path = w.path
+          ; root = w.root
+          })
+  in
+  List.dedup_and_sort (t.noted @ outputs @ worktrees) ~compare:Leftover.compare
+;;
+
+let host_call_on t ~host ~cwd ~name arguments =
+  match find_host t host with
+  | None -> Tool.Result.error (sprintf "tool host %S is not connected" host)
+  | Some h ->
+    host_exec_on
+      t
+      h
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"leftover"
+      ~cwd
+      ~name
+      ~arguments
+;;
+
+let remove_leftover t (leftover : Leftover.t) =
+  match leftover.kind with
+  | Upload | Output ->
+    (* web_fetch saves its outputs in the backend, whichever host ran *)
+    if
+      Tool_bash.is_own_output leftover.path
+      && Sys_unix.file_exists_exn leftover.path
+    then (
+      try Sys_unix.remove leftover.path with
+      | _ -> ());
+    (match
+       host_call_on
+         t
+         ~host:leftover.host
+         ~cwd:leftover.root
+         ~name:Host_files.delete_op
+         (`Object [ "path", `String leftover.path ])
+     with
+     | { is_error = false; _ } -> Ok ()
+     | { is_error = true; text; _ } ->
+       if
+         String.is_substring text ~substring:"No such file"
+         || String.is_substring text ~substring:"not found"
+         || String.is_substring text ~substring:"does not exist"
+       then Ok ()
+       else Error text)
+  | Worktree ->
+    (match
+       host_call_on
+         t
+         ~host:leftover.host
+         ~cwd:leftover.root
+         ~name:Worktree.remove_op
+         (Worktree.remove_args
+            ~dir:t.config.worktrees_dir
+            ~path:leftover.path
+            ~force:false
+            ())
+       |> Worktree.removed_of_result
+     with
+     | Ok (_ : Worktree.t) -> Ok ()
+     | Error e -> Error (Error.to_string_hum e))
+;;
+
+let remove_leftovers t leftovers =
+  List.filter_map leftovers ~f:(fun leftover ->
+    match remove_leftover t leftover with
+    | Ok () -> None
+    | Error why -> Some (leftover, why))
+;;
+
+let note_leftovers t leftovers = List.iter leftovers ~f:(note_leftover t)
+
+(* Ends with nothing running: its run, subagents and jobs are stopped. *)
+let stop_everything t =
+  if resume_pending t then ignore (cancel_resume t : unit Or_error.t);
+  shutdown t;
+  wait_idle t
 ;;

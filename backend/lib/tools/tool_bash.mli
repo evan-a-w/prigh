@@ -16,6 +16,12 @@ val tool : Tool.t
     if that directory is a symlink or another user's. *)
 val save_output : Tool.Context.t -> string -> string
 
+(** The paths of saved outputs ({!save_output}) a result's text mentions. *)
+val output_paths : string -> string list
+
+(** Whether [path] is in this process's own output directory. *)
+val is_own_output : string -> bool
+
 (** [bash] for subagents: never moved to the background by itself, and its
     [background] parameter says that they finish only once their jobs have
     exited. *)

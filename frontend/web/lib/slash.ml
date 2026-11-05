@@ -68,6 +68,10 @@ let every =
       "appearance, sessions, models, git hosting and your account; a section \
        opens at it (Ctrl+,)"
   ; c "new" "start a new session"
+  ; c
+      "temporary"
+      "a temporary session: not saved or listed, deleted when you leave it \
+       (Ctrl+Shift+O); in one, keep it or delete it"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"
   ; c

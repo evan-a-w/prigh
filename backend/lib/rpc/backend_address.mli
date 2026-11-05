@@ -43,6 +43,15 @@ val connect
   -> t
   -> Eio.Flow.two_way_ty Eio.Resource.t
 
+(** {!connect}, with what shuts the TCP connection down at once (also under
+    TLS, without a word to the peer), so that reads and writes stuck on it
+    end. *)
+val connect_abortable
+  :  env:Env.t
+  -> sw:Switch.t
+  -> t
+  -> Eio.Flow.two_way_ty Eio.Resource.t * (unit -> unit)
+
 (** Raised by {!websocket} when the server does not open the WebSocket,
     with what it answered. *)
 exception Not_upgraded of string
@@ -52,6 +61,14 @@ exception Not_upgraded of string
 val websocket
   :  env:Env.t
   -> sw:Switch.t
+  -> t
+  -> path:string
+  -> query:(string * string) list
+  -> Websocket.t
+
+(** {!websocket} over a connection [connect] made. *)
+val websocket_over
+  :  Eio.Flow.two_way_ty Eio.Resource.t
   -> t
   -> path:string
   -> query:(string * string) list

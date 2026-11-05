@@ -413,6 +413,7 @@ let rec apply t (event : Event.t) =
   | Generate_delta _
   | Review _
   | Sessions_changed
+  | Temporary_ended _
   | Agent_queues _
   | Nix_gc_progress _
   | Masked _

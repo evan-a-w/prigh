@@ -115,6 +115,8 @@ type t =
       }
   | Nix_gc_confirm of Nix_generations.t
   | Annotate of Annotate.t
+  | Temporary_menu
+  | Leave_temporary
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -154,6 +156,8 @@ let per_session = function
       ; _
       }
   | Annotate _
+  | Temporary_menu
+  | Leave_temporary
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true
   | Picker
       { kind =

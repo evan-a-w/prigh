@@ -5786,6 +5786,7 @@ let event m (e : P.Event.t) =
     (match m.nix_gc with
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
+  | Temporary_ended _ -> m, []
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]

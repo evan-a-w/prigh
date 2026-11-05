@@ -60,6 +60,7 @@ let act t action =
      | Drop_connection
      | Reload_page _
      | Auth_failed _
+     | Remember_temporary _
      | Apply_update -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;

@@ -179,6 +179,7 @@ let%expect_test "help lists every key and command" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     → / ← (reviewing; also ] [, n p, j k) the next / previous changed file
@@ -205,6 +206,7 @@ let%expect_test "help lists every key and command" =
     /hotkeys show the keyboard shortcuts
     /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
+    /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
     /fallback [model...|off] show or set the models that take over, in order, when one's usage runs out
