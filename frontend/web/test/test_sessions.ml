@@ -595,7 +595,7 @@ let%expect_test "new session and switching session reload the state" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     (New session)
-    Loading the session…
+    What are we building?
     |}];
   Harness.reply h "get_messages_page" (Harness.page "[]");
   Harness.text h ~selector:".chat";
@@ -603,12 +603,6 @@ let%expect_test "new session and switching session reload the state" =
     {|
     Scroll_to_bottom
     What are we building?
-    /work
-    / commands
-    @ mention a file
-    ! run a command
-    Ctrl+L switch model
-    Ctrl+K find a session
     |}];
   (* The session clicked is marked until it has loaded. *)
   Harness.act h (Switch_session "/sessions/s3.jsonl");
@@ -652,7 +646,7 @@ let%expect_test "new session and switching session reload the state" =
      (tag (Worktrees (place  "s3\
                             \nbackend\
                             \n/work") (purpose (Sidebar 3)))))
-    Loading the session…
+    What are we building?
     |}];
   Harness.reply
     h
@@ -865,7 +859,7 @@ let%expect_test "~ in places is the home of the tool host they are on" =
   in
   let h = H.create ~sessions ~state () in
   H.names h ~selector:".session-cwd";
-  H.text h ~selector:".empty-where";
+  H.text h ~selector:".tray-folder";
   [%expect
     {|
     span "~/src" -- /Users/ann/src

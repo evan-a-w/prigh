@@ -242,14 +242,20 @@ let no_delay flow =
 (* A peer that vanished without a word (a laptop suspended, a network gone)
    is noticed within a minute even while nothing is sent to it: until then
    it still counts as connected, and as a tool host it would be sent tool
-   calls nobody answers. *)
+   calls nobody answers. Keepalive probes only go while nothing is sent:
+   what was sent and is not acknowledged within a minute (a tool call to a
+   host that went) ends the connection too (Linux only). A peer that is
+   there but does not answer (a frozen process) takes the heartbeats of
+   [Rpc_server] and [Backend_socket]. *)
 let keepalive flow =
-  try
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE true;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE 30;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL 10;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT 3
-  with
+  (try
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE true;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE 30;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL 10;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT 3
+   with
+   | _ -> ());
+  try Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_USER_TIMEOUT 60_000 with
   | _ -> ()
 ;;
 

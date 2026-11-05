@@ -80,3 +80,30 @@ let draft =
 ;;
 
 let saved_draft () = for_this_session draft
+let temporary_key = "prigh-web.temporary"
+
+let remember_temporary = function
+  | Some (session, key) ->
+    Option.iter (storage ()) ~f:(fun storage ->
+      storage##setItem
+        (Js.string temporary_key)
+        (Js.string
+           (Jsonaf.to_string
+              (`Object [ "session", `String session; "key", `String key ]))))
+  | None ->
+    Option.iter (storage ()) ~f:(fun storage ->
+      storage##removeItem (Js.string temporary_key))
+;;
+
+let temporary_key_of session =
+  let open Option.Let_syntax in
+  let%bind storage = storage () in
+  let%bind text =
+    Js.Opt.to_option (storage##getItem (Js.string temporary_key))
+  in
+  let%bind json = Jsonaf.parse (Js.to_string text) |> Result.ok in
+  match Jsonaf.member "session" json, Jsonaf.member "key" json with
+  | Some (`String saved), Some (`String key) when String.equal saved session ->
+    Some key
+  | _ -> None
+;;

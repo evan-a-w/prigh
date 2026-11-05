@@ -408,6 +408,83 @@ let%expect_test
     |}]
 ;;
 
+(* The session's host stopped answering and the backend gave up on it: the
+   chip says it is offline, and the menu still lists it, dimmed and marked,
+   with the others to pick instead; choosing it says why not, at once. *)
+let%expect_test
+    "an offline host stays in the menu, dimmed; choosing it says why"
+  =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ ( "hosts"
+               , Jsonaf.of_string
+                   {|[{"id":"backend","name":"container","cwd":"/work"}]|} )
+             ; "active_host", `String "host-laptop"
+             ; "active_host_name", `String "server-laptop"
+             ]
+           ())
+      ()
+  in
+  H.names h ~selector:".host-chip";
+  H.click h ~selector:".host-chip";
+  H.text h ~selector:"#chip-popover";
+  H.elements h ~selector:"#chip-popover .popover-item";
+  [%expect
+    {|
+    button "server-laptop, disconnected" -- Tools wait for server-laptop to reconnect: run prigh tool-host -connect (or a TUI) there, or /host picks another
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    [] /host
+    container /work
+    ✓ server-laptop offline: waiting for it to reconnect
+    The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
+    Enter chooses, ← → the next setting, Esc closes
+    <div class="menu-item popover-item">
+    <div class="dimmed marked menu-item popover-item selected">
+    |}];
+  H.key h "Enter" ~target:Field;
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    Dialog_accept
+    (Focus editor)
+    server-laptop is offline: pick another host, or run prigh tool-host -connect there to bring it back. (Dismiss)
+    |}];
+  (* It reconnects: listed as any other, the chip lit again. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ ( "hosts"
+              , Jsonaf.of_string
+                  {|[{"id":"backend","name":"container","cwd":"/work"},{"id":"host-laptop","name":"server-laptop","cwd":"/home/me"}]|}
+              )
+            ; "active_host", `String "host-laptop"
+            ; "active_host_name", `String "server-laptop"
+            ]
+          ()));
+  H.names h ~selector:".host-chip";
+  H.click h ~selector:".host-chip";
+  H.text h ~selector:"#chip-popover";
+  [%expect
+    {|
+    button "server-laptop" -- Tools run on server-laptop, in /home/me (/host switches)
+    (Open_chip Host)
+    (Focus popover-filter)
+    Place_popover
+    [] /host
+    container /work
+    ✓ server-laptop /home/me
+    Enter chooses, ← → the next setting, Esc closes
+    |}]
+;;
+
 let%expect_test "with one host the chip still names it, and says how to add one"
   =
   let h =
@@ -973,6 +1050,7 @@ let%expect_test
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     <textarea class="editor">
     <div class="composer-buttons">
+    <div class="tray">
     <div class="composer-controls menu-open">
     <div class="attach-menu chip-anchor">
     <div class="chip-anchor model open">

@@ -257,7 +257,15 @@ let upload flow ~headers ~reader (ticket : File_tickets.Ticket.t) =
        (match
           File_ops.upload ticket.agent ~path ~conflict ~size ~make_dir ~read ()
         with
-        | Ok json -> respond_json flow ~status:200 ~reason:"OK" json
+        | Ok json ->
+          (* a chat's attachment; a temporary session deletes it *)
+          (match make_dir, json with
+           | true, `Object fields ->
+             (match List.Assoc.find fields ~equal:String.equal "path" with
+              | Some (`String path) -> Agent.note_upload ticket.agent ~path
+              | _ -> ())
+           | _ -> ());
+          respond_json flow ~status:200 ~reason:"OK" json
         | Error e ->
           let message = Error.to_string_hum e in
           drain reader ~left:!left;

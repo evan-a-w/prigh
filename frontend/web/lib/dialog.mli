@@ -138,6 +138,9 @@ type t =
   | Nix_gc_confirm of Nix_generations.t
   (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
   | Annotate of Annotate.t (** drawing on an image *)
+  | Temporary_menu (** a temporary session's: keep it, or delete it *)
+  | Leave_temporary
+  (** leaving a temporary session that is still working ([Model.leaving]) *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

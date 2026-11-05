@@ -63,6 +63,7 @@ let methods =
   ; "resume_now"
   ; "downsize_images"
   ; "new_session"
+  ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
   ; "set_session_name"
@@ -308,9 +309,26 @@ module Client = struct
     ; generations : Cancellation.t String.Table.t
       (** in-flight [generate_text] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
+    ; mutable heard : float
+      (** when its last line came, by [heartbeat_clock]: a tool host that
+          promised heartbeats ([features] has [heartbeat]) and is silent for
+          [host_timeout] is given up on *)
+    ; mutable silent : bool (** given up on for that *)
     }
 
   let id t = t.id
+end
+
+(* A live temporary session (see [end_temporary]). *)
+module Temporary = struct
+  type t =
+    { key : string
+      (** what reattaching to it takes ([hello]'s [temporary_key]): only
+          the page that made it has it *)
+    ; mutable away : unit ref option
+      (** while it has no client: the grace period's token *)
+    ; mutable written : Leftover.t list (** in its ledger *)
+    }
 end
 
 (* An execution sent to a tool host, until its result. *)
@@ -348,6 +366,9 @@ type t =
   ; mutable generate_seq : int
   ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
   ; host_grace : float
+  ; host_timeout : float
+    (** how long a tool host that sends heartbeats may be silent *)
+  ; heartbeat_clock : float Eio.Time.clock_ty Eio.Resource.t
     (** how long the executions of a host that dropped its connection wait
         for it to come back with them, and new calls for it to come back *)
   ; returning : float String.Table.t
@@ -372,6 +393,9 @@ type t =
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
   ; nix_store : Nix_store.t option
+  ; temporaries : Temporary.t String.Table.t (** by session id *)
+  ; temporary_grace : float
+  ; ledger_dir : string
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -406,8 +430,138 @@ let clients_of t agent =
   |> List.filter ~f:(fun (c : Client.t) -> phys_equal c.agent agent)
 ;;
 
+(* The tool host clients are few: a scan is fine. *)
+let host_client t host_id =
+  List.find (Hashtbl.data t.clients) ~f:(fun (c : Client.t) ->
+    c.tools && String.equal c.host_id host_id)
+;;
+
+let terminal_key t ~session =
+  match t.namespace with
+  | None -> session
+  | Some namespace -> namespace ^ ":" ^ session
+;;
+
+(* The ledger follows what the session made, so that a restart can delete
+   it. *)
+let write_ledger t agent =
+  let id = session_id agent in
+  Option.iter (Hashtbl.find t.temporaries id) ~f:(fun (temp : Temporary.t) ->
+    let leftovers = Agent.leftovers agent in
+    if not (List.equal Leftover.equal leftovers temp.written)
+    then (
+      temp.written <- leftovers;
+      try Temporary_ledger.write ~dir:t.ledger_dir { id; leftovers } with
+      | exn ->
+        eprintf
+          "prigh: the ledger of temporary session %s: %s\n%!"
+          id
+          (Exn.to_string exn)))
+;;
+
+let temporary_ended_event ~session ~messages ~kept =
+  `Object
+    [ "type", `String "event"
+    ; "event", `String "temporary_ended"
+    ; "session", `String session
+    ; "messages", `Number (Int.to_string messages)
+    ; ( "kept"
+      , `Array
+          (List.map kept ~f:(fun ((l : Leftover.t), why) ->
+             `Object
+               [ "path", `String l.path
+               ; ( "kind"
+                 , `String
+                     (match l.kind with
+                      | Upload -> "upload"
+                      | Output -> "output"
+                      | Worktree -> "worktree") )
+               ; "why", `String why
+               ])) )
+    ]
+;;
+
+(* Its terminals go with it. *)
+let forget_session t id =
+  let key = terminal_key t ~session:id in
+  List.iter (Terminal_relay.close_key t.terminals ~key) ~f:(fun host ->
+    Option.iter (host_client t host) ~f:(fun (c : Client.t) ->
+      if List.mem c.features "terminal_kill" ~equal:String.equal
+      then c.send (Terminal_relay.kill_event ~host ~key)));
+  List.iter t.on_session_deleted ~f:(fun f -> f ~key)
+;;
+
+(* Removes [leftovers] where their host is connected; the rest (and what a
+   host failed at while going away) stay in the session's ledger, for when
+   it connects. Answers what a connected host could not remove (worktrees
+   with uncommitted changes). *)
+let remove_leftovers t agent ~id leftovers =
+  let reachable (l : Leftover.t) =
+    if String.equal l.host Agent.Host.backend_id
+    then t.backend_host
+    else Option.is_some (host_client t l.host)
+  in
+  let now, later = List.partition_tf leftovers ~f:reachable in
+  let failed = Agent.remove_leftovers agent now in
+  let lost, kept =
+    List.partition_tf failed ~f:(fun ((l : Leftover.t), _) -> not (reachable l))
+  in
+  (match later @ List.map lost ~f:fst with
+   | [] -> Temporary_ledger.remove ~dir:t.ledger_dir ~id
+   | leftovers -> Temporary_ledger.write ~dir:t.ledger_dir { id; leftovers });
+  kept
+;;
+
+(* Leaving a temporary session ends it: nobody can reach it any more, what
+   runs in it stops, and what it made goes (but worktrees with uncommitted
+   changes, which [notify] hear of). What could not be deleted on a host
+   that is gone stays in the ledger, for when it is back. *)
+let end_temporary t agent ~notify =
+  let id = session_id agent in
+  if Option.exists (Hashtbl.find t.agents id) ~f:(phys_equal agent)
+  then (
+    Hashtbl.remove t.agents id;
+    Hashtbl.remove t.listed id;
+    Hashtbl.remove t.temporaries id;
+    Fiber.fork ~sw:t.sw (fun () ->
+      Guarded.run ~what:"ending a temporary session" (fun () ->
+        Agent.stop_everything agent;
+        forget_session t id;
+        let kept = remove_leftovers t agent ~id (Agent.leftovers agent) in
+        let event =
+          temporary_ended_event
+            ~session:id
+            ~messages:(List.length (Agent.messages agent))
+            ~kept
+        in
+        List.iter notify ~f:(fun (c : Client.t) ->
+          if Hashtbl.mem t.clients c.id then c.send event))))
+;;
+
+(* A temporary session without a client waits [temporary_grace] for one
+   (a reload, a phone that killed the page) before it ends. *)
+let await_return t agent =
+  match Hashtbl.find t.temporaries (session_id agent) with
+  | None -> ()
+  | Some { away = Some _; _ } -> ()
+  | Some temp ->
+    let token = ref () in
+    temp.away <- Some token;
+    Fiber.fork_daemon ~sw:t.sw (fun () ->
+      t.sleep t.temporary_grace;
+      (match temp.away with
+       | Some token' when phys_equal token token' ->
+         temp.away <- None;
+         if List.is_empty (clients_of t agent)
+         then end_temporary t agent ~notify:[]
+       | Some _ | None -> ());
+      `Stop_daemon)
+;;
+
 let maybe_evict t agent =
-  if
+  if Agent.temporary agent
+  then (if List.is_empty (clients_of t agent) then await_return t agent)
+  else if
     (* a stale agent of a session reopened since is not the live one *)
     Option.exists
       (Hashtbl.find t.agents (session_id agent))
@@ -439,19 +593,14 @@ let note_listed t agent =
   let id = session_id agent in
   match Hashtbl.find t.listed id with
   | Some before
-    when Option.exists (Hashtbl.find t.agents id) ~f:(phys_equal agent) ->
+    when Option.exists (Hashtbl.find t.agents id) ~f:(phys_equal agent)
+         && not (Agent.temporary agent) ->
     let listed = Listed.of_agent agent in
     if not (Listed.equal before listed)
     then (
       Hashtbl.set t.listed ~key:id ~data:listed;
       sessions_changed t)
   | Some _ | None -> ()
-;;
-
-(* The tool host clients are few: a scan is fine. *)
-let host_client t host_id =
-  List.find (Hashtbl.data t.clients) ~f:(fun (c : Client.t) ->
-    c.tools && String.equal c.host_id host_id)
 ;;
 
 let host_of (client : Client.t) =
@@ -497,6 +646,15 @@ let host_disconnected =
 let host_restarted =
   "[the tool host restarted during this call, so its result is lost: run it \
    again if you still need it]"
+;;
+
+let host_silent t (client : Client.t) =
+  sprintf
+    "[the tool host %S stopped responding (no reply for %gs), so it was \
+     disconnected and this call's result is lost: pick another host with \
+     /host, or wait for it to reconnect and run it again]"
+    client.name
+    t.host_timeout
 ;;
 
 (* The connection running an execution: the one it was sent on, which may
@@ -549,7 +707,9 @@ let route t agent (event : Agent.Event.t) =
    | State_changed _
    | Loop (Tool_confirm _ | Tool_confirm_done _ | Ask_user _ | Ask_user_done _)
      -> note_listed t agent
-   | Loop e when message_end e -> note_listed t agent
+   | Loop e when message_end e ->
+     note_listed t agent;
+     if Agent.temporary agent then write_ledger t agent
    | _ -> ());
   match event with
   | State_changed { running; _ } ->
@@ -567,6 +727,7 @@ let register t agent =
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
   Agent.subscribe agent ~f:(route t agent);
+  Agent.on_noted agent ~f:(fun () -> write_ledger t agent);
   Agent.report_interrupted_subagents agent;
   agent
 ;;
@@ -576,6 +737,10 @@ let create
       ~sw
       ?token
       ?(host_grace = 60.)
+      ?(temporary_grace = 120.)
+      ?sleep
+      ?(host_timeout = 30.)
+      ?heartbeat_clock
       ?namespace
       ?(backend_host = true)
       ?home
@@ -621,8 +786,16 @@ let create
     ; generate_seq = 0
     ; execs = String.Table.create ()
     ; host_grace
+    ; host_timeout
+    ; heartbeat_clock =
+        Option.value
+          heartbeat_clock
+          ~default:
+            (Eio.Stdenv.clock env :> float Eio.Time.clock_ty Eio.Resource.t)
     ; returning = String.Table.create ()
-    ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
+    ; sleep =
+        Option.value_or_thunk sleep ~default:(fun () ->
+          Eio.Time.sleep (Eio.Stdenv.clock env))
     ; sw
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
@@ -637,6 +810,9 @@ let create
     ; loading = String.Table.create ()
     ; repos = String.Table.create ()
     ; nix_store
+    ; temporaries = String.Table.create ()
+    ; temporary_grace
+    ; ledger_dir = Temporary_ledger.dir ~sessions_dir
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -668,10 +844,15 @@ let preferred_host t (client : Client.t) =
 
 let attach t (client : Client.t) agent =
   let previous = client.agent in
+  Option.iter
+    (Hashtbl.find t.temporaries (session_id agent))
+    ~f:(fun temp -> temp.away <- None);
   if not (phys_equal previous agent)
   then (
     client.agent <- agent;
-    maybe_evict t previous);
+    if Agent.temporary previous && List.is_empty (clients_of t previous)
+    then end_temporary t previous ~notify:[ client ]
+    else maybe_evict t previous);
   publish_hosts t;
   if client.tools
   then Agent.prefer_host agent client.host_id
@@ -845,6 +1026,8 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; btws = String.Table.create ()
     ; generations = String.Table.create ()
     ; told = String.Set.empty
+    ; heard = Eio.Time.now t.heartbeat_clock
+    ; silent = false
     }
   in
   Hashtbl.set t.clients ~key:client.id ~data:client;
@@ -918,12 +1101,20 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.iter client.generations ~f:Cancellation.cancel;
-  if client.tools then await_host t client;
-  if client.tools && not (String.equal client.host_id client.id)
-  then (
-    Hashtbl.set t.returning ~key:client.host_id ~data:(t.now () +. t.host_grace);
-    Terminal_relay.host_gone t.terminals ~host:client.host_id)
-  else release_host_id t client ~text:host_disconnected;
+  (* A host that went silent is not waited for: whatever it was given fails
+     now, and so do new calls until it is back. *)
+  if client.tools && client.silent
+  then release_host_id t client ~text:(host_silent t client)
+  else (
+    if client.tools then await_host t client;
+    if client.tools && not (String.equal client.host_id client.id)
+    then (
+      Hashtbl.set
+        t.returning
+        ~key:client.host_id
+        ~data:(t.now () +. t.host_grace);
+      Terminal_relay.host_gone t.terminals ~host:client.host_id)
+    else release_host_id t client ~text:host_disconnected);
   hand_over_host_id t client;
   if client.tools then publish_hosts t;
   maybe_evict t client.agent
@@ -953,13 +1144,25 @@ let session_file t path =
     else Or_error.errorf "%S is not in the sessions directory" path)
 ;;
 
+(* Temporary sessions are not found: only [hello] with their key reaches
+   them. *)
 let find_live t key =
-  match Hashtbl.find t.agents key with
-  | Some agent -> Some agent
-  | None ->
-    Hashtbl.data t.agents
-    |> List.find ~f:(fun agent ->
-      String.equal (Session.path (Agent.session agent)) key)
+  (match Hashtbl.find t.agents key with
+   | Some agent -> Some agent
+   | None ->
+     Hashtbl.data t.agents
+     |> List.find ~f:(fun agent ->
+       String.equal (Session.path (Agent.session agent)) key))
+  |> Option.filter ~f:(fun agent -> not (Agent.temporary agent))
+;;
+
+let find_temporary t ~session ~key =
+  match Hashtbl.find t.temporaries session, Hashtbl.find t.agents session with
+  | Some temp, Some agent when String.equal temp.key key -> Ok agent
+  | _ ->
+    Or_error.errorf
+      "temporary session %S is gone: it was deleted when it was left"
+      session
 ;;
 
 (* The file of a saved session, by path or id. *)
@@ -993,8 +1196,14 @@ let find_agent t (client : Client.t) key =
 
 (* A session's messages to read: the live session's, else from disk without
    opening it (kept in [t.loaded] for when it is opened). *)
-let session_to_read t key =
-  match find_live t key with
+let session_to_read ?(client : Client.t option) t key =
+  let own =
+    Option.map client ~f:(fun (c : Client.t) -> c.agent)
+    |> Option.filter ~f:(fun agent ->
+      String.equal (session_id agent) key
+      || String.equal (Session.path (Agent.session agent)) key)
+  in
+  match Option.first_some own (find_live t key) with
   | Some agent -> Ok (Agent.session agent)
   | None ->
     Or_error.bind (saved_path t key) ~f:(fun path ->
@@ -1019,7 +1228,7 @@ let messages_page t (client : Client.t) params =
   let%bind session =
     match%bind string_param_opt params "session" with
     | None -> Ok (Agent.session client.agent)
-    | Some key -> session_to_read t key
+    | Some key -> session_to_read ~client t key
   in
   let%map page =
     Message_page.create
@@ -1034,7 +1243,7 @@ let messages_page t (client : Client.t) params =
 let read_session t (client : Client.t) params =
   match%bind.Or_error string_param_opt params "session" with
   | None -> Ok (Agent.session client.agent)
-  | Some key -> session_to_read t key
+  | Some key -> session_to_read ~client t key
 ;;
 
 let outline t client params =
@@ -1081,7 +1290,7 @@ let tool_output t (client : Client.t) params =
       let%map session =
         match key with
         | None -> Ok (Agent.session client.agent)
-        | Some key -> session_to_read t key
+        | Some key -> session_to_read ~client t key
       in
       List.filter_map (Session.entries session) ~f:(fun (e : Session.Entry.t) ->
         match e.payload with
@@ -1092,7 +1301,11 @@ let tool_output t (client : Client.t) params =
         match key with
         | None -> Ok client.agent
         | Some key ->
-          (match find_live t key with
+          (match
+             if String.equal key (session_id client.agent)
+             then Some client.agent
+             else find_live t key
+           with
            | Some agent -> Ok agent
            | None ->
              Or_error.errorf
@@ -1168,13 +1381,6 @@ let credentials_ok t ?user given =
 ;;
 
 let namespace t = t.namespace
-
-let terminal_key t ~session =
-  match t.namespace with
-  | None -> session
-  | Some namespace -> namespace ^ ":" ^ session
-;;
-
 let on_session_deleted t ~f = t.on_session_deleted <- f :: t.on_session_deleted
 
 let terminal_target t ~session =
@@ -1304,6 +1510,38 @@ let take_over_tab t (client : Client.t) tab =
   client.tab <- Some tab
 ;;
 
+(* What temporary sessions made that the backend did not live to delete
+   (it stopped while they were open): deleted on the hosts that are here,
+   the rest when their host connects. Worktrees with uncommitted changes
+   stay, said on stderr. *)
+let clean_leftovers t =
+  let ledgers =
+    Temporary_ledger.load_all ~dir:t.ledger_dir
+    |> List.filter ~f:(fun (l : Temporary_ledger.t) ->
+      not (Hashtbl.mem t.temporaries l.id))
+  in
+  if not (List.is_empty ledgers)
+  then (
+    let agent =
+      t.new_agent
+        ~session:
+          (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ~temporary:true ())
+        ~cwd:t.cwd
+        ()
+    in
+    Agent.set_hosts agent (hosts t) ~returning:String.Map.empty;
+    List.iter ledgers ~f:(fun (ledger : Temporary_ledger.t) ->
+      List.iter
+        (remove_leftovers t agent ~id:ledger.id ledger.leftovers)
+        ~f:(fun ((l : Leftover.t), why) ->
+          eprintf
+            "prigh: temporary session %s left %s: %s\n%!"
+            ledger.id
+            l.path
+            why));
+    Agent.shutdown agent)
+;;
+
 let hello t (client : Client.t) params =
   let string name =
     match param params name with
@@ -1360,8 +1598,9 @@ let hello t (client : Client.t) params =
                 | _ -> None)
             | _ -> []);
         let agent =
-          match param params "session" with
-          | Some (`String key) -> find_agent t client key
+          match param params "session", string "temporary_key" with
+          | Some (`String session), Some key -> find_temporary t ~session ~key
+          | Some (`String key), None -> find_agent t client key
           | _ -> Ok (first_session t client)
         in
         client.placeholder <- None;
@@ -1373,6 +1612,11 @@ let hello t (client : Client.t) params =
             Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
               if Option.equal String.equal c.prefer_host (Some client.host_id)
               then Agent.prefer_host c.agent client.host_id);
+          if tools
+          then
+            Fiber.fork ~sw:t.sw (fun () ->
+              Guarded.run ~what:"cleaning up temporary sessions" (fun () ->
+                clean_leftovers t));
           `Object
             [ "client_id", `String client.id
             ; "host_id", `String client.host_id
@@ -1565,12 +1809,7 @@ let delete_saved t client (summary : Session.Summary.t) =
       Option.iter agent ~f:(fun agent ->
         if Agent.resume_pending agent
         then ignore (Agent.cancel_resume agent : unit Or_error.t));
-      let key = terminal_key t ~session:summary.id in
-      List.iter (Terminal_relay.close_key t.terminals ~key) ~f:(fun host ->
-        Option.iter (host_client t host) ~f:(fun (c : Client.t) ->
-          if List.mem c.features "terminal_kill" ~equal:String.equal
-          then c.send (Terminal_relay.kill_event ~host ~key)));
-      List.iter t.on_session_deleted ~f:(fun f -> f ~key);
+      forget_session t summary.id;
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
 
@@ -2072,6 +2311,54 @@ let prefs t client ~meth ~params =
        `Object [ "value", list ])
 ;;
 
+(* A temporary session is not saved or listed, and ends when its client
+   leaves it ([attach]), or [temporary_grace] after the last one went. Its
+   ledger exists from the start, so that a restart knows to clean up. *)
+let new_session t (client : Client.t) ~temporary =
+  let start = start_location t client ~cwd:(own_cwd client) in
+  let cwd =
+    match start with
+    | Some (_, cwd) -> cwd
+    | None -> (Agent.state client.agent).cwd
+  in
+  let session = Session.create ~dir:t.sessions_dir ~cwd ~temporary () in
+  let key = Option.some_if temporary (Pkce.random_hex 16) in
+  Option.iter key ~f:(fun key ->
+    Hashtbl.set
+      t.temporaries
+      ~key:(Session.id session)
+      ~data:{ Temporary.key; away = None; written = [] };
+    try
+      Temporary_ledger.write
+        ~dir:t.ledger_dir
+        { id = Session.id session; leftovers = [] }
+    with
+    | exn ->
+      eprintf
+        "prigh: the ledger of a temporary session: %s\n%!"
+        (Exn.to_string exn));
+  start_agent t session start |> attach t client;
+  match attached_state client, key with
+  | `Object fields, Some key ->
+    `Object (fields @ [ "temporary_key", `String key ])
+  | state, _ -> state
+;;
+
+let keep_session t (client : Client.t) =
+  let agent = client.agent in
+  if not (Agent.temporary agent)
+  then
+    Or_error.error_string "this session is not temporary: it is saved already"
+  else (
+    let id = session_id agent in
+    Hashtbl.remove t.temporaries id;
+    Temporary_ledger.remove ~dir:t.ledger_dir ~id;
+    Agent.keep agent;
+    Hashtbl.set t.listed ~key:id ~data:(Listed.of_agent agent);
+    sessions_changed t;
+    Ok (attached_state client))
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -2150,15 +2437,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (unit_result
          (Terminal_relay.closed t.terminals ~host:client.host_id params))
   | "new_session" ->
-    let start = start_location t client ~cwd:(own_cwd client) in
-    let cwd =
-      match start with
-      | Some (_, cwd) -> cwd
-      | None -> (Agent.state agent).cwd
-    in
-    start_agent t (Session.create ~dir:t.sessions_dir ~cwd ()) start
-    |> attach t client;
-    Some (Ok (attached_state client))
+    Some
+      (Or_error.map
+         (bool_param params "temporary" ~default:false)
+         ~f:(fun temporary -> new_session t client ~temporary))
+  | "keep_session" -> Some (keep_session t client)
   | "switch_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
@@ -2832,6 +3115,29 @@ let respond_or_log t (client : Client.t) request =
       (Exn.to_string exn)
 ;;
 
+let sends_heartbeats (client : Client.t) =
+  client.tools && List.mem client.features "heartbeat" ~equal:String.equal
+;;
+
+(* A tool host gone without closing its connection (a network dropped, a
+   machine asleep, a frozen process) would be sent tool calls nobody
+   answers: one that sends heartbeats is given up on once it is silent for
+   [host_timeout]. *)
+let watch_heartbeats t (client : Client.t) ~give_up =
+  let rec loop () =
+    Eio.Time.sleep t.heartbeat_clock (Float.min 5. (t.host_timeout /. 3.));
+    if
+      sends_heartbeats client
+      && Float.(
+           Eio.Time.now t.heartbeat_clock -. client.heard >= t.host_timeout)
+    then (
+      client.silent <- true;
+      give_up (sprintf "no reply for %gs" t.host_timeout))
+    else loop ()
+  in
+  loop ()
+;;
+
 let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
@@ -2843,10 +3149,14 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
       (fun () -> Outbox.run outbox ~write:write_line)
       (fun () -> ignore (Promise.await (Outbox.failed outbox) : string)));
   let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
+  Fiber.fork_daemon ~sw (fun () ->
+    watch_heartbeats t client ~give_up:(Outbox.fail outbox);
+    `Stop_daemon);
   let rec loop requests =
     match read_line () with
     | None -> None
     | Some line ->
+      client.heard <- Eio.Time.now t.heartbeat_clock;
       if String.is_empty (String.strip line)
       then loop requests
       else (

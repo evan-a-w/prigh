@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Runs the browser e2e (prigh_web.mjs, which starts and restarts the backend,
+# then temporary.mjs, temporary sessions and the new-session screen,
 # then accounts.mjs, the account switcher on a backend with users, then
 # reconnect.mjs, losing the connection on a phone, then paging.mjs, a long
 # session loaded a page at a time, then resilience.mjs, a long session on a
@@ -53,7 +54,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote desktop steer subagent_paged trim filter viewer math card status mobile long_press pwa compaction images:desktop images:phone images:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes tabs worktrees review review_git remote desktop steer subagent_paged trim filter viewer math card status mobile long_press pwa compaction images:desktop images:phone images:small"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {
