@@ -2012,6 +2012,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
   passed, URLs normalised (`Backend_address.normalize`: `https://host/`
   is saved as `wss://host/ws`, as the TUI saves it).
+- `Backend_choice` — the backend `prigh web` and `prigh tool-host
+  -connect`/`-remote` connect to: flags, else `$PRIGH_CONNECT`/`_TOKEN`/
+  `_USER`, else `Saved_connection` (its `resolve`), with where the address
+  and the token came from so that a bad address or a refused login says
+  what to fix there (`refused_hint`). Only `prigh web` saves; a tool host
+  only reads the saved connection.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -2128,7 +2134,8 @@ overrides the site), `-stdio` as well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
 killed), `tool-host` (the local tool worker, or with `-connect
-HOST:PORT|URL` a tool host of its own), `web` (`-connect HOST:PORT|URL`,
+HOST:PORT|URL` a tool host of its own; `-remote`: `$PRIGH_CONNECT` or the
+saved connection, with its token and user), `web` (`-connect HOST:PORT|URL`,
 else `$PRIGH_CONNECT` or the saved connection; prigh-web for that backend,
 above; `./prigh -web` runs it when given `-connect` or `-remote`; the site
 listens on `-listen`, `$PRIGH_WEB_LISTEN` or the first free port from
