@@ -110,20 +110,23 @@ report() {
 }
 profile="$XDG_DATA_HOME/io.github.evan-a-w.prigh/browser"
 
-# An instance left on prigh's profile by an app that died, its command line
-# one string as Chrome's is once it rewrites its title: closed, and the page
-# opens in a new one (handed to it, the window would go with it).
-: >"$work/log"
-: >"$work/browser-log"
-FAKE_BROWSER_LOG="$work/browser-log" FAKE_BROWSER_MODE=stay FAKE_BROWSER_TITLE=1 "$browser" \
-	--app=http://127.0.0.1:9/ --user-data-dir="$profile" &
-stale=$!
-wait_for "$work/browser-log" "loaded the page"
-browser_app FAKE_BROWSER_MODE=close
-wait "$app_pid"
-code=$?
-wait "$stale"
-report "browser: an instance left on the profile (its title rewritten) is closed; the page opens in a new one" $code
+# An instance left on prigh's profile by an app that died: closed, and the
+# page opens in a new one (handed to it, the window would go with it). Found
+# whether its command line is one string (Chrome rewrites its title) or does
+# not name the profile at all (by the files it holds open there).
+for title in 1 hidden; do
+	: >"$work/log"
+	: >"$work/browser-log"
+	FAKE_BROWSER_LOG="$work/browser-log" FAKE_BROWSER_MODE=stay FAKE_BROWSER_TITLE=$title "$browser" \
+		--app=http://127.0.0.1:9/ --user-data-dir="$profile" &
+	stale=$!
+	wait_for "$work/browser-log" "loaded the page"
+	browser_app FAKE_BROWSER_MODE=close
+	wait "$app_pid"
+	code=$?
+	wait "$stale"
+	report "browser: an instance left on the profile (title $title) is closed; the page opens in a new one" $code
+done
 
 # Ctrl-C (SIGINT) in the terminal it runs in: the app stops as when its
 # window closes, the browser with it (it is in a process group of its own).

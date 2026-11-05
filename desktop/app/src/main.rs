@@ -231,8 +231,16 @@ impl BrowserWindow {
     fn runs_on_profile(&self, pid: i32) -> bool {
         // Only Linux says (in /proc) what a process runs: elsewhere a pid
         // from the lock is not trusted with a signal.
+        // The command line can be rewritten (its title) or reordered (a
+        // relaunch): files it holds open in the profile say it too.
         std::fs::read(format!("/proc/{pid}/cmdline"))
             .is_ok_and(|c| browser::names_profile(&c, &self.profile.to_string_lossy()))
+            || std::fs::read_dir(format!("/proc/{pid}/fd")).is_ok_and(|fds| {
+                let profile = std::fs::canonicalize(&self.profile).unwrap_or_else(|_| self.profile.clone());
+                fds.filter_map(Result::ok)
+                    .filter_map(|fd| std::fs::read_link(fd.path()).ok())
+                    .any(|target| target.starts_with(&profile))
+            })
     }
 
     /// Ends the instance `pid` on prigh's profile: SIGTERM, then SIGKILL.
