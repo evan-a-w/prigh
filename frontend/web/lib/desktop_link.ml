@@ -70,8 +70,8 @@ module Connect_reply = struct
   let of_json text =
     Option.bind (parse text) ~f:(fun json ->
       match Json.field json "ok" with
-      | Some (`True) -> Some (Ok (string json "code"))
-      | Some (`False) ->
+      | Some `True -> Some (Ok (string json "code"))
+      | Some `False ->
         Some
           (Error
              (Option.value

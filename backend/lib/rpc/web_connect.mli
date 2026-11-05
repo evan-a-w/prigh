@@ -24,6 +24,7 @@ module Credentials : sig
     { token : string option
     ; user : string option
     }
+  [@@deriving sexp_of]
 end
 
 (** Says [hello] to the backend once, as a frontend, so that an unreachable
@@ -54,6 +55,7 @@ module Check : sig
       | Env (** [$PRIGH_CONNECT] *)
       | Saved of string (** the saved connection's file *)
       | Form (** typed into [prigh desktop]'s connect form *)
+    [@@deriving sexp_of]
   end
 
   (** What went wrong and what to do next. *)
@@ -86,10 +88,7 @@ val browser_host : Eio.Net.Ipaddr.v4v6 -> string
 
 (** What a site serving prigh-web for a backend elsewhere answers a
     JSON-lines client: it is [what]'s site, connect to [connect_to]. *)
-val not_a_backend
-  :  what:string
-  -> connect_to:string
-  -> Web_server.on_lines
+val not_a_backend : what:string -> connect_to:string -> Web_server.on_lines
 
 module Tool_host_config : sig
   type t =

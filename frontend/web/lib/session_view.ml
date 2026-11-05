@@ -136,16 +136,17 @@ let sheet (m : App.Model.t) ~inject =
           ~on_click:(go Action.Open_settings)
           ()
       ]
-    @ (if m.desktop
-       then
-      [ sheet_row
-          ~cls:"quit-row"
-          ~name:"Quit prigh"
-          ~glyph:Logout
-          ~on_click:(go Action.Quit_desktop)
-          ()
-      ]
-       else []))
+    @
+    (if m.desktop
+     then
+       [ sheet_row
+           ~cls:"quit-row"
+           ~name:"Quit prigh"
+           ~glyph:Logout
+           ~on_click:(go Action.Quit_desktop)
+           ()
+       ]
+     else []))
 ;;
 
 let more (m : App.Model.t) ~inject =

@@ -11,7 +11,10 @@ val key : unit -> string option
 val active : unit -> bool
 
 (** Asks the sidecar where it stands (it waits for a check under way). *)
-val status : key:string -> f:(Prigh_web.Desktop_link.Status.t option -> unit) -> unit
+val status
+  :  key:string
+  -> f:(Prigh_web.Desktop_link.Status.t option -> unit)
+  -> unit
 
 val connect
   :  key:string

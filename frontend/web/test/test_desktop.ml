@@ -23,7 +23,8 @@ let%expect_test "in a browser: /quit says to close the tab, no Quit prigh" =
          }));
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
@@ -54,7 +55,8 @@ let%expect_test "under the desktop app: /quit, Ctrl+Q and ⌘Q quit" =
   H.key h "q" ~meta:true ~code:"KeyQ";
   print_endline "-- Ctrl+Shift+Q (with Caps Lock) on the page:";
   H.key h "Q" ~ctrl:true ~code:"KeyQ" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
@@ -86,7 +88,8 @@ let%expect_test "under the desktop app: Quit prigh in the account menu" =
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
   H.act h (Picker_choose "quit");
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     A
     alice
@@ -112,7 +115,8 @@ let%expect_test "under the desktop app on a phone: Quit prigh in the ⋯ sheet" 
   H.elements h ~selector:"#chrome-menu > .quit-row";
   H.text h ~selector:"#chrome-menu > .quit-row";
   H.click h ~selector:"#chrome-menu > .quit-row";
-  [%expect {|
+  [%expect
+    {|
     Toggle_status_tray
     <button class="quit-row sheet-row">
     (Quit prigh)
@@ -128,7 +132,8 @@ let%expect_test "/help lists the key and /quit" =
     then printf "%s: %s\n" key text);
   Option.iter (Slash.find ~superuser:false "quit") ~f:(fun c ->
     printf "/%s: %s\n" c.name c.help);
-  [%expect {|
+  [%expect
+    {|
     Ctrl+Q / ⌘+Q (desktop app): quit prigh: its window and this machine's tool host (/quit)
     /quit: leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
     |}]
@@ -156,7 +161,9 @@ let%expect_test "the sidecar's link and answers" =
     ; "not json"
     ]
     ~f:(fun reply ->
-      print_s [%sexp (Desktop_link.Status.of_json reply : Desktop_link.Status.t option)]);
+      print_s
+        [%sexp
+          (Desktop_link.Status.of_json reply : Desktop_link.Status.t option)]);
   List.iter
     [ {|{"ok":true,"code":"c0de"}|}
     ; {|{"ok":false,"error":"cannot reach the backend"}|}
@@ -168,7 +175,8 @@ let%expect_test "the sidecar's link and answers" =
         [%sexp
           (Desktop_link.Connect_reply.of_json reply
            : Desktop_link.Connect_reply.t option)]);
-  [%expect {|
+  [%expect
+    {|
     (#desktop=0123abcd (key (0123abcd)))
     (#signin=x&desktop=k (key (k)))
     (#desktop= (key ()))
