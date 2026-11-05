@@ -795,6 +795,10 @@ mod linux {
             settings.set_enable_smooth_scrolling(true);
             // Zoom scales the whole page, as a browser's does.
             settings.set_zoom_text_only(false);
+            // The page opens a window (Open in new window) from an effect run
+            // after the click, which WebKit no longer counts as the user's;
+            // the shell's on_new_window still decides where it goes.
+            settings.set_javascript_can_open_windows_automatically(true);
         }
         webview.connect_run_file_chooser(|_, request| {
             log(format!(
