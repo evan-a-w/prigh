@@ -1996,6 +1996,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   and the token came from so that a bad address or a refused login says
   what to fix there (`refused_hint`). Only `prigh web` saves; a tool host
   only reads the saved connection.
+- `Desktop_sidecar` — `prigh desktop`, the desktop app's process: a site
+  (`Web_server.listen`, `Static_site`) that is first a connect form and
+  then `prigh web`'s. Its state is `Form` (the prefill and the error),
+  `Checking` (a promise the `/desktop/status` answer waits on) or
+  `Connected` (the remote, a `Signin_handoff` and the tool host's switch).
+  `/desktop/status`, `/desktop/connect` and `/desktop/quit` are `POST`s of
+  JSON carrying the run's key (from the URL's `#desktop=KEY`; 403
+  otherwise); `connect` runs `Web_connect.Check` and, when the backend
+  accepts, saves the connection, starts the tool host
+  (`Web_connect.start_tool_host`) and switches the routes to `prigh web`'s
+  (`Web_proxy`, the handoff). `run` returns `Quit` or `Stdin_closed`,
+  whichever comes first, and stops everything under its switch. The CLI
+  resolves the initial connection with `Backend_choice` (none or a bad one:
+  the form) and prints the URL as a JSON line on stdout.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -3281,7 +3295,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     that shows it, so that the editor's height, scrolling and focus never
     show a frame late), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
     `Terminal_panel` (the `/terminal` URL; whether an event is inside the
-    panel). `Web_main.run`: first, on a page `prigh web` opened
+    panel). `Web_main.run`: under `prigh desktop` (`#desktop=KEY`, or the
+    key kept in sessionStorage after a reload: `Desktop_page`,
+    `Desktop_link`) it asks `/desktop/status` and either shows the connect
+    form (whose submit `POST`s `/desktop/connect`) or signs in with the
+    handoff code it is given, then runs the app with `Set_desktop true`
+    (Quit prigh in the account menu and the ⋯ sheet, `/quit` and Ctrl+Q
+    issue `Command.Quit_desktop`, which `POST`s `/desktop/quit`); else,
+    on a page `prigh web` opened
+
     (`#signin=CODE`, `Signin_link`), drops the fragment from the URL, trades
     the code for the credentials (`POST /signin-handoff`), activates them as
     the account (over any sign-out or refusal noted before) and keeps the
