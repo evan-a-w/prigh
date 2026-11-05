@@ -20,6 +20,9 @@ val create
 (** 32 hex digits. *)
 val code : t -> string
 
+(** Whether the code was traded already. *)
+val taken : t -> bool
+
 (** [/signin-handoff] *)
 val path : string
 

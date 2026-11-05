@@ -344,6 +344,9 @@ module Command : sig
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
     | Sign_out (** forget this account's saved login and reload *)
+    | Quit_desktop
+    (** stop [prigh desktop] (the desktop app: its window, site and tool
+        host) *)
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
@@ -396,6 +399,10 @@ module Command : sig
     | Apply_update
     (** the new build's service worker takes over, and the page reloads into
         it *)
+    | Remember_temporary of (string * string) option
+    (** the temporary session this page is in, and its key ([hello]'s
+        [temporary_key]), for this page only: sessionStorage; [None]: it
+        left it *)
   [@@deriving sexp_of, equal]
 end
 
@@ -428,6 +435,8 @@ module Action : sig
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
+    | Set_desktop of bool (** the page runs under [prigh desktop] *)
+    | Quit_desktop (** Quit prigh: only under [prigh desktop] *)
     | Page_hidden of bool
     (** the tab was hidden or shown again (reconnect now, or check the socket) *)
     | Restore_prefs of
@@ -458,6 +467,17 @@ module Action : sig
     | Complete_choose of int (** clicked *)
     | Complete_close
     | New_session
+    | Set_temporary of bool
+    (** the new-session screen's Temporary chip: a new session of that
+        kind, unless the empty one shown is already *)
+    | New_temporary
+    (** Ctrl+Shift+O: a new temporary session; on the new-session screen,
+        the Temporary chip *)
+    | Temporary_menu (** the pill of a temporary session *)
+    | Keep_session (** a temporary session becomes a saved one *)
+    | Delete_temporary (** leave it, to a new session *)
+    | Leave_keep (** leaving while it works: keep it, then leave *)
+    | Leave_delete (** leaving while it works: delete it *)
     | Switch_session of string (** path *)
     | Ask_delete of string
     (** path; the marked sessions instead when it is one of them *)
@@ -752,6 +772,8 @@ module Model : sig
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; narrow : bool
+    ; desktop : bool
+    (** under [prigh desktop], the desktop app: Quit prigh is offered *)
     ; draft : string
     ; cursor : int (** the caret's byte offset in [draft] *)
     ; completion : Completion.t option
@@ -832,6 +854,16 @@ module Model : sig
     ; session_gone : string option
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
+    ; want_temporary : bool option
+    (** the Temporary chip, pressed: what it shows until the session is
+        there *)
+    ; leaving : Action.t option
+    (** what would leave a temporary session that is still working: it
+        waits for the [Leave_temporary] dialog *)
+    ; leave_ok : bool (** while that action runs *)
+    ; landing : bool
+    (** the first message of a new session was just sent: the composer
+        goes down to its place *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
@@ -926,6 +958,16 @@ val compact_tokens : int -> string
 
 (** Whether the user signed in as a superuser. *)
 val superuser : Model.t -> bool
+
+(** Whether the session is temporary ([State.temporary]). *)
+val temporary : Model.t -> bool
+
+(** A session with nothing in it yet: the new-session screen. *)
+val fresh : Model.t -> bool
+
+(** What the Temporary chip shows: the session's kind, or the one asked
+    for. *)
+val temporary_shown : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list

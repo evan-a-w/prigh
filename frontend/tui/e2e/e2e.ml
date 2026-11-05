@@ -146,6 +146,8 @@ let rec summarise (e : Event.t) : string option =
   | Btw_delta { btw_id; delta } -> Some (sprintf "btw_delta %s %S" btw_id delta)
   (* A hint to refresh session lists: how many arrive depends on timing. *)
   | Sessions_changed -> None
+  | Temporary_ended { session; _ } ->
+    Some (sprintf "temporary_ended %s" session)
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
   | Prefs_changed _ -> None
   | Generate_delta { gen_id; delta } ->

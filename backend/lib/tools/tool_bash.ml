@@ -149,6 +149,26 @@ let save_output_in ~tmp ~call_id output =
   path
 ;;
 
+(* What [save_output] answers, as results quote it: absolute, in an output
+   directory, ending in [.log]. *)
+let output_paths text =
+  String.split_on_chars text ~on:[ ' '; '\n'; '\t'; '('; ')'; '"'; '\''; ',' ]
+  |> List.filter ~f:(fun word ->
+    String.is_prefix word ~prefix:"/"
+    && String.is_suffix word ~suffix:".log"
+    && String.is_substring word ~substring:"/prigh-output-")
+  |> List.dedup_and_sort ~compare:String.compare
+;;
+
+let is_own_output path =
+  String.is_prefix
+    path
+    ~prefix:
+      (Filename.concat
+         Filename.temp_dir_name
+         (sprintf "prigh-output-%d/" (Core_unix.getuid ())))
+;;
+
 let save_output (context : Tool.Context.t) output =
   save_output_in ~tmp:Filename.temp_dir_name ~call_id:context.call_id output
 ;;

@@ -365,6 +365,7 @@ let%expect_test
     Branch main
     Click for the session’s details · /compact frees context
     (Dictate (speak, then click again to stop)) (Send (Enter))
+    (/work work) (main) (Temporary)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event
@@ -406,7 +407,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
-    /quit how to leave (close the tab; /signout signs out)
+    /quit leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)

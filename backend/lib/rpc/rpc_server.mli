@@ -50,6 +50,18 @@ val create
   -> ?host_grace:float
        (** seconds the in-flight executions of a tool host whose connection
            dropped wait for it to come back with them (default: 60) *)
+  -> ?temporary_grace:float
+       (** seconds a temporary session without a client waits for one
+           before it ends (default: 120) *)
+  -> ?sleep:(float -> unit)
+       (** how the grace periods are waited for (default: the clock) *)
+  -> ?host_timeout:float
+       (** seconds after which a tool host that sends heartbeats (its
+           [features] have [heartbeat]: [prigh tool-host] pings every 10s)
+           and is silent is given up on: its connection is closed and what
+           it was running fails at once (default: 30) *)
+  -> ?heartbeat_clock:float Eio.Time.clock_ty Eio.Resource.t
+       (** what [host_timeout] is measured by (default: [env]'s clock) *)
   -> ?namespace:string
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)
@@ -76,6 +88,11 @@ val create
     come ([Session.resume_at]), so that they resume on time with nobody
     attached; one that cannot be loaded is skipped with a line on stderr. *)
 val restore_resumes : t -> unit
+
+(** Deletes what temporary sessions made that a backend stopped before
+    deleting ([Temporary_ledger]), on the hosts connected now (the others'
+    when they connect). *)
+val clean_leftovers : t -> unit
 
 (** Registers a client whose outgoing lines go through [send]; it starts
     in a new session in [cwd] (or the default one). With [signed_in] (the

@@ -44,6 +44,9 @@ let%expect_test "the names of the controls" =
     button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
+    button "Folder: /work. Change it" -- Start in another folder (/cd)
+    button "Branch: main. Change it" -- Work in another worktree (/worktree)
+    [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
@@ -53,6 +56,7 @@ let%expect_test "the names of the controls" =
     [group] div "Session status"
     [status] span "Ready"
     [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
+    [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;

@@ -42,7 +42,21 @@ let rpc ~env ~log remote ~query:_ ws =
         Websocket.send_text ws line;
         if not (Websocket.is_closed ws) then down ()
     in
-    Fiber.first up down;
+    (* A remote gone without a word ends the page's socket, which then
+       reconnects, rather than leaving the page waiting on it. *)
+    let watch () =
+      Backend_socket.heartbeat
+        socket
+        ~clock:(Eio.Stdenv.clock env)
+        ~on_silent:(fun seconds ->
+          log
+            (sprintf
+               "no reply from %s for %gs: closing the page's connection"
+               (Backend_address.to_string remote)
+               seconds))
+        ()
+    in
+    Fiber.any [ up; down; watch ];
     Backend_socket.close socket
 ;;
 

@@ -51,7 +51,9 @@ module Settings = struct
     @ Option.value_map t.prefer_host ~default:[] ~f:(fun host ->
       [ "prefer_host", `String host ])
     @ Option.value_map session ~default:[] ~f:(fun s ->
-      [ "session", `String s ])
+      [ "session", `String s ]
+      @ Option.value_map (Tab_memory.temporary_key_of s) ~default:[] ~f:(fun key ->
+        [ "temporary_key", `String key ]))
   ;;
 end
 
@@ -524,6 +526,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         ()
     | Auth_failed message -> Effect.of_sync_fun auth_failed message
     | Apply_update -> Effect.of_sync_fun Service_worker.apply_update ()
+    | Remember_temporary temporary ->
+      Effect.of_sync_fun Tab_memory.remember_temporary temporary
     | Set_url_session session ->
       Effect.of_sync_fun
         (fun () ->
@@ -533,7 +537,9 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
              ( model.account
              , Option.bind model.hello ~f:Prigh_protocol.Hello_reply.acting_as )
            with
-           | Some account, None -> Accounts.set_session storage account session
+           | Some account, None
+             when not (Option.exists model.state ~f:(fun s -> s.temporary)) ->
+             Accounts.set_session storage account session
            | _ -> ())
         ()
     | Expire_toast { id; after_ms } ->
@@ -577,6 +583,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
+    | Quit_desktop -> Effect.of_sync_fun Desktop_page.quit ()
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
     | Copy text -> Effect.of_sync_fun Browser.copy_to_clipboard text
     | Select_message n -> Effect.of_sync_fun Menu_listeners.select_message n
@@ -1415,6 +1422,7 @@ let run_app (settings : Settings.t) =
             ; current = Accounts.current storage ~backend:settings.backend
             });
        schedule (App.Action.Set_narrow (narrow ()));
+       schedule (App.Action.Set_desktop (Desktop_page.active ()));
        schedule
          (App.Action.Set_notification_permission
             (Page_notifications.permission ()));
@@ -1501,32 +1509,165 @@ let start () =
    any sign-out or refusal noted before. A code already used changes
    nothing. *)
 let sign_in_from_link code ~f =
-  Browser.post ~url:Signin_link.path ~body:code ~f:(fun reply ->
-    Option.iter
-      (Option.bind reply ~f:Signin_link.Credentials.of_json)
-      ~f:(fun (c : Signin_link.Credentials.t) ->
-        (match c.prefer_host with
-         | Some host -> Browser.set_item Signin_link.prefer_host_key host
-         | None -> Browser.remove_item Signin_link.prefer_host_key);
-        Accounts.activate
-          storage
-          { Accounts.Account.backend = (Settings.load ()).backend
-          ; user = c.user
-          ; token = c.token
-          ; session = None
-          };
-        ignore (Login.take_signed_out Login.Storage.browser : bool);
-        ignore (take_adding () : bool);
-        Browser.remove_item refused_key);
-    f ())
+  Browser.post
+    ~content_type:"text/plain"
+    ~url:Signin_link.path
+    ~body:code
+    ~f:(fun reply ->
+      Option.iter
+        (Option.bind reply ~f:Signin_link.Credentials.of_json)
+        ~f:(fun (c : Signin_link.Credentials.t) ->
+          (match c.prefer_host with
+           | Some host -> Browser.set_item Signin_link.prefer_host_key host
+           | None -> Browser.remove_item Signin_link.prefer_host_key);
+          Accounts.activate
+            storage
+            { Accounts.Account.backend = (Settings.load ()).backend
+            ; user = c.user
+            ; token = c.token
+            ; session = None
+            };
+          ignore (Login.take_signed_out Login.Storage.browser : bool);
+          ignore (take_adding () : bool);
+          Browser.remove_item refused_key);
+      f ())
+;;
+
+let signed_in_by_desktop = function
+  | Some code -> sign_in_from_link code ~f:start
+  | None -> start ()
+;;
+
+(* [prigh desktop] without a working connection: the backend to run this
+   computer's tools for, checked and saved by the sidecar. [unencrypted]:
+   the address the sidecar warned is not encrypted, which submitting
+   unchanged connects to anyway. *)
+let rec desktop_form
+          ~key
+          ?(connecting = false)
+          ?unencrypted
+          ~address
+          ~user
+          ~error
+          ()
+  =
+  let value = Option.value_map ~default:"" ~f:escape in
+  let confirming =
+    Option.is_some unencrypted
+    && [%equal: string option] unencrypted address
+  in
+  Browser.set_app_html
+    (sprintf
+       {|<div class="signin-page"><form class="signin" id="desktop-form">
+  <div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div>
+  <h1>Connect to a backend</h1>
+  <p class="signin-sub">prigh runs this computer's tools for a prigh backend (prigh serve). The connection is saved for next time.</p>
+  <p class="signin-error" role="alert">%s</p>
+  <label>Backend address <input id="address" name="address" value="%s" placeholder="wss://host/ws, or 127.0.0.1:7790 through an SSH tunnel" autofocus autocomplete="url" autocapitalize="off" spellcheck="false" inputmode="url"></label>
+  <label>User name <input id="user" name="user" value="%s" placeholder="optional" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+  <label>Password <input id="password" name="password" type="password" placeholder="the backend's token" autocomplete="current-password"></label>
+  <button class="btn %s" type="submit" id="desktop-connect"%s>%s</button>
+  <button class="btn ghost" type="button" id="desktop-quit">Quit prigh</button>
+</form></div>|}
+       (escape (Option.value error ~default:""))
+       (value address)
+       (value user)
+       (if confirming then "danger" else "primary")
+       (if connecting then " disabled" else "")
+       (if connecting
+        then "Connecting…"
+        else if confirming
+        then "Connect without encryption"
+        else "Connect"));
+  on_click "desktop-quit" Desktop_page.quit;
+  Option.iter
+    (Dom_html.getElementById_coerce "desktop-form" Dom_html.CoerceTo.form)
+    ~f:(fun form ->
+      ignore
+        (Dom_html.addEventListener
+           form
+           Dom_html.Event.submit
+           (Dom.handler (fun ev ->
+              Dom.preventDefault ev;
+              let field id =
+                Option.filter
+                  (Some (String.strip (Browser.input_value id)))
+                  ~f:(Fn.non String.is_empty)
+              in
+              let address = field "address" in
+              let user = field "user" in
+              let token = field "password" in
+              (match address with
+               | None ->
+                 desktop_form
+                   ~key
+                   ~address
+                   ~user
+                   ~error:
+                     (Some
+                        "Enter the backend's address: HOST:PORT (its -web or \
+                         -listen port), or a prigh-web URL such as \
+                         wss://host/ws.")
+                   ()
+               | Some address ->
+                 desktop_form
+                   ~key
+                   ~connecting:true
+                   ~address:(Some address)
+                   ~user
+                   ~error:None
+                   ();
+                 Desktop_page.connect
+                   ~key
+                   ~address
+                   ~user
+                   ~token
+                   ~plaintext:
+                     ([%equal: string option] unencrypted (Some address))
+                   ~f:(function
+                   | Some (Connected code) -> signed_in_by_desktop code
+                   | Some (Refused error) ->
+                     desktop_form
+                       ~key
+                       ~address:(Some address)
+                       ~user
+                       ~error:(Some error)
+                       ()
+                   | Some (Plaintext warning) ->
+                     desktop_form
+                       ~key
+                       ~unencrypted:address
+                       ~address:(Some address)
+                       ~user
+                       ~error:(Some warning)
+                       ()
+                   | None -> desktop_lost ()));
+              Js._false))
+           Js._false
+         : Dom_html.event_listener_id))
+
+and desktop_lost () =
+  Browser.set_app_html
+    {|<div class="signin-page"><div class="signin"><div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div><h1>prigh desktop is not answering</h1><p class="signin-error" role="alert">It has stopped, or this page is not its window: close it and start prigh again.</p></div></div>|}
+;;
+
+let desktop key =
+  Desktop_page.status ~key ~f:(function
+    | Some (Connect { address; user; error }) ->
+      desktop_form ~key ~address ~user ~error ()
+    | Some (Connected { code }) -> signed_in_by_desktop code
+    | None -> desktop_lost ())
 ;;
 
 let run () =
   Async_js.init ();
   Service_worker.register ();
-  match Signin_link.code_of_hash (Browser.hash ()) with
-  | Some code ->
-    Browser.clear_hash ();
-    sign_in_from_link code ~f:start
-  | None -> start ()
+  match Desktop_page.key () with
+  | Some key -> desktop key
+  | None ->
+    (match Signin_link.code_of_hash (Browser.hash ()) with
+     | Some code ->
+       Browser.clear_hash ();
+       sign_in_from_link code ~f:start
+     | None -> start ())
 ;;
