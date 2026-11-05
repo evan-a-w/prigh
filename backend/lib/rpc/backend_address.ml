@@ -96,7 +96,11 @@ let to_string t =
 ;;
 
 let web_url t =
-  sprintf "%s://%s%s/" (if t.tls then "https" else "http") (authority t) t.prefix
+  sprintf
+    "%s://%s%s/"
+    (if t.tls then "https" else "http")
+    (authority t)
+    t.prefix
 ;;
 
 let normalize text =
