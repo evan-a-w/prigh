@@ -273,3 +273,5 @@ echo 1.25 >"$zoom_file"
 real_scenario "the real sidecar at 125% zoom: a chip's menu, chosen with the real pointer" menu local
 rm "$zoom_file"
 real_scenario "the real sidecar, -ui remote: the backend's own site; its /quit ends the app" quit remote
+real_scenario "the real sidecar: Open in new window opens another app window; one sidecar" window local
+real_scenario "the real sidecar, -ui remote: Open in new window on the backend's site" window remote

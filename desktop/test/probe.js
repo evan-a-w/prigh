@@ -6,7 +6,10 @@
 // -ui remote, with its sign-in) and then quits with /quit; "menu" mode
 // first opens the thinking chip's menu on the new-session screen and
 // chooses from it with the real pointer (run.sh's report server moves and
-// clicks it with xdotool), hovering first.
+// clicks it with xdotool), hovering first. "window" mode sends a message,
+// then Ctrl+clicks its session in the sidebar: the page opens it in another
+// window (where this script runs too: it reports what that window shows and
+// closes it), and once that one has closed the first quits.
 (() => {
   // What it saw, for the report when the page is stuck: its requests and
   // errors.
@@ -87,6 +90,33 @@
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
+  // The window the first one opened (Open in new window), on ?session=.
+  const opened = new URLSearchParams(location.search).get("session");
+  const desktop = () =>
+    ["prigh.desktop_key", "prigh.desktop_app"].some(k => sessionStorage.getItem(k) !== null);
+  const openAnother = async composer => {
+    localStorage.removeItem("probe-window");
+    type(composer, "hello");
+    composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+    const session = await until(() => document.querySelector(".sessions .session-open"), 15000);
+    if (!session) return report("window: no session in the sidebar");
+    session.dispatchEvent(new MouseEvent("click", { ctrlKey: true, bubbles: true, cancelable: true }));
+    const seen = await until(() => localStorage.getItem("probe-window"), 30000);
+    await report(`window: the other window: ${seen || "nothing within 30s"}`);
+    // It has closed by now, or is closing: this window, and the app, go on.
+    await until(() => false, 1000);
+    await report(`window: the first window still works: ${document.querySelector(".composer textarea") !== null}`);
+  };
+  const anotherWindow = async () => {
+    const composer = await until(() => document.querySelector(".composer textarea"), 15000);
+    const seen = `on ?session=, desktop mode ${desktop()}, composer ${composer !== null}`;
+    localStorage.setItem("probe-window", seen);
+    location.href = "about:blank#prigh-desktop-test-close";
+  };
+  if (opened) {
+    anotherWindow();
+    return;
+  }
   let done = false;
   let submitted = false;
   let signedIn = false;
@@ -134,6 +164,7 @@
       // The window may close before anything sent after the /quit arrives.
       report("signed in").then(async () => {
         if ("@MODE@" === "menu") await chooseFromMenu();
+        if ("@MODE@" === "window") await openAnother(composer);
         type(composer, "/quit");
         composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
       });
