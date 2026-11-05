@@ -135,7 +135,9 @@ let open_window url =
       ~backend_site:(on_backend_site ())
       ~browser:(in_browser ())
   in
-  let url = Option.value_map fragment ~default:url ~f:(fun f -> url ^ "#" ^ f) in
+  let url =
+    Option.value_map fragment ~default:url ~f:(fun f -> url ^ "#" ^ f)
+  in
   let features =
     if in_browser ()
     then

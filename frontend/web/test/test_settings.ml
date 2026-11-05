@@ -509,7 +509,9 @@ let%expect_test "/settings completes the sections" =
     |}]
 ;;
 
-let%expect_test "a phone: the list of sections, one a level down, back to the list" =
+let%expect_test
+    "a phone: the list of sections, one a level down, back to the list"
+  =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.act h Open_settings;
@@ -525,7 +527,8 @@ let%expect_test "a phone: the list of sections, one a level down, back to the li
   H.type_ h "/settings account";
   H.act h Send;
   H.text h ~selector:".settings-dialog .modal-head h2";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     Settings
     (Close (Esc))

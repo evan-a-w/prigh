@@ -826,6 +826,5 @@ let%expect_test "output streamed while disconnected" =
     h
     {|{"event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"step 1\nstep 2\nstep 3\n","is_error":false}}|};
   Harness.text h ~selector:".chat .tool";
-  [%expect
-    {| (✓ bash make) |}]
+  [%expect {| (✓ bash make) |}]
 ;;

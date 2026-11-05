@@ -106,7 +106,7 @@ module Message : sig
     ; newest : bool (** nothing after it to trim *)
     ; running : bool (** a run is in progress: it cannot change *)
     ; select : bool
-    (** offer Select text: on a phone, where a long press opens the menu
+      (** offer Select text: on a phone, where a long press opens the menu
         rather than selecting *)
     }
   [@@deriving sexp_of, equal]

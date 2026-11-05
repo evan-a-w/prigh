@@ -1025,7 +1025,8 @@ let%expect_test
   H.key h "Escape" ~target:Page;
   H.right_click h ~selector:".session" ~nth:1;
   H.text h ~selector:".context-menu [data-item=switch_back]";
-  [%expect {|
+  [%expect
+    {|
     from ~/notes
     from /home/bob/notes
     (Open_menu
@@ -1136,7 +1137,8 @@ let%expect_test "a session in a new window" =
   H.middle_click h ~selector:".session-open" ~nth:1;
   print_endline "-- a plain click:";
   H.modified_click h ~selector:".session-open" ~nth:1;
-  [%expect {|
+  [%expect
+    {|
     (Open_menu
      ((target (Session /sessions/s2.jsonl)) (anchor (Element session-s2))))
     (Focus dialog)

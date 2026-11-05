@@ -635,7 +635,8 @@ let middle_click ?nth t ~selector =
     t
     ~selector
     ~event_name:"onmousedown"
-    [ "button", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.number_of_float 1.) ]
+    [ "button", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.number_of_float 1.)
+    ]
 ;;
 
 let input ?nth t ~selector text =
