@@ -1499,24 +1499,28 @@ let start () =
    any sign-out or refusal noted before. A code already used changes
    nothing. *)
 let sign_in_from_link code ~f =
-  Browser.post ~url:Signin_link.path ~body:code ~f:(fun reply ->
-    Option.iter
-      (Option.bind reply ~f:Signin_link.Credentials.of_json)
-      ~f:(fun (c : Signin_link.Credentials.t) ->
-        (match c.prefer_host with
-         | Some host -> Browser.set_item Signin_link.prefer_host_key host
-         | None -> Browser.remove_item Signin_link.prefer_host_key);
-        Accounts.activate
-          storage
-          { Accounts.Account.backend = (Settings.load ()).backend
-          ; user = c.user
-          ; token = c.token
-          ; session = None
-          };
-        ignore (Login.take_signed_out Login.Storage.browser : bool);
-        ignore (take_adding () : bool);
-        Browser.remove_item refused_key);
-    f ())
+  Browser.post
+    ~content_type:"text/plain"
+    ~url:Signin_link.path
+    ~body:code
+    ~f:(fun reply ->
+      Option.iter
+        (Option.bind reply ~f:Signin_link.Credentials.of_json)
+        ~f:(fun (c : Signin_link.Credentials.t) ->
+          (match c.prefer_host with
+           | Some host -> Browser.set_item Signin_link.prefer_host_key host
+           | None -> Browser.remove_item Signin_link.prefer_host_key);
+          Accounts.activate
+            storage
+            { Accounts.Account.backend = (Settings.load ()).backend
+            ; user = c.user
+            ; token = c.token
+            ; session = None
+            };
+          ignore (Login.take_signed_out Login.Storage.browser : bool);
+          ignore (take_adding () : bool);
+          Browser.remove_item refused_key);
+      f ())
 ;;
 
 let signed_in_by_desktop = function
