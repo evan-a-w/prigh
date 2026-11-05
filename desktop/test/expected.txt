@@ -120,12 +120,42 @@ page: connect form: Connect to a backend
 page: signed in
 saved connection: yes
 left running: nothing
+== the real sidecar: a chip's menu, chosen with the real pointer: exit 0
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-5
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: quit from the page
+sidecar: prigh desktop: quit
+page: signed in
+page: menu: the thinking chip's menu shows (5 levels), on screen: true; off reachable: true
+page: menu: the pointer over off: hovered true
+page: menu: clicked off: the menu closed, the chip says off
+saved connection: yes
+left running: nothing
+== the real sidecar at 125% zoom: a chip's menu, chosen with the real pointer: exit 0
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-8
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: quit from the page
+sidecar: prigh desktop: quit
+page: signed in
+page: menu: the thinking chip's menu shows (5 levels), on screen: true; off reachable: true
+page: menu: the pointer over off: hovered true
+page: menu: clicked off: the menu closed, the chip says off
+saved connection: yes
+left running: nothing
 == the real sidecar, -ui remote: the backend's own site; its /quit ends the app: exit 0
 prigh-desktop: starting PRIGH desktop -ui remote -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: showing the backend's prigh-web at http://127.0.0.1:PORT/
 prigh-desktop: the page's Quit: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
-sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-5
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-11
 sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
 sidecar: prigh desktop: connected to 127.0.0.1:PORT
 sidecar: prigh desktop: stdin closed: the window is gone
