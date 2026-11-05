@@ -1,0 +1,7 @@
+[package]
+name = "prigh-desktop-core"
+description = "The prigh desktop shell's logic, without the window: tested on its own"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

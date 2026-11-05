@@ -23,6 +23,7 @@ module Credentials = struct
     { token : string option
     ; user : string option
     }
+  [@@deriving sexp_of]
 end
 
 module Check = struct
@@ -121,6 +122,8 @@ module Check = struct
       | Flag
       | Env
       | Saved of string
+      | Form
+    [@@deriving sexp_of]
   end
 
   let explain
@@ -146,20 +149,32 @@ module Check = struct
            sprintf
              "The address is the saved connection (%s): pass -connect \
               HOST:PORT to replace it."
-             file)
+             file
+         | Form ->
+           "Check the address: HOST:PORT (its -web or -listen port), or a \
+            prigh-web URL such as wss://host/ws.")
     | Refused why ->
       sprintf
         "%s refused the login: %s\n%s"
         address
         why
-        (match token, user with
-         | None, _ ->
+        (match source, token, user with
+         | Form, None, _ ->
+           "No password was given: enter the backend's token (its -token, or \
+            yours from its -tokens) as the password."
+         | Form, Some _, None ->
+           "Check the password against the backend's token; if it serves \
+            several users (-tokens), also enter your user name."
+         | Form, Some _, Some _ ->
+           "Check the user name and password against the backend's -tokens \
+            NAME=TOKEN entries."
+         | (Flag | Env | Saved _), None, _ ->
            "No token was given: pass the backend's with -token SECRET (or \
             $PRIGH_TOKEN); it is saved for next time."
-         | Some _, None ->
+         | (Flag | Env | Saved _), Some _, None ->
            "Check -token (or $PRIGH_TOKEN) against the backend's; if it serves \
             several users (-tokens), also give -user NAME (or $PRIGH_USER)."
-         | Some _, Some _ ->
+         | (Flag | Env | Saved _), Some _, Some _ ->
            "Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against \
             the backend's -tokens NAME=TOKEN entries.")
     | Not_prigh_web why ->
@@ -182,7 +197,55 @@ module Listen = struct
   type t =
     | At of Eio.Net.Ipaddr.v4v6 * int
     | From of Eio.Net.Ipaddr.v4v6 * int
+    | From_or_any of Eio.Net.Ipaddr.v4v6 * int
+
+  let in_use exn =
+    match Net_error.unix_error exn with
+    | Some EADDRINUSE -> true
+    | _ -> false
+  ;;
+
+  let bind t serve =
+    match t with
+    | At (addr, port) -> addr, serve ~addr ~port
+    | From (addr, first) | From_or_any (addr, first) ->
+      let rec attempt port =
+        match serve ~addr ~port with
+        | bound -> addr, bound
+        | exception exn when in_use exn && port < first + 9 -> attempt (port + 1)
+        | exception exn
+          when in_use exn
+               &&
+               match t with
+               | From_or_any _ -> true
+               | At _ | From _ -> false -> addr, serve ~addr ~port:0
+      in
+      attempt first
+  ;;
 end
+
+let browser_host addr =
+  match Format.asprintf "%a" Eio.Net.Ipaddr.pp addr with
+  | "0.0.0.0" -> "127.0.0.1"
+  | "::" -> "::1"
+  | host -> host
+;;
+
+let not_a_backend ~what ~connect_to ~read_line:_ ~write_line =
+  write_line
+    (Json.to_string
+       (`Object
+           [ "type", `String "response"
+           ; "id", `Null
+           ; "ok", `False
+           ; ( "error"
+             , `String
+                 (sprintf
+                    "this is %s's site, not a backend: connect to %s"
+                    what
+                    connect_to) )
+           ]))
+;;
 
 module Config = struct
   type t =
@@ -209,6 +272,7 @@ let serve ~env ~sw ~log ~handoff (config : Config.t) ~addr ~port =
   Web_server.listen
     ~env
     ~sw
+    ~local:true
     ~routes:(fun request ->
       match Signin_handoff.route handoff request with
       | Some handler -> Some handler
@@ -219,40 +283,24 @@ let serve ~env ~sw ~log ~handoff (config : Config.t) ~addr ~port =
     ~websockets:(Web_proxy.websockets ~env ~log config.remote)
       (* The site does not speak for the backend to terminals: they can
          connect to it themselves. *)
-    ~on_lines:(fun ~read_line:_ ~write_line ->
-      write_line
-        (Json.to_string
-           (`Object
-               [ "type", `String "response"
-               ; "id", `Null
-               ; "ok", `False
-               ; ( "error"
-                 , `String
-                     (sprintf
-                        "this is prigh web's site, not a backend: connect to %s"
-                        (Backend_address.to_string config.remote)) )
-               ])))
+    ~on_lines:
+      (not_a_backend
+         ~what:"prigh web"
+         ~connect_to:(Backend_address.to_string config.remote))
     ()
 ;;
 
-let listen ~env ~sw ~log ~handoff (config : Config.t) =
-  match config.listen with
-  | At (addr, port) -> addr, serve ~env ~sw ~log ~handoff config ~addr ~port
-  | From (addr, first) ->
-    let rec attempt port =
-      match serve ~env ~sw ~log ~handoff config ~addr ~port with
-      | bound -> addr, bound
-      | exception exn
-        when port < first + 9
-             &&
-             match Net_error.unix_error exn with
-             | Some EADDRINUSE -> true
-             | _ -> false -> attempt (port + 1)
-    in
-    attempt first
-;;
+module Tool_host_config = struct
+  type t =
+    { remote : Backend_address.t
+    ; credentials : Credentials.t
+    ; name : string
+    ; host_id : string
+    ; cwd : string
+    }
+end
 
-let tool_host ~env ~sw ~log ~wait (config : Config.t) =
+let start_tool_host ~env ~sw ~log ~wait (config : Tool_host_config.t) =
   let state, set_state = Promise.create () in
   let settle value =
     if not (Promise.is_resolved state) then Promise.resolve set_state value
@@ -302,20 +350,28 @@ let start
          | Local -> Some config.host_id
          | Remote -> None)
   in
-  let addr, port = listen ~env ~sw ~log ~handoff config in
+  let addr, port =
+    Listen.bind config.listen (serve ~env ~sw ~log ~handoff config)
+  in
   let tool_host_state =
     match config.tools with
     | Remote -> `Off
-    | Local -> tool_host ~env ~sw ~log ~wait:tool_host_wait config
-  in
-  let host =
-    match Format.asprintf "%a" Eio.Net.Ipaddr.pp addr with
-    | "0.0.0.0" -> "127.0.0.1"
-    | "::" -> "::1"
-    | host -> host
+    | Local ->
+      (start_tool_host
+         ~env
+         ~sw
+         ~log
+         ~wait:tool_host_wait
+         { remote = config.remote
+         ; credentials = config.credentials
+         ; name = config.name
+         ; host_id = config.host_id
+         ; cwd = config.cwd
+         }
+        :> [ `Connected | `Connecting | `Refused of string | `Off ])
   in
   { Started.url =
-      Web_server.browser_url ~host ~port
+      Web_server.browser_url ~host:(browser_host addr) ~port
       ^ "#signin="
       ^ Signin_handoff.code handoff
   ; port

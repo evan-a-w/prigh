@@ -74,6 +74,7 @@ let%expect_test "every command does something (none is unknown)" =
     /hotkeys                   Hotkeys
     /settings                  Settings
     /new                       rpc new_session
+    /temporary                 rpc new_session
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
     /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
@@ -205,6 +206,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
+    Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
@@ -215,6 +217,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
     → / ← (reviewing; also ] [, n p, j k) the next / previous changed file
@@ -1862,12 +1865,6 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (tag Ignore))
     (Expire_toast (id 2) (after_ms 4780))
     What are we building?
-    /work
-    / commands
-    @ mention a file
-    ! run a command
-    Ctrl+L switch model
-    Ctrl+K find a session
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
     (Expire_toast (id 3) (after_ms 4620))

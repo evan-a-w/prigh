@@ -12,3 +12,8 @@ Both are MIT licensed; see `LICENSE-xterm` and `LICENSE-addon-fit`.
   to the woff2 fonts, which sit next to it (`url(KaTeX_X.woff2)`, not
   `fonts/`): every browser prigh-web supports reads woff2. MIT licensed; see
   `katex/LICENSE-katex`.
+
+- `temporal-polyfill.js`: temporal-polyfill 1.0.8 (`global.js`), loaded by
+  `index.html` only where the browser has no `Temporal` (e.g. WebKitGTK):
+  Core's time zones (`Timezone_js_loader`) need it, and Bonsai_web's start
+  asks for the local zone. MIT licensed; see `LICENSE-temporal-polyfill`.

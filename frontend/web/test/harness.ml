@@ -37,6 +37,7 @@ let act t action =
      | Cache_prefs _
      | Apply_theme _
      | Sign_out
+     | Quit_desktop
      | Reveal _
      | Copy _
      | Select_message _
@@ -59,6 +60,7 @@ let act t action =
      | Drop_connection
      | Reload_page _
      | Auth_failed _
+     | Remember_temporary _
      | Apply_update -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;

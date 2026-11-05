@@ -83,7 +83,11 @@ val run
     [tool_exec], [tool_exec_cancel], [tool_exec_input] and [terminal_*]
     events, reconnecting with exponential backoff (from
     [initial_backoff], default 0.5s, up to [max_backoff], default 10s) when
-    the connection fails or drops. Every [hello] carries the same [host_id]
+    the connection fails or drops, or the backend stops answering: it pings
+    the backend every [heartbeat_interval] seconds (default 10) and gives
+    up on a connection that brought nothing for [heartbeat_timeout]
+    (default 30; {!Backend_socket.heartbeat}); it says [heartbeat] in its
+    [features], so the backend gives up on it likewise. Every [hello] carries the same [host_id]
     (default: a random {!Host_id.generate}; [prigh tool-host] passes
     {!Host_id.load_or_create}'s), so the backend sees a reconnect as the
     same host and its sessions resume on it. Returns only when the backend
@@ -95,6 +99,8 @@ val connect
   -> ?log:(string -> unit)
   -> ?initial_backoff:Time_ns.Span.t
   -> ?max_backoff:Time_ns.Span.t
+  -> ?heartbeat_interval:float
+  -> ?heartbeat_timeout:float
   -> ?on_connect:(unit -> unit) (** after each accepted [hello] *)
   -> backend:Backend_address.t
   -> token:string option

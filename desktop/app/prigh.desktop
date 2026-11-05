@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=prigh
+GenericName=Coding agent
+Comment={{comment}}
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+StartupWMClass=prigh-desktop
+StartupNotify=true
+Keywords=agent;ai;coding;llm;

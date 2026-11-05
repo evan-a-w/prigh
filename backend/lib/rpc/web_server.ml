@@ -140,13 +140,29 @@ let is_json_lines reader =
   | exception (End_of_file | Eio.Io _) -> false
 ;;
 
-let handle ?clock ?(routes = fun _ -> None) ~root ~websockets ~on_lines flow =
+let handle
+      ?clock
+      ?local_port
+      ?(routes = fun _ -> None)
+      ~root
+      ~websockets
+      ~on_lines
+      flow
+  =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
+  let refused (request : Request.t) =
+    match local_port with
+    | None -> None
+    | Some port ->
+      Result.error (Local_site.check ~port ~headers:request.headers)
+  in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
   else (
     match Request.parse reader with
     | None -> ()
+    | Some request when Option.is_some (refused request) ->
+      respond flow (Option.value_exn (refused request))
     | Some request when Option.is_some (upgrade_handler ~websockets request) ->
       let on_websocket =
         Option.value_exn (upgrade_handler ~websockets request)
@@ -226,14 +242,20 @@ let no_delay flow =
 (* A peer that vanished without a word (a laptop suspended, a network gone)
    is noticed within a minute even while nothing is sent to it: until then
    it still counts as connected, and as a tool host it would be sent tool
-   calls nobody answers. *)
+   calls nobody answers. Keepalive probes only go while nothing is sent:
+   what was sent and is not acknowledged within a minute (a tool call to a
+   host that went) ends the connection too (Linux only). A peer that is
+   there but does not answer (a frozen process) takes the heartbeats of
+   [Rpc_server] and [Backend_socket]. *)
 let keepalive flow =
-  try
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE true;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE 30;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL 10;
-    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT 3
-  with
+  (try
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE true;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE 30;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL 10;
+     Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT 3
+   with
+   | _ -> ());
+  try Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_USER_TIMEOUT 60_000 with
   | _ -> ()
 ;;
 
@@ -302,7 +324,18 @@ let serve_terminal router terminals ~query ws =
      | `Unavailable reason -> error ("no terminal: " ^ reason))
 ;;
 
-let listen ~env ~sw ?routes ~addr ~port ~root ~websockets ~on_lines () =
+let listen
+      ~env
+      ~sw
+      ?(local = false)
+      ?routes
+      ~addr
+      ~port
+      ~root
+      ~websockets
+      ~on_lines
+      ()
+  =
   let socket =
     Eio.Net.listen
       ~sw
@@ -328,6 +361,7 @@ let listen ~env ~sw ?routes ~addr ~port ~root ~websockets ~on_lines () =
          keepalive flow;
          handle
            ~clock:(Eio.Stdenv.clock env)
+           ?local_port:(Option.some_if local port)
            ?routes
            ~root
            ~websockets

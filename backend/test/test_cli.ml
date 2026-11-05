@@ -74,7 +74,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -web :99999: the port must be a number from 0 to 65535
     [exit 2]
     $ prigh tool-host -connect 7777
-    -connect: "7777" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
+    prigh tool-host: -connect: "7777" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
     [exit 2]
     |}]
 ;;
@@ -302,6 +302,28 @@ let%expect_test "serve: a taken port, a refused tool host" =
   prigh t [ "tool-host"; "-connect"; address ];
   prigh t [ "tool-host"; "-connect"; address; "-token"; "bad" ];
   prigh t [ "tool-host"; "-connect"; address; "-token"; "bad"; "-user"; "me" ];
+  (* The saved connection: -remote uses it, and -connect to its address
+     takes its token. *)
+  prigh t [ "tool-host"; "-remote" ];
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    (sprintf "((connect %s) (token stale))" address);
+  prigh t [ "tool-host"; "-remote" ];
+  prigh t [ "tool-host"; "-connect"; address ];
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    (sprintf "((connect %s) (token good))" address);
+  let host = spawn t [ "tool-host"; "-remote"; "-name"; "box" ] in
+  let err = Core_unix.in_channel_of_descr host.stderr in
+  let line = Option.value_exn (In_channel.input_line err) in
+  print_endline
+    (String.substr_replace_all line ~pattern:address ~with_:"127.0.0.1:PORT"
+     |> String.split ~on:' '
+     |> List.take_while ~f:(Fn.non (String.equal "as"))
+     |> String.concat ~sep:" ");
+  stop host;
   stop server;
   [%expect
     {|
@@ -315,7 +337,7 @@ let%expect_test "serve: a taken port, a refused tool host" =
     [exit 2]
     $ prigh tool-host -connect 127.0.0.1:PORT
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
-    No token was given: pass the backend's with -token SECRET (or $PRIGH_TOKEN).
+    No token was given, and none is saved for 127.0.0.1:PORT: pass the backend's with -token SECRET (or $PRIGH_TOKEN), or sign in once with prigh-tui -connect 127.0.0.1:PORT -token SECRET (or prigh web -connect 127.0.0.1:PORT -token SECRET), which saves it.
     [exit 1]
     $ prigh tool-host -connect 127.0.0.1:PORT -token bad
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
@@ -325,6 +347,18 @@ let%expect_test "serve: a taken port, a refused tool host" =
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
     Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the backend's -tokens NAME=TOKEN (or -host-tokens) entries.
     [exit 1]
+    $ prigh tool-host -remote
+    prigh tool-host: no backend to connect to: pass -connect HOST:PORT (or a prigh-web URL such as wss://host/ws) and -token SECRET, set $PRIGH_CONNECT, or save a connection first with prigh-tui -connect HOST:PORT -token SECRET (or prigh web -connect HOST:PORT -token SECRET).
+    [exit 2]
+    $ prigh tool-host -remote
+    prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    The credentials are the ones saved for 127.0.0.1:PORT in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect 127.0.0.1:PORT -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    [exit 1]
+    $ prigh tool-host -connect 127.0.0.1:PORT
+    prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    The credentials are the ones saved for 127.0.0.1:PORT in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect 127.0.0.1:PORT -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    [exit 1]
+    prigh tool-host: connected to 127.0.0.1:PORT
     |}]
 ;;
 
@@ -529,5 +563,85 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
       none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
+    |}]
+;;
+
+let%expect_test "desktop: the URL as a JSON line; stdin closing ends it" =
+  with_sandbox
+  @@ fun t ->
+  write t "site/index.html" "";
+  let site = Filename.concat t.dir "site" in
+  prigh t [ "desktop"; "-web-root"; site; "-cwd"; "/nonexistent" ];
+  prigh t [ "desktop"; "-tools"; "elsewhere" ];
+  let p =
+    spawn
+      t
+      [ "desktop"; "-listen"; "127.0.0.1:0"; "-web-root"; site; "-cwd"; t.dir ]
+  in
+  let out = Core_unix.in_channel_of_descr p.stdout in
+  let line = In_channel.input_line_exn out in
+  let url =
+    match Jsonaf.parse line with
+    | Ok (`Object [ ("url", `String url) ]) -> url
+    | _ -> failwithf "not the URL's line: %s" line ()
+  in
+  let shown =
+    match String.lsplit2 url ~on:'#' with
+    | Some (base, key) ->
+      sprintf
+        "%s#%s (%d hex digits)"
+        (Re.replace_string
+           (Re.compile (Re.Perl.re ":[0-9]+/"))
+           ~by:":PORT/"
+           base)
+        (String.prefix key 8)
+        (String.length key - 8)
+    | None -> url
+  in
+  print_endline shown;
+  Core_unix.close p.stdin;
+  let rest = In_channel.input_all out in
+  let err = In_channel.input_all (Core_unix.in_channel_of_descr p.stderr) in
+  printf "more stdout: %S\n" rest;
+  print_s [%sexp (Core_unix.waitpid p.pid : Core_unix.Exit_or_signal.t)];
+  print_endline
+    (err
+     |> Re.replace_string
+          (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/"))
+          ~by:"127.0.0.1:PORT/"
+     |> Re.replace_string
+          (Re.compile (Re.Perl.re "#desktop=[0-9a-f]+"))
+          ~by:"#desktop=<key>");
+  [%expect
+    {|
+    $ prigh desktop -web-root $DIR/site -cwd /nonexistent
+    prigh desktop: -cwd /nonexistent: no such directory (mkdir -p it first)
+    [exit 2]
+    $ prigh desktop -tools elsewhere
+    prigh desktop: -tools elsewhere: local (run tools on this machine) or remote (on the backend)
+    [exit 2]
+    http://127.0.0.1:PORT/#desktop= (32 hex digits)
+    more stdout: ""
+    (Ok ())
+    prigh desktop: prigh-web on http://127.0.0.1:PORT/
+    prigh desktop: stdin closed: the window is gone
+    |}];
+  (* SIGTERM (the shell's fallback) quits the same way. *)
+  let p =
+    spawn
+      t
+      [ "desktop"; "-listen"; "127.0.0.1:0"; "-web-root"; site; "-cwd"; t.dir ]
+  in
+  let out = Core_unix.in_channel_of_descr p.stdout in
+  ignore (In_channel.input_line_exn out : string);
+  Signal_unix.send_i Signal.term (`Pid p.pid);
+  let err = In_channel.input_all (Core_unix.in_channel_of_descr p.stderr) in
+  print_s [%sexp (Core_unix.waitpid p.pid : Core_unix.Exit_or_signal.t)];
+  print_endline (List.last_exn (String.split_lines (String.strip err)));
+  Core_unix.close p.stdin;
+  [%expect
+    {|
+    (Ok ())
+    prigh desktop: stopped by a signal
     |}]
 ;;

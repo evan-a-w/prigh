@@ -294,6 +294,7 @@ module Command = struct
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
     | Sign_out
+    | Quit_desktop
     | Reveal of string list
     (** scroll the main chat to a subagent's card: the call ids from the
         top-level one down *)
@@ -327,6 +328,7 @@ module Command = struct
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying this *)
     | Apply_update
+    | Remember_temporary of (string * string) option
   [@@deriving sexp_of, equal]
 end
 
@@ -361,6 +363,8 @@ module Action = struct
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
+    | Set_desktop of bool
+    | Quit_desktop
     | Page_hidden of bool
     | Restore_prefs of
         { prefs : Prefs.Change.t list
@@ -383,6 +387,15 @@ module Action = struct
     | Complete_choose of int
     | Complete_close
     | New_session
+    | Set_temporary of bool
+    | New_temporary
+    (** Ctrl+Shift+O: a new temporary session; on the new-session screen,
+        the Temporary chip *)
+    | Temporary_menu
+    | Keep_session
+    | Delete_temporary
+    | Leave_keep
+    | Leave_delete
     | Switch_session of string
     | Ask_delete of string
     | Select_sessions of bool
@@ -611,6 +624,7 @@ module Model = struct
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
     ; narrow : bool
+    ; desktop : bool
     ; draft : string
     ; cursor : int
     ; completion : Completion.t option
@@ -668,11 +682,15 @@ module Model = struct
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
           transcript stays on show, read-only *)
+    ; want_temporary : bool option
+    ; leaving : Action.t option
+    ; leave_ok : bool
+    ; landing : bool
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
-    (* A phone's settings show the list of sections, not one of them. *)
+      (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool
     ; return_to_settings : bool
     ; theme : Theme.t
@@ -868,6 +886,7 @@ let init =
   ; now = None
   ; utc_offset = Time_ns.Span.zero
   ; narrow = false
+  ; desktop = false
   ; draft = ""
   ; cursor = 0
   ; completion = None
@@ -923,6 +942,10 @@ let init =
   ; trimmed = Trimmed.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
+  ; want_temporary = None
+  ; leaving = None
+  ; leave_ok = false
+  ; landing = false
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; compact_at = Compact_at.empty
@@ -958,6 +981,17 @@ let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
 ;;
 
 let error m text = toast m ~error:true text
+
+(* In a browser there is nothing to quit: the tab is closed instead. *)
+let quit_desktop (m : Model.t) =
+  if m.desktop
+  then m, [ Command.Quit_desktop ]
+  else
+    toast
+      m
+      "Close the tab to leave: the session stays in the backend (/signout \
+       signs out)."
+;;
 
 (* What a trim, or its undo, did to the context: only the latest shows. *)
 let context_toast m text =
@@ -1215,6 +1249,9 @@ let is_current (m : Model.t) path =
    page forgotten if it changed since it came (it is refreshed then). *)
 let keep_chat (m : Model.t) =
   match session_path m with
+  (* A temporary session's transcript goes with it. *)
+  | Some path when Option.exists m.state ~f:(fun s -> s.temporary) ->
+    Chat_cache.remove m.chat_cache path
   | Some path when not m.pending.messages ->
     let entry =
       match Chat_cache.find m.chat_cache path with
@@ -1362,6 +1399,9 @@ let set_state_without_files (m : Model.t) (state : State.t) =
           List.filter m.toasts ~f:(fun t ->
             not (t.error || Option.is_some t.undo))
       ; session_gone = None
+      ; want_temporary = None
+      ; leaving = None
+      ; landing = false
       }
     , cancel_btw m
       @ cancel_generate m
@@ -1415,7 +1455,22 @@ let host_label (m : Model.t) (h : Host.t) =
     | _ -> h.name)
 ;;
 
+(* The session's host stays in the list while it is offline (gone, or given
+   up on when it stopped answering), dimmed: choosing it says why not. *)
 let hosts_list (m : Model.t) (state : State.t) =
+  let offline =
+    match Active_host.of_state state with
+    | Disconnected { id; name } ->
+      [ Picker.Item.create
+          ~id
+          ~detail:"offline: waiting for it to reconnect"
+          ~search:(name ^ " " ^ id ^ " offline")
+          ~marked:true
+          ~dimmed:true
+          name
+      ]
+    | Connected _ | Unset -> []
+  in
   Picker.create
     ~title:"Where tools run"
     (List.map state.hosts ~f:(fun h ->
@@ -1424,7 +1479,8 @@ let hosts_list (m : Model.t) (state : State.t) =
          ~detail:h.cwd
          ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
          ~marked:(String.equal h.id state.active_host)
-         (host_label m h)))
+         (host_label m h))
+     @ offline)
 ;;
 
 (* The hosts' menu follows hosts coming and going, keeping what is typed. *)
@@ -3033,7 +3089,8 @@ let open_chip (m : Model.t) (chip : Chip.t) =
    focus nowhere). *)
 let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
   match before.dialog with
-  | Some (Popover { chip = Model; _ }) -> m, cmds @ [ Command.Focus "popover-filter" ]
+  | Some (Popover { chip = Model; _ }) ->
+    m, cmds @ [ Command.Focus "popover-filter" ]
   | _ -> m, cmds
 ;;
 
@@ -3488,9 +3545,10 @@ let dictation_models_picker (m : Model.t) =
     let current = config.dictation_model in
     let suggestions =
       Prigh_ui.Dictation_command.suggestions
-      @ if has_groq m
-        then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
-        else []
+      @
+      if has_groq m
+      then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
+      else []
     in
     let suggested =
       List.map suggestions ~f:(fun (key, detail) ->
@@ -3503,12 +3561,8 @@ let dictation_models_picker (m : Model.t) =
     in
     let configured =
       match current with
-      | Some key
-        when not
-               (List.Assoc.mem
-                  suggestions
-                  ~equal:String.equal
-                  key) ->
+      | Some key when not (List.Assoc.mem suggestions ~equal:String.equal key)
+        ->
         [ Picker.Item.create
             ~id:key
             ~detail:"configured"
@@ -3884,7 +3938,16 @@ let account_menu (m : Model.t) =
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
                  "Sign out"
-             ])
+             ]
+           @
+           if m.desktop
+           then
+             [ Picker.Item.create
+                 ~id:"quit"
+                 ~detail:"close the desktop app and its tool host (Ctrl+Q)"
+                 "Quit prigh"
+             ]
+           else [])
     }
 ;;
 
@@ -3946,6 +4009,9 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; worktrees = Worktrees.reset m.worktrees
     ; pending = In_flight.none
     ; session_gone = None
+    ; want_temporary = None
+    ; leaving = None
+    ; landing = false
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
     ; tabs = Session_tabs.reset m.tabs
@@ -3980,6 +4046,7 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, "quit" -> quit_desktop m
   | _, "settings" -> open_settings m
   | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
@@ -4855,6 +4922,61 @@ let new_session (m : Model.t) =
   , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
 ;;
 
+let temporary (m : Model.t) = Option.exists m.state ~f:(fun s -> s.temporary)
+
+(* What leaving a temporary session would stop. *)
+let temporary_working (m : Model.t) =
+  match m.state with
+  | Some s when s.temporary ->
+    s.running
+    || List.exists s.subagents ~f:(fun a -> a.running)
+    || List.exists s.jobs ~f:(fun j -> j.running)
+  | _ -> false
+;;
+
+let temporary_shown (m : Model.t) =
+  Option.value m.want_temporary ~default:(temporary m)
+;;
+
+(* A new session with nothing in it yet: the new-session screen. *)
+let fresh (m : Model.t) =
+  match m.state with
+  | Some s ->
+    s.message_count = 0
+    && List.is_empty (Chat.entries m.chat)
+    && List.is_empty m.pending.prompts
+  | None -> false
+;;
+
+let new_temporary_session (m : Model.t) ~temporary =
+  let m, cmds = new_session m in
+  ( { m with want_temporary = Some temporary }
+  , List.map cmds ~f:(function
+      | Command.Rpc ({ method_ = "new_session"; _ } as r) ->
+        Command.Rpc
+          { r with params = r.params @ [ "temporary", Json.bool temporary ] }
+      | cmd -> cmd) )
+;;
+
+(* The Temporary chip of the new-session screen: the empty session shown
+   gives way to one of the other kind (an empty session leaves nothing). *)
+let set_temporary (m : Model.t) on =
+  if Bool.equal on (temporary_shown m)
+  then m, [ focus_editor ]
+  else new_temporary_session m ~temporary:on
+;;
+
+let keep_session (m : Model.t) =
+  if not (temporary m)
+  then m, []
+  else (
+    let m = { m with dialog = None } in
+    let m, toast =
+      toast m "Kept: this session is saved, and in your sessions"
+    in
+    m, (rpc "keep_session" [] ~tag:Reload_state :: toast) @ [ focus_editor ])
+;;
+
 let switch_tab (m : Model.t) id =
   match List.find (shown_tabs m) ~f:(fun (id', _) -> String.equal id id') with
   | Some (_, Some s) -> switch_session m s.path
@@ -5592,6 +5714,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "settings", arg -> settings_command m arg
   | "nix-gc", rest when superuser m -> nix_gc_command m rest
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
+  | "temporary", _ when temporary m -> open_dialog m Temporary_menu
+  | "temporary", _ -> new_temporary_session m ~temporary:true
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
     (match Prigh_ui.Model_match.resolve m.models query with
@@ -5985,11 +6109,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       { m with chat = Chat.empty; paging = Paging.all }
       "Cleared the view; the conversation is kept (a reload shows it, /new \
        starts afresh)"
-  | "quit", _ ->
-    toast
-      m
-      "Close the tab to leave: the session stays in the backend (/signout \
-       signs out)."
+  | "quit", _ -> quit_desktop m
   | name, _ ->
     error
       m
@@ -7558,10 +7678,18 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        decode m state State.of_json ~f:(fun state ->
          if superseded m state
          then m, []
-         else
-           set_state
-             { m with pending = { m.pending with session = None } }
-             state)
+         else (
+           let m, cmds =
+             set_state
+               { m with pending = { m.pending with session = None } }
+               state
+           in
+           match field json "temporary_key" with
+           | Some (`String key) when state.temporary ->
+             ( m
+             , cmds
+               @ [ Command.Remember_temporary (Some (state.session_id, key)) ] )
+           | _ -> m, cmds))
      | None -> m, [ rpc "get_state" [] ~tag:State ])
   | Page { path; before = None }, Ok json ->
     decode m json Message_page.of_json ~f:(fun page ->
@@ -8178,6 +8306,21 @@ let main_event (m : Model.t) (event : Event.t) =
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
   | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Temporary_ended { messages; kept; _ } ->
+    let m, deleted =
+      if messages > 0 then toast m "Temporary session deleted" else m, []
+    in
+    let m, kept =
+      List.fold kept ~init:(m, []) ~f:(fun (m, cmds) (path, why) ->
+        let text =
+          if String.is_substring why ~substring:"uncommitted changes"
+          then sprintf "Kept the worktree %s: it has uncommitted changes" path
+          else sprintf "Couldn't delete %s: %s" path why
+        in
+        let m, more = toast m text in
+        m, cmds @ more)
+    in
+    m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
@@ -8282,36 +8425,40 @@ let send (m : Model.t) ~follow_up =
   (* The errors were about what was sent before. *)
   let m = { m with toasts = List.filter m.toasts ~f:(fun t -> not t.error) } in
   let sent (m : Model.t) =
-    let history = History.add m.history text in
-    let m = { (set_draft m "") with history; completion = None } in
-    (* The backend's is the one that counts: once it has answered, ours
+    let m = { m with landing = m.landing || fresh m } in
+    if temporary m
+    then { (set_draft m "") with completion = None }, []
+    else (
+      let history = History.add m.history text in
+      let m = { (set_draft m "") with history; completion = None } in
+      (* The backend's is the one that counts: once it has answered, ours
        waits for the next page load. *)
-    ( m
-    , (match m.prefs.remote, acting_as m with
-       | Kept, None -> []
-       | (Unknown | Local), _ | Kept, Some _ ->
-         [ Command.Cache_prefs
-             [ { key = Key.history
-               ; value =
-                   Some
-                     (`Array
-                         (List.map (History.to_list history) ~f:(fun s ->
-                            `String s)))
-               }
-             ]
-         ])
-      @
-      if saves_prefs m
-      then
-        [ rpc
-            "push_pref"
-            (Prefs.push_params
-               ~key:Key.history
-               (`String text)
-               ~max:Pref_sync.history_max)
-            ~tag:Ignore
-        ]
-      else [] )
+      ( m
+      , (match m.prefs.remote, acting_as m with
+         | Kept, None -> []
+         | (Unknown | Local), _ | Kept, Some _ ->
+           [ Command.Cache_prefs
+               [ { key = Key.history
+                 ; value =
+                     Some
+                       (`Array
+                           (List.map (History.to_list history) ~f:(fun s ->
+                              `String s)))
+                 }
+               ]
+           ])
+        @
+        if saves_prefs m
+        then
+          [ rpc
+              "push_pref"
+              (Prefs.push_params
+                 ~key:Key.history
+                 (`String text)
+                 ~max:Pref_sync.history_max)
+              ~tag:Ignore
+          ]
+        else [] ))
   in
   let attached = not (List.is_empty m.files.attachments) in
   match Slash.parse text with
@@ -8736,7 +8883,15 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some host -> host_prompt m host
        | None ->
-         error m (sprintf "Tool host %s has gone: /host lists them." item.id))
+         error
+           m
+           (if item.dimmed
+            then
+              sprintf
+                "%s is offline: pick another host, or run prigh tool-host \
+                 -connect there to bring it back."
+                item.label
+            else sprintf "Tool host %s has gone: /host lists them." item.label))
     | Users -> act_as m item.id
     | Accounts -> account_chosen m item.id
     | Skills -> edit m ("/skill:" ^ item.id ^ " ")
@@ -8858,6 +9013,9 @@ let respond_login (m : Model.t) (flow : Login_flow.t) =
 let dialog_accept (m : Model.t) =
   match m.dialog with
   | None -> m, []
+  | Some Temporary_menu -> keep_session m
+  (* [update] has it *)
+  | Some Leave_temporary -> m, []
   | Some (Picker { kind = Accents; picker })
     when Option.is_some (Theme.Accent.of_string (Picker.query picker)) ->
     accent_named { m with dialog = None } (Picker.query picker)
@@ -9024,8 +9182,11 @@ let update_connected (m : Model.t) (action : Action.t) =
       @ (if Page_notify.equal notifications m.notifications
          then []
          else [ Command.Set_title (Page_notify.title notifications) ])
-      @ Option.value_map notification ~default:[] ~f:(fun n ->
-        [ Command.Notify n ]) )
+      (* the system keeps them: a temporary session leaves none *)
+      @ Option.value_map
+          (Option.filter notification ~f:(fun _ -> not (temporary m)))
+          ~default:[]
+          ~f:(fun n -> [ Command.Notify n ]) )
   | Page_hidden hidden ->
     let notifications = Page_notify.set_hidden m.notifications hidden in
     let title =
@@ -9098,6 +9259,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
+  | Set_desktop desktop -> { m with desktop }, []
+  | Quit_desktop -> quit_desktop m
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
     then m, []
@@ -9130,6 +9293,16 @@ let update_connected (m : Model.t) (action : Action.t) =
        accept_completion { m with completion = Some c } ~run:true)
   | Complete_close -> { m with completion = None }, []
   | New_session -> new_session m
+  | Set_temporary on -> set_temporary m on
+  | New_temporary when fresh m -> set_temporary m (not (temporary_shown m))
+  | New_temporary -> new_temporary_session m ~temporary:true
+  | Temporary_menu ->
+    if temporary m then open_dialog m Temporary_menu else m, []
+  | Keep_session -> keep_session m
+  | Delete_temporary ->
+    new_temporary_session { m with dialog = None } ~temporary:false
+  (* [update] has them *)
+  | Leave_keep | Leave_delete -> m, []
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
     if Set.mem m.marks.marked path
@@ -9657,7 +9830,52 @@ let settle (m : Model.t) cmds =
   | _ -> m, cmds
 ;;
 
-let update (m : Model.t) (action : Action.t) =
+(* What leaves the session (for another, or another user). *)
+let leaves cmds =
+  List.exists cmds ~f:(function
+    | Command.Rpc { method_ = "new_session" | "switch_session" | "set_user"; _ }
+    | Switch_account _ | Sign_out -> true
+    | _ -> false)
+;;
+
+(* Leaving a temporary session deletes it: while it works, the user says
+   so first ([Leave_temporary]). *)
+let rec update (m : Model.t) (action : Action.t) =
+  match action, m.leaving with
+  (* Stay: what would have left is dropped, the command typed too. *)
+  | Close_dialog, Some leaving ->
+    let m = { m with leaving = None; dialog = None } in
+    (match leaving with
+     | Send | Send_follow_up ->
+       { (set_draft m "") with completion = None }, [ focus_editor ]
+     | _ -> m, [ focus_editor ])
+  | Dialog_accept, _
+    when [%equal: Dialog.t option] m.dialog (Some Leave_temporary) ->
+    update m Leave_delete
+  | (Leave_keep | Leave_delete), None -> close_dialog m
+  | (Leave_keep | Leave_delete), Some leaving ->
+    let m = { m with leaving = None; dialog = None; leave_ok = true } in
+    let m, keep =
+      match action with
+      | Leave_keep ->
+        let m, toast =
+          toast m "Kept: this session is saved, and in your sessions"
+        in
+        m, rpc "keep_session" [] ~tag:Ignore :: toast
+      | _ -> m, []
+    in
+    let m, cmds = update m leaving in
+    { m with leave_ok = false }, keep @ cmds
+  | _ ->
+    let m', cmds = update_unguarded m action in
+    (match action with
+     | Delete_temporary -> m', cmds
+     | _ when temporary_working m && (not m.leave_ok) && leaves cmds ->
+       ( { m with leaving = Some action; dialog = Some Leave_temporary }
+       , [ Command.Focus "dialog" ] )
+     | _ -> m', cmds)
+
+and update_unguarded (m : Model.t) (action : Action.t) =
   let m', cmds = update_connected m action in
   (* The drawer over the review goes with it. *)
   let m' =

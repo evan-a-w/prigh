@@ -77,6 +77,7 @@ let where (state : P.State.t option) =
   | None -> "prigh"
   | Some s ->
     (match s.session_name with
+     | _ when s.temporary -> "Temporary session"
      | Some name when not (String.is_empty (String.strip name)) -> name
      | _ ->
        (match List.last (String.split s.cwd ~on:'/') with

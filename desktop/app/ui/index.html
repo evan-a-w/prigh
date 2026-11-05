@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>prigh</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: grid; place-items: center;
+        background: #1b1e23; color: #9aa3ad;
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: light) { body { background: #f6f6f4; color: #555; } }
+      .dot { display: inline-block; width: .5em; height: .5em; margin-right: .6em;
+             border-radius: 50%; background: currentColor; animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 50% { opacity: .25; } }
+    </style>
+  </head>
+  <body>
+    <p><span class="dot"></span>Starting prigh…</p>
+  </body>
+</html>

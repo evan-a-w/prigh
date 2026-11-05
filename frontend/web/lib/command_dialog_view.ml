@@ -708,6 +708,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (trim_after_confirm m point ~busy ~error ~inject)
   | Nix_gc_confirm generations -> Some (nix_gc_confirm generations ~inject)
   | Annotate _ -> None
+  | Temporary_menu -> Some (Temporary_view.menu ~inject)
+  | Leave_temporary -> Some (Temporary_view.leave m ~inject)
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)

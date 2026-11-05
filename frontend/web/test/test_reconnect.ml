@@ -599,7 +599,7 @@ let%expect_test "losing the connection while a session loads" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
-    Loading the session…
+    What are we building?
     |}];
   Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
   Harness.quiet h (fun () ->

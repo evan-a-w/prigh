@@ -740,6 +740,7 @@ let serve_command =
              ()
          in
          Rpc_server.restore_resumes server;
+         Rpc_server.clean_leftovers server;
          server
        in
        let router =
@@ -843,8 +844,8 @@ let tool_host_command =
   Command.basic
     ~summary:
       "Run tools and terminals on this machine for a backend: as a frontend's \
-       worker (JSON lines on stdin/stdout), or with -connect as a tool host \
-       connected to the backend over TCP"
+       worker (JSON lines on stdin/stdout), or with -connect or -remote as a \
+       tool host connected to the backend"
     (let%map_open.Command connect =
        flag
          "-connect"
@@ -853,18 +854,27 @@ let tool_host_command =
            "HOST:PORT|URL connect to a backend's JSON-lines port (-listen or \
             -web), or to its prigh-web URL (wss://host/ws behind a TLS proxy), \
             and serve it, reconnecting when the connection drops"
+     and remote =
+       flag
+         "-remote"
+         no_arg
+         ~doc:
+           " connect to $PRIGH_CONNECT, else the connection saved by prigh-tui \
+            or prigh web (~/.prigh/tui-connection.sexp), as -connect does"
      and token =
        flag
          "-token"
          (optional string)
-         ~doc:"SECRET the backend's token (default: $PRIGH_TOKEN)"
+         ~doc:
+           "SECRET the backend's token (default: $PRIGH_TOKEN, else the saved \
+            one when connecting to the saved address)"
      and user =
        flag
          "-user"
          (optional string)
          ~doc:
            "NAME the user (namespace) name to log in as, with -token as its \
-            password (default: $PRIGH_USER)"
+            password (default: $PRIGH_USER, else the saved one)"
      and name =
        flag
          "-name"
@@ -885,8 +895,8 @@ let tool_host_command =
          ~doc:"DIR the host's directory (default: the current one)"
      in
      fun () ->
-       match connect with
-       | None ->
+       if Option.is_none connect && not remote
+       then
          Eio_main.run
          @@ fun env ->
          Tool_host.run
@@ -894,62 +904,109 @@ let tool_host_command =
            ~input:(Eio.Stdenv.stdin env)
            ~output:(Eio.Stdenv.stdout env)
            ()
-       | Some spec ->
-         let backend =
-           match Backend_address.parse spec with
-           | Ok backend -> backend
+       else (
+         let home = home () in
+         let fail fmt =
+           ksprintf
+             (fun message ->
+                eprintf "prigh tool-host: %s\n%!" message;
+                exit 2)
+             fmt
+         in
+         let choice =
+           match
+             Backend_choice.choose
+               ~home
+               ~flags:{ connect; token; user }
+               ~env:(Backend_choice.env ())
+           with
+           | Ok choice -> choice
            | Error e ->
-             eprintf "-connect: %s\n" (Error.to_string_hum e);
-             exit 2
+             fail
+               "%s"
+               (Backend_choice.Error.to_string_hum
+                  e
+                  ~no_backend:
+                    "no backend to connect to: pass -connect HOST:PORT (or a \
+                     prigh-web URL such as wss://host/ws) and -token SECRET, \
+                     set $PRIGH_CONNECT, or save a connection first with \
+                     prigh-tui -connect HOST:PORT -token SECRET (or prigh web \
+                     -connect HOST:PORT -token SECRET).")
          in
          let cwd =
            match cwd with
-           | Some dir -> Filename_unix.realpath dir
            | None -> Core_unix.getcwd ()
+           | Some dir when Sys_unix.is_directory_exn dir ->
+             Filename_unix.realpath dir
+           | Some dir ->
+             fail "-cwd %s: no such directory (mkdir -p it first)" dir
          in
-         let token = Option.first_some token (Sys.getenv "PRIGH_TOKEN") in
-         let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
          let host_id =
-           Host_id.choose
-             ?given:host_id
-             ~home:(home ())
-             ~warn:(eprintf "%s\n%!")
-             ()
+           Host_id.choose ?given:host_id ~home ~warn:(eprintf "%s\n%!") ()
          in
+         let name = Option.value name ~default:(Core_unix.gethostname ()) in
          (* Not for the tools it runs. *)
-         List.iter [ "PRIGH_TOKEN"; "PRIGH_USER" ] ~f:Core_unix.unsetenv;
-         let user_given = Option.is_some user in
-         let token_given = Option.is_some token in
+         List.iter
+           [ "PRIGH_TOKEN"; "PRIGH_USER"; "PRIGH_CONNECT" ]
+           ~f:Core_unix.unsetenv;
          let refused =
            Eio_main.run
            @@ fun env ->
            Tool_host.connect
              ~env
-             ~backend
-             ~token
-             ?user
+             ~backend:choice.remote
+             ~token:choice.credentials.token
+             ?user:choice.credentials.user
              ~host_id
-             ~name:(Option.value name ~default:(Core_unix.gethostname ()))
+             ~name
              ~cwd
              ()
          in
          eprintf
            "prigh tool-host: %s\n%s\n"
            (Error.to_string_hum refused)
-           (match token_given, user_given with
-            | false, _ ->
-              "No token was given: pass the backend's with -token SECRET (or \
-               $PRIGH_TOKEN)."
-            | true, false ->
-              "Check -token (or $PRIGH_TOKEN) against the backend's; if it \
-               serves several users (-tokens), also give -user NAME (or \
-               $PRIGH_USER)."
-            | true, true ->
-              "Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) \
-               against the backend's -tokens NAME=TOKEN (or -host-tokens) \
-               entries.");
-         exit 1)
+           (Backend_choice.refused_hint choice);
+         exit 1))
 ;;
+
+(* What [prigh web] and [prigh desktop] share: their flags' checks. *)
+module Remote_choice = struct
+  let tools ~fail tools =
+    match Option.map tools ~f:Web_connect.Tools.of_string with
+    | None -> Web_connect.Tools.Local
+    | Some (Ok tools) -> tools
+    | Some (Error e) -> fail (Error.to_string_hum e)
+  ;;
+
+  let web_root ~fail web_root =
+    match Option.first_some web_root (find_web_root ()) with
+    | Some root when Sys_unix.is_directory_exn root -> root
+    | Some root ->
+      fail
+        (sprintf
+           "no prigh-web site in %s: build it (cd frontend && dune build \
+            ./web/bin/site) or pass -web-root DIR"
+           root)
+    | None ->
+      fail
+        "no prigh-web site found: build it (cd frontend && dune build \
+         ./web/bin/site), or pass -web-root DIR (or $PRIGH_WEB_ROOT)"
+  ;;
+
+  let cwd ~fail = function
+    | None -> Core_unix.getcwd ()
+    | Some dir when Sys_unix.is_directory_exn dir -> Filename_unix.realpath dir
+    | Some dir ->
+      fail (sprintf "-cwd %s: no such directory (mkdir -p it first)" dir)
+  ;;
+
+  (* Not for the tools the tool host runs. *)
+  let unsetenv () =
+    List.iter
+      [ "PRIGH_TOKEN"; "PRIGH_USER"; "PRIGH_CONNECT" ]
+      ~f:Core_unix.unsetenv
+  ;;
+end
 
 let web_command =
   Command.basic
@@ -1032,89 +1089,32 @@ let web_command =
               exit code)
            fmt
        in
-       let saved_file = Saved_connection.file ~home in
-       let saved =
-         match Saved_connection.load ~home with
-         | Ok saved -> saved
+       let { Backend_choice.remote; credentials; source; save; _ } =
+         match
+           Backend_choice.choose
+             ~home
+             ~flags:{ connect; token; user }
+             ~env:(Backend_choice.env ())
+         with
+         | Ok choice -> choice
          | Error e ->
            fail
-             "cannot read the saved connection: %s\n\
-              Fix or delete %s, or pass -connect HOST:PORT."
-             (Error.to_string_hum e)
-             saved_file
+             "%s"
+             (Backend_choice.Error.to_string_hum
+                e
+                ~no_backend:
+                  "no backend to connect to: pass -connect HOST:PORT (or a \
+                   prigh-web URL such as wss://host/ws), which is saved for \
+                   next time.\n\
+                   For prigh-web with a backend on this machine, run prigh \
+                   serve -web 127.0.0.1:7790 (./prigh -web without -connect or \
+                   -remote).")
        in
+       let fail_with message = fail "%s" message in
+       let tools = Remote_choice.tools ~fail:fail_with tools in
+       let root = Remote_choice.web_root ~fail:fail_with web_root in
        let getenv var =
          Option.filter (Sys.getenv var) ~f:(Fn.non String.is_empty)
-       in
-       let env_settings =
-         { Saved_connection.Settings.connect = getenv "PRIGH_CONNECT"
-         ; token = getenv "PRIGH_TOKEN"
-         ; user = getenv "PRIGH_USER"
-         }
-       in
-       let { Saved_connection.Resolved.settings; save } =
-         Saved_connection.resolve
-           ~saved
-           ~flags:
-             { connect = Option.map connect ~f:Backend_address.normalize
-             ; token
-             ; user
-             }
-           ~env:
-             { env_settings with
-               connect =
-                 Option.map env_settings.connect ~f:Backend_address.normalize
-             }
-           ~local:false
-       in
-       let address =
-         match settings.connect with
-         | Some address -> address
-         | None ->
-           fail
-             "no backend to connect to: pass -connect HOST:PORT (or a \
-              prigh-web URL such as wss://host/ws), which is saved for next \
-              time.\n\
-              For prigh-web with a backend on this machine, run prigh serve \
-              -web 127.0.0.1:7790 (./prigh -web without -connect or -remote)."
-       in
-       let source : Web_connect.Check.Source.t =
-         if Option.is_some connect
-         then Flag
-         else if Option.is_some env_settings.connect
-         then Env
-         else Saved saved_file
-       in
-       let remote =
-         match Backend_address.parse address with
-         | Ok remote -> remote
-         | Error e ->
-           fail
-             "-connect: %s%s"
-             (Error.to_string_hum e)
-             (match source with
-              | Flag -> ""
-              | Env -> " (from $PRIGH_CONNECT)"
-              | Saved file -> sprintf " (saved in %s)" file)
-       in
-       let tools =
-         match Option.map tools ~f:Web_connect.Tools.of_string with
-         | None -> Web_connect.Tools.Local
-         | Some (Ok tools) -> tools
-         | Some (Error e) -> fail "%s" (Error.to_string_hum e)
-       in
-       let root =
-         match Option.first_some web_root (find_web_root ()) with
-         | Some root when Sys_unix.is_directory_exn root -> root
-         | Some root ->
-           fail
-             "no prigh-web site in %s: build it (cd frontend && dune build \
-              ./web/bin/site) or pass -web-root DIR"
-             root
-         | None ->
-           fail
-             "no prigh-web site found: build it (cd frontend && dune build \
-              ./web/bin/site), or pass -web-root DIR (or $PRIGH_WEB_ROOT)"
        in
        let listen : Web_connect.Listen.t =
          match listen, getenv "PRIGH_WEB_LISTEN" with
@@ -1126,25 +1126,11 @@ let web_command =
            At (addr, port)
          | None, None -> From (Eio.Net.Ipaddr.V4.loopback, 7790)
        in
-       let cwd =
-         match cwd with
-         | None -> Core_unix.getcwd ()
-         | Some dir when Sys_unix.is_directory_exn dir ->
-           Filename_unix.realpath dir
-         | Some dir -> fail "-cwd %s: no such directory (mkdir -p it first)" dir
-       in
+       let cwd = Remote_choice.cwd ~fail:fail_with cwd in
        let host_id =
          Host_id.choose ?given:host_id ~home ~warn:(eprintf "%s\n%!") ()
        in
-       let credentials =
-         { Web_connect.Credentials.token = settings.token
-         ; user = settings.user
-         }
-       in
-       (* Not for the tools the tool host runs. *)
-       List.iter
-         [ "PRIGH_TOKEN"; "PRIGH_USER"; "PRIGH_CONNECT" ]
-         ~f:Core_unix.unsetenv;
+       Remote_choice.unsetenv ();
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -1166,7 +1152,8 @@ let web_command =
        let log line = eprintf "prigh web: %s\n%!" line in
        let listen_addr =
          match listen with
-         | At (addr, port) | From (addr, port) -> addr, port
+         | At (addr, port) | From (addr, port) | From_or_any (addr, port) ->
+           addr, port
        in
        let started =
          listen_or_exit ~flag:"-listen" listen_addr (fun () ->
@@ -1205,6 +1192,164 @@ let web_command =
        log "the link signs the page in once; Ctrl+C stops";
        if open_browser then open_in_browser started.url;
        Eio.Fiber.await_cancel ())
+;;
+
+let desktop_command =
+  Command.basic
+    ~summary:
+      "The desktop app's process: serves prigh-web on this machine for a \
+       backend elsewhere (the saved connection, or one typed into the page's \
+       connect form), runs its tools here, prints the page's URL as a JSON \
+       line and runs until stdin closes (so give it a pipe, not /dev/null), \
+       the page quits, or SIGTERM"
+    (let%map_open.Command connect =
+       flag
+         "-connect"
+         (optional string)
+         ~doc:
+           "HOST:PORT|URL the backend (default: $PRIGH_CONNECT, else the saved \
+            connection; without one the page asks for it)"
+     and token =
+       flag
+         "-token"
+         (optional string)
+         ~doc:
+           "SECRET the backend's token (default: $PRIGH_TOKEN, else the saved \
+            one)"
+     and user =
+       flag
+         "-user"
+         (optional string)
+         ~doc:"NAME the user to sign in as (default: $PRIGH_USER, else saved)"
+     and tools =
+       flag
+         "-tools"
+         (optional string)
+         ~doc:
+           "local|remote run sessions' tools on this machine (local, the \
+            default) or on the backend"
+     and name =
+       flag
+         "-name"
+         (optional string)
+         ~doc:"NAME how this machine's tool host is shown (default: hostname)"
+     and host_id =
+       flag
+         "-host-id"
+         (optional string)
+         ~doc:"ID the tool host's id (default: the machine's, ~/.prigh/host-id)"
+     and cwd =
+       flag
+         "-cwd"
+         (optional string)
+         ~doc:"DIR the tool host's directory (default: the current one)"
+     and listen =
+       flag
+         "-listen"
+         (optional string)
+         ~doc:
+           "HOST:PORT serve the site there (default: 127.0.0.1:7780, else the \
+            next free port, else any)"
+     and web_root =
+       flag
+         "-web-root"
+         (optional string)
+         ~doc:
+           "DIR the built prigh-web site (default: $PRIGH_WEB_ROOT or the dune \
+            build)"
+     in
+     fun () ->
+       let home = home () in
+       let fail message =
+         eprintf "prigh desktop: %s\n%!" message;
+         exit 2
+       in
+       let tools = Remote_choice.tools ~fail tools in
+       let root = Remote_choice.web_root ~fail web_root in
+       let cwd = Remote_choice.cwd ~fail cwd in
+       let listen : Web_connect.Listen.t =
+         match listen with
+         | Some spec ->
+           let addr, port = parse_listen_addr ~flag:"-listen" spec in
+           At (addr, port)
+         | None -> From_or_any (Eio.Net.Ipaddr.V4.loopback, 7780)
+       in
+       let flags = { Saved_connection.Settings.connect; token; user } in
+       let env = Backend_choice.env () in
+       let initial : Desktop_sidecar.Initial.t =
+         match Backend_choice.choose ~home ~flags ~env with
+         | Ok { remote; credentials; source; save; _ } ->
+           Check { remote; credentials; source; save }
+         | Error e ->
+           Form
+             { address = Option.first_some flags.connect env.connect
+             ; user = Option.first_some flags.user env.user
+             ; error =
+                 (match e with
+                  | No_backend -> None
+                  | Unreadable_saved _ ->
+                    Some
+                      (Backend_choice.Error.to_string_hum e ~no_backend:""
+                       ^ "\nConnecting here replaces it.")
+                  | Bad_address _ ->
+                    Some (Backend_choice.Error.to_string_hum e ~no_backend:""))
+             }
+       in
+       let host_id =
+         Host_id.choose
+           ?given:host_id
+           ~home
+           ~warn:(eprintf "prigh desktop: %s\n%!")
+           ()
+       in
+       Remote_choice.unsetenv ();
+       let log line = eprintf "prigh desktop: %s\n%!" line in
+       let listen_addr =
+         match listen with
+         | At (addr, port) | From (addr, port) | From_or_any (addr, port) ->
+           addr, port
+       in
+       (* SIGTERM or SIGHUP (the shell's fallback, a logout) quits as stdin
+          closing does, stopping the tools' processes. *)
+       let signalled = Atomic.make false in
+       let signal = Eio.Condition.create () in
+       List.iter [ Stdlib.Sys.sigterm; Stdlib.Sys.sighup ] ~f:(fun s ->
+         Stdlib.Sys.set_signal
+           s
+           (Signal_handle
+              (fun (_ : int) ->
+                Atomic.set signalled true;
+                Eio.Condition.broadcast signal)));
+       let ended =
+         Eio_main.run
+         @@ fun env ->
+         listen_or_exit ~flag:"-listen" listen_addr (fun () ->
+           Desktop_sidecar.run
+             ~env
+             ~log
+             ~stopped:(fun () ->
+               Eio.Condition.loop_no_mutex signal (fun () ->
+                 Option.some_if (Atomic.get signalled) ()))
+             ~on_url:(fun url ->
+               print_endline (Jsonaf.to_string (`Object [ "url", `String url ]));
+               Out_channel.flush stdout)
+             ~stdin:(Eio.Stdenv.stdin env)
+             { initial
+             ; tools
+             ; name = Option.value name ~default:(Core_unix.gethostname ())
+             ; host_id
+             ; cwd
+             ; listen
+             ; root
+             ; save = Saved_connection.save ~home
+             })
+       in
+       log
+         (match ended with
+          | Quit -> "quit"
+          | Stdin_closed -> "stdin closed: the window is gone"
+          | Stopped -> "stopped by a signal");
+       exit 0)
 ;;
 
 let acp_command =
@@ -2081,6 +2226,7 @@ let () =
        ; "tool-host", tool_host_command
        ; "acp", acp_command
        ; "web", web_command
+       ; "desktop", desktop_command
        ; "sessions", sessions_command
        ; "trace", trace_command
        ; "login", login_command

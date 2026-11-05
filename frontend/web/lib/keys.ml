@@ -90,6 +90,8 @@ let help =
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
+  ; ( "Ctrl+Q / ⌘+Q (desktop app)"
+    , "quit prigh: its window and this machine's tool host (/quit)" )
   ; "Ctrl+B", "show or hide the sidebar (while reviewing, over the review)"
   ; ( "Ctrl+,"
     , "settings: notifications, transcript detail, your account (/settings)" )
@@ -107,6 +109,9 @@ let help =
        button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
+  ; ( "Ctrl+Shift+O"
+    , "a new temporary session (/temporary): not saved or listed, deleted \
+       when you leave it; on the new-session screen, its Temporary chip" )
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
@@ -594,6 +599,11 @@ let handle (m : App.Model.t) t : App.Action.t option =
               ~alt:t.alt
               ~meta:t.meta -> Some (Files Toggle)
      | _
+       when (t.ctrl || t.meta)
+            && t.shift
+            && (not t.alt)
+            && String.equal t.code "KeyO" -> Some New_temporary
+     | _
        when Code_review.toggle_key
               ~code:t.code
               ~shift:t.shift
@@ -603,6 +613,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("l" | "L") when command t -> Some (Open_chip Model)
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
+     | ("q" | "Q") when command t && m.desktop -> Some Quit_desktop
      | "," when ctrl_only t -> Some Open_settings
      | ("j" | "J") when ctrl_only t -> Some Open_jump_list
      | ("o" | "O") when ctrl_only t -> Some Cycle_verbosity

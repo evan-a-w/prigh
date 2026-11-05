@@ -85,6 +85,8 @@ module State : sig
       (** what trims and deletions keep out of it ({!Session.hidden}) *)
     ; transcript_filter : string option
       (** what prigh-web shows of the transcript ({!set_transcript_filter}) *)
+    ; temporary : bool
+      (** never saved or listed, deleted when left ({!Session.temporary}) *)
     }
   [@@deriving sexp_of]
 end
@@ -899,3 +901,37 @@ val tool_exec_output : t -> exec_id:string -> chunk:string -> unit Or_error.t
 
 (** Completes a remote execution. *)
 val tool_exec_result : t -> exec_id:string -> Tool_result.t -> unit Or_error.t
+
+(** {2 Temporary sessions} *)
+
+(** Whether its session is temporary ({!Session.temporary}). *)
+val temporary : t -> bool
+
+(** Makes it a normal session ({!Session.keep}), its subagents' log
+    written too, and names it (when it describes sessions). *)
+val keep : t -> unit
+
+(** Records a file uploaded to [path] on the active host (a temporary
+    session's only). *)
+val note_upload : t -> path:string -> unit
+
+(** Records what an earlier run of the session left (a temporary
+    session's only). *)
+val note_leftovers : t -> Leftover.t list -> unit
+
+(** What it made that it must delete when it ends: uploads, saved outputs
+    its results (and its subagents') mention, worktrees it made (not those
+    it moved into), and what {!note_leftovers} gave it. *)
+val leftovers : t -> Leftover.t list
+
+(** Deletes them on their hosts, a worktree only if it has no uncommitted
+    changes; answers those it could not, with why. *)
+val remove_leftovers : t -> Leftover.t list -> (Leftover.t * string) list
+
+(** Stops its run, a pending resume, its subagents and its jobs, and waits
+    for them. *)
+val stop_everything : t -> unit
+
+(** [f] is called whenever {!note_upload} or {!note_leftovers} adds to
+    {!leftovers}. *)
+val on_noted : t -> f:(unit -> unit) -> unit
