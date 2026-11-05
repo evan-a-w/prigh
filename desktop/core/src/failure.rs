@@ -212,9 +212,13 @@ mod tests {
         let s = show(Os::Unix, Failure::NoBrowser);
         assert!(s.starts_with("No browser for prigh\n---\nPRIGH_DESKTOP_WINDOW is browser"), "{s}");
         assert!(s.contains("PRIGH_DESKTOP_BROWSER"), "{s}");
-        let s = show(Os::Unix, Failure::BrowserSpawn { program: "/usr/bin/chromium".into(), error: "Permission denied".into() });
+        let s = show(
+            Os::Unix,
+            Failure::BrowserSpawn { program: "/usr/bin/chromium".into(), error: "Permission denied".into() },
+        );
         assert!(s.contains("Could not run /usr/bin/chromium: Permission denied"), "{s}");
-        let s = show(Os::Unix, Failure::BadWindow("PRIGH_DESKTOP_WINDOW is \"x\": use auto, browser or webview".into()));
+        let s =
+            show(Os::Unix, Failure::BadWindow("PRIGH_DESKTOP_WINDOW is \"x\": use auto, browser or webview".into()));
         assert!(s.starts_with("Bad window setting"), "{s}");
     }
 

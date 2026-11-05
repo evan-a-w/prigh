@@ -45,7 +45,12 @@ const BROWSERS: &[(&str, &[&str], &str, &str)] = &[
         "Google Chrome.app/Contents/MacOS/Google Chrome",
         r"Google\Chrome\Application\chrome.exe",
     ),
-    ("Chromium", &["chromium", "chromium-browser"], "Chromium.app/Contents/MacOS/Chromium", r"Chromium\Application\chrome.exe"),
+    (
+        "Chromium",
+        &["chromium", "chromium-browser"],
+        "Chromium.app/Contents/MacOS/Chromium",
+        r"Chromium\Application\chrome.exe",
+    ),
     (
         "Brave",
         &["brave", "brave-browser", "brave-browser-stable"],
@@ -58,7 +63,12 @@ const BROWSERS: &[(&str, &[&str], &str, &str)] = &[
         "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         r"Microsoft\Edge\Application\msedge.exe",
     ),
-    ("Vivaldi", &["vivaldi-stable", "vivaldi"], "Vivaldi.app/Contents/MacOS/Vivaldi", r"Vivaldi\Application\vivaldi.exe"),
+    (
+        "Vivaldi",
+        &["vivaldi-stable", "vivaldi"],
+        "Vivaldi.app/Contents/MacOS/Vivaldi",
+        r"Vivaldi\Application\vivaldi.exe",
+    ),
 ];
 
 /// Where to look besides the PATH: the user's home (macOS ~/Applications)
@@ -97,9 +107,7 @@ pub fn find(
                 }
                 dirs.into_iter().map(|d| format!("{d}/{mac}")).find(|p| executable(p))
             }
-            Platform::Windows => {
-                places.windows_roots.iter().map(|r| format!(r"{r}\{win}")).find(|p| executable(p))
-            }
+            Platform::Windows => places.windows_roots.iter().map(|r| format!(r"{r}\{win}")).find(|p| executable(p)),
         };
         if let Some(program) = found {
             return Ok(Some(Found { name: name.to_string(), program }));
@@ -195,7 +203,10 @@ mod tests {
         let places = Places::default();
         let any = |_: &str| true;
         assert_eq!(show(find(Platform::Linux, None, &places, path(&[]), any)), "none");
-        assert_eq!(show(find(Platform::Linux, None, &places, path(&["vivaldi", "brave"]), any)), "Brave: /usr/bin/brave");
+        assert_eq!(
+            show(find(Platform::Linux, None, &places, path(&["vivaldi", "brave"]), any)),
+            "Brave: /usr/bin/brave"
+        );
         assert_eq!(
             show(find(Platform::Linux, None, &places, path(&["chromium", "google-chrome"]), any)),
             "Google Chrome: /usr/bin/google-chrome"
@@ -216,8 +227,10 @@ mod tests {
 
     #[test]
     fn finds_on_macos_and_windows() {
-        let places =
-            Places { home: Some("/Users/me".into()), windows_roots: vec![r"C:\Program Files".into(), r"C:\Users\me\AppData\Local".into()] };
+        let places = Places {
+            home: Some("/Users/me".into()),
+            windows_roots: vec![r"C:\Program Files".into(), r"C:\Users\me\AppData\Local".into()],
+        };
         let none = |_: &str| None;
         assert_eq!(
             show(find(Platform::MacOs, None, &places, none, |p: &str| p
@@ -274,7 +287,10 @@ mod tests {
 
     #[test]
     fn shell_fragment() {
-        assert_eq!(with_browser_shell("http://127.0.0.1:7780/#desktop=k"), "http://127.0.0.1:7780/#desktop=k&shell=browser");
+        assert_eq!(
+            with_browser_shell("http://127.0.0.1:7780/#desktop=k"),
+            "http://127.0.0.1:7780/#desktop=k&shell=browser"
+        );
         assert_eq!(
             with_browser_shell("https://ai.example.com/#app=desktop&host=h"),
             "https://ai.example.com/#app=desktop&host=h&shell=browser"
