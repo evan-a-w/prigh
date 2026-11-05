@@ -63,7 +63,7 @@ const startDesktop = home => new Promise((resolve, reject) => {
   for (const name of ["PRIGH_CONNECT", "PRIGH_TOKEN", "PRIGH_USER"]) delete env[name];
   const proc = spawn(
     backend,
-    ["desktop", "-listen", "127.0.0.1:0", "-web-root", site, "-cwd", dirs["laptop-cwd"],
+    ["desktop", "-ui", "local", "-listen", "127.0.0.1:0", "-web-root", site, "-cwd", dirs["laptop-cwd"],
       "-name", "laptop", "-host-id", "host-laptop"],
     { env, stdio: ["pipe", "pipe", "pipe"] },
   );

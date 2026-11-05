@@ -63,16 +63,20 @@
   font-size: 13px;
   color: var(--muted);
 }
+/* Hung from the card's bottom edge, not tucked under it: lifting the card
+   over the tray (a z-index) would make it a stacking context, and the
+   chips' menus in it would sit under their own backdrop, which then takes
+   every hover and click meant for them. */
 .app:not(.narrow) .tray {
   position: relative;
-  margin: -16px 14px 0;
-  padding: 12px 6px 2px 8px;
+  min-height: 34px;
+  margin: -6px 14px 0;
+  padding: 2px 6px 2px 8px;
   background: color-mix(in srgb, var(--slate) 50%, var(--bg));
   border: 1px solid var(--rule);
   border-top: 0;
   border-radius: 0 0 14px 14px;
 }
-.main.fresh .composer-stack { z-index: 1; }
 .tray-where {
   min-width: 0;
   height: 30px;

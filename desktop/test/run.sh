@@ -5,9 +5,9 @@
 #   desktop/test/run.sh PRIGH_DESKTOP_BINARY [PRIGH]
 #
 # REAL_CHROMIUM, if set, is a Chromium for the browser window scenarios
-# (with curl). Needs a display (run it under xvfb-run), a D-Bus session bus (for the
-# single-instance plugin: dbus-run-session) and python3. The flake's
-# desktop-window check runs it that way.
+# (with curl). Needs a display (run it under xvfb-run), a D-Bus session bus
+# (for the single-instance plugin: dbus-run-session), python3 and xdotool.
+# The flake's desktop-window check runs it that way.
 set -uo pipefail
 app=$1
 real=${2:-}
@@ -190,14 +190,37 @@ HOME="$work/server-home" "$real" serve -web 127.0.0.1:0 -faux -token sekrit \
 	-cwd "$work/server-home" 2>"$work/server.err" &
 server=$!
 report_port_file="$work/report-port"
+# POST /pointer "move|click X Y" (the window's pixels) moves the real
+# pointer there, and clicks, with xdotool; anything else is a report line.
 python3 - "$work/reports" "$report_port_file" <<'PY' &
-import http.server, sys
+import http.server, subprocess, sys
 out, port_file = sys.argv[1], sys.argv[2]
+def window():
+    # The app's window: the largest visible one called prigh.
+    ids = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^prigh$"],
+                         capture_output=True, text=True).stdout.split()
+    def geometry(i):
+        g = dict(l.split("=") for l in subprocess.run(
+            ["xdotool", "getwindowgeometry", "--shell", i], capture_output=True, text=True).stdout.split())
+        return int(g["X"]), int(g["Y"]), int(g["WIDTH"]) * int(g["HEIGHT"])
+    return max(map(geometry, ids), key=lambda g: g[2])
+def pointer(what, x, y):
+    wx, wy, _ = window()
+    move = ["xdotool", "mousemove", "--sync", str(wx + int(x)), str(wy + int(y))]
+    subprocess.run(move + (["click", "1"] if what == "click" else []), check=True)
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode()
-        with open(out, "a") as f:
-            f.write(body + "\n")
+        if self.path == "/pointer":
+            try:
+                pointer(*body.split())
+            except Exception as e:
+                body = f"pointer {body}: {e}"
+            else:
+                body = None
+        if body is not None:
+            with open(out, "a") as f:
+                f.write(body + "\n")
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
@@ -242,5 +265,11 @@ real_scenario() {
 }
 real_scenario "the real sidecar: the connect form; closing the window stops it" close local
 real_scenario "the real sidecar: signed in with the form; the page's /quit ends the app" quit local
-# Saved by the one before: straight to the backend's own prigh-web.
+# Saved by the one before: signed in at once.
+real_scenario "the real sidecar: a chip's menu, chosen with the real pointer" menu local
+zoom_file="$XDG_CONFIG_HOME/io.github.evan-a-w.prigh/zoom"
+mkdir -p "$(dirname "$zoom_file")"
+echo 1.25 >"$zoom_file"
+real_scenario "the real sidecar at 125% zoom: a chip's menu, chosen with the real pointer" menu local
+rm "$zoom_file"
 real_scenario "the real sidecar, -ui remote: the backend's own site; its /quit ends the app" quit remote
