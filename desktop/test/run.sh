@@ -56,7 +56,7 @@ scenario() {
 	return 0
 }
 normalize() {
-	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#'
+	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#' -e 's#\(pid [0-9]+\)#(pid PID)#g'
 }
 
 scenario "the window shows the page; closing it stops the sidecar" \
