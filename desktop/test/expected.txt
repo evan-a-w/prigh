@@ -165,7 +165,7 @@ prigh-desktop: Fix it (programs.prigh.desktop.window and .browser in Home Manage
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
 prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
-prigh-desktop: google-chrome-stable handed the window to its instance on prigh's profile (pid 3459319)
+prigh-desktop: google-chrome-stable handed the window to its instance on prigh's profile (pid PID)
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
 fake: args desktop
