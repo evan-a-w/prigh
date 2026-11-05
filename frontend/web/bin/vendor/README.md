@@ -14,6 +14,6 @@ Both are MIT licensed; see `LICENSE-xterm` and `LICENSE-addon-fit`.
   `katex/LICENSE-katex`.
 
 - `temporal-polyfill.js`: temporal-polyfill 1.0.8 (`global.js`), loaded by
-  `index.html` only where the browser has no `Temporal` (WebKit): Core's
-  time zones (`Timezone_js_loader`) need it, and Bonsai_web's start asks for
-  the local zone. MIT licensed; see `LICENSE-temporal-polyfill`.
+  `index.html` only where the browser has no `Temporal` (e.g. WebKitGTK):
+  Core's time zones (`Timezone_js_loader`) need it, and Bonsai_web's start
+  asks for the local zone. MIT licensed; see `LICENSE-temporal-polyfill`.

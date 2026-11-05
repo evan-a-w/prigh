@@ -1187,6 +1187,9 @@ it), so install prigh as well.
   library Nix provides, not your browser). Links to other sites open in
   your browser; downloads go to the Downloads folder; prigh-web may use the
   microphone (dictation), notifications and the clipboard without asking.
+- **Quitting**: closing the window, Quit prigh (the account menu, the ⋯
+  sheet, `/quit`) or Ctrl+Q / ⌘Q stop `prigh desktop`, its tool host and
+  what its tools started, then the app.
 - **Windows**: prigh does not run natively there, so the app runs it inside
   [WSL](https://learn.microsoft.com/windows/wsl/install): `wsl --install`,
   then install prigh in the distribution (e.g. Nix and `nix profile install
