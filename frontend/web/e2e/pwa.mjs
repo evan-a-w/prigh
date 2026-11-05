@@ -105,9 +105,17 @@ const caches = () => page.evaluate(async () => {
 });
 const swVersion = () => readFileSync(join(site, "sw.js"), "utf8").match(/const VERSION = "([^"]+)"/)[1];
 const shell = JSON.parse(readFileSync(join(site, "sw.js"), "utf8").match(/const SHELL = (\[[^\]]*\])/)[1]);
-// A request from the page, as [status] or the error it failed with.
+// A request from the page, as [status] or the error it failed with. The body
+// is cancelled: Chromium's worker often streams a cached response (rather
+// than handing over a blob) and stays busy until the page has read it all,
+// and a busy worker is not replaced, so an unread main.bc.js (~50 MB) kept
+// the new build's worker waiting when Reload asked it to take over.
 const request = (path, init) => page.evaluate(async ([path, init]) => {
-  try { return String((await fetch(path, init)).status); } catch (e) { return `failed (${e.name})`; }
+  try {
+    const response = await fetch(path, init);
+    await response.body?.cancel();
+    return String(response.status);
+  } catch (e) { return `failed (${e.name})`; }
 }, [path, init]);
 
 try {
