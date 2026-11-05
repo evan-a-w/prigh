@@ -301,7 +301,7 @@ let%expect_test "session/cancel while a command runs" =
     ]
   @@ fun h ->
   ignore (H.prompt ~wait:false h "wait" : Jsonaf.t);
-  H.wait_for h "started";
+  H.wait_for h {|"text":"```\nstarted|};
   H.notify h "session/cancel" (sprintf {|{"sessionId": %S}|} h.session);
   H.wait_for h "stopReason";
   H.dump h;
