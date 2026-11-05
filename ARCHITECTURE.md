@@ -3512,9 +3512,9 @@ pinch zoom the page in steps (`core/zoom.rs`), remembered in the app's
 config directory (`zoom`); F11 toggles fullscreen. On Linux (`mod linux`)
 WebKitGTK's hardware acceleration is set to always (Tauri leaves its
 default, on demand) and zoom applies to the whole page; at start the app
-asks xdg-desktop-portal, on Wayland, whether it has a FileChooser, and
-says on stderr how to get one when not (WebKitGTK's file chooser goes
-through it there); `PRIGH_DESKTOP_GPU_INFO=1` opens `webkit://gpu` instead
+checks, when `GTK_USE_PORTAL` asks GTK for xdg-desktop-portal's file
+chooser, that a portal with a FileChooser answers, and otherwise unsets it
+(GTK would open nothing) and says so; `PRIGH_DESKTOP_GPU_INFO=1` opens `webkit://gpu` instead
 of the sidecar's page. Nix: `nix/desktop.nix` is the app as a function of
 `pkgs`, so the Home Manager module can build it with the system's nixpkgs
 (`useSystemNixpkgs`): WebKitGTK draws with the GPU only when its Mesa
