@@ -245,6 +245,12 @@ when the backend refuses its `-token`/`-user`; it is the machine's host, by
 `~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
+`prigh tool-host -remote` connects to the saved connection instead (the one
+`prigh-tui -connect`, `/signin` and `prigh web` save, or `$PRIGH_CONNECT`),
+with its token and user, by the TUI's rules: `-token`, `-user` and
+`$PRIGH_TOKEN`/`$PRIGH_USER` win, and `-connect` to the saved address also
+takes the saved token and user. A tool host only reads the saved
+connection, it never changes it.
 
 ### Several users (namespaces)
 
@@ -916,7 +922,8 @@ models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
 lists them (Delete there trims the context before one); `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
-and what to use instead, and `/quit` says to close the tab.
+and what to use instead, and `/quit` says to close the tab (in the desktop app it quits, as Ctrl+Q
+does: see "Desktop app").
 
 The account at the bottom of the sidebar (also in the settings page) opens the
 account menu: switch to another saved account in one click (the page
@@ -1207,6 +1214,38 @@ The Nix package exists for Linux and macOS; Windows uses the installers.
 Build it from `desktop/` with `nix develop .#desktop` (Rust, cargo-tauri
 and the webview's libraries), then `cargo tauri dev` or `cargo tauri build`
 in `desktop/app`.
+
+### `prigh desktop`
+
+`prigh desktop` is the process the desktop app runs: its window shows the
+page it serves. It is `prigh web` (above) for a backend elsewhere, with this
+machine's tool host in-process, but it also starts without a working
+connection, and it lives exactly as long as its window.
+
+```
+prigh desktop                                # the saved connection, else a connect form
+prigh desktop -connect server:7790 -token sekrit -cwd ~/proj
+```
+
+- It prints one JSON line on stdout once it is listening,
+  `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`, for the window to open;
+  everything else goes to stderr. It serves on `127.0.0.1:7780`, else the
+  next free port, else any (`-listen HOST:PORT` to choose).
+- The backend is `-connect`/`-token`/`-user`, else `$PRIGH_CONNECT`/`_TOKEN`/
+  `_USER`, else the saved connection, by the TUI's rules, as for `prigh
+  web`. When there is none, or it cannot be reached, refuses the login or
+  has no prigh-web, the page is a connect form (the backend's address, the
+  user name and the token as the password), prefilled and saying what went
+  wrong and what to do. What the backend accepts is saved for next time,
+  and the page goes on signed in.
+- It stops (and its tool host with it) when its stdin reaches its end, the
+  window gone, or when the page quits: `/quit`, Ctrl+Q (⌘Q), Quit prigh in
+  the account menu, or on a phone at the foot of the ⋯ sheet. In a browser,
+  outside the desktop app, `/quit` still says to close the tab.
+- `#desktop=KEY` is a per-run key that the page keeps for the tab and
+  sends with its requests to the sidecar's `/desktop/` endpoints, so no
+  other page or local process can point this machine's tool host at
+  another backend or stop the app.
 
 ## Editors (ACP)
 
@@ -2738,7 +2777,9 @@ The desktop app has two: `cargo test -p prigh-desktop-core` in `desktop/`
 (the decisions: how `prigh desktop` is started, its ready line, where the
 window may go, the error dialogs; `./test` runs it), and
 `desktop/test/run.sh`, the app in a real window against a fake `prigh
-desktop` (the flake's `desktop-window` check runs it under Xvfb; it prints
+desktop` for the failure paths and, given a prigh, the real one for a
+`prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
+connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
 a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout
