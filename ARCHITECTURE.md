@@ -3411,7 +3411,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
     `.gz`, and 260 KB of fonts, of which a page fetches those its math
     uses; none of it until a reply has math, but the service worker
-    keeps it all), assembled under
+    keeps it all), temporal-polyfill (which `index.html` loads before
+    `main.bc.js` only where the browser has no `Temporal`, e.g. WebKitGTK:
+    Core's `Timezone_js_loader` needs it and Bonsai_web's start asks for
+    the local zone, so without it the app never starts), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
