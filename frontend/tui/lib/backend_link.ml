@@ -70,8 +70,7 @@ let connection_hello ?home hello ~host_id =
   | None -> hello @ [ "tools", `False ]
   | Some id ->
     hello
-    @ Option.value_map home ~default:[] ~f:(fun home ->
-      [ "home", `String home ])
+    @ Option.value_map home ~default:[] ~f:(fun home -> [ "home", `String home ])
     @ [ "tools", `True
       ; "host_id", `String id
       ; ( "features"
@@ -452,8 +451,6 @@ let handle_incoming t (incoming : Client.Incoming.t) =
   | Closed, Some host ->
     Tool_host.set_online host false;
     Some incoming
-  (* The TUI calls, it never sends. *)
-  | Reply _, _ -> None
   | _ -> Some incoming
 ;;
 

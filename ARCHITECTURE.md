@@ -2153,7 +2153,12 @@ terminal frontend and `web/` prigh-web, the browser one.
   reconnectable: correlates responses by id, fans out events, stderr and
   `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
   with "not connected" in between; `received` and `waiting` count the lines
-  received and the calls waiting, for prigh-web's probe). `client/unix/` (`prigh_client_unix`)
+  received and the calls waiting, for prigh-web's probe). `call` answers
+  with a deferred; `send` (prigh-web's requests) answers with a `Reply` on
+  the pipe, in its place among the events, so that a reply reflecting some
+  events (an empty first page, then the turn's events) is never overtaken by
+  them, as a deferred's continuation can be when several lines arrive at once
+  (WebKit hands them over so). The TUI still uses `call`. `client/unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
   spawns the backend, `Tcp_transport` connects to `-listen`,
   `Websocket_transport` to a prigh-web URL's `/ws` (the RFC 6455 client
@@ -3546,12 +3551,13 @@ size and the precompressed siblings.
 
 prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
 `web-e2e` check, against the packaged backend and site), runs
-`prigh_web.mjs` and the scripts below in Chromium and Firefox (`ENGINES`
-picks), all at once, each with its own backend, browser and directory, and
+`prigh_web.mjs` and the scripts below in Chromium, Firefox and WebKit
+(`ENGINES` picks; WebKit on Linux needs an EGL driver: without a system one
+`./test` and the check point `__EGL_VENDOR_LIBRARY_DIRS` at Mesa's), all at once, each with its own backend, browser and directory, and
 joins their outputs in a fixed order. The driver owns the backend
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
-(ids, cwd, cost, context and messages' times replaced) diffed against `chromium.expected` or `firefox.expected`:
+(ids, cwd, cost, context and messages' times replaced) diffed against `chromium.expected`, `firefox.expected` or `webkit.expected`:
 the sign-in form and signing in with the token, the session's card, a scripted
 bash call and its output, a long output folded, unfolded and folded again,
 the model `read`ing a real PNG (`png.mjs` writes

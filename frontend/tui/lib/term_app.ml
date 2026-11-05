@@ -335,7 +335,6 @@ let action_of_incoming (incoming : Client.Incoming.t) : App.Action.t =
   | Event e -> Event e
   | Protocol_error e -> Protocol_error e
   | Stderr line -> Stderr line
-  | Reply { id; _ } -> Protocol_error (sprintf "reply to unsent request %d" id)
   | Closed -> Backend_closed
 ;;
 
