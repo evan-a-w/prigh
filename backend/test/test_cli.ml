@@ -605,10 +605,13 @@ let%expect_test "desktop: the URL as a JSON line; stdin closing ends it" =
   printf "more stdout: %S\n" rest;
   print_s [%sexp (Core_unix.waitpid p.pid : Core_unix.Exit_or_signal.t)];
   print_endline
-    (Re.replace_string
-       (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/#desktop=[0-9a-f]+"))
-       ~by:"127.0.0.1:PORT/#desktop=<key>"
-       err);
+    (err
+     |> Re.replace_string
+          (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/"))
+          ~by:"127.0.0.1:PORT/"
+     |> Re.replace_string
+          (Re.compile (Re.Perl.re "#desktop=[0-9a-f]+"))
+          ~by:"#desktop=<key>");
   [%expect
     {|
     $ prigh desktop -web-root $DIR/site -cwd /nonexistent
@@ -620,7 +623,25 @@ let%expect_test "desktop: the URL as a JSON line; stdin closing ends it" =
     http://127.0.0.1:PORT/#desktop= (32 hex digits)
     more stdout: ""
     (Ok ())
-    prigh desktop: prigh-web on http://127.0.0.1:PORT/#desktop=<key>
+    prigh desktop: prigh-web on http://127.0.0.1:PORT/
     prigh desktop: stdin closed: the window is gone
+    |}];
+  (* SIGTERM (the shell's fallback) quits the same way. *)
+  let p =
+    spawn
+      t
+      [ "desktop"; "-listen"; "127.0.0.1:0"; "-web-root"; site; "-cwd"; t.dir ]
+  in
+  let out = Core_unix.in_channel_of_descr p.stdout in
+  ignore (In_channel.input_line_exn out : string);
+  Signal_unix.send_i Signal.term (`Pid p.pid);
+  let err = In_channel.input_all (Core_unix.in_channel_of_descr p.stderr) in
+  print_s [%sexp (Core_unix.waitpid p.pid : Core_unix.Exit_or_signal.t)];
+  print_endline (List.last_exn (String.split_lines (String.strip err)));
+  Core_unix.close p.stdin;
+  [%expect
+    {|
+    (Ok ())
+    prigh desktop: stopped by a signal
     |}]
 ;;

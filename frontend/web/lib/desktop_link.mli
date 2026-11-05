@@ -29,6 +29,7 @@ val connect_body
   -> address:string
   -> user:string option
   -> token:string option
+  -> plaintext:bool (** connect even though it is not encrypted *)
   -> string
 
 module Status : sig
@@ -46,8 +47,12 @@ module Status : sig
 end
 
 module Connect_reply : sig
-  type t = (string option, string) Result.t
-  (** [Ok code] (as {!Status.Connected}) or [Error what_to_do] *)
+  type t =
+    | Connected of string option (** as {!Status.Connected} *)
+    | Refused of string (** what is wrong and what to do *)
+    | Plaintext of string
+    (** the address is not encrypted and is another machine: the risk and
+        the alternatives; connecting needs [~plaintext:true] *)
   [@@deriving sexp_of]
 
   val of_json : string -> t option
