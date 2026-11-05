@@ -245,6 +245,12 @@ when the backend refuses its `-token`/`-user`; it is the machine's host, by
 `~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
+`prigh tool-host -remote` connects to the saved connection instead (the one
+`prigh-tui -connect`, `/signin` and `prigh web` save, or `$PRIGH_CONNECT`),
+with its token and user, by the TUI's rules: `-token`, `-user` and
+`$PRIGH_TOKEN`/`$PRIGH_USER` win, and `-connect` to the saved address also
+takes the saved token and user. A tool host only reads the saved
+connection, it never changes it.
 
 ### Several users (namespaces)
 

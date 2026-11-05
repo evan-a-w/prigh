@@ -24,6 +24,7 @@ module Credentials : sig
     { token : string option
     ; user : string option
     }
+  [@@deriving sexp_of]
 end
 
 (** Says [hello] to the backend once, as a frontend, so that an unreachable
@@ -53,6 +54,7 @@ module Check : sig
       | Flag
       | Env (** [$PRIGH_CONNECT] *)
       | Saved of string (** the saved connection's file *)
+    [@@deriving sexp_of]
   end
 
   (** What went wrong and what to do next. *)
