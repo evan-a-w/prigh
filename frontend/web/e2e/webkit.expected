@@ -1332,9 +1332,11 @@ Since latest
 (comment · <TIME>)
 Send 1 comment
 === webkit: review: page: the files ===
+src/
 main.ml
 1
 +2 −1
+src/
 util.ml
 +3 −0
 2 files changed, +5 −1
@@ -1905,7 +1907,8 @@ Read-only
 Check out into a worktree
 === webkit: review: compare: read-only, what is reviewed ===
 Reviewing feat/old (not checked out) against main (merge base <SHA>)
-files: old.ml
+files: src/
+old.ml
 +1 −0
 1 file changed, +1 −0
 edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
