@@ -74,7 +74,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -web :99999: the port must be a number from 0 to 65535
     [exit 2]
     $ prigh tool-host -connect 7777
-    -connect: "7777" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
+    prigh tool-host: -connect: "7777" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
     [exit 2]
     |}]
 ;;
@@ -302,6 +302,28 @@ let%expect_test "serve: a taken port, a refused tool host" =
   prigh t [ "tool-host"; "-connect"; address ];
   prigh t [ "tool-host"; "-connect"; address; "-token"; "bad" ];
   prigh t [ "tool-host"; "-connect"; address; "-token"; "bad"; "-user"; "me" ];
+  (* The saved connection: -remote uses it, and -connect to its address
+     takes its token. *)
+  prigh t [ "tool-host"; "-remote" ];
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    (sprintf "((connect %s) (token stale))" address);
+  prigh t [ "tool-host"; "-remote" ];
+  prigh t [ "tool-host"; "-connect"; address ];
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    (sprintf "((connect %s) (token good))" address);
+  let host = spawn t [ "tool-host"; "-remote"; "-name"; "box" ] in
+  let err = Core_unix.in_channel_of_descr host.stderr in
+  let line = Option.value_exn (In_channel.input_line err) in
+  print_endline
+    (String.substr_replace_all line ~pattern:address ~with_:"127.0.0.1:PORT"
+     |> String.split ~on:' '
+     |> List.take_while ~f:(Fn.non (String.equal "as"))
+     |> String.concat ~sep:" ");
+  stop host;
   stop server;
   [%expect
     {|
@@ -315,7 +337,7 @@ let%expect_test "serve: a taken port, a refused tool host" =
     [exit 2]
     $ prigh tool-host -connect 127.0.0.1:PORT
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
-    No token was given: pass the backend's with -token SECRET (or $PRIGH_TOKEN).
+    No token was given, and none is saved for 127.0.0.1:PORT: pass the backend's with -token SECRET (or $PRIGH_TOKEN), or sign in once with prigh-tui -connect 127.0.0.1:PORT -token SECRET (or prigh web -connect 127.0.0.1:PORT -token SECRET), which saves it.
     [exit 1]
     $ prigh tool-host -connect 127.0.0.1:PORT -token bad
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
@@ -325,6 +347,18 @@ let%expect_test "serve: a taken port, a refused tool host" =
     prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
     Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the backend's -tokens NAME=TOKEN (or -host-tokens) entries.
     [exit 1]
+    $ prigh tool-host -remote
+    prigh tool-host: no backend to connect to: pass -connect HOST:PORT (or a prigh-web URL such as wss://host/ws) and -token SECRET, set $PRIGH_CONNECT, or save a connection first with prigh-tui -connect HOST:PORT -token SECRET (or prigh web -connect HOST:PORT -token SECRET).
+    [exit 2]
+    $ prigh tool-host -remote
+    prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    The credentials are the ones saved for 127.0.0.1:PORT in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect 127.0.0.1:PORT -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    [exit 1]
+    $ prigh tool-host -connect 127.0.0.1:PORT
+    prigh tool-host: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    The credentials are the ones saved for 127.0.0.1:PORT in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect 127.0.0.1:PORT -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    [exit 1]
+    prigh tool-host: connected to 127.0.0.1:PORT
     |}]
 ;;
 
