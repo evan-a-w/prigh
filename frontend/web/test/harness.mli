@@ -56,6 +56,18 @@ val fail : t -> string -> string -> unit
     actions its handler produced, and applies them. *)
 val click : ?nth:int -> t -> selector:string -> unit
 
+(** Clicks it with Ctrl or Cmd ([meta]) held. *)
+val modified_click
+  :  ?nth:int
+  -> ?ctrl:bool
+  -> ?meta:bool
+  -> t
+  -> selector:string
+  -> unit
+
+(** Presses the middle button on it ([mousedown] with [button] 1). *)
+val middle_click : ?nth:int -> t -> selector:string -> unit
+
 (** Right-clicks it ([contextmenu]), at [at] in the window (default 0,0:
     as from the keyboard). *)
 val right_click : ?nth:int -> ?at:int * int -> t -> selector:string -> unit

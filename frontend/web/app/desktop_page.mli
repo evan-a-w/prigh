@@ -40,6 +40,13 @@ val connect
   -> f:(Prigh_web.Desktop_link.Connect_reply.t option -> unit)
   -> unit
 
+(** Opens [url] (the page's own, for another session) in a new window: a
+    new tab in a browser; under the desktop app, another of its windows, in
+    desktop mode too (see {!Prigh_web.Desktop_link.window_fragment}): the
+    app's own window opens another app window, a browser's app window a
+    popup (no tabs, no address bar) in the same browser. *)
+val open_window : string -> unit
+
 (** Stops the desktop app, and shows what happened in the page meanwhile
     (the window closes once the sidecar has exited). On the backend's own
     site it goes to {!Prigh_web.Desktop_link.quit_url}, which the window

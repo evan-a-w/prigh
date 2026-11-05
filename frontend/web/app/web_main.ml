@@ -574,12 +574,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
                "session"
                session
            in
-           ignore
-             (Dom_html.window##open_
-                (Js.string (Js.to_string location##.pathname ^ search))
-                (Js.string "_blank")
-                Js.null
-              : Dom_html.window Js.t Js.opt))
+           Desktop_page.open_window (Js.to_string location##.pathname ^ search))
         ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
