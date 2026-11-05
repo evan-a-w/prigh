@@ -9,6 +9,10 @@ module Incoming : sig
     | Event of Event.t
     | Protocol_error of string
     | Stderr of string
+    | Reply of
+        { id : int
+        ; result : Json.t Or_error.t
+        } (** The answer to a {!send}, in its place among the events. *)
     | Closed
   [@@deriving sexp_of]
 end
@@ -43,6 +47,13 @@ val disconnected : t -> unit Deferred.t
 
 (** Fails immediately with "not connected" while disconnected. *)
 val call : t -> string -> (string * Json.t) list -> Json.t Deferred.Or_error.t
+
+(** Sends a request and returns its id. Its answer comes on [incoming] as
+    [Reply], in the order the backend sent it among the events: a reply that
+    reflects some events is never overtaken by them, as a [call]'s
+    continuation can be. When the transport closes first, its [Reply] is an
+    error, before [Closed]. Fails with "not connected" while disconnected. *)
+val send : t -> string -> (string * Json.t) list -> int Or_error.t
 
 (** Stays open across reconnections; ends with [close]. *)
 val incoming : t -> Incoming.t Pipe.Reader.t
