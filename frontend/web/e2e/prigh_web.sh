@@ -24,7 +24,9 @@
 # images too large for the model and image files, on a desktop and two
 # phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected). The scripts all run at once (JOBS at a time, default:
-# the number of CPUs), each with its own backend, browser and directory;
+# the number of CPUs, fewer if the memory available would not hold them;
+# and on Linux none starts while less than MEM_PER_JOB is available, unless
+# none is running), each with its own backend, browser and directory;
 # their outputs are joined in the order above. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
 # PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
@@ -33,7 +35,8 @@
 #   PRIGH_WEB_ROOT       the built site (default: the dune build)
 #   ENGINES              browsers to run (default: chromium firefox)
 #   SHOTS                a directory to save screenshots of each step in
-#   JOBS                 how many scripts run at once
+#   JOBS                 how many scripts run at once (at most)
+#   MEM_PER_JOB          MiB a script (backend, browser, node) may need (default 1536)
 #   SCRIPT_TIMEOUT       seconds a script may take (default 300)
 #   TIMES=1              print how long each script took
 #   UPDATE=1             rewrite ENGINE.expected instead of diffing
@@ -56,6 +59,31 @@ if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote desktop steer subagent_paged trim filter viewer math card status mobile long_press pwa compaction images:desktop images:phone images:small"
 engines="${ENGINES:-chromium firefox}"
 jobs="${JOBS:-$(nproc)}"
+# Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
+# about the same in each browser; they do not all peak at once.
+mem_per_job="${MEM_PER_JOB:-1536}"
+# MiB the kernel says can be had without swapping; empty where there is no
+# /proc/meminfo (macOS: JOBS alone limits it there).
+mem_available() {
+	awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null || true
+}
+# A browser grows for seconds after it starts, so what is available now does
+# not count the scripts just started: cap the count up front, then check
+# before each start for what else on the machine took memory meanwhile.
+available="$(mem_available)"
+if [ -n "$available" ]; then
+	fits=$((available / mem_per_job))
+	[ "$fits" -ge 1 ] || fits=1
+	if [ "$fits" -lt "$jobs" ]; then
+		echo "e2e: $fits scripts at a time, not $jobs: ${available} MiB available, ${mem_per_job} MiB each (JOBS, MEM_PER_JOB)" >&2
+		jobs=$fits
+	fi
+fi
+room_for_one() {
+	local available
+	available="$(mem_available)"
+	[ -z "$available" ] || [ "$available" -ge "$mem_per_job" ]
+}
 run_one() {
 	# script:part runs script.mjs ENGINE part
 	local engine=$1 script=$2 start=$EPOCHREALTIME status=0
@@ -77,7 +105,10 @@ run_one() {
 }
 for engine in $engines; do
 	for script in $scripts; do
-		while [ "$(jobs -rp | wc -l)" -ge "$jobs" ]; do wait -n || true; done
+		while running="$(jobs -rp | wc -l)" && [ "$running" -gt 0 ] &&
+			{ [ "$running" -ge "$jobs" ] || ! room_for_one; }; do
+			wait -n || true
+		done
 		run_one "$engine" "$script" &
 	done
 done
