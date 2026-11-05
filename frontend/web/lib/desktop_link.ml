@@ -58,6 +58,25 @@ end
 
 let storage_key = "prigh.desktop_key"
 let hint_storage_key = "prigh.desktop_app"
+
+let browser_shell_of_hash hash =
+  List.exists
+    (String.split (String.chop_prefix_if_exists hash ~prefix:"#") ~on:'&')
+    ~f:(String.equal "shell=browser")
+;;
+
+let shell_storage_key = "prigh.desktop_shell"
+
+let follow ~browser url =
+  if not browser
+  then url
+  else (
+    match String.lsplit2 url ~on:'#' with
+    | Some (base, "") -> base ^ "#shell=browser"
+    | Some (base, fragment) -> base ^ "#" ^ fragment ^ "&shell=browser"
+    | None -> url ^ "#shell=browser")
+;;
+
 let quit_url = "about:blank#prigh-desktop-quit"
 let status_path = "/desktop/status"
 let connect_path = "/desktop/connect"

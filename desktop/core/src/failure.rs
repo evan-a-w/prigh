@@ -26,6 +26,15 @@ pub enum Failure {
         message: String,
         stderr: String,
     },
+    /// PRIGH_DESKTOP_WINDOW or PRIGH_DESKTOP_BROWSER is wrong.
+    BadWindow(String),
+    /// PRIGH_DESKTOP_WINDOW=browser and no Chromium-family browser.
+    NoBrowser,
+    /// The browser found did not start.
+    BrowserSpawn {
+        program: String,
+        error: String,
+    },
 }
 
 pub struct Message {
@@ -107,6 +116,27 @@ pub fn message(os: Os, f: &Failure) -> Message {
             title: "prigh did not start".into(),
             body: with_stderr(format!("{message}\n\nThe desktop app and prigh may not match: update both."), stderr),
         },
+        Failure::BadWindow(e) => Message {
+            title: "Bad window setting".into(),
+            body: format!(
+                "{e}\n\nFix it (programs.prigh.desktop.window and .browser in Home Manager) and start prigh again."
+            ),
+        },
+        Failure::NoBrowser => Message {
+            title: "No browser for prigh".into(),
+            body: "PRIGH_DESKTOP_WINDOW is browser, but no Chromium-family browser was found (Google Chrome, \
+                   Chromium, Brave, Microsoft Edge or Vivaldi).\n\nInstall one, set PRIGH_DESKTOP_BROWSER to one's \
+                   path (programs.prigh.desktop.browser), or use the built-in window: PRIGH_DESKTOP_WINDOW=auto or \
+                   webview."
+                .into(),
+        },
+        Failure::BrowserSpawn { program, error } => Message {
+            title: "The browser did not start".into(),
+            body: format!(
+                "Could not run {program}: {error}\n\nSet PRIGH_DESKTOP_BROWSER to a working Chromium-family browser, \
+                 or PRIGH_DESKTOP_WINDOW=webview for the built-in window."
+            ),
+        },
     }
 }
 
@@ -175,6 +205,21 @@ mod tests {
         // on Linux, 127 is just an exit code
         let s = show(Os::Unix, Failure::Exited { code: Some(127), ready: false, stderr: String::new() });
         assert!(!s.contains("WSL"), "{s}");
+    }
+
+    #[test]
+    fn browser() {
+        let s = show(Os::Unix, Failure::NoBrowser);
+        assert!(s.starts_with("No browser for prigh\n---\nPRIGH_DESKTOP_WINDOW is browser"), "{s}");
+        assert!(s.contains("PRIGH_DESKTOP_BROWSER"), "{s}");
+        let s = show(
+            Os::Unix,
+            Failure::BrowserSpawn { program: "/usr/bin/chromium".into(), error: "Permission denied".into() },
+        );
+        assert!(s.contains("Could not run /usr/bin/chromium: Permission denied"), "{s}");
+        let s =
+            show(Os::Unix, Failure::BadWindow("PRIGH_DESKTOP_WINDOW is \"x\": use auto, browser or webview".into()));
+        assert!(s.starts_with("Bad window setting"), "{s}");
     }
 
     #[test]

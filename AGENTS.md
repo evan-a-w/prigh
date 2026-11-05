@@ -16,7 +16,7 @@ while iterating.
 | `frontend/` | the frontends' dune project: `protocol/`, `client/` (+ `client/unix/`) and `ui/` shared, `tui/` and `web/` | OxCaml 5.2, Bonsai | `nix develop`, then `cd frontend && dune build @runtest` |
 | `frontend/tui/` | the terminal frontend (`prigh-tui`): `lib/`, `bin/`, `test/`, `e2e/`, `tmux-test/` | OxCaml 5.2, Bonsai_term | `cd frontend && dune build @tui/test/runtest` (unit tests only) |
 | `frontend/web/` | prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`, `e2e/` | OxCaml 5.2, Bonsai_web | `cd frontend && dune build @web/test/runtest ./web/bin/site`; e2e: `ENGINES=chromium bash frontend/web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
-| `desktop/` | prigh-desktop, the Tauri v2 window running `prigh desktop`: `core/` (logic), `app/` (shell), `test/` (window vs a fake sidecar) | Rust, Tauri | `nix develop .#desktop`, then `cd desktop && cargo test`; window: `nix build .#checks.x86_64-linux.desktop-window` |
+| `desktop/` | prigh-desktop, the Tauri v2 window running `prigh desktop`: `core/` (logic), `app/` (shell), `test/` (window and browser window vs a fake sidecar) | Rust, Tauri | `nix develop .#desktop`, then `cd desktop && cargo test`; window: `nix build .#checks.x86_64-linux.desktop-window` |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 
