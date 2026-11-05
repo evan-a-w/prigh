@@ -41,6 +41,11 @@
 </head>
 <body>
   <div id="app"><div class="loading">connecting…</div></div>
+  <script>
+    // Core's time zones need Temporal: a polyfill where the browser has none
+    // (WebKit), before main.bc.js.
+    if (typeof Temporal === "undefined") document.write('<script src="temporal-polyfill.js"><\/script>');
+  </script>
   <script src="main.bc.js"></script>
 </body>
 </html>

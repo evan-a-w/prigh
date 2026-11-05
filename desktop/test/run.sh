@@ -2,13 +2,14 @@
 # The desktop shell against a fake `prigh desktop` (fake-sidecar.py), in a
 # real window: prints what each scenario did, to diff with expected.txt.
 #
-#   desktop/test/run.sh PRIGH_DESKTOP_BINARY
+#   desktop/test/run.sh PRIGH_DESKTOP_BINARY [PRIGH]
 #
 # Needs a display (run it under xvfb-run), a D-Bus session bus (for the
 # single-instance plugin: dbus-run-session) and python3. The flake's
 # desktop-window check runs it that way.
 set -uo pipefail
 app=$1
+real=${2:-}
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -39,7 +40,7 @@ scenario() {
 	return 0
 }
 normalize() {
-	sed -E -e "s#$work#WORK#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g' -e 's#serving on [0-9]+#serving on PORT#'
+	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g' -e 's#serving on [0-9]+#serving on PORT#'
 }
 
 scenario "the window shows the page; closing it stops the sidecar" \
@@ -59,7 +60,7 @@ scenario "bad PRIGH_DESKTOP_ARGS" PRIGH_DESKTOP_ARGS="-cwd 'x"
 # prigh-web site, as the flake's wrapper or PRIGH_WEB_ROOT gives it) for a
 # `prigh serve -web` backend with a scripted model. The window's page is
 # driven by probe.js, which reports what it shows to a small server.
-real=${2:-}
+
 [ -n "$real" ] || exit 0
 mkdir -p "$work/server-home" "$work/laptop-cwd"
 HOME="$work/server-home" "$real" serve -web 127.0.0.1:0 -faux -token sekrit \
@@ -100,7 +101,7 @@ real_scenario() {
 	sed -e "s#@REPORT@#http://127.0.0.1:$(cat "$report_port_file")/#" \
 		-e "s#@ADDRESS@#$address#" -e "s#@MODE@#$mode#" "$here/probe.js" >"$work/probe.js"
 	env PRIGH_DESKTOP_BACKEND="$real" PRIGH_DESKTOP_TEST_SCRIPT="$work/probe.js" \
-		PRIGH_DESKTOP_ARGS="-cwd '$work/laptop-cwd' -name laptop -listen 127.0.0.1:0" \
+		PRIGH_DESKTOP_ARGS="-cwd '$work/laptop-cwd' -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:0" \
 		timeout 90 "$app" >"$work/stdout" 2>"$work/stderr"
 	local code=$?
 	echo "== $name: exit $code"
