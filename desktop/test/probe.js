@@ -3,7 +3,10 @@
 // what the page shows by POSTing to the report server and drives it: in
 // "close" mode it closes the window once the connect form shows, in "quit"
 // mode it signs in with the form (or, on the backend's own prigh-web under
-// -ui remote, with its sign-in) and then quits with /quit.
+// -ui remote, with its sign-in) and then quits with /quit; "menu" mode
+// first opens the thinking chip's menu on the new-session screen and
+// chooses from it with the real pointer (run.sh's report server moves and
+// clicks it with xdotool), hovering first.
 (() => {
   // What it saw, for the report when the page is stuck: its requests and
   // errors.
@@ -24,6 +27,60 @@
   const seen = () =>
     `requests: ${requests.map(([what, x]) => `${what} ${x.readyState === 4 ? x.status : "pending"}`).join(", ")}; errors: ${errors.join(" | ") || "none"}`;
   const report = text => fetch("@REPORT@", { method: "POST", mode: "no-cors", body: text });
+  // The real pointer to the middle of el ("move" or "click"), in the
+  // window's pixels: CSS pixels times the zoom.
+  const pointer = (what, el) => {
+    const r = el.getBoundingClientRect();
+    const x = Math.round((r.left + r.width / 2) * devicePixelRatio);
+    const y = Math.round((r.top + r.height / 2) * devicePixelRatio);
+    return fetch("@REPORT@pointer", { method: "POST", mode: "no-cors", body: `${what} ${x} ${y}` });
+  };
+  const until = (what, timeout = 5000) =>
+    new Promise(resolve => {
+      const end = Date.now() + timeout;
+      const poll = () => {
+        const v = what();
+        if (v || Date.now() > end) resolve(v);
+        else setTimeout(poll, 50);
+      };
+      poll();
+    });
+  const onScreen = el => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+  };
+  // Whether the pointer at its middle reaches it (not something over it).
+  const reachable = el => {
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  };
+  // Where the last click landed, for a report of one that missed.
+  let landed = "nowhere";
+  document.addEventListener("pointerdown", e => {
+    const r = e.target.getBoundingClientRect();
+    landed = `(${Math.round(e.clientX)}, ${Math.round(e.clientY)}) on .${String(e.target.className).split(" ").join(".")} at (${Math.round(r.left)}, ${Math.round(r.top)})`;
+  }, true);
+  const chooseFromMenu = async () => {
+    const fresh = await until(() => document.querySelector(".main.fresh .thinking-chip"), 10000);
+    if (!fresh) return report("menu: no thinking chip on the new-session screen");
+    const label = () => document.querySelector(".thinking-chip").textContent.trim();
+    const before = label();
+    await pointer("click", fresh);
+    const menu = await until(() => document.querySelector("#chip-popover[data-chip=thinking]"));
+    if (!menu) return report(`menu: the thinking chip's click opened nothing: it landed at ${landed}, the chip is at (${Math.round(fresh.getBoundingClientRect().left)}, ${Math.round(fresh.getBoundingClientRect().top)})`);
+    await until(() => menu.getAnimations().every(a => a.playState !== "running"), 1000);
+    const items = [...menu.querySelectorAll(".popover-item")];
+    const name = i => i.querySelector(".menu-label").textContent.trim();
+    const item = items.find(i => name(i) !== before);
+    if (!item) return report(`menu: no level but ${before} in the menu`);
+    await report(`menu: the thinking chip's menu shows (${items.length} levels), on screen: ${onScreen(menu)}; ${name(item)} reachable: ${reachable(item)}`);
+    await pointer("move", item);
+    const hovered = await until(() => item.matches(":hover"), 3000);
+    await report(`menu: the pointer over ${name(item)}: hovered ${hovered}`);
+    await pointer("click", item);
+    const closed = await until(() => !document.querySelector("#chip-popover") && label() !== before);
+    await report(`menu: clicked ${name(item)}: the menu ${document.querySelector("#chip-popover") ? "is still open" : "closed"}, the chip says ${closed ? label() : `${label()} (was ${before})`}`);
+  };
   const type = (el, value) => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
     Object.getOwnPropertyDescriptor(proto.prototype, "value").set.call(el, value);
@@ -75,7 +132,8 @@
     } else if (composer) {
       done = true;
       // The window may close before anything sent after the /quit arrives.
-      report("signed in").then(() => {
+      report("signed in").then(async () => {
+        if ("@MODE@" === "menu") await chooseFromMenu();
         type(composer, "/quit");
         composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
       });

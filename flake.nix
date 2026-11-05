@@ -337,6 +337,7 @@
               {
                 nativeBuildInputs = [
                   pkgs.xvfb-run
+                  pkgs.xdotool
                   pkgs.dbus
                   pkgs.python3
                   pkgs.curl
@@ -352,7 +353,7 @@
                 cp -r ${./desktop/test} test
                 chmod -R u+w test
                 patchShebangs test
-                xvfb-run -a dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
+                xvfb-run -a -s "-screen 0 1920x1200x24" dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
                   bash test/run.sh ${prighDesktop}/bin/prigh-desktop ${prigh}/bin/prigh > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
                 diff -u test/expected.txt actual.txt
                 # what the wrapper and the desktop entry say
@@ -361,6 +362,12 @@
                 grep -qx 'Name=prigh' ${prighDesktop}/share/applications/prigh.desktop
                 grep -qx 'Icon=prigh-desktop' ${prighDesktop}/share/applications/prigh.desktop
                 test -f ${prighDesktop}/share/icons/hicolor/128x128/apps/prigh-desktop.png
+                # WebKitGTK's GStreamer plugins (media, the microphone)
+                # (a binary wrapper: the paths are among its strings)
+                grep -aq GST_PLUGIN_SYSTEM_PATH_1_0 ${prighDesktop.unwrapped}/bin/prigh-desktop
+                for plugins in gst-plugins-base gst-plugins-good; do
+                  grep -aq "$plugins-[^/]*/lib/gstreamer-1.0" ${prighDesktop.unwrapped}/bin/prigh-desktop
+                done
                 touch "$out"
               ''
           else

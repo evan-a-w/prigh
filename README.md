@@ -2892,7 +2892,8 @@ fake `prigh desktop` for the failure paths, in a browser's window (a fake
 browser, `fake-browser.py`, that keeps a profile lock as Chromium does,
 and a real Chromium, `REAL_CHROMIUM`, closed through its DevTools) and, given a prigh, the real one for a
 `prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
-connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
+connect form, closing the window, signing in, a chip's menu chosen from
+with the real pointer (xdotool) at 100% and 125% zoom, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
 a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout
