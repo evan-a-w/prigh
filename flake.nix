@@ -174,124 +174,14 @@
           '';
         };
 
-        # The desktop app (desktop/): a Tauri shell, prigh-web in the system
-        # webview, running `prigh desktop` while it is open. Unwrapped, it
-        # finds prigh on the PATH; `prighDesktop` points it at ours.
+        # The desktop app: nix/desktop.nix (a function of pkgs, for the Home
+        # Manager module to build with the system's nixpkgs).
         lib = pkgs.lib;
         isLinux = pkgs.stdenv.hostPlatform.isLinux;
-        desktopVersion = (builtins.fromTOML (builtins.readFile ./desktop/Cargo.toml)).workspace.package.version;
-        desktopLinuxDeps = [
-          pkgs.webkitgtk_4_1
-          pkgs.libsoup_3
-          pkgs.glib-networking
-          pkgs.openssl
-        ];
-        prighDesktopUnwrapped = pkgs.rustPlatform.buildRustPackage {
-          pname = "prigh-desktop-unwrapped";
-          version = desktopVersion;
-          src = lib.fileset.toSource {
-            root = ./desktop;
-            fileset = lib.fileset.unions [
-              ./desktop/Cargo.toml
-              ./desktop/Cargo.lock
-              ./desktop/core
-              (lib.fileset.difference ./desktop/app (lib.fileset.maybeMissing ./desktop/app/gen))
-            ];
-          };
-          cargoLock.lockFile = ./desktop/Cargo.lock;
-          buildAndTestSubdir = "app";
-          nativeBuildInputs = [
-            pkgs.cargo-tauri.hook
-            pkgs.pkg-config
-          ]
-          ++ lib.optionals isLinux [ pkgs.wrapGAppsHook3 ];
-          buildInputs = lib.optionals isLinux desktopLinuxDeps;
-          # The logic is in prigh-desktop-core; the app's own crate has no
-          # tests.
-          checkPhase = ''
-            runHook preCheck
-            cargo test --offline -j "$NIX_BUILD_CORES" -p prigh-desktop-core
-            runHook postCheck
-          '';
-          meta = {
-            description = "prigh's desktop app, without a default prigh";
-            mainProgram = "prigh-desktop";
-            platforms = lib.platforms.linux ++ lib.platforms.darwin;
-          };
-        };
-        # `.override { backend; extraArgs; disableDmabuf; }` is what
-        # programs.prigh.desktop in the Home Manager module uses.
-        prighDesktop = lib.makeOverridable (
-          {
-            backend ? prigh,
-            extraArgs ? [ ],
-            disableDmabuf ? false,
-          }:
-          let
-            env = {
-              PRIGH_DESKTOP_BACKEND = "${backend}/bin/prigh";
-            }
-            // lib.optionalAttrs (extraArgs != [ ]) { PRIGH_DESKTOP_ARGS = lib.escapeShellArgs extraArgs; }
-            // lib.optionalAttrs disableDmabuf { WEBKIT_DISABLE_DMABUF_RENDERER = "1"; };
-            wrapFlags = lib.concatLists (
-              lib.mapAttrsToList (name: value: [
-                "--set-default"
-                name
-                value
-              ]) env
-            );
-            unwrapped = prighDesktopUnwrapped;
-          in
-          pkgs.runCommand "prigh-desktop-${desktopVersion}"
-            {
-              nativeBuildInputs = [ pkgs.makeWrapper ];
-              passthru = { inherit unwrapped backend; };
-              meta = unwrapped.meta // {
-                description = "prigh's desktop app: prigh-web in a native window, with prigh desktop running while it is open";
-              };
-            }
-            (
-              ''
-                mkdir -p "$out/bin"
-                makeWrapper ${unwrapped}/bin/prigh-desktop "$out/bin/prigh-desktop" ${lib.escapeShellArgs wrapFlags}
-              ''
-              + (
-                if isLinux then
-                  ''
-                    mkdir -p "$out/share"
-                    ln -s ${unwrapped}/share/icons "$out/share/icons"
-                    mkdir "$out/share/applications"
-                    sed "s|^Exec=.*|Exec=$out/bin/prigh-desktop|" \
-                      ${unwrapped}/share/applications/prigh.desktop > "$out/share/applications/prigh.desktop"
-                  ''
-                else
-                  # A Dock or Finder launch does not go through bin/: the
-                  # bundle's Info.plist carries the environment
-                  # (LSEnvironment).
-                  ''
-                    mkdir -p "$out/Applications"
-                    cp -R ${unwrapped}/Applications/prigh.app "$out/Applications/"
-                    chmod -R u+w "$out/Applications/prigh.app"
-                    plist="$out/Applications/prigh.app/Contents/Info.plist"
-                    entries=${
-                      lib.escapeShellArg (
-                        lib.concatStrings (
-                          lib.mapAttrsToList (
-                            name: value: "<key>${name}</key><string>${lib.escapeXML value}</string>"
-                          ) env
-                        )
-                      )
-                    }
-                    ENTRY="<key>LSEnvironment</key><dict>$entries</dict>" awk '
-                      { lines[NR] = $0 }
-                      /<\/dict>/ { last = NR }
-                      END { for (i = 1; i <= NR; i++) { if (i == last) print ENVIRON["ENTRY"]; print lines[i] } }
-                    ' "$plist" > plist.new
-                    mv plist.new "$plist"
-                  ''
-              )
-            )
-        ) { };
+        desktop = import ./nix/desktop.nix { inherit pkgs prigh; };
+        desktopVersion = desktop.version;
+        prighDesktopUnwrapped = desktop.unwrapped;
+        prighDesktop = desktop.wrapped;
       in
       {
         legacyPackages = frontendScope;
