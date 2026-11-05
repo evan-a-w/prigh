@@ -126,6 +126,9 @@ struct BrowserWindow {
     url: Mutex<Option<String>>,
     /// We are closing it (the sidecar exited): its exit says nothing.
     closing: AtomicBool,
+    /// The instance already on the profile that our launch handed the
+    /// window to.
+    handed_to: Mutex<Option<i32>>,
 }
 
 /// How long the browser has to exit after SIGTERM before it is killed.
@@ -187,6 +190,7 @@ impl BrowserWindow {
             #[cfg(unix)]
             if let Some(pid) = me.instance().filter(|p| *p as u32 != child.id()) {
                 log(format!("{} handed the window to its instance on prigh's profile (pid {pid})", me.found.name));
+                *me.handed_to.lock().unwrap() = Some(pid);
                 while alive(pid) && !me.closing.load(Ordering::SeqCst) {
                     thread::sleep(Duration::from_millis(500));
                 }
@@ -247,6 +251,9 @@ impl BrowserWindow {
         let child = self.child.lock().unwrap().clone();
         #[cfg(unix)]
         {
+            // Only what we started, or the instance it handed the window to
+            // (still that process: alive, on this profile).
+            let handed = || (*self.handed_to.lock().unwrap()).filter(|p| alive(*p) && self.runs_on_profile(*p));
             let signal = |sig: libc::c_int| {
                 if let Some(c) = &child {
                     // Not reaped: its pid (its group's id) is still ours.
@@ -254,7 +261,7 @@ impl BrowserWindow {
                         unsafe { libc::killpg(c.id() as libc::pid_t, sig) };
                     }
                 }
-                if let Some(pid) = self.instance() {
+                if let Some(pid) = handed() {
                     unsafe { libc::kill(pid, sig) };
                 }
             };
@@ -319,6 +326,7 @@ fn window_choice(app: &AppHandle) -> Result<Option<Arc<BrowserWindow>>, Failure>
                 child: Mutex::new(None),
                 url: Mutex::new(None),
                 closing: AtomicBool::new(false),
+                handed_to: Mutex::new(None),
             })))
         }
     }
