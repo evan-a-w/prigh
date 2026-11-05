@@ -349,7 +349,7 @@
                 cp -r ${./desktop/test} test
                 chmod -R u+w test
                 patchShebangs test
-                xvfb-run -a dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
+                xvfb-run -a -s "-screen 0 1920x1200x24" dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
                   bash test/run.sh ${prighDesktop}/bin/prigh-desktop ${prigh}/bin/prigh > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
                 diff -u test/expected.txt actual.txt
                 # what the wrapper and the desktop entry say
