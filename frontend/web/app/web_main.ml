@@ -1622,7 +1622,8 @@ let rec desktop_form
                      ([%equal: string option] unencrypted (Some address))
                    ~f:(function
                    | Some (Connected code) -> signed_in_by_desktop code
-                   | Some (Remote url) -> Browser.navigate url
+                   | Some (Remote url) ->
+                     Browser.navigate (Desktop_page.follow url)
                    | Some (Refused error) ->
                      desktop_form
                        ~key
@@ -1653,13 +1654,14 @@ let desktop key =
     | Some (Connect { address; user; error }) ->
       desktop_form ~key ~address ~user ~error ()
     | Some (Connected { code }) -> signed_in_by_desktop code
-    | Some (Remote url) -> Browser.navigate url
+    | Some (Remote url) -> Browser.navigate (Desktop_page.follow url)
     | None -> desktop_lost ())
 ;;
 
 let run () =
   Async_js.init ();
   Service_worker.register ();
+  Desktop_page.take_shell ();
   Desktop_page.take_hint ();
   match Desktop_page.key () with
   | Some key -> desktop key
