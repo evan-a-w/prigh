@@ -168,6 +168,7 @@ let%expect_test "help lists every key and command" =
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
+    Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
@@ -275,7 +276,7 @@ let%expect_test "help lists every key and command" =
     /retry-backend-connection reconnect to the backend now
     /state show the session state as the backend reports it
     /clear clear the transcript view (the conversation is kept)
-    /quit how to leave (close the tab; /signout signs out)
+    /quit leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
     Left to the browser
     Ctrl+C / Ctrl+V / Ctrl+Z copy, paste, undo: the browser's (Esc stops a run)
     Ctrl+F find in the page, which has the whole transcript

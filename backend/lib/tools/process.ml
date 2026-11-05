@@ -72,6 +72,14 @@ let run
       ?env:process_env
       (prog :: args)
   in
+  let group = `Group (Pid.of_int (Eio.Process.pid child)) in
+  (* Until it is reaped: once it is, its pid (the group's id) may be
+     another's. *)
+  let reaped = ref false in
+  (* Cancelled by Eio (the switch above ending, e.g. the process exiting),
+     not by [cancel]: Eio kills only the child, not what it started. *)
+  Switch.on_release sw (fun () ->
+    if not !reaped then Signal_unix.send_i Signal.kill group);
   Eio.Flow.close stdin_r;
   Eio.Flow.close stdout_w;
   Eio.Flow.close stderr_w;
@@ -125,19 +133,23 @@ let run
   in
   Option.iter input ~f:Stdin_feed.finish;
   let kill_and_reap () =
-    Signal_unix.send_i Signal.kill (`Group (Pid.of_int (Eio.Process.pid child)));
+    Signal_unix.send_i Signal.kill group;
     drain ();
     ignore (Eio.Process.await child : Eio.Process.exit_status)
   in
-  match outcome with
-  | `Cancelled ->
-    kill_and_reap ();
-    Exit.Cancelled
-  | `Timed_out ->
-    kill_and_reap ();
-    Timed_out
-  | `Done (`Exited n) -> Exited n
-  | `Done (`Signaled n) -> Signaled (Signal.of_caml_int n)
+  let exit =
+    match outcome with
+    | `Cancelled ->
+      kill_and_reap ();
+      Exit.Cancelled
+    | `Timed_out ->
+      kill_and_reap ();
+      Timed_out
+    | `Done (`Exited n) -> Exited n
+    | `Done (`Signaled n) -> Signaled (Signal.of_caml_int n)
+  in
+  reaped := true;
+  exit
 ;;
 
 module Output = struct

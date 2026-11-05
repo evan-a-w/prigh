@@ -922,7 +922,8 @@ models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
 lists them (Delete there trims the context before one); `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
-and what to use instead, and `/quit` says to close the tab.
+and what to use instead, and `/quit` says to close the tab (in the desktop app it quits, as Ctrl+Q
+does: see "Desktop app").
 
 The account at the bottom of the sidebar (also in the settings page) opens the
 account menu: switch to another saved account in one click (the page
@@ -1180,6 +1181,112 @@ prigh serve -web 0.0.0.0:7790 -token sekrit
 Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
 the backend's ports carries the RPC, but the terminal and file transfers
 need its `-web` port.
+
+## Desktop app
+
+prigh-desktop is prigh-web in a window of its own: a small native app
+([Tauri](https://tauri.app), `desktop/`) on the system's webview, which runs
+`prigh desktop` while it is open and stops it when the window closes. `prigh
+desktop` serves prigh-web for the saved backend (or asks which one to
+connect to) and is this machine's tool host, so the window is a
+frontend whose sessions run their tools here, as a TUI's do.
+
+```nix
+# Home Manager (flake input `prigh`):
+imports = [ prigh.homeManagerModules.default ];
+programs.prigh.enable = true;          # prigh on the PATH
+programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/Applications
+# programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
+# programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
+```
+
+Without Home Manager, `nix profile install github:evan-a-w/prigh#prigh-desktop`
+(it brings its own prigh), or `nix run github:evan-a-w/prigh#prigh-desktop`.
+The repository's CI builds installers too (the `desktop` workflow's
+artifacts: `.deb`/`.AppImage`, `.dmg`, `.msi`/`.exe`); those contain only
+the app, which then runs the `prigh` on the PATH (as the login shell sets
+it), so install prigh as well.
+
+- **The engine is the system's webview**: WKWebView (Safari's engine) on
+  macOS, WebView2 (Edge's Chromium) on Windows, WebKitGTK on Linux (a
+  library Nix provides, not your browser). Links to other sites open in
+  your browser; downloads go to the Downloads folder; prigh-web may use the
+  microphone (dictation), notifications and the clipboard without asking.
+- **Quitting**: closing the window, Quit prigh (the account menu, the ⋯
+  sheet, `/quit`) or Ctrl+Q / ⌘Q stop `prigh desktop`, its tool host and
+  what its tools started, then the app.
+- **Windows**: prigh does not run natively there, so the app runs it inside
+  [WSL](https://learn.microsoft.com/windows/wsl/install): `wsl --install`,
+  then install prigh in the distribution (e.g. Nix and `nix profile install
+  github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
+  prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
+  opens the page through WSL's localhost forwarding (on by default).
+- **Settings** (environment variables; Home Manager sets the first two):
+  `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
+  Windows, in WSL), `PRIGH_DESKTOP_ARGS` arguments for `prigh desktop`
+  (split like a shell's words: `-cwd '/my proj' -name laptop`),
+  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default).
+  Never put a token in Home Manager options or `PRIGH_DESKTOP_ARGS` in Nix:
+  the store is world-readable (the module refuses `-token`); sign in from
+  the app, which saves the connection like prigh-tui.
+- **One window**: starting the app again focuses the open one. Its size and
+  position are remembered.
+- **A blank or flickering window on Linux** (WebKitGTK with some GPU drivers,
+  NVIDIA in particular): set `WEBKIT_DISABLE_DMABUF_RENDERER=1`
+  (`programs.prigh.desktop.disableDmabuf = true`).
+- If `prigh desktop` cannot start or stops with an error, a dialog shows
+  what it said and what to do (install prigh, update it, install it in
+  WSL); the app's own log goes to stderr, prefixed `prigh-desktop:`.
+
+The Nix package exists for Linux and macOS; Windows uses the installers.
+Build it from `desktop/` with `nix develop .#desktop` (Rust, cargo-tauri
+and the webview's libraries), then `cargo tauri dev` or `cargo tauri build`
+in `desktop/app`.
+
+### `prigh desktop`
+
+`prigh desktop` is the process the desktop app runs: its window shows the
+page it serves. It is `prigh web` (above) for a backend elsewhere, with this
+machine's tool host in-process, but it also starts without a working
+connection, and it lives exactly as long as its window.
+
+```
+prigh desktop                                # the saved connection, else a connect form
+PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
+```
+
+- It prints one JSON line on stdout once it is listening,
+  `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`, for the window to open;
+  everything else goes to stderr. It serves on `127.0.0.1:7780`, else the
+  next free port, else any (`-listen HOST:PORT` to choose).
+- The backend is `-connect`/`-token`/`-user`, else `$PRIGH_CONNECT`/`_TOKEN`/
+  `_USER`, else the saved connection, by the TUI's rules, as for `prigh
+  web`. When there is none, or it cannot be reached, refuses the login or
+  has no prigh-web, the page is a connect form (the backend's address, the
+  user name and the token as the password), prefilled and saying what went
+  wrong and what to do. What the backend accepts is saved for next time,
+  and the page goes on signed in.
+- An address without TLS on another machine (`server:7790`, `ws://`)
+  would send the token and everything else in the clear, and whoever is on
+  the way could run commands on this computer: the form says so and asks
+  again ("Connect without encryption"). Use the backend's `wss://` address
+  behind a TLS proxy, or an SSH tunnel (`ssh -L 7790:localhost:7790
+  server`, then `127.0.0.1:7790`).
+- It stops (and its tool host and every process its tools started with
+  it) when its stdin reaches its end (or fails), the window gone (so give
+  it a pipe, not `</dev/null`), on SIGTERM or SIGHUP, or when the page
+  quits: `/quit`, Ctrl+Q (⌘Q), Quit prigh in
+  the account menu, or on a phone at the foot of the ⋯ sheet. In a browser,
+  outside the desktop app, `/quit` still says to close the tab.
+- `#desktop=KEY` is a per-run key that the page keeps for the tab and
+  sends with its requests to the sidecar's `/desktop/` endpoints, so no
+  other page or local process can point this machine's tool host at
+  another backend or stop the app. Only the window gets it: the log shows
+  the URL without it.
+- Like `prigh web`'s, its site answers only its own pages: a request under
+  another host name (DNS rebinding) or from another page (`Origin`, which
+  matters most for WebSockets, which browsers open to any address) is
+  refused.
 
 ## Editors (ACP)
 
@@ -2707,6 +2814,15 @@ prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
 and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
 against the real backend, its scripts all at once; the flake runs it as a
 check.
+
+The desktop app has two: `cargo test -p prigh-desktop-core` in `desktop/`
+(the decisions: how `prigh desktop` is started, its ready line, where the
+window may go, the error dialogs; `./test` runs it), and
+`desktop/test/run.sh`, the app in a real window against a fake `prigh
+desktop` for the failure paths and, given a prigh, the real one for a
+`prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
+connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
+a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout
 

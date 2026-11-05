@@ -38,7 +38,7 @@ module Error = struct
         "-connect: %s%s"
         (Core.Error.to_string_hum error)
         (match source with
-         | Flag -> ""
+         | Flag | Form -> ""
          | Env -> " (from $PRIGH_CONNECT)"
          | Saved file -> sprintf " (saved in %s)" file)
   ;;
@@ -118,10 +118,10 @@ let refused_hint t =
       address
       file
       address
-  | Some (Flag | Env), None ->
+  | Some (Flag | Env | Form), None ->
     "Check -token (or $PRIGH_TOKEN) against the backend's; if it serves \
      several users (-tokens), also give -user NAME (or $PRIGH_USER)."
-  | Some (Flag | Env), Some _ ->
+  | Some (Flag | Env | Form), Some _ ->
     "Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the \
      backend's -tokens NAME=TOKEN (or -host-tokens) entries."
 ;;

@@ -90,6 +90,8 @@ let help =
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
+  ; ( "Ctrl+Q / ⌘+Q (desktop app)"
+    , "quit prigh: its window and this machine's tool host (/quit)" )
   ; "Ctrl+B", "show or hide the sidebar (while reviewing, over the review)"
   ; ( "Ctrl+,"
     , "settings: notifications, transcript detail, your account (/settings)" )
@@ -611,6 +613,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("l" | "L") when command t -> Some (Open_chip Model)
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
+     | ("q" | "Q") when command t && m.desktop -> Some Quit_desktop
      | "," when ctrl_only t -> Some Open_settings
      | ("j" | "J") when ctrl_only t -> Some Open_jump_list
      | ("o" | "O") when ctrl_only t -> Some Cycle_verbosity

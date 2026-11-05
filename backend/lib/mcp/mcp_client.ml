@@ -287,7 +287,14 @@ module Stdio = struct
         Error (sprintf "could not start %s: %s" command (Exn.to_string exn))
     in
     let pid = Pid.of_int (Eio.Process.pid child) in
-    let kill_group () = Signal_unix.send_i Signal.kill (`Group pid) in
+    let killed = ref false in
+    let kill_group () =
+      killed := true;
+      Signal_unix.send_i Signal.kill (`Group pid)
+    in
+    (* The switch ending (the process exiting) kills only the server, not
+       what it started. *)
+    Switch.on_release sw (fun () -> if not !killed then kill_group ());
     let stderr = Output_tail.create ~capacity:stderr_capacity () in
     let pending = Int.Table.create () in
     let write_lock = Eio.Mutex.create () in

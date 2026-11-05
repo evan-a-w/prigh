@@ -54,6 +54,7 @@ module Check : sig
       | Flag
       | Env (** [$PRIGH_CONNECT] *)
       | Saved of string (** the saved connection's file *)
+      | Form (** typed into [prigh desktop]'s connect form *)
     [@@deriving sexp_of]
   end
 
@@ -71,7 +72,44 @@ module Listen : sig
     | At of Eio.Net.Ipaddr.v4v6 * int (** exactly there (port 0: any) *)
     | From of Eio.Net.Ipaddr.v4v6 * int
     (** the first free port of the ten from there *)
+    | From_or_any of Eio.Net.Ipaddr.v4v6 * int
+    (** the same, else any free port *)
+
+  (** Calls [serve] (which binds and returns the bound port) at the address
+      [t] says, trying the next port while one is in use. *)
+  val bind
+    :  t
+    -> (addr:Eio.Net.Ipaddr.v4v6 -> port:int -> int)
+    -> Eio.Net.Ipaddr.v4v6 * int
 end
+
+(** The host to put in a page's URL for a site listening on [addr]. *)
+val browser_host : Eio.Net.Ipaddr.v4v6 -> string
+
+(** What a site serving prigh-web for a backend elsewhere answers a
+    JSON-lines client: it is [what]'s site, connect to [connect_to]. *)
+val not_a_backend : what:string -> connect_to:string -> Web_server.on_lines
+
+module Tool_host_config : sig
+  type t =
+    { remote : Backend_address.t
+    ; credentials : Credentials.t
+    ; name : string
+    ; host_id : string
+    ; cwd : string
+    }
+end
+
+(** Connects a {!Tool_host} to the backend in a daemon fiber of [sw] (until
+    it refuses the credentials) and says how it went once it connected or
+    [wait] passed. *)
+val start_tool_host
+  :  env:Env.t
+  -> sw:Switch.t
+  -> log:(string -> unit)
+  -> wait:Time_ns.Span.t
+  -> Tool_host_config.t
+  -> [ `Connected | `Connecting | `Refused of string ]
 
 module Config : sig
   type t =
