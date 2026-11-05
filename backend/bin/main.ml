@@ -1197,11 +1197,12 @@ let web_command =
 let desktop_command =
   Command.basic
     ~summary:
-      "The desktop app's process: serves prigh-web on this machine for a \
-       backend elsewhere (the saved connection, or one typed into the page's \
-       connect form), runs its tools here, prints the page's URL as a JSON \
-       line and runs until stdin closes (so give it a pipe, not /dev/null), \
-       the page quits, or SIGTERM"
+      "The desktop app's process: runs this machine's tools for a backend \
+       elsewhere (the saved connection, or one typed into the connect form it \
+       serves here), prints where the window should be as JSON lines (the \
+       backend's own prigh-web, or with -ui local prigh-web served here, \
+       signed in) and runs until stdin closes (so give it a pipe, not \
+       /dev/null), the page quits, or SIGTERM"
     (let%map_open.Command connect =
        flag
          "-connect"
@@ -1221,6 +1222,14 @@ let desktop_command =
          "-user"
          (optional string)
          ~doc:"NAME the user to sign in as (default: $PRIGH_USER, else saved)"
+     and ui =
+       flag
+         "-ui"
+         (optional string)
+         ~doc:
+           "remote|local the window shows the backend's own prigh-web, signed \
+            in to there (remote, the default), or prigh-web served by this \
+            prigh, relayed and signed in for you (local)"
      and tools =
        flag
          "-tools"
@@ -1265,6 +1274,13 @@ let desktop_command =
          exit 2
        in
        let tools = Remote_choice.tools ~fail tools in
+       let ui : Desktop_sidecar.Ui.t =
+         match Option.map ui ~f:String.lowercase with
+         | None | Some "remote" -> Remote
+         | Some "local" -> Local
+         | Some other ->
+           fail (sprintf "-ui %S: expected remote or local" other)
+       in
        let root = Remote_choice.web_root ~fail web_root in
        let cwd = Remote_choice.cwd ~fail cwd in
        let listen : Web_connect.Listen.t =
@@ -1330,11 +1346,12 @@ let desktop_command =
              ~stopped:(fun () ->
                Eio.Condition.loop_no_mutex signal (fun () ->
                  Option.some_if (Atomic.get signalled) ()))
-             ~on_url:(fun url ->
-               print_endline (Jsonaf.to_string (`Object [ "url", `String url ]));
+             ~on_page:(fun page ->
+               print_endline (Desktop_sidecar.Page.to_json_line page);
                Out_channel.flush stdout)
              ~stdin:(Eio.Stdenv.stdin env)
              { initial
+             ; ui
              ; tools
              ; name = Option.value name ~default:(Core_unix.gethostname ())
              ; host_id

@@ -16,9 +16,31 @@ module Initial = struct
         }
 end
 
+module Ui = struct
+  type t =
+    | Remote
+    | Local
+  [@@deriving sexp_of]
+end
+
+module Page = struct
+  type t =
+    { url : string
+    ; remote : bool
+    }
+  [@@deriving sexp_of]
+
+  let to_json_line t =
+    Json.to_string
+      (`Object
+          (("url", `String t.url) :: (if t.remote then [ "remote", `True ] else [])))
+  ;;
+end
+
 module Config = struct
   type t =
     { initial : Initial.t
+    ; ui : Ui.t
     ; tools : Web_connect.Tools.t
     ; name : string
     ; host_id : string
@@ -47,11 +69,18 @@ module Form = struct
     }
 end
 
+(* What the page here needs under [Ui.Local]: the sign-in and the relay. *)
+module Relay = struct
+  type t =
+    { handoff : Signin_handoff.t
+    ; websockets : (string * Web_server.on_websocket) list
+    }
+end
+
 module Connected = struct
   type t =
     { remote : Backend_address.t
-    ; handoff : Signin_handoff.t
-    ; websockets : (string * Web_server.on_websocket) list
+    ; relay : Relay.t option (** [None] under [Ui.Remote] *)
     }
 end
 
@@ -72,10 +101,22 @@ type t =
   ; check_timeout : Time_ns.Span.t
   ; mutable state : State.t
   ; quit : unit Promise.u
+  ; on_page : Page.t -> unit
   }
 
 let digest s = Digestif.SHA256.to_raw_string (Digestif.SHA256.digest_string s)
 let string_or_null = Option.value_map ~default:`Null ~f:(fun s -> `String s)
+
+(* The backend's own prigh-web, told it is in the desktop app and which tool
+   host is this machine's. *)
+let remote_url t remote =
+  Backend_address.web_url remote
+  ^ "#app=desktop"
+  ^
+  match t.config.tools with
+  | Local -> "&host=" ^ Uri.pct_encode ~component:`Query_value t.config.host_id
+  | Remote -> ""
+;;
 
 (* The page continues signed in, the tool host connected (or given up on
    after [tool_host_wait]). *)
@@ -85,15 +126,6 @@ let connected t ~remote ~(credentials : Web_connect.Credentials.t) ~save =
     | Ok () -> ()
     | Error e ->
       t.log (sprintf "cannot save the connection: %s" (Error.to_string_hum e)));
-  let handoff =
-    Signin_handoff.create
-      ~user:credentials.user
-      ~token:credentials.token
-      ~prefer_host:
-        (match t.config.tools with
-         | Local -> Some t.config.host_id
-         | Remote -> None)
-  in
   (match t.config.tools with
    | Remote -> t.log "tools run on the backend (-tools remote)"
    | Local ->
@@ -118,10 +150,36 @@ let connected t ~remote ~(credentials : Web_connect.Credentials.t) ~save =
            it is"
       | `Refused _ -> ()));
   t.log (sprintf "connected to %s" (Backend_address.to_string remote));
-  { Connected.remote
-  ; handoff
-  ; websockets = Web_proxy.websockets ~env:t.env ~log:t.log remote
-  }
+  let relay =
+    match t.config.ui with
+    | Remote -> None
+    | Local ->
+      Some
+        { Relay.handoff =
+            Signin_handoff.create
+              ~user:credentials.user
+              ~token:credentials.token
+              ~prefer_host:
+                (match t.config.tools with
+                 | Local -> Some t.config.host_id
+                 | Remote -> None)
+        ; websockets = Web_proxy.websockets ~env:t.env ~log:t.log remote
+        }
+  in
+  { Connected.remote; relay }
+;;
+
+(* Where the page goes once connected: signed in here, or the backend's. *)
+module Next = struct
+  type t =
+    | Code of string
+    | Remote of string
+end
+
+let next t (c : Connected.t) : Next.t =
+  match c.relay with
+  | Some relay -> Code (Signin_handoff.code relay.handoff)
+  | None -> Remote (remote_url t c.remote)
 ;;
 
 (* Says hello to [remote]; a refusal goes back to the form, with what to do
@@ -186,7 +244,11 @@ let connect ?(prefix = "") t ~remote ~credentials ~save =
                 (Exn.to_string exn))
          | c ->
            t.state <- Connected c;
-           Ok (Signin_handoff.code c.handoff)))
+           let next = next t c in
+           (match next with
+            | Remote url -> t.on_page { url; remote = true }
+            | Code _ -> ());
+           Ok next))
 ;;
 
 (* Tokens and everything else would cross the network in the clear. *)
@@ -262,7 +324,7 @@ let rec status t flow =
           ; "user", string_or_null user
           ; "error", string_or_null error
           ])
-  | Connected { remote; handoff; _ } ->
+  | Connected { remote; relay = Some { handoff; _ } } ->
     respond_json
       flow
       (`Object
@@ -273,6 +335,11 @@ let rec status t flow =
               then `Null
               else `String (Signin_handoff.code handoff) )
           ])
+  | Connected ({ relay = None; _ } as c) ->
+    respond_json
+      flow
+      (`Object
+          [ "state", `String "remote"; "url", `String (remote_url t c.remote) ])
 ;;
 
 let confirmed json name =
@@ -324,8 +391,10 @@ let form_connect t flow json =
                ~credentials:{ token; user }
                ~save:(Some { Saved_connection.connect = address; token; user })
            with
-           | Ok code ->
+           | Ok (Code code) ->
              respond_json flow (`Object [ "ok", `True; "code", `String code ])
+           | Ok (Remote url) ->
+             respond_json flow (`Object [ "ok", `True; "remote", `String url ])
            | Error error -> failed error)))
 ;;
 
@@ -397,22 +466,22 @@ let routes t (request : Web_server.Request.t) =
   then Some (handle t)
   else (
     match t.state with
-    | Connected { remote; handoff; _ } ->
+    | Connected { remote; relay = Some { handoff; _ } } ->
       (match Signin_handoff.route handoff request with
        | Some handler -> Some handler
        | None -> Web_proxy.routes ~env:t.env ~log:t.log remote request)
-    | Checking _ | Form _ -> None)
+    | Connected { relay = None; _ } | Checking _ | Form _ -> None)
 ;;
 
 (* The relayed sockets go to the backend once connected; before that there
    is nothing to relay to. *)
 let websocket t path ~query ws =
   match t.state with
-  | Connected { websockets; _ } ->
+  | Connected { relay = Some { websockets; _ }; _ } ->
     Option.iter
       (List.Assoc.find websockets ~equal:String.equal path)
       ~f:(fun f -> f ~query ws)
-  | Checking _ | Form _ -> ()
+  | Connected { relay = None; _ } | Checking _ | Form _ -> ()
 ;;
 
 let on_lines t ~read_line ~write_line =
@@ -448,7 +517,7 @@ let run
       ?(check_timeout = Time_ns.Span.of_sec 15.)
       ?(stopped = Fiber.await_cancel)
       ~log
-      ~on_url
+      ~on_page
       ~stdin
       (config : Config.t)
   =
@@ -466,6 +535,7 @@ let run
            ; check_timeout
            ; state = Form { address = None; user = None; error = None }
            ; quit = set_quit
+           ; on_page
            }
          in
          let addr, port =
@@ -496,18 +566,30 @@ let run
                 sprintf "The saved connection (%s) did not work: " file
               | Form -> ""
             in
-            (* [connect] is [Checking] before it first waits, so before the
-               page can ask. *)
-            Fiber.fork ~sw (fun () ->
-              ignore
-                (connect t ~prefix ~remote ~credentials ~save
-                 : (string, string) Result.t)));
+            (match config.ui with
+             | Local ->
+               (* [connect] is [Checking] before it first waits, so before
+                  the page can ask. *)
+               Fiber.fork ~sw (fun () ->
+                 ignore
+                   (connect t ~prefix ~remote ~credentials ~save
+                    : (Next.t, string) Result.t))
+             | Remote ->
+               (* The window goes straight to the backend when it answers
+                  (said by [connect]); the page here only when it does
+                  not, to show the form. *)
+               ignore
+                 (connect t ~prefix ~remote ~credentials ~save
+                  : (Next.t, string) Result.t)));
          let url =
            Web_server.browser_url ~host:(Web_connect.browser_host addr) ~port
          in
          (* The key only to the shell: logs end up in files. *)
          log (sprintf "prigh-web on %s" url);
-         on_url (url ^ "#desktop=" ^ t.key);
+         (match t.state with
+          | Connected { relay = None; _ } -> ()
+          | Connected { relay = Some _; _ } | Checking _ | Form _ ->
+            on_page { url = url ^ "#desktop=" ^ t.key; remote = false });
          Fiber.await_cancel ()))
     (fun () ->
        Fiber.any
