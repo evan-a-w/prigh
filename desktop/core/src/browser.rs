@@ -93,7 +93,10 @@ pub fn find(
     if let Some(path) = explicit.map(str::trim).filter(|p| !p.is_empty()) {
         let program = if path.contains('/') || path.contains('\\') { Some(path.to_string()) } else { on_path(path) };
         return match program.filter(|p| executable(p)) {
-            Some(program) => Ok(Some(Found { name: path.to_string(), program })),
+            Some(program) => {
+                let name = program.rsplit(['/', '\\']).next().unwrap_or(&program).to_string();
+                Ok(Some(Found { name, program }))
+            }
             None => Err(format!("PRIGH_DESKTOP_BROWSER is {path:?}, which is not an executable")),
         };
     }
@@ -217,7 +220,7 @@ mod tests {
         );
         assert_eq!(
             show(find(Platform::Linux, Some("/opt/x/chrome"), &places, path(&[]), |p: &str| p == "/opt/x/chrome")),
-            "/opt/x/chrome: /opt/x/chrome"
+            "chrome: /opt/x/chrome"
         );
         assert_eq!(
             show(find(Platform::Linux, Some("/nope"), &places, path(&["chromium"]), |_: &str| false)),

@@ -19,7 +19,17 @@ fake="$work/bin/fake-prigh"
 mkdir -p "$work/bin"
 cp "$here/fake-sidecar.py" "$fake"
 chmod +x "$fake"
+mkdir -p "$work/browsers"
+cp "$here/fake-browser.py" "$work/browsers/google-chrome-stable"
+chmod +x "$work/browsers/google-chrome-stable"
 export PRIGH_DESKTOP_NO_DIALOG=1
+# dbus-run-session gives two addresses, each with its server's GUID; zbus
+# (the single-instance plugin) pairs the first with the wrong GUID and goes
+# without. A desktop session's bus has one.
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS%%;*}"
+# The app's own window unless a scenario says otherwise (`auto` would take
+# a browser installed here).
+export PRIGH_DESKTOP_WINDOW=webview
 
 # scenario NAME [VAR=VALUE...]: runs the app with them, prints its exit
 # code, its own log lines and the fake's events, ports and paths replaced.
@@ -27,7 +37,8 @@ scenario() {
 	local name=$1
 	shift
 	: >"$work/log"
-	env FAKE_LOG="$work/log" PRIGH_DESKTOP_BACKEND="$fake" "$@" \
+	: >"$work/browser-log"
+	env FAKE_LOG="$work/log" FAKE_BROWSER_LOG="$work/browser-log" PRIGH_DESKTOP_BACKEND="$fake" "$@" \
 		timeout 60 "$app" >"$work/stdout" 2>"$work/stderr"
 	local code=$?
 	echo "== $name: exit $code"
@@ -37,6 +48,7 @@ scenario() {
 	case " $* " in *" PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD=1 "*) unsure='/favicon.ico' ;; esac
 	normalize <"$work/stderr" | grep -E '^prigh-desktop: ' | grep -v -e '/favicon.ico' -e "$unsure"
 	normalize <"$work/log" | grep -v 'GET /favicon.ico' | sed 's/^/fake: /'
+	normalize <"$work/browser-log"
 	return 0
 }
 normalize() {
@@ -56,6 +68,76 @@ scenario "the sidecar ignores SIGTERM too: killed" \
 	FAKE_MODE=ignore-term PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD=1
 scenario "no such prigh" PRIGH_DESKTOP_BACKEND=prigh-not-installed
 scenario "bad PRIGH_DESKTOP_ARGS" PRIGH_DESKTOP_ARGS="-cwd 'x"
+
+# The page in a browser's app window (fake-browser.py, standing in for
+# Chromium), not the app's own.
+browser="$work/browsers/google-chrome-stable"
+scenario "browser: auto takes one on the PATH; closing its window stops the sidecar" \
+	PRIGH_DESKTOP_WINDOW= PATH="$work/browsers:$PATH"
+scenario "browser: the page's Quit (the sidecar exits) closes the browser" \
+	PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$browser" FAKE_MODE=quit FAKE_BROWSER_MODE=stay
+scenario "browser: the sidecar fails: the browser closes, the failure is told" \
+	PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$browser" FAKE_MODE=crash FAKE_BROWSER_MODE=stay
+scenario "browser: none installed" PRIGH_DESKTOP_WINDOW=browser
+scenario "browser: PRIGH_DESKTOP_BROWSER is not one" \
+	PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER=/no/such/chrome
+scenario "bad PRIGH_DESKTOP_WINDOW" PRIGH_DESKTOP_WINDOW=chrome
+
+# wait_for FILE PATTERN
+wait_for() {
+	for _ in $(seq 300); do
+		grep -q -- "$2" "$1" 2>/dev/null && return 0
+		sleep 0.1
+	done
+	echo "timed out waiting for $2 in $1"
+}
+# browser_app [VAR=VALUE...]: the app, in the background, in browser mode.
+browser_app() {
+	env FAKE_LOG="$work/log" FAKE_BROWSER_LOG="$work/browser-log" PRIGH_DESKTOP_BACKEND="$fake" \
+		PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$browser" "$@" \
+		timeout 60 "$app" >"$work/stdout" 2>"$work/stderr" &
+	app_pid=$!
+}
+report() {
+	echo "== $1: exit $2"
+	normalize <"$work/stderr" | grep -E '^prigh-desktop: ' | grep -v '/favicon.ico'
+	normalize <"$work/log" | grep -v 'GET /favicon.ico' | sed 's/^/fake: /'
+	normalize <"$work/browser-log"
+}
+profile="$XDG_DATA_HOME/io.github.evan-a-w.prigh/browser"
+
+# An instance left on prigh's profile (by an app that was killed) takes the
+# window: the app waits for that instance instead.
+: >"$work/log"
+: >"$work/browser-log"
+FAKE_BROWSER_LOG="$work/browser-log" FAKE_BROWSER_MODE=stay "$browser" \
+	--app=http://127.0.0.1:9/ --user-data-dir="$profile" &
+stale=$!
+wait_for "$work/browser-log" "loaded the page"
+browser_app FAKE_BROWSER_MODE=close
+wait_for "$work/stderr" "handed the window"
+kill -TERM "$stale"
+wait "$stale"
+wait "$app_pid"
+report "browser: an instance already on the profile; its window closing stops the sidecar" $?
+
+# A second launch opens another window in the running browser, and its
+# launcher exiting at once does not end the app.
+: >"$work/log"
+: >"$work/browser-log"
+browser_app FAKE_BROWSER_MODE=close-later FAKE_BROWSER_CLOSE="$work/close"
+wait_for "$work/browser-log" "loaded the page"
+env FAKE_LOG="$work/log2" FAKE_BROWSER_LOG="$work/browser-log" PRIGH_DESKTOP_WINDOW=browser \
+	PRIGH_DESKTOP_BROWSER="$browser" PRIGH_DESKTOP_BACKEND="$fake" timeout 30 "$app" >/dev/null 2>"$work/stderr2"
+second=$?
+wait_for "$work/browser-log" "handed the window"
+sleep 0.5
+running=$(kill -0 "$app_pid" 2>/dev/null && echo yes || echo no)
+touch "$work/close"
+wait "$app_pid"
+code=$?
+echo "second launch: exit $second; the first still running after it: $running"
+report "browser: a second launch, then the first window closes" $code
 
 # The real `prigh desktop` (run.sh's second argument: a prigh with its
 # prigh-web site, as the flake's wrapper or PRIGH_WEB_ROOT gives it) for a
