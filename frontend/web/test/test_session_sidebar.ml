@@ -254,7 +254,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     (Place_menu (Point (x 40) (y 200)))
     Landing page site trunk
     Open Enter
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     New worktree… /worktree new
@@ -288,9 +288,9 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
           <span class="menu-label"> Open </span>
           <kbd class="menu-command"> Enter </kbd>
         </div>
-        <div role="menuitem" data-item="open_tab" class="menu-item" @on_click @on_mouseenter>
+        <div role="menuitem" data-item="open_window" class="menu-item" @on_click @on_mouseenter>
           <icon class="external"> </icon>
-          <span class="menu-label"> Open in new tab </span>
+          <span class="menu-label"> Open in new window </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
@@ -377,7 +377,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     (Focus dialog)
     (Place_menu (Element session-s1))
     Main work prigh main
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     New worktree… /worktree new
@@ -396,7 +396,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     (Place_menu (Element session-s5))
     Shopping list ~/notes
     Open Enter
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     Review changes /review
@@ -413,7 +413,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     (Focus dialog)
     (Place_menu (Element more-session-s6))
     [menuitem] div "Open Enter"
-    [menuitem] div "Open in new tab"
+    [menuitem] div "Open in new window"
     [menuitem] div "Rename\226\128\166 /name"
     [menuitem] div "Fork\226\128\166 /fork"
     [menuitem] div "New worktree\226\128\166 /worktree new"
@@ -931,7 +931,7 @@ let%expect_test
     (Place_menu (Element session-s1))
     Login form prigh feat/login
     Switch back to main /worktree back
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     New worktree… /worktree new
@@ -951,7 +951,7 @@ let%expect_test
     Notes site redesign
     Switch back to ~/notes /worktree back
     Open Enter
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     New worktree… /worktree new
@@ -970,7 +970,7 @@ let%expect_test
     (Place_menu (Element session-s3))
     Landing page site trunk
     Open Enter
-    Open in new tab
+    Open in new window
     Rename… /name
     Fork… /fork
     New worktree… /worktree new
@@ -1119,5 +1119,47 @@ let%expect_test "/worktree back: without a home, or when it fails" =
              (branch (main)) (main true))))))))))
     Couldn't switch back: the tool host srv that /home/u/src/prigh is on is not connected. (Dismiss)
     [/worktree back main]
+    |}]
+;;
+
+(* A session in a new window: its menu's Open in new window, a Ctrl or Cmd
+   click, a middle click; a plain click switches to it. *)
+let%expect_test "a session in a new window" =
+  let h = create () in
+  H.right_click h ~selector:".session" ~nth:1;
+  choose h "open_window";
+  print_endline "-- Ctrl+click:";
+  H.modified_click h ~ctrl:true ~selector:".session-open" ~nth:1;
+  print_endline "-- Cmd+click:";
+  H.modified_click h ~meta:true ~selector:".session-open" ~nth:1;
+  print_endline "-- middle click:";
+  H.middle_click h ~selector:".session-open" ~nth:1;
+  print_endline "-- a plain click:";
+  H.modified_click h ~selector:".session-open" ~nth:1;
+  [%expect {|
+    (Open_menu
+     ((target (Session /sessions/s2.jsonl)) (anchor (Element session-s2))))
+    (Focus dialog)
+    (Place_menu (Element session-s2))
+    (Picker_choose open_window)
+    (Focus editor)
+    (Open_window s2)
+    -- Ctrl+click:
+    (Open_session_window s2)
+    (Open_window s2)
+    -- Cmd+click:
+    (Open_session_window s2)
+    (Open_window s2)
+    -- middle click:
+    (Open_session_window s2)
+    (Open_window s2)
+    -- a plain click:
+    (Switch_session /sessions/s2.jsonl)
+    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
+     (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
+    (Focus editor)
     |}]
 ;;

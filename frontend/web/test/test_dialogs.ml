@@ -175,7 +175,6 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
-    Alt+Shift+] Alt+Shift+[ / Alt+Shift+1…9 / Alt+W (session tabs) the next or previous tab, the Nth, close this one (/tabs on; also its ×, a middle click; drag a tab to move it)
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
@@ -222,7 +221,6 @@ let%expect_test "help lists every key and command" =
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /tabs [on|off] show the open sessions as tabs over the chat (saved for your account)
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
@@ -600,10 +598,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

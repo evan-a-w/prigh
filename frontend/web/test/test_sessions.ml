@@ -53,6 +53,7 @@ let%expect_test
               class="session-open"
               @on_click
               @on_focus
+              @on_mousedown
               @on_pointerdown>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <div class="session-mark">

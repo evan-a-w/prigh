@@ -21,6 +21,11 @@ let age (m : App.Model.t) (s : Session_summary.t) =
 
 let shift_click ev = Js_of_ocaml.Js.to_bool ev##.shiftKey
 
+(* Ctrl or Cmd: open in a new window, as a browser does with a link. *)
+let new_window_click ev =
+  Js_of_ocaml.Js.to_bool ev##.ctrlKey || Js_of_ocaml.Js.to_bool ev##.metaKey
+;;
+
 module Session_worktrees = Prigh_ui.Session_worktrees
 
 (* A context menu's event: at the pointer, or (from the keyboard, which
@@ -358,7 +363,18 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                     inject
                       (Action.Mark_session
                          { path = s.path; range = shift_click ev })
+                  else if new_window_click ev
+                  then inject (Action.Open_session_window s.id)
                   else inject (Action.Switch_session s.path))
+              ; (if selecting
+                 then Attr.empty
+                 else
+                   Attr.on_mousedown (fun ev ->
+                     if ev##.button = 1
+                     then (
+                       Js_of_ocaml.Dom.preventDefault ev;
+                       inject (Action.Open_session_window s.id))
+                     else Effect.Ignore))
               ; Attr.on_pointerdown (fun _ ->
                   inject (Action.Prefetch_session s.path))
               ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
