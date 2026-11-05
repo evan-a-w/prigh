@@ -54,7 +54,12 @@ val clear_hash : unit -> unit
 
 (** [POST]s [body] to [url] and calls [f] with the answer's body when its
     status is 200, else with [None]. *)
-val post : url:string -> body:string -> f:(string option -> unit) -> unit
+val post
+  :  content_type:string
+  -> url:string
+  -> body:string
+  -> f:(string option -> unit)
+  -> unit
 
 val set_app_html : string -> unit
 val input_value : string -> string
