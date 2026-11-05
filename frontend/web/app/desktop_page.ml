@@ -42,10 +42,21 @@ let connect ~key ~address ~user ~token ~f =
     ~f:(fun reply -> f (Option.bind reply ~f:Desktop_link.Connect_reply.of_json))
 ;;
 
+(* Over whatever the page shows (the app, which keeps redrawing its root, or
+   the connect form) until the window closes. *)
+let show_quitting () =
+  let overlay = Dom_html.createDiv Dom_html.document in
+  overlay##.className := Js.string "signin-page desktop-quitting";
+  overlay##setAttribute (Js.string "role") (Js.string "status");
+  overlay##.innerHTML
+  := Js.string
+       {|<div class="signin"><div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div><h1>Quitting prigh…</h1><p class="signin-sub">The window closes once this computer's tool host has stopped.</p></div>|};
+  Dom.appendChild Dom_html.document##.body overlay
+;;
+
 let quit () =
   Option.iter (stored ()) ~f:(fun key ->
-    Browser.set_app_html
-      {|<div class="signin-page"><div class="signin"><div class="brand"><span class="logo">prigh</span></div><h1>Quitting prigh…</h1><p class="signin-sub">The window closes once this computer's tool host has stopped.</p></div></div>|};
+    show_quitting ();
     Browser.post
       ~url:Desktop_link.quit_path
       ~body:(Desktop_link.quit_body ~key)

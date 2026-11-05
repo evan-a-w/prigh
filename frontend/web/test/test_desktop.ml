@@ -115,7 +115,7 @@ let%expect_test "under the desktop app on a phone: Quit prigh in the ⋯ sheet" 
   [%expect {|
     Toggle_status_tray
     <button class="quit-row sheet-row">
-    (Quit prigh the desktop app and its tool host)
+    (Quit prigh)
     Toggle_status_tray
     Quit_desktop
     Quit_desktop
