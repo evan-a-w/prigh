@@ -1310,15 +1310,15 @@ let desktop_command =
        in
        (* SIGTERM or SIGHUP (the shell's fallback, a logout) quits as stdin
           closing does, stopping the tools' processes. *)
-      let signalled = Atomic.make false in
-      let signal = Eio.Condition.create () in
-      List.iter [ Stdlib.Sys.sigterm; Stdlib.Sys.sighup ] ~f:(fun s ->
-        Stdlib.Sys.Safe.set_signal
-          s
-          (Signal_handle
-             (fun (_ : int) ->
-               Atomic.set signalled true;
-               Eio.Condition.broadcast signal)));
+       let signalled = Atomic.make false in
+       let signal = Eio.Condition.create () in
+       List.iter [ Stdlib.Sys.sigterm; Stdlib.Sys.sighup ] ~f:(fun s ->
+         Stdlib.Sys.set_signal
+           s
+           (Signal_handle
+              (fun (_ : int) ->
+                Atomic.set signalled true;
+                Eio.Condition.broadcast signal)));
        let ended =
          Eio_main.run
          @@ fun env ->

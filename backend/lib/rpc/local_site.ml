@@ -45,9 +45,7 @@ let local_host ~port authority =
 let refuse ~status ~reason body =
   let response = Static_site.Response.text ~status ~reason body in
   Error
-    { response with
-      headers = [ "Content-Type", "text/plain; charset=utf-8" ]
-    }
+    { response with headers = [ "Content-Type", "text/plain; charset=utf-8" ] }
 ;;
 
 let check ~port ~headers =
@@ -60,8 +58,7 @@ let check ~port ~headers =
        refuse
          ~status:403
          ~reason:"Forbidden"
-         "only the page this site served may use it: open prigh's page \
-          itself\n")
+         "only the page this site served may use it: open prigh's page itself\n")
   | Some _ | None ->
     refuse
       ~status:421

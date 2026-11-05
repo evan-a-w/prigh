@@ -1166,7 +1166,7 @@ connection, and it lives exactly as long as its window.
 
 ```
 prigh desktop                                # the saved connection, else a connect form
-prigh desktop -connect server:7790 -token sekrit -cwd ~/proj
+PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
 ```
 
 - It prints one JSON line on stdout once it is listening,
@@ -1180,14 +1180,27 @@ prigh desktop -connect server:7790 -token sekrit -cwd ~/proj
   user name and the token as the password), prefilled and saying what went
   wrong and what to do. What the backend accepts is saved for next time,
   and the page goes on signed in.
-- It stops (and its tool host with it) when its stdin reaches its end, the
-  window gone, or when the page quits: `/quit`, Ctrl+Q (⌘Q), Quit prigh in
+- An address without TLS on another machine (`server:7790`, `ws://`)
+  would send the token and everything else in the clear, and whoever is on
+  the way could run commands on this computer: the form says so and asks
+  again ("Connect without encryption"). Use the backend's `wss://` address
+  behind a TLS proxy, or an SSH tunnel (`ssh -L 7790:localhost:7790
+  server`, then `127.0.0.1:7790`).
+- It stops (and its tool host and every process its tools started with
+  it) when its stdin reaches its end (or fails), the window gone (so give
+  it a pipe, not `</dev/null`), on SIGTERM or SIGHUP, or when the page
+  quits: `/quit`, Ctrl+Q (⌘Q), Quit prigh in
   the account menu, or on a phone at the foot of the ⋯ sheet. In a browser,
   outside the desktop app, `/quit` still says to close the tab.
 - `#desktop=KEY` is a per-run key that the page keeps for the tab and
   sends with its requests to the sidecar's `/desktop/` endpoints, so no
   other page or local process can point this machine's tool host at
-  another backend or stop the app.
+  another backend or stop the app. Only the window gets it: the log shows
+  the URL without it.
+- Like `prigh web`'s, its site answers only its own pages: a request under
+  another host name (DNS rebinding) or from another page (`Origin`, which
+  matters most for WebSockets, which browsers open to any address) is
+  refused.
 
 ## Editors (ACP)
 

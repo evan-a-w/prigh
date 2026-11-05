@@ -302,7 +302,7 @@ let post_code t ~sw ~port code =
     ~sw
     ~port
     (sprintf
-       "POST %s HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s"
+       "POST %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: %d\r\n\r\n%s"
        Signin_handoff.path
        (String.length code)
        code)
@@ -438,12 +438,16 @@ let%expect_test
     tool host: connected
     |}];
   (* The page, and the code traded for the credentials, once. *)
-  http t ~sw ~port "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
+  http t ~sw ~port "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
   printf "code: %d hex digits\n" (String.length code);
   post_code t ~sw ~port "wrong";
   post_code t ~sw ~port code;
   post_code t ~sw ~port code;
-  http t ~sw ~port (sprintf "GET %s HTTP/1.1\r\n\r\n" Signin_handoff.path);
+  http
+    t
+    ~sw
+    ~port
+    (sprintf "GET %s HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n" Signin_handoff.path);
   [%expect
     {|
     HTTP/1.1 200 OK
@@ -501,7 +505,7 @@ let%expect_test
     ~sw
     ~port
     "GET /files/download?ticket=nope HTTP/1.1\r\n\
-     Host: x\r\n\
+     Host: 127.0.0.1\r\n\
      Connection: keep-alive\r\n\
      \r\n";
   [%expect
@@ -654,7 +658,7 @@ module Desktop = struct
     ; saved : Saved_connection.t Queue.t
     }
 
-  let start ?(tools = Web_connect.Tools.Local) t ~sw ~logs initial =
+  let start ?(tools = Web_connect.Tools.Local) ?save t ~sw ~logs initial =
     let saved = Queue.create () in
     let config : Desktop_sidecar.Config.t =
       { initial
@@ -665,7 +669,7 @@ module Desktop = struct
       ; listen = At (Eio.Net.Ipaddr.V4.loopback, 0)
       ; root = site t
       ; save =
-          (fun c ->
+          Option.value save ~default:(fun c ->
             Queue.enqueue saved c;
             Ok ())
       }
@@ -713,14 +717,23 @@ module Desktop = struct
 
   (* A [POST] of [fields] (and the key, unless [key] says otherwise) to
      [/desktop/what]; prints the answer with the codes masked. *)
-  let post ?key t ~sw d what fields =
+  let post
+        ?key
+        ?(headers = "Host: 127.0.0.1\r\nContent-Type: application/json\r\n")
+        t
+        ~sw
+        d
+        what
+        fields
+    =
     let key = Option.value key ~default:d.key in
     let body = Jsonaf.to_string (`Object (("key", `String key) :: fields)) in
     let flow = connect t ~sw ~port:d.port in
     Eio.Flow.copy_string
       (sprintf
-         "POST /desktop/%s HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s"
+         "POST /desktop/%s HTTP/1.1\r\n%sContent-Length: %d\r\n\r\n%s"
          what
+         headers
          (String.length body)
          body)
       flow;
@@ -759,7 +772,12 @@ let unport port s =
 
 (* Which client the tool host is depends on the tests before. *)
 let show_log t ~port line =
-  let line = mask t (unport port line) in
+  let line =
+    mask t (unport port line)
+    |> Re.replace_string
+         (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/$"))
+         ~by:"127.0.0.1:SITE/"
+  in
   match String.substr_index line ~pattern:" as client-" with
   | Some i -> print_endline (String.prefix line i ^ " as client-N")
   | None -> print_endline line
@@ -789,9 +807,13 @@ let%expect_test
   in
   [%expect {| url: http://127.0.0.1:PORT/#desktop=<key> |}];
   (* The page is served; the endpoints want the run's key. *)
-  http t ~sw ~port:d.port "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
+  http t ~sw ~port:d.port "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
   post ~key:"wrong" "status" [];
-  http t ~sw ~port:d.port "GET /desktop/status HTTP/1.1\r\nHost: x\r\n\r\n";
+  http
+    t
+    ~sw
+    ~port:d.port
+    "GET /desktop/status HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
   post "status" [];
   [%expect
     {|
@@ -884,6 +906,7 @@ let%expect_test
     quit HTTP/1.1 200 OK: {"ok":true}
     Quit
     connection refused
+    prigh-web on http://127.0.0.1:SITE/
     127.0.0.1:PORT refused the login: unauthorised: bad user name or password
     No password was given: enter the backend's token (its -token, or yours from its -tokens) as the password.
     127.0.0.1:PORT refused the login: unauthorised: bad user name or password
@@ -938,6 +961,7 @@ let%expect_test
       Content-Type: application/json
       body: {"user":null,"token":"sekrit","prefer_host":null}
     Stdin_closed
+    prigh-web on http://127.0.0.1:SITE/
     tools run on the backend (-tools remote)
     connected to 127.0.0.1:PORT
     ()
@@ -971,6 +995,284 @@ let%expect_test
     {|
     url: http://127.0.0.1:PORT/#desktop=<key>
     status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":"me","error":"The saved connection (~/.prigh/tui-connection.sexp) did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    Stdin_closed
+    |}]
+;;
+
+let%expect_test "the local sites: only their own pages, by their own names" =
+  List.iter
+    [ [ "Host", "127.0.0.1:7780" ]
+    ; [ "Host", "localhost:7780" ]
+    ; [ "Host", "[::1]:7780" ]
+    ; [ "Host", "192.168.1.5:7780" ]
+    ; [ "Host", "127.0.0.1" ]
+    ; [ "Host", "127.0.0.1:7780"; "Origin", "http://127.0.0.1:7780" ]
+    ; [ "host", "LOCALHOST:7780"; "origin", "http://localhost:7780" ]
+    ; [ "Host", "127.0.0.1:7781" ]
+    ; [ "Host", "evil.example:7780" ]
+    ; [ "Host", "127.0.0.1.evil.example:7780" ]
+    ; []
+    ; [ "Host", "127.0.0.1:7780"; "Origin", "https://evil.example" ]
+    ; [ "Host", "127.0.0.1:7780"; "Origin", "http://localhost:7780" ]
+    ; [ "Host", "127.0.0.1:7780"; "Origin", "null" ]
+    ]
+    ~f:(fun headers ->
+      let answer =
+        match Local_site.check ~port:7780 ~headers with
+        | Ok () -> "ok"
+        | Error { status; body; _ } ->
+          sprintf "%d %s" status (String.strip body)
+      in
+      print_s [%message answer (headers : (string * string) list)]);
+  [%expect
+    {|
+    (ok (headers ((Host 127.0.0.1:7780))))
+    (ok (headers ((Host localhost:7780))))
+    (ok (headers ((Host [::1]:7780))))
+    (ok (headers ((Host 192.168.1.5:7780))))
+    (ok (headers ((Host 127.0.0.1))))
+    (ok (headers ((Host 127.0.0.1:7780) (Origin http://127.0.0.1:7780))))
+    (ok (headers ((host LOCALHOST:7780) (origin http://localhost:7780))))
+    ("421 this site answers only at http://127.0.0.1:7780/ (or localhost, or this machine's IP address): open it there"
+     (headers ((Host 127.0.0.1:7781))))
+    ("421 this site answers only at http://127.0.0.1:7780/ (or localhost, or this machine's IP address): open it there"
+     (headers ((Host evil.example:7780))))
+    ("421 this site answers only at http://127.0.0.1:7780/ (or localhost, or this machine's IP address): open it there"
+     (headers ((Host 127.0.0.1.evil.example:7780))))
+    ("421 this site answers only at http://127.0.0.1:7780/ (or localhost, or this machine's IP address): open it there"
+     (headers ()))
+    ("403 only the page this site served may use it: open prigh's page itself"
+     (headers ((Host 127.0.0.1:7780) (Origin https://evil.example))))
+    ("403 only the page this site served may use it: open prigh's page itself"
+     (headers ((Host 127.0.0.1:7780) (Origin http://localhost:7780))))
+    ("403 only the page this site served may use it: open prigh's page itself"
+     (headers ((Host 127.0.0.1:7780) (Origin null))))
+    |}]
+;;
+
+(* Just the status line of [request]'s answer. *)
+let status_line t ~sw ~port request =
+  let flow = connect t ~sw ~port in
+  Eio.Flow.copy_string request flow;
+  let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
+  print_endline (Eio.Buf_read.line reader);
+  Eio.Flow.close flow
+;;
+
+let upgrade ?(headers = "") target =
+  sprintf
+    "GET %s HTTP/1.1\r\n\
+     Host: 127.0.0.1\r\n\
+     %sUpgrade: websocket\r\n\
+     Connection: Upgrade\r\n\
+     Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+     Sec-WebSocket-Version: 13\r\n\
+     \r\n"
+    target
+    headers
+;;
+
+let%expect_test
+    "prigh desktop: other pages, other host names and simple requests are \
+     refused"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = address (backend_spec backend_port)
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Flag
+         ; save = None
+         })
+  in
+  let post ?headers what =
+    ignore (Desktop.post ?headers t ~sw d what [] : string option)
+  in
+  (* Another page's WebSocket (no CORS for those), or under another name
+     (DNS rebinding). *)
+  let origin o = sprintf "Origin: %s\r\n" o in
+  let page = sprintf "http://127.0.0.1:%d" d.port in
+  status_line
+    t
+    ~sw
+    ~port:d.port
+    (upgrade ~headers:(origin "https://evil.example") "/ws");
+  status_line
+    t
+    ~sw
+    ~port:d.port
+    (upgrade ~headers:(origin "https://evil.example") "/terminal?token=sekrit");
+  status_line
+    t
+    ~sw
+    ~port:d.port
+    (String.substr_replace_first
+       (upgrade "/ws")
+       ~pattern:"Host: 127.0.0.1"
+       ~with_:(sprintf "Host: evil.example:%d" d.port));
+  status_line
+    t
+    ~sw
+    ~port:d.port
+    (String.substr_replace_first
+       (upgrade ~headers:(origin page) "/ws")
+       ~pattern:"Host: 127.0.0.1"
+       ~with_:(sprintf "Host: 127.0.0.1:%d" d.port));
+  page_hello t ~sw ~port:d.port {|{"name": "prigh-web", "token": "sekrit"}|};
+  (* [/desktop/]: JSON only (so another page's needs a preflight), from the
+     page itself. *)
+  post ~headers:"Host: 127.0.0.1\r\n" "status";
+  post ~headers:"Host: 127.0.0.1\r\nContent-Type: text/plain\r\n" "status";
+  post
+    ~headers:
+      (sprintf
+         "Host: 127.0.0.1:%d\r\nContent-Type: application/json\r\n%s"
+         d.port
+         (origin "https://evil.example"))
+    "quit";
+  post
+    ~headers:
+      (sprintf
+         "Host: evil.example:%d\r\nContent-Type: application/json\r\n"
+         d.port)
+    "quit";
+  post
+    ~headers:
+      (sprintf
+         "Host: 127.0.0.1:%d\r\n\
+          Content-Type: application/json; charset=utf-8\r\n\
+          %s"
+         d.port
+         (origin page))
+    "status";
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  (* The key goes to the shell only. *)
+  List.iter (Queue.to_list logs) ~f:(fun line ->
+    if String.is_substring line ~substring:"prigh-web on"
+    then
+      printf
+        "logged: %s (key in it: %b)\n"
+        (unport d.port line)
+        (String.is_substring line ~substring:d.key));
+  print_string (unport backend_port (unport d.port [%expect.output]));
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    HTTP/1.1 403 Forbidden
+    HTTP/1.1 403 Forbidden
+    HTTP/1.1 421 Misdirected Request
+    HTTP/1.1 101 Switching Protocols
+    hello: ok, active host backend; hosts: backend (<host>, $DIR), host-laptop (laptop, $DIR/here)
+    status HTTP/1.1 415 Unsupported Media Type: a JSON body (Content-Type: application/json) expected
+    status HTTP/1.1 415 Unsupported Media Type: a JSON body (Content-Type: application/json) expected
+    quit HTTP/1.1 403 Forbidden: only the page this site served may use it: open prigh's page itself
+    quit HTTP/1.1 421 Misdirected Request: this site answers only at http://127.0.0.1:PORT/ (or localhost, or this machine's IP address): open it there
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":"<code>"}
+    Stdin_closed
+    logged: prigh-web on http://127.0.0.1:PORT/ (key in it: false)
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop: an unencrypted backend elsewhere needs confirming"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      t
+      ~sw
+      ~logs
+      (Form { address = None; user = None; error = None })
+  in
+  let submit fields =
+    ignore (Desktop.post t ~sw d "connect" fields : string option)
+  in
+  (* 0.0.0.0 is not loopback to the check, but connecting to it reaches
+     this machine, so the confirmed attempt fails at once. *)
+  submit [ "address", `String "0.0.0.0:1"; "token", `String "sekrit" ];
+  submit [ "address", `String "ws://0.0.0.0:1/ws"; "token", `String "sekrit" ];
+  submit
+    [ "address", `String "0.0.0.0:1"
+    ; "token", `String "sekrit"
+    ; "plaintext", `False
+    ];
+  submit
+    [ "address", `String "0.0.0.0:1"
+    ; "token", `String "sekrit"
+    ; "plaintext", `True
+    ];
+  (* Loopback (an SSH tunnel) and TLS need no confirming. *)
+  submit [ "address", `String "127.0.0.1:1"; "token", `String "sekrit" ];
+  submit [ "address", `String "localhost:1"; "token", `String "sekrit" ];
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"ws://0.0.0.0:1/ws is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 0.0.0.0:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at localhost:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    Stdin_closed
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop: a connection that fails while starting goes back to the \
+     form, and the page waiting on status is answered"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~save:(fun (_ : Saved_connection.t) -> failwith "disk on fire")
+      t
+      ~sw
+      ~logs
+      (Form { address = None; user = None; error = None })
+  in
+  let here = backend_spec backend_port in
+  ignore
+    (Desktop.post
+       t
+       ~sw
+       d
+       "connect"
+       [ "address", `String here; "token", `String "sekrit" ]
+     : string option);
+  ignore (Desktop.post t ~sw d "status" [] : string option);
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"connected to 127.0.0.1:PORT, but starting failed: (Failure \"disk on fire\")"}
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:PORT","user":null,"error":"connected to 127.0.0.1:PORT, but starting failed: (Failure \"disk on fire\")"}
     Stdin_closed
     |}]
 ;;
