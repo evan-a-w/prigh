@@ -7202,8 +7202,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Worktree_removed { target; force }, Error e ->
     worktree_remove_failed m ~target ~force e
   (* A backend that keeps none: this browser keeps them. *)
-  | Prefs, Error _ ->
-    { m with prefs = { m.prefs with remote = Local } }, []
+  | Prefs, Error _ -> { m with prefs = { m.prefs with remote = Local } }, []
   | Skills { place; purpose = Complete }, Error _ ->
     (* Complete nothing rather than ask again at every key. *)
     if Option.equal String.equal (Skills.place m.state) (Some place)

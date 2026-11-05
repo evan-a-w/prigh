@@ -362,9 +362,9 @@ let dictation_model (m : App.Model.t) ~inject =
     ~cls:"dictation-model"
     ~name:"Dictation"
     ~about:
-      "Turns what you say into text (the composer's microphone): an OpenAI \
-       or OpenAI-compatible transcription model. Without one, the browser's \
-       own speech recognition, where it has one."
+      "Turns what you say into text (the composer's microphone): an OpenAI or \
+       OpenAI-compatible transcription model. Without one, the browser's own \
+       speech recognition, where it has one."
     [ select
         ~cls:"dictation-model-choice"
         ~title:"Choose the model (/dictation model)"
@@ -683,9 +683,9 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"
         [ naming_model m ~inject
-          ; summary_model m m.config ~inject
-          ; dictation_model m ~inject
-          ]
+        ; summary_model m m.config ~inject
+        ; dictation_model m ~inject
+        ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
@@ -748,7 +748,6 @@ let nav (m : App.Model.t) ~current ~inject =
     (List.map (Section.available ~superuser:(App.superuser m)) ~f:tab)
 ;;
 
-
 (* On a phone: the settings fill the screen, a list of the sections (each
    with what it is about) and a level down to one, with a way back, rather
    than a strip of tabs over a page. *)
@@ -762,7 +761,9 @@ let phone_home (m : App.Model.t) ~inject =
     in
     Node.button
       ~attrs:
-        [ classes [ "settings-home-row"; "settings-tab-" ^ Section.arg section ] []
+        [ classes
+            [ "settings-home-row"; "settings-tab-" ^ Section.arg section ]
+            []
         ; Attr.type_ "button"
         ; Attr.create "data-settings-tab" (Section.arg section)
         ; Attr.title ("/settings " ^ Section.arg section)
@@ -779,7 +780,9 @@ let phone_home (m : App.Model.t) ~inject =
   in
   Node.nav
     ~attrs:
-      [ Attr.class_ "settings-home"; Attr.create "aria-label" "Settings sections" ]
+      [ Attr.class_ "settings-home"
+      ; Attr.create "aria-label" "Settings sections"
+      ]
     (List.map (Section.available ~superuser:(App.superuser m)) ~f:row)
 ;;
 
@@ -791,7 +794,11 @@ let panel (m : App.Model.t) current ~inject =
       ; Attr.id "settings-panel"
       ; (if m.narrow
          then Attr.create "aria-label" (Section.name current)
-         else Attr.many [ Attr.role "tabpanel"; Attr.create "aria-labelledby" (Section.tab_id current) ])
+         else
+           Attr.many
+             [ Attr.role "tabpanel"
+             ; Attr.create "aria-labelledby" (Section.tab_id current)
+             ])
       ]
     (Node.header
        ~attrs:[ Attr.class_ "settings-panel-head" ]

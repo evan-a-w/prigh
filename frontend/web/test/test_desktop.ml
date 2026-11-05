@@ -310,7 +310,8 @@ let%expect_test "a new window's fragment" =
             ~fragment:
               (Desktop_link.window_fragment ~key ~backend_site ~browser
                : string option)]);
-  [%expect {|
+  [%expect
+    {|
     ((key (k)) (backend_site false) (browser false) (fragment (desktop=k)))
     ((key (k)) (backend_site false) (browser true)
      (fragment (desktop=k&shell=browser)))

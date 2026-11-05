@@ -216,8 +216,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
                 ~elided:(String.length head, 12, String.length whole)
             ])));
   Harness.text h ~selector:".tool";
-  [%expect
-    {| (✓ bash seq 12) |}];
+  [%expect {| (✓ bash seq 12) |}];
   (* Unfolded, the rest is fetched (once), the gap saying how much. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Load_output "c1");
@@ -234,8 +233,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
     (Jsonaf.to_string (`Object [ "text", `String whole ]));
   Harness.text h ~selector:".tool .output";
   print_s [%sexp (Set.to_list (Harness.model h).outputs_loading : string list)];
-  [%expect
-    {| () |}];
+  [%expect {| () |}];
   (* Folded and unfolded again: it is whole now. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Toggle_fold "c1");

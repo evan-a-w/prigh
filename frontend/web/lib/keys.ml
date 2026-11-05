@@ -85,8 +85,8 @@ let help =
   ; ( "Shift+F10 / ContextMenu (on a message)"
     , "its menu: copy, trim everything before or after it, delete it (also \
        right-click or a long press, at the pointer; with text selected, \
-       right-click is the browser's, to copy it; on a phone, its Select \
-       text selects its words)" )
+       right-click is the browser's, to copy it; on a phone, its Select text \
+       selects its words)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -107,8 +107,8 @@ let help =
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
   ; ( "Ctrl+Shift+O"
-    , "a new temporary session (/temporary): not saved or listed, deleted \
-       when you leave it; on the new-session screen, its Temporary chip" )
+    , "a new temporary session (/temporary): not saved or listed, deleted when \
+       you leave it; on the new-session screen, its Temporary chip" )
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )

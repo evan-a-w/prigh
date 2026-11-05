@@ -226,7 +226,8 @@ let swipe_actions ~inject (s : Session_summary.t) =
         [ Attr.class_ ("session-swipe-action " ^ cls)
         ; Attr.type_ "button"
         ; Attr.tabindex (-1)
-        ; Attr.on_click (fun _ -> Effect.Many [ Effect.Stop_propagation; inject on_click ])
+        ; Attr.on_click (fun _ ->
+            Effect.Many [ Effect.Stop_propagation; inject on_click ])
         ]
       [ icon glyph; Node.span [ Node.text label ] ]
   in
@@ -245,7 +246,11 @@ let swipe_actions ~inject (s : Session_summary.t) =
            ~label:"Archive"
            ~icon:Archive
            (Action.Set_archived { path = s.path; archived = true }))
-    ; action ~cls:"delete" ~label:"Delete" ~icon:Trash (Action.Ask_delete s.path)
+    ; action
+        ~cls:"delete"
+        ~label:"Delete"
+        ~icon:Trash
+        (Action.Ask_delete s.path)
     ]
 ;;
 
