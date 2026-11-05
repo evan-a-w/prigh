@@ -4,7 +4,8 @@
 #
 #   desktop/test/run.sh PRIGH_DESKTOP_BINARY [PRIGH]
 #
-# Needs a display (run it under xvfb-run), a D-Bus session bus (for the
+# REAL_CHROMIUM, if set, is a Chromium for the browser window scenarios
+# (with curl). Needs a display (run it under xvfb-run), a D-Bus session bus (for the
 # single-instance plugin: dbus-run-session) and python3. The flake's
 # desktop-window check runs it that way.
 set -uo pipefail
@@ -138,6 +139,42 @@ wait "$app_pid"
 code=$?
 echo "second launch: exit $second; the first still running after it: $running"
 report "browser: a second launch, then the first window closes" $code
+
+# A real Chromium ($REAL_CHROMIUM; the check gives Playwright's), its windows
+# closed through its DevTools as a user would close them (Xvfb has no window
+# manager to ask).
+if [ -n "${REAL_CHROMIUM:-}" ]; then
+	printf '#!/bin/sh\nexec "%s" --remote-debugging-port=9333 --no-sandbox "$@"\n' "$REAL_CHROMIUM" >"$work/chromium"
+	chmod +x "$work/chromium"
+	rm -rf "$profile"
+	pages() {
+		curl -s http://127.0.0.1:9333/json/list |
+			python3 -c 'import json, sys; print(" ".join(t["id"] for t in json.load(sys.stdin) if t["type"] == "page"))'
+	}
+	real_report() {
+		echo "== $1: exit $2"
+		normalize <"$work/stderr" | grep -E '^prigh-desktop: ' | grep -v '/favicon.ico'
+		normalize <"$work/log" | grep -v -e 'GET /favicon.ico' -e '^args' -e '^cwd' | sort | uniq -c | sed -E 's/^ +/fake: /'
+		echo "left running: $(ps -eo args= | grep -c -F -- "--user-data-dir=$profile")"
+	}
+	: >"$work/log"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium"
+	wait_for "$work/log" "GET /pixel.gif"
+	env FAKE_LOG="$work/log2" PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$work/chromium" \
+		PRIGH_DESKTOP_BACKEND="$fake" timeout 30 "$app" >/dev/null 2>&1
+	second=$?
+	for _ in $(seq 100); do [ "$(pages | wc -w)" = 2 ] && break; sleep 0.1; done
+	echo "second launch: exit $second; windows: $(pages | wc -w)"
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; sleep 0.5; done
+	wait "$app_pid"
+	real_report "real Chromium: two windows; closing both stops the sidecar" $?
+	: >"$work/log"
+	env FAKE_LOG="$work/log" PRIGH_DESKTOP_BACKEND="$fake" PRIGH_DESKTOP_WINDOW=browser \
+		PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_MODE=quit timeout 60 "$app" >"$work/stdout" 2>"$work/stderr"
+	code=$?
+	sleep 0.5
+	real_report "real Chromium: the sidecar quits, Chromium closes" $code
+fi
 
 # The real `prigh desktop` (run.sh's second argument: a prigh with its
 # prigh-web site, as the flake's wrapper or PRIGH_WEB_ROOT gives it) for a
