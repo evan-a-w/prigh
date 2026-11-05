@@ -2859,7 +2859,8 @@ window may go, the error dialogs; `./test` runs it), and
 `desktop/test/run.sh`, the app in a real window against a fake `prigh
 desktop` for the failure paths and, given a prigh, the real one for a
 `prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
-connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
+connect form, closing the window, signing in, a chip's menu chosen from
+with the real pointer (xdotool) at 100% and 125% zoom, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
 a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout
