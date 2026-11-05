@@ -44,7 +44,9 @@ type t =
 module Item : sig
   type t =
     | Open (** switch to the session *)
-    | Open_tab (** the session in a new browser tab *)
+    | Open_window
+    (** the session in a new window: a new tab in a browser, another window
+        in the desktop app *)
     | Rename
     | Fork
     | New_worktree

@@ -8,8 +8,6 @@ module Key = struct
   let verbosity = "web.verbosity"
   let terminal_open = "web.terminal-open"
   let folded = "web.sidebar-folded"
-  let tabs = "web.tabs"
-  let open_tabs = "web.open-tabs"
   let review = "web.review"
   let history = "history"
   let migrated = "web.migrated"
@@ -21,8 +19,6 @@ module Key = struct
     ; verbosity
     ; terminal_open
     ; folded
-    ; tabs
-    ; open_tabs
     ; review
     ; history
     ; migrated

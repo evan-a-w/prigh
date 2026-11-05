@@ -564,7 +564,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Annotate_clear -> Effect.of_sync_fun Annotate_widget.clear ()
     | Annotate_export -> Effect.of_sync_fun Annotate_widget.export ()
     | Place_menu anchor -> Effect.of_sync_fun Menu_listeners.place anchor
-    | Open_tab session ->
+    | Open_window session ->
       Effect.of_sync_fun
         (fun () ->
            let location = Dom_html.window##.location in
