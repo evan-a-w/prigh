@@ -8,17 +8,23 @@ let storage () =
   |> Option.join
 ;;
 
-let stored () =
+let stored_at name =
   Option.bind (storage ()) ~f:(fun storage ->
-    Js.Opt.to_option (storage##getItem (Js.string Desktop_link.storage_key))
+    Js.Opt.to_option (storage##getItem (Js.string name))
     |> Option.map ~f:Js.to_string)
 ;;
+
+let store name value =
+  Option.iter (storage ()) ~f:(fun storage ->
+    storage##setItem (Js.string name) (Js.string value))
+;;
+
+let stored () = stored_at Desktop_link.storage_key
 
 let key () =
   match Desktop_link.key_of_hash (Browser.hash ()) with
   | Some key ->
-    Option.iter (storage ()) ~f:(fun storage ->
-      storage##setItem (Js.string Desktop_link.storage_key) (Js.string key));
+    store Desktop_link.storage_key key;
     (* The sign-in code, if any, is the sidecar's to give: only the key was
        in the fragment. *)
     Browser.clear_hash ();
@@ -26,7 +32,22 @@ let key () =
   | None -> stored ()
 ;;
 
-let active () = Option.is_some (stored ())
+(* On the backend's own site: the hint says which tool host is this
+   machine's, which the page then prefers, as a [prigh web] sign-in does. *)
+let take_hint () =
+  match Desktop_link.Hint.of_hash (Browser.hash ()) with
+  | Some { host } ->
+    store Desktop_link.hint_storage_key "1";
+    Option.iter host ~f:(Browser.set_item Signin_link.prefer_host_key);
+    Browser.clear_hash ()
+  | None -> ()
+;;
+
+let on_backend_site () =
+  Option.is_some (stored_at Desktop_link.hint_storage_key)
+;;
+
+let active () = Option.is_some (stored ()) || on_backend_site ()
 
 let status ~key ~f =
   Browser.post
@@ -58,11 +79,16 @@ let show_quitting () =
 ;;
 
 let quit () =
-  Option.iter (stored ()) ~f:(fun key ->
+  match stored () with
+  | Some key ->
     show_quitting ();
     Browser.post
       ~content_type:"application/json"
       ~url:Desktop_link.quit_path
       ~body:(Desktop_link.quit_body ~key)
-      ~f:(fun _ -> ()))
+      ~f:(fun _ -> ())
+  | None when on_backend_site () ->
+    show_quitting ();
+    Browser.navigate Desktop_link.quit_url
+  | None -> ()
 ;;

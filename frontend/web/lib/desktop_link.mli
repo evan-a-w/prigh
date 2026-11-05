@@ -13,6 +13,22 @@ val key_of_hash : string -> string option
     desktop mode. *)
 val storage_key : string
 
+(** The backend's own prigh-web opened by the desktop app ([prigh desktop
+    -ui remote]): its URL's fragment is [#app=desktop], with [&host=ID],
+    this machine's tool host, when its tools run here. *)
+module Hint : sig
+  type t = { host : string option } [@@deriving sexp_of]
+
+  val of_hash : string -> t option
+end
+
+(** Where the tab keeps that it is in the desktop app (sessionStorage). *)
+val hint_storage_key : string
+
+(** Where the backend's page goes to quit the app: the window catches it (the
+    page cannot reach [prigh desktop] from another origin). *)
+val quit_url : string
+
 (** [/desktop/status], [/desktop/connect], [/desktop/quit]. *)
 val status_path : string
 
@@ -41,6 +57,7 @@ module Status : sig
         } (** show the connect form, prefilled, with what went wrong *)
     | Connected of { code : string option }
     (** sign in with [code]; [None]: already signed in (a reload) *)
+    | Remote of string (** the window goes to the backend's own prigh-web *)
   [@@deriving sexp_of]
 
   val of_json : string -> t option
@@ -53,6 +70,7 @@ module Connect_reply : sig
     | Plaintext of string
     (** the address is not encrypted and is another machine: the risk and
         the alternatives; connecting needs [~plaintext:true] *)
+    | Remote of string (** connected: as {!Status.Remote} *)
   [@@deriving sexp_of]
 
   val of_json : string -> t option

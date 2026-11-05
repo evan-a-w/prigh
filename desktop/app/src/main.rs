@@ -1,9 +1,11 @@
 // prigh's desktop app: a native window (the system webview: WebKitGTK,
-// WKWebView, WebView2) on prigh-web, served by `prigh desktop`, the sidecar
-// this process starts and stops. See "Desktop app" in ARCHITECTURE.md.
+// WKWebView, WebView2) on prigh-web, the backend's own or served by `prigh
+// desktop`, the sidecar this process starts and stops. See "Desktop app" in
+// ARCHITECTURE.md.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader, Read};
+use std::path::PathBuf;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -14,6 +16,7 @@ use prigh_desktop_core::failure::{self, Failure};
 use prigh_desktop_core::launch::{self, Os};
 use prigh_desktop_core::navigation::{self, Decision};
 use prigh_desktop_core::tail::Tail;
+use prigh_desktop_core::zoom::{self, Step};
 use prigh_desktop_core::{ready, search_path};
 use shared_child::SharedChild;
 use tauri::webview::{Color, DownloadEvent, NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
@@ -29,6 +32,8 @@ const STOP_GRACE: Duration = Duration::from_secs(5);
 #[cfg(unix)]
 const TERM_GRACE: Duration = Duration::from_secs(2);
 const TEST_CLOSE_URL: &str = "about:blank#prigh-desktop-test-close";
+/// WebKitGTK's page on its graphics: whether it renders with the GPU.
+const GPU_INFO_URL: &str = "webkit://gpu";
 
 fn log(msg: impl AsRef<str>) {
     for line in msg.as_ref().lines() {
@@ -42,8 +47,9 @@ fn env_flag(name: &str) -> bool {
 
 #[derive(Default)]
 struct Sidecar {
-    /// The origin of its site, once its ready line said it.
-    origin: Mutex<Option<String>>,
+    /// The origins of the sites its page lines said to show: its own, then
+    /// the backend's under `-ui remote`.
+    origins: Mutex<Vec<String>>,
     child: Mutex<Option<Arc<SharedChild>>>,
     stdin: Mutex<Option<ChildStdin>>,
     /// We asked it to stop (the window closed): its exit is not a failure.
@@ -55,8 +61,12 @@ struct Sidecar {
 }
 
 impl Sidecar {
-    fn origin(&self) -> Option<String> {
-        self.origin.lock().unwrap().clone()
+    fn origins(&self) -> Vec<String> {
+        self.origins.lock().unwrap().clone()
+    }
+
+    fn is_ours(&self, url: &str) -> bool {
+        navigation::origin(url).is_some_and(|o| self.origins.lock().unwrap().contains(&o))
     }
 
     /// Closes its stdin, which tells it to stop. If it has not within
@@ -209,7 +219,7 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
                 let Some(first) = lines.next() else { return };
                 ready_seen.store(true, Ordering::SeqCst);
                 match ready::parse(&first) {
-                    Ok(url) => on_ready(&app, &sidecar, &url),
+                    Ok(page) => on_page(&app, &sidecar, &page),
                     Err(e) => {
                         sidecar.failing.store(true, Ordering::SeqCst);
                         let _ = child.kill();
@@ -218,8 +228,13 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
                         return fail(&app, Failure::BadReady { message: e.0, stderr }, 1);
                     }
                 }
+                // Later pages: the backend's own site once the connect form
+                // has connected (`-ui remote`).
                 for line in lines {
-                    log(format!("prigh desktop printed after its ready line: {line}"));
+                    match ready::parse(&line) {
+                        Ok(page) => on_page(&app, &sidecar, &page),
+                        Err(e) => log(e.0),
+                    }
                 }
             });
         }
@@ -251,17 +266,34 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
     });
 }
 
-fn on_ready(app: &AppHandle, sidecar: &Sidecar, url: &str) {
-    let Ok(parsed) = Url::parse(url) else {
+fn on_page(app: &AppHandle, sidecar: &Sidecar, page: &ready::Page) {
+    let url = page.url.as_str();
+    let (Ok(parsed), Some(origin)) = (Url::parse(url), navigation::origin(url)) else {
         log(format!("prigh desktop's url does not parse: {url}"));
         return;
     };
-    *sidecar.origin.lock().unwrap() = navigation::origin(url);
-    log(format!("prigh desktop is ready at {}", redact(url)));
-    if let Some(w) = app.get_webview_window(WINDOW) {
-        if let Err(e) = w.navigate(parsed) {
-            log(format!("navigating to prigh-web: {e}"));
+    let first = {
+        let mut origins = sidecar.origins.lock().unwrap();
+        let first = origins.is_empty();
+        if !origins.contains(&origin) {
+            origins.push(origin);
         }
+        first
+    };
+    if page.remote {
+        log(format!("showing the backend's prigh-web at {}", redact(url)));
+    } else {
+        log(format!("prigh desktop is ready at {}", redact(url)));
+    }
+    let Some(w) = app.get_webview_window(WINDOW) else { return };
+    let target = if first && cfg!(target_os = "linux") && env_flag("PRIGH_DESKTOP_GPU_INFO") {
+        log(format!("PRIGH_DESKTOP_GPU_INFO: showing {GPU_INFO_URL} instead (reload to go on to prigh)"));
+        GPU_INFO_URL.parse().expect("webkit://gpu")
+    } else {
+        parsed
+    };
+    if let Err(e) = w.navigate(target) {
+        log(format!("navigating to prigh-web: {e}"));
     }
 }
 
@@ -277,9 +309,53 @@ fn open_external(app: &AppHandle, url: &str) {
     }
 }
 
-fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
+/// The window's zoom (Ctrl+= / Ctrl+- / Ctrl+0 and Ctrl+wheel on Linux, the
+/// View menu on macOS; WebView2 zooms by itself on Windows), kept between
+/// runs in the app's config directory.
+struct Zoom {
+    level: Mutex<f64>,
+    file: Option<PathBuf>,
+}
+
+impl Zoom {
+    fn load(app: &AppHandle) -> Zoom {
+        let file = app.path().app_config_dir().ok().map(|d| d.join("zoom"));
+        let level =
+            file.as_ref().and_then(|f| std::fs::read_to_string(f).ok()).and_then(|t| zoom::parse(&t)).unwrap_or(1.0);
+        Zoom { level: Mutex::new(level), file }
+    }
+
+    fn level(&self) -> f64 {
+        *self.level.lock().unwrap()
+    }
+
+    fn apply(&self, app: &AppHandle, step: Step) {
+        let level = {
+            let mut level = self.level.lock().unwrap();
+            *level = zoom::step(*level, step);
+            *level
+        };
+        if let Some(w) = app.get_webview_window(WINDOW) {
+            if let Err(e) = w.set_zoom(level) {
+                log(format!("zooming to {level}: {e}"));
+            }
+        }
+        if let Some(file) = &self.file {
+            let saved = file
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| std::fs::write(file, zoom::format(level)));
+            if let Err(e) = saved {
+                log(format!("keeping the zoom in {}: {e}", file.display()));
+            }
+        }
+    }
+}
+
+fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>, zoom: Arc<Zoom>) -> tauri::Result<()> {
     let (nav_app, nav_sidecar) = (app.clone(), sidecar.clone());
     let (new_app, new_sidecar) = (app.clone(), sidecar.clone());
+    let gpu_info = cfg!(target_os = "linux") && env_flag("PRIGH_DESKTOP_GPU_INFO");
     let perm_sidecar = sidecar.clone();
     let load_sidecar = sidecar;
     let close_on_load = env_flag("PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD");
@@ -290,16 +366,27 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
         .filter(|p| !p.is_empty())
         .map(|p| std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("PRIGH_DESKTOP_TEST_SCRIPT {p}: {e}")));
     let test_close = test_script.is_some();
-    WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
         .title("prigh")
         .inner_size(1200.0, 800.0)
         .min_inner_size(320.0, 480.0)
         .background_color(Color(0x1b, 0x1e, 0x23, 0xff))
-        .on_navigation(move |url| match navigation::decide(url.as_str(), nav_sidecar.origin().as_deref()) {
+        // Files dropped on the window go to the page (prigh-web's
+        // attachments and uploads), not to Tauri.
+        .disable_drag_drop_handler()
+        // WebView2's own Ctrl+=/-/0, Ctrl+wheel and pinch (Windows).
+        .zoom_hotkeys_enabled(true)
+        .on_navigation(move |url| match navigation::decide(url.as_str(), &nav_sidecar.origins()) {
             _ if test_close && url.as_str() == TEST_CLOSE_URL => {
                 if let Some(w) = nav_app.get_webview_window(WINDOW) {
                     let _ = w.close();
                 }
+                false
+            }
+            _ if gpu_info && url.as_str() == GPU_INFO_URL => true,
+            Decision::Quit => {
+                log("the page's Quit: stopping prigh desktop");
+                nav_sidecar.stop();
                 false
             }
             Decision::Allow => true,
@@ -312,8 +399,12 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
                 false
             }
         })
-        .on_new_window(move |url, _| match navigation::decide(url.as_str(), new_sidecar.origin().as_deref()) {
+        .on_new_window(move |url, _| match navigation::decide(url.as_str(), &new_sidecar.origins()) {
             Decision::Allow => NewWindowResponse::Allow,
+            Decision::Quit => {
+                new_sidecar.stop();
+                NewWindowResponse::Deny
+            }
             Decision::External => {
                 open_external(&new_app, url.as_str());
                 NewWindowResponse::Deny
@@ -341,11 +432,7 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
         // Only prigh-web's own page asks: dictation needs the microphone,
         // finished turns notify, paste reads the clipboard.
         .on_permission_request(move |webview, kind| {
-            let ours = webview
-                .url()
-                .ok()
-                .and_then(|u| navigation::origin(u.as_str()))
-                .is_some_and(|o| Some(o) == perm_sidecar.origin());
+            let ours = webview.url().ok().is_some_and(|u| perm_sidecar.is_ours(u.as_str()));
             match kind {
                 PermissionKind::Microphone | PermissionKind::Notifications | PermissionKind::ClipboardRead if ours => {
                     PermissionResponse::Allow
@@ -359,7 +446,7 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
                 return;
             }
             let url = payload.url().as_str();
-            if navigation::origin(url).is_some_and(|o| Some(o) == load_sidecar.origin()) {
+            if load_sidecar.is_ours(url) {
                 log(format!("loaded {}", redact(url)));
                 if close_on_load {
                     let _ = window.close();
@@ -372,11 +459,143 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
             }
         })
         .build()?;
+    if (zoom.level() - 1.0).abs() > 0.001 {
+        let _ = window.set_zoom(zoom.level());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let (app, zoom) = (app.clone(), zoom.clone());
+        window.with_webview(move |webview| linux::set_up(webview.inner(), app, zoom))?;
+    }
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use std::cell::Cell;
+    use std::sync::Arc;
+
+    use gtk::prelude::*;
+    use prigh_desktop_core::zoom::Step;
+    use tauri::AppHandle;
+    use webkit2gtk::{FileChooserRequestExt, HardwareAccelerationPolicy, SettingsExt, WebViewExt};
+
+    use super::{log, Zoom};
+
+    /// GTK reads GTK_USE_PORTAL once, when it first opens a file chooser:
+    /// set (as some Wayland sessions do) with no file-chooser portal running
+    /// (Hyprland's own portal has none), the chooser never opens. Then GTK's
+    /// own dialog is used instead. Before GTK starts.
+    pub fn check_file_chooser_portal() {
+        let wanted = std::env::var("GTK_USE_PORTAL").is_ok_and(|v| !v.is_empty() && v != "0");
+        if !wanted {
+            return;
+        }
+        let answer = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).and_then(|bus| {
+            bus.call_sync(
+                Some("org.freedesktop.portal.Desktop"),
+                "/org/freedesktop/portal/desktop",
+                "org.freedesktop.DBus.Properties",
+                "Get",
+                Some(&("org.freedesktop.portal.FileChooser", "version").to_variant()),
+                None,
+                gio::DBusCallFlags::NONE,
+                2000,
+                gio::Cancellable::NONE,
+            )
+        });
+        if let Err(e) = answer {
+            log(format!(
+                "GTK_USE_PORTAL is set but no file-chooser portal answers ({e}): using GTK's own file chooser. \
+                 To use the portal's, run one that has a FileChooser (e.g. xdg-desktop-portal-gtk)."
+            ));
+            std::env::remove_var("GTK_USE_PORTAL");
+        }
+    }
+
+    pub fn set_up(webview: webkit2gtk::WebView, app: AppHandle, zoom: Arc<Zoom>) {
+        if let Some(settings) = WebViewExt::settings(&webview) {
+            // The GPU always (WebKitGTK may otherwise fall back to the CPU
+            // for a page it judges simple); PRIGH_DESKTOP_GPU_INFO=1 shows
+            // whether it got one.
+            settings.set_hardware_acceleration_policy(HardwareAccelerationPolicy::Always);
+            settings.set_enable_webgl(true);
+            settings.set_enable_smooth_scrolling(true);
+            // Zoom scales the whole page, as a browser's does.
+            settings.set_zoom_text_only(false);
+        }
+        webview.connect_run_file_chooser(|_, request| {
+            log(format!(
+                "the page opens a file chooser{}",
+                if request.selects_multiple() { " (several files)" } else { "" }
+            ));
+            false
+        });
+        {
+            let (app, zoom) = (app.clone(), zoom.clone());
+            webview.connect_key_press_event(move |widget, key| {
+                use gtk::gdk::keys::constants as k;
+                let ctrl = key.state().contains(gtk::gdk::ModifierType::CONTROL_MASK);
+                let keyval = key.keyval();
+                let step = match keyval {
+                    _ if !ctrl => None,
+                    k::plus | k::equal | k::KP_Add => Some(Step::In),
+                    k::minus | k::underscore | k::KP_Subtract => Some(Step::Out),
+                    k::_0 | k::KP_0 => Some(Step::Reset),
+                    _ => None,
+                };
+                if let Some(step) = step {
+                    zoom.apply(&app, step);
+                    return glib::Propagation::Stop;
+                }
+                if keyval == k::F11 {
+                    if let Some(window) = widget.toplevel().and_then(|t| t.downcast::<gtk::Window>().ok()) {
+                        let full =
+                            window.window().is_some_and(|w| w.state().contains(gtk::gdk::WindowState::FULLSCREEN));
+                        if full {
+                            window.unfullscreen()
+                        } else {
+                            window.fullscreen()
+                        }
+                    }
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            });
+        }
+        // Ctrl+wheel; a touchpad's smooth scrolling adds up to a step.
+        let pending = Cell::new(0.0);
+        webview.connect_scroll_event(move |_, event| {
+            if !event.state().contains(gtk::gdk::ModifierType::CONTROL_MASK) {
+                return glib::Propagation::Proceed;
+            }
+            let dy = match event.direction() {
+                gtk::gdk::ScrollDirection::Up => -1.0,
+                gtk::gdk::ScrollDirection::Down => 1.0,
+                gtk::gdk::ScrollDirection::Smooth => event.delta().1,
+                _ => 0.0,
+            };
+            pending.set(pending.get() + dy);
+            if pending.get() <= -1.0 {
+                pending.set(0.0);
+                zoom.apply(&app, Step::In);
+            } else if pending.get() >= 1.0 {
+                pending.set(0.0);
+                zoom.apply(&app, Step::Out);
+            }
+            glib::Propagation::Stop
+        });
+    }
 }
 
 #[cfg(target_os = "macos")]
 const QUIT: &str = "quit";
+#[cfg(target_os = "macos")]
+const ZOOM_IN: &str = "zoom-in";
+#[cfg(target_os = "macos")]
+const ZOOM_OUT: &str = "zoom-out";
+#[cfg(target_os = "macos")]
+const ZOOM_RESET: &str = "zoom-reset";
 
 /// macOS needs an app menu: WKWebView's Copy, Paste and Select All come
 /// from its Edit items. Its Quit (⌘Q) stops the sidecar as closing the
@@ -413,6 +632,16 @@ fn macos_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
             &PredefinedMenuItem::select_all(app, None)?,
         ],
     )?;
+    let view = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[
+            &MenuItem::with_id(app, ZOOM_IN, "Zoom In", true, Some("CmdOrCtrl+="))?,
+            &MenuItem::with_id(app, ZOOM_OUT, "Zoom Out", true, Some("CmdOrCtrl+-"))?,
+            &MenuItem::with_id(app, ZOOM_RESET, "Actual Size", true, Some("CmdOrCtrl+0"))?,
+        ],
+    )?;
     let window = Submenu::with_items(
         app,
         "Window",
@@ -424,20 +653,32 @@ fn macos_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
             &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&app_menu, &edit, &window])
+    Menu::with_items(app, &[&app_menu, &edit, &view, &window])
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    linux::check_file_chooser_portal();
     let sidecar = Arc::new(Sidecar::default());
     let setup_sidecar = sidecar.clone();
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = {
         let quit_sidecar = sidecar.clone();
-        builder.menu(macos_menu).on_menu_event(move |_, event| {
-            if event.id() == QUIT {
-                log("Quit prigh: stopping prigh desktop");
-                quit_sidecar.stop();
+        builder.menu(macos_menu).on_menu_event(move |app, event| {
+            let step = match event.id().as_ref() {
+                QUIT => {
+                    log("Quit prigh: stopping prigh desktop");
+                    quit_sidecar.stop();
+                    None
+                }
+                ZOOM_IN => Some(Step::In),
+                ZOOM_OUT => Some(Step::Out),
+                ZOOM_RESET => Some(Step::Reset),
+                _ => None,
+            };
+            if let (Some(step), Some(zoom)) = (step, app.try_state::<Arc<Zoom>>()) {
+                zoom.apply(app, step);
             }
         })
     };
@@ -453,7 +694,9 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
-            build_window(app.handle(), setup_sidecar.clone())?;
+            let zoom = Arc::new(Zoom::load(app.handle()));
+            app.manage(zoom.clone());
+            build_window(app.handle(), setup_sidecar.clone(), zoom)?;
             start_sidecar(app.handle().clone(), setup_sidecar.clone());
             Ok(())
         })

@@ -40,12 +40,13 @@ scenario() {
 	return 0
 }
 normalize() {
-	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g' -e 's#serving on [0-9]+#serving on PORT#'
+	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#'
 }
 
 scenario "the window shows the page; closing it stops the sidecar" \
 	PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD=1 PRIGH_DESKTOP_ARGS="-cwd '/a b' -name laptop"
 scenario "the page's Quit: the sidecar exits 0, so does the app" FAKE_MODE=quit
+scenario "the backend's own site (-ui remote), quitting from it" FAKE_MODE=remote
 scenario "the sidecar fails after it was ready" FAKE_MODE=crash
 scenario "the sidecar fails before it is ready" FAKE_MODE=fail
 scenario "the sidecar prints something else" FAKE_MODE=bad-ready
@@ -93,21 +94,21 @@ for _ in $(seq 300); do
 done
 [ -n "$address" ] || { echo "the backend did not start:"; cat "$work/server.err"; exit 1; }
 
-# real NAME MODE: a fresh laptop home (no saved connection) for MODE close,
-# the same one again for quit.
+# real NAME MODE UI: a fresh laptop home (no saved connection) for MODE
+# close, the same one again for quit.
 real_scenario() {
-	local name=$1 mode=$2
+	local name=$1 mode=$2 ui=$3
 	: >"$work/reports"
 	sed -e "s#@REPORT@#http://127.0.0.1:$(cat "$report_port_file")/#" \
 		-e "s#@ADDRESS@#$address#" -e "s#@MODE@#$mode#" "$here/probe.js" >"$work/probe.js"
 	env PRIGH_DESKTOP_BACKEND="$real" PRIGH_DESKTOP_TEST_SCRIPT="$work/probe.js" \
-		PRIGH_DESKTOP_ARGS="-cwd '$work/laptop-cwd' -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:0" \
+		PRIGH_DESKTOP_ARGS="-ui $ui -cwd '$work/laptop-cwd' -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:0" \
 		timeout 90 "$app" >"$work/stdout" 2>"$work/stderr"
 	local code=$?
 	echo "== $name: exit $code"
 	normalize <"$work/stderr" | grep -E '^prigh-desktop: ' |
 		grep -v -e '/favicon.ico' -e '^prigh-desktop: loaded ' |
-		sed -E 's#(ready at http://127.0.0.1:PORT/).*#\1#'
+		sed -E 's#(ready at http://127.0.0.1:PORT/).*#\1#; s#(prigh-web at http://127.0.0.1:PORT/).*#\1#'
 	normalize <"$work/stderr" | grep -E '^prigh desktop: |^prigh: ' | grep -E 'quit|stdin|connected|tools run' |
 		sed 's/^/sidecar: /'
 	sed 's/^/page: /' "$work/reports"
@@ -117,5 +118,7 @@ real_scenario() {
 	left=$(ps -eo args= | grep -F -- "$work/laptop-cwd" | grep -v -e grep -e '^timeout' || true)
 	echo "left running: ${left:-nothing}"
 }
-real_scenario "the real sidecar: the connect form; closing the window stops it" close
-real_scenario "the real sidecar: signed in with the form; the page's /quit ends the app" quit
+real_scenario "the real sidecar: the connect form; closing the window stops it" close local
+real_scenario "the real sidecar: signed in with the form; the page's /quit ends the app" quit local
+# Saved by the one before: straight to the backend's own prigh-web.
+real_scenario "the real sidecar, -ui remote: the backend's own site; its /quit ends the app" quit remote
