@@ -133,6 +133,110 @@ let%expect_test "the saved connection: flags are saved, the environment is not" 
     |}]
 ;;
 
+let%expect_test "choosing the backend: flags, environment, saved connection" =
+  with_sandbox
+  @@ fun t ->
+  let none =
+    { Saved_connection.Settings.connect = None; token = None; user = None }
+  in
+  let show ?(flags = none) ?(env = none) () =
+    match Backend_choice.choose ~home:t.dir ~flags ~env with
+    | Ok choice ->
+      print_endline
+        (mask_sexp
+           t
+           [%sexp
+             { address = (Backend_address.to_string choice.remote : string)
+             ; credentials = (choice.credentials : Web_connect.Credentials.t)
+             ; source = (choice.source : Web_connect.Check.Source.t)
+             ; token_source =
+                 (choice.token_source : Web_connect.Check.Source.t option)
+             ; save = (choice.save : Saved_connection.t option)
+             }]);
+      print_endline (mask t (Backend_choice.refused_hint choice))
+    | Error e ->
+      print_endline
+        (mask t (Backend_choice.Error.to_string_hum e ~no_backend:"NO BACKEND"))
+  in
+  (* Nothing anywhere. *)
+  show ();
+  [%expect {| NO BACKEND |}];
+  (* A flag alone (normalised as saved), and the environment's token. *)
+  show
+    ~flags:{ none with connect = Some "https://example.com/" }
+    ~env:{ none with token = Some "env" }
+    ();
+  [%expect
+    {|
+    ((address wss://example.com/ws) (credentials ((token (env)) (user ())))
+     (source Flag) (token_source (Env))
+     (save (((connect wss://example.com/ws)))))
+    Check -token (or $PRIGH_TOKEN) against the backend's; if it serves several users (-tokens), also give -user NAME (or $PRIGH_USER).
+    |}];
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    "((connect server:7790) (token sekrit) (user me))";
+  (* -remote: the saved connection, its token and user. *)
+  show ();
+  [%expect
+    {|
+    ((address server:7790) (credentials ((token (sekrit)) (user (me))))
+     (source (Saved $DIR/.prigh/tui-connection.sexp))
+     (token_source ((Saved $DIR/.prigh/tui-connection.sexp))) (save ()))
+    The credentials are the ones saved for server:7790 in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect server:7790 -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    |}];
+  (* -connect to the saved address takes its token and user... *)
+  show ~flags:{ none with connect = Some " server:7790 " } ();
+  [%expect
+    {|
+    ((address server:7790) (credentials ((token (sekrit)) (user (me))))
+     (source Flag) (token_source ((Saved $DIR/.prigh/tui-connection.sexp)))
+     (save ()))
+    The credentials are the ones saved for server:7790 in $DIR/.prigh/tui-connection.sexp: sign in again with /signin in prigh-tui (or prigh-tui -connect server:7790 -token SECRET [-user NAME]), or pass -token SECRET (and -user NAME).
+    |}];
+  (* ... another address does not. *)
+  show ~flags:{ none with connect = Some "other:7790" } ();
+  [%expect
+    {|
+    ((address other:7790) (credentials ((token ()) (user ()))) (source Flag)
+     (token_source ()) (save (((connect other:7790)))))
+    No token was given, and none is saved for other:7790: pass the backend's with -token SECRET (or $PRIGH_TOKEN), or sign in once with prigh-tui -connect other:7790 -token SECRET (or prigh web -connect other:7790 -token SECRET), which saves it.
+    |}];
+  (* $PRIGH_CONNECT wins over the saved address, so the saved token stays
+     with it; the flag's token and user win over everything. *)
+  show ~env:{ none with connect = Some "envhost:7790" } ();
+  show
+    ~flags:{ none with token = Some "flag"; user = Some "you" }
+    ~env:{ connect = None; token = Some "env"; user = Some "them" }
+    ();
+  [%expect
+    {|
+    ((address envhost:7790) (credentials ((token ()) (user ()))) (source Env)
+     (token_source ()) (save ()))
+    No token was given, and none is saved for envhost:7790: pass the backend's with -token SECRET (or $PRIGH_TOKEN), or sign in once with prigh-tui -connect envhost:7790 -token SECRET (or prigh web -connect envhost:7790 -token SECRET), which saves it.
+    ((address server:7790) (credentials ((token (flag)) (user (you))))
+     (source (Saved $DIR/.prigh/tui-connection.sexp)) (token_source (Flag))
+     (save (((connect server:7790) (token flag) (user you)))))
+    Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the backend's -tokens NAME=TOKEN (or -host-tokens) entries.
+    |}];
+  (* Bad addresses say where they came from; a broken file how to fix it. *)
+  show ~env:{ none with connect = Some "nohost" } ();
+  write t ".prigh/tui-connection.sexp" "((connect nohost))";
+  show ();
+  write t ".prigh/tui-connection.sexp" "((connect";
+  show ~flags:{ none with connect = Some "server:7790" } ();
+  [%expect
+    {|
+    -connect: "nohost" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/) (from $PRIGH_CONNECT)
+    -connect: "nohost" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/) (saved in $DIR/.prigh/tui-connection.sexp)
+    cannot read the saved connection: ($DIR/.prigh/tui-connection.sexp
+     (Failure
+      "Sexplib.Sexp.gen_load_sexp: EOF in $DIR/.prigh/tui-connection.sexp while in state Parsing_list"))
+    Fix or delete $DIR/.prigh/tui-connection.sexp, or pass -connect HOST:PORT.
+    |}]
+;;
+
 (* A [prigh serve -web] backend with token [sekrit] (and file transfers);
    returns the server and its port. *)
 let backend t ~sw =
@@ -535,5 +639,338 @@ let%expect_test "prigh web: what is wrong with the backend, and what to do" =
     Is it running there (prigh serve -web HOST:PORT, or -listen)? The address is the saved connection (~/.prigh/tui-connection.sexp): pass -connect HOST:PORT to replace it.
     cannot reach the backend at 127.0.0.1:1: connection refused
     Is it running there (prigh serve -web HOST:PORT, or -listen)? Check $PRIGH_CONNECT, or pass -connect HOST:PORT.
+    |}]
+;;
+
+(* [prigh desktop]: the same site, started with or without a working
+   connection; the page drives it through [/desktop/] with the run's key. *)
+module Desktop = struct
+  type d =
+    { url : string
+    ; key : string
+    ; port : int
+    ; ended : Desktop_sidecar.Ended.t Eio.Promise.or_exn
+    ; close_stdin : unit -> unit
+    ; saved : Saved_connection.t Queue.t
+    }
+
+  let start ?(tools = Web_connect.Tools.Local) t ~sw ~logs initial =
+    let saved = Queue.create () in
+    let config : Desktop_sidecar.Config.t =
+      { initial
+      ; tools
+      ; name = "laptop"
+      ; host_id = "host-laptop"
+      ; cwd = t.dir ^/ "here"
+      ; listen = At (Eio.Net.Ipaddr.V4.loopback, 0)
+      ; root = site t
+      ; save =
+          (fun c ->
+            Queue.enqueue saved c;
+            Ok ())
+      }
+    in
+    Core_unix.mkdir_p config.cwd;
+    let stdin, stdin_writer = Eio_unix.pipe sw in
+    let url, set_url = Eio.Promise.create () in
+    let ended =
+      Eio.Fiber.fork_promise ~sw (fun () ->
+        Desktop_sidecar.run
+          ~env:t.env
+          ~tool_host_wait:(Time_ns.Span.of_sec 10.)
+          ~check_timeout:(Time_ns.Span.of_sec 5.)
+          ~log:(Queue.enqueue logs)
+          ~on_url:(Eio.Promise.resolve set_url)
+          ~stdin
+          config)
+    in
+    let url = Eio.Promise.await url in
+    let port =
+      String.lsplit2_exn url ~on:':'
+      |> snd
+      |> String.lsplit2_exn ~on:':'
+      |> snd
+      |> String.lsplit2_exn ~on:'/'
+      |> fst
+      |> Int.of_string
+    in
+    let key = String.lsplit2_exn url ~on:'=' |> snd in
+    printf
+      "url: %s\n"
+      (url
+       |> String.substr_replace_all
+            ~pattern:(sprintf ":%d/" port)
+            ~with_:":PORT/"
+       |> String.substr_replace_all ~pattern:key ~with_:"<key>");
+    { url
+    ; key
+    ; port
+    ; ended
+    ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+    ; saved
+    }
+  ;;
+
+  (* A [POST] of [fields] (and the key, unless [key] says otherwise) to
+     [/desktop/what]; prints the answer with the codes masked. *)
+  let post ?key t ~sw d what fields =
+    let key = Option.value key ~default:d.key in
+    let body = Jsonaf.to_string (`Object (("key", `String key) :: fields)) in
+    let flow = connect t ~sw ~port:d.port in
+    Eio.Flow.copy_string
+      (sprintf
+         "POST /desktop/%s HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s"
+         what
+         (String.length body)
+         body)
+      flow;
+    let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
+    let status = Eio.Buf_read.line reader in
+    let rec skip () =
+      match Eio.Buf_read.line reader with
+      | "" -> ()
+      | _ -> skip ()
+    in
+    skip ();
+    let body = Eio.Buf_read.take_all reader in
+    let json = Jsonaf.parse body |> Result.ok in
+    let code =
+      Option.bind json ~f:(fun json ->
+        match field json "code" with
+        | Some (`String code) -> Some code
+        | _ -> None)
+    in
+    let shown =
+      match code with
+      | Some code ->
+        String.substr_replace_all body ~pattern:code ~with_:"<code>"
+      | None -> body
+    in
+    printf "%s %s: %s\n" what status (String.strip (mask t shown));
+    code
+  ;;
+end
+
+let backend_spec port = sprintf "127.0.0.1:%d" port
+
+let unport port s =
+  String.substr_replace_all s ~pattern:(sprintf ":%d" port) ~with_:":PORT"
+;;
+
+(* Which client the tool host is depends on the tests before. *)
+let show_log t ~port line =
+  let line = mask t (unport port line) in
+  match String.substr_index line ~pattern:" as client-" with
+  | Some i -> print_endline (String.prefix line i ^ " as client-N")
+  | None -> print_endline line
+;;
+
+let%expect_test
+    "prigh desktop with no connection: the connect form, checked, saved, \
+     signed in, then quit"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      t
+      ~sw
+      ~logs
+      (Form { address = None; user = Some "me"; error = None })
+  in
+  let post ?key what fields =
+    ignore (Desktop.post ?key t ~sw d what fields : string option)
+  in
+  [%expect {| url: http://127.0.0.1:PORT/#desktop=<key> |}];
+  (* The page is served; the endpoints want the run's key. *)
+  http t ~sw ~port:d.port "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
+  post ~key:"wrong" "status" [];
+  http t ~sw ~port:d.port "GET /desktop/status HTTP/1.1\r\nHost: x\r\n\r\n";
+  post "status" [];
+  [%expect
+    {|
+    HTTP/1.1 200 OK
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 22
+      Content-Type: text/html; charset=utf-8
+      body: <html>prigh-web</html>
+    status HTTP/1.1 403 Forbidden: this is not the page prigh desktop opened: open prigh again
+    HTTP/1.1 405 Method Not Allowed
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 19
+      Content-Type: text/plain; charset=utf-8
+      body: method not allowed
+
+    status HTTP/1.1 200 OK: {"state":"connect","address":null,"user":"me","error":null}
+    |}];
+  (* Nothing to relay to yet. *)
+  page_hello t ~sw ~port:d.port {|{"name": "prigh-web", "token": "sekrit"}|};
+  [%expect {| (closed) |}];
+  (* What is wrong, and what to do: the form stays, with what was typed. *)
+  let here = backend_spec backend_port in
+  let submit fields =
+    ignore (Desktop.post t ~sw d "connect" fields : string option)
+  in
+  submit [];
+  submit [ "address", `String "nowhere" ];
+  submit [ "address", `String here ];
+  submit
+    [ "address", `String here; "token", `String "wrong"; "user", `String "me" ];
+  post "status" [];
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"Enter the backend's address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"\"nowhere\" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)"}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"127.0.0.1:PORT refused the login: unauthorised: bad user name or password\nNo password was given: enter the backend's token (its -token, or yours from its -tokens) as the password."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"127.0.0.1:PORT refused the login: unauthorised: bad user name or password\nCheck the user name and password against the backend's -tokens NAME=TOKEN entries."}
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:PORT","user":"me","error":"127.0.0.1:PORT refused the login: unauthorised: bad user name or password\nCheck the user name and password against the backend's -tokens NAME=TOKEN entries."}
+    |}];
+  (* Accepted: saved, the tool host connected, the page signed in by the
+     code (once). *)
+  let code =
+    Desktop.post
+      t
+      ~sw
+      d
+      "connect"
+      [ "address", `String here; "token", `String "sekrit" ]
+  in
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  post "status" [];
+  post_code t ~sw ~port:d.port (Option.value_exn code);
+  post "status" [];
+  submit [ "address", `String here; "token", `String "sekrit" ];
+  page_hello
+    t
+    ~sw
+    ~port:d.port
+    {|{"name": "prigh-web", "token": "sekrit", "prefer_host": "host-laptop"}|};
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    connect HTTP/1.1 200 OK: {"ok":true,"code":"<code>"}
+    (((connect 127.0.0.1:PORT) (token sekrit)))
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":"<code>"}
+    HTTP/1.1 200 OK
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 58
+      Content-Type: application/json
+      body: {"user":null,"token":"sekrit","prefer_host":"host-laptop"}
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":null}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"Already connected to 127.0.0.1:PORT: reload the page."}
+    hello: ok, active host host-laptop; hosts: backend (<host>, $DIR), host-laptop (laptop, $DIR/here)
+    |}];
+  (* The page's Quit ends it, and with it the site. *)
+  post ~key:"wrong" "quit" [];
+  post "quit" [];
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  (match connect t ~sw ~port:d.port with
+   | (_ : _ Eio.Net.stream_socket) -> print_endline "still listening"
+   | exception exn -> print_endline (Net_error.to_string_hum exn));
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  [%expect
+    {|
+    quit HTTP/1.1 403 Forbidden: this is not the page prigh desktop opened: open prigh again
+    quit HTTP/1.1 200 OK: {"ok":true}
+    Quit
+    connection refused
+    127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    No password was given: enter the backend's token (its -token, or yours from its -tokens) as the password.
+    127.0.0.1:PORT refused the login: unauthorised: bad user name or password
+    Check the user name and password against the backend's -tokens NAME=TOKEN entries.
+    tool host: connected to 127.0.0.1:PORT as client-N
+    tools run on this machine, in $DIR/here
+    connected to 127.0.0.1:PORT
+    quit from the page
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop with the saved connection: signed in at once; stdin closing \
+     ends it"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~tools:Remote
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = address (backend_spec backend_port)
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Saved "~/.prigh/tui-connection.sexp"
+         ; save = None
+         })
+  in
+  let code = Desktop.post t ~sw d "status" [] in
+  post_code t ~sw ~port:d.port (Option.value_exn code);
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":"<code>"}
+    HTTP/1.1 200 OK
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 49
+      Content-Type: application/json
+      body: {"user":null,"token":"sekrit","prefer_host":null}
+    Stdin_closed
+    tools run on the backend (-tools remote)
+    connected to 127.0.0.1:PORT
+    ()
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop with a saved connection that fails: the form, saying so"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = address "127.0.0.1:1"
+         ; credentials = { token = Some "sekrit"; user = Some "me" }
+         ; source = Saved "~/.prigh/tui-connection.sexp"
+         ; save = None
+         })
+  in
+  ignore (Desktop.post t ~sw d "status" [] : string option);
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":"me","error":"The saved connection (~/.prigh/tui-connection.sexp) did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    Stdin_closed
     |}]
 ;;

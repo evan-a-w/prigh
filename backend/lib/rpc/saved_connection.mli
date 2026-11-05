@@ -1,11 +1,12 @@
 open! Core
 open! Import
 
-(** The remote backend [prigh-tui] and [prigh web] connect to when not told
-    otherwise, kept in [~/.prigh/tui-connection.sexp] (mode 0600: it holds
-    the token) so that [-connect], [-token] and [-user] need only be given
-    once. The TUI has the same module
-    ([frontend/client/unix/saved_connection.ml]): keep the two in step. *)
+(** The remote backend [prigh-tui], [prigh web] and [prigh tool-host
+    -remote] connect to when not told otherwise, kept in
+    [~/.prigh/tui-connection.sexp] (mode 0600: it holds the token) so that
+    [-connect], [-token] and [-user] need only be given once. The TUI has
+    the same module ([frontend/client/unix/saved_connection.ml]): keep the
+    two in step. *)
 
 type t =
   { connect : string

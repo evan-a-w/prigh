@@ -344,6 +344,9 @@ module Command : sig
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
     | Sign_out (** forget this account's saved login and reload *)
+    | Quit_desktop
+    (** stop [prigh desktop] (the desktop app: its window, site and tool
+        host) *)
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
@@ -428,6 +431,8 @@ module Action : sig
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
+    | Set_desktop of bool (** the page runs under [prigh desktop] *)
+    | Quit_desktop (** Quit prigh: only under [prigh desktop] *)
     | Page_hidden of bool
     (** the tab was hidden or shown again (reconnect now, or check the socket) *)
     | Restore_prefs of
@@ -752,6 +757,8 @@ module Model : sig
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; narrow : bool
+    ; desktop : bool
+    (** under [prigh desktop], the desktop app: Quit prigh is offered *)
     ; draft : string
     ; cursor : int (** the caret's byte offset in [draft] *)
     ; completion : Completion.t option

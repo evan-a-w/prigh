@@ -362,7 +362,10 @@ let every =
   ; c "retry-backend-connection" "reconnect to the backend now"
   ; c "state" "show the session state as the backend reports it"
   ; c "clear" "clear the transcript view (the conversation is kept)"
-  ; c "quit" "how to leave (close the tab; /signout signs out)"
+  ; c
+      "quit"
+      "leave: quit the desktop app (Ctrl+Q); in a browser, close the tab \
+       (/signout signs out)"
   ]
 ;;
 

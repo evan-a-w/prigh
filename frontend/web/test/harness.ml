@@ -37,6 +37,7 @@ let act t action =
      | Cache_prefs _
      | Apply_theme _
      | Sign_out
+     | Quit_desktop
      | Reveal _
      | Copy _
      | Select_message _

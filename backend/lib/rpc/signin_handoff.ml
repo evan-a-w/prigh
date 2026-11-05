@@ -23,6 +23,7 @@ let create ~user ~token ~prefer_host =
 ;;
 
 let code t = t.code
+let taken t = t.taken
 let path = "/signin-handoff"
 
 (* Compared by digest, so that the time taken says nothing about the code. *)
