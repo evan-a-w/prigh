@@ -1,6 +1,8 @@
-//! Where the window may go. It shows the shell's loading page, then only
-//! the sidecar's site; web links elsewhere open in the system browser, and
-//! anything else (file:, javascript:, custom schemes) is refused.
+//! Where the window may go. It shows the shell's loading page, then the
+//! sidecar's site and, under `prigh desktop -ui remote`, the backend's own
+//! site; web links elsewhere open in the system browser, and anything else
+//! (file:, javascript:, custom schemes) is refused. A page asks to quit the
+//! app by going to [QUIT_URL] (the backend's site cannot reach the sidecar).
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Decision {
@@ -8,7 +10,11 @@ pub enum Decision {
     /// Open it in the system browser instead.
     External,
     Block,
+    /// Stop the sidecar, which ends the app.
+    Quit,
 }
+
+pub const QUIT_URL: &str = "about:blank#prigh-desktop-quit";
 
 /// `scheme://host[:port]`, lowercased, with the scheme's default port
 /// dropped; None for URLs without an authority.
@@ -42,9 +48,12 @@ fn is_shell_page(url: &str) -> bool {
     matches!(origin(url).as_deref(), Some("tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost"))
 }
 
-/// `sidecar` is the origin of the sidecar's site, once it has said it.
-pub fn decide(url: &str, sidecar: Option<&str>) -> Decision {
+/// `ours`: the origins of the sites the sidecar has said to show.
+pub fn decide(url: &str, ours: &[String]) -> Decision {
     let lower = url.to_ascii_lowercase();
+    if lower == QUIT_URL {
+        return Decision::Quit;
+    }
     if is_shell_page(url)
         || lower == "about:blank"
         || lower.starts_with("about:srcdoc")
@@ -53,10 +62,8 @@ pub fn decide(url: &str, sidecar: Option<&str>) -> Decision {
     {
         return Decision::Allow;
     }
-    if let (Some(o), Some(s)) = (origin(url), sidecar) {
-        if o == s {
-            return Decision::Allow;
-        }
+    if origin(url).is_some_and(|o| ours.contains(&o)) {
+        return Decision::Allow;
     }
     if lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:") {
         Decision::External
@@ -83,15 +90,16 @@ mod tests {
 
     #[test]
     fn decisions() {
-        let site = Some("http://127.0.0.1:7790");
-        assert_eq!(decide("tauri://localhost/index.html", None), Allow);
-        assert_eq!(decide("http://tauri.localhost/index.html", None), Allow);
+        let site = &["http://127.0.0.1:7790".to_string()][..];
+        let none: &[String] = &[];
+        assert_eq!(decide("tauri://localhost/index.html", none), Allow);
+        assert_eq!(decide("http://tauri.localhost/index.html", none), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/#signin=x", site), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/#desktop=k3y", site), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/?session=abc#desktop=k3y", site), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/files/a.txt", site), Allow);
         // before the sidecar has said where it is, nothing of it is allowed
-        assert_eq!(decide("http://127.0.0.1:7790/", None), External);
+        assert_eq!(decide("http://127.0.0.1:7790/", none), External);
         assert_eq!(decide("http://127.0.0.1:7791/", site), External);
         assert_eq!(decide("https://github.com/evan-a-w/prigh/pull/1", site), External);
         assert_eq!(decide("mailto:me@example.com", site), External);
@@ -100,5 +108,16 @@ mod tests {
         assert_eq!(decide("file:///etc/passwd", site), Block);
         assert_eq!(decide("javascript:alert(1)", site), Block);
         assert_eq!(decide("vscode://file/x", site), Block);
+        // the backend's own site too, once the sidecar has said to show it
+        let both = &["http://127.0.0.1:7790".to_string(), "https://ai.example.com".to_string()][..];
+        assert_eq!(decide("https://ai.example.com/#app=desktop&host=laptop", site), External);
+        assert_eq!(decide("https://ai.example.com/#app=desktop&host=laptop", both), Allow);
+        assert_eq!(decide("https://ai.example.com:443/files/x", both), Allow);
+        assert_eq!(decide("http://ai.example.com/", both), External);
+        assert_eq!(decide("https://evil.example/", both), External);
+        // quitting, from any of them
+        assert_eq!(decide(QUIT_URL, both), Quit);
+        assert_eq!(decide("about:blank#prigh-desktop-quit", none), Quit);
+        assert_eq!(decide("about:blank#prigh-desktop-quitx", both), Block);
     }
 }

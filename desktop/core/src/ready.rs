@@ -1,20 +1,33 @@
-//! The sidecar's ready line: one JSON object on its stdout,
-//! `{"url":"http://127.0.0.1:PORT/..."}`. Only flat objects of strings
-//! (and other scalars, ignored) are accepted: enough for the contract, with
-//! no JSON dependency.
+//! The sidecar's page lines: JSON objects on its stdout, one per page the
+//! window is to show: `{"url":"http://127.0.0.1:PORT/..."}` (its own site),
+//! or `{"url":"https://backend/...","remote":true}` (the backend's own
+//! prigh-web, `prigh desktop -ui remote`). The first is its ready line. Only
+//! flat objects of strings and other scalars are accepted: enough for the
+//! contract, with no JSON dependency.
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Error(pub String);
 
-pub fn parse(line: &str) -> Result<String, Error> {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Page {
+    pub url: String,
+    /// The backend's site, not the sidecar's.
+    pub remote: bool,
+}
+
+pub fn parse(line: &str) -> Result<Page, Error> {
     let fields = parse_object(line.trim())
         .map_err(|e| Error(format!("prigh desktop printed {:?}, not its ready line ({e})", truncate(line))))?;
     let url = fields
-        .into_iter()
-        .find_map(|(k, v)| (k == "url").then_some(v).flatten())
+        .iter()
+        .find_map(|(k, v)| match v {
+            Value::Str(s) if k == "url" => Some(s.clone()),
+            _ => None,
+        })
         .ok_or_else(|| Error(format!("prigh desktop's ready line has no \"url\": {:?}", truncate(line))))?;
+    let remote = fields.iter().any(|(k, v)| k == "remote" && matches!(v, Value::Scalar(s) if s == "true"));
     if url.starts_with("http://") || url.starts_with("https://") {
-        Ok(url)
+        Ok(Page { url, remote })
     } else {
         Err(Error(format!("prigh desktop's ready line has a url that is not http(s): {url:?}")))
     }
@@ -29,7 +42,13 @@ fn truncate(s: &str) -> String {
     }
 }
 
-type Fields = Vec<(String, Option<String>)>;
+enum Value {
+    Str(String),
+    /// A number, true, false or null, as written.
+    Scalar(String),
+}
+
+type Fields = Vec<(String, Value)>;
 
 fn parse_object(s: &str) -> Result<Fields, String> {
     let mut p = Parser { s: s.as_bytes(), i: 0 };
@@ -46,12 +65,7 @@ fn parse_object(s: &str) -> Result<Fields, String> {
             p.ws();
             p.expect(b':')?;
             p.ws();
-            let value = if p.peek() == Some(b'"') {
-                Some(p.string()?)
-            } else {
-                p.scalar()?;
-                None
-            };
+            let value = if p.peek() == Some(b'"') { Value::Str(p.string()?) } else { Value::Scalar(p.scalar()?) };
             fields.push((key, value));
             p.ws();
             match p.next() {
@@ -94,7 +108,7 @@ impl Parser<'_> {
             Err(format!("expected {}", c as char))
         }
     }
-    fn scalar(&mut self) -> Result<(), String> {
+    fn scalar(&mut self) -> Result<String, String> {
         let start = self.i;
         while matches!(self.peek(), Some(c) if c.is_ascii_alphanumeric() || b"+-.".contains(&c)) {
             self.i += 1;
@@ -102,7 +116,7 @@ impl Parser<'_> {
         if start == self.i {
             Err("expected a string, number, true, false or null".into())
         } else {
-            Ok(())
+            Ok(String::from_utf8_lossy(&self.s[start..self.i]).into_owned())
         }
     }
     fn hex4(&mut self) -> Result<u32, String> {
@@ -159,15 +173,20 @@ mod tests {
 
     #[test]
     fn ready_lines() {
-        assert_eq!(
-            parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#),
-            Ok("http://127.0.0.1:41234/#signin=abc".to_string())
-        );
+        let page = |url: &str, remote| Ok(Page { url: url.to_string(), remote });
+        assert_eq!(parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#), page("http://127.0.0.1:41234/#signin=abc", false));
         // escapes, spacing, other fields, a trailing CR
         assert_eq!(
             parse("{ \"pid\": 12, \"ok\": true, \"url\" : \"http:\\/\\/127.0.0.1:1\\/x?a=\\u00e9\" }\r\n"),
-            Ok("http://127.0.0.1:1/x?a=é".to_string())
+            page("http://127.0.0.1:1/x?a=é", false)
         );
+        // the backend's own site
+        assert_eq!(
+            parse(r#"{"url":"https://ai.example.com/#app=desktop&host=laptop","remote":true}"#),
+            page("https://ai.example.com/#app=desktop&host=laptop", true)
+        );
+        assert_eq!(parse(r#"{"url":"http://x/","remote":false}"#), page("http://x/", false));
+        assert_eq!(parse(r#"{"url":"http://x/","remote":"true"}"#), page("http://x/", false));
     }
 
     #[test]
