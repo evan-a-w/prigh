@@ -89,7 +89,7 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
 page.on("console", message => {
-  if (message.type() === "error" && !/favicon\.ico|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
 

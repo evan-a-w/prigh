@@ -1,0 +1,2790 @@
+=== webkit: sign-in page ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+User name
+Password
+Backend
+Sign in
+=== webkit: signed in: sidebar ===
+prigh
+web
+New session
+No sessions yet: send a message to start one.
+T
+token
+=== webkit: signed in: chat ===
+What are we building?
+<CWD>
+/ commands
+@ mention a file
+! run a command
+Ctrl+L switch model
+Ctrl+K find a session
+=== webkit: signed in: the session's card ===
+on
+auto
+normal
+0%
+$<COST>
+=== webkit: a dialog keeps the focus ===
+Tab: dialog: Close (Esc)
+Tab: dialog: Keys
+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+Shift+Tab: dialog: Close (Esc)
+Shift+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+after Esc: editor
+=== webkit: a mistyped command ===
+Unknown command /modle. Did you mean /mode? (/help lists them)
+editor: /modle
+=== webkit: snippets: Alt+N, filtered ===
+Snippets
+tests
+Run the tests and fix failures.
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== webkit: snippets: inserted at the caret ===
+value "Please Run the tests and fix failures. now", caret 38-38, focused true
+typing goes after it: "Please Run the tests and fix failures.! now"
+=== webkit: snippets: /snippet, filtered by the text ===
+Snippets
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== webkit: snippets: /snippet inserted ===
+value "Review the diff for bugs.\nList them by severity.", caret 48-48, focused true
+=== webkit: snippets: /snippet tests ===
+value "Run the tests and fix failures.", caret 31-31, focused true
+=== webkit: snippets: #rev completes ===
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#review
+Review the diff for bugs.
+=== webkit: snippets: #rev replaced ===
+value "a Review the diff for bugs.\nList them by severity. b", caret 50-50, focused true
+typing goes after it: "a Review the diff for bugs.\nList them by severity.! b"
+=== webkit: snippets: # that is not a snippet ===
+"# Title #123 x#rev": no popup
+=== webkit: snippets: /snippet add ===
+snippet fix saved: Fix the failing test. (/snippet fix inserts it)
+config: review, tests, fix
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#fix
+Fix the failing test.
+value "Fix the failing test.", caret 21-21, focused true
+=== webkit: snippets: /snippet rm ===
+snippet fix removed
+config: review, tests
+#fi: no popup
+=== webkit: reminders: added ===
+Reminder r1 added (when the agent ends its turn, up to 3 in a row): Keep going until the tests pass. · /remind rm r1 removes it
+Reminder r2 added (every 5 turns): Check the disk space. · /remind rm r2 removes it
+status: Remind 2
+=== webkit: reminders: /remind ===
+Reminders
+r1
+on stop 0/3 · Keep going until the tests pass.
+Remove
+r2
+every 5 turns · Check the disk space.
+Remove
+↑↓ to move, Enter to show, Delete to remove, Esc to close
+=== webkit: reminders: Delete removes the highlighted one ===
+Reminder r1 removed
+Reminder r2 removed
+status: no reminders
+=== webkit: bash run ===
+count some lines
+<TIME>
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+three lines
+<TIME>
+=== webkit: the session's card after a run ===
+on
+auto
+normal
+0%
+$<COST>
+=== webkit: a budget in the status line ===
+0%
+$<COST>/$<COST>
+=== webkit: long output, at rest ===
+bash
+seq 1 30
+=== webkit: long output, folded ===
+bash
+seq 1 30
+1
+2
+3
+4
+5
+6
+Show all 30 lines
+=== webkit: long output, expanded ===
+33 lines, ending: 30 / Fold to 6 lines
+folded again: Show all 30 lines
+=== webkit: read an image ===
+what does flag.png look like?
+<TIME>
+opening it
+read
+flag.png
+Read image file [image/png, 24x16]
+a red flag with a blue stripe
+<TIME>
+=== webkit: the read tool's image ===
+data:image/png;base64, 24x16
+=== webkit: an image open: the chips ===
+model: under dialog.viewer
+host: under dialog.viewer
+=== webkit: drawing on the read tool's image ===
+viewer closed: true
+Saving attaches the drawing to your next message.
+Cancel
+Attach
+=== webkit: a chip's menu open: the chips ===
+model: the chip, on top
+host: the chip, on top
+=== webkit: attached in the composer ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+=== webkit: drawing: nothing drawn, nothing to save ===
+save enabled: false
+=== webkit: drawn on, in the composer ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+composer cleared: true
+=== webkit: the prompt's images ===
+data:image/png;base64, 20x10
+data:image/png;base64, 12x30
+=== webkit: the backend's copy of the prompt ===
+what are these?
+image/png 20x10
+image/png 12x30
+url has the session: true
+same session after reload: true
+=== webkit: sidebar after reload ===
+prigh
+web
+New session
+Sessions
+Select
+count some lines
+<AGE>
+<CWD>
+T
+token
+=== webkit: new session ===
+What are we building?
+<CWD>
+/ commands
+@ mention a file
+! run a command
+Ctrl+L switch model
+Ctrl+K find a session
+=== webkit: sending ===
+hello again
+Sending…
+send button: Sending…
+new session in the url: true
+=== webkit: two sessions ===
+prigh
+web
+New session
+Sessions
+Select
+hello again
+<AGE>
+<CWD>
+count some lines
+<AGE>
+<CWD>
+T
+token
+=== webkit: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+switched back: true
+=== webkit: switched back ===
+count some lines
+<TIME>
+=== webkit: backend gone ===
+Connection lost: reconnecting…
+Reconnecting…
+same session after reconnecting: true
+=== webkit: after reconnecting ===
+still there?
+<TIME>
+back again
+<TIME>
+=== webkit: agents panel ===
+Agents
+Subagents
+2
+Done
+Survey the project
+The survey: 3 files.
+Done
+Count the files
+There are 3 files.
+Jobs
+1
+Done
+sleep 1; echo built
+<T>
+built
+=== webkit: a nested subagent ===
+Subagent a1/n1
+There are 3 files.
+<TIME>
+Survey the project
+›
+Count the files
+Show in chat
+Done
+deepseek-flash  1 turn  $<COST>
+its top-level card is in view in the chat
+=== webkit: a background job ===
+Job j1
+built
+Output, lines 1-1 of 1
+sleep 1; echo built
+Done
+<T>
+6 B
+=== webkit: a card opens its agent ===
+Subagent a1
+Its subagents
+1
+Done
+Count the files
+There are 3 files.
+asking a helper
+Subagent:
+Count the files
+Open ›
+The survey: 3 files.
+<TIME>
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== webkit: the agent's footer stays in sight ===
+at the top: scrolls true, footer at the panel's foot true, under the transcript true
+at the end: scrolls true, footer at the panel's foot true, under the transcript true
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== webkit: a shell in the terminal panel ===
+<HOSTNAME>
+<CWD>
+$ echo hello-from-prigh-web
+hello-from-prigh-web
+$ pwd
+<CWD>
+$ cat -v
+^[
+^[
+$
+the shell has the panel's rows: true
+taller after dragging: true; the panel's rows: true
+closed: the editor has the keyboard
+=== webkit: reopened: the same shell ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+reloaded: the same height: true
+=== webkit: reloaded: the panel and the shell are back ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+another session: another shell
+back: the first one again
+=== webkit: the terminal on a phone ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+=== webkit: /diff ===
+Changes
+<CWD> against HEAD 2 files changed, +5 −1
+notes.txt
++2
+−1
+@@ -1,3 +1,4 @@
+1		one
+2	-	two
+2	+	2
+3		three
+4	+	four
+todo.md
+new
++3
+−0
+@@ -0,0 +1,3 @@
+1	+	# Todo
+2	+
+3	+	- ship it
+/diff PATH shows one file or directory
+Review
+Done
+=== webkit: a missing directory ===
+Create folder?
+This folder doesn't exist on <HOSTNAME>:
+<CWD>/sub
+Missing parent folders are created too.
+Enter creates, Esc cancels
+Cancel
+Create folder and switch
+created on the host: true
+=== webkit: an environment note above the prompt ===
+cwd closed: ⌂
+Working directory is now <CWD>/sub
+=== webkit: the prompt shows only what was typed ===
+anything new?
+<TIME>
+=== webkit: a margin note unfolded ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+=== webkit: the model saw the note ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+anything new?
+=== webkit: the model and host controls ===
+DeepSeek V4.1 Flash
+<HOSTNAME>
+=== webkit: the host picker ===
+Where tools run
+<HOSTNAME>
+<CWD>/sub
+↑↓ to move, Enter to choose, Esc to close
+=== webkit: the + menu ===
+Add to your message
+or paste, or drop
+Files…
+uploaded to the tool host; the agent gets their paths
+Images…
+shown to the model; draw on it before sending
+Enter chooses, Esc closes
+attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+=== webkit: the thinking chip's menu ===
+Thinking
+Alt+T cycles
+Off
+answer straight away
+Low
+a little
+On
+the provider's default budget
+High
+more
+Max
+as much as the model allows
+Enter chooses, ← → the next setting, Esc closes
+thinking's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+closed: true; focus: editor
+model's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+=== webkit: the model chip's menu, filtered ===
+DeepSeek V4.1 Flash
+DeepSeek, not logged in
+1M
+=== webkit: the host chip's menu, from the model's with → ===
+/host
+<HOSTNAME>
+<CWD>/sub
+The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
+Enter chooses, ← → the next setting, Esc closes
+host's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+=== webkit: mode ask ===
+high
+ask
+normal
+=== webkit: a confirmation ===
+Confirm
+Run bash: echo built-ok?
+y
+Allow once
+a
+Always allow bash(echo:*) this session
+n
+Deny
+r
+Deny, saying why
+=== webkit: allowed always ===
+build it
+<TIME>
+building
+bash
+echo built-ok
+Built.
+<TIME>
+=== webkit: a question ===
+Storage
+Which database?
+Postgres
+the one in prod
+SQLite
+Other:
+Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
+Decline
+Send
+=== webkit: answered ===
+ask me
+<TIME>
+one question
+ask_user
+answered
+SQLite it is.
+<TIME>
+=== webkit: plan mode (Alt+M) ===
+high
+plan
+normal
+=== webkit: plan mode: the status line ===
+high
+plan
+normal
+0%
+$<COST>
+=== webkit: plan mode: the composer's placeholder ===
+Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
+=== webkit: the plan, in plan mode ===
+◇
+Plan mode on: the model was told to plan, not change files
+plan it
+<TIME>
+here is the plan
+update_plan
+Write the schema
+0/2 done
+Write the schema
+Test it
+<TIME>
+=== webkit: plan mode off ===
+high
+auto
+normal
+=== webkit: plan mode off: the status line ===
+plan 0/2: Write the schema
+high
+auto
+normal
+0%
+$<COST>
+=== webkit: implementing ===
+◇
+Plan mode off: the model was told it can change files
+go ahead
+<TIME>
+Implementing.
+<TIME>
+=== webkit: permissions ===
+Permissions
+Mode: auto (tools run without asking)
+Allowed this session: bash(echo:*)
+Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+/mode or Alt+M switches the mode.
+Done
+=== webkit: two queued messages ===
+Steers this turn
+also check the docs
+Edit
+After this turn
+then write the changelog
+Edit
+=== webkit: one removed ===
+Steers this turn
+also check the docs
+Edit
+=== webkit: the steer delivered ===
+Steer delivered: also check the docs
+=== webkit: the steer in the transcript ===
+also check the docs
+<TIME>
+Done waiting.
+<TIME>
+=== webkit: phone: the drawer open: the chips ===
+model: under .sidebar, .scrim
+host: under .sidebar, .scrim
+=== webkit: phone: a chip's menu ===
+attach's menu: a sheet across the bottom; focus in it: true
+=== webkit: archived, folded ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+Archived
+1
+=== webkit: archived ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+Archived
+1
+hello again
+<AGE>
+<CWD>
+Delete archived
+muted: 1
+=== webkit: selected ===
+Cancel
+Delete 2 sessions (<SIZE>)
+=== webkit: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== webkit: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+cwd
+main
+session files after: 1
+=== webkit: /cd: the directory popup ===
+Directories
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+<CWD>/sub/
+=== webkit: files: the session's directory ===
+<HOSTNAME>
+Review
+cwd
+=== webkit: files: listed ===
+sub/
+1
+<TIME>
+flag.png
+88 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== webkit: files: a text preview ===
+notes.txt
+17 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -1,3 +1,4 @@
+1		one
+2	-	two
+2	+	2
+3		three
+4	+	four
+=== webkit: files: an image preview ===
+ 24x16
+toast: Uploaded "hello.txt"
+on the host: "hello\n"
+=== webkit: files: replace? ===
+Replace hello.txt?
+<CWD> already has a hello.txt. Replace it with the one you are uploading (12 B)?
+Skip
+Replace
+replaced: "hello again\n"
+=== webkit: files: a downloaded file ===
+notes.txt
+"one\n2\nthree\nfour\n"
+=== webkit: files: a typed path ===
+sub
+inner.txt
+7 B
+<TIME>
+=== webkit: files: a directory downloaded ===
+sub.tar.gz
+sub/
+sub/inner.txt
+toast: Created folder "made"
+toast: Renamed "made" to "renamed"
+=== webkit: files: delete? ===
+Delete renamed?
+<CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
+Cancel
+Delete
+toast: Deleted "renamed"
+renamed on the host: false
+=== webkit: files: after the changes ===
+sub/
+1
+<TIME>
+flag.png
+88 B
+<TIME>
+hello.txt
+12 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== webkit: files: uploads in the status line ===
+Uploading 2 files
+=== webkit: files: attachments in the composer ===
+hello.txt
+12 B
+dropped.txt
+13 B
+data.bin
+7 B
+uploads on the host: .gitignore data.bin dropped.txt
+=== webkit: files: sent with the prompt ===
+⌂
+Working directory is now <CWD>
+read these
+@hello.txt
+@.prigh/uploads/dropped.txt
+@.prigh/uploads/data.bin
+<TIME>
+Read the attachments.
+<TIME>
+=== webkit: files: what the model saw ===
+read these
+<file path="hello.txt">
+hello again
+<file path=".prigh/uploads/dropped.txt">
+dropped text
+<file path=".prigh/uploads/data.bin">
+[binary file, 7 bytes: not shown; inspect it with tools]
+=== webkit: files on a phone ===
+sub/
+1
+flag.png
+88 B
+hello.txt
+12 B
+notes.txt
+17 B
+todo.md
+18 B
+=== webkit: files: a preview on a phone ===
+the list: hidden; todo.md
+18 B
+<TIME>
+back: the list shown, the preview closed
+=== webkit: resize: a highlighted preview ===
+hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+left to right: chat to 619, the preview from 619, the list from 974
+=== webkit: resize: the file browser's edge ===
+handles: sidebar 280, files 400
+while dragging: resizing-x; no text selected: true
+dragged 160px left: 400 -> 560 (aria 560), kept 560
+as wide as it goes: 600, the chat keeps 400
+double-clicked: 400, kept null
+arrow keys: 480
+=== webkit: resize: the preview's edge ===
+dragged 100px left: the preview 480 -> 580 (aria 580), the list 480, the chat 460
+at 1150px: the list hidden, the preview 472 with files
+=== webkit: resize: the sidebar's edge ===
+dragged 80px right: 280 -> 360
+=== webkit: resize: kept after a reload ===
+sidebar 360, files 480
+=== webkit: resize: a narrower window ===
+sidebar 306, files 413, chat 401
+wide again: sidebar 360, files 480
+on a phone: 0 handles
+=== webkit: resize: highlighted code in a reply ===
+hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
+hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
+=== webkit: the session: a 700px chat column ===
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: the session: a 520px chat column ===
+chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: the session: a 400px chat column ===
+chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: settings ===
+Settings
+Appearance
+Sessions
+Models
+Git hosting
+T
+token
+Appearance
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+LOOK
+Theme
+The page's colours.
+Original
+Dark
+Light
+Accent
+Your turns, the selection, focus and work in progress.
+Custom
+LAYOUT
+Tabs
+The open sessions as tabs over the chat (not on a phone).
+Transcript detail
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
+Quiet
+Normal
+Verbose
+Keyboard shortcuts
+Done
+=== webkit: a dialog open: the chips ===
+model: under .modal-backdrop
+host: under .modal-backdrop
+a choice keeps it open: true
+=== webkit: settings: the sections ===
+clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
+ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
+End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
+ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
+desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
+phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
+Esc closes it, the editor has the focus: true
+=== webkit: the session's bar: a 900px chat column without the sidebar ===
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: the session's bar: a 600px chat column without the sidebar ===
+chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: the session's bar: a 400px chat column without the sidebar ===
+chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+.chat-chrome: fits
+.composer: fits
+the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+=== webkit: errors ===
+none
+=== webkit: accounts: sessions ===
+I am alice
+=== webkit: accounts: alice's menu ===
+A
+alice
+127.0.0.1:<PORT>
+signed in
+Act as…
+see and work in another user's sessions
+Add account…
+sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
+Sign out
+forget this account in this browser
+↑↓ to move, Enter to choose, Esc to close
+=== webkit: accounts: add an account ===
+prigh
+web
+Add an account
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Saved accounts
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+Back to alice
+=== webkit: accounts: sessions ===
+I am bob
+=== webkit: accounts: bob's settings ===
+Appearance
+Sessions
+Models
+Git hosting
+B
+bob
+=== webkit: accounts: bob's commands ===
+/setus offers: /setusr [user]
+/nix-g offers: nothing
+=== webkit: accounts: bob's /nix-gc ===
+Unknown command /nix-gc: /help lists the commands.
+=== webkit: accounts: bob's menu ===
+B
+bob
+127.0.0.1:<PORT>
+signed in
+Switch to
+A
+alice
+127.0.0.1:<PORT>
+Add account…
+sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
+Settings
+Ctrl+,
+Commands and keys
+/help
+Sign out
+forget this account in this browser
+↑↓ to move, Enter to choose, Esc to close
+=== webkit: accounts: sessions ===
+I am alice
+=== webkit: accounts: alice's nix store ===
+Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: none recorded
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Also delete generations over 14 days…
+Collect
+=== webkit: accounts: collected ===
+Nix store
+The packages agents fetch with Nix, on the shared /nix volume.
+Disk usage
+Store: 4.0 GiB in 2 paths; /nix: 30.0 GiB free of 100.0 GiB (30%).
+Last collection: <DATE> <TIME> by alice, freed 3.0 GiB: 1 path deleted in <N> s
+Refresh
+Collect garbage
+Delete the store paths no profile or GC root uses. Deleting users' old profile generations first frees more, but they can no longer roll back to them.
+Freed 3.0 GiB: 1 path deleted in <N> s
+Also delete generations over 14 days…
+Collect
+=== webkit: accounts: act as ===
+alice
+you
+bob
+=== webkit: accounts: sessions ===
+I am bob
+=== webkit: accounts: acting as bob ===
+A
+alice
+acting as bob
+=== webkit: accounts: sessions ===
+I am alice
+=== webkit: accounts: signed out ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Signed out.
+Continue as
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+=== webkit: accounts: alice again ===
+A
+alice
+=== webkit: accounts: saved accounts ===
+alice
+=== webkit: accounts: errors ===
+none
+=== webkit: reconnect: a long session, halfway up ===
+scrolled: true
+draft: half-written thought
+images in the composer: 1
+=== webkit: reconnect: offline ===
+Connection lost: reconnecting…
+composer: Offline: send once back
+=== webkit: reconnect: network back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== webkit: reconnect: backend gone ===
+Connection lost: reconnecting…
+=== webkit: reconnect: backend back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== webkit: reconnect: reloaded ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+jump button: 1
+=== webkit: reconnect: reloaded out of reach ===
+Connection lost: reconnecting…
+sign-in page: false
+=== webkit: reconnect: back in reach ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+=== webkit: reconnect: errors ===
+none
+=== webkit: paging: opened ===
+steps 26 to 40 (15)
+earlier: Show earlier messages 100 more
+at the end: true
+=== webkit: paging: scrolled up ===
+steps 11 to 40 (30)
+earlier: Show earlier messages 40 more
+step 26 kept in place: true
+=== webkit: paging: at the start ===
+steps 1 to 40 (40)
+earlier: none
+=== webkit: paging: a long output ===
+shown lines: 6
+toggle: Show all 2000 lines
+loaded whole: 2000 lines
+=== webkit: paging: reloaded ===
+steps 1 to 40 (40)
+step 5 at the same place: true
+=== webkit: paging: jump: the rail ===
+steps 26 to 40 (15)
+marks: 40, not loaded: 25
+button: Jump to a message
+the one in view: Step 39
+along the chat's right edge: true
+=== webkit: paging: jump: a mark's tooltip ===
+Step 30: look at module 30. | <TIME>
+=== webkit: paging: jump: to a loaded message ===
+step 30 at the top, marked: true
+the one in view: Step 30
+=== webkit: paging: jump: to a message not loaded ===
+steps 1 to 40 (40)
+not loaded: 0
+the one in view: Step 3
+=== webkit: paging: jump: the list ===
+Step 40: look at module 40. | 40 of 40 <TIME> | Trim before
+Step 17: look at module 17. | 17 of 40 <TIME> | Trim before
+step 17 at the top
+=== webkit: paging: jump: on a phone ===
+marks: 0
+the list: 40 messages
+=== webkit: paging: errors ===
+none
+=== webkit: resilience: a long chat (slow) ===
+newest answer on show: true
+=== webkit: resilience: a slow network, the page shown again and again ===
+sockets opened: 1
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== webkit: resilience: errors ===
+none
+=== webkit: resilience: a long chat (drops) ===
+newest answer on show: true
+=== webkit: resilience: a connection that drops while the session loads ===
+sockets opened: 6
+banner: The backend keeps dropping the connection while loading this session: open another session, or reload. Retry now Another session Reload
+status: Stopped reconnecting
+"Reconnected" said: 0
+transcript still on show: true
+sockets opened since: 6
+=== webkit: resilience: retry now ===
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== webkit: resilience: errors ===
+none
+=== webkit: stability: idle ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and the session's status: none
+=== webkit: stability: a reply streamed ===
+nodes watched: true
+all kept: true
+removed: none
+layout shift in the transcript and the session's status: none
+=== webkit: stability: the streamed reply once ended ===
+its parts kept: true
+selection kept: true
+=== webkit: stability: the editor ===
+frames sampled: true
+frames with lines out of view: 0
+frames empty but still tall: 0
+=== webkit: stability: a turn starts and ends: the status at the composer ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== webkit: stability: a turn starts and ends on a phone: the status at the composer ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== webkit: stability: errors ===
+none
+=== webkit: themes: first paint before choosing ===
+- -; original orange #f0b44c on #1b1e23
+=== webkit: themes: settings ===
+Appearance
+
+How this page looks. Saved for your account, so it follows you to every browser you sign in on.
+
+LOOK
+Theme
+The page's colours.
+Original
+Dark
+Light
+Accent
+Your turns, the selection, focus and work in progress.
+Custom
+LAYOUT
+Tabs
+The open sessions as tabs over the chat (not on a phone).
+Transcript detail
+This browser
+How much of tool calls and thinking the transcript shows (Ctrl+O).
+Quiet
+Normal
+Verbose
+=== webkit: themes: dark from the settings ===
+dark orange #f0b44c on #1d1d1d; checked: Dark
+=== webkit: themes: saved on the backend ===
+web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue"
+=== webkit: themes: reloaded ===
+first paint: dark blue; dark blue #6aa6f8 on #1d1d1d
+=== webkit: themes: another browser ===
+first paint: - -; dark blue #6aa6f8 on #1d1d1d
+=== webkit: themes: changed live in the other ===
+light custom #c2410c on #f4f5f7
+its history: /accent #c2410c
+=== webkit: themes: picker ===
+Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c"
+=== webkit: themes: back ===
+original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
+=== webkit: themes: errors ===
+none
+=== webkit: tabs: off by default ===
+(no tabs)
+switch: false
+=== webkit: tabs: on ===
+* New session
+=== webkit: tabs: three sessions ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files (Waiting for you: a confirmation or a question)
+=== webkit: tabs: another browser ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+  List the files (Waiting for you: a confirmation or a question)
+* New session
+=== webkit: tabs: switched from the keyboard ===
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+* List the files
+=== webkit: tabs: dragged ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+saved: web.tabs=true web.open-tabs=3
+=== webkit: tabs: reloaded ===
+* List the files
+  Read the README
+  Refactor the parser (Failed: its last reply ended in an error)
+=== webkit: tabs: closed ===
+* Read the README
+sidebar: 3 sessions
+=== webkit: tabs: phone ===
+(no tabs)
+=== webkit: tabs: off ===
+(no tabs); saved: web.tabs=undefined web.open-tabs=1
+=== webkit: tabs: errors ===
+none
+=== webkit: worktrees: a session's menu ===
+Tidy the docs in a worktree — prigh — main
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== webkit: worktrees: the new worktree dialog ===
+New worktree
+Branch
+✦
+Generate name
+A new branch, or an existing one to check out (✦ names one from the task typed here)
+Base
+Where a new branch starts (empty: main, where this session is)
+Created in ~/.prigh/worktrees/prigh, then this session works there.
+Enter creates, Esc cancels
+Cancel
+Create and switch
+=== webkit: worktrees: a worktree's menu ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== webkit: worktrees: sessions and their worktrees ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
+│ agent/tidy-the-docs | subagent [agent]
+│ feat/login
+│ docs | here | ● 2 [dirty here]
+=== webkit: worktrees: from the keyboard ===
+A landing page — site — trunk
+Open  Enter
+▸ Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== webkit: worktrees: Esc changed nothing ===
+Tidy the docs in a worktree
+=== webkit: worktrees: a terminal in the worktree ===
+~/.prigh/worktrees/prigh/feat-login
+=== webkit: worktrees: folded ===
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [folded selected]
+=== webkit: worktrees: searching ===
+Tidy the docs in a worktree
+=== webkit: worktrees: a switched session's menu ===
+Tidy the docs in a worktree — prigh — docs
+▸ Switch back to main  /worktree back
+Open in new tab
+Rename…  /name
+Fork…  /fork
+New worktree…  /worktree new
+Review changes  /review
+Open in file browser  /files
+Open terminal there  /terminal
+Copy path
+Copy session id
+Archive  A
+Delete…  Delete
+=== webkit: worktrees: switched back ===
+Tidy the docs in a worktree | <age> | prigh | main | 3 [selected]
+│ agent/tidy-the-docs | subagent [agent]
+│ feat/login
+│ docs | ● 2 [dirty]
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== webkit: worktrees: remove: asked first ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== webkit: worktrees: remove: refused with changes ===
+Remove worktree with changes?
+Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
+<DIR>/prigh-docs has uncommitted changes (2 files): commit or stash them first, or force the removal: “Discard changes and remove” removes it anyway.
+Enter removes, Esc cancels
+Cancel
+Discard changes and remove
+Remove
+=== webkit: worktrees: removed ===
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+│ feat/login
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== webkit: worktrees: the /worktree picker ===
+Worktrees of <DIR>/prigh
+main
+<DIR>/prigh · main worktree · here · 1 session
+feat/login
+<DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
+Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
+=== webkit: worktrees: on a phone ===
+Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+│ feat/login
+The login form | <age> | prigh | feat/login | 1
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
+=== webkit: worktrees: a long press on a phone ===
+feat/login — in Tidy the docs in a worktree
+▸ Switch session here  /worktree open feat/login
+New session here  /worktree open -n feat/login
+Review changes  /review feat/login
+Open in file browser  /files <DIR>/home/.prigh/worktrees/prigh/feat-login
+Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
+Create pull request…  /pr new
+Copy path
+Remove worktree…  /worktree rm feat/login
+=== webkit: worktrees: errors ===
+none
+=== webkit: review: files: changes marked ===
+src (changed: 2)
+README.md
+=== webkit: review: files: a changed file's diff ===
+main.ml
+395 B
+<TIME>
++2 −1
+Changes
+Whole file
+Review
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+12	+	let v12 = 12 * 2
+13	+	let doubled = true
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+=== webkit: review: files: the whole file ===
+rows: 32
+=== webkit: review: files: text selected ===
+selected: "12 * 2"
+Comment
+c
+=== webkit: review: files: writing a comment ===
+Comment on line 12
+12 * 2
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== webkit: review: files: the comment under its code ===
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+=== webkit: review: files: its code marked ===
+[ '12 * 2' ]
+=== webkit: review: page: opened ===
+Review
+0/2 approved
+Comment
+Edit
+Changes
+Whole file
+Since latest
+(comment · <TIME>)
+Send 1 comment
+=== webkit: review: page: the files ===
+src/
+main.ml
+1
++2 −1
+src/
+util.ml
++3 −0
+2 files changed, +5 −1
+chat still shown: true
+file browser beside the review: true
+=== webkit: review: page: resized ===
+the chat 400 -> 520 (aria 520), the files 260 -> 340 (aria 340), the page keeps 920
+the chat as wide as it goes: the page keeps 480
+double-clicked: the chat 400, the files 260
+=== webkit: review: page: a second comment, not sent yet ===
+src/util.mlnew
+Nothing changed since your comment on line 3 · <TIME>· the changes as they are, below
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+not sent yet
+Name it for what it does.
+←
+Approve & next
+Space
+→
+File 2 of 2
+=== webkit: review: page: text selected across lines ===
+selection ends with: "let doubled"
+=== webkit: review: page: writing a comment across lines ===
+Comment on lines 12–13
+* 2
+let doubled
+Enter adds it · Shift+Enter a new line · Esc cancels
+Cancel
+Add comment
+=== webkit: review: page: Esc dropped the comment ===
+threads: 2
+=== webkit: review: page: comments on selections ===
+src/main.ml
+Nothing changed since your comment on old line 12 · <TIME>· the changes as they are, below
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+not sent yet
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+not sent yet
+Why double it here?
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+not sent yet
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+←
+Approve & next
+Space
+→
+File 1 of 2
+=== webkit: review: page: the marked code ===
+c4: v12
+c1: 12 
+c1 (lit): * 2
+c3 (lit): let doubled
+=== webkit: review: page: the dock ===
+←
+Approve & next
+Space
+→
+File 1 of 2
+=== webkit: review: page: approved, on to util.ml ===
+←
+Approve
+Space
+→
+File 2 of 2
+=== webkit: review: page: main.ml approved ===
+Review
+1/2 approved
+Comment
+Edit
+Changes
+Whole file
+Since latest
+(approval · <TIME>)
+Send 4 comments
+=== webkit: review: page: back on main.ml ===
+←
+Approved
+Space
+→
+File 1 of 2
+=== webkit: review: page: the files after the agent's edit ===
+README.md
++1 −1
+src/
+main.ml
+3
++2 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +6 −2
+=== webkit: review: page: the agent's reply ===
+src/main.ml
+Nothing changed since your approval · <TIME>· the changes as they are, below
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+←
+Approved
+Space
+→
+File 2 of 3
+=== webkit: review: chat: what the agent did ===
+c1
+Doubling is intended: v12 feeds the scale.
+reply_to_comment
+c2
+proposes a change
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+edit
+README.md
++1
+−1
+Replied to both comments and updated the README.
+<TIME>
+=== webkit: review: page: a proposed change ===
+src/util.mlnew
+Nothing changed since your comment on line 3 · <TIME>· the changes as they are, below
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accept
+Reject
+←
+Approve & next
+Space
+→
+File 3 of 3
+=== webkit: review: page: accepted, the file changed ===
+src/util.mlnew
+Nothing changed since you accepted the change on line 3 · <TIME>· the changes as they are, below
+@@ -0,0 +1,3 @@
+1	+	let id x = x
+2	+
+3	+	let apply_twice f x = f (f x)
+c2
+line 3
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+←
+Approve & next
+Space
+→
+File 3 of 3
+util.ml on disk: "let id x = x\n\nlet apply_twice f x = f (f x)\n"
+=== webkit: review: page: changed since approved ===
+src/main.ml
+Changed since you approved it
+main.ml ends: "let late = 0\nlet edited = 1\n"
+Esc closed it: true
+/review opened it: true
+=== webkit: review: worktree: what is reviewed ===
+Reviewing feat/login (<WT>) against main (merge base <SHA>)
+base: main
+=== webkit: review: worktree: the files ===
+README.md
++1 −1
+src/
+login.ml
++1 −0
+2 files changed, +2 −1
+=== webkit: review: worktree: against HEAD ===
+README.md
++1 −1
+1 file changed, +1 −1
+=== webkit: review: worktree: against HEAD, what is reviewed ===
+Reviewing feat/login (<WT>) against HEAD
+=== webkit: review: worktree: back to the session's own ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++3 −0
+3 files changed, +8 −2
+=== webkit: review: since: the files ===
+README.md
++1 −1
+src/
+main.ml
+3
++4 −1
+src/
+util.ml
+1
++1 −0 since approved
++4 −0
+3 files changed, +9 −2
+=== webkit: review: since: the view shown ===
+Comment
+Since latest
+(approval · <TIME>)
+=== webkit: review: since: what changed since approved ===
+src/util.mlnew
+Changed since you approved it
+Since your approval · <TIME>: +1 −0
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+4		let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+←
+Approve again
+Space
+→
+File 3 of 3
+=== webkit: review: since: the earlier actions ===
+Latest
+follows your newest action: Approved · <TIME>
+Accepted change on line 3 · <TIME>
+Comment on line 3 · <TIME>
+=== webkit: review: since: the switch, an earlier action picked ===
+Since
+comment on line 3 · <TIME>
+=== webkit: review: since: since the comment ===
+src/util.mlnew
+Changed since you approved it
+Since your comment on line 3 · <TIME>: +2 −1(removed lines are the file as it was then)
+@@ -1,3 +1,4 @@
+1		let id x = x
+2	+	let const x _ = x
+3
+3	-	let twice f x = f (f x)
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+←
+Approve again
+Space
+→
+File 3 of 3
+=== webkit: review: since: Latest follows the new comment ===
+Since latest
+(comment · <TIME>)
+=== webkit: review: since: a comment in the since-view ===
+src/util.mlnew
+Changed since you approved it
+Nothing changed since your comment on line 2 · <TIME>· the changes as they are, below
+@@ -0,0 +1,4 @@
+1	+	let id x = x
+2	+	let const x _ = x
+c5
+line 2
+Resolve
+const
+You
+<TIME>
+not sent yet
+Is const used?
+3	+
+4	+	let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+←
+Approve again
+Space
+→
+File 3 of 3
+=== webkit: review: since: what changed since the comment ===
+src/util.mlnew
+Changed since you approved it
+Since your comment on line 2 · <TIME>: +1 −1(removed lines are the file as it was then)
+1 outdated comment
+@@ -1,4 +1,4 @@
+1		let id x = x
+2	-	let const x _ = x
+2	+	let always x _ = x
+3
+4		let apply_twice f x = f (f x)
+c2
+line 4
+Resolve
+twice
+You
+<TIME>
+Name it for what it does.
+prigh
+<TIME>
+Agreed, a clearer name:
+-	let twice f x
++	let apply_twice f x
+Accepted: applied to the file
+You
+<TIME>
+not sent yet
+Accepted your proposed change: it is applied.
+←
+Approve again
+Space
+→
+File 3 of 3
+=== webkit: review: since: l, the changes again ===
+Comment
+Changes
+=== webkit: review: since: main.ml since its last action ===
+src/main.ml
+Changed since you approved it
+Nothing changed since your edit · <TIME>· the changes as they are, below
+@@ -9,7 +9,8 @@ let v8 = 8
+9		let v9 = 9
+10		let v10 = 10
+11		let v11 = 11
+12	-	let v12 = 12
+c4
+old line 12
+old text
+Resolve
+v12
+You
+<TIME>
+Was v12 used elsewhere?
+12	+	let v12 = 12 * 2
+c1
+line 12
+Resolve
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+13	+	let doubled = true
+c3
+lines 12–13
+Resolve
+* 2
+let doubled
+You
+<TIME>
+One line for both?
+14		let v13 = 13
+15		let v14 = 14
+16		let v15 = 15
+@@ -28,3 +29,5 @@ let v27 = 27
+29		let v28 = 28
+30		let v29 = 29
+31		let v30 = 30
+32	+	let late = 0
+33	+	let edited = 1
+←
+Approve again
+Space
+→
+File 2 of 3
+=== webkit: review: margin: threads beside their lines ===
+c4 open old 12: at its line
+c1 open new 12: below its line
+c3 open new 12: below its line
+lines 12 and 13 adjacent: true
+=== webkit: review: margin: c1 resolved, folded to its line ===
+c4 open old 12: at its line
+c1 folded new 12: below its line
+c3 open new 12: below its line
+c1
+Why double it here?
+2
+=== webkit: review: margin: c1 unfolded ===
+c1
+line 12
+resolved
+Reopen
+12 * 2
+You
+<TIME>
+Why double it here?
+prigh
+<TIME>
+Doubling is intended: v12 feeds the scale.
+=== webkit: review: margin: dragged wider ===
+wider by: 60
+=== webkit: review: git: the actions at the page's foot ===
+git bar under the code: true
+git bar at the foot: true
+Send comments in the head: true
+git buttons in the head: 0
+=== webkit: review: since: the file browser ===
+Changes
+Whole file
+Since latest
+(comment · <TIME>)
+Since your comment on line 2 · <TIME>: +1 −1(removed lines are the file as it was then)
+=== webkit: review: compare: the base picker, filtered ===
+b
+origin/main
+remote-tracking branch
+origin/ma
+compare with this branch, tag or commit
+↑ ↓ and Enter choose, Esc closes
+=== webkit: review: compare: against origin/main ===
+Reviewing main (<REPO>) against origin/main (merge base <SHA>)
+=== webkit: review: compare: directly ===
+Reviewing main (<REPO>) against origin/main directly
+=== webkit: review: compare: what to review ===
+r
+Worktrees
+main
+<REPO> · this session's
+feat/login
+<WT>
+Branches
+feat/old
+not checked out: read-only
+Remote branches
+origin/main
+not checked out: read-only
+↑ ↓ and Enter choose, Esc closes
+=== webkit: review: compare: a branch not checked out ===
+Reviewing
+feat/old
+not checked out
+against
+main
+(merge base <SHA>)
+Since merge base
+Directly
+Read-only
+Check out into a worktree
+=== webkit: review: compare: read-only, what is reviewed ===
+Reviewing feat/old (not checked out) against main (merge base <SHA>)
+files: src/
+old.ml
++1 −0
+1 file changed, +1 −0
+edit: feat/old is not checked out, so it is read-only here: Check out into a worktree to change it.
+=== webkit: review: compare: checked out ===
+Reviewing feat/old (<HOME>/.prigh/worktrees/repo/feat-old) against main (merge base <SHA>)
+=== webkit: review: focus: reviewing ===
+sidebar: hidden
+the chrome over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+files beside: true
+=== webkit: review: focus: the terminal, the agents and the files open ===
+sidebar: hidden
+the chrome over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+terminal from the review's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+=== webkit: review: focus: a wider window ===
+sidebar: hidden
+the chrome over the chat: true
+review from the left edge: true
+chat beside the review: true, at least 300px: true
+review at least 480px: true
+terminal from the review's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+=== webkit: review: focus: the review closed ===
+sidebar: shown
+the chrome over the chat: true
+terminal from the chat's left to the chat's right: true
+terminal under them: true
+files beside: true
+agents beside: true
+the same terminal: true
+=== webkit: review: focus: reviewing again ===
+the same terminal: true
+=== webkit: review: focus: the sessions drawer ===
+over the review: true
+the page behind is inert: true
+Esc closed the drawer, the review open: true
+=== webkit: review: phone ===
+sheet: fixed
+Alt+R closed it
+=== webkit: review: errors ===
+none
+=== webkit: review git: the bar ===
+main
+↑0 ↓0 origin/main
+0 staged
+1 unstaged
+1 untracked
+Commit…
+Push
+Create PR
+=== webkit: review git: the list: no boxes ===
+src/main.ml: current
+src/util.ml: -
+checkboxes: 0
+=== webkit: review git: util.ml's menu ===
+util.ml
+src
+Approve
+Space
+Take back the approval
+Not approved
+Stage
+Unstage
+Nothing staged
+Commit…
+Shift+C
+Select
+x
+Copy path
+=== webkit: review git: approved and staged ===
+src/main.ml: approved
+src/util.ml: current, staged
+=== webkit: review git: one staged ===
+1 staged
+1 unstaged
+0 untracked
+=== webkit: review git: two selected ===
+2 selected
+Approve
+Commit…
+=== webkit: review git: selected ===
+src/main.ml: current, approved, selected
+src/util.ml: selected, staged
+=== webkit: review git: the commit's files ===
+src/main.ml
+src/util.ml
+staged
+=== webkit: review git: drafted ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+=== webkit: review git: the commit box ===
+Commit 2 files
+src/main.ml
+staged
+src/util.ml
+staged
+Message
+✦
+Generate
+Undo
+Amend
+Commit 2 files
+=== webkit: review git: both staged ===
+2 staged
+0 unstaged
+0 untracked
+=== webkit: review git: committed ===
+Committed <SHA> main: double v12, add util on main
+=== webkit: review git: ahead of origin ===
+main
+↑1 ↓0 origin/main
+0 staged
+0 unstaged
+0 untracked
+Commit…
+Push ↑1
+Create PR
+Committed <SHA> main: double v12, add util on main
+=== webkit: review git: pushed ===
+Pushed main to origin
+=== webkit: review git: level with origin ===
+↑0 ↓0 origin/main
+=== webkit: review git: origin has it ===
+main: double v12, add util
+
+util has id and twice, for the next step.
+src/main.ml | 2 +-
+src/util.ml | 3 +++
+2 files changed, 4 insertions(+), 1 deletion(-)
+=== webkit: review git: errors ===
+none
+=== webkit: remote: prigh web ===
+http://127.0.0.1:<PORT>/#signin=<code>
+=== webkit: remote: opened ===
+http://127.0.0.1:<PORT>/?session=<id>
+sign-in form: 0
+=== webkit: remote: the tool ran on the laptop ===
+in the laptop's directory: true
+in the server's directory: false
+=== webkit: remote: reloaded ===
+sign-in form: 0
+prefer_host: host-laptop
+=== webkit: remote: the spent link elsewhere ===
+Sign in
+=== webkit: remote: errors ===
+none
+=== webkit: steer: showing it leaves the composer on the main agent ===
+(no chip); Steer the agent…
+Survey the project
+Steer
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== webkit: steer: Steer ===
+Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+editor focused: true
+Survey the project
+Steering
+Cancel
+Show in chat
+Running
+<T>
+deepseek-flash  1 turn  1 tool call
+=== webkit: steer: Esc ===
+(no chip); Steer the agent…
+still running: true
+Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+=== webkit: steer: queued for it ===
+To a1, next step
+use the tests
+Edit
+To a1, after its turn
+then summarise
+Edit
+=== webkit: steer: its row says so ===
+2 queued  deepseek-flash  1 turn  1 tool call
+=== webkit: steer: edited ===
+in the editor: then summarise
+=== webkit: steer: delivered, it finished ===
+a1 has finished: you are writing to the main agent again
+=== webkit: steer: the composer is the main agent's again ===
+(no chip); Steer the agent…
+=== webkit: steer: its transcript ===
+Looking around.
+bash
+timeout 300 sh -c 'until [ -f sub-go ]; do sleep 0.1; done'; echo sub-go
+→
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+use the tests
+<TIME>
+Using the tests, as asked.
+<TIME>
+→
+You (follow-up)
+[The user sends you this as you finish: deal with it before you report.]
+then summarise
+<TIME>
+Summary: 3 files, all tested.
+<TIME>
+=== webkit: steer: too late ===
+Couldn't send it to a1: a1 has finished and its report is on its way to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor.
+in the editor: /agents steer a1 one more thing
+=== webkit: steer: the main agent got the report ===
+The survey is in.
+=== webkit: steer: errors ===
+none
+=== webkit: subagent_paged: reloaded ===
+the call is loaded: false
+older messages to load: true
+=== webkit: subagent_paged: its transcript ===
+There are 3 files.
+<TIME>
+=== webkit: subagent_paged: errors ===
+none
+=== webkit: trim: opened ===
+steps: 1 2 3 4 5
+focusable: 10
+⋯: 0
+=== webkit: trim: the first message's menu ===
+Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything before this — The context starts here | Trim everything after this — /trim after | Delete — /delete
+=== webkit: trim: a reply's menu ===
+Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
+=== webkit: trim: a message's menu ===
+Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
+at the pointer: 2,0
+marked: true
+cut line: dashed
+after Esc: 1 2 3 4 5; preview: 0
+=== webkit: trim: selected text ===
+menu prevented: false
+=== webkit: trim: copy ===
+toast: Copied the reply to the clipboard
+copied: Module 3 is fixed. | Its handler returns the error now instead of dropping it. Its handler returns the error now instead of dropping it. Its handler returns the error now instead of dropping it. Its handler returns the error now instead of dropping it. Its handler returns the error now instead of dropping it. Its handler returns the error now instead of dropping it.
+=== webkit: trim: confirmation ===
+Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+after Esc, steps: 1 2 3 4 5; divider: 0
+=== webkit: trim: keyboard ===
+under the message: 0,2
+highlighted: Trim everything before this
+=== webkit: trim: trimmed ===
+divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
+steps: 3 4 5
+focusable: 6
+divider in view: true
+toast: Trimmed 4 messages (~196 tokens): Undo is on the divider
+=== webkit: trim: rail ===
+trimmed "Not in the model's context, 4 messages trimmed · ~196 tokens, <TIME>" | user "Your message 1, Step 3: look at module 3., <TIME>" | user "Your message 2, Step 4: look at module 4., <TIME>" | user "Your message 3, Step 5: look at module 5., <TIME>"
+tooltip: Not in the model's context | 4 messages trimmed · ~196 tokens | <TIME>
+=== webkit: trim: shown ===
+head: Not in the model's context | Kept in the transcript only; the model no longer sees them.
+trimmed: Step 1, Step 2
+menus on them: 0
+dimmed: true
+divider: ✂ | 4 messages trimmed · ~196 tokens | Hide | · | Undo
+hidden again
+=== webkit: trim: undone ===
+steps: 1 2 3 4 5
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>" | user "Your message 4, Step 4: look at module 4., <TIME>" | user "Your message 5, Step 5: look at module 5., <TIME>"
+=== webkit: trim: trim before a reply ===
+Trim the context here? | Trim 3 messages (~104 tokens) before this reply? | Module 2 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+transcript: Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+trimmed "Not in the model's context, 3 messages trimmed · ~104 tokens, <TIME>" | user "Your message 1, Step 3: look at module 3., <TIME>" | user "Your message 2, Step 4: look at module 4., <TIME>" | user "Your message 3, Step 5: look at module 5., <TIME>"
+on the reply now first: Reply — Module 2 is fixed. | Copy | (disabled) Trim everything before this — The context starts here | Trim everything after this — /trim after | Delete — /delete
+toasts: Trimmed 3 messages (~104 tokens): Undo is on the divider; jump button: shown; covered: false
+undone: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+toasts: Back in the context: 3 messages (~104 tokens); jump button: shown; covered: false
+=== webkit: trim: delete ===
+the newest's menu: Reply — Module 5 is fixed. | Copy | Trim everything before this — /trim | (disabled) Trim everything after this — Nothing after it: the newest message | Delete — /delete
+toast: Message deleted | Undo
+transcript: Step 1, Module 1, Step 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+dividers: 0
+after deleting step 2: Step 1, Module 1, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 3: look at module 3., <TIME>" | user "Your message 3, Step 4: look at module 4., <TIME>" | user "Your message 4, Step 5: look at module 5., <TIME>"
+undone: Step 1, Module 1, Step 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+undone: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+=== webkit: trim: trim after: confirmation ===
+Trim the context after this? | Trim 5 messages (~288 tokens) after this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded where they were, what you send next goes after them, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
+after Esc: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5
+=== webkit: trim: trimmed after ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo]
+user "Your message 1, Step 1: look at module 1., <TIME>" | user "Your message 2, Step 2: look at module 2., <TIME>" | user "Your message 3, Step 3: look at module 3., <TIME>"
+shown: Module 3, Step 4, Module 4, Step 5, Module 5
+menus on them: 0
+dimmed: true
+=== webkit: trim: sent after the trim ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, [✂ 5 messages trimmed · ~288 tokens Show · Undo], Step 6, Noted after the trim
+=== webkit: trim: trim after undone ===
+transcript: Step 1, Module 1, Step 2, Module 2, Step 3, Module 3, Step 4, Module 4, Step 5, Module 5, Step 6, Noted after the trim
+=== webkit: trim: phone ===
+Reply — Module 3 is fixed. | Copy | Select text | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
+Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Module 3 is fixed. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Cancel | Trim
+=== webkit: trim: errors ===
+none
+=== webkit: filter: opened ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+note: none
+=== webkit: filter: menu ===
+> [x] Your messages
+  [x] Replies
+  [x] Thinking
+  [x] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+below the button: true; inside the window: true; focused: true
+=== webkit: filter: thinking and tools hidden ===
+  [x] Your messages
+  [x] Replies
+  [ ] Thinking
+> [ ] Tool calls
+  [x] Subagents
+  [x] Notices
+      Show all
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+=== webkit: filter: Esc ===
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+=== webkit: filter: clicked outside ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== webkit: filter: reloaded ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+=== webkit: filter: another session ===
+user 1, replies 1, thinking 1, tools 0, subagents 0, stopped 0
+note: none
+=== webkit: filter: back ===
+user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+note: Hiding thinking, tool calls, subagents · 3 items hidden | Show all
+=== webkit: filter: your messages hidden ===
+user 0, replies 3, thinking 0, tools 0, subagents 0, stopped 1
+rail: 2 marks
+the rail's first mark: jumped to where the message is
+Ctrl+J lists: 2 messages
+=== webkit: filter: show all ===
+user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+Filter the transcript; plain; badge none; next: Files
+=== webkit: filter: image viewer ===
+#filter-toggle: under the image; .composer-controls .chip-button: under the image
+=== webkit: filter: phone ===
+a sheet across the bottom: true; inside the window: true; focused: true
+user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
+Filter the transcript Hiding thinking, tool calls; on
+note: Hiding thinking, tool calls · 2 items hidden | Show all
+note inside the screen: true; Show all clickable; button inside: true
+after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
+=== webkit: filter: errors ===
+none
+=== webkit: viewer: desktop: fit ===
+thumbnails: 3, named: View [image: image/png, 4.1 KB]
+focused: Close
+1 / 3: 46%; whole and inside the window: true; clear of the toolbar: true
+2 / 3: 82%; whole and inside the window: true; clear of the toolbar: true
+3 / 3: 2133%; whole and inside the window: true; clear of the toolbar: true; tiny shown larger: true
+=== webkit: viewer: desktop: zoom and pan ===
+1: 100%; 300x1500; fills the stage's height: true
+arrows down: moved up by the image: true
+dragged far down: stops with its top at the stage's margin: true
+dragged far up: stops with its bottom at the stage's margin: true
+0: 1 / 3: 46%; whole and inside the window: true; clear of the toolbar: true
+ctrl+wheel: zoomed in: true; the point under the pointer stays: true
+zoom in button: larger: true
+double-click: back to fit: true
+double-click: 100%
++ many times: at most 800%
+- many times: 1 / 3: 46%; whole and inside the window: true; clear of the toolbar: true
+=== webkit: viewer: desktop: draw and close ===
+viewer closed: true; the drawing's image whole: true
+zoomed: true; the stroke under the pointer: true
+Esc: closed; focus back on: View [image: image/png, 7.7 KB]
+=== webkit: viewer: phone ===
+1 / 3: 51%; whole and inside the window: true; clear of the toolbar: true
+toolbar inside the screen: true
+size buttons hidden: true
+zoom in: 77%
+double-tap: 1 / 3: 51%; whole and inside the window: true; clear of the toolbar: true
+double-tap: 100%
+2 / 3: 25%; whole and inside the window: true; clear of the toolbar: true
+closed
+=== webkit: viewer: errors ===
+none
+=== webkit: math: drawn ===
+inline: e^{i\pi} + 1 = 0; links: 0
+inline: a^2 + b^2 = c^2; links: 0
+display katex-display: \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}; links: 0
+display katex-display: A = \begin{pmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{pmatrix}; links: 0
+display katex-display: \begin{aligned} f(x) &= (x + 1)^2 \\ &= x^2 + 2x + 1 \end{aligned}; links: 0
+display katex-display: \sum_{k=1}^{n} \frac{k^2 + 3k + 2}{(k + 1)(k + 2)(k + 3)(k + 4)} + \sum_{j=1}^{m} \binom{m}{j} x^j y^{m - j} = \prod_{i=1}^{n} (1 + x_i); links: 0
+inline error: \frac{1}{\undefinedmacro} (title: KaTeX parse error: Undefined control sequence: \undefinedmacro at position 10: \frac{1}{\undefinedmacro})
+inline: \href{javascript:alert(1)}{click}; links: 0; refused
+=== webkit: math: prose and code ===
+It costs $5 and $10 (US$3 abroad); set $HOME and $PATH, or run echo $x$.
+math in it: 0, code: echo $x$
+=== webkit: math: loaded once ===
+katex.min.js: 1, copy-tex.min.js: 1, katex.min.css: 1
+=== webkit: math: original ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== webkit: math: dark ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== webkit: math: light ===
+math in the text's colour: true; fraction rule too: true; error tinted: true
+=== webkit: math: copy a selection ===
+Euler's identity $e^{i\pi} + 1 = 0$, and Pythagoras $a^2 + b^2 = c^2$.
+=== webkit: math: copy the message ===
+as written: true
+=== webkit: math: streamed ===
+math math-inline: \alpha + \beta = \gamma
+math math-display: \sqrt{2} \approx 1.414
+=== webkit: math: phone ===
+markdown fits: true; page fits: true; scrolling display math: 1, auto
+=== webkit: math: errors ===
+none
+=== webkit: card: idle ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+=== webkit: card: working, a subagent running ===
+row 1: Running tools | 0% | $<COST>
+lamps: 1; accented: Running tools; 28px high
+fits
+=== webkit: card: ready, a subagent running ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+=== webkit: card: idle, a mode on ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+=== webkit: card: the sidebar at its narrowest ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+=== webkit: card: the composer's chips ===
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | on | auto | verbose
+chip problems: none
+=== webkit: card: another host to choose ===
+✓ <HOSTNAME>
+build-runner-eu-west-a-long-hostname (in <SESSION>)
+=== webkit: card: on a host with a long name ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | on | auto | verbose
+chip problems: none (host name truncated)
+=== webkit: card: the context opens the session's details ===
+Session
+=== webkit: card: the sidebar closed ===
+row 1: 0% | $<COST>
+lamps: 0; accented: nothing; 28px high
+fits
+=== webkit: card: a phone ===
+row 1: 0%
+lamps: 0; accented: nothing; 40px high
+fits
+chips 1: V4.1 Flash | icon
+chip problems: none
+=== webkit: status: desktop 1280: the status ===
+shows: true; clear of the mic and send: true
+the row fits: true
+it says: 36%
+=== webkit: status: desktop 700: the status ===
+shows: true; clear of the mic and send: true
+the row fits: true
+it says: 36%
+=== webkit: status: desktop: the chips' menus act ===
+thinking by mouse: high; menu closed: true
+mode by mouse: ask; menu closed: true
+verbosity by mouse: verbose; menu closed: true
+thinking by keyboard: max; menu closed: true
+mode by keyboard: auto-edit; menu closed: true
+verbosity by keyboard: normal; menu closed: true
+=== webkit: status: desktop: a click outside closes, and goes no further ===
+model: closed: true; the filter's menu opened: false
+host: closed: true; the filter's menu opened: false
++: closed: true; the filter's menu opened: false
+thinking: closed: true; the filter's menu opened: false
+mode: closed: true; the filter's menu opened: false
+verbosity: closed: true; the filter's menu opened: false
+=== webkit: status: desktop: the status's details ===
+on hover: true
+on keyboard focus (Context 36% full): true
+the context opens: Session
+=== webkit: status: 390x844: the composer's row ===
+the row fits: true
+it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+=== webkit: status: 390x844: the ⋯ sheet's choices act ===
+Thinking: high; reopened: high
+Mode: ask; reopened: ask
+Transcript: verbose; reopened: verbose
+=== webkit: status: 390x844: a tap outside closes, and goes no further ===
+model: closed: true; the drawer opened: false
+host: closed: true; the drawer opened: false
++: closed: true; the drawer opened: false
+=== webkit: status: 390x844: drags ===
+from the left edge: the drawer opens: true
+a row to the left: its actions: Archive, Delete
+a tap elsewhere puts it back: true
+dragged left: the drawer closes: true
+the model's sheet down by its grip: closed: true
+the ⋯ sheet down by its grip: closed: true
+a settings section, from the left edge: back to the list: true
+a pending image's tile up: removed: true
+the viewer at fit, aside: 1 / 2 to 2 / 2
+down: closed: true
+=== webkit: status: 320x640: the composer's row ===
+the row fits: true
+it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+=== webkit: status: 320x640: the ⋯ sheet's choices act ===
+Thinking: high; reopened: high
+Mode: ask; reopened: ask
+Transcript: verbose; reopened: verbose
+=== webkit: status: 320x640: a tap outside closes, and goes no further ===
+model: closed: true; the drawer opened: false
+host: closed: true; the drawer opened: false
++: closed: true; the drawer opened: false
+=== webkit: status: 320x640: drags ===
+from the left edge: the drawer opens: true
+a row to the left: its actions: Archive, Delete
+a tap elsewhere puts it back: true
+dragged left: the drawer closes: true
+the model's sheet down by its grip: closed: true
+the ⋯ sheet down by its grip: closed: true
+a settings section, from the left edge: back to the list: true
+a pending image's tile up: removed: true
+the viewer at fit, aside: 1 / 2 to 2 / 2
+down: closed: true
+=== webkit: status: 390x844 pwa: the safe areas ===
+the strip under the notch: true; the composer over the home indicator: true
+the row fits: true
+=== webkit: mobile: 390x844: the chat ===
+ok
+=== webkit: mobile: 390x844: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== webkit: mobile: 390x844: the ⋯ sheet ===
+ok
+=== webkit: mobile: 390x844: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== webkit: mobile: 390x844: the settings' list ===
+ok
+=== webkit: mobile: 390x844: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== webkit: mobile: 390x844: settings: appearance ===
+ok
+title: Appearance; back: Settings
+choice controls fit: true
+back to the list: true
+=== webkit: mobile: 390x844: settings: models ===
+ok
+choice controls fit: true
+=== webkit: mobile: 390x844: the drawer ===
+ok
+=== webkit: mobile: 390x844: the model menu ===
+ok
+=== webkit: mobile: 390x844: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== webkit: mobile: 390x844: / completion ===
+ok
+=== webkit: mobile: 390x844: the files ===
+ok
+=== webkit: mobile: 390x844: the keyboard ===
+the composer in view: true
+=== webkit: mobile: 320x640: the chat ===
+ok
+=== webkit: mobile: 320x640: the chrome ===
+strip: 0 to 48; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== webkit: mobile: 320x640: the ⋯ sheet ===
+ok
+=== webkit: mobile: 320x640: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== webkit: mobile: 320x640: the settings' list ===
+ok
+=== webkit: mobile: 320x640: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== webkit: mobile: 320x640: settings: appearance ===
+ok
+title: Appearance; back: Settings
+choice controls fit: true
+back to the list: true
+=== webkit: mobile: 320x640: settings: models ===
+ok
+choice controls fit: true
+=== webkit: mobile: 320x640: the drawer ===
+ok
+=== webkit: mobile: 320x640: the model menu ===
+ok
+=== webkit: mobile: 320x640: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== webkit: mobile: 320x640: / completion ===
+ok
+=== webkit: mobile: 320x640: the files ===
+ok
+=== webkit: mobile: 320x640: the keyboard ===
+the composer in view: true
+=== webkit: mobile: 390x844-pwa: the chat ===
+ok
+=== webkit: mobile: 390x844-pwa: the chrome ===
+strip: 0 to 95; its pieces overlap: false
+the transcript starts under it: true
+the composer ends at 0px from the bottom
+=== webkit: mobile: 390x844-pwa: the ⋯ sheet ===
+ok
+=== webkit: mobile: 390x844-pwa: the sheet's rows ===
+Jump to a message, Filter the transcript, Files, Terminal, Settings
+=== webkit: mobile: 390x844-pwa: the settings' list ===
+ok
+=== webkit: mobile: 390x844-pwa: the settings ===
+Appearance, Sessions, Models, Git hosting, Account
+=== webkit: mobile: 390x844-pwa: settings: appearance ===
+ok
+title: Appearance; back: Settings
+choice controls fit: true
+back to the list: true
+=== webkit: mobile: 390x844-pwa: settings: models ===
+ok
+choice controls fit: true
+=== webkit: mobile: 390x844-pwa: the drawer ===
+ok
+=== webkit: mobile: 390x844-pwa: the model menu ===
+ok
+=== webkit: mobile: 390x844-pwa: the model menu is a sheet ===
+full width: true; at the bottom: true
+=== webkit: mobile: 390x844-pwa: / completion ===
+ok
+=== webkit: mobile: 390x844-pwa: the files ===
+ok
+=== webkit: mobile: 390x844-pwa: the keyboard ===
+the composer in view: true
+=== webkit: long press: held on your message ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+the release clicked nothing: true
+selected: ""
+=== webkit: long press: held on a reply ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+=== webkit: long press: held on a tool line ===
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+the release did not open it: false
+=== webkit: long press: a short tap ===
+no menu
+=== webkit: long press: a scroll ===
+no menu
+=== webkit: long press: the browser's own long press, with a word selected ===
+cancelled: true; the word unselected: true
+menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
+menus: 1
+=== webkit: long press: Select text ===
+selected: "Done. The port is a literal; it should come from the environment."
+selectable: text
+=== webkit: long press: then a dragged selection's end (no press of its own) ===
+left to the browser: true
+no menu
+=== webkit: long press: then a long press there is the browser's ===
+no menu
+=== webkit: long press: Delete ===
+your messages: make the port configurable
+=== webkit: long press: a session in the drawer ===
+menu: open_tab, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+=== webkit: long press: a worktree in the drawer ===
+menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
+=== webkit: long press: a file of the review ===
+menu: approve_files, unapprove_files, stage_files, unstage_files, commit_files, select_files, copy_paths; a sheet at the bottom: true
+=== webkit: pwa: manifest ===
+{"manifest":"manifest.webmanifest","themeColor":"#1b1e23","appleIcon":"apple-touch-icon.png","appleCapable":"yes","appleTitle":"prigh"}
+status: 200
+content-type: application/manifest+json
+name: prigh
+short_name: prigh
+id: ./
+start_url: ./
+scope: ./
+display: standalone
+theme_color: #1b1e23
+background_color: #1b1e23
+page background: rgb(27, 30, 35)
+icon icon.svg any any: 200 image/svg+xml
+icon icon-192.png 192x192 any: 200 image/png 192x192
+icon icon-512.png 512x512 any: 200 image/png 512x512
+icon icon-maskable-512.png 512x512 maskable: 200 image/png 512x512
+icon icon-maskable.svg any maskable: 200 image/svg+xml
+apple-touch-icon: 200 image/png
+=== webkit: pwa: service worker ===
+controls the page: true
+script: /sw.js
+scope: /
+caches: prigh-web-<BUILD>
+cached the shell: true
+  index.html: true
+  main.bc.js: true
+  theme.css: true
+  recursive-sans.woff2: true
+  katex.min.js: true
+  KaTeX_Main-Regular.woff2: true
+  xterm.js: true
+  icon-192.png: true
+  manifest.webmanifest: true
+theme-color: rgb(27, 30, 35) (page rgb(27, 30, 35))
+theme-color, light: rgb(244, 245, 247) (page rgb(244, 245, 247))
+=== webkit: pwa: not cached ===
+a turn over the RPC: true
+file download: 410
+sign-in link: 405
+unknown path: 404
+only the shell cached: true
+=== webkit: pwa: reloaded with the backend stopped ===
+banner: Connection lost: reconnecting…
+sign-in page: false
+composer: 1
+file download: failed (TypeError)
+sign-in link: failed (TypeError)
+main.bc.js: 200
+=== webkit: pwa: a new build ===
+notice before it: 0
+notice: A new version of prigh-web is ready.
+buttons: Reload (Reload the page into it, in this session), Dismiss (Later (the next page load uses it))
+a worker waiting: true
+caches: prigh-web-<BUILD>-next
+notice after: 0
+draft: a draft
+=== webkit: pwa: errors ===
+none
+=== webkit: compaction: default ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "200k" (placeholder 200k); Off pressed: false; mask: true
+=== webkit: compaction: refused ===
+“lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
+still open: 1
+=== webkit: compaction: set ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); Off pressed: false; mask: false
+compact_at_tokens=150000 compaction_model=null mask_observations=false
+=== webkit: compaction: picker ===
+Summary model; first: The conversation's model whichever model the conversation uses
+chosen: a Haiku; compact_at_tokens=150000 compaction_model=anthropic/(a haiku) mask_observations=false
+=== webkit: compaction: reloaded ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Off
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); Off pressed: false; mask: false
+=== webkit: compaction: /compaction ===
+Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
+=== webkit: compaction: off by /compaction ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+Off: only at 80% of the window. Type a number to set one.
+tokens
+Off
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "" (placeholder 150k); Off pressed: true; mask: false
+compact_at_tokens=0 compaction_model=null mask_observations=false
+=== webkit: compaction: phone ===
+fits: true
+=== webkit: compaction: errors ===
+(none)
+=== webkit: images (desktop): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== webkit: images (desktop): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== webkit: images (desktop): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== webkit: images (desktop): an image file opens in the drawing dialog ===
+Saving replaces the attached image.
+Cancel
+Save
+=== webkit: images (desktop): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== webkit: images (desktop): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== webkit: images (desktop): sent ===
+composer cleared: true
+843x3
+48x48
+=== webkit: images (desktop): errors ===
+none
+=== webkit: images (phone): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== webkit: images (phone): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== webkit: images (phone): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== webkit: images (phone): an image file opens in the drawing dialog ===
+Cancel
+Save
+=== webkit: images (phone): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== webkit: images (phone): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== webkit: images (phone): sent ===
+composer cleared: true
+843x3
+48x48
+=== webkit: images (phone): errors ===
+none
+=== webkit: images (small): refused as too large: the error card ===
+The model returned an error
+HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
+An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
+Downsize images and retry
+button: big enough; fits the width
+=== webkit: images (small): downsized and retried ===
+Images will be sent smaller; retrying a failed reply
+Got it, smaller this time.
+<TIME>
+uploaded as files: 0
+=== webkit: images (small): image files attached: the wide one too large ===
+pending-image too-large 9000x40 [Too large Downsize] tappable
+pending-image 48x48
+fits the width
+=== webkit: images (small): an image file opens in the drawing dialog ===
+Cancel
+Save
+=== webkit: images (small): downsized ===
+pending-image 843x3
+pending-image 48x48
+=== webkit: images (small): the toast ===
+Downsized the image: <SIZE> → <SIZE>
+=== webkit: images (small): sent ===
+composer cleared: true
+843x3
+48x48
+=== webkit: images (small): errors ===
+none

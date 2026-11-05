@@ -72,7 +72,7 @@ const page = await context.newPage();
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|NS_ERROR_CONNECTION_REFUSED|establish a connection|Failed to fetch|NetworkError|Failed to load resource/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|NS_ERROR_CONNECTION_REFUSED|establish a connection|Failed to fetch|NetworkError|Failed to load resource/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));

@@ -74,19 +74,20 @@ const browser = await engine.launch({
 const context = await browser.newContext({ viewport: { width: 390, height: 760 } });
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
-// While the tab's [e2e-ws-down] is set, the backend is out of reach.
+// While the tab's [e2e-ws-down] is set, the backend is out of reach (port 2:
+// closed, and not one of the ports WebKit refuses with an exception).
 await page.addInitScript(() => {
   const Real = window.WebSocket;
   window.WebSocket = class extends Real {
     constructor(url, protocols) {
-      super(sessionStorage.getItem("e2e-ws-down") ? "ws://127.0.0.1:9/" : url, protocols);
+      super(sessionStorage.getItem("e2e-ws-down") ? "ws://127.0.0.1:2/" : url, protocols);
     }
   };
 });
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));

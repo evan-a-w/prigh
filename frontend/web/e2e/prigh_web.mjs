@@ -176,7 +176,7 @@ const errors = [];
 page.on("console", message => {
   const text = message.text();
   // The backend going away (step 7) is logged by the browser.
-  if (message.type() === "error" && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|establish a connection/.test(text)) {
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|establish a connection/.test(text)) {
     errors.push(`console: ${text}`);
   }
 });
