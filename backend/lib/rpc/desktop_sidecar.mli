@@ -12,8 +12,10 @@ open! Import
     which the page keeps (in sessionStorage) and sends with every request to
     the [/desktop/] endpoints below, so that no other local process or web
     page can redirect this machine's tool host to another backend or stop
-    the app. Each is a [POST] of a JSON object with ["key"]; a wrong key gets
-    403:
+    the app. Each is a [POST] of a JSON object with ["key"] ([Content-Type:
+    application/json], so another page's request needs a CORS preflight,
+    which is refused, as is any request from another origin or under another
+    host name: {!Local_site}); a wrong key gets 403:
 
     - [/desktop/status]: once any check under way is done,
       [{"state": "connect", "address", "user", "error"}] (the form's
@@ -23,7 +25,10 @@ open! Import
     - [/desktop/connect] with ["address"], ["user"] and ["token"]: checks
       them ({!Web_connect.Check}), and if the backend accepts them saves
       them and answers [{"ok": true, "code"}], else
-      [{"ok": false, "error"}] (what is wrong and what to do);
+      [{"ok": false, "error"}] (what is wrong and what to do). An address
+      without TLS to another machine is refused with
+      [{"ok": false, "error", "plaintext": true}] (the risk, and the
+      alternatives) unless the request has ["plaintext": true];
     - [/desktop/quit]: answers [{"ok": true}] and ends {!run}. *)
 
 module Initial : sig
@@ -58,6 +63,7 @@ module Ended : sig
   type t =
     | Quit (** the page's Quit *)
     | Stdin_closed (** the window that ran us is gone *)
+    | Stopped (** [stopped] returned: a signal *)
   [@@deriving sexp_of]
 end
 
@@ -65,12 +71,15 @@ end
 val path_prefix : string
 
 (** Serves the site, calls [on_url] with the page's URL once listening, and
-    runs until the page quits or [stdin] reaches its end; then stops the
-    site and the tool host and returns. Raises what listening raises. *)
+    runs until the page quits, [stdin] reaches its end (or fails) or
+    [stopped] returns; then stops the site and the tool host (killing the
+    tools' processes) and returns. The URL logged leaves the key out. Raises
+    what listening raises. *)
 val run
   :  env:Env.t
   -> ?tool_host_wait:Time_ns.Span.t (** default 10s *)
   -> ?check_timeout:Time_ns.Span.t (** default 15s *)
+  -> ?stopped:(unit -> unit) (** default: never *)
   -> log:(string -> unit)
   -> on_url:(string -> unit)
   -> stdin:_ Eio.Flow.source

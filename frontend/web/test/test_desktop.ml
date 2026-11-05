@@ -151,7 +151,15 @@ let%expect_test "the sidecar's link and answers" =
        ~key:"k"
        ~address:"host:7790"
        ~user:None
-       ~token:(Some "sekrit"));
+       ~token:(Some "sekrit")
+       ~plaintext:false);
+  print_endline
+    (Desktop_link.connect_body
+       ~key:"k"
+       ~address:"host:7790"
+       ~user:None
+       ~token:None
+       ~plaintext:true);
   List.iter
     [ {|{"state":"connect","address":"host:7790","user":null,"error":"refused"}|}
     ; {|{"state":"connect","address":null,"user":null,"error":null}|}
@@ -167,6 +175,7 @@ let%expect_test "the sidecar's link and answers" =
   List.iter
     [ {|{"ok":true,"code":"c0de"}|}
     ; {|{"ok":false,"error":"cannot reach the backend"}|}
+    ; {|{"ok":false,"error":"not encrypted","plaintext":true}|}
     ; {|{"ok":false}|}
     ; "[]"
     ]
@@ -184,15 +193,17 @@ let%expect_test "the sidecar's link and answers" =
     ("" (key ()))
     {"key":"k"}
     {"key":"k","address":"host:7790","user":null,"token":"sekrit"}
+    {"key":"k","address":"host:7790","user":null,"token":null,"plaintext":true}
     ((Connect (address (host:7790)) (user ()) (error (refused))))
     ((Connect (address ()) (user ()) (error ())))
     ((Connected (code (c0de))))
     ((Connected (code ())))
     ()
     ()
-    ((Ok (c0de)))
-    ((Error "cannot reach the backend"))
-    ((Error "The backend did not accept the connection."))
+    ((Connected (c0de)))
+    ((Refused "cannot reach the backend"))
+    ((Plaintext "not encrypted"))
+    ((Refused "The backend did not accept the connection."))
     ()
     |}]
 ;;

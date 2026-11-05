@@ -16,15 +16,16 @@ let quit_path = "/desktop/quit"
 let status_body ~key = Json.to_string (Json.obj [ "key", Json.str key ])
 let quit_body = status_body
 
-let connect_body ~key ~address ~user ~token =
+let connect_body ~key ~address ~user ~token ~plaintext =
   let opt = Option.value_map ~default:`Null ~f:Json.str in
   Json.to_string
     (Json.obj
-       [ "key", Json.str key
-       ; "address", Json.str address
-       ; "user", opt user
-       ; "token", opt token
-       ])
+       ([ "key", Json.str key
+        ; "address", Json.str address
+        ; "user", opt user
+        ; "token", opt token
+        ]
+        @ if plaintext then [ "plaintext", `True ] else []))
 ;;
 
 let parse text =
@@ -65,18 +66,25 @@ module Status = struct
 end
 
 module Connect_reply = struct
-  type t = (string option, string) Result.t [@@deriving sexp_of]
+  type t =
+    | Connected of string option
+    | Refused of string
+    | Plaintext of string
+  [@@deriving sexp_of]
 
   let of_json text =
     Option.bind (parse text) ~f:(fun json ->
       match Json.field json "ok" with
-      | Some `True -> Some (Ok (string json "code"))
+      | Some `True -> Some (Connected (string json "code"))
       | Some `False ->
-        Some
-          (Error
-             (Option.value
-                (string json "error")
-                ~default:"The backend did not accept the connection."))
+        let error =
+          Option.value
+            (string json "error")
+            ~default:"The backend did not accept the connection."
+        in
+        (match Json.field json "plaintext" with
+         | Some `True -> Some (Plaintext error)
+         | _ -> Some (Refused error))
       | _ -> None)
   ;;
 end

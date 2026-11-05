@@ -147,6 +147,23 @@ try {
   console.log(clean(await page.locator(".signin").innerText()));
   await screenshot(page, "connect form");
 
+  // Unencrypted to another machine: the risk, the alternatives, and a
+  // second, explicit step (0.0.0.0 reaches nothing here, at once).
+  await page.locator("#address").fill("0.0.0.0:1");
+  await page.locator("#password").fill("sekrit");
+  await page.locator("#desktop-connect").click();
+  await page.locator("#desktop-connect.danger").waitFor();
+  section("unencrypted");
+  console.log(clean(await page.locator(".signin-error").innerText()));
+  console.log(`button: ${await page.locator("#desktop-connect").innerText()}`);
+  await screenshot(page, "unencrypted");
+  await page.locator("#password").fill("sekrit");
+  await page.locator("#desktop-connect").click();
+  await page.waitForFunction(() => document.querySelector(".signin-error")?.innerText.includes("cannot reach"));
+  section("unencrypted, confirmed");
+  console.log(clean(await page.locator(".signin-error").innerText()));
+  console.log(`button: ${await page.locator("#desktop-connect").innerText()}`);
+
   // A wrong password says what to do, and keeps the address.
   await page.locator("#address").fill(serverAddress);
   await page.locator("#password").fill("wrong");

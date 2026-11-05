@@ -1199,7 +1199,8 @@ let desktop_command =
       "The desktop app's process: serves prigh-web on this machine for a \
        backend elsewhere (the saved connection, or one typed into the page's \
        connect form), runs its tools here, prints the page's URL as a JSON \
-       line and runs until stdin closes or the page quits"
+       line and runs until stdin closes (so give it a pipe, not /dev/null), \
+       the page quits, or SIGTERM"
     (let%map_open.Command connect =
        flag
          "-connect"
@@ -1307,6 +1308,17 @@ let desktop_command =
          | At (addr, port) | From (addr, port) | From_or_any (addr, port) ->
            addr, port
        in
+       (* SIGTERM or SIGHUP (the shell's fallback, a logout) quits as stdin
+          closing does, stopping the tools' processes. *)
+       let signalled = Atomic.make false in
+       let signal = Eio.Condition.create () in
+       List.iter [ Stdlib.Sys.sigterm; Stdlib.Sys.sighup ] ~f:(fun s ->
+         Stdlib.Sys.set_signal
+           s
+           (Signal_handle
+              (fun (_ : int) ->
+                Atomic.set signalled true;
+                Eio.Condition.broadcast signal)));
        let ended =
          Eio_main.run
          @@ fun env ->
@@ -1314,10 +1326,12 @@ let desktop_command =
            Desktop_sidecar.run
              ~env
              ~log
+             ~stopped:(fun () ->
+               Eio.Condition.loop_no_mutex signal (fun () ->
+                 Option.some_if (Atomic.get signalled) ()))
              ~on_url:(fun url ->
                print_endline (Jsonaf.to_string (`Object [ "url", `String url ]));
-               Out_channel.flush stdout;
-               log (sprintf "prigh-web on %s" url))
+               Out_channel.flush stdout)
              ~stdin:(Eio.Stdenv.stdin env)
              { initial
              ; tools
@@ -1332,7 +1346,8 @@ let desktop_command =
        log
          (match ended with
           | Quit -> "quit"
-          | Stdin_closed -> "stdin closed: the window is gone");
+          | Stdin_closed -> "stdin closed: the window is gone"
+          | Stopped -> "stopped by a signal");
        exit 0)
 ;;
 
