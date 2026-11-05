@@ -1536,7 +1536,7 @@ let rec desktop_form ~key ?(connecting = false) ~address ~user ~error () =
   <p class="signin-sub">prigh runs this computer's tools for a prigh backend (prigh serve). The connection is saved for next time.</p>
   <p class="signin-error" role="alert">%s</p>
   <label>Backend address <input id="address" name="address" value="%s" placeholder="host:7790 or wss://host/ws" autofocus autocomplete="url" autocapitalize="off" spellcheck="false" inputmode="url"></label>
-  <label>User name <input id="user" name="user" value="%s" placeholder="if the backend has several users" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+  <label>User name <input id="user" name="user" value="%s" placeholder="optional" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
   <label>Password <input id="password" name="password" type="password" placeholder="the backend's token" autocomplete="current-password"></label>
   <button class="btn primary" type="submit" id="desktop-connect"%s>%s</button>
   <button class="btn ghost" type="button" id="desktop-quit">Quit prigh</button>

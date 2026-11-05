@@ -1384,7 +1384,7 @@ kbd {
   background: var(--sodium-hover);
   border-color: var(--sodium-hover);
 }
-.signin-error { color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 8px 12px; margin: 0; font-size: 12.5px; }
+.signin-error { white-space: pre-line; color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 8px 12px; margin: 0; font-size: 12.5px; }
 .signin-error.notice { color: var(--muted); background: var(--slate); border-color: var(--rule); }
 .signin-error:empty { display: none; }
 
@@ -1635,6 +1635,7 @@ kbd {
 .saved-or { margin: 4px 0 -4px; color: var(--faint); font-size: 12.5px; }
 .signin #signin-back { justify-content: center; }
 .signin #desktop-quit { justify-content: center; }
+.desktop-quitting { position: fixed; inset: 0; z-index: 2147483647; }
 .signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
 @media (pointer: coarse) {
   .signin input { font-size: 16px; }

@@ -141,7 +141,6 @@ let sheet (m : App.Model.t) ~inject =
       [ sheet_row
           ~cls:"quit-row"
           ~name:"Quit prigh"
-          ~detail:"the desktop app and its tool host"
           ~glyph:Logout
           ~on_click:(go Action.Quit_desktop)
           ()
