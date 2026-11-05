@@ -205,12 +205,11 @@ let plaintext (remote : Backend_address.t) =
 
 let plaintext_warning remote =
   sprintf
-    "%s is not encrypted: the password and everything prigh sends would \
-     cross the network in the clear, and anyone on the way could run \
-     commands on this computer. Use the backend's HTTPS address \
-     (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L \
-     7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on \
-     a network you trust."
+    "%s is not encrypted: the password and everything prigh sends would cross \
+     the network in the clear, and anyone on the way could run commands on \
+     this computer. Use the backend's HTTPS address (wss://host/ws, behind a \
+     TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, \
+     then 127.0.0.1:7790). Connect anyway only on a network you trust."
     (Backend_address.to_string remote)
 ;;
 

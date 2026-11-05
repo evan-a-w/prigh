@@ -139,14 +139,14 @@ let run
   in
   let exit =
     match outcome with
-  | `Cancelled ->
-    kill_and_reap ();
-    Exit.Cancelled
-  | `Timed_out ->
-    kill_and_reap ();
-    Timed_out
-  | `Done (`Exited n) -> Exited n
-  | `Done (`Signaled n) -> Signaled (Signal.of_caml_int n)
+    | `Cancelled ->
+      kill_and_reap ();
+      Exit.Cancelled
+    | `Timed_out ->
+      kill_and_reap ();
+      Timed_out
+    | `Done (`Exited n) -> Exited n
+    | `Done (`Signaled n) -> Signaled (Signal.of_caml_int n)
   in
   reaped := true;
   exit

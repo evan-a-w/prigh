@@ -2006,10 +2006,25 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   otherwise); `connect` runs `Web_connect.Check` and, when the backend
   accepts, saves the connection, starts the tool host
   (`Web_connect.start_tool_host`) and switches the routes to `prigh web`'s
-  (`Web_proxy`, the handoff). `run` returns `Quit` or `Stdin_closed`,
-  whichever comes first, and stops everything under its switch. The CLI
-  resolves the initial connection with `Backend_choice` (none or a bad one:
-  the form) and prints the URL as a JSON line on stdout.
+  (`Web_proxy`, the handoff). An address without TLS to another machine
+  is refused until the request confirms it (`"plaintext": true`, the
+  form's "Connect without encryption"). `run` returns `Quit`,
+  `Stdin_closed` or `Stopped` (the CLI's SIGTERM/SIGHUP), whichever comes
+  first, and stops everything under its switch. The CLI resolves the
+  initial connection with `Backend_choice` (none or a bad one: the form)
+  and prints the URL as a JSON line on stdout; its log leaves the key
+  out.
+- `Local_site` — what `prigh web`'s and `prigh desktop`'s sites
+  (`Web_server.listen ~local:true`) accept: they relay to a backend and run
+  this machine's tool host, so another page reaching them could run
+  commands here. Every request (WebSocket upgrades too, which browsers
+  send to any address without CORS) needs a `Host` that is an IP address
+  or `localhost` with the site's port (else 421: DNS rebinding) and, if it
+  has an `Origin`, `http://` and that `Host` (else 403). `/desktop/`
+  also requires `Content-Type: application/json`, so another page's
+  request would need a preflight. `prigh serve -web` does not check:
+  behind a reverse proxy its names and origins are the proxy's, and its
+  token guards it.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys

@@ -193,15 +193,17 @@ let%expect_test "the sidecar's link and answers" =
     ("" (key ()))
     {"key":"k"}
     {"key":"k","address":"host:7790","user":null,"token":"sekrit"}
+    {"key":"k","address":"host:7790","user":null,"token":null,"plaintext":true}
     ((Connect (address (host:7790)) (user ()) (error (refused))))
     ((Connect (address ()) (user ()) (error ())))
     ((Connected (code (c0de))))
     ((Connected (code ())))
     ()
     ()
-    ((Ok (c0de)))
-    ((Error "cannot reach the backend"))
-    ((Error "The backend did not accept the connection."))
+    ((Connected (c0de)))
+    ((Refused "cannot reach the backend"))
+    ((Plaintext "not encrypted"))
+    ((Refused "The backend did not accept the connection."))
     ()
     |}]
 ;;
