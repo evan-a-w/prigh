@@ -29,7 +29,13 @@ let
     if desktopBase ? override then
       desktopBase.override {
         backend = cfg.package;
-        inherit (cfg.desktop) ui extraArgs disableDmabuf;
+        inherit (cfg.desktop)
+          ui
+          window
+          browser
+          extraArgs
+          disableDmabuf
+          ;
       }
     else
       desktopBase;
@@ -56,8 +62,8 @@ in
 
     desktop = {
       enable = mkEnableOption ''
-        prigh's desktop app: prigh-web in a native window (the system
-        webview), running `prigh desktop` (prigh-web's site and a tool host
+        prigh's desktop app: prigh-web in an installed Chromium-family
+        browser's app window or a native one (see window), running `prigh desktop` (prigh-web's site and a tool host
         for this machine) while it is open. Adds "prigh" to the application
         menu on Linux and ~/Applications/Home Manager Apps on macOS. With no
         saved connection it asks for the backend to connect to. Its file
@@ -74,7 +80,7 @@ in
         description = ''
           The desktop app (when useSystemNixpkgs is off). When it has
           `override` (the flake's has), it is given programs.prigh.package,
-          ui, extraArgs and disableDmabuf.
+          ui, window, browser, extraArgs and disableDmabuf.
         '';
       };
 
@@ -91,6 +97,37 @@ in
           this prigh, relayed to the backend and signed in for you. Either
           way the window asks for the backend the first time
           (`prigh desktop -ui`).
+        '';
+      };
+
+      window = mkOption {
+        type = types.enum [
+          "auto"
+          "browser"
+          "webview"
+        ];
+        default = "auto";
+        description = ''
+          The window prigh-web is shown in. browser: an installed
+          Chromium-family browser's app window (Google Chrome, Chromium,
+          Brave, Microsoft Edge, Vivaldi; or browser), with a profile of its
+          own (its own cookies, extensions and settings, apart from your
+          usual one), the app ending when its last window closes. webview:
+          the app's own window (WebKitGTK on Linux, WKWebView on macOS,
+          WebView2 on Windows). auto: browser on Linux when one is installed
+          (WebKitGTK is slower and does less), else webview
+          (PRIGH_DESKTOP_WINDOW).
+        '';
+      };
+
+      browser = mkOption {
+        type = types.nullOr (types.either types.package types.path);
+        default = null;
+        example = lib.literalExpression "pkgs.chromium";
+        description = ''
+          The Chromium-family browser for the window (a package, run as its
+          main program, or a path), instead of the first one found
+          (PRIGH_DESKTOP_BROWSER).
         '';
       };
 

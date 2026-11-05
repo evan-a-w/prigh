@@ -340,10 +340,14 @@
                   pkgs.xdotool
                   pkgs.dbus
                   pkgs.python3
+                  pkgs.curl
                 ];
                 __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
                 LIBGL_ALWAYS_SOFTWARE = "1";
                 WEBKIT_DISABLE_DMABUF_RENDERER = "1";
+                # the browser window with a real Chromium (Playwright's, as the
+                # web e2e uses)
+                REAL_CHROMIUM = "${pkgs.playwright-driver.browsers}/chromium-${pkgs.playwright-driver.passthru.browsersJSON.chromium.revision}/chrome-linux64/chrome";
               }
               ''
                 cp -r ${./desktop/test} test
@@ -409,6 +413,8 @@
                     "/my proj"
                   ];
                   disableDmabuf = true;
+                  window = "browser";
+                  browser = pkgs.writeShellScriptBin "my-chrome" "";
                 };
               };
             };
@@ -455,6 +461,11 @@
             grep -q 'PRIGH_DESKTOP_BACKEND.*${prigh}/bin/prigh' "$wrapper"
             grep -q "PRIGH_DESKTOP_ARGS.*-ui remote -cwd.*/my proj" "$wrapper"
             grep -q 'WEBKIT_DISABLE_DMABUF_RENDERER.*1' "$wrapper"
+            grep -q 'PRIGH_DESKTOP_WINDOW.*browser' "$wrapper"
+            grep -q 'PRIGH_DESKTOP_BROWSER.*/bin/my-chrome' "$wrapper"
+            # the default: auto
+            grep -q 'PRIGH_DESKTOP_WINDOW.*auto' ${localUi}/bin/prigh-desktop
+            ! grep -q PRIGH_DESKTOP_BROWSER ${localUi}/bin/prigh-desktop
             grep -q 'PRIGH_DESKTOP_ARGS.*-ui local' ${localUi}/bin/prigh-desktop
             # built from this nixpkgs: the same derivation as the flake's here
             test "${systemNixpkgs.unwrapped}" = "${prighDesktopUnwrapped}"

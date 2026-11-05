@@ -1,5 +1,6 @@
-// prigh's desktop app: a native window (the system webview: WebKitGTK,
-// WKWebView, WebView2) on prigh-web, the backend's own or served by `prigh
+// prigh's desktop app: prigh-web in a native window (the system webview:
+// WebKitGTK, WKWebView, WebView2) or an installed Chromium-family browser's
+// app window, the backend's own or served by `prigh
 // desktop`, the sidecar this process starts and stops. See "Desktop app" in
 // ARCHITECTURE.md.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -12,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use prigh_desktop_core::browser::{self, Choice, Found, Mode, Platform};
 use prigh_desktop_core::failure::{self, Failure};
 use prigh_desktop_core::launch::{self, Os};
 use prigh_desktop_core::navigation::{self, Decision};
@@ -25,6 +27,13 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 
 const OS: Os = if cfg!(windows) { Os::Windows } else { Os::Unix };
+const PLATFORM: Platform = if cfg!(target_os = "macos") {
+    Platform::MacOs
+} else if cfg!(windows) {
+    Platform::Windows
+} else {
+    Platform::Linux
+};
 const WINDOW: &str = "main";
 /// How long the sidecar has to exit after its stdin closes before it is
 /// killed.
@@ -58,9 +67,15 @@ struct Sidecar {
     /// nothing more.
     failing: AtomicBool,
     exited: AtomicBool,
+    /// The page is in a browser's app window, not the app's own.
+    browser: Mutex<Option<Arc<BrowserWindow>>>,
 }
 
 impl Sidecar {
+    fn browser(&self) -> Option<Arc<BrowserWindow>> {
+        self.browser.lock().unwrap().clone()
+    }
+
     fn origins(&self) -> Vec<String> {
         self.origins.lock().unwrap().clone()
     }
@@ -95,6 +110,225 @@ impl Sidecar {
             log("prigh desktop did not stop: killing it");
             let _ = child.kill();
         });
+    }
+}
+
+/// The page in an installed Chromium-family browser's app window (see
+/// [prigh_desktop_core::browser]), with a profile of prigh's own: a browser
+/// instance of its own, which exits when its last window closes. The app
+/// then has no window: the browser's exit stops the sidecar, and the
+/// sidecar's exit closes the browser.
+struct BrowserWindow {
+    found: Found,
+    profile: PathBuf,
+    child: Mutex<Option<Arc<SharedChild>>>,
+    /// The page it opened, for another window on a second launch.
+    url: Mutex<Option<String>>,
+    /// We are closing it (the sidecar exited): its exit says nothing.
+    closing: AtomicBool,
+    /// The instance already on the profile that our launch handed the
+    /// window to.
+    handed_to: Mutex<Option<i32>>,
+}
+
+/// How long the browser has to exit after SIGTERM before it is killed.
+#[cfg(unix)]
+const BROWSER_GRACE: Duration = Duration::from_secs(3);
+
+impl BrowserWindow {
+    fn command(&self, url: &str) -> Command {
+        let mut cmd = Command::new(&self.found.program);
+        cmd.args(browser::args(PLATFORM, &self.profile.to_string_lossy(), url))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        cmd
+    }
+
+    /// Opens the page; when the browser exits (its last window closed),
+    /// stops the sidecar.
+    fn open(self: &Arc<Self>, app: &AppHandle, sidecar: &Arc<Sidecar>, url: &str) {
+        let url = browser::with_browser_shell(url);
+        *self.url.lock().unwrap() = Some(url.clone());
+        if let Err(e) = std::fs::create_dir_all(&self.profile) {
+            log(format!("making the browser's profile {}: {e}", self.profile.display()));
+        }
+        log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
+        let mut cmd = self.command(&url);
+        // Its own process group: closing it reaches its helpers too.
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+        let child = match SharedChild::spawn(&mut cmd) {
+            Ok(c) => Arc::new(c),
+            Err(e) => {
+                sidecar.failing.store(true, Ordering::SeqCst);
+                sidecar.stop();
+                let program = self.found.program.clone();
+                return fail(app, Failure::BrowserSpawn { program, error: e.to_string() }, 1);
+            }
+        };
+        *self.child.lock().unwrap() = Some(child.clone());
+        // Browsers say a lot on stderr: only kept, for when it fails.
+        let tail = Arc::new(Mutex::new(Tail::new(20)));
+        if let Some(s) = child.take_stderr() {
+            let tail = tail.clone();
+            thread::spawn(move || {
+                for line in BufReader::new(s).lines().map_while(Result::ok) {
+                    tail.lock().unwrap().push(&line);
+                }
+            });
+        }
+        let (me, sidecar) = (self.clone(), sidecar.clone());
+        thread::spawn(move || {
+            let status = child.wait();
+            if me.closing.load(Ordering::SeqCst) {
+                return;
+            }
+            // Already running on the profile (left by an app that was
+            // killed), the browser hands it the window and exits: the
+            // window is that instance's.
+            #[cfg(unix)]
+            if let Some(pid) = me.instance().filter(|p| *p as u32 != child.id()) {
+                log(format!("{} handed the window to its instance on prigh's profile (pid {pid})", me.found.name));
+                *me.handed_to.lock().unwrap() = Some(pid);
+                while alive(pid) && !me.closing.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(500));
+                }
+                if me.closing.load(Ordering::SeqCst) {
+                    return;
+                }
+            }
+            match status {
+                Ok(s) if !s.success() => {
+                    log(format!("{} exited ({s}):\n{}", me.found.name, tail.lock().unwrap().text()))
+                }
+                _ => {}
+            }
+            log("the browser window closed: stopping prigh desktop");
+            sidecar.stop();
+        });
+    }
+
+    /// The browser instance running on prigh's profile: the pid in its
+    /// SingletonLock, if that process is alive and runs on this profile.
+    #[cfg(unix)]
+    fn instance(&self) -> Option<i32> {
+        let target = std::fs::read_link(self.profile.join("SingletonLock")).ok()?;
+        let pid = browser::singleton_pid(&target.to_string_lossy())?;
+        (alive(pid) && self.runs_on_profile(pid)).then_some(pid)
+    }
+
+    #[cfg(unix)]
+    fn runs_on_profile(&self, pid: i32) -> bool {
+        // Only Linux says (in /proc) what a process runs: elsewhere a pid
+        // from the lock is not trusted with a signal.
+        let wanted = format!("--user-data-dir={}", self.profile.to_string_lossy());
+        std::fs::read(format!("/proc/{pid}/cmdline"))
+            .is_ok_and(|c| c.split(|b| *b == 0).any(|arg| arg == wanted.as_bytes()))
+    }
+
+    /// A second launch of the app: another window on the page, which the
+    /// browser hands to its running instance.
+    fn another_window(&self) {
+        let Some(url) = self.url.lock().unwrap().clone() else { return };
+        match self.command(&url).stderr(Stdio::null()).spawn() {
+            Ok(mut c) => {
+                thread::spawn(move || {
+                    let _ = c.wait();
+                });
+            }
+            Err(e) => log(format!("opening another window: {e}")),
+        }
+    }
+
+    /// The sidecar exited: closes the browser, SIGTERM first (Unix), to
+    /// its process group while the process we started runs, and to the
+    /// instance it handed the window to.
+    fn close(&self) {
+        if self.closing.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let child = self.child.lock().unwrap().clone();
+        #[cfg(unix)]
+        {
+            // Only what we started, or the instance it handed the window to
+            // (still that process: alive, on this profile).
+            let handed = || (*self.handed_to.lock().unwrap()).filter(|p| alive(*p) && self.runs_on_profile(*p));
+            let signal = |sig: libc::c_int| {
+                if let Some(c) = &child {
+                    // Not reaped: its pid (its group's id) is still ours.
+                    if matches!(c.try_wait(), Ok(None)) {
+                        unsafe { libc::killpg(c.id() as libc::pid_t, sig) };
+                    }
+                }
+                if let Some(pid) = handed() {
+                    unsafe { libc::kill(pid, sig) };
+                }
+            };
+            let running =
+                || child.as_ref().is_some_and(|c| matches!(c.try_wait(), Ok(None))) || self.instance().is_some();
+            if !running() {
+                return;
+            }
+            log("prigh desktop exited: closing the browser window");
+            signal(libc::SIGTERM);
+            let deadline = std::time::Instant::now() + BROWSER_GRACE;
+            while running() && std::time::Instant::now() < deadline {
+                thread::sleep(Duration::from_millis(100));
+            }
+            if running() {
+                log("the browser did not close: killing it");
+                signal(libc::SIGKILL);
+            }
+        }
+        #[cfg(not(unix))]
+        if let Some(c) = child {
+            log("prigh desktop exited: closing the browser window");
+            let _ = c.kill();
+        }
+    }
+}
+
+#[cfg(unix)]
+fn alive(pid: i32) -> bool {
+    unsafe { libc::kill(pid, 0) == 0 }
+}
+
+/// Where the page is shown: `None` for the app's own window.
+fn window_choice(app: &AppHandle) -> Result<Option<Arc<BrowserWindow>>, Failure> {
+    let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+    let mode = browser::mode(var("PRIGH_DESKTOP_WINDOW").as_deref()).map_err(Failure::BadWindow)?;
+    if mode == Mode::Webview {
+        return Ok(None);
+    }
+    // No login shell (it may take seconds): the usual install places cover
+    // a launcher's bare PATH.
+    let path = search_path::compose(None, var("PATH").as_deref(), var("HOME").as_deref(), var("USER").as_deref());
+    let places = browser::Places {
+        home: var("HOME"),
+        windows_roots: ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"].iter().filter_map(|v| var(v)).collect(),
+    };
+    let on_path = |name: &str| if OS == Os::Windows { None } else { search_path::find(name, &path, is_executable) };
+    let found = browser::find(PLATFORM, var("PRIGH_DESKTOP_BROWSER").as_deref(), &places, on_path, is_executable)
+        .map_err(Failure::BadWindow)?;
+    match browser::choose(mode, PLATFORM, found) {
+        Choice::Webview => Ok(None),
+        Choice::NoBrowser => Err(Failure::NoBrowser),
+        Choice::Browser(found) => {
+            let profile = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| Failure::BadWindow(format!("no data directory for the browser's profile: {e}")))?
+                .join("browser");
+            Ok(Some(Arc::new(BrowserWindow {
+                found,
+                profile,
+                child: Mutex::new(None),
+                url: Mutex::new(None),
+                closing: AtomicBool::new(false),
+                handed_to: Mutex::new(None),
+            })))
+        }
     }
 }
 
@@ -241,6 +475,9 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
 
         let status = child.wait();
         sidecar.exited.store(true, Ordering::SeqCst);
+        if let Some(b) = sidecar.browser() {
+            b.close();
+        }
         if let Some(t) = stderr {
             let _ = t.join();
         }
@@ -266,7 +503,7 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
     });
 }
 
-fn on_page(app: &AppHandle, sidecar: &Sidecar, page: &ready::Page) {
+fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     let url = page.url.as_str();
     let (Ok(parsed), Some(origin)) = (Url::parse(url), navigation::origin(url)) else {
         log(format!("prigh desktop's url does not parse: {url}"));
@@ -284,6 +521,14 @@ fn on_page(app: &AppHandle, sidecar: &Sidecar, page: &ready::Page) {
         log(format!("showing the backend's prigh-web at {}", redact(url)));
     } else {
         log(format!("prigh desktop is ready at {}", redact(url)));
+    }
+    if let Some(b) = sidecar.browser() {
+        // Later pages (the backend's site after the connect form) the
+        // page goes to itself.
+        if first {
+            b.open(app, sidecar, url);
+        }
+        return;
     }
     let Some(w) = app.get_webview_window(WINDOW) else { return };
     let target = if first && cfg!(target_os = "linux") && env_flag("PRIGH_DESKTOP_GPU_INFO") {
@@ -661,6 +906,7 @@ fn main() {
     linux::check_file_chooser_portal();
     let sidecar = Arc::new(Sidecar::default());
     let setup_sidecar = sidecar.clone();
+    let instance_sidecar = sidecar.clone();
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = {
@@ -683,11 +929,13 @@ fn main() {
         })
     };
     let app = builder
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+        .plugin(tauri_plugin_single_instance::init(move |app, _, _| {
             if let Some(w) = app.get_webview_window(WINDOW) {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
+            } else if let Some(b) = instance_sidecar.browser() {
+                b.another_window();
             }
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -696,7 +944,15 @@ fn main() {
         .setup(move |app| {
             let zoom = Arc::new(Zoom::load(app.handle()));
             app.manage(zoom.clone());
-            build_window(app.handle(), setup_sidecar.clone(), zoom)?;
+            match window_choice(app.handle()) {
+                Err(f) => {
+                    let app = app.handle().clone();
+                    thread::spawn(move || fail(&app, f, 2));
+                    return Ok(());
+                }
+                Ok(Some(b)) => *setup_sidecar.browser.lock().unwrap() = Some(b),
+                Ok(None) => build_window(app.handle(), setup_sidecar.clone(), zoom)?,
+            }
             start_sidecar(app.handle().clone(), setup_sidecar.clone());
             Ok(())
         })

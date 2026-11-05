@@ -25,6 +25,18 @@ end
 (** Where the tab keeps that it is in the desktop app (sessionStorage). *)
 val hint_storage_key : string
 
+(** Whether the page is in an installed browser's app window rather than
+    the desktop app's own: [shell=browser] in its fragment, which the app
+    adds. There the backend's page quits by closing its window. *)
+val browser_shell_of_hash : string -> bool
+
+(** Where the tab keeps that (sessionStorage). *)
+val shell_storage_key : string
+
+(** [url] with [shell=browser] added to its fragment when [browser]: what the
+    sidecar's page goes to (the backend's own site), so that page knows too. *)
+val follow : browser:bool -> string -> string
+
 (** Where the backend's page goes to quit the app: the window catches it (the
     page cannot reach [prigh desktop] from another origin). *)
 val quit_url : string

@@ -246,3 +246,45 @@ let%expect_test "the backend's own site opened by the desktop app" =
     about:blank#prigh-desktop-quit
     |}]
 ;;
+
+let%expect_test "in an installed browser's app window" =
+  List.iter
+    [ "#desktop=k&shell=browser"
+    ; "#app=desktop&host=laptop&shell=browser"
+    ; "#shell=browser"
+    ; "#desktop=k"
+    ; "#shell=browsers"
+    ; ""
+    ]
+    ~f:(fun hash ->
+      print_s
+        [%message
+          hash ~browser:(Desktop_link.browser_shell_of_hash hash : bool)]);
+  List.iter
+    [ "https://ai.example.com/#app=desktop&host=laptop"
+    ; "https://ai.example.com/"
+    ; "https://ai.example.com/#"
+    ]
+    ~f:(fun url ->
+      print_s
+        [%message
+          url
+            ~browser:(Desktop_link.follow ~browser:true url : string)
+            ~webview:(Desktop_link.follow ~browser:false url : string)]);
+  [%expect
+    {|
+    (#desktop=k&shell=browser (browser true))
+    (#app=desktop&host=laptop&shell=browser (browser true))
+    (#shell=browser (browser true))
+    (#desktop=k (browser false))
+    (#shell=browsers (browser false))
+    ("" (browser false))
+    (https://ai.example.com/#app=desktop&host=laptop
+     (browser https://ai.example.com/#app=desktop&host=laptop&shell=browser)
+     (webview https://ai.example.com/#app=desktop&host=laptop))
+    (https://ai.example.com/ (browser https://ai.example.com/#shell=browser)
+     (webview https://ai.example.com/))
+    (https://ai.example.com/# (browser https://ai.example.com/#shell=browser)
+     (webview https://ai.example.com/#))
+    |}]
+;;

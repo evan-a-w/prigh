@@ -5,7 +5,7 @@
 # from another nixpkgs, WebKitGTK may fall back to drawing on the CPU.
 #
 # `unwrapped` finds prigh on the PATH; `wrapped` points it at `prigh` and
-# takes `.override { backend; ui; extraArgs; disableDmabuf; }`.
+# takes `.override { backend; ui; window; browser; extraArgs; disableDmabuf; }`.
 { pkgs, prigh }:
 let
   lib = pkgs.lib;
@@ -57,7 +57,7 @@ let
       platforms = lib.platforms.linux ++ lib.platforms.darwin;
     };
   };
-  # `.override { backend; ui; extraArgs; disableDmabuf; }` is what
+  # `.override { backend; ui; window; browser; extraArgs; disableDmabuf; }` is what
   # programs.prigh.desktop in the Home Manager module uses.
   prighDesktop = lib.makeOverridable (
     {
@@ -65,6 +65,11 @@ let
       # remote: the backend's own prigh-web (the default of `prigh desktop`);
       # local: prigh-web served by this prigh, relayed.
       ui ? null,
+      # auto, browser or webview (PRIGH_DESKTOP_WINDOW); null: the app's default, auto.
+      window ? null,
+      # A Chromium-family browser for the window: a package (its main
+      # program) or a path (PRIGH_DESKTOP_BROWSER).
+      browser ? null,
       extraArgs ? [ ],
       disableDmabuf ? false,
     }:
@@ -79,6 +84,10 @@ let
         PRIGH_DESKTOP_BACKEND = "${backend}/bin/prigh";
       }
       // lib.optionalAttrs (args != [ ]) { PRIGH_DESKTOP_ARGS = lib.escapeShellArgs args; }
+      // lib.optionalAttrs (window != null) { PRIGH_DESKTOP_WINDOW = window; }
+      // lib.optionalAttrs (browser != null) {
+        PRIGH_DESKTOP_BROWSER = if lib.isDerivation browser then lib.getExe browser else toString browser;
+      }
       // lib.optionalAttrs disableDmabuf { WEBKIT_DISABLE_DMABUF_RENDERER = "1"; };
       wrapFlags = lib.concatLists (
         lib.mapAttrsToList (name: value: [
