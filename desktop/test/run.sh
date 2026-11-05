@@ -21,7 +21,10 @@ mkdir -p "$work/bin"
 cp "$here/fake-sidecar.py" "$fake"
 chmod +x "$fake"
 mkdir -p "$work/browsers"
-cp "$here/fake-browser.py" "$work/browsers/google-chrome-stable"
+# A wrapper, not a copy: in the Nix build only this directory's shebangs are
+# patched, and /usr/bin/env is not there.
+printf '#!%s\nexec %s %s "$@"\n' "$(command -v bash)" "$(command -v python3)" "$here/fake-browser.py" \
+	>"$work/browsers/google-chrome-stable"
 chmod +x "$work/browsers/google-chrome-stable"
 export PRIGH_DESKTOP_NO_DIALOG=1
 # dbus-run-session gives two addresses, each with its server's GUID; zbus
@@ -144,7 +147,7 @@ report "browser: a second launch, then the first window closes" $code
 # closed through its DevTools as a user would close them (Xvfb has no window
 # manager to ask).
 if [ -n "${REAL_CHROMIUM:-}" ]; then
-	printf '#!/bin/sh\nexec "%s" --remote-debugging-port=9333 --no-sandbox "$@"\n' "$REAL_CHROMIUM" >"$work/chromium"
+	printf '#!%s\nexec "%s" --remote-debugging-port=9333 --no-sandbox "$@"\n' "$(command -v bash)" "$REAL_CHROMIUM" >"$work/chromium"
 	chmod +x "$work/chromium"
 	rm -rf "$profile"
 	pages() {
