@@ -23,6 +23,7 @@ module Credentials = struct
     { token : string option
     ; user : string option
     }
+  [@@deriving sexp_of]
 end
 
 module Check = struct
@@ -121,6 +122,7 @@ module Check = struct
       | Flag
       | Env
       | Saved of string
+    [@@deriving sexp_of]
   end
 
   let explain
