@@ -36,28 +36,34 @@ let%expect_test "backend addresses: HOST:PORT and prigh-web URLs" =
     {|
     (server:7790
      (t ((tls false) (host server) (port 7790) (prefix "") (lines true)))
-     (to_string server:7790) (authority server:7790))
+     (to_string server:7790) (authority server:7790)
+     (web_url http://server:7790/))
     (:7777
      (t ((tls false) (host 127.0.0.1) (port 7777) (prefix "") (lines true)))
-     (to_string 127.0.0.1:7777) (authority 127.0.0.1:7777))
+     (to_string 127.0.0.1:7777) (authority 127.0.0.1:7777)
+     (web_url http://127.0.0.1:7777/))
     ([::1]:7790 (t ((tls false) (host ::1) (port 7790) (prefix "") (lines true)))
-     (to_string [::1]:7790) (authority [::1]:7790))
+     (to_string [::1]:7790) (authority [::1]:7790) (web_url http://[::1]:7790/))
     (ws://server:7790/ws
      (t ((tls false) (host server) (port 7790) (prefix "") (lines false)))
-     (to_string ws://server:7790/ws) (authority server:7790))
+     (to_string ws://server:7790/ws) (authority server:7790)
+     (web_url http://server:7790/))
     (wss://example.com/ws
      (t ((tls true) (host example.com) (port 443) (prefix "") (lines false)))
-     (to_string wss://example.com/ws) (authority example.com))
+     (to_string wss://example.com/ws) (authority example.com)
+     (web_url https://example.com/))
     (https://example.com/prigh/
      (t ((tls true) (host example.com) (port 443) (prefix /prigh) (lines false)))
-     (to_string wss://example.com/prigh/ws) (authority example.com))
+     (to_string wss://example.com/prigh/ws) (authority example.com)
+     (web_url https://example.com/prigh/))
     (wss://example.com:8443/prigh/ws
      (t
       ((tls true) (host example.com) (port 8443) (prefix /prigh) (lines false)))
-     (to_string wss://example.com:8443/prigh/ws) (authority example.com:8443))
+     (to_string wss://example.com:8443/prigh/ws) (authority example.com:8443)
+     (web_url https://example.com:8443/prigh/))
     (http://server
      (t ((tls false) (host server) (port 80) (prefix "") (lines false)))
-     (to_string ws://server/ws) (authority server))
+     (to_string ws://server/ws) (authority server) (web_url http://server/))
     (server
      (e
       "\"server\" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)"))
@@ -1077,6 +1083,19 @@ let%expect_test
     connect HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
     page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
     status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
+    HTTP/1.1 405 Method Not Allowed
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 19
+      body: method not allowed
+
+    (closed)
+    (((connect ws://127.0.0.1:PORT/ws) (token sekrit)))
+    Stdin_closed
+    prigh-web on http://127.0.0.1:SITE/
+    tool host: connected to ws://127.0.0.1:PORT/ws as client-N
+    tools run on this machine, in $DIR/here
+    connected to ws://127.0.0.1:PORT/ws
     |}]
 ;;
 
@@ -1115,7 +1134,19 @@ let%expect_test
   start ~tools:Remote (sprintf "ws://127.0.0.1:%d/ws" backend_port);
   List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
   print_string (unport backend_port [%expect.output]);
-  [%expect {| |}]
+  [%expect {|
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
+    Stdin_closed
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true}
+    Stdin_closed
+    tool host: connected to 127.0.0.1:PORT as client-N
+    tools run on this machine, in $DIR/here
+    connected to 127.0.0.1:PORT
+    prigh-web on http://127.0.0.1:SITE/
+    tools run on the backend (-tools remote)
+    connected to ws://127.0.0.1:PORT/ws
+    prigh-web on http://127.0.0.1:SITE/
+    |}]
 ;;
 
 let%expect_test
@@ -1143,7 +1174,11 @@ let%expect_test
   ignore (Desktop.post t ~sw d "status" [] : string option);
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
-  [%expect {| |}]
+  [%expect {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":null,"error":"-connect did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    Stdin_closed
+    |}]
 ;;
 
 let%expect_test "the remote site's URL, from each form of address" =
@@ -1161,7 +1196,15 @@ let%expect_test "the remote site's URL, from each form of address" =
         "%s -> %s\n"
         spec
         (Backend_address.web_url (Or_error.ok_exn (Backend_address.parse spec))));
-  [%expect {| |}]
+  [%expect {|
+    server:7790 -> http://server:7790/
+    ws://server:7790/ws -> http://server:7790/
+    wss://ai.example.com/ws -> https://ai.example.com/
+    https://ai.example.com/ -> https://ai.example.com/
+    https://example.com/prigh/ -> https://example.com/prigh/
+    wss://example.com:8443/prigh/ws -> https://example.com:8443/prigh/
+    [::1]:7790 -> http://[::1]:7790/
+    |}]
 ;;
 
 let%expect_test "the local sites: only their own pages, by their own names" =
