@@ -1257,11 +1257,13 @@ it), so install prigh as well.
   building the app with your nixpkgs: `programs.prigh.desktop.useSystemNixpkgs
   = true`, or `inputs.prigh.inputs.nixpkgs.follows = "nixpkgs"` in your
   flake (both build it from source).
-- **No file chooser on Wayland** (Hyprland, sway): WebKitGTK asks
-  xdg-desktop-portal for it, and Hyprland's portal has none. Add one with
-  a FileChooser: on NixOS `xdg.portal = { enable = true; extraPortals = [
-  pkgs.xdg-desktop-portal-gtk ]; };`. The app says so on stderr when no
-  portal answers.
+- **File chooser**: the window's is GTK's own, unless `GTK_USE_PORTAL=1`
+  (NixOS's old `xdg.portal.gtkUsePortal` sets it) asks for
+  xdg-desktop-portal's. With that set and no portal that has a FileChooser
+  running (Hyprland's own portal has none), GTK opens nothing at all; the
+  app checks at start, says so on stderr and uses GTK's chooser instead. For
+  the portal's chooser, run one: on NixOS `xdg.portal = { enable = true;
+  extraPortals = [ pkgs.xdg-desktop-portal-gtk ]; };`.
 - **A blank or flickering window on Linux** (WebKitGTK with some GPU drivers,
   NVIDIA in particular): set `WEBKIT_DISABLE_DMABUF_RENDERER=1`
   (`programs.prigh.desktop.disableDmabuf = true`).

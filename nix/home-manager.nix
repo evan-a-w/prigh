@@ -60,10 +60,11 @@ in
         webview), running `prigh desktop` (prigh-web's site and a tool host
         for this machine) while it is open. Adds "prigh" to the application
         menu on Linux and ~/Applications/Home Manager Apps on macOS. With no
-        saved connection it asks for the backend to connect to. On Wayland
-        (Hyprland, sway) its file chooser goes through xdg-desktop-portal:
-        the system needs a portal with a FileChooser, e.g. on NixOS
-        xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-gtk ]
+        saved connection it asks for the backend to connect to. Its file
+        chooser is GTK's, or with GTK_USE_PORTAL=1 xdg-desktop-portal's,
+        which needs a portal with a FileChooser (on NixOS
+        xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-gtk ]); without
+        one it falls back to GTK's
       '';
 
       package = mkOption {
