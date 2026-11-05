@@ -148,6 +148,15 @@
  (action
   (copy ../vendor/addon-fit.js addon-fit.js)))
 
+; Temporal for browsers without it (index.html loads it only then): Core's
+; time zones need it, and Bonsai_web's start asks for the local one.
+
+(rule
+ (target temporal-polyfill.js)
+ (deps ../vendor/temporal-polyfill.js)
+ (action
+  (copy ../vendor/temporal-polyfill.js temporal-polyfill.js)))
+
 ; KaTeX (vendored, see ../vendor/README.md), loaded the first time math is
 ; shown: its script, stylesheet, copy-tex and fonts.
 
@@ -226,6 +235,7 @@
   xterm.js
   xterm.css
   addon-fit.js
+  temporal-polyfill.js
   katex.min.js
   katex.min.css
   copy-tex.min.js
@@ -270,6 +280,7 @@
   (xterm.js as web/xterm.js)
   (xterm.css as web/xterm.css)
   (addon-fit.js as web/addon-fit.js)
+  (temporal-polyfill.js as web/temporal-polyfill.js)
   (katex.min.js as web/katex.min.js)
   (katex.min.css as web/katex.min.css)
   (copy-tex.min.js as web/copy-tex.min.js)

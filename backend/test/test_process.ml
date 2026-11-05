@@ -191,3 +191,68 @@ let%expect_test "eio_posix reaps every child promptly" =
   printf "children not reaped within 2s: %d\n" !late;
   [%expect {| children not reaped within 2s: 0 |}]
 ;;
+
+(* Whether [pid] is still running: gone, or a zombie waiting for init. *)
+let running pid =
+  match In_channel.read_all (sprintf "/proc/%d/stat" pid) with
+  | exception _ -> false
+  | stat ->
+    (match String.rsplit2 stat ~on:')' with
+     | Some (_, rest) -> not (String.is_prefix (String.lstrip rest) ~prefix:"Z")
+     | None -> false)
+;;
+
+let%expect_test
+    "cancelled by Eio (the process exiting), not [cancel]: what the tool \
+     started is killed too"
+  =
+  Eio_main.run
+  @@ fun env ->
+  let dir = Filename_unix.temp_dir "prigh-process" "" in
+  let pidfile = dir ^/ "pid" in
+  let started, set_started = Eio.Promise.create () in
+  (match
+     Eio.Fiber.first
+       (fun () ->
+          `Finished
+            (sh
+               ~env
+               (sprintf
+                  "sleep 1000 & echo $! > %s.tmp; mv %s.tmp %s; wait"
+                  pidfile
+                  pidfile
+                  pidfile)))
+       (fun () ->
+          let rec wait () =
+            if Sys_unix.file_exists_exn pidfile
+            then Eio.Promise.resolve set_started ()
+            else (
+              Eio.Time.sleep (Eio.Stdenv.clock env) 0.01;
+              wait ())
+          in
+          wait ();
+          `Cancelled)
+   with
+   | `Cancelled -> print_endline "cancelled once it had started"
+   | `Finished (_ : Process.Output.t) -> print_endline "finished?");
+  Eio.Promise.await started;
+  let grandchild = Int.of_string (String.strip (In_channel.read_all pidfile)) in
+  let deadline = Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_sec 10.) in
+  let rec gone () =
+    if not (running grandchild)
+    then true
+    else if Time_ns.( > ) (Time_ns.now ()) deadline
+    then (
+      Signal_unix.send_i Signal.kill (`Pid (Pid.of_int grandchild));
+      false)
+    else (
+      Eio.Time.sleep (Eio.Stdenv.clock env) 0.01;
+      gone ())
+  in
+  printf "background grandchild gone: %b\n" (gone ());
+  [%expect
+    {|
+    cancelled once it had started
+    background grandchild gone: true
+    |}]
+;;

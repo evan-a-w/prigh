@@ -40,9 +40,11 @@ val respond : flow -> Static_site.Response.t -> unit
     With [clock], a WebSocket whose peer looks gone ({!Websocket.keepalive})
     is shut down and its handler cancelled. Another request goes to
     [routes]'s handler for it, if any, else to {!File_http} or the static
-    site. *)
+    site. With [local_port], every HTTP request (WebSocket upgrades too)
+    first passes {!Local_site.check}. *)
 val handle
   :  ?clock:_ Eio.Time.clock
+  -> ?local_port:int
   -> ?routes:(Request.t -> on_http option)
   -> root:string option
   -> websockets:(string * on_websocket) list
@@ -73,10 +75,12 @@ val serve_rpc : Rpc_router.t -> on_websocket
 val serve_terminal : Rpc_router.t -> Terminals.t -> on_websocket
 
 (** Accepts connections until [sw] ends; returns the bound port (useful with
-    port 0). *)
+    port 0). [local]: the site is only for the pages it serves
+    ({!Local_site}), as [prigh web]'s and [prigh desktop]'s are. *)
 val listen
   :  env:Env.t
   -> sw:Switch.t
+  -> ?local:bool
   -> ?routes:(Request.t -> on_http option)
   -> addr:Eio.Net.Ipaddr.v4v6
   -> port:int

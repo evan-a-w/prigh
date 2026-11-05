@@ -2018,6 +2018,35 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   and the token came from so that a bad address or a refused login says
   what to fix there (`refused_hint`). Only `prigh web` saves; a tool host
   only reads the saved connection.
+- `Desktop_sidecar` — `prigh desktop`, the desktop app's process: a site
+  (`Web_server.listen`, `Static_site`) that is first a connect form and
+  then `prigh web`'s. Its state is `Form` (the prefill and the error),
+  `Checking` (a promise the `/desktop/status` answer waits on) or
+  `Connected` (the remote, a `Signin_handoff` and the tool host's switch).
+  `/desktop/status`, `/desktop/connect` and `/desktop/quit` are `POST`s of
+  JSON carrying the run's key (from the URL's `#desktop=KEY`; 403
+  otherwise); `connect` runs `Web_connect.Check` and, when the backend
+  accepts, saves the connection, starts the tool host
+  (`Web_connect.start_tool_host`) and switches the routes to `prigh web`'s
+  (`Web_proxy`, the handoff). An address without TLS to another machine
+  is refused until the request confirms it (`"plaintext": true`, the
+  form's "Connect without encryption"). `run` returns `Quit`,
+  `Stdin_closed` or `Stopped` (the CLI's SIGTERM/SIGHUP), whichever comes
+  first, and stops everything under its switch. The CLI resolves the
+  initial connection with `Backend_choice` (none or a bad one: the form)
+  and prints the URL as a JSON line on stdout; its log leaves the key
+  out.
+- `Local_site` — what `prigh web`'s and `prigh desktop`'s sites
+  (`Web_server.listen ~local:true`) accept: they relay to a backend and run
+  this machine's tool host, so another page reaching them could run
+  commands here. Every request (WebSocket upgrades too, which browsers
+  send to any address without CORS) needs a `Host` that is an IP address
+  or `localhost` with the site's port (else 421: DNS rebinding) and, if it
+  has an `Origin`, `http://` and that `Host` (else 403). `/desktop/`
+  also requires `Content-Type: application/json`, so another page's
+  request would need a preflight. `prigh serve -web` does not check:
+  behind a reverse proxy its names and origins are the proxy's, and its
+  token guards it.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
@@ -3303,7 +3332,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     that shows it, so that the editor's height, scrolling and focus never
     show a frame late), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
     `Terminal_panel` (the `/terminal` URL; whether an event is inside the
-    panel). `Web_main.run`: first, on a page `prigh web` opened
+    panel). `Web_main.run`: under `prigh desktop` (`#desktop=KEY`, or the
+    key kept in sessionStorage after a reload: `Desktop_page`,
+    `Desktop_link`) it asks `/desktop/status` and either shows the connect
+    form (whose submit `POST`s `/desktop/connect`) or signs in with the
+    handoff code it is given, then runs the app with `Set_desktop true`
+    (Quit prigh in the account menu and the ⋯ sheet, `/quit` and Ctrl+Q
+    issue `Command.Quit_desktop`, which `POST`s `/desktop/quit`); else,
+    on a page `prigh web` opened
+
     (`#signin=CODE`, `Signin_link`), drops the fragment from the URL, trades
     the code for the credentials (`POST /signin-handoff`), activates them as
     the account (over any sign-out or refusal noted before) and keeps the
@@ -3396,7 +3433,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
     `.gz`, and 260 KB of fonts, of which a page fetches those its math
     uses; none of it until a reply has math, but the service worker
-    keeps it all), assembled under
+    keeps it all), temporal-polyfill (which `index.html` loads before
+    `main.bc.js` only where the browser has no `Temporal`, e.g. WebKitGTK:
+    Core's `Timezone_js_loader` needs it and Bonsai_web's start asks for
+    the local zone, so without it the app never starts), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
@@ -3422,6 +3462,58 @@ terminal frontend and `web/` prigh-web, the browser one.
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
     `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
+
+## Desktop app (`desktop/`)
+
+A Rust workspace, apart from the dune projects: `core/` (the decisions,
+without a window, unit-tested) and `app/` (the Tauri v2 shell,
+`prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
+a blank page shown while `prigh desktop` starts, then the window navigates
+to the URL it reports, and prigh-web there is the whole UI.
+
+The sidecar contract (the shell's only coupling to the backend):
+
+- the shell runs `<backend> desktop [$PRIGH_DESKTOP_ARGS]` (`core/launch.rs`:
+  `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
+  shell's PATH, since an app started from a desktop menu has a short one;
+  on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
+  home directory, with stdin a pipe it holds open;
+- the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
+  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
+  anything else ends the app with a dialog); stderr is its log, of which the
+  shell keeps the last 30 lines for the error dialog;
+- it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
+  failure.
+
+The window closing closes the pipe, waits up to 5 s and then kills the
+sidecar; the sidecar exiting ends the app (after a dialog, from
+`core/failure.rs`, when it failed or never became ready). Navigation stays on
+the sidecar's origin (`core/navigation.rs`); other links and new windows go
+to the system browser through the opener plugin. Downloads are saved in the
+Downloads folder. The page has no Tauri IPC: the window is created in
+`main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
+page there. Plugins: single-instance (a second launch focuses the window),
+window-state (size and position), opener, dialog.
+
+Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
+page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit`; the
+sidecar exits 0 and so does the app. On macOS the app menu (needed for
+WKWebView's Edit shortcuts) takes ⌘Q: its Quit stops the sidecar as closing
+the window does. Either way the sidecar ends first and the app follows.
+
+Test hooks (environment): `PRIGH_DESKTOP_NO_DIALOG` logs failures instead of
+showing dialogs, `PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD` closes the window once
+the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
+the sidecar's pages, which may close the window by going to
+`about:blank#prigh-desktop-test-close`.
+
+Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
+on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
+`$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh`, with the desktop entry
+and hicolor icons. `nix/home-manager.nix` is `homeManagerModules.default`
+(`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
+for Linux, macOS and Windows.
 
 ## Data on disk
 

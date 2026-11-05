@@ -2170,6 +2170,63 @@ prefer_host: host-laptop
 Sign in
 === chromium: remote: errors ===
 none
+=== chromium: desktop: its stdout ===
+{"url":"http://127.0.0.1:<PORT>/#desktop=<key>"}
+=== chromium: desktop: the connect form ===
+http://127.0.0.1:<PORT>/
+prigh
+desktop
+Connect to a backend
+prigh runs this computer's tools for a prigh backend (prigh serve). The connection is saved for next time.
+Backend address
+User name
+Password
+Connect
+Quit prigh
+=== chromium: desktop: unencrypted ===
+0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
+button: Connect without encryption
+=== chromium: desktop: unencrypted, confirmed ===
+cannot reach the backend at 0.0.0.0:1: connection refused
+Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws.
+button: Connect
+=== chromium: desktop: a wrong password ===
+127.0.0.1:<PORT> refused the login: unauthorised: bad user name or password
+Check the password against the backend's token; if it serves several users (-tokens), also enter your user name.
+address kept: true
+saved: false
+=== chromium: desktop: connected ===
+http://127.0.0.1:<PORT>/?session=<id>
+saved: true
+in the laptop's directory: true
+=== chromium: desktop: reloaded ===
+connect form: 0
+=== chromium: desktop: /quit ===
+prigh
+desktop
+Quitting prigh…
+The window closes once this computer's tool host has stopped.
+exit: 0; more stdout: ""
+prigh desktop: quit from the page
+prigh desktop: quit
+=== chromium: desktop: again, on a phone: the saved connection ===
+connect form: 0
+Quit prigh
+exit: 0; more stdout: ""
+prigh desktop: quit from the page
+prigh desktop: quit
+=== chromium: desktop: a small phone ===
+overflow: false; off screen: none
+address 16px ok
+user 16px ok
+password 16px ok
+desktop-connect 14px ok
+desktop-quit 14px ok
+=== chromium: desktop: its window gone ===
+exit: 0; more stdout: ""
+prigh desktop: stdin closed: the window is gone
+=== chromium: desktop: errors ===
+none
 === chromium: steer: showing it leaves the composer on the main agent ===
 (no chip); Steer the agent…
 Survey the project

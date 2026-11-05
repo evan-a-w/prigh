@@ -140,13 +140,29 @@ let is_json_lines reader =
   | exception (End_of_file | Eio.Io _) -> false
 ;;
 
-let handle ?clock ?(routes = fun _ -> None) ~root ~websockets ~on_lines flow =
+let handle
+      ?clock
+      ?local_port
+      ?(routes = fun _ -> None)
+      ~root
+      ~websockets
+      ~on_lines
+      flow
+  =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
+  let refused (request : Request.t) =
+    match local_port with
+    | None -> None
+    | Some port ->
+      Result.error (Local_site.check ~port ~headers:request.headers)
+  in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
   else (
     match Request.parse reader with
     | None -> ()
+    | Some request when Option.is_some (refused request) ->
+      respond flow (Option.value_exn (refused request))
     | Some request when Option.is_some (upgrade_handler ~websockets request) ->
       let on_websocket =
         Option.value_exn (upgrade_handler ~websockets request)
@@ -308,7 +324,18 @@ let serve_terminal router terminals ~query ws =
      | `Unavailable reason -> error ("no terminal: " ^ reason))
 ;;
 
-let listen ~env ~sw ?routes ~addr ~port ~root ~websockets ~on_lines () =
+let listen
+      ~env
+      ~sw
+      ?(local = false)
+      ?routes
+      ~addr
+      ~port
+      ~root
+      ~websockets
+      ~on_lines
+      ()
+  =
   let socket =
     Eio.Net.listen
       ~sw
@@ -334,6 +361,7 @@ let listen ~env ~sw ?routes ~addr ~port ~root ~websockets ~on_lines () =
          keepalive flow;
          handle
            ~clock:(Eio.Stdenv.clock env)
+           ?local_port:(Option.some_if local port)
            ?routes
            ~root
            ~websockets

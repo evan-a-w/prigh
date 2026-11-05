@@ -294,6 +294,7 @@ module Command = struct
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
     | Sign_out
+    | Quit_desktop
     | Reveal of string list
     (** scroll the main chat to a subagent's card: the call ids from the
         top-level one down *)
@@ -362,6 +363,8 @@ module Action = struct
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
+    | Set_desktop of bool
+    | Quit_desktop
     | Page_hidden of bool
     | Restore_prefs of
         { prefs : Prefs.Change.t list
@@ -621,6 +624,7 @@ module Model = struct
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
     ; narrow : bool
+    ; desktop : bool
     ; draft : string
     ; cursor : int
     ; completion : Completion.t option
@@ -882,6 +886,7 @@ let init =
   ; now = None
   ; utc_offset = Time_ns.Span.zero
   ; narrow = false
+  ; desktop = false
   ; draft = ""
   ; cursor = 0
   ; completion = None
@@ -976,6 +981,17 @@ let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
 ;;
 
 let error m text = toast m ~error:true text
+
+(* In a browser there is nothing to quit: the tab is closed instead. *)
+let quit_desktop (m : Model.t) =
+  if m.desktop
+  then m, [ Command.Quit_desktop ]
+  else
+    toast
+      m
+      "Close the tab to leave: the session stays in the backend (/signout \
+       signs out)."
+;;
 
 (* What a trim, or its undo, did to the context: only the latest shows. *)
 let context_toast m text =
@@ -3922,7 +3938,16 @@ let account_menu (m : Model.t) =
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
                  "Sign out"
-             ])
+             ]
+           @
+           if m.desktop
+           then
+             [ Picker.Item.create
+                 ~id:"quit"
+                 ~detail:"close the desktop app and its tool host (Ctrl+Q)"
+                 "Quit prigh"
+             ]
+           else [])
     }
 ;;
 
@@ -4021,6 +4046,7 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, "quit" -> quit_desktop m
   | _, "settings" -> open_settings m
   | _, "help" -> open_dialog m Help
   | _, ("notify on" | "notify off") ->
@@ -6083,11 +6109,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       { m with chat = Chat.empty; paging = Paging.all }
       "Cleared the view; the conversation is kept (a reload shows it, /new \
        starts afresh)"
-  | "quit", _ ->
-    toast
-      m
-      "Close the tab to leave: the session stays in the backend (/signout \
-       signs out)."
+  | "quit", _ -> quit_desktop m
   | name, _ ->
     error
       m
@@ -9229,6 +9251,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
+  | Set_desktop desktop -> { m with desktop }, []
+  | Quit_desktop -> quit_desktop m
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
     then m, []
