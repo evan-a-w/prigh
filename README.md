@@ -1150,6 +1150,64 @@ Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
 the backend's ports carries the RPC, but the terminal and file transfers
 need its `-web` port.
 
+## Desktop app
+
+prigh-desktop is prigh-web in a window of its own: a small native app
+([Tauri](https://tauri.app), `desktop/`) on the system's webview, which runs
+`prigh desktop` while it is open and stops it when the window closes. `prigh
+desktop` serves prigh-web for the saved backend (or asks which one to
+connect to) and is this machine's tool host, so the window is a
+frontend whose sessions run their tools here, as a TUI's do.
+
+```nix
+# Home Manager (flake input `prigh`):
+imports = [ prigh.homeManagerModules.default ];
+programs.prigh.enable = true;          # prigh on the PATH
+programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/Applications
+# programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
+# programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
+```
+
+Without Home Manager, `nix profile install github:evan-a-w/prigh#prigh-desktop`
+(it brings its own prigh), or `nix run github:evan-a-w/prigh#prigh-desktop`.
+The repository's CI builds installers too (the `desktop` workflow's
+artifacts: `.deb`/`.AppImage`, `.dmg`, `.msi`/`.exe`); those contain only
+the app, which then runs the `prigh` on the PATH (as the login shell sets
+it), so install prigh as well.
+
+- **The engine is the system's webview**: WKWebView (Safari's engine) on
+  macOS, WebView2 (Edge's Chromium) on Windows, WebKitGTK on Linux (a
+  library Nix provides, not your browser). Links to other sites open in
+  your browser; downloads go to the Downloads folder; prigh-web may use the
+  microphone (dictation), notifications and the clipboard without asking.
+- **Windows**: prigh does not run natively there, so the app runs it inside
+  [WSL](https://learn.microsoft.com/windows/wsl/install): `wsl --install`,
+  then install prigh in the distribution (e.g. Nix and `nix profile install
+  github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
+  prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
+  opens the page through WSL's localhost forwarding (on by default).
+- **Settings** (environment variables; Home Manager sets the first two):
+  `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
+  Windows, in WSL), `PRIGH_DESKTOP_ARGS` arguments for `prigh desktop`
+  (split like a shell's words: `-cwd '/my proj' -name laptop`),
+  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default).
+  Never put a token in Home Manager options or `PRIGH_DESKTOP_ARGS` in Nix:
+  the store is world-readable (the module refuses `-token`); sign in from
+  the app, which saves the connection like prigh-tui.
+- **One window**: starting the app again focuses the open one. Its size and
+  position are remembered.
+- **A blank or flickering window on Linux** (WebKitGTK with some GPU drivers,
+  NVIDIA in particular): set `WEBKIT_DISABLE_DMABUF_RENDERER=1`
+  (`programs.prigh.desktop.disableDmabuf = true`).
+- If `prigh desktop` cannot start or stops with an error, a dialog shows
+  what it said and what to do (install prigh, update it, install it in
+  WSL); the app's own log goes to stderr, prefixed `prigh-desktop:`.
+
+The Nix package exists for Linux and macOS; Windows uses the installers.
+Build it from `desktop/` with `nix develop .#desktop` (Rust, cargo-tauri
+and the webview's libraries), then `cargo tauri dev` or `cargo tauri build`
+in `desktop/app`.
+
 ## Editors (ACP)
 
 `prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
@@ -2675,6 +2733,13 @@ prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
 and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
 against the real backend, its scripts all at once; the flake runs it as a
 check.
+
+The desktop app has two: `cargo test -p prigh-desktop-core` in `desktop/`
+(the decisions: how `prigh desktop` is started, its ready line, where the
+window may go, the error dialogs; `./test` runs it), and
+`desktop/test/run.sh`, the app in a real window against a fake `prigh
+desktop` (the flake's `desktop-window` check runs it under Xvfb; it prints
+a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout
 

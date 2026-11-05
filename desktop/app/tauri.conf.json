@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "prigh",
+  "mainBinaryName": "prigh-desktop",
+  "version": "0.1.0",
+  "identifier": "io.github.evan-a-w.prigh",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": false,
+    "security": {
+      "csp": null,
+      "capabilities": []
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "dmg", "app", "msi", "nsis"],
+    "category": "DeveloperTool",
+    "shortDescription": "prigh, the coding agent",
+    "longDescription": "prigh-web in a native window, with prigh desktop (a tool host for this machine) running while it is open.",
+    "homepage": "https://github.com/evan-a-w/prigh",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "deb": {
+        "desktopTemplate": "prigh.desktop"
+      }
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}

@@ -3394,6 +3394,46 @@ terminal frontend and `web/` prigh-web, the browser one.
     `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
 
+## Desktop app (`desktop/`)
+
+A Rust workspace, apart from the dune projects: `core/` (the decisions,
+without a window, unit-tested) and `app/` (the Tauri v2 shell,
+`prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
+a blank page shown while `prigh desktop` starts, then the window navigates
+to the URL it reports, and prigh-web there is the whole UI.
+
+The sidecar contract (the shell's only coupling to the backend):
+
+- the shell runs `<backend> desktop [$PRIGH_DESKTOP_ARGS]` (`core/launch.rs`:
+  `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
+  shell's PATH, since an app started from a desktop menu has a short one;
+  on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
+  home directory, with stdin a pipe it holds open;
+- the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/…"}`, on stdout
+  when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
+  anything else ends the app with a dialog); stderr is its log, of which the
+  shell keeps the last 30 lines for the error dialog;
+- it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
+  failure.
+
+The window closing closes the pipe, waits up to 5 s and then kills the
+sidecar; the sidecar exiting ends the app (after a dialog, from
+`core/failure.rs`, when it failed or never became ready). Navigation stays on
+the sidecar's origin (`core/navigation.rs`); other links and new windows go
+to the system browser through the opener plugin. Downloads are saved in the
+Downloads folder. The page has no Tauri IPC: the window is created in
+`main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
+page there. Plugins: single-instance (a second launch focuses the window),
+window-state (size and position), opener, dialog.
+
+Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
+on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
+`$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh`, with the desktop entry
+and hicolor icons. `nix/home-manager.nix` is `homeManagerModules.default`
+(`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
+for Linux, macOS and Windows.
+
 ## Data on disk
 
 - `~/.config/prigh/auth.json` — credentials (pi-compatible), and git hosts'
