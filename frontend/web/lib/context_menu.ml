@@ -32,7 +32,7 @@ type t =
 module Item = struct
   type t =
     | Open
-    | Open_tab
+    | Open_window
     | Rename
     | Fork
     | New_worktree
@@ -69,7 +69,7 @@ module Item = struct
   let danger = function
     | Delete | Remove -> true
     | Open
-    | Open_tab
+    | Open_window
     | Rename
     | Fork
     | New_worktree
@@ -109,7 +109,7 @@ let session_items ?host_home (s : Session_summary.t) ~current
           ^ Session_home.label home ~tilde:(Tilde.of_path ?host_home)
         , "/worktree back" ))
     ; Option.some_if (not current) (Item.Open, "Open", "Enter")
-    ; Some (Open_tab, "Open in new tab", "")
+    ; Some (Open_window, "Open in new window", "")
     ; Some (Rename, "Rename…", "/name")
     ; Some (Fork, "Fork…", "/fork")
     ; Option.some_if

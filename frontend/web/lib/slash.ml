@@ -17,7 +17,6 @@ module Argument = struct
     | Mode
     | Plan
     | Notify
-    | Tabs
     | Settings
     | Session
     | Path
@@ -138,11 +137,6 @@ let every =
       "notify"
       "tell you when a turn ends or something waits for you while the tab is \
        hidden"
-  ; c
-      ~argument:Tabs
-      ~args:"[on|off]"
-      "tabs"
-      "show the open sessions as tabs over the chat (saved for your account)"
   ; c
       ~args:"[instructions]"
       "compact"

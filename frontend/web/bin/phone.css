@@ -326,7 +326,6 @@
 .app.narrow .compact-at-input { width: 6ch; font-size: 16px; }
 .app.narrow .compact-at-unit { white-space: nowrap; }
 /* Tabs never show on a phone: their switch is for the desktop. */
-.app.narrow .setting.tabs { display: none; }
 
 /* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
 .app.narrow .keyboard { display: none !important; }

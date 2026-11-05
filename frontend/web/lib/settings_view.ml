@@ -51,24 +51,6 @@ let notifications (m : App.Model.t) ~inject =
     ]
 ;;
 
-let tabs (m : App.Model.t) ~inject =
-  let on = m.tabs.enabled in
-  row
-    ~cls:"tabs"
-    ~name:"Tabs"
-    ~about:"The open sessions as tabs over the chat (not on a phone)."
-    [ switch
-        ~label:"Tabs"
-        ~title:
-          (if on
-           then "Turn session tabs off (/tabs off)"
-           else "Turn session tabs on (/tabs on)")
-        ~on
-        ~on_click:(inject (Action.Run (if on then "/tabs off" else "/tabs on")))
-        ()
-    ]
-;;
-
 let verbosity (m : App.Model.t) ~inject =
   row
     ~cls:"verbosity"
@@ -683,9 +665,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   match section with
   | Appearance ->
     [ group ~title:"Look" (Theme_view.rows m ~inject)
-    ; group
-        ~title:"Layout"
-        [ tabs m ~inject; verbosity m ~inject ]
+    ; group ~title:"Layout" [ verbosity m ~inject ]
     ]
   | Sessions ->
     [ group

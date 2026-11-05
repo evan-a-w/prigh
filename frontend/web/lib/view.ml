@@ -358,10 +358,7 @@ let view (m : Model.t) ~inject ~terminal =
                   ; "landing", m.landing
                   ]
               ]
-            (List.map
-               ~f:under_drawer
-               (Option.to_list (Session_tabs_view.view m ~inject))
-             @ [ layered modal_composer (Session_view.chrome m ~inject) ]
+            ([ layered modal_composer (Session_view.chrome m ~inject) ]
              @ List.map
                  ~f:under_drawer
                  [ banner m ~inject
