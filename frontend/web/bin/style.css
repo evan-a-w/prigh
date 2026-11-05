@@ -1634,6 +1634,12 @@ kbd {
 .saved-forget { font-size: 18px; }
 .saved-or { margin: 4px 0 -4px; color: var(--faint); font-size: 12.5px; }
 .signin #signin-back { justify-content: center; }
+.signin #desktop-quit { justify-content: center; }
+.signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
+@media (pointer: coarse) {
+  .signin input { font-size: 16px; }
+  .signin .btn { min-height: 44px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .modal, .account-menu { animation: none; }
