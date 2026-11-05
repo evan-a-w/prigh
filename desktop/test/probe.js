@@ -2,7 +2,8 @@
 // desktop`'s pages; run.sh fills in @REPORT@, @ADDRESS@ and @MODE@. It says
 // what the page shows by POSTing to the report server and drives it: in
 // "close" mode it closes the window once the connect form shows, in "quit"
-// mode it signs in with the form and then quits with /quit.
+// mode it signs in with the form (or, on the backend's own prigh-web under
+// -ui remote, with its sign-in) and then quits with /quit.
 (() => {
   // What it saw, for the report when the page is stuck: its requests and
   // errors.
@@ -31,6 +32,7 @@
   };
   let done = false;
   let submitted = false;
+  let signedIn = false;
   const started = Date.now();
   let stuck = false;
   const step = () => {
@@ -59,16 +61,23 @@
     } else if (form && document.querySelector(".signin-error")?.innerText.trim()) {
       done = true;
       report(`the form says: ${document.querySelector(".signin-error").innerText.trim()}`);
+    } else if (!form && !composer && !signedIn && document.querySelector("form input[type=password]")) {
+      // The backend's own prigh-web (-ui remote): its sign-in.
+      done = true;
+      signedIn = true;
+      const where = location.host === "@ADDRESS@" ? "the backend" : location.host;
+      report(`the backend's sign-in, on ${where}`).then(() => {
+        type(document.querySelector("form input[type=password]"), "sekrit");
+        document.querySelector("form button[type=submit]").click();
+        done = false;
+        setTimeout(step, 100);
+      });
     } else if (composer) {
       done = true;
+      // The window may close before anything sent after the /quit arrives.
       report("signed in").then(() => {
         type(composer, "/quit");
         composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-        const quitting = () =>
-          document.querySelector(".desktop-quitting")
-            ? report("quitting")
-            : setTimeout(quitting, 100);
-        quitting();
       });
     }
     if (!done) setTimeout(step, 100);
