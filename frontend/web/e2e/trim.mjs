@@ -406,6 +406,8 @@ try {
   await choose("delete");
   await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Step 2:"));
   await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 4);
+  // Its toast comes with the backend's answer, after the transcript changed.
+  await page.locator(".toast", { hasText: "Message deleted" }).nth(1).waitFor();
   console.log(`after deleting step 2: ${await transcript()}`);
   console.log(clean(await rail()));
   await page.locator(".toast", { hasText: "Message deleted" }).last().locator(".toast-undo").click();
