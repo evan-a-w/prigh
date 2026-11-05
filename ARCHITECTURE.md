@@ -2035,7 +2035,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   first, and stops everything under its switch. The CLI resolves the
   initial connection with `Backend_choice` (none or a bad one: the form)
   and prints the URL as a JSON line on stdout; its log leaves the key
-  out.
+  out. Under `-ui remote` (the default) `Connected` has no relay or
+  handoff: once connected (at start, or from the form, whose answers then
+  carry `remote`) it prints a second line, the backend's own prigh-web
+  (`Backend_address.web_url`) with `#app=desktop&host=ID` and
+  `"remote":true`, and the window goes there.
 - `Local_site` — what `prigh web`'s and `prigh desktop`'s sites
   (`Web_server.listen ~local:true`) accept: they relay to a backend and run
   this machine's tool host, so another page reaching them could run
@@ -3469,7 +3473,8 @@ A Rust workspace, apart from the dune projects: `core/` (the decisions,
 without a window, unit-tested) and `app/` (the Tauri v2 shell,
 `prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
 a blank page shown while `prigh desktop` starts, then the window navigates
-to the URL it reports, and prigh-web there is the whole UI.
+to the URL it reports, and prigh-web there (the sidecar's, or the
+backend's own under `-ui remote`) is the whole UI.
 
 The sidecar contract (the shell's only coupling to the backend):
 
@@ -3479,24 +3484,45 @@ The sidecar contract (the shell's only coupling to the backend):
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
   home directory, with stdin a pipe it holds open;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
-  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
-  anything else ends the app with a dialog); stderr is its log, of which the
-  shell keeps the last 30 lines for the error dialog;
+  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
+  first must be http(s) on a loopback host, anything else ends the app with
+  a dialog); later lines `{"url":"https://…","remote":true}` send the
+  window to the backend's own prigh-web, whose origin then counts as the
+  app's too; stderr is its log, of which the shell keeps the last 30 lines
+  for the error dialog;
 - it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
   failure.
 
 The window closing closes the pipe, waits up to 5 s and then kills the
 sidecar; the sidecar exiting ends the app (after a dialog, from
 `core/failure.rs`, when it failed or never became ready). Navigation stays on
-the sidecar's origin (`core/navigation.rs`); other links and new windows go
-to the system browser through the opener plugin. Downloads are saved in the
+the origins the sidecar named (`core/navigation.rs`); other links and new
+windows go to the system browser through the opener plugin;
+`about:blank#prigh-desktop-quit` is the backend's page quitting (it cannot
+reach the sidecar from another origin), and stops the sidecar as closing
+the window does. Downloads are saved in the
 Downloads folder. The page has no Tauri IPC: the window is created in
 `main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
 page there. Plugins: single-instance (a second launch focuses the window),
 window-state (size and position), opener, dialog.
 
+The window is a browser as far as is cheap: Tauri's drop handler is off,
+so drops reach the page; Ctrl/⌘ with `+`/`=`, `-`, `0`, Ctrl+scroll and a
+pinch zoom the page in steps (`core/zoom.rs`), remembered in the app's
+config directory (`zoom`); F11 toggles fullscreen. On Linux (`mod linux`)
+WebKitGTK's hardware acceleration is set to always (Tauri leaves its
+default, on demand) and zoom applies to the whole page; at start the app
+asks xdg-desktop-portal, on Wayland, whether it has a FileChooser, and
+says on stderr how to get one when not (WebKitGTK's file chooser goes
+through it there); `PRIGH_DESKTOP_GPU_INFO=1` opens `webkit://gpu` instead
+of the sidecar's page. Nix: `nix/desktop.nix` is the app as a function of
+`pkgs`, so the Home Manager module can build it with the system's nixpkgs
+(`useSystemNixpkgs`): WebKitGTK draws with the GPU only when its Mesa
+matches the driver NixOS installs.
+
 Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
-page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit`; the
+page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit` (on
+the backend's own site, `Desktop_page` goes to the quit URL instead); the
 sidecar exits 0 and so does the app. On macOS the app menu (needed for
 WKWebView's Edit shortcuts) takes ⌘Q: its Quit stops the sidecar as closing
 the window does. Either way the sidecar ends first and the app follows.
@@ -3507,11 +3533,12 @@ the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
 the sidecar's pages, which may close the window by going to
 `about:blank#prigh-desktop-test-close`.
 
-Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
+Packaging (`nix/desktop.nix`): the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
 on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
 `$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
-`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh`, with the desktop entry
-and hicolor icons. `nix/home-manager.nix` is `homeManagerModules.default`
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh` (and `PRIGH_DESKTOP_ARGS`
+from `.override { ui; extraArgs; }`), with the desktop entry and hicolor
+icons. `nix/home-manager.nix` is `homeManagerModules.default`
 (`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
 for Linux, macOS and Windows.
 

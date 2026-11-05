@@ -1187,16 +1187,29 @@ need its `-web` port.
 prigh-desktop is prigh-web in a window of its own: a small native app
 ([Tauri](https://tauri.app), `desktop/`) on the system's webview, which runs
 `prigh desktop` while it is open and stops it when the window closes. `prigh
-desktop` serves prigh-web for the saved backend (or asks which one to
-connect to) and is this machine's tool host, so the window is a
-frontend whose sessions run their tools here, as a TUI's do.
+desktop` connects to the saved backend (or asks which one to connect to)
+and is this machine's tool host, so the window is a frontend whose sessions
+run their tools here, as a TUI's do.
+
+What the window shows (`-ui`, `programs.prigh.desktop.ui`):
+
+- **remote** (the default): the backend's own prigh-web, e.g.
+  `https://ai.example.com/`. You sign in there (once: it remembers you) and
+  get the backend's version of prigh-web; sessions you start prefer this
+  machine's tool host (`#app=desktop&host=ID` in the address tells the page
+  which it is, with a backend whose prigh-web knows it).
+- **local**: prigh-web served by this prigh on `127.0.0.1`, relayed to the
+  backend and signed in for you (`prigh web -connect`'s way): this prigh's
+  version of prigh-web, and no sign-in of its own.
 
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
 programs.prigh.enable = true;          # prigh on the PATH
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/Applications
+# programs.prigh.desktop.ui = "local";                           # see above (default "remote")
 # programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
+# programs.prigh.desktop.useSystemNixpkgs = true;                # slow window on NixOS? see below
 # programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
 ```
 
@@ -1212,6 +1225,10 @@ it), so install prigh as well.
   library Nix provides, not your browser). Links to other sites open in
   your browser; downloads go to the Downloads folder; prigh-web may use the
   microphone (dictation), notifications and the clipboard without asking.
+- **Like a browser**: Ctrl (⌘) with `+`/`=`, `-` and `0` zoom, as do
+  Ctrl+scroll and a touchpad pinch; the zoom is remembered. F11 is
+  fullscreen. Files dropped on the window reach the page (attachments,
+  the Files panel), and file pickers are the system's.
 - **Quitting**: closing the window, Quit prigh (the account menu, the ⋯
   sheet, `/quit`) or Ctrl+Q / ⌘Q stop `prigh desktop`, its tool host and
   what its tools started, then the app.
@@ -1231,6 +1248,20 @@ it), so install prigh as well.
   the app, which saves the connection like prigh-tui.
 - **One window**: starting the app again focuses the open one. Its size and
   position are remembered.
+- **Slow on Linux?** WebKitGTK is asked to draw with the GPU, but on NixOS
+  it can only when its Mesa matches the system's driver
+  (`/run/opengl-driver`); from prigh's pinned nixpkgs it may not, and it
+  quietly draws on the CPU. `PRIGH_DESKTOP_GPU_INFO=1 prigh-desktop` shows
+  WebKit's graphics page (`webkit://gpu`): look at the hardware
+  acceleration and the GL renderer (`llvmpipe` means the CPU). The cure is
+  building the app with your nixpkgs: `programs.prigh.desktop.useSystemNixpkgs
+  = true`, or `inputs.prigh.inputs.nixpkgs.follows = "nixpkgs"` in your
+  flake (both build it from source).
+- **No file chooser on Wayland** (Hyprland, sway): WebKitGTK asks
+  xdg-desktop-portal for it, and Hyprland's portal has none. Add one with
+  a FileChooser: on NixOS `xdg.portal = { enable = true; extraPortals = [
+  pkgs.xdg-desktop-portal-gtk ]; };`. The app says so on stderr when no
+  portal answers.
 - **A blank or flickering window on Linux** (WebKitGTK with some GPU drivers,
   NVIDIA in particular): set `WEBKIT_DISABLE_DMABUF_RENDERER=1`
   (`programs.prigh.desktop.disableDmabuf = true`).
@@ -1259,6 +1290,11 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`, for the window to open;
   everything else goes to stderr. It serves on `127.0.0.1:7780`, else the
   next free port, else any (`-listen HOST:PORT` to choose).
+- With `-ui remote` (the default), once it is connected it prints another,
+  `{"url":"https://backend/#app=desktop&host=ID","remote":true}`: the
+  backend's own prigh-web, which the window goes to (the connect form, when
+  there is one, is still its own page). The backend's page quits the app
+  by going to `about:blank#prigh-desktop-quit`, which the window catches.
 - The backend is `-connect`/`-token`/`-user`, else `$PRIGH_CONNECT`/`_TOKEN`/
   `_USER`, else the saved connection, by the TUI's rules, as for `prigh
   web`. When there is none, or it cannot be reached, refuses the login or
