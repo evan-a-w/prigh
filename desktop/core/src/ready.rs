@@ -174,7 +174,10 @@ mod tests {
     #[test]
     fn ready_lines() {
         let page = |url: &str, remote| Ok(Page { url: url.to_string(), remote });
-        assert_eq!(parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#), page("http://127.0.0.1:41234/#signin=abc", false));
+        assert_eq!(
+            parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#),
+            page("http://127.0.0.1:41234/#signin=abc", false)
+        );
         // escapes, spacing, other fields, a trailing CR
         assert_eq!(
             parse("{ \"pid\": 12, \"ok\": true, \"url\" : \"http:\\/\\/127.0.0.1:1\\/x?a=\\u00e9\" }\r\n"),
