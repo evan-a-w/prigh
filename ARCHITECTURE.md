@@ -3536,10 +3536,19 @@ Linux) in a process group of its own, and later page lines are left to the
 page, which goes there itself (`Desktop_page.follow` keeps `shell=browser`
 on the backend's URL). The profile of prigh's own makes it an instance of
 its own, which exits when its last window closes: that exit stops the
-sidecar, as a window closing does. If the profile was already held (an
-instance left by a killed app; Chromium hands the window over and the
-launch exits), the shell waits for the pid in the profile's `SingletonLock`
-instead, trusting it only while `/proc/PID/cmdline` names the profile. The
+sidecar, as a window closing does. One app runs at a time, so an instance
+already on the profile at launch was left by an app that died: the shell
+SIGTERMs it (then SIGKILLs it) before starting the browser, since a window
+handed to it would show a page whose sidecar is gone. The instance is the
+pid in the profile's `SingletonLock`, trusted only while that process runs
+on the profile: its `/proc/PID/cmdline` names it (NUL-separated, or one
+space-joined string once Chrome rewrites its title: `browser::names_profile`)
+or it holds files open in it (`/proc/PID/fd`), for a command line
+reordered by a relaunch. Should a launch still hand its window over (a race
+with another launcher), the shell waits for that instance instead. SIGINT,
+SIGTERM and SIGHUP stop the app as its window closing does (the sidecar,
+then the browser, which is in a process group of its own and would
+otherwise outlive a Ctrl-C); a second signal exits at once. The
 sidecar exiting SIGTERMs (then, after 3 s, SIGKILLs) the browser's process
 group while the process we started is unreaped, and the instance we handed
 the window to; never another. A second launch runs the browser again on the
