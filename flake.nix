@@ -416,6 +416,26 @@
               };
             };
             app = lib.last desktop.home.packages;
+            localUi = lib.last
+              (eval {
+                programs.prigh = {
+                  enable = true;
+                  desktop = {
+                    enable = true;
+                    ui = "local";
+                  };
+                };
+              }).home.packages;
+            systemNixpkgs = lib.last
+              (eval {
+                programs.prigh = {
+                  enable = true;
+                  desktop = {
+                    enable = true;
+                    useSystemNixpkgs = true;
+                  };
+                };
+              }).home.packages;
           in
           pkgs.runCommand "prigh-home-manager-module" { } ''
             test "${names off}" = ""
@@ -426,8 +446,12 @@
             # the desktop app was given the options
             wrapper=${app}/bin/prigh-desktop
             grep -q 'PRIGH_DESKTOP_BACKEND.*${prigh}/bin/prigh' "$wrapper"
-            grep -q "PRIGH_DESKTOP_ARGS.*-cwd.*/my proj" "$wrapper"
+            grep -q "PRIGH_DESKTOP_ARGS.*-ui remote -cwd.*/my proj" "$wrapper"
             grep -q 'WEBKIT_DISABLE_DMABUF_RENDERER.*1' "$wrapper"
+            grep -q 'PRIGH_DESKTOP_ARGS.*-ui local' ${localUi}/bin/prigh-desktop
+            # built from this nixpkgs: the same derivation as the flake's here
+            test "${systemNixpkgs.unwrapped}" = "${prighDesktopUnwrapped}"
+            grep -q 'PRIGH_DESKTOP_ARGS.*-ui remote' ${systemNixpkgs}/bin/prigh-desktop
             touch "$out"
           '';
 
