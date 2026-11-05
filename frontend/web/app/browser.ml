@@ -183,11 +183,10 @@ let clear_hash () =
           (Js.to_string location##.pathname ^ Js.to_string location##.search)))
 ;;
 
-let post ?content_type ~url ~body ~f =
+let post ~content_type ~url ~body ~f =
   let xhr = XmlHttpRequest.create () in
   xhr##_open (Js.string "POST") (Js.string url) Js._true;
-  Option.iter content_type ~f:(fun content_type ->
-    xhr##setRequestHeader (Js.string "Content-Type") (Js.string content_type));
+  xhr##setRequestHeader (Js.string "Content-Type") (Js.string content_type);
   xhr##.onreadystatechange
   := Js.wrap_callback (fun () ->
        match xhr##.readyState with

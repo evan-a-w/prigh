@@ -55,7 +55,7 @@ val clear_hash : unit -> unit
 (** [POST]s [body] to [url] and calls [f] with the answer's body when its
     status is 200, else with [None]. *)
 val post
-  :  ?content_type:string
+  :  content_type:string
   -> url:string
   -> body:string
   -> f:(string option -> unit)
