@@ -3411,7 +3411,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     stylesheet, copy-tex and woff2 fonts: 270 KB of script, 76 KB as
     `.gz`, and 260 KB of fonts, of which a page fetches those its math
     uses; none of it until a reply has math, but the service worker
-    keeps it all), assembled under
+    keeps it all), temporal-polyfill (which `index.html` loads before
+    `main.bc.js` only where the browser has no `Temporal`, e.g. WebKitGTK:
+    Core's `Timezone_js_loader` needs it and Bonsai_web's start asks for
+    the local zone, so without it the app never starts), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
@@ -3437,6 +3440,58 @@ terminal frontend and `web/` prigh-web, the browser one.
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
     `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
+
+## Desktop app (`desktop/`)
+
+A Rust workspace, apart from the dune projects: `core/` (the decisions,
+without a window, unit-tested) and `app/` (the Tauri v2 shell,
+`prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
+a blank page shown while `prigh desktop` starts, then the window navigates
+to the URL it reports, and prigh-web there is the whole UI.
+
+The sidecar contract (the shell's only coupling to the backend):
+
+- the shell runs `<backend> desktop [$PRIGH_DESKTOP_ARGS]` (`core/launch.rs`:
+  `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
+  shell's PATH, since an app started from a desktop menu has a short one;
+  on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
+  home directory, with stdin a pipe it holds open;
+- the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
+  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
+  anything else ends the app with a dialog); stderr is its log, of which the
+  shell keeps the last 30 lines for the error dialog;
+- it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
+  failure.
+
+The window closing closes the pipe, waits up to 5 s and then kills the
+sidecar; the sidecar exiting ends the app (after a dialog, from
+`core/failure.rs`, when it failed or never became ready). Navigation stays on
+the sidecar's origin (`core/navigation.rs`); other links and new windows go
+to the system browser through the opener plugin. Downloads are saved in the
+Downloads folder. The page has no Tauri IPC: the window is created in
+`main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
+page there. Plugins: single-instance (a second launch focuses the window),
+window-state (size and position), opener, dialog.
+
+Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
+page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit`; the
+sidecar exits 0 and so does the app. On macOS the app menu (needed for
+WKWebView's Edit shortcuts) takes ⌘Q: its Quit stops the sidecar as closing
+the window does. Either way the sidecar ends first and the app follows.
+
+Test hooks (environment): `PRIGH_DESKTOP_NO_DIALOG` logs failures instead of
+showing dialogs, `PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD` closes the window once
+the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
+the sidecar's pages, which may close the window by going to
+`about:blank#prigh-desktop-test-close`.
+
+Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
+on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
+`$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh`, with the desktop entry
+and hicolor icons. `nix/home-manager.nix` is `homeManagerModules.default`
+(`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
+for Linux, macOS and Windows.
 
 ## Data on disk
 

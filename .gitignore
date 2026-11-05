@@ -92,3 +92,7 @@
 # dune build artifacts at any depth
 _build/
 *.orig
+
+# The desktop shell (Rust, Tauri)
+/desktop/target/
+/desktop/app/gen/
