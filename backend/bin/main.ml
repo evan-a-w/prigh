@@ -1278,8 +1278,7 @@ let desktop_command =
          match Option.map ui ~f:String.lowercase with
          | None | Some "remote" -> Remote
          | Some "local" -> Local
-         | Some other ->
-           fail (sprintf "-ui %S: expected remote or local" other)
+         | Some other -> fail (sprintf "-ui %S: expected remote or local" other)
        in
        let root = Remote_choice.web_root ~fail web_root in
        let cwd = Remote_choice.cwd ~fail cwd in

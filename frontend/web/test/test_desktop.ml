@@ -165,6 +165,8 @@ let%expect_test "the sidecar's link and answers" =
     ; {|{"state":"connect","address":null,"user":null,"error":null}|}
     ; {|{"state":"connected","address":"host:7790","code":"c0de"}|}
     ; {|{"state":"connected","address":"host:7790","code":null}|}
+    ; {|{"state":"remote","url":"https://ai.example.com/#app=desktop&host=laptop"}|}
+    ; {|{"state":"remote"}|}
     ; {|{"state":"other"}|}
     ; "not json"
     ]
@@ -174,6 +176,7 @@ let%expect_test "the sidecar's link and answers" =
           (Desktop_link.Status.of_json reply : Desktop_link.Status.t option)]);
   List.iter
     [ {|{"ok":true,"code":"c0de"}|}
+    ; {|{"ok":true,"remote":"https://ai.example.com/#app=desktop"}|}
     ; {|{"ok":false,"error":"cannot reach the backend"}|}
     ; {|{"ok":false,"error":"not encrypted","plaintext":true}|}
     ; {|{"ok":false}|}
@@ -198,12 +201,48 @@ let%expect_test "the sidecar's link and answers" =
     ((Connect (address ()) (user ()) (error ())))
     ((Connected (code (c0de))))
     ((Connected (code ())))
+    ((Remote https://ai.example.com/#app=desktop&host=laptop))
+    ()
     ()
     ()
     ((Connected (c0de)))
+    ((Remote https://ai.example.com/#app=desktop))
     ((Refused "cannot reach the backend"))
     ((Plaintext "not encrypted"))
     ((Refused "The backend did not accept the connection."))
     ()
+    |}]
+;;
+
+let%expect_test "the backend's own site opened by the desktop app" =
+  List.iter
+    [ "#app=desktop&host=host-laptop"
+    ; "#app=desktop&host=my%20laptop%2Fhome"
+    ; "#app=desktop&host=a+b%zz%4"
+    ; "#app=desktop"
+    ; "#app=desktop&host="
+    ; "#host=laptop"
+    ; "#app=other&host=laptop"
+    ; "#desktop=k"
+    ; ""
+    ]
+    ~f:(fun hash ->
+      print_s
+        [%message
+          hash
+            ~hint:(Desktop_link.Hint.of_hash hash : Desktop_link.Hint.t option)]);
+  print_endline Desktop_link.quit_url;
+  [%expect
+    {|
+    (#app=desktop&host=host-laptop (hint (((host (host-laptop))))))
+    (#app=desktop&host=my%20laptop%2Fhome (hint (((host ("my laptop/home"))))))
+    (#app=desktop&host=a+b%zz%4 (hint (((host (a+b%zz%4))))))
+    (#app=desktop (hint (((host ())))))
+    (#app=desktop&host= (hint (((host ())))))
+    (#host=laptop (hint ()))
+    (#app=other&host=laptop (hint ()))
+    (#desktop=k (hint ()))
+    ("" (hint ()))
+    about:blank#prigh-desktop-quit
     |}]
 ;;

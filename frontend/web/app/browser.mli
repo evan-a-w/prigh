@@ -52,6 +52,9 @@ val hash : unit -> string
     entry. *)
 val clear_hash : unit -> unit
 
+(** Replaces the page with [url] (no history entry). *)
+val navigate : string -> unit
+
 (** [POST]s [body] to [url] and calls [f] with the answer's body when its
     status is 200, else with [None]. *)
 val post

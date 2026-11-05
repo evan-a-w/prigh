@@ -33,7 +33,8 @@ module Page = struct
   let to_json_line t =
     Json.to_string
       (`Object
-          (("url", `String t.url) :: (if t.remote then [ "remote", `True ] else [])))
+          (("url", `String t.url)
+           :: (if t.remote then [ "remote", `True ] else [])))
   ;;
 end
 

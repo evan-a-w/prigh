@@ -713,33 +713,40 @@ module Desktop = struct
     if first.remote
     then (
       printf "first page: %s\n" (Desktop_sidecar.Page.to_json_line first);
-      { url; key = ""; port = 0; ended; close_stdin = (fun () -> Eio.Flow.close stdin_writer); saved; pages })
+      { url
+      ; key = ""
+      ; port = 0
+      ; ended
+      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+      ; saved
+      ; pages
+      })
     else (
-    let port =
-      String.lsplit2_exn url ~on:':'
-      |> snd
-      |> String.lsplit2_exn ~on:':'
-      |> snd
-      |> String.lsplit2_exn ~on:'/'
-      |> fst
-      |> Int.of_string
-    in
-    let key = String.lsplit2_exn url ~on:'=' |> snd in
-    printf
-      "url: %s\n"
-      (url
-       |> String.substr_replace_all
-            ~pattern:(sprintf ":%d/" port)
-            ~with_:":PORT/"
-       |> String.substr_replace_all ~pattern:key ~with_:"<key>");
-    { url
-    ; key
-    ; port
-    ; ended
-    ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
-    ; saved
-    ; pages
-    })
+      let port =
+        String.lsplit2_exn url ~on:':'
+        |> snd
+        |> String.lsplit2_exn ~on:':'
+        |> snd
+        |> String.lsplit2_exn ~on:'/'
+        |> fst
+        |> Int.of_string
+      in
+      let key = String.lsplit2_exn url ~on:'=' |> snd in
+      printf
+        "url: %s\n"
+        (url
+         |> String.substr_replace_all
+              ~pattern:(sprintf ":%d/" port)
+              ~with_:":PORT/"
+         |> String.substr_replace_all ~pattern:key ~with_:"<key>");
+      { url
+      ; key
+      ; port
+      ; ended
+      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+      ; saved
+      ; pages
+      })
   ;;
 
   (* The pages said since, as the shell reads them. *)
@@ -1134,7 +1141,8 @@ let%expect_test
   start ~tools:Remote (sprintf "ws://127.0.0.1:%d/ws" backend_port);
   List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
   print_string (unport backend_port [%expect.output]);
-  [%expect {|
+  [%expect
+    {|
     first page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
     Stdin_closed
     first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true}
@@ -1150,8 +1158,7 @@ let%expect_test
 ;;
 
 let%expect_test
-    "prigh desktop -ui remote with a saved connection that fails: the form \
-     here"
+    "prigh desktop -ui remote with a saved connection that fails: the form here"
   =
   with_sandbox
   @@ fun t ->
@@ -1174,7 +1181,8 @@ let%expect_test
   ignore (Desktop.post t ~sw d "status" [] : string option);
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
-  [%expect {|
+  [%expect
+    {|
     url: http://127.0.0.1:PORT/#desktop=<key>
     status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":null,"error":"-connect did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
     Stdin_closed
@@ -1196,7 +1204,8 @@ let%expect_test "the remote site's URL, from each form of address" =
         "%s -> %s\n"
         spec
         (Backend_address.web_url (Or_error.ok_exn (Backend_address.parse spec))));
-  [%expect {|
+  [%expect
+    {|
     server:7790 -> http://server:7790/
     ws://server:7790/ws -> http://server:7790/
     wss://ai.example.com/ws -> https://ai.example.com/
