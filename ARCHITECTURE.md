@@ -3304,25 +3304,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
-    - Session tabs: `Session_tabs` (pure) holds whether they are on (the
-      `web.tabs` preference, `/tabs on|off` and the settings' switch) and
-      the open sessions' ids in order (`web.open-tabs`), restored from the
-      browser's cache and then the backend's preferences, and saved
-      (`to_save`) only once those arrived (`load`), so a page that has not
-      heard them yet never overwrites another browser's. `update` keeps
-      the tabs in step (`follow_tabs`): the current session gains a tab
-      when it changes, except a new session started by closing the last
-      tab (`Blank`), which stays out, showing the empty state, until it is
-      listed; `list_sessions` (`listed`) closes the tabs of sessions
-      deleted or archived and, from its `running`, `waiting` and `failed`,
-      marks those whose work finished while out of sight (`finished`, cleared
-      when seen). Closing, `Step_tab`, `Nth_tab` and dropping a dragged
-      tab (`Drag_tab`, `Drop_tab`: HTML drag and drop, the page's
-      `dragover` already allows drops) only switch sessions through
-      `switch_session`/`New_session`, so switching still resets everything
-      of the old session; steps count from the session being switched to,
-      so keys pressed in a row each move on. `Session_tabs_view` renders
-      the strip (none when off or narrow: a phone keeps its slim bar).
+    - Open in new window: `Command.Open_window` (the session menu's item,
+      `Action.Open_session_window` from a Ctrl/⌘- or middle click in the
+      sidebar) opens the page on `?session=ID` in another window
+      (`Desktop_page.open_window`). A new window gets none of the opener's
+      sessionStorage, so under the desktop app the URL carries the
+      fragment that puts it in desktop mode too
+      (`Desktop_link.window_fragment`: `desktop=KEY` on the sidecar's
+      page, `app=desktop` on the backend's site, plus `shell=browser`); in
+      a browser's app window it asks for a `popup` (no tabs or address
+      bar) the size of this one.
     - Installing: `Model.update_ready` is the update notice (one, over
       the toasts, until answered): `Update_ready` raises it, `Apply_update`
       emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s
@@ -3549,6 +3540,16 @@ in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 (an `--app` window's history is one entry, so the page may close it), with
 "Close this window to quit prigh." if the browser refuses.
 
+
+More windows: the page's Open in new window (`window.open` on its own site)
+reaches the app's window as `on_new_window`; one `navigation::decide`
+allows becomes another app window (`main-N`, built off the callback's
+thread, with the same handlers and zoom), not a webview Tauri makes on its
+own, and the request is refused. All the windows share the one sidecar and
+tool host; the app stops it when the last closes (`ExitRequested`).
+Zoom applies to every window. In a browser's app window the page opens a
+popup in the same instance, which the shell already waits for.
+
 Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
 page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit` (on
 the backend's own site, `Desktop_page` goes to the quit URL instead); the
@@ -3559,7 +3560,7 @@ the window does. Either way the sidecar ends first and the app follows.
 Test hooks (environment): `PRIGH_DESKTOP_NO_DIALOG` logs failures instead of
 showing dialogs, `PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD` closes the window once
 the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
-the sidecar's pages, which may close the window by going to
+the sidecar's pages, which may close its window by going to
 `about:blank#prigh-desktop-test-close`.
 
 Packaging (`nix/desktop.nix`): the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
