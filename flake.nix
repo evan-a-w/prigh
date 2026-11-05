@@ -167,12 +167,131 @@
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
             case "''${1:-}" in
-              acp | run | serve | tool-host | web | sessions | login | logout | auth | models | trace)
+              acp | run | serve | tool-host | web | desktop | sessions | login | logout | auth | models | trace)
                 exec "$PRIGH_BACKEND" "$@" ;;
             esac
             exec ${prighFrontend}/bin/prigh-tui "$@"
           '';
         };
+
+        # The desktop app (desktop/): a Tauri shell, prigh-web in the system
+        # webview, running `prigh desktop` while it is open. Unwrapped, it
+        # finds prigh on the PATH; `prighDesktop` points it at ours.
+        lib = pkgs.lib;
+        isLinux = pkgs.stdenv.hostPlatform.isLinux;
+        desktopVersion = (builtins.fromTOML (builtins.readFile ./desktop/Cargo.toml)).workspace.package.version;
+        desktopLinuxDeps = [
+          pkgs.webkitgtk_4_1
+          pkgs.libsoup_3
+          pkgs.glib-networking
+          pkgs.openssl
+        ];
+        prighDesktopUnwrapped = pkgs.rustPlatform.buildRustPackage {
+          pname = "prigh-desktop-unwrapped";
+          version = desktopVersion;
+          src = lib.fileset.toSource {
+            root = ./desktop;
+            fileset = lib.fileset.unions [
+              ./desktop/Cargo.toml
+              ./desktop/Cargo.lock
+              ./desktop/core
+              (lib.fileset.difference ./desktop/app (lib.fileset.maybeMissing ./desktop/app/gen))
+            ];
+          };
+          cargoLock.lockFile = ./desktop/Cargo.lock;
+          buildAndTestSubdir = "app";
+          nativeBuildInputs = [
+            pkgs.cargo-tauri.hook
+            pkgs.pkg-config
+          ]
+          ++ lib.optionals isLinux [ pkgs.wrapGAppsHook3 ];
+          buildInputs = lib.optionals isLinux desktopLinuxDeps;
+          # The logic is in prigh-desktop-core; the app's own crate has no
+          # tests.
+          checkPhase = ''
+            runHook preCheck
+            cargo test --offline -j "$NIX_BUILD_CORES" -p prigh-desktop-core
+            runHook postCheck
+          '';
+          meta = {
+            description = "prigh's desktop app, without a default prigh";
+            mainProgram = "prigh-desktop";
+            platforms = lib.platforms.linux ++ lib.platforms.darwin;
+          };
+        };
+        # `.override { backend; extraArgs; disableDmabuf; }` is what
+        # programs.prigh.desktop in the Home Manager module uses.
+        prighDesktop = lib.makeOverridable (
+          {
+            backend ? prigh,
+            extraArgs ? [ ],
+            disableDmabuf ? false,
+          }:
+          let
+            env = {
+              PRIGH_DESKTOP_BACKEND = "${backend}/bin/prigh";
+            }
+            // lib.optionalAttrs (extraArgs != [ ]) { PRIGH_DESKTOP_ARGS = lib.escapeShellArgs extraArgs; }
+            // lib.optionalAttrs disableDmabuf { WEBKIT_DISABLE_DMABUF_RENDERER = "1"; };
+            wrapFlags = lib.concatLists (
+              lib.mapAttrsToList (name: value: [
+                "--set-default"
+                name
+                value
+              ]) env
+            );
+            unwrapped = prighDesktopUnwrapped;
+          in
+          pkgs.runCommand "prigh-desktop-${desktopVersion}"
+            {
+              nativeBuildInputs = [ pkgs.makeWrapper ];
+              passthru = { inherit unwrapped backend; };
+              meta = unwrapped.meta // {
+                description = "prigh's desktop app: prigh-web in a native window, with prigh desktop running while it is open";
+              };
+            }
+            (
+              ''
+                mkdir -p "$out/bin"
+                makeWrapper ${unwrapped}/bin/prigh-desktop "$out/bin/prigh-desktop" ${lib.escapeShellArgs wrapFlags}
+              ''
+              + (
+                if isLinux then
+                  ''
+                    mkdir -p "$out/share"
+                    ln -s ${unwrapped}/share/icons "$out/share/icons"
+                    mkdir "$out/share/applications"
+                    sed "s|^Exec=.*|Exec=$out/bin/prigh-desktop|" \
+                      ${unwrapped}/share/applications/prigh.desktop > "$out/share/applications/prigh.desktop"
+                  ''
+                else
+                  # A Dock or Finder launch does not go through bin/: the
+                  # bundle's Info.plist carries the environment
+                  # (LSEnvironment).
+                  ''
+                    mkdir -p "$out/Applications"
+                    cp -R ${unwrapped}/Applications/prigh.app "$out/Applications/"
+                    chmod -R u+w "$out/Applications/prigh.app"
+                    plist="$out/Applications/prigh.app/Contents/Info.plist"
+                    entries=${
+                      lib.escapeShellArg (
+                        lib.concatStrings (
+                          lib.mapAttrsToList (
+                            name: value: "<key>${name}</key><string>${lib.escapeXML value}</string>"
+                          ) env
+                        )
+                      )
+                    }
+                    ENTRY="<key>LSEnvironment</key><dict>$entries</dict>" awk '
+                      { lines[NR] = $0 }
+                      /<\/dict>/ { last = NR }
+                      END { for (i = 1; i <= NR; i++) { if (i == last) print ENVIRON["ENTRY"]; print lines[i] } }
+                    ' "$plist" > plist.new
+                    mv plist.new "$plist"
+                  ''
+              )
+            )
+        ) { };
       in
       {
         legacyPackages = frontendScope;
@@ -181,6 +300,8 @@
           default = prigh;
           frontend = prighFrontend;
           backend = prighBackend;
+          prigh-desktop = prighDesktop;
+          prigh-desktop-unwrapped = prighDesktopUnwrapped;
         };
 
         apps.default = {
@@ -317,6 +438,109 @@
           else
             pkgs.runCommand "prigh-web-e2e-skipped" { } ''touch "$out"'';
 
+        # desktop/test: the app in a real window (WebKitGTK under Xvfb, software
+        # rendering) against a fake `prigh desktop` (the failure paths) and the
+        # real one with a `prigh serve -web` backend.
+        checks.desktop-window =
+          if isLinux then
+            pkgs.runCommand "prigh-desktop-window"
+              {
+                nativeBuildInputs = [
+                  pkgs.xvfb-run
+                  pkgs.dbus
+                  pkgs.python3
+                ];
+                __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
+                LIBGL_ALWAYS_SOFTWARE = "1";
+                WEBKIT_DISABLE_DMABUF_RENDERER = "1";
+              }
+              ''
+                cp -r ${./desktop/test} test
+                chmod -R u+w test
+                patchShebangs test
+                xvfb-run -a dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
+                  bash test/run.sh ${prighDesktop}/bin/prigh-desktop ${prigh}/bin/prigh > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
+                diff -u test/expected.txt actual.txt
+                # what the wrapper and the desktop entry say
+                grep -q 'PRIGH_DESKTOP_BACKEND.*${prigh}/bin/prigh' ${prighDesktop}/bin/prigh-desktop
+                grep -qx 'Exec=${prighDesktop}/bin/prigh-desktop' ${prighDesktop}/share/applications/prigh.desktop
+                grep -qx 'Name=prigh' ${prighDesktop}/share/applications/prigh.desktop
+                grep -qx 'Icon=prigh-desktop' ${prighDesktop}/share/applications/prigh.desktop
+                test -f ${prighDesktop}/share/icons/hicolor/128x128/apps/prigh-desktop.png
+                touch "$out"
+              ''
+          else
+            pkgs.runCommand "prigh-desktop-window-skipped" { } ''touch "$out"'';
+
+        # nix/home-manager.nix, evaluated with stand-ins for the two Home
+        # Manager options it sets.
+        checks.home-manager-module =
+          let
+            stub =
+              { lib, ... }:
+              {
+                options.home.packages = lib.mkOption {
+                  type = lib.types.listOf lib.types.package;
+                  default = [ ];
+                };
+                options.assertions = lib.mkOption {
+                  type = lib.types.listOf lib.types.unspecified;
+                  default = [ ];
+                };
+                config._module.args.pkgs = pkgs;
+              };
+            eval =
+              config:
+              (lib.evalModules {
+                modules = [
+                  self.homeManagerModules.default
+                  stub
+                  config
+                ];
+              }).config;
+            names = c: lib.concatMapStringsSep " " (p: p.name) c.home.packages;
+            failing = c: lib.concatMapStrings (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
+            off = eval { };
+            cli = eval { programs.prigh.enable = true; };
+            desktop = eval {
+              programs.prigh = {
+                enable = true;
+                desktop = {
+                  enable = true;
+                  extraArgs = [
+                    "-cwd"
+                    "/my proj"
+                  ];
+                  disableDmabuf = true;
+                };
+              };
+            };
+            secret = eval {
+              programs.prigh = {
+                enable = true;
+                desktop.extraArgs = [
+                  "-name"
+                  "x"
+                  "-token=sekrit"
+                ];
+              };
+            };
+            app = lib.last desktop.home.packages;
+          in
+          pkgs.runCommand "prigh-home-manager-module" { } ''
+            test "${names off}" = ""
+            test "${names cli}" = "prigh"
+            test "${names desktop}" = "prigh prigh-desktop-${desktopVersion}"
+            test -z ${lib.escapeShellArg (failing desktop)}
+            echo ${lib.escapeShellArg (failing secret)} | grep -q 'programs.prigh.desktop.extraArgs has -token=sekrit:'
+            # the desktop app was given the options
+            wrapper=${app}/bin/prigh-desktop
+            grep -q 'PRIGH_DESKTOP_BACKEND.*${prigh}/bin/prigh' "$wrapper"
+            grep -q "PRIGH_DESKTOP_ARGS.*-cwd.*/my proj" "$wrapper"
+            grep -q 'WEBKIT_DISABLE_DMABUF_RENDERER.*1' "$wrapper"
+            touch "$out"
+          '';
+
         # One OxCaml toolchain for the backend and the frontends: both projects
         # build from this shell (`.#backend` is kept as an alias).
         devShells.default = pkgs.mkShell {
@@ -346,6 +570,21 @@
           '';
         };
         devShells.backend = self.devShells.${system}.default;
+        # desktop/: Rust, cargo-tauri and the webview's libraries, apart from
+        # the OxCaml shell so that one stays lean.
+        devShells.desktop = pkgs.mkShell {
+          inputsFrom = [ prighDesktopUnwrapped ];
+          packages = [
+            pkgs.cargo-tauri
+            pkgs.clippy
+            pkgs.rustfmt
+            pkgs.rust-analyzer
+          ];
+        };
       }
-    );
+    )
+    // {
+      homeManagerModules.default = self.homeManagerModules.prigh;
+      homeManagerModules.prigh = import ./nix/home-manager.nix self;
+    };
 }
