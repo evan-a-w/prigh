@@ -531,3 +531,59 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
       none               13.3k    0    45.8k    13.3k    19.9k     0     0     0  15.5k       1/0/1     6/6       -       -
     |}]
 ;;
+
+let%expect_test "desktop: the URL as a JSON line; stdin closing ends it" =
+  with_sandbox
+  @@ fun t ->
+  write t "site/index.html" "";
+  let site = Filename.concat t.dir "site" in
+  prigh t [ "desktop"; "-web-root"; site; "-cwd"; "/nonexistent" ];
+  prigh t [ "desktop"; "-tools"; "elsewhere" ];
+  let p =
+    spawn
+      t
+      [ "desktop"; "-listen"; "127.0.0.1:0"; "-web-root"; site; "-cwd"; t.dir ]
+  in
+  let out = Core_unix.in_channel_of_descr p.stdout in
+  let line = In_channel.input_line_exn out in
+  let url =
+    match Jsonaf.parse line with
+    | Ok (`Object [ ("url", `String url) ]) -> url
+    | _ -> failwithf "not the URL's line: %s" line ()
+  in
+  let shown =
+    match String.lsplit2 url ~on:'#' with
+    | Some (base, key) ->
+      sprintf
+        "%s#%s (%d hex digits)"
+        (Re.replace_string (Re.compile (Re.Perl.re ":[0-9]+/")) ~by:":PORT/" base)
+        (String.prefix key 8)
+        (String.length key - 8)
+    | None -> url
+  in
+  print_endline shown;
+  Core_unix.close p.stdin;
+  let rest = In_channel.input_all out in
+  let err = In_channel.input_all (Core_unix.in_channel_of_descr p.stderr) in
+  printf "more stdout: %S\n" rest;
+  print_s [%sexp (Core_unix.waitpid p.pid : Core_unix.Exit_or_signal.t)];
+  print_endline
+    (Re.replace_string
+       (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/#desktop=[0-9a-f]+"))
+       ~by:"127.0.0.1:PORT/#desktop=<key>"
+       err);
+  [%expect
+    {|
+    $ prigh desktop -web-root $DIR/site -cwd /nonexistent
+    prigh desktop: -cwd /nonexistent: no such directory (mkdir -p it first)
+    [exit 2]
+    $ prigh desktop -tools elsewhere
+    prigh desktop: -tools elsewhere: local (run tools on this machine) or remote (on the backend)
+    [exit 2]
+    http://127.0.0.1:PORT/#desktop= (32 hex digits)
+    more stdout: ""
+    (Ok ())
+    prigh desktop: prigh-web on http://127.0.0.1:PORT/#desktop=<key>
+    prigh desktop: stdin closed: the window is gone
+    |}]
+;;
