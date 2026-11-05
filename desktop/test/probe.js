@@ -7,9 +7,10 @@
 // first opens the thinking chip's menu on the new-session screen and
 // chooses from it with the real pointer (run.sh's report server moves and
 // clicks it with xdotool), hovering first. "window" mode sends a message,
-// then Ctrl+clicks its session in the sidebar: the page opens it in another
-// window (where this script runs too: it reports what that window shows and
-// closes it), and once that one has closed the first quits.
+// then Ctrl+clicks its session in the sidebar with the real pointer: the
+// page opens it in another window (where this script runs too: it reports
+// what that window shows and closes it), and once that one has closed the
+// first quits.
 (() => {
   // What it saw, for the report when the page is stuck: its requests and
   // errors.
@@ -100,7 +101,8 @@
     composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
     const session = await until(() => document.querySelector(".sessions .session-open"), 15000);
     if (!session) return report("window: no session in the sidebar");
-    session.dispatchEvent(new MouseEvent("click", { ctrlKey: true, bubbles: true, cancelable: true }));
+    // The real pointer: a page opens windows only from a user's action.
+    await pointer("ctrlclick", session);
     const seen = await until(() => localStorage.getItem("probe-window"), 30000);
     await report(`window: the other window: ${seen || "nothing within 30s"}`);
     // It has closed by now, or is closing: this window, and the app, go on.
