@@ -7,6 +7,11 @@ open! Core
     under the desktop app. *)
 val key : unit -> string option
 
+(** On the backend's own site opened by the desktop app ([#app=desktop]):
+    notes it for the tab, prefers the tool host the fragment names, and
+    clears the fragment. *)
+val take_hint : unit -> unit
+
 (** Whether the page runs under the desktop app. *)
 val active : unit -> bool
 
@@ -26,5 +31,7 @@ val connect
   -> unit
 
 (** Stops the desktop app, and shows what happened in the page meanwhile
-    (the window closes once the sidecar has exited). *)
+    (the window closes once the sidecar has exited). On the backend's own
+    site it goes to {!Prigh_web.Desktop_link.quit_url}, which the window
+    catches. *)
 val quit : unit -> unit

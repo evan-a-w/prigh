@@ -2,11 +2,22 @@ open! Core
 open! Import
 
 (** [prigh desktop]: the process the desktop app's window (the Tauri shell
-    in [desktop/]) runs and shows. Like [prigh web] it serves prigh-web on
-    this machine for a backend elsewhere, relayed, with the page signed in
-    and a {!Tool_host} running this machine's tools; unlike it, it starts
-    without a working connection too: the page then shows a connect form,
-    and the connection typed there is checked, saved and used.
+    in [desktop/]) runs and shows, with a {!Tool_host} running this
+    machine's tools for the backend. The window shows either the backend's
+    own prigh-web ({!Ui.Remote}: the user signs in there) or, like
+    [prigh web], prigh-web served on this machine, relayed and signed in
+    ({!Ui.Local}). Unlike [prigh web] it starts without a working
+    connection too: the window then shows a connect form served here, and
+    the connection typed there is checked, saved and used.
+
+    It says where the window should be as JSON lines on stdout
+    ({!Page.t}): first the page here (or, under {!Ui.Remote} with a
+    connection that works at once, the backend's), then the backend's once
+    the form has connected. The backend's URL's fragment is
+    [#app=desktop&host=ID]: the page then offers Quit (by going to
+    [about:blank#prigh-desktop-quit], which the window takes as quitting)
+    and prefers this machine's tool host ([ID]; absent with
+    [-tools remote]).
 
     The page's URL carries a per-run key in its fragment ([#desktop=KEY]),
     which the page keeps (in sessionStorage) and sends with every request to
@@ -19,12 +30,14 @@ open! Import
 
     - [/desktop/status]: once any check under way is done,
       [{"state": "connect", "address", "user", "error"}] (the form's
-      prefill, each a string or null) or
+      prefill, each a string or null),
       [{"state": "connected", "address", "code"}] ([code] the
-      {!Signin_handoff}'s, null once traded);
+      {!Signin_handoff}'s, null once traded) or, under {!Ui.Remote},
+      [{"state": "remote", "url"}] (the window is on its way there);
     - [/desktop/connect] with ["address"], ["user"] and ["token"]: checks
       them ({!Web_connect.Check}), and if the backend accepts them saves
-      them and answers [{"ok": true, "code"}], else
+      them and answers [{"ok": true, "code"}] ([{"ok": true, "remote":
+      url}] under {!Ui.Remote}), else
       [{"ok": false, "error"}] (what is wrong and what to do). An address
       without TLS to another machine is refused with
       [{"ok": false, "error", "plaintext": true}] (the risk, and the
@@ -46,9 +59,31 @@ module Initial : sig
         }
 end
 
+module Ui : sig
+  type t =
+    | Remote (** the backend's own prigh-web *)
+    | Local (** prigh-web served here, relayed and signed in *)
+  [@@deriving sexp_of]
+end
+
+(** Where the window should go: a line on stdout. *)
+module Page : sig
+  type t =
+    { url : string
+    ; remote : bool
+      (** the backend's site, which the window is to trust as it trusts
+          the page here *)
+    }
+  [@@deriving sexp_of]
+
+  (** [{"url": ...}], with ["remote": true] when it is. *)
+  val to_json_line : t -> string
+end
+
 module Config : sig
   type t =
     { initial : Initial.t
+    ; ui : Ui.t
     ; tools : Web_connect.Tools.t
     ; name : string (** the tool host's *)
     ; host_id : string
@@ -70,8 +105,8 @@ end
 (** [/desktop/] *)
 val path_prefix : string
 
-(** Serves the site, calls [on_url] with the page's URL once listening, and
-    runs until the page quits, [stdin] reaches its end (or fails) or
+(** Serves the site, calls [on_page] with where the window should go once
+    listening (and again each time that changes), and runs until the page quits, [stdin] reaches its end (or fails) or
     [stopped] returns; then stops the site and the tool host (killing the
     tools' processes) and returns. The URL logged leaves the key out. Raises
     what listening raises. *)
@@ -81,7 +116,7 @@ val run
   -> ?check_timeout:Time_ns.Span.t (** default 15s *)
   -> ?stopped:(unit -> unit) (** default: never *)
   -> log:(string -> unit)
-  -> on_url:(string -> unit)
+  -> on_page:(Page.t -> unit)
   -> stdin:_ Eio.Flow.source
   -> Config.t
   -> Ended.t
