@@ -1185,7 +1185,8 @@ need its `-web` port.
 ## Desktop app
 
 prigh-desktop is prigh-web in a window of its own: a small native app
-([Tauri](https://tauri.app), `desktop/`) on the system's webview, which runs
+([Tauri](https://tauri.app), `desktop/`), showing it in an installed
+Chromium-family browser's app window or on the system's webview, which runs
 `prigh desktop` while it is open and stops it when the window closes. `prigh
 desktop` connects to the saved backend (or asks which one to connect to)
 and is this machine's tool host, so the window is a frontend whose sessions
@@ -1202,12 +1203,38 @@ What the window shows (`-ui`, `programs.prigh.desktop.ui`):
   backend and signed in for you (`prigh web -connect`'s way): this prigh's
   version of prigh-web, and no sign-in of its own.
 
+Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
+
+- **auto** (the default): on Linux, an installed Chromium-family browser's
+  app window when there is one, else the app's own; elsewhere the app's own
+  (WebView2 is Chromium already, and on macOS a browser keeps running when
+  its last window closes, so closing the window would not end the app).
+- **browser**: an installed Chromium-family browser's app window (`--app`,
+  no tabs or address bar): Google Chrome, Chromium, Brave, Microsoft Edge
+  or Vivaldi, the first found on the PATH or where the system installs them,
+  or the one `PRIGH_DESKTOP_BROWSER` / `programs.prigh.desktop.browser`
+  names. It is the browser itself, so its speed, GPU, zoom, find,
+  drag-and-drop and file pickers are the browser's. It runs with a profile
+  of prigh's own (in the app's data directory, e.g.
+  `~/.local/share/io.github.evan-a-w.prigh/browser`): its own cookies,
+  sign-ins, extensions and settings, apart from your usual profile; you
+  sign in to the backend once there. The app has no window of its own then:
+  closing the browser's window (its last one) stops `prigh desktop`, and
+  `prigh desktop` stopping (Quit prigh, a failure) closes the browser. On
+  the backend's own site Quit prigh closes the window, which does the same.
+  Window managers see the class `prigh` on X11; on Wayland Chromium names
+  an app window's app_id after the site (e.g. `chrome-ai.example.com__-Default`),
+  so match that in Hyprland or sway rules (`hyprctl clients` shows it).
+- **webview**: the app's own window on the system's webview (below).
+
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
 programs.prigh.enable = true;          # prigh on the PATH
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/Applications
 # programs.prigh.desktop.ui = "local";                           # see above (default "remote")
+# programs.prigh.desktop.window = "webview";                     # see above (default "auto")
+# programs.prigh.desktop.browser = pkgs.chromium;                # instead of the first one found
 # programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
 # programs.prigh.desktop.useSystemNixpkgs = true;                # slow window on NixOS? see below
 # programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
@@ -1220,9 +1247,9 @@ artifacts: `.deb`/`.AppImage`, `.dmg`, `.msi`/`.exe`); those contain only
 the app, which then runs the `prigh` on the PATH (as the login shell sets
 it), so install prigh as well.
 
-- **The engine is the system's webview**: WKWebView (Safari's engine) on
-  macOS, WebView2 (Edge's Chromium) on Windows, WebKitGTK on Linux (a
-  library Nix provides, not your browser). Links to other sites open in
+- **The webview** (`webview`, or `auto` without a browser): WKWebView
+  (Safari's engine) on macOS, WebView2 (Edge's Chromium) on Windows,
+  WebKitGTK on Linux (a library Nix provides, not your browser). Links to other sites open in
   your browser; downloads go to the Downloads folder; prigh-web may use the
   microphone (dictation), notifications and the clipboard without asking.
 - **Like a browser**: Ctrl (⌘) with `+`/`=`, `-` and `0` zoom, as do
@@ -1238,17 +1265,21 @@ it), so install prigh as well.
   github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
   prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
   opens the page through WSL's localhost forwarding (on by default).
-- **Settings** (environment variables; Home Manager sets the first two):
+- **Settings** (environment variables; Home Manager sets all but the WSL
+  one):
   `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
   Windows, in WSL), `PRIGH_DESKTOP_ARGS` arguments for `prigh desktop`
   (split like a shell's words: `-cwd '/my proj' -name laptop`),
-  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default).
+  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default),
+  `PRIGH_DESKTOP_WINDOW` and `PRIGH_DESKTOP_BROWSER` (above).
   Never put a token in Home Manager options or `PRIGH_DESKTOP_ARGS` in Nix:
   the store is world-readable (the module refuses `-token`); sign in from
   the app, which saves the connection like prigh-tui.
-- **One window**: starting the app again focuses the open one. Its size and
-  position are remembered.
-- **Slow on Linux?** WebKitGTK is asked to draw with the GPU, but on NixOS
+- **One app**: starting it again focuses the open window (in a browser, opens
+  another window on the page). The app's own window's size and position are
+  remembered.
+- **Slow on Linux?** A browser's window (`auto` with one installed) is the
+  quickest. WebKitGTK is asked to draw with the GPU, but on NixOS
   it can only when its Mesa matches the system's driver
   (`/run/opengl-driver`); from prigh's pinned nixpkgs it may not, and it
   quietly draws on the CPU. `PRIGH_DESKTOP_GPU_INFO=1 prigh-desktop` shows
@@ -2854,10 +2885,12 @@ against the real backend, its scripts all at once; the flake runs it as a
 check.
 
 The desktop app has two: `cargo test -p prigh-desktop-core` in `desktop/`
-(the decisions: how `prigh desktop` is started, its ready line, where the
-window may go, the error dialogs; `./test` runs it), and
-`desktop/test/run.sh`, the app in a real window against a fake `prigh
-desktop` for the failure paths and, given a prigh, the real one for a
+(the decisions: how `prigh desktop` is started, its ready line, which
+window and browser, where the window may go, the error dialogs; `./test`
+runs it), and `desktop/test/run.sh`, the app in a real window against a
+fake `prigh desktop` for the failure paths, in a browser's window (a fake
+browser, `fake-browser.py`, that keeps a profile lock as Chromium does,
+and a real Chromium, `REAL_CHROMIUM`, closed through its DevTools) and, given a prigh, the real one for a
 `prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
 connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
 a transcript compared with `desktop/test/expected.txt`).

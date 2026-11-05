@@ -3471,7 +3471,9 @@ terminal frontend and `web/` prigh-web, the browser one.
 
 A Rust workspace, apart from the dune projects: `core/` (the decisions,
 without a window, unit-tested) and `app/` (the Tauri v2 shell,
-`prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
+`prigh-desktop`). The shell shows prigh-web in its own window (the system
+webview) or an installed browser's app window (below), and has no
+frontend of its own: `ui/index.html` is
 a blank page shown while `prigh desktop` starts, then the window navigates
 to the URL it reports, and prigh-web there (the sidecar's, or the
 backend's own under `-ui remote`) is the whole UI.
@@ -3503,7 +3505,8 @@ reach the sidecar from another origin), and stops the sidecar as closing
 the window does. Downloads are saved in the
 Downloads folder. The page has no Tauri IPC: the window is created in
 `main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
-page there. Plugins: single-instance (a second launch focuses the window),
+page there. Plugins: single-instance (a second launch focuses the window,
+or opens another browser window),
 window-state (size and position), opener, dialog.
 
 The window is a browser as far as is cheap: Tauri's drop handler is off,
@@ -3519,6 +3522,32 @@ of the sidecar's page. Nix: `nix/desktop.nix` is the app as a function of
 `pkgs`, so the Home Manager module can build it with the system's nixpkgs
 (`useSystemNixpkgs`): WebKitGTK draws with the GPU only when its Mesa
 matches the driver NixOS installs.
+
+The browser window (`core/browser.rs`; `PRIGH_DESKTOP_WINDOW`
+auto|browser|webview, `PRIGH_DESKTOP_BROWSER`): before the window is made,
+`window_choice` looks for a Chromium-family browser (the explicit one, else
+by name on the PATH plus the usual install directories, without the login
+shell; on macOS in `/Applications`, on Windows under `%ProgramFiles%` and
+`%LocalAppData%`); `auto` takes one only on Linux. Then the shell makes no
+window: the first page line runs `BROWSER --app=URL#…&shell=browser
+--user-data-dir=<app data>/browser --no-first-run
+--no-default-browser-check` (`--class=prigh --ozone-platform-hint=auto` on
+Linux) in a process group of its own, and later page lines are left to the
+page, which goes there itself (`Desktop_page.follow` keeps `shell=browser`
+on the backend's URL). The profile of prigh's own makes it an instance of
+its own, which exits when its last window closes: that exit stops the
+sidecar, as a window closing does. If the profile was already held (an
+instance left by a killed app; Chromium hands the window over and the
+launch exits), the shell waits for the pid in the profile's `SingletonLock`
+instead, trusting it only while `/proc/PID/cmdline` names the profile. The
+sidecar exiting SIGTERMs (then, after 3 s, SIGKILLs) the browser's process
+group while the process we started is unreaped, and the instance we handed
+the window to; never another. A second launch runs the browser again on the
+same URL and profile, which opens another window in the running instance.
+`shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
+in sessionStorage) that on the backend's site Quit prigh is `window.close()`
+(an `--app` window's history is one entry, so the page may close it), with
+"Close this window to quit prigh." if the browser refuses.
 
 Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
 page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit` (on
@@ -3536,8 +3565,9 @@ the sidecar's pages, which may close the window by going to
 Packaging (`nix/desktop.nix`): the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
 on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
 `$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
-`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh` (and `PRIGH_DESKTOP_ARGS`
-from `.override { ui; extraArgs; }`), with the desktop entry and hicolor
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh` (and `PRIGH_DESKTOP_ARGS`,
+`PRIGH_DESKTOP_WINDOW` and `PRIGH_DESKTOP_BROWSER` from `.override { ui;
+window; browser; extraArgs; }`), with the desktop entry and hicolor
 icons. `nix/home-manager.nix` is `homeManagerModules.default`
 (`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
 for Linux, macOS and Windows.
