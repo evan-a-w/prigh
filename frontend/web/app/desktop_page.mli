@@ -21,6 +21,7 @@ val connect
   -> address:string
   -> user:string option
   -> token:string option
+  -> plaintext:bool
   -> f:(Prigh_web.Desktop_link.Connect_reply.t option -> unit)
   -> unit
 

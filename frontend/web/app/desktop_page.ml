@@ -30,15 +30,17 @@ let active () = Option.is_some (stored ())
 
 let status ~key ~f =
   Browser.post
+    ~content_type:"application/json"
     ~url:Desktop_link.status_path
     ~body:(Desktop_link.status_body ~key)
     ~f:(fun reply -> f (Option.bind reply ~f:Desktop_link.Status.of_json))
 ;;
 
-let connect ~key ~address ~user ~token ~f =
+let connect ~key ~address ~user ~token ~plaintext ~f =
   Browser.post
+    ~content_type:"application/json"
     ~url:Desktop_link.connect_path
-    ~body:(Desktop_link.connect_body ~key ~address ~user ~token)
+    ~body:(Desktop_link.connect_body ~key ~address ~user ~token ~plaintext)
     ~f:(fun reply ->
       f (Option.bind reply ~f:Desktop_link.Connect_reply.of_json))
 ;;
@@ -59,6 +61,7 @@ let quit () =
   Option.iter (stored ()) ~f:(fun key ->
     show_quitting ();
     Browser.post
+      ~content_type:"application/json"
       ~url:Desktop_link.quit_path
       ~body:(Desktop_link.quit_body ~key)
       ~f:(fun _ -> ()))

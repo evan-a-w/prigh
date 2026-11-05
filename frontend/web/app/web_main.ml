@@ -1525,9 +1525,23 @@ let signed_in_by_desktop = function
 ;;
 
 (* [prigh desktop] without a working connection: the backend to run this
-   computer's tools for, checked and saved by the sidecar. *)
-let rec desktop_form ~key ?(connecting = false) ~address ~user ~error () =
+   computer's tools for, checked and saved by the sidecar. [unencrypted]:
+   the address the sidecar warned is not encrypted, which submitting
+   unchanged connects to anyway. *)
+let rec desktop_form
+          ~key
+          ?(connecting = false)
+          ?unencrypted
+          ~address
+          ~user
+          ~error
+          ()
+  =
   let value = Option.value_map ~default:"" ~f:escape in
+  let confirming =
+    Option.is_some unencrypted
+    && [%equal: string option] unencrypted address
+  in
   Browser.set_app_html
     (sprintf
        {|<div class="signin-page"><form class="signin" id="desktop-form">
@@ -1535,17 +1549,22 @@ let rec desktop_form ~key ?(connecting = false) ~address ~user ~error () =
   <h1>Connect to a backend</h1>
   <p class="signin-sub">prigh runs this computer's tools for a prigh backend (prigh serve). The connection is saved for next time.</p>
   <p class="signin-error" role="alert">%s</p>
-  <label>Backend address <input id="address" name="address" value="%s" placeholder="host:7790 or wss://host/ws" autofocus autocomplete="url" autocapitalize="off" spellcheck="false" inputmode="url"></label>
+  <label>Backend address <input id="address" name="address" value="%s" placeholder="wss://host/ws, or 127.0.0.1:7790 through an SSH tunnel" autofocus autocomplete="url" autocapitalize="off" spellcheck="false" inputmode="url"></label>
   <label>User name <input id="user" name="user" value="%s" placeholder="optional" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
   <label>Password <input id="password" name="password" type="password" placeholder="the backend's token" autocomplete="current-password"></label>
-  <button class="btn primary" type="submit" id="desktop-connect"%s>%s</button>
+  <button class="btn %s" type="submit" id="desktop-connect"%s>%s</button>
   <button class="btn ghost" type="button" id="desktop-quit">Quit prigh</button>
 </form></div>|}
        (escape (Option.value error ~default:""))
        (value address)
        (value user)
+       (if confirming then "danger" else "primary")
        (if connecting then " disabled" else "")
-       (if connecting then "Connecting…" else "Connect"));
+       (if connecting
+        then "Connecting…"
+        else if confirming
+        then "Connect without encryption"
+        else "Connect"));
   on_click "desktop-quit" Desktop_page.quit;
   Option.iter
     (Dom_html.getElementById_coerce "desktop-form" Dom_html.CoerceTo.form)
@@ -1589,14 +1608,24 @@ let rec desktop_form ~key ?(connecting = false) ~address ~user ~error () =
                    ~address
                    ~user
                    ~token
+                   ~plaintext:
+                     ([%equal: string option] unencrypted (Some address))
                    ~f:(function
-                   | Some (Ok code) -> signed_in_by_desktop code
-                   | Some (Error error) ->
+                   | Some (Connected code) -> signed_in_by_desktop code
+                   | Some (Refused error) ->
                      desktop_form
                        ~key
                        ~address:(Some address)
                        ~user
                        ~error:(Some error)
+                       ()
+                   | Some (Plaintext warning) ->
+                     desktop_form
+                       ~key
+                       ~unencrypted:address
+                       ~address:(Some address)
+                       ~user
+                       ~error:(Some warning)
                        ()
                    | None -> desktop_lost ()));
               Js._false))

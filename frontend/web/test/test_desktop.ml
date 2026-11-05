@@ -151,7 +151,15 @@ let%expect_test "the sidecar's link and answers" =
        ~key:"k"
        ~address:"host:7790"
        ~user:None
-       ~token:(Some "sekrit"));
+       ~token:(Some "sekrit")
+       ~plaintext:false);
+  print_endline
+    (Desktop_link.connect_body
+       ~key:"k"
+       ~address:"host:7790"
+       ~user:None
+       ~token:None
+       ~plaintext:true);
   List.iter
     [ {|{"state":"connect","address":"host:7790","user":null,"error":"refused"}|}
     ; {|{"state":"connect","address":null,"user":null,"error":null}|}
@@ -167,6 +175,7 @@ let%expect_test "the sidecar's link and answers" =
   List.iter
     [ {|{"ok":true,"code":"c0de"}|}
     ; {|{"ok":false,"error":"cannot reach the backend"}|}
+    ; {|{"ok":false,"error":"not encrypted","plaintext":true}|}
     ; {|{"ok":false}|}
     ; "[]"
     ]
