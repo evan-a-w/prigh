@@ -431,15 +431,17 @@ let%expect_test "slash commands run prigh's commands" =
 
 let%expect_test "_prigh/state follows the queue another frontend fills" =
   H.run
-    [ {|{"tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo started; sleep 0.5"}}]}|}
+    [ {|{"tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo started; until [ -e go ]; do sleep 0.01; done"}}]}|}
     ; {|{"text": "first"}|}
     ; {|{"text": "queued one answered"}|}
     ]
   @@ fun h ->
   ignore (H.prompt ~wait:false h "work" : Jsonaf.t);
-  H.wait_for h "started";
+  H.wait_for h {|"text":"```\nstarted|};
   let tui = H.other_client h in
   tui "follow_up" {|{"text": "and then this"}|};
+  H.wait_for h {|"follow_up":1|};
+  Out_channel.write_all (Filename.concat h.sandbox.dir "go") ~data:"";
   H.wait_for h "stopReason";
   H.dump h;
   [%expect
@@ -447,7 +449,7 @@ let%expect_test "_prigh/state follows the queue another frontend fills" =
     > request 2 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"work"}]}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"on","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update tool_call {"toolCallId":"c1","title":"bash","kind":"execute","status":"pending"}
-    < update tool_call_update {"toolCallId":"c1","title":"echo started; sleep 0.5","kind":"execute","status":"in_progress","rawInput":{"command":"echo started; sleep 0.5"}}
+    < update tool_call_update {"toolCallId":"c1","title":"echo started; until [ -e go ]; do sleep 0.01; done","kind":"execute","status":"in_progress","rawInput":{"command":"echo started; until [ -e go ]; do sleep 0.01; done"}}
     < update tool_call_update {"toolCallId":"c1","content":[{"type":"content","content":{"type":"text","text":"```\nstarted\n```"}}]}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"on","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":1},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update tool_call_update {"toolCallId":"c1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"```\nstarted\n```"}}]}
