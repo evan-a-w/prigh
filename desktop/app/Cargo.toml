@@ -16,3 +16,6 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 shared_child = "1"
 
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

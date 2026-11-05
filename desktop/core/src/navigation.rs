@@ -87,6 +87,8 @@ mod tests {
         assert_eq!(decide("tauri://localhost/index.html", None), Allow);
         assert_eq!(decide("http://tauri.localhost/index.html", None), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/#signin=x", site), Allow);
+        assert_eq!(decide("http://127.0.0.1:7790/#desktop=k3y", site), Allow);
+        assert_eq!(decide("http://127.0.0.1:7790/?session=abc#desktop=k3y", site), Allow);
         assert_eq!(decide("http://127.0.0.1:7790/files/a.txt", site), Allow);
         // before the sidecar has said where it is, nothing of it is allowed
         assert_eq!(decide("http://127.0.0.1:7790/", None), External);

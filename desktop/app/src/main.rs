@@ -1,6 +1,6 @@
 // prigh's desktop app: a native window (the system webview: WebKitGTK,
 // WKWebView, WebView2) on prigh-web, served by `prigh desktop`, the sidecar
-// this process starts and stops. See desktop/README.md.
+// this process starts and stops. See "Desktop app" in ARCHITECTURE.md.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader, Read};
@@ -26,6 +26,9 @@ const WINDOW: &str = "main";
 /// How long the sidecar has to exit after its stdin closes before it is
 /// killed.
 const STOP_GRACE: Duration = Duration::from_secs(5);
+#[cfg(unix)]
+const TERM_GRACE: Duration = Duration::from_secs(2);
+const TEST_CLOSE_URL: &str = "about:blank#prigh-desktop-test-close";
 
 fn log(msg: impl AsRef<str>) {
     for line in msg.as_ref().lines() {
@@ -56,8 +59,9 @@ impl Sidecar {
         self.origin.lock().unwrap().clone()
     }
 
-    /// Closes its stdin, which tells it to stop, and kills it if it has not
-    /// within [STOP_GRACE].
+    /// Closes its stdin, which tells it to stop. If it has not within
+    /// [STOP_GRACE]: SIGTERM (Unix; it stops its tools' process groups on
+    /// that too), and SIGKILL after [TERM_GRACE] more.
     fn stop(self: &Arc<Self>) {
         if self.stopping.swap(true, Ordering::SeqCst) {
             return;
@@ -66,12 +70,20 @@ impl Sidecar {
         let Some(child) = self.child.lock().unwrap().clone() else { return };
         let me = self.clone();
         thread::spawn(move || {
-            if let Ok(None) = child.wait_timeout(STOP_GRACE) {
-                if !me.exited.load(Ordering::SeqCst) {
-                    log("prigh desktop did not stop when asked: killing it");
-                    let _ = child.kill();
+            if !matches!(child.wait_timeout(STOP_GRACE), Ok(None)) || me.exited.load(Ordering::SeqCst) {
+                return;
+            }
+            #[cfg(unix)]
+            {
+                use shared_child::unix::SharedChildExt;
+                log("prigh desktop did not stop when asked: terminating it");
+                let _ = child.send_signal(libc::SIGTERM);
+                if !matches!(child.wait_timeout(TERM_GRACE), Ok(None)) || me.exited.load(Ordering::SeqCst) {
+                    return;
                 }
             }
+            log("prigh desktop did not stop: killing it");
+            let _ = child.kill();
         });
     }
 }
@@ -253,7 +265,7 @@ fn on_ready(app: &AppHandle, sidecar: &Sidecar, url: &str) {
     }
 }
 
-/// The URL without its fragment, which holds a one-time sign-in code.
+/// The URL without its fragment, which holds the run's key.
 fn redact(url: &str) -> &str {
     url.split('#').next().unwrap_or(url)
 }
@@ -271,12 +283,25 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
     let perm_sidecar = sidecar.clone();
     let load_sidecar = sidecar;
     let close_on_load = env_flag("PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD");
+    // Tests: a script run on each of the sidecar's pages, which closes the
+    // window by going to [TEST_CLOSE_URL].
+    let test_script = std::env::var("PRIGH_DESKTOP_TEST_SCRIPT")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .map(|p| std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("PRIGH_DESKTOP_TEST_SCRIPT {p}: {e}")));
+    let test_close = test_script.is_some();
     WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
         .title("prigh")
         .inner_size(1200.0, 800.0)
         .min_inner_size(320.0, 480.0)
         .background_color(Color(0x1b, 0x1e, 0x23, 0xff))
         .on_navigation(move |url| match navigation::decide(url.as_str(), nav_sidecar.origin().as_deref()) {
+            _ if test_close && url.as_str() == TEST_CLOSE_URL => {
+                if let Some(w) = nav_app.get_webview_window(WINDOW) {
+                    let _ = w.close();
+                }
+                false
+            }
             Decision::Allow => true,
             Decision::External => {
                 open_external(&nav_app, url.as_str());
@@ -339,16 +364,84 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>) -> tauri::Result<()> {
                 if close_on_load {
                     let _ = window.close();
                 }
+                if let Some(script) = &test_script {
+                    if let Err(e) = window.eval(script) {
+                        log(format!("PRIGH_DESKTOP_TEST_SCRIPT: {e}"));
+                    }
+                }
             }
         })
         .build()?;
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+const QUIT: &str = "quit";
+
+/// macOS needs an app menu: WKWebView's Copy, Paste and Select All come
+/// from its Edit items. Its Quit (⌘Q) stops the sidecar as closing the
+/// window does, whose exit ends the app; elsewhere there is no menu and
+/// Ctrl+Q reaches the page, whose Quit stops the sidecar itself.
+#[cfg(target_os = "macos")]
+fn macos_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+    let app_menu = Submenu::with_items(
+        app,
+        "prigh",
+        true,
+        &[
+            &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::show_all(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, QUIT, "Quit prigh", true, Some("CmdOrCtrl+Q"))?,
+        ],
+    )?;
+    let edit = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+    let window = Submenu::with_items(
+        app,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::fullscreen(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&app_menu, &edit, &window])
+}
+
 fn main() {
     let sidecar = Arc::new(Sidecar::default());
     let setup_sidecar = sidecar.clone();
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = {
+        let quit_sidecar = sidecar.clone();
+        builder.menu(macos_menu).on_menu_event(move |_, event| {
+            if event.id() == QUIT {
+                log("Quit prigh: stopping prigh desktop");
+                quit_sidecar.stop();
+            }
+        })
+    };
+    let app = builder
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(w) = app.get_webview_window(WINDOW) {
                 let _ = w.unminimize();
