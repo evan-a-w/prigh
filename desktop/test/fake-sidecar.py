@@ -8,13 +8,15 @@ $FAKE_MODE picks a behaviour:
   crash        exit 4 once the page has loaded
   fail         print an error and exit 3 before the ready line
   bad-ready    print something that is not a ready line
-  ignore-eof   keep running after stdin closes (the shell must kill it)
+  ignore-eof   keep running after stdin closes (the shell terminates it)
+  ignore-term  ... and after SIGTERM too (the shell must kill it)
 What happens is appended to $FAKE_LOG, one event per line.
 """
 
 import http.server
 import json
 import os
+import signal
 import sys
 import threading
 
@@ -73,11 +75,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
 server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 port = server.server_address[1]
-print(json.dumps({"url": f"http://127.0.0.1:{port}/#signin=one-time-code"}), flush=True)
+print(json.dumps({"url": f"http://127.0.0.1:{port}/#desktop=0123abcd"}), flush=True)
 print(f"fake sidecar: serving on {port}", file=sys.stderr, flush=True)
 
 sys.stdin.read()
 log("eof")
 if mode == "ignore-eof":
+    signal.signal(signal.SIGTERM, lambda *_: (log("SIGTERM"), os._exit(0)))
+if mode == "ignore-term":
+    signal.signal(signal.SIGTERM, lambda *_: log("SIGTERM ignored"))
+if mode in ("ignore-eof", "ignore-term"):
     threading.Event().wait()
 sys.exit(0)

@@ -458,7 +458,7 @@
                 chmod -R u+w test
                 patchShebangs test
                 xvfb-run -a dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
-                  bash test/run.sh ${prighDesktop}/bin/prigh-desktop > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
+                  bash test/run.sh ${prighDesktop}/bin/prigh-desktop ${prigh}/bin/prigh > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
                 diff -u test/expected.txt actual.txt
                 # what the wrapper and the desktop entry say
                 grep -q 'PRIGH_DESKTOP_BACKEND.*${prigh}/bin/prigh' ${prighDesktop}/bin/prigh-desktop

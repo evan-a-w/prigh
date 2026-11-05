@@ -3438,8 +3438,8 @@ The sidecar contract (the shell's only coupling to the backend):
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
   home directory, with stdin a pipe it holds open;
-- the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/…"}`, on stdout
-  when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
+- the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
+  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
   anything else ends the app with a dialog); stderr is its log, of which the
   shell keeps the last 30 lines for the error dialog;
 - it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
@@ -3454,6 +3454,18 @@ Downloads folder. The page has no Tauri IPC: the window is created in
 `main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
 page there. Plugins: single-instance (a second launch focuses the window),
 window-state (size and position), opener, dialog.
+
+Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
+page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit`; the
+sidecar exits 0 and so does the app. On macOS the app menu (needed for
+WKWebView's Edit shortcuts) takes ⌘Q: its Quit stops the sidecar as closing
+the window does. Either way the sidecar ends first and the app follows.
+
+Test hooks (environment): `PRIGH_DESKTOP_NO_DIALOG` logs failures instead of
+showing dialogs, `PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD` closes the window once
+the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
+the sidecar's pages, which may close the window by going to
+`about:blank#prigh-desktop-test-close`.
 
 Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
 on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
