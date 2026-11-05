@@ -4,6 +4,24 @@
 // "close" mode it closes the window once the connect form shows, in "quit"
 // mode it signs in with the form and then quits with /quit.
 (() => {
+  // What it saw, for the report when the page is stuck: its requests and
+  // errors.
+  const requests = [];
+  const errors = [];
+  const open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    requests.push([`${method} ${url}`, this]);
+    return open.call(this, method, url, ...rest);
+  };
+  const consoleError = console.error;
+  console.error = (...args) => {
+    errors.push(args.map(String).join(" "));
+    consoleError(...args);
+  };
+  window.addEventListener("error", e => errors.push(`error: ${e.message}`));
+  window.addEventListener("unhandledrejection", e => errors.push(`rejection: ${e.reason}`));
+  const seen = () =>
+    `requests: ${requests.map(([what, x]) => `${what} ${x.readyState === 4 ? x.status : "pending"}`).join(", ")}; errors: ${errors.join(" | ") || "none"}`;
   const report = text => fetch("@REPORT@", { method: "POST", mode: "no-cors", body: text });
   const type = (el, value) => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
@@ -19,7 +37,7 @@
     if (done) return;
     if (!stuck && Date.now() - started > 30000) {
       stuck = true;
-      report(`stuck at ${location.pathname}: ${document.body.innerText.trim().replace(/\s+/g, " ").slice(0, 300)}`);
+      report(`stuck at ${location.pathname}: ${seen()}; it shows: ${document.body.innerText.trim().replace(/\s+/g, " ").slice(0, 300)}`);
     }
     const form = document.querySelector("#desktop-form");
     const composer = document.querySelector(".composer textarea");

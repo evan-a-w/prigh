@@ -439,7 +439,8 @@
             pkgs.runCommand "prigh-web-e2e-skipped" { } ''touch "$out"'';
 
         # desktop/test: the app in a real window (WebKitGTK under Xvfb, software
-        # rendering) against a fake `prigh desktop`.
+        # rendering) against a fake `prigh desktop` (the failure paths) and the
+        # real one with a `prigh serve -web` backend.
         checks.desktop-window =
           if isLinux then
             pkgs.runCommand "prigh-desktop-window"
