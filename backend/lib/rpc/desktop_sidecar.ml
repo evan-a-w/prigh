@@ -130,7 +130,11 @@ let connect ?(prefix = "") t ~remote ~credentials ~source ~save =
   t.state <- Checking settled;
   let result =
     match
-      Web_connect.Check.run ~env:t.env ~timeout:t.check_timeout remote credentials
+      Web_connect.Check.run
+        ~env:t.env
+        ~timeout:t.check_timeout
+        remote
+        credentials
     with
     | Ok () ->
       let c = connected t ~remote ~credentials ~save in
@@ -159,7 +163,8 @@ let respond_json flow ?(status = 200) ?(reason = "OK") json =
     flow
     { status
     ; reason
-    ; headers = [ "Content-Type", "application/json"; "Cache-Control", "no-store" ]
+    ; headers =
+        [ "Content-Type", "application/json"; "Cache-Control", "no-store" ]
     ; content_length = Some (String.length body)
     ; body
     }
@@ -258,8 +263,9 @@ let max_body = 64 * 1024
 
 let handle t (request : Web_server.Request.t) ~reader flow =
   let length =
-    Option.bind (Web_server.Request.header request "Content-Length") ~f:(fun n ->
-      Int.of_string_opt (String.strip n))
+    Option.bind
+      (Web_server.Request.header request "Content-Length")
+      ~f:(fun n -> Int.of_string_opt (String.strip n))
   in
   match request.meth, length with
   | "POST", Some length when length > 0 && length <= max_body ->
@@ -294,7 +300,12 @@ let handle t (request : Web_server.Request.t) ~reader flow =
       | _ -> respond_text flow ~status:404 ~reason:"Not Found" "not found\n")
   | "POST", _ ->
     respond_text flow ~status:400 ~reason:"Bad Request" "a JSON body expected\n"
-  | _ -> respond_text flow ~status:405 ~reason:"Method Not Allowed" "method not allowed\n"
+  | _ ->
+    respond_text
+      flow
+      ~status:405
+      ~reason:"Method Not Allowed"
+      "method not allowed\n"
 ;;
 
 let routes t (request : Web_server.Request.t) =
@@ -314,8 +325,9 @@ let routes t (request : Web_server.Request.t) =
 let websocket t path ~query ws =
   match t.state with
   | Connected { websockets; _ } ->
-    Option.iter (List.Assoc.find websockets ~equal:String.equal path) ~f:(fun f ->
-      f ~query ws)
+    Option.iter
+      (List.Assoc.find websockets ~equal:String.equal path)
+      ~f:(fun f -> f ~query ws)
   | Checking _ | Form _ -> ()
 ;;
 
@@ -396,17 +408,12 @@ let run
                 match source with
                 | Flag -> "-connect did not work: "
                 | Env -> "$PRIGH_CONNECT did not work: "
-                | Saved file -> sprintf "The saved connection (%s) did not work: " file
+                | Saved file ->
+                  sprintf "The saved connection (%s) did not work: " file
                 | Form -> ""
               in
               ignore
-                (connect
-                   t
-                   ~prefix
-                   ~remote
-                   ~credentials
-                   ~source:Form
-                   ~save
+                (connect t ~prefix ~remote ~credentials ~source:Form ~save
                  : (string, string) Result.t);
               Promise.resolve settle ()));
          on_url

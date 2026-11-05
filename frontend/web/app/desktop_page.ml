@@ -39,7 +39,8 @@ let connect ~key ~address ~user ~token ~f =
   Browser.post
     ~url:Desktop_link.connect_path
     ~body:(Desktop_link.connect_body ~key ~address ~user ~token)
-    ~f:(fun reply -> f (Option.bind reply ~f:Desktop_link.Connect_reply.of_json))
+    ~f:(fun reply ->
+      f (Option.bind reply ~f:Desktop_link.Connect_reply.of_json))
 ;;
 
 (* Over whatever the page shows (the app, which keeps redrawing its root, or

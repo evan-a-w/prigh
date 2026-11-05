@@ -23,6 +23,7 @@ module Credentials = struct
     { token : string option
     ; user : string option
     }
+  [@@deriving sexp_of]
 end
 
 module Check = struct
@@ -122,6 +123,7 @@ module Check = struct
       | Env
       | Saved of string
       | Form
+    [@@deriving sexp_of]
   end
 
   let explain
@@ -210,8 +212,7 @@ module Listen = struct
       let rec attempt port =
         match serve ~addr ~port with
         | bound -> addr, bound
-        | exception exn when in_use exn && port < first + 9 ->
-          attempt (port + 1)
+        | exception exn when in_use exn && port < first + 9 -> attempt (port + 1)
         | exception exn
           when in_use exn
                &&
@@ -366,7 +367,7 @@ let start
          ; host_id = config.host_id
          ; cwd = config.cwd
          }
-       :> [ `Connected | `Connecting | `Refused of string | `Off ])
+        :> [ `Connected | `Connecting | `Refused of string | `Off ])
   in
   { Started.url =
       Web_server.browser_url ~host:(browser_host addr) ~port
