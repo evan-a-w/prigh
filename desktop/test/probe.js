@@ -54,6 +54,12 @@
     const r = el.getBoundingClientRect();
     return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
   };
+  // Where the last click landed, for a report of one that missed.
+  let landed = "nowhere";
+  document.addEventListener("pointerdown", e => {
+    const r = e.target.getBoundingClientRect();
+    landed = `(${Math.round(e.clientX)}, ${Math.round(e.clientY)}) on .${String(e.target.className).split(" ").join(".")} at (${Math.round(r.left)}, ${Math.round(r.top)})`;
+  }, true);
   const chooseFromMenu = async () => {
     const fresh = await until(() => document.querySelector(".main.fresh .thinking-chip"), 10000);
     if (!fresh) return report("menu: no thinking chip on the new-session screen");
@@ -61,7 +67,7 @@
     const before = label();
     await pointer("click", fresh);
     const menu = await until(() => document.querySelector("#chip-popover[data-chip=thinking]"));
-    if (!menu) return report(`menu: the thinking chip's click opened nothing (zoom ${devicePixelRatio})`);
+    if (!menu) return report(`menu: the thinking chip's click opened nothing: it landed at ${landed}, the chip is at (${Math.round(fresh.getBoundingClientRect().left)}, ${Math.round(fresh.getBoundingClientRect().top)})`);
     await until(() => menu.getAnimations().every(a => a.playState !== "running"), 1000);
     const items = [...menu.querySelectorAll(".popover-item")];
     const name = i => i.querySelector(".menu-label").textContent.trim();
