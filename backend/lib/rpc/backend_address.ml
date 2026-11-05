@@ -95,6 +95,10 @@ let to_string t =
       t.prefix
 ;;
 
+let web_url t =
+  sprintf "%s://%s%s/" (if t.tls then "https" else "http") (authority t) t.prefix
+;;
+
 let normalize text =
   match parse text with
   | Ok t when not t.lines -> to_string t
