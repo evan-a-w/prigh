@@ -154,8 +154,8 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	real_report() {
 		echo "== $1: exit $2"
 		normalize <"$work/stderr" | grep -E '^prigh-desktop: ' | grep -v '/favicon.ico'
-		normalize <"$work/log" | grep -v -e 'GET /favicon.ico' -e '^args' -e '^cwd' | sort | uniq -c | sed -E 's/^ +/fake: /'
-		echo "left running: $(ps -eo args= | grep -c -F -- "--user-data-dir=$profile")"
+		normalize <"$work/log" | grep -v -e 'GET /favicon.ico' -e '^args' -e '^cwd' | LC_ALL=C sort | uniq -c | sed -E 's/^ +/fake: /'
+		echo "left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
 	}
 	: >"$work/log"
 	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium"
