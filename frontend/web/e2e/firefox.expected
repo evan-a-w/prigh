@@ -2480,6 +2480,50 @@ focus: textarea (composer); composer caret: 1-3; textareas: 1; scrolled: 0
 clipboard: "Run this:\n\n```sh\nmake check && echo 'all good'\n```\n\nThen push."
 === firefox: clipboard: errors ===
 none
+=== firefox: field_menu: a plain page ===
+composer: browser's; field menus: 0
+=== firefox: field_menu: the browser shell ===
+composer: cancelled; menu at the pointer
+> Cut  Ctrl+X
+  Copy  Ctrl+C
+  Paste  Ctrl+V
+  Select all  Ctrl+A
+the transcript: cancelled; menus: 0
+=== firefox: field_menu: copy ===
+clipboard: "hello brave"
+focus: composer; "hello brave world" selected 0-11
+=== firefox: field_menu: cut ===
+clipboard: "hello brave"
+focus: composer; " world" selected 0-0
+=== firefox: field_menu: nothing selected ===
+  Cut (disabled)  Ctrl+X
+  Copy (disabled)  Ctrl+C
+> Paste  Ctrl+V
+  Select all  Ctrl+A
+menus: 1
+=== firefox: field_menu: paste ===
+focus: composer; " world again" selected 12-12
+=== firefox: field_menu: select all ===
+focus: composer; " world again" selected 0-12
+=== firefox: field_menu: the keyboard ===
+  Cut (disabled)  Ctrl+X
+  Copy (disabled)  Ctrl+C
+  Paste  Ctrl+V
+> Select all  Ctrl+A
+focus: composer; " world again" selected 12-12
+focus: composer; " world again" selected 0-12
+focus: composer; " world again" selected 0-12
+=== firefox: field_menu: sent ===
+message: "world again"
+=== firefox: field_menu: a session's menu and a dialog ===
+session: cancelled; field menus: 0
+> Cut  Ctrl+X
+  Copy  Ctrl+C
+  Paste  Ctrl+V
+  Select all  Ctrl+A
+dialog: 1; focus: dialog's field; "renamed" selected 0-7
+=== firefox: field_menu: errors ===
+none
 === firefox: card: idle ===
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high

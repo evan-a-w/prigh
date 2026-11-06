@@ -1238,6 +1238,11 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   Window managers see the class `prigh` on X11; on Wayland Chromium names
   an app window's app_id after the site (e.g. `chrome-ai.example.com__-Default`),
   so match that in Hyprland or sway rules (`hyprctl clients` shows it).
+  The browser's own right-click menu never shows there (it would give away
+  that the window is Chrome): a text field's right-click (or Shift+F10)
+  opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
+  over a dialog too, and sessions, worktrees, messages and the review's
+  files have their usual menus; elsewhere a right-click does nothing.
 - **webview**: the app's own window on the system's webview (below).
 
 ```nix
