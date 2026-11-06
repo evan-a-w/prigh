@@ -534,3 +534,183 @@ let%expect_test "opening a session with unreadable lines tells the client" =
     {"type":"event","event":"notice","text":"parts of this session could not be read and are left out:\nline 4: skipped an incomplete last line (prigh probably stopped while writing it)"}
     |}]
 ;;
+
+(* What a deletion with [switch_to] did: where the reply says the client now
+   is, what went and what was kept; then where the backend has it. *)
+let delete_leaving t (c : Client.t) meth params =
+  let name_of_state state =
+    match Json.member "session_name" state with
+    | Some (`String name) -> name
+    | _ ->
+      (match Json.member "message_count" state with
+       | Some (`Number "0") -> "(a new session)"
+       | _ -> "(unnamed)")
+  in
+  (match Client.result (Client.request c meth params) with
+   | Error e -> printf "error: %s\n" (mask t e)
+   | Ok result ->
+     printf
+       "reply's state: %s\n"
+       (Option.value_map
+          (Json.member "state" result)
+          ~default:"none"
+          ~f:name_of_state);
+     let list name ~f =
+       match Json.member name result with
+       | Some (`Array items) -> List.iter items ~f
+       | _ -> ()
+     in
+     list "deleted" ~f:(fun d ->
+       match Json.member "id" d with
+       | Some (`String id) -> printf "deleted %s\n" (mask t id)
+       | _ -> ());
+     list "refused" ~f:(fun r ->
+       match Json.member "error" r with
+       | Some (`String e) -> printf "refused: %s\n" (mask t e)
+       | _ -> ()));
+  printf
+    "%s is in: %s\n"
+    c.name
+    (Option.value
+       (Session.name (Agent.session (Client.agent c)))
+       ~default:"(a new session)")
+;;
+
+let%expect_test "deleting the session you are in moves you first" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let mine = saved t "mine" ~days_ago:0.4 in
+  let next = saved t "next" ~days_ago:0.3 in
+  let shared = saved t "shared" ~days_ago:0.2 in
+  let other = saved t "other" ~days_ago:0.1 in
+  let server = Server.create t ~sw ~provider:(Faux_provider.create []) in
+  let a = Client.connect server "a" ~session:(Session.id mine) in
+  let b = Client.connect server "b" ~session:(Session.id shared) in
+  let paths sessions =
+    [ "paths", `Array (List.map sessions ~f:(fun s -> `String (Session.path s)))
+    ]
+  in
+  (* Without switch_to: refused, as before. *)
+  delete_leaving t a "delete_sessions" (paths [ mine ]);
+  [%expect
+    {|
+    reply's state: none
+    refused: session "mine" is the session you are in: switch to another one first
+    a is in: mine
+    |}];
+  (* The session to move to is being deleted too: nothing happens. *)
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    (paths [ mine; next ] @ [ "switch_to", `String (Session.path next) ]);
+  [%expect
+    {|
+    error: switch_to is among the sessions to delete: name another one
+    a is in: mine
+    |}];
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    (paths [ mine ] @ [ "switch_to", `String (Session.path next) ]);
+  print_sessions b;
+  Client.sessions_changed b;
+  [%expect
+    {|
+    reply's state: next
+    deleted <id>
+    a is in: next
+    other       background=0 clients=-
+    shared     live background=0 clients=1
+    next       live background=0 clients=1
+    b: 1 sessions_changed
+    |}];
+  print_s [%sexp (Sys_unix.file_exists_exn (Session.path mine) : bool)];
+  [%expect {| false |}];
+  (* Open in another frontend: kept, and the client stays. *)
+  let (_ : Json.t) = Client.request a "switch_session" (path shared) in
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    (paths [ shared ] @ [ "switch_to", `String (Session.path other) ]);
+  [%expect
+    {|
+    reply's state: none
+    refused: session "shared" is open in 1 other frontend(s): close it there first
+    a is in: shared
+    |}];
+  (* Several at once, with delete_session for one and a new session when
+     there is nowhere else to go. *)
+  let (_ : Json.t) = Client.request b "switch_session" (path next) in
+  delete_leaving
+    t
+    a
+    "delete_session"
+    (path shared @ [ "switch_to", `String (Session.id other) ]);
+  [%expect
+    {|
+    reply's state: other
+    a is in: other
+    |}];
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    (paths [ other; next ] @ [ "switch_to_new", `True ]);
+  print_sessions a;
+  [%expect
+    {|
+    reply's state: (a new session)
+    deleted <id>
+    refused: session "next" is open in 1 other frontend(s): close it there first
+    a is in: (a new session)
+    next       live background=0 clients=1
+    |}]
+;;
+
+let%expect_test "the session you are in is kept while it runs" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let provider = Faux_provider.create [ Reply.text "hello" ] in
+  let server = Server.create t ~sw ~provider in
+  let a = Client.connect server "a" in
+  Client.call t a "prompt" [ "text", `String "start" ];
+  Agent.wait_idle (Client.agent a);
+  Client.call t a "set_session_name" [ "name", `String "worker" ];
+  Client.call t a "shell" [ "command", `String gated; "background", `True ];
+  Queue.clear a.sent;
+  let worker = Session.path (Agent.session (Client.agent a)) in
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    [ "paths", `Array [ `String worker ]; "switch_to_new", `True ];
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"job_id":"j1"}}
+    reply's state: none
+    refused: session "worker" is running: wait for it or /abort it first
+    a is in: worker
+    |}];
+  write t "gate" "";
+  Agent.wait_idle (Client.agent a);
+  delete_leaving
+    t
+    a
+    "delete_sessions"
+    [ "paths", `Array [ `String worker ]; "switch_to_new", `True ];
+  [%expect
+    {|
+    reply's state: (a new session)
+    deleted <id>
+    a is in: (a new session)
+    |}]
+;;

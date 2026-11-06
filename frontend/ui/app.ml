@@ -4238,7 +4238,6 @@ let refresh_command_autocomplete m =
   match
     Autocomplete.compute
       ~superuser:m.superuser
-      ~current_session:(current_session m)
       ~line
       ~col
       ~line_index
@@ -4856,20 +4855,29 @@ let save_scoped_models m picker =
 
 (* ---- sessions picker --------------------------------------------------- *)
 
-let confirm_delete m ~back (sessions : P.Session_summary.t list) =
-  match Session_selection.deletable sessions ~current:(current_session m) with
+let confirm_delete m ~back selection (sessions : P.Session_summary.t list) =
+  let current = current_session m in
+  match Session_selection.deletable sessions ~current with
   | Error e -> error m e, []
   | Ok [] -> m, []
   | Ok sessions ->
+    let switch_to =
+      Session_selection.moving_to selection ~deleting:sessions ~current
+    in
     ( { m with
         mode =
           Confirm
-            { question = Session_selection.delete_question sessions
+            { question =
+                Session_selection.delete_question
+                  ?moving:switch_to
+                  selection
+                  sessions
             ; action =
                 Delete_sessions
                   { paths =
                       List.map sessions ~f:(fun (s : P.Session_summary.t) ->
                         s.path)
+                  ; switch_to
                   ; back
                   }
             }
@@ -4882,13 +4890,17 @@ let confirm_delete_archived m ~back selection =
   match Session_selection.delete_archived_question selection ~current with
   | None -> notice m "no archived sessions to delete", []
   | Some question ->
+    let archived = Session_selection.archived_to_delete selection ~current in
     let paths =
-      List.map
-        (Session_selection.archived_to_delete selection ~current)
-        ~f:(fun (s : P.Session_summary.t) -> s.path)
+      List.map archived ~f:(fun (s : P.Session_summary.t) -> s.path)
+    in
+    let switch_to =
+      Session_selection.moving_to selection ~deleting:archived ~current
     in
     ( { m with
-        mode = Confirm { question; action = Delete_sessions { paths; back } }
+        mode =
+          Confirm
+            { question; action = Delete_sessions { paths; switch_to; back } }
       }
     , [] )
 ;;
@@ -4956,12 +4968,17 @@ let map_sessions_picker m ~f =
       { question
       ; action =
           Delete_sessions
-            { paths; back = Some { kind = Sessions selection; picker } }
+            { paths
+            ; switch_to
+            ; back = Some { kind = Sessions selection; picker }
+            }
       } ->
     let kind, picker = update selection picker in
     let back = Some { Mode.Open_picker.kind; picker } in
     { m with
-      mode = Confirm { question; action = Delete_sessions { paths; back } }
+      mode =
+        Confirm
+          { question; action = Delete_sessions { paths; switch_to; back } }
     }
   | _ -> m
 ;;
@@ -5062,7 +5079,11 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
             ~command:("/remind rm " ^ item.id)
             (Remind_command.Action.Remove item.id))
      | Sessions selection ->
-       confirm_delete m ~back (Session_selection.targets selection picker)
+       confirm_delete
+         m
+         ~back
+         selection
+         (Session_selection.targets selection picker)
      | Worktrees listing ->
        worktree_in_picker m listing picker ~f:(fun w ->
          confirm_remove_worktree m w ~force:false ~back)
@@ -5362,8 +5383,9 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Trim_after after ->
       ( notice m "trimming…"
       , [ call (Trim_after { after }) ~tag:(Trimmed `Trim_after) ] )
-    | Delete_sessions { paths; back } ->
-      back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
+    | Delete_sessions { paths; switch_to; back } ->
+      ( back_to m back
+      , [ call (Delete_sessions { paths; switch_to }) ~tag:Sessions_deleted ] )
     | Tool_confirm c -> answer_confirm m c Allow
     | Nix_gc generations -> start_nix_gc m (Some generations)
     | Browser_signin ->
@@ -6386,7 +6408,18 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                    .sessions)
            }
          in
-         notice ~severity m (P.Delete_result.summary result), [])
+         (* Moved out of a deleted session: as a switch from the picker,
+            which closes it. *)
+         let m, commands =
+           match result.moved_to with
+           | None -> m, []
+           | Some _ ->
+             let m =
+               if sessions_picker_shown m then { m with mode = Editing } else m
+             in
+             reset_session m
+         in
+         notice ~severity m (P.Delete_result.summary result), commands)
      | Sessions_to_delete args ->
        decode
          json
@@ -6404,7 +6437,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               , [] )
             | Ok _ when Mode.is_dialog m.mode ->
               warn m "close the current dialog first (Esc)", []
-            | Ok found -> confirm_delete m ~back:None found)
+            | Ok found ->
+              confirm_delete
+                m
+                ~back:None
+                (Session_selection.create sessions)
+                found)
      | Archived_to_delete ->
        decode
          json

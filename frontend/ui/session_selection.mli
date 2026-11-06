@@ -39,20 +39,36 @@ val remove : t -> paths:string list -> t
 (** ["session \"build fix\""], or by id when unnamed. *)
 val describe : P.Session_summary.t -> string
 
-(** ["Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps them"]. *)
-val delete_question : P.Session_summary.t list -> string
+(** ["Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps them"], with
+    where deleting them [moving] takes us (["You'll move to session
+    \"build fix\"."]) before the last sentence. *)
+val delete_question
+  :  ?moving:P.Switch_to.t
+  -> t
+  -> P.Session_summary.t list
+  -> string
 
 (** [Error] says what to do when they include the [current] session (its
-    path), which cannot be deleted. *)
+    path) and the backend would keep it: it is running or open in another
+    frontend. *)
 val deletable
   :  P.Session_summary.t list
   -> current:string option
   -> (P.Session_summary.t list, string) Result.t
 
-(** The archived sessions but the [current] one. *)
+(** Where deleting [deleting] moves us when the [current] session is among
+    them: the next session down the list (as the picker orders it) not being
+    deleted, else the nearest above, else a new session. *)
+val moving_to
+  :  t
+  -> deleting:P.Session_summary.t list
+  -> current:string option
+  -> P.Switch_to.t option
+
+(** The archived sessions, but the [current] one when it would be kept. *)
 val archived_to_delete : t -> current:string option -> P.Session_summary.t list
 
-(** [None] when nothing but the [current] session is archived. *)
+(** [None] when there are none to delete. *)
 val delete_archived_question : t -> current:string option -> string option
 
 (** ["2 marked (1.2 MB)"] while sessions are marked. *)

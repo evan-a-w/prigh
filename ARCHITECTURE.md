@@ -1740,7 +1740,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   [{path, id, bytes}], refused: [{path, error}]}`; `delete_session {path}`
   is the single form (its error the refusal's). A session is refused when
   it is the caller's own, the default (`-session`) one, running, open in
-  other frontends, or unknown; otherwise its files go, it leaves the agents
+  other frontends, or unknown. All three take `switch_to` (a session's
+  path or id) or `switch_to_new: true`: when the caller's own session is
+  among those deleted and would not be refused otherwise, the backend
+  first moves the caller there (as `switch_session`, or `new_session`) and
+  the reply adds that session's `state`; done in the one request, so no
+  other request can land between the move and the deletion (a `switch_to`
+  among the sessions deleted is an error, and nothing happens). Otherwise its files go, it leaves the agents
   table, and its terminal is killed (`on_session_deleted`, wired to
   `Terminals.kill` by `main`, keyed by `terminal_key`; relayed ones are
   closed with `Terminal_relay.close_key`, and every connected host that ran
@@ -2361,12 +2367,18 @@ terminal frontend and `web/` prigh-web, the browser one.
     `Picker.Item.section` keeps them apart, also when filtering, and
     `Render` draws the divider). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
-    highlighted) sessions and Alt+D every archived one but the current, with
-    the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
-    confirmed and the picker as `Open_picker`, so Esc and Enter go back to
-    it); the session you are in is refused up front
-    (`Session_selection.deletable`), and the `delete_sessions` reply
-    (`Delete_result`) is the notice, refusals included. Alt+A flips `archived` in the picker at once
+    highlighted) sessions and Alt+D every archived one, with the count and
+    `bytes` (`Confirm_action.Delete_sessions` carries the paths confirmed,
+    the `switch_to` and the picker as `Open_picker`, so Esc and Enter go
+    back to it). When the session you are in is among them,
+    `Session_selection.moving_to` picks the next one down the picker's
+    order not being deleted (else the nearest above, else a new session),
+    the question names it and the request carries it as `switch_to`; while
+    it is running or open in another frontend (`clients > 1`: it counts us)
+    it is refused up front (`Session_selection.deletable`) and Alt+D leaves
+    it out. The `delete_sessions` reply (`Delete_result`) is the notice,
+    refusals included; with `moved_to` it closes the picker and resets the
+    session as a `switch_session` reply does (`reset_session`). Alt+A flips `archived` in the picker at once
     and sends `set_archived` (a refusal refetches the list). `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
@@ -2997,7 +3009,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       Space mark, shift-click and Shift+Space mark the range from the last
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
-      backend will keep, running, open elsewhere or our own, and the
+      backend will keep (`Model.kept_from_deletion`: running or open
+      elsewhere); when our own session is among them `Model.moving_to`
+      picks where we go (the next row down not deleted, else above, else a
+      new session), the request carries it as `switch_to`
+      (`Moved_and_deleted`: shown as a switch under way, and the reply's
+      `moved_to` state applied as `switch_session`'s), and the
       `Delete_result` reply is a toast; the current session's row shows
       its live cwd and a rename button; at its foot `Session_view.card`,
       then the account and the settings gear), `Session_view` (the
