@@ -208,12 +208,27 @@ let index_param params =
 
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
+(* An answer through a component is dropped, not given back to edit: its
+   text is empty, and [ui_action] says what it was. *)
 let queued_json (queued : Agent.Queued.t) =
-  `Object
-    [ "text", `String queued.text
-    ; ( "attachments"
-      , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
-    ]
+  match queued.ui_action with
+  | Some action ->
+    `Object
+      [ "text", `String ""
+      ; "attachments", `Array []
+      ; ( "ui_action"
+        , `Object
+            [ "call_id", `String action.call_id
+            ; "component", `String action.component
+            ; "summary", `String queued.text
+            ] )
+      ]
+  | None ->
+    `Object
+      [ "text", `String queued.text
+      ; ( "attachments"
+        , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
+      ]
 ;;
 
 let provider_of_string login s =
@@ -1575,7 +1590,9 @@ let hello t (client : Client.t) params =
       | `String cwd -> client.cwd <- Some cwd
       | _ -> ());
     client.home <- string "home";
-    client.kind <- Client_kind.of_hello (string "client");
+    (* A second hello that does not say keeps what the first said. *)
+    Option.iter (string "client") ~f:(fun kind ->
+      client.kind <- Client_kind.of_hello (Some kind));
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
       let claimed =
         match string "host_id" with
@@ -2845,8 +2862,12 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       ~f:[%jsonaf_of: Git_diff.Shown.t]
   | "review" ->
     Or_error.bind (string_param_opt params "args") ~f:(fun args ->
-      unit_result (Agent.review agent ~args:(Option.value args ~default:"")))
-  | "init" -> unit_result (Agent.init agent)
+      unit_result
+        (Agent.review
+           ~client:client.kind
+           agent
+           ~args:(Option.value args ~default:"")))
+  | "init" -> unit_result (Agent.init ~client:client.kind agent)
   | "set_budget" ->
     (match param params "usd" with
      | None | Some `Null -> unit_result (Agent.set_budget agent None)
@@ -3102,7 +3123,12 @@ let handle t client (request : Json.t) : Json.t =
                 Option.first_some
                   (Files_rpc.dispatch ?by agent ~meth ~params)
                   (Option.first_some
-                     (Review_rpc.dispatch ?by agent ~meth ~params)
+                     (Review_rpc.dispatch
+                        ?by
+                        ~client:client.kind
+                        agent
+                        ~meth
+                        ~params)
                      (Git_rpc.dispatch agent ~meth ~params))
               with
               | Some result -> result

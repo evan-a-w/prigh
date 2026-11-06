@@ -232,7 +232,7 @@ let%expect_test "invalid components: every problem by path, nothing shown" =
       note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
     render_ui error: Nothing was shown. Fix these and call render_ui again:
     - components[0].series[0].values: 2 values for 3 labels; give one per label (null for a gap).
-    - components[1].type: unknown type "tabel"; did you mean "table"?.
+    - components[1].type: unknown type "tabel"; did you mean "table"?
     |}]
 ;;
 
@@ -338,7 +338,7 @@ let%expect_test
   [%expect
     {|
     prompt: error "unknown render_ui call \"c9\" in this session: answer a component the session shows"
-    prompt: error "render_ui call c1 has no component \"deplyo\" (its ids: deploy, next)"
+    prompt: error "render_ui call c1 has no interactive component \"deplyo\" (its forms, choices and checklists with submit: deploy, next)"
     prompt: error "a prompt with ui_action takes no text: send text \"\""
     steer: error "steer does not take ui_action: send it with prompt, or follow_up while a run is in progress"
     prompt: error "ui_action needs \"values\""

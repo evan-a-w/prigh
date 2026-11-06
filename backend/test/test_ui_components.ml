@@ -37,12 +37,12 @@ let%expect_test "the arguments' shape" =
           (List.init 21 ~f:(fun _ -> {|{"type": "divider"}|}))));
   [%expect
     {|
-    arguments.components: missing; render_ui needs it
-    arguments.components: has none; give at least 1
-    arguments.components: must be an array of components, not an object
-    arguments: must be an object, not an array
-    arguments.theme: render_ui does not take "theme"; it takes components
-    arguments.components: has 21 components; give at most 20
+    components: missing; render_ui needs it
+    components: has none; give at least 1
+    components: must be an array of components, not an object
+    arguments: must be an object {"components": [...]}, not an array
+    theme: render_ui does not take "theme"; it takes components
+    components: has 21 components; give at most 20
     |}]
 ;;
 
@@ -175,9 +175,7 @@ let%expect_test "text and status" =
     components[3].spark: has 1 point; give at least 2
     components[4].spark[1]: must be a number, not a string
     components[5].items[0].value: must be a string, not a number: write "3"
-    components[6].value: is 120, outside 0 to 100; give a value in that range (or set max)
-    components[7].max: must be more than 0
-    components[8].value: is -1, outside 0 to 10; give a value in that range (or set max)
+    components[7].max: is 0; give more than 0
     components[9].items: has none; give at least 1
     |}]
 ;;
@@ -508,7 +506,7 @@ let%expect_test "form" =
     components[1].fields[1].name: "a" is also components[1].fields[0]'s name; give each field its own
     components[1].fields[1].options: missing; a form field needs it
     components[1].fields[2].options: a text field has no options; use kind select, radio or checkbox
-    components[1].fields[2].min: only number and slider fields take min
+    components[1].fields[2].min: only number, slider and date fields take min
     components[1].fields[3]: a slider needs min and max
     components[1].fields[4].max: is 1, not more than min 5
     components[1].fields[4].default: a number field's default must be a number, not a string
@@ -553,16 +551,17 @@ let%expect_test "choices and checklist" =
     |}]
 ;;
 
-let%expect_test "ids, nested ones too" =
+let%expect_test "interactive ids, nested ones too" =
   print_s
     [%sexp
-      (Ui_components.ids
+      (Ui_components.interactive_ids
          (Json.of_string
             {|{"components": [
                 {"type": "form", "id": "a"},
                 {"type": "card", "children": [{"type": "choices", "id": "b"}]},
-                {"type": "tabs", "tabs": [{"label": "t", "children": [{"type": "checklist", "id": "c"}]}]},
-                {"type": "accordion", "items": [{"title": "t", "children": [{"type": "divider", "id": "d"}]}]}]}|})
+                {"type": "tabs", "tabs": [{"label": "t", "children": [{"type": "checklist", "id": "c", "submit": "Send"}]}]},
+                {"type": "checklist", "id": "no-submit"},
+                {"type": "accordion", "items": [{"title": "t", "children": [{"type": "divider", "id": "d"}, {"type": "form", "id": "e"}]}]}]}|})
        : string list)];
-  [%expect {| (a b c d) |}]
+  [%expect {| (a b c e) |}]
 ;;

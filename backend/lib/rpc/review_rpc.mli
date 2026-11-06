@@ -34,6 +34,7 @@ val methods : string list
 (** [None] for other methods. *)
 val dispatch
   :  ?by:string
+  -> ?client:Client_kind.t
   -> Agent.t
   -> meth:string
   -> params:Json.t

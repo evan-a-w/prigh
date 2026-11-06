@@ -92,27 +92,29 @@ let plural n word =
   else sprintf "%d %ss" n word
 ;;
 
-type ctx =
-  { errors : string Queue.t
-  ; ids : string String.Table.t (** id to the path of its component *)
-  ; images : (string * string) Queue.t
-  ; interactive : string Queue.t
-  ; resolve : string -> string
-  ; mutable count : int
-  }
+module Ctx = struct
+  type t =
+    { errors : string Queue.t
+    ; ids : string String.Table.t (** id to the path of its component *)
+    ; images : (string * string) Queue.t
+    ; interactive : string Queue.t
+    ; resolve : string -> string
+    ; mutable count : int
+    }
+end
 
-let error ctx path fmt =
+let error (ctx : Ctx.t) path fmt =
   ksprintf (fun s -> Queue.enqueue ctx.errors (path ^ ": " ^ s)) fmt
 ;;
 
-let at path name = path ^ "." ^ name
+let at path name = if String.is_empty path then name else path ^ "." ^ name
 let nth path i = sprintf "%s[%d]" path i
 
 (* An object being checked: the accessors record which fields it takes, so
    that [finish] can report the others. *)
-module Obj = struct
+module Fields = struct
   type t =
-    { ctx : ctx
+    { ctx : Ctx.t
     ; path : string
     ; what : string
     ; fields : (string * Json.t) list
@@ -191,6 +193,9 @@ module Obj = struct
             None
           | Some lo, None when i < lo ->
             error t.ctx path "is %d; use %d or more" i lo;
+            None
+          | None, Some hi when i > hi ->
+            error t.ctx path "is %d; use %d or less" i hi;
             None
           | _ -> Some i)))
   ;;
@@ -291,9 +296,9 @@ end
 (* Each item of an array of objects. *)
 let objects ctx items ~what ~f =
   List.filter_map items ~f:(fun (path, json) ->
-    Option.map (Obj.create ctx path ~what json) ~f:(fun o ->
+    Option.map (Fields.create ctx path ~what json) ~f:(fun o ->
       let r = f o in
-      Obj.finish o;
+      Fields.finish o;
       r))
 ;;
 
@@ -323,8 +328,8 @@ let is_identifier s =
   && String.for_all s ~f:(fun c -> Char.is_alphanum c || Char.equal c '_')
 ;;
 
-let check_image ctx (o : Obj.t) =
-  match Obj.string ~required:true o "path" with
+let check_image (ctx : Ctx.t) (o : Fields.t) =
+  match Fields.string ~required:true o "path" with
   | None -> ()
   | Some path ->
     let field = at o.path "path" in
@@ -357,10 +362,11 @@ let check_date ctx path s =
                 ~d:(Int.of_string d)))
     | _ -> false
   in
-  if not ok then error ctx path "%S is not a date; write YYYY-MM-DD" s
+  if not ok then error ctx path "%S is not a date; write YYYY-MM-DD" s;
+  ok
 ;;
 
-let rec component ctx path ~depth (json : Json.t) =
+let rec component (ctx : Ctx.t) path ~depth (json : Json.t) =
   ctx.count <- ctx.count + 1;
   match json with
   | `Object fields ->
@@ -369,9 +375,9 @@ let rec component ctx path ~depth (json : Json.t) =
        error ctx (at path "type") "missing; give one of %s" (one_of types);
        None
      | Some (`String type_) when List.mem types type_ ~equal:String.equal ->
-       let o = { Obj.ctx; path; what = type_; fields; takes = [ "type" ] } in
+       let o = { Fields.ctx; path; what = type_; fields; takes = [ "type" ] } in
        let id =
-         Option.map (Obj.string o "id") ~f:(fun id ->
+         Option.map (Fields.string o "id") ~f:(fun id ->
            let field = at path "id" in
            if String.is_empty (String.strip id)
            then error ctx field "is empty; give a short name, e.g. \"deploy\""
@@ -388,7 +394,7 @@ let rec component ctx path ~depth (json : Json.t) =
            id)
        in
        let summary = check_type ctx o ~type_ ~id ~depth in
-       Obj.finish o;
+       Fields.finish o;
        Some summary
      | Some (`String type_) ->
        error
@@ -416,8 +422,10 @@ let rec component ctx path ~depth (json : Json.t) =
       (describe_json other);
     None
 
-and children ctx (o : Obj.t) ?(name = "children") ~depth () =
-  match Obj.array ~required:true o name ~max:max_children ~noun:"component" with
+and children ctx (o : Fields.t) ?(name = "children") ~depth () =
+  match
+    Fields.array ~required:true o name ~max:max_children ~noun:"component"
+  with
   | None -> 0
   | Some items ->
     if depth + 1 >= max_depth
@@ -433,8 +441,8 @@ and children ctx (o : Obj.t) ?(name = "children") ~depth () =
         ignore (component ctx path ~depth:(depth + 1) json : string option));
       List.length items)
 
-and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
-  let title () = Obj.string o "title" in
+and check_type (ctx : Ctx.t) (o : Fields.t) ~type_ ~id ~depth =
+  let title () = Fields.string o "title" in
   let count n noun = sprintf " (%s)" (plural n noun) in
   let items_count = Option.value_map ~default:0 ~f:List.length in
   let interactive summary = Queue.enqueue ctx.interactive summary in
@@ -450,154 +458,146 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
   match type_ with
   | "card" ->
     let title = title () in
-    ignore (Obj.string o "subtitle" : string option);
+    ignore (Fields.string o "subtitle" : string option);
     ignore (children ctx o ~depth () : int);
     "card" ^ quoted title
   | "grid" ->
-    ignore (Obj.int o "columns" ~min:1 ~max:4 : int option);
+    ignore (Fields.int o "columns" ~min:1 ~max:4 : int option);
     let n = children ctx o ~depth () in
     "grid" ^ count n "component"
   | "tabs" ->
     let tabs =
-      Obj.array ~required:true ~min:2 o "tabs" ~max:8 ~noun:"tab"
+      Fields.array ~required:true ~min:2 o "tabs" ~max:8 ~noun:"tab"
       |> Option.value ~default:[]
     in
     let labels =
       objects ctx tabs ~what:"a tab" ~f:(fun tab ->
-        let label = Obj.string ~required:true tab "label" in
+        let label = Fields.string ~required:true tab "label" in
         ignore (children ctx tab ~depth () : int);
         label)
     in
     "tabs" ^ quoted (Some (String.concat ~sep:", " (List.filter_opt labels)))
   | "accordion" ->
     let items =
-      Obj.array ~required:true o "items" ~max:max_children ~noun:"item"
+      Fields.array ~required:true o "items" ~max:max_children ~noun:"item"
       |> Option.value ~default:[]
     in
     ignore
       (objects ctx items ~what:"an accordion item" ~f:(fun item ->
-         ignore (Obj.string ~required:true item "title" : string option);
-         ignore (Obj.bool item "open" : bool option);
+         ignore (Fields.string ~required:true item "title" : string option);
+         ignore (Fields.bool item "open" : bool option);
          ignore (children ctx item ~depth () : int))
        : unit list);
     "accordion" ^ count (List.length items) "section"
   | "divider" -> "divider"
   | "markdown" ->
-    ignore (Obj.string ~required:true o "text" : string option);
+    ignore (Fields.string ~required:true o "text" : string option);
     "markdown"
   | "callout" ->
-    Obj.tone o;
+    Fields.tone o;
     let title = title () in
-    ignore (Obj.string ~required:true o "text" : string option);
+    ignore (Fields.string ~required:true o "text" : string option);
     "callout" ^ quoted title
   | "stat" ->
-    let label = Obj.string ~required:true o "label" in
-    ignore (Obj.text_or_number ~required:true o "value" : string option);
-    ignore (Obj.string o "unit" : string option);
-    ignore (Obj.text_or_number o "delta" : string option);
-    ignore (Obj.enum o "trend" [ "up"; "down"; "flat" ] : string option);
-    ignore (Obj.enum o "good" [ "up"; "down" ] : string option);
-    ignore (Obj.string o "caption" : string option);
+    let label = Fields.string ~required:true o "label" in
+    ignore (Fields.text_or_number ~required:true o "value" : string option);
+    ignore (Fields.string o "unit" : string option);
+    ignore (Fields.text_or_number o "delta" : string option);
+    ignore (Fields.enum o "trend" [ "up"; "down"; "flat" ] : string option);
+    ignore (Fields.enum o "good" [ "up"; "down" ] : string option);
+    ignore (Fields.string o "caption" : string option);
     Option.iter
-      (Obj.array ~min:2 o "spark" ~max:200 ~noun:"point")
+      (Fields.array ~min:2 o "spark" ~max:200 ~noun:"point")
       ~f:
         (List.iter ~f:(fun (path, json) ->
-           ignore (Obj.number_of ctx path json : float option)));
+           ignore (Fields.number_of ctx path json : float option)));
     "stat" ^ quoted label
   | "kv" ->
     let title = title () in
-    let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
+    let items = Fields.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
       (objects
          ctx
          (Option.value items ~default:[])
          ~what:"a kv item"
          ~f:(fun item ->
-           ignore (Obj.string ~required:true item "key" : string option);
-           ignore (Obj.string ~required:true item "value" : string option))
+           ignore (Fields.string ~required:true item "key" : string option);
+           ignore (Fields.string ~required:true item "value" : string option))
        : unit list);
     "kv" ^ quoted title ^ count (items_count items) "item"
   | "progress" ->
-    let label = Obj.string o "label" in
-    let value = Obj.number ~required:true o "value" in
-    let max = Obj.number o "max" in
-    Obj.tone o;
-    ignore (Obj.string o "caption" : string option);
-    (match max with
+    let label = Fields.string o "label" in
+    (* A value outside 0 to max is shown clamped. *)
+    ignore (Fields.number ~required:true o "value" : float option);
+    (match Fields.number o "max" with
      | Some m when Float.(m <= 0.) ->
-       error ctx (at o.path "max") "must be more than 0"
-     | _ ->
-       let top = Option.value max ~default:100. in
-       Option.iter value ~f:(fun v ->
-         if Float.(v < 0. || v > top)
-         then
-           error
-             ctx
-             (at o.path "value")
-             "is %g, outside 0 to %g; give a value in that range (or set max)"
-             v
-             top));
+       error ctx (at o.path "max") "is %g; give more than 0" m
+     | _ -> ());
+    Fields.tone o;
+    ignore (Fields.string o "caption" : string option);
     "progress" ^ quoted label
   | "badges" ->
-    let items = Obj.array ~required:true o "items" ~max:30 ~noun:"badge" in
+    let items = Fields.array ~required:true o "items" ~max:30 ~noun:"badge" in
     ignore
       (objects ctx (Option.value items ~default:[]) ~what:"a badge" ~f:(fun b ->
-         ignore (Obj.string ~required:true b "text" : string option);
-         Obj.tone b)
+         ignore (Fields.string ~required:true b "text" : string option);
+         Fields.tone b)
        : unit list);
     "badges" ^ count (items_count items) "badge"
   | "table" -> table ctx o
   | "chart" -> chart ctx o
   | "timeline" ->
     let title = title () in
-    let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
+    let items = Fields.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
       (objects
          ctx
          (Option.value items ~default:[])
          ~what:"a timeline item"
          ~f:(fun item ->
-           ignore (Obj.string ~required:true item "title" : string option);
-           ignore (Obj.string item "time" : string option);
-           ignore (Obj.string item "text" : string option);
-           Obj.tone item)
+           ignore (Fields.string ~required:true item "title" : string option);
+           ignore (Fields.string item "time" : string option);
+           ignore (Fields.string item "text" : string option);
+           Fields.tone item)
        : unit list);
     "timeline" ^ quoted title ^ count (items_count items) "item"
   | "steps" ->
     let title = title () in
-    let items = Obj.array ~required:true o "items" ~max:50 ~noun:"step" in
+    let items = Fields.array ~required:true o "items" ~max:50 ~noun:"step" in
     ignore
       (objects
          ctx
          (Option.value items ~default:[])
          ~what:"a step"
          ~f:(fun item ->
-           ignore (Obj.string ~required:true item "title" : string option);
-           ignore (Obj.string item "text" : string option);
+           ignore (Fields.string ~required:true item "title" : string option);
+           ignore (Fields.string item "text" : string option);
            ignore
-             (Obj.enum item "status" [ "done"; "current"; "todo"; "failed" ]
+             (Fields.enum item "status" [ "done"; "current"; "todo"; "failed" ]
               : string option))
        : unit list);
     "steps" ^ quoted title ^ count (items_count items) "step"
   | "code" ->
-    ignore (Obj.string o "lang" : string option);
+    ignore (Fields.string o "lang" : string option);
     let title = title () in
-    ignore (Obj.string ~required:true o "code" : string option);
+    ignore (Fields.string ~required:true o "code" : string option);
     "code" ^ quoted title
   | "diff" ->
     let title = title () in
-    ignore (Obj.string ~required:true o "diff" : string option);
+    ignore (Fields.string ~required:true o "diff" : string option);
     "diff" ^ quoted title
   | "tree" ->
     let title = title () in
-    let entries = Obj.array ~required:true o "entries" ~max:500 ~noun:"entry" in
+    let entries =
+      Fields.array ~required:true o "entries" ~max:500 ~noun:"entry"
+    in
     ignore
       (objects
          ctx
          (Option.value entries ~default:[])
          ~what:"a tree entry"
          ~f:(fun e ->
-           Option.iter (Obj.string ~required:true e "path") ~f:(fun p ->
+           Option.iter (Fields.string ~required:true e "path") ~f:(fun p ->
              let path = at e.path "path" in
              if String.is_prefix p ~prefix:"/"
              then
@@ -619,21 +619,21 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
                  path
                  "%S has an empty segment; separate names with one \"/\""
                  p);
-           ignore (Obj.string e "note" : string option);
-           Obj.tone e)
+           ignore (Fields.string e "note" : string option);
+           Fields.tone e)
        : unit list);
     "tree" ^ quoted title ^ count (items_count entries) "entry"
   | "image" ->
     check_image ctx o;
-    ignore (Obj.string o "caption" : string option);
-    ignore (Obj.string o "alt" : string option);
-    ignore (Obj.enum o "width" [ "small"; "medium"; "full" ] : string option);
+    ignore (Fields.string o "caption" : string option);
+    ignore (Fields.string o "alt" : string option);
+    ignore (Fields.enum o "width" [ "small"; "medium"; "full" ] : string option);
     (match List.Assoc.find o.fields "path" ~equal:String.equal with
      | Some (`String p) -> "image " ^ p
      | _ -> "image")
   | "gallery" ->
     let title = title () in
-    let images = Obj.array ~required:true o "images" ~max:24 ~noun:"image" in
+    let images = Fields.array ~required:true o "images" ~max:24 ~noun:"image" in
     ignore
       (objects
          ctx
@@ -641,28 +641,28 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
          ~what:"a gallery image"
          ~f:(fun i ->
            check_image ctx i;
-           ignore (Obj.string i "caption" : string option);
-           ignore (Obj.string i "alt" : string option))
+           ignore (Fields.string i "caption" : string option);
+           ignore (Fields.string i "alt" : string option))
        : unit list);
     "gallery" ^ quoted title ^ count (items_count images) "image"
   | "calculator" -> calculator ctx o
   | "flashcards" ->
     let title = title () in
-    let cards = Obj.array ~required:true o "cards" ~max:50 ~noun:"card" in
+    let cards = Fields.array ~required:true o "cards" ~max:50 ~noun:"card" in
     ignore
       (objects
          ctx
          (Option.value cards ~default:[])
          ~what:"a flashcard"
          ~f:(fun c ->
-           ignore (Obj.string ~required:true c "front" : string option);
-           ignore (Obj.string ~required:true c "back" : string option))
+           ignore (Fields.string ~required:true c "front" : string option);
+           ignore (Fields.string ~required:true c "back" : string option))
        : unit list);
     "flashcards" ^ quoted title ^ count (items_count cards) "card"
   | "quiz" ->
     let title = title () in
     let questions =
-      Obj.array ~required:true o "questions" ~max:50 ~noun:"question"
+      Fields.array ~required:true o "questions" ~max:50 ~noun:"question"
     in
     ignore
       (objects
@@ -670,10 +670,10 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
          (Option.value questions ~default:[])
          ~what:"a quiz question"
          ~f:(fun q ->
-           ignore (Obj.string ~required:true q "question" : string option);
+           ignore (Fields.string ~required:true q "question" : string option);
            let options =
              Option.map
-               (Obj.array
+               (Fields.array
                   ~required:true
                   ~min:2
                   q
@@ -682,8 +682,8 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
                   ~noun:"option")
                ~f:(strings ctx)
            in
-           let answer = Obj.int ~required:true q "answer" in
-           ignore (Obj.string q "explanation" : string option);
+           let answer = Fields.int ~required:true q "answer" in
+           ignore (Fields.string q "explanation" : string option);
            match options, answer with
            | Some options, Some answer
              when answer < 0 || answer >= List.length options ->
@@ -701,17 +701,19 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
   | "form" ->
     need_id "a form";
     let title = title () in
-    ignore (Obj.string o "description" : string option);
-    ignore (Obj.string o "submit" : string option);
+    ignore (Fields.string o "description" : string option);
+    ignore (Fields.string o "submit" : string option);
     form_fields ctx o;
     let summary = "form" ^ quoted (Option.first_some title id) in
     interactive summary;
     summary
   | "choices" ->
     need_id "choices";
-    let prompt = Obj.string o "prompt" in
-    ignore (Obj.bool o "multiple" : bool option);
-    let options = Obj.array ~required:true o "options" ~max:12 ~noun:"option" in
+    let prompt = Fields.string o "prompt" in
+    ignore (Fields.bool o "multiple" : bool option);
+    let options =
+      Fields.array ~required:true o "options" ~max:12 ~noun:"option"
+    in
     let values = String.Table.create () in
     ignore
       (objects
@@ -719,10 +721,10 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
          (Option.value options ~default:[])
          ~what:"a choice"
          ~f:(fun c ->
-           let label = Obj.string ~required:true c "label" in
-           let value = Obj.string c "value" in
-           ignore (Obj.string c "description" : string option);
-           Obj.tone c;
+           let label = Fields.string ~required:true c "label" in
+           let value = Fields.string c "value" in
+           ignore (Fields.string c "description" : string option);
+           Fields.tone c;
            Option.iter (Option.first_some value label) ~f:(fun v ->
              match Hashtbl.find values v with
              | Some other ->
@@ -739,16 +741,16 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     summary
   | "checklist" ->
     let title = title () in
-    let submit = Obj.string o "submit" in
-    let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
+    let submit = Fields.string o "submit" in
+    let items = Fields.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
       (objects
          ctx
          (Option.value items ~default:[])
          ~what:"a checklist item"
          ~f:(fun i ->
-           ignore (Obj.string ~required:true i "text" : string option);
-           ignore (Obj.bool i "checked" : bool option))
+           ignore (Fields.string ~required:true i "text" : string option);
+           ignore (Fields.bool i "checked" : bool option))
        : unit list);
     let summary =
       "checklist"
@@ -762,11 +764,13 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     summary
   | other -> raise_s [%message "unhandled component type" other]
 
-and table ctx (o : Obj.t) =
-  let title = Obj.string o "title" in
-  ignore (Obj.bool o "sortable" : bool option);
-  ignore (Obj.string o "caption" : string option);
-  let columns = Obj.array ~required:true o "columns" ~max:12 ~noun:"column" in
+and table ctx (o : Fields.t) =
+  let title = Fields.string o "title" in
+  ignore (Fields.bool o "sortable" : bool option);
+  ignore (Fields.string o "caption" : string option);
+  let columns =
+    Fields.array ~required:true o "columns" ~max:12 ~noun:"column"
+  in
   let keys = String.Table.create () in
   ignore
     (objects
@@ -774,7 +778,7 @@ and table ctx (o : Obj.t) =
        (Option.value columns ~default:[])
        ~what:"a table column"
        ~f:(fun c ->
-         Option.iter (Obj.string ~required:true c "key") ~f:(fun key ->
+         Option.iter (Fields.string ~required:true c "key") ~f:(fun key ->
            match Hashtbl.find keys key with
            | Some other ->
              error
@@ -784,16 +788,16 @@ and table ctx (o : Obj.t) =
                key
                other
            | None -> Hashtbl.set keys ~key ~data:c.path);
-         ignore (Obj.string c "label" : string option);
+         ignore (Fields.string c "label" : string option);
          ignore
-           (Obj.enum c "align" [ "left"; "right"; "center" ] : string option);
+           (Fields.enum c "align" [ "left"; "right"; "center" ] : string option);
          ignore
-           (Obj.enum
+           (Fields.enum
               c
               "format"
               [ "text"; "number"; "percent"; "currency"; "date"; "md" ]
             : string option);
-         Option.iter (Obj.string c "currency") ~f:(fun cur ->
+         Option.iter (Fields.string c "currency") ~f:(fun cur ->
            if
              not
                (String.length cur = 3 && String.for_all cur ~f:Char.is_uppercase)
@@ -803,11 +807,11 @@ and table ctx (o : Obj.t) =
                (at c.path "currency")
                "%S is not an ISO currency code; write e.g. \"USD\" or \"EUR\""
                cur);
-         ignore (Obj.int c "decimals" ~min:0 ~max:10 : int option))
+         ignore (Fields.int c "decimals" ~min:0 ~max:10 : int option))
      : unit list);
   let rows =
     Option.value
-      (Obj.array ~required:true ~min:0 o "rows" ~max:500 ~noun:"row")
+      (Fields.array ~required:true ~min:0 o "rows" ~max:500 ~noun:"row")
       ~default:[]
   in
   let column_keys = Hashtbl.keys keys |> List.sort ~compare:String.compare in
@@ -846,7 +850,7 @@ and table ctx (o : Obj.t) =
         (describe_json other));
   "table" ^ quoted title ^ sprintf " (%s)" (plural (List.length rows) "row")
 
-and chart ctx (o : Obj.t) =
+and chart ctx (o : Fields.t) =
   let kinds =
     [ "line"
     ; "area"
@@ -858,11 +862,11 @@ and chart ctx (o : Obj.t) =
     ; "scatter"
     ]
   in
-  let kind = Obj.enum ~required:true o "kind" kinds in
-  let title = Obj.string o "title" in
+  let kind = Fields.enum ~required:true o "kind" kinds in
+  let title = Fields.string o "title" in
   List.iter [ "subtitle"; "unit"; "x_label"; "y_label" ] ~f:(fun name ->
-    ignore (Obj.string o name : string option));
-  ignore (Obj.enum o "height" [ "small"; "medium"; "large" ] : string option);
+    ignore (Fields.string o name : string option));
+  ignore (Fields.enum o "height" [ "small"; "medium"; "large" ] : string option);
   let series_count = ref 0 in
   let wrong_for ?(o = o) kind names ~takes =
     List.iter names ~f:(fun name ->
@@ -884,12 +888,14 @@ and chart ctx (o : Obj.t) =
      wrong_for kind [ "slices" ] ~takes:"labels and series";
      let labels =
        Option.map
-         (Obj.array ~required:true o "labels" ~max:200 ~noun:"label")
+         (Fields.array ~required:true o "labels" ~max:200 ~noun:"label")
          ~f:(fun l ->
            ignore (strings ctx l : string list);
            List.length l)
      in
-     let series = Obj.array ~required:true o "series" ~max:8 ~noun:"series" in
+     let series =
+       Fields.array ~required:true o "series" ~max:8 ~noun:"series"
+     in
      series_count := Option.value_map series ~default:0 ~f:List.length;
      ignore
        (objects
@@ -897,16 +903,17 @@ and chart ctx (o : Obj.t) =
           (Option.value series ~default:[])
           ~what:"a chart series"
           ~f:(fun s ->
-            ignore (Obj.string ~required:true s "name" : string option);
+            ignore (Fields.string ~required:true s "name" : string option);
             wrong_for ~o:s kind [ "points" ] ~takes:"values (one per label)";
             match
-              Obj.field s "values" ~required:true ~f:(fun p j -> Some (p, j))
+              Fields.field s "values" ~required:true ~f:(fun p j -> Some (p, j))
             with
             | Some (path, `Array values) ->
               List.iteri values ~f:(fun i v ->
                 match (v : Json.t) with
                 | `Null -> ()
-                | v -> ignore (Obj.number_of ctx (nth path i) v : float option));
+                | v ->
+                  ignore (Fields.number_of ctx (nth path i) v : float option));
               Option.iter labels ~f:(fun labels ->
                 let n = List.length values in
                 if n <> labels
@@ -927,15 +934,17 @@ and chart ctx (o : Obj.t) =
         : unit list)
    | Some (("pie" | "donut") as kind) ->
      wrong_for kind [ "labels"; "series" ] ~takes:"slices";
-     let slices = Obj.array ~required:true o "slices" ~max:12 ~noun:"slice" in
+     let slices =
+       Fields.array ~required:true o "slices" ~max:12 ~noun:"slice"
+     in
      let values =
        objects
          ctx
          (Option.value slices ~default:[])
          ~what:"a slice"
          ~f:(fun s ->
-           ignore (Obj.string ~required:true s "label" : string option);
-           match Obj.number ~required:true s "value" with
+           ignore (Fields.string ~required:true s "label" : string option);
+           match Fields.number ~required:true s "value" with
            | Some v when Float.(v < 0.) ->
              error ctx (at s.path "value") "is %g; slices cannot be negative" v;
              None
@@ -949,7 +958,9 @@ and chart ctx (o : Obj.t) =
      then error ctx (at o.path "slices") "are all 0; give the slices' sizes"
    | Some kind ->
      wrong_for kind [ "labels"; "slices" ] ~takes:"series of points";
-     let series = Obj.array ~required:true o "series" ~max:8 ~noun:"series" in
+     let series =
+       Fields.array ~required:true o "series" ~max:8 ~noun:"series"
+     in
      series_count := Option.value_map series ~default:0 ~f:List.length;
      let total =
        objects
@@ -957,18 +968,18 @@ and chart ctx (o : Obj.t) =
          (Option.value series ~default:[])
          ~what:"a scatter series"
          ~f:(fun s ->
-           ignore (Obj.string ~required:true s "name" : string option);
+           ignore (Fields.string ~required:true s "name" : string option);
            wrong_for ~o:s kind [ "values" ] ~takes:"points ([[x, y], ...])";
            let points =
              Option.value
-               (Obj.array ~required:true s "points" ~max:2000 ~noun:"point")
+               (Fields.array ~required:true s "points" ~max:2000 ~noun:"point")
                ~default:[]
            in
            List.iter points ~f:(fun (path, p) ->
              match (p : Json.t) with
              | `Array [ x; y ] ->
-               ignore (Obj.number_of ctx (nth path 0) x : float option);
-               ignore (Obj.number_of ctx (nth path 1) y : float option)
+               ignore (Fields.number_of ctx (nth path 0) x : float option);
+               ignore (Fields.number_of ctx (nth path 1) y : float option)
              | other ->
                error
                  ctx
@@ -991,9 +1002,9 @@ and chart ctx (o : Obj.t) =
   ^ quoted title
   ^ if !series_count > 1 then sprintf " (%d series)" !series_count else ""
 
-and calculator ctx (o : Obj.t) =
-  let title = Obj.string o "title" in
-  let inputs = Obj.array ~required:true o "inputs" ~max:20 ~noun:"input" in
+and calculator ctx (o : Fields.t) =
+  let title = Fields.string o "title" in
+  let inputs = Fields.array ~required:true o "inputs" ~max:20 ~noun:"input" in
   let names = String.Table.create () in
   ignore
     (objects
@@ -1001,7 +1012,7 @@ and calculator ctx (o : Obj.t) =
        (Option.value inputs ~default:[])
        ~what:"a calculator input"
        ~f:(fun i ->
-         Option.iter (Obj.string ~required:true i "name") ~f:(fun name ->
+         Option.iter (Fields.string ~required:true i "name") ~f:(fun name ->
            let path = at i.path "name" in
            if not (is_identifier name)
            then
@@ -1028,16 +1039,16 @@ and calculator ctx (o : Obj.t) =
                  name
                  other
              | None -> Hashtbl.set names ~key:name ~data:i.path));
-         ignore (Obj.string ~required:true i "label" : string option);
-         let default = Obj.number ~required:true i "default" in
-         let min = Obj.number i "min" in
-         let max = Obj.number i "max" in
-         (match Obj.number i "step" with
+         ignore (Fields.string ~required:true i "label" : string option);
+         let default = Fields.number ~required:true i "default" in
+         let min = Fields.number i "min" in
+         let max = Fields.number i "max" in
+         (match Fields.number i "step" with
           | Some s when Float.(s <= 0.) ->
             error ctx (at i.path "step") "must be more than 0"
           | _ -> ());
-         ignore (Obj.string i "unit" : string option);
-         let slider = Option.value (Obj.bool i "slider") ~default:false in
+         ignore (Fields.string i "unit" : string option);
+         let slider = Option.value (Fields.bool i "slider") ~default:false in
          if slider && (Option.is_none min || Option.is_none max)
          then error ctx i.path "a slider needs min and max";
          match min, max with
@@ -1066,20 +1077,25 @@ and calculator ctx (o : Obj.t) =
          | _ -> None)
       | _ -> None)
   in
-  let outputs = Obj.array ~required:true o "outputs" ~max:20 ~noun:"output" in
+  let outputs =
+    Fields.array ~required:true o "outputs" ~max:20 ~noun:"output"
+  in
   ignore
     (objects
        ctx
        (Option.value outputs ~default:[])
        ~what:"a calculator output"
        ~f:(fun out ->
-         ignore (Obj.string ~required:true out "label" : string option);
+         ignore (Fields.string ~required:true out "label" : string option);
          ignore
-           (Obj.enum out "format" [ "number"; "percent"; "currency"; "integer" ]
+           (Fields.enum
+              out
+              "format"
+              [ "number"; "percent"; "currency"; "integer" ]
             : string option);
-         ignore (Obj.int out "decimals" ~min:0 ~max:10 : int option);
-         ignore (Obj.string out "unit" : string option);
-         Option.iter (Obj.string ~required:true out "expr") ~f:(fun expr ->
+         ignore (Fields.int out "decimals" ~min:0 ~max:10 : int option);
+         ignore (Fields.string out "unit" : string option);
+         Option.iter (Fields.string ~required:true out "expr") ~f:(fun expr ->
            let path = at out.path "expr" in
            match Ui_expr.parse expr with
            | Error e -> error ctx path "%s in %S" e expr
@@ -1089,7 +1105,7 @@ and calculator ctx (o : Obj.t) =
      : unit list);
   "calculator" ^ quoted title
 
-and form_fields ctx (o : Obj.t) =
+and form_fields ctx (o : Fields.t) =
   let kinds =
     [ "text"
     ; "textarea"
@@ -1102,7 +1118,7 @@ and form_fields ctx (o : Obj.t) =
     ; "date"
     ]
   in
-  let fields = Obj.array ~required:true o "fields" ~max:30 ~noun:"field" in
+  let fields = Fields.array ~required:true o "fields" ~max:30 ~noun:"field" in
   let names = String.Table.create () in
   ignore
     (objects
@@ -1110,7 +1126,7 @@ and form_fields ctx (o : Obj.t) =
        (Option.value fields ~default:[])
        ~what:"a form field"
        ~f:(fun f ->
-         Option.iter (Obj.string ~required:true f "name") ~f:(fun name ->
+         Option.iter (Fields.string ~required:true f "name") ~f:(fun name ->
            match Hashtbl.find names name with
            | Some other ->
              error
@@ -1120,18 +1136,17 @@ and form_fields ctx (o : Obj.t) =
                name
                other
            | None -> Hashtbl.set names ~key:name ~data:f.path);
-         ignore (Obj.string ~required:true f "label" : string option);
-         ignore (Obj.bool f "required" : bool option);
-         ignore (Obj.string f "placeholder" : string option);
-         ignore (Obj.string f "help" : string option);
-         let kind = Obj.enum ~required:true f "kind" kinds in
+         ignore (Fields.string ~required:true f "label" : string option);
+         ignore (Fields.bool f "required" : bool option);
+         ignore (Fields.string f "placeholder" : string option);
+         ignore (Fields.string f "help" : string option);
+         let kind = Fields.enum ~required:true f "kind" kinds in
          let with_options = [ "select"; "radio"; "checkbox" ] in
-         let numeric = [ "number"; "slider" ] in
          let options =
            match kind with
            | Some k when List.mem with_options k ~equal:String.equal ->
              Option.map
-               (Obj.array ~required:true f "options" ~max:50 ~noun:"option")
+               (Fields.array ~required:true f "options" ~max:50 ~noun:"option")
                ~f:(strings ctx)
            | Some k ->
              if List.Assoc.mem f.fields "options" ~equal:String.equal
@@ -1148,28 +1163,55 @@ and form_fields ctx (o : Obj.t) =
              None
          in
          let range =
-           List.map [ "min"; "max"; "step" ] ~f:(fun name ->
-             match kind with
-             | Some k when not (List.mem numeric k ~equal:String.equal) ->
-               if List.Assoc.mem f.fields name ~equal:String.equal
-               then (
-                 f.takes <- name :: f.takes;
-                 error
-                   ctx
-                   (at f.path name)
-                   "only number and slider fields take %s"
-                   name);
-               None
-             | _ -> Obj.number f name)
+           let wrong_kind name =
+             if List.Assoc.mem f.fields name ~equal:String.equal
+             then (
+               f.takes <- name :: f.takes;
+               error
+                 ctx
+                 (at f.path name)
+                 "only number, slider and date fields take %s"
+                 name)
+           in
+           let step () =
+             match Fields.number f "step" with
+             | Some s when Float.(s <= 0.) ->
+               error ctx (at f.path "step") "is %g; give more than 0" s
+             | _ -> ()
+           in
+           match kind with
+           | Some ("number" | "slider") ->
+             let lo = Fields.number f "min" in
+             let hi = Fields.number f "max" in
+             step ();
+             (match kind, lo, hi with
+              | Some "slider", None, _ | Some "slider", _, None ->
+                error ctx f.path "a slider needs min and max"
+              | _, Some lo, Some hi when Float.(lo >= hi) ->
+                error ctx (at f.path "max") "is %g, not more than min %g" hi lo
+              | _ -> ());
+             `Numbers (lo, hi)
+           | Some "date" ->
+             let date name =
+               Option.bind (Fields.string f name) ~f:(fun d ->
+                 Option.some_if (check_date ctx (at f.path name) d) d)
+             in
+             let lo = date "min" in
+             let hi = date "max" in
+             (* In days, as the browser's date input takes it. *)
+             ignore (Fields.int f "step" ~min:1 : int option);
+             (match lo, hi with
+              | Some lo, Some hi when String.( > ) lo hi ->
+                error ctx (at f.path "max") "is %s, before min %s" hi lo
+              | _ -> ());
+             `Dates (lo, hi)
+           | Some _ ->
+             List.iter [ "min"; "max"; "step" ] ~f:wrong_kind;
+             `None
+           | None ->
+             f.takes <- [ "min"; "max"; "step" ] @ f.takes;
+             `None
          in
-         (match kind, range with
-          | Some "slider", ([ None; _; _ ] | [ _; None; _ ]) ->
-            error ctx f.path "a slider needs min and max"
-          | _, [ Some lo; Some hi; _ ] when Float.(lo >= hi) ->
-            error ctx (at f.path "max") "is %g, not more than min %g" hi lo
-          | _, [ _; _; Some s ] when Float.(s <= 0.) ->
-            error ctx (at f.path "step") "must be more than 0"
-          | _ -> ());
          let default_path = at f.path "default" in
          let wrong expected (json : Json.t) =
            error
@@ -1192,22 +1234,32 @@ and form_fields ctx (o : Obj.t) =
                  (String.concat ~sep:", " (List.map options ~f:(sprintf "%S"))))
          in
          ignore
-           (Obj.field f "default" ~required:false ~f:(fun _ json ->
+           (Fields.field f "default" ~required:false ~f:(fun _ json ->
               (match kind, json with
                | None, _ -> ()
                | Some ("text" | "textarea"), `String _ -> ()
-               | Some "date", `String s -> check_date ctx default_path s
+               | Some "date", `String s ->
+                 if check_date ctx default_path s
+                 then (
+                   match range with
+                   | `Dates (lo, hi)
+                     when Option.exists lo ~f:(fun lo -> String.( < ) s lo)
+                          || Option.exists hi ~f:(fun hi -> String.( > ) s hi)
+                     -> error ctx default_path "is %s, outside min to max" s
+                   | _ -> ())
                | Some ("select" | "radio"), `String s -> in_options s
                | Some ("text" | "textarea" | "date" | "select" | "radio"), json
                  -> wrong "a string" json
                | Some ("number" | "slider"), (`Number _ as json) ->
-                 Option.iter (Obj.number_of ctx default_path json) ~f:(fun d ->
-                   match range with
-                   | [ lo; hi; _ ]
-                     when Option.exists lo ~f:(fun lo -> Float.(d < lo))
-                          || Option.exists hi ~f:(fun hi -> Float.(d > hi)) ->
-                     error ctx default_path "is %g, outside min to max" d
-                   | _ -> ())
+                 Option.iter
+                   (Fields.number_of ctx default_path json)
+                   ~f:(fun d ->
+                     match range with
+                     | `Numbers (lo, hi)
+                       when Option.exists lo ~f:(fun lo -> Float.(d < lo))
+                            || Option.exists hi ~f:(fun hi -> Float.(d > hi)) ->
+                       error ctx default_path "is %g, outside min to max" d
+                     | _ -> ())
                | Some ("number" | "slider"), json -> wrong "a number" json
                | Some "toggle", (`True | `False) -> ()
                | Some "toggle", json -> wrong "true or false" json
@@ -1226,7 +1278,7 @@ and form_fields ctx (o : Obj.t) =
 
 let check json ~resolve =
   let ctx =
-    { errors = Queue.create ()
+    { Ctx.errors = Queue.create ()
     ; ids = String.Table.create ()
     ; images = Queue.create ()
     ; interactive = Queue.create ()
@@ -1235,12 +1287,15 @@ let check json ~resolve =
     }
   in
   let summaries =
-    match Obj.create ctx "arguments" ~what:"render_ui" json with
-    | None -> []
-    | Some o ->
+    (* The paths start at the arguments' fields: [components[0].title]. *)
+    match json with
+    | `Object fields ->
+      let o =
+        { Fields.ctx; path = ""; what = "render_ui"; fields; takes = [] }
+      in
       let summaries =
         match
-          Obj.array
+          Fields.array
             ~required:true
             o
             "components"
@@ -1249,12 +1304,18 @@ let check json ~resolve =
         with
         | None -> []
         | Some items ->
-          List.filter_map items ~f:(fun (i, json) ->
-            let path = String.chop_prefix_if_exists i ~prefix:"arguments." in
+          List.filter_map items ~f:(fun (path, json) ->
             component ctx path ~depth:0 json)
       in
-      Obj.finish o;
+      Fields.finish o;
       summaries
+    | other ->
+      error
+        ctx
+        "arguments"
+        "must be an object {\"components\": [...]}, not %s"
+        (describe_json other);
+      []
   in
   if ctx.count > max_components
   then
@@ -1275,17 +1336,22 @@ let check json ~resolve =
   else Error (Queue.to_list ctx.errors)
 ;;
 
-let ids json =
+let interactive_ids json =
   let rec of_component (json : Json.t) =
     match json with
     | `Object fields ->
+      let field name = List.Assoc.find fields name ~equal:String.equal in
       let own =
-        match List.Assoc.find fields "id" ~equal:String.equal with
-        | Some (`String id) -> [ id ]
+        match field "type", field "id" with
+        | Some (`String ("form" | "choices")), Some (`String id) -> [ id ]
+        | Some (`String "checklist"), Some (`String id)
+          when Option.exists (field "submit") ~f:(function
+                 | `String _ -> true
+                 | _ -> false) -> [ id ]
         | _ -> []
       in
       let nested name f =
-        match List.Assoc.find fields name ~equal:String.equal with
+        match field name with
         | Some (`Array items) -> List.concat_map items ~f
         | _ -> []
       in

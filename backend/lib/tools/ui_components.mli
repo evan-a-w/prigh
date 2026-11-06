@@ -34,6 +34,7 @@ val check
   -> resolve:(string -> string)
   -> (Checked.t, string list) Result.t
 
-(** The [id]s of the components in [render_ui]'s arguments, nested ones
+(** The [id]s of the components in [render_ui]'s arguments that reply to the
+    model ([form], [choices], a [checklist] with [submit]), nested ones
     too. *)
-val ids : Json.t -> string list
+val interactive_ids : Json.t -> string list

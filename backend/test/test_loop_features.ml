@@ -163,10 +163,10 @@ let%expect_test
        : (string * bool) list)];
   [%expect
     {|
-    request: 1 messages, last user "the task"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    request: 3 messages, last user "the task"
+    request: 3 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     summarise: the agent's request, 3 messages
@@ -174,9 +174,9 @@ let%expect_test
     request: 4 messages, last user "Summary of the conversation so far:"
     assistant: done
     (true true false)
-    ("U the task"  "U Summary of the conversation so far:\
-                  \nSUMM"
-     "A " "T c2" "A done")
+    ("U [Client: the user is on another client, "
+      "U Summary of the conversation so far:\
+     \nSUMM" "A " "T c2" "A done")
     ((SUMMARY true))
     |}]
 ;;
@@ -201,13 +201,13 @@ let%expect_test "an overflowing request in a session is compacted and retried" =
        : int)];
   [%expect
     {|
-    request: 1 messages, last user "the task"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    request: 3 messages, last user "the task"
+    request: 3 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    request: 5 messages, last user "the task"
+    request: 5 messages, last user "[Client: the user is on another client, which cannot display"
     summarise: transcript
     compacted: SUMMARY
     request: 4 messages, last user "Summary of the conversation so far:"
@@ -247,10 +247,10 @@ let%expect_test "the budget stops a run between turns and refuses prompts" =
   ignore t;
   [%expect
     {|
-    request: 1 messages, last user "spend"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxx
-    request: 3 messages, last user "spend"
+    request: 3 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxx
     notice: the session's budget of $0.50 is spent ($0.60 so far): /budget 2 raises it, /budget off removes it
@@ -564,7 +564,7 @@ let%expect_test "/goal off; queued messages come before a continuation" =
     (Error "there is no goal; /goal TEXT sets one")
     request: 1 messages, last user "[prigh goal] Work on this goal until it is fully achieved:" (+goal_complete)
     assistant: first
-    request: 3 messages, last user "a question" (+goal_complete)
+    request: 3 messages, last user "[Client: the user is on another client, which cannot display" (+goal_complete)
     assistant: for the follow-up
     request: 5 messages, last user "[prigh goal: continuation 1 of 20] Continue working toward t" (+goal_complete)
     assistant: continued
@@ -703,10 +703,10 @@ let%expect_test "a run stopped by a usage limit resumes when it resets" =
   show_state agent;
   [%expect
     {|
-    request: 1 messages, last user "work"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:
     tool filler: xxxxxxxxxx
-    request: 3 messages, last user "work"
+    request: 3 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 1h 01m): /resume now retries at once, /resume cancel stays stopped
     ((running false) (cost_usd 0) (budget_usd ()) (goal ())
@@ -748,7 +748,7 @@ let%expect_test
   show_state agent;
   [%expect
     {|
-    request: 1 messages, last user "work"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes in 1m (the provider says it reset at <time>, which has passed): /resume now retries at once, /resume cancel stays stopped
     resume in 60s
@@ -804,7 +804,7 @@ let%expect_test
   print_s [%sexp (recorded () : bool option list)];
   [%expect
     {|
-    request: 1 messages, last user "work"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
     ((true))
@@ -850,7 +850,7 @@ let%expect_test "a resume whose session was deleted meanwhile does not run" =
       (Sys_unix.file_exists_exn (Session.path (Agent.session agent)) : bool)];
   [%expect
     {|
-    request: 1 messages, last user "work"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
     notice: the usage limit has reset, but this session was deleted, so its run does not resume
@@ -892,7 +892,7 @@ let%expect_test
   show_state agent;
   [%expect
     {|
-    request: 1 messages, last user "one"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
     ((running false) (cost_usd 0) (budget_usd ()) (goal ())
@@ -926,7 +926,7 @@ let%expect_test
   show_state agent;
   [%expect
     {|
-    request: 1 messages, last user "x"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached)
     notice: deepseek/deepseek-flash: the usage limit is reached and the provider did not say when it resets, so the run will not resume by itself; send a message to try again, or /model picks another model
     ((running false) (cost_usd 0) (budget_usd ()) (goal ())
@@ -942,7 +942,7 @@ let%expect_test
   show_state agent;
   [%expect
     {|
-    request: 1 messages, last user "x"
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
     assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
     ((running false) (cost_usd 0) (budget_usd ()) (goal ())
      (resume_scheduled false))
