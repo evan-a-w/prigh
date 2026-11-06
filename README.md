@@ -1222,9 +1222,30 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   and closes a new tab or window on another site, or sends prigh's window
   back, opening the link in your browser instead (Linux only: elsewhere
   they open in the browser on prigh's profile).
-  Window managers see the class `prigh` on X11; on Wayland Chromium names
-  an app window's app_id after the site (e.g. `chrome-ai.example.com__-Default`),
-  so match that in Hyprland or sway rules (`hyprctl clients` shows it).
+  The window is an app's, not a browser's (also Linux only, through the
+  same DevTools pipe): the browser's own pages are closed as soon as they
+  open and the focus goes back to prigh's window, so Ctrl+T, Ctrl+N
+  (a new tab or a tabbed window), Ctrl+Shift+N (incognito: its windows are
+  closed), Ctrl+H, Ctrl+J, Ctrl+U, settings and DevTools (F12; keep it with
+  `PRIGH_DESKTOP_DEVTOOLS=1`) do nothing visible. Open in new window opens
+  another app window on the page (the browser's popup, which has an address
+  bar, is closed). prigh's sites get the clipboard, notifications and the
+  microphone up front (no permission bubbles), and downloads go to your
+  downloads directory (`XDG_DOWNLOAD_DIR`, else `~/Downloads`) without a
+  prompt. Before each launch the app merges its settings into the profile:
+  the system's title bar rather than the browser's, no "Restore pages?"
+  bubble, and translation, the password manager, autofill, sign-in,
+  promotions, background mode and the default-browser check off. The
+  browser's find bar, print dialog and crash page still show as the
+  browser's.
+  Window managers see the class `prigh` on X11; on Wayland Chromium ignores
+  `--class` for an app window and names its app_id after the site and the
+  profile (e.g. `chrome-127.0.0.1__-Default`, or `chrome-ai.example.com__-Default`
+  on a backend's site; `brave-`, `msedge-`, `vivaldi-` for those). The app
+  writes a hidden desktop entry by that name
+  (`~/.local/share/applications/chrome-127.0.0.1__-Default.desktop`) so
+  docks and taskbars show prigh's name and icon; match the app_id in
+  Hyprland or sway rules (`hyprctl clients` shows it).
 - **webview**: the app's own window on the system's webview (below).
 
 ```nix
