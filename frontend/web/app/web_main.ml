@@ -7,6 +7,7 @@ module Client = Prigh_client.Client
 module Accounts = Prigh_web.Accounts
 module Reconnect_gate = Prigh_web.Reconnect_gate
 module Signin_link = Prigh_web.Signin_link
+module Desktop_link = Prigh_web.Desktop_link
 
 let storage =
   { Accounts.Storage.get = Browser.get_item
@@ -1662,6 +1663,7 @@ let rec desktop_form
                    | Some (Connected code) -> signed_in_by_desktop code
                    | Some (Remote url) ->
                      Browser.navigate (Desktop_page.follow url)
+                   | Some Signin -> desktop key
                    | Some (Refused error) ->
                      desktop_form
                        ~key
@@ -1683,17 +1685,111 @@ let rec desktop_form
          : Dom_html.event_listener_id))
 
 and desktop_lost () =
+  Dom_html.document##.onkeydown := Dom_html.no_handler;
   Browser.set_app_html
     {|<div class="signin-page"><div class="signin"><div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div><h1>prigh desktop is not answering</h1><p class="signin-error" role="alert">It has stopped, or this page is not its window: close it and start prigh again.</p></div></div>|}
-;;
 
-let desktop key =
-  Desktop_page.status ~key ~f:(function
+(* Where the sidecar stands, shown: [signin] tells it the window was sent
+   back to its sign-in page. *)
+and desktop ?signin key =
+  Desktop_page.status ?signin ~key () ~f:(function
     | Some (Connect { address; user; error }) ->
       desktop_form ~key ~address ~user ~error ()
     | Some (Connected { code }) -> signed_in_by_desktop code
     | Some (Remote url) -> Browser.navigate (Desktop_page.follow url)
+    | Some (Signin { site; login; waiting; error; expired }) ->
+      let s = { Desktop_link.Signin_page.site; login; expired } in
+      (match waiting with
+       | Some _ ->
+         (* A reload while it waits: joins the sign-in under way. *)
+         desktop_signin_browser ~key s
+       | None -> desktop_signin ~key s ~error)
     | None -> desktop_lost ())
+
+(* [prigh desktop -ui remote] when a sign-in proxy guards the backend's
+   site: signing in to it through the default browser (where the user is
+   already signed in), or in the window. *)
+and desktop_signin ~key (s : Desktop_link.Signin_page.t) ~error =
+  Dom_html.document##.onkeydown := Dom_html.no_handler;
+  Browser.set_app_html
+    (sprintf
+       {|<div class="signin-page"><form class="signin" id="desktop-signin">
+  <div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div>
+  <h1>%s</h1>
+  <p class="signin-sub">%s</p>
+  <p class="signin-error" role="alert">%s</p>
+  <button class="btn primary" type="submit" id="desktop-signin-browser" autofocus>Sign in with your browser</button>
+  <button class="btn ghost" type="button" id="desktop-signin-here">Sign in here</button>
+  <button class="btn ghost" type="button" id="desktop-quit">Quit prigh</button>
+</form></div>|}
+       (escape (Desktop_link.Signin_page.heading s))
+       (escape (Desktop_link.Signin_page.explanation s))
+       (escape (Option.value error ~default:"")));
+  Option.iter
+    (Dom_html.getElementById_coerce
+       "desktop-signin-browser"
+       Dom_html.CoerceTo.button)
+    ~f:(fun button -> button##focus);
+  on_click "desktop-quit" Desktop_page.quit;
+  on_click "desktop-signin-here" (fun () ->
+    Desktop_page.signin ~key ~how:Here ~f:(desktop_signed_in ~key));
+  Option.iter
+    (Dom_html.getElementById_coerce "desktop-signin" Dom_html.CoerceTo.form)
+    ~f:(fun form ->
+      ignore
+        (Dom_html.addEventListener
+           form
+           Dom_html.Event.submit
+           (Dom.handler (fun ev ->
+              Dom.preventDefault ev;
+              desktop_signin_browser ~key s;
+              Js._false))
+           Js._false
+         : Dom_html.event_listener_id))
+
+(* Waiting for the sign-in through the browser; Esc cancels it. *)
+and desktop_signin_browser ~key (s : Desktop_link.Signin_page.t) =
+  Browser.set_app_html
+    (sprintf
+       {|<div class="signin-page"><div class="signin" id="desktop-signin" role="dialog" aria-labelledby="desktop-signin-title">
+  <div class="brand"><span class="logo">prigh</span><span class="brand-sub">desktop</span></div>
+  <h1 id="desktop-signin-title">%s</h1>
+  <p class="signin-sub" role="status">Waiting for you to allow it in your browser…</p>
+  <button class="btn primary" type="button" id="desktop-signin-again">Open it again</button>
+  <button class="btn ghost" type="button" id="desktop-signin-cancel">Cancel</button>
+</div></div>|}
+       (escape (Desktop_link.Signin_page.heading s)));
+  Option.iter
+    (Dom_html.getElementById_coerce
+       "desktop-signin-again"
+       Dom_html.CoerceTo.button)
+    ~f:(fun button -> button##focus);
+  let cancel () =
+    desktop_signin ~key s ~error:None;
+    Desktop_page.signin ~key ~how:Cancel ~f:(fun (_ : _ option) -> ())
+  in
+  on_click "desktop-signin-cancel" cancel;
+  on_click "desktop-signin-again" (fun () ->
+    Desktop_page.signin ~key ~how:Again ~f:(function
+      | Some (Failed _) -> desktop key
+      | Some (Remote _ | Done | Cancelled) | None -> ()));
+  Dom_html.document##.onkeydown
+  := Dom_html.handler (fun ev ->
+    match Js.Optdef.to_option ev##.key with
+    | Some key when String.equal (Js.to_string key) "Escape" ->
+      cancel ();
+      Js._false
+    | _ -> Js._true);
+  Desktop_page.signin ~key ~how:Browser ~f:(desktop_signed_in ~key)
+
+and desktop_signed_in ~key : Desktop_link.Signin_reply.t option -> unit =
+  function
+  | Some (Remote url) ->
+    Dom_html.document##.onkeydown := Dom_html.no_handler;
+    Browser.navigate (Desktop_page.follow url)
+  | Some Done -> ()
+  | Some (Failed _ | Cancelled) -> desktop key
+  | None -> desktop_lost ()
 ;;
 
 let run () =
@@ -1701,8 +1797,9 @@ let run () =
   Service_worker.register ();
   Desktop_page.take_shell ();
   Desktop_page.take_hint ();
+  let signin = Desktop_page.signin_requested () in
   match Desktop_page.key () with
-  | Some key -> desktop key
+  | Some key -> desktop ~signin key
   | None ->
     (match Cli_signin_page.take (), Signin_link.code_of_hash (Browser.hash ()) with
      | Some request, _ ->

@@ -9,6 +9,11 @@ open! Core
 (** The key in a [location.hash] such as ["#desktop=KEY"]. *)
 val key_of_hash : string -> string option
 
+(** Whether the hash is the sidecar's sign-in page ([#desktop=KEY&signin=1]):
+    where the desktop app's window comes back to when the backend's site's
+    sign-in proxy sends it to its login again (the sign-in expired). *)
+val signin_of_hash : string -> bool
+
 (** Where the tab keeps the key (sessionStorage), so a reload stays in
     desktop mode. *)
 val storage_key : string
@@ -53,14 +58,17 @@ val window_fragment
     page cannot reach [prigh desktop] from another origin). *)
 val quit_url : string
 
-(** [/desktop/status], [/desktop/connect], [/desktop/quit]. *)
+(** [/desktop/status], [/desktop/connect], [/desktop/quit],
+    [/desktop/signin]. *)
 val status_path : string
 
 val connect_path : string
 val quit_path : string
+val signin_path : string
 
-(** The [POST]s' bodies. *)
-val status_body : key:string -> string
+(** The [POST]s' bodies. [signin]: the window was sent back to the sign-in
+    page (see {!signin_of_hash}). *)
+val status_body : key:string -> signin:bool -> string
 
 val quit_body : key:string -> string
 
@@ -72,6 +80,18 @@ val connect_body
   -> plaintext:bool (** connect even though it is not encrypted *)
   -> string
 
+(** How to sign in to the sign-in proxy in front of the backend's site. *)
+module How : sig
+  type t =
+    | Browser (** through the default browser, where the user is signed in *)
+    | Again (** open the browser's sign-in under way again *)
+    | Cancel (** cancel it *)
+    | Here (** in the window *)
+  [@@deriving sexp_of, enumerate]
+end
+
+val signin_body : key:string -> how:How.t -> string
+
 module Status : sig
   type t =
     | Connect of
@@ -82,6 +102,14 @@ module Status : sig
     | Connected of { code : string option }
     (** sign in with [code]; [None]: already signed in (a reload) *)
     | Remote of string (** the window goes to the backend's own prigh-web *)
+    | Signin of
+        { site : string
+        ; login : string option (** the login site's host *)
+        ; waiting : string option
+          (** the URL of the sign-in through the browser under way *)
+        ; error : string option
+        ; expired : bool
+        } (** a sign-in proxy guards the backend's site: sign in to it first *)
   [@@deriving sexp_of]
 
   val of_json : string -> t option
@@ -95,6 +123,34 @@ module Connect_reply : sig
     (** the address is not encrypted and is another machine: the risk and
         the alternatives; connecting needs [~plaintext:true] *)
     | Remote of string (** connected: as {!Status.Remote} *)
+    | Signin (** connected, but the site wants a sign-in: {!Status.Signin} *)
+  [@@deriving sexp_of]
+
+  val of_json : string -> t option
+end
+
+(** The text of the page here that offers the sign-in. *)
+module Signin_page : sig
+  type t =
+    { site : string
+    ; login : string option
+    ; expired : bool
+    }
+  [@@deriving sexp_of]
+
+  (** "Sign in to SITE" *)
+  val heading : t -> string
+
+  (** What is in the way, and the choice. *)
+  val explanation : t -> string
+end
+
+module Signin_reply : sig
+  type t =
+    | Remote of string (** signed in (or to sign in in the window): go there *)
+    | Done (** opened again, or cancelled *)
+    | Failed of string
+    | Cancelled (** the sign-in through the browser was *)
   [@@deriving sexp_of]
 
   val of_json : string -> t option

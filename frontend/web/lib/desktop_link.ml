@@ -9,6 +9,12 @@ let key_of_hash hash =
     | _ -> None)
 ;;
 
+let signin_of_hash hash =
+  List.exists
+    (String.split (String.chop_prefix_if_exists hash ~prefix:"#") ~on:'&')
+    ~f:(String.equal "signin=1")
+;;
+
 (* [%XX] escapes; a malformed one is kept as it is. *)
 let pct_decode s =
   let b = Buffer.create (String.length s) in
@@ -81,8 +87,36 @@ let quit_url = "about:blank#prigh-desktop-quit"
 let status_path = "/desktop/status"
 let connect_path = "/desktop/connect"
 let quit_path = "/desktop/quit"
-let status_body ~key = Json.to_string (Json.obj [ "key", Json.str key ])
-let quit_body = status_body
+let signin_path = "/desktop/signin"
+
+let status_body ~key ~signin =
+  Json.to_string
+    (Json.obj
+       (("key", Json.str key) :: (if signin then [ "signin", `True ] else [])))
+;;
+
+let quit_body ~key = Json.to_string (Json.obj [ "key", Json.str key ])
+
+module How = struct
+  type t =
+    | Browser
+    | Again
+    | Cancel
+    | Here
+  [@@deriving sexp_of, enumerate]
+
+  let to_string = function
+    | Browser -> "browser"
+    | Again -> "again"
+    | Cancel -> "cancel"
+    | Here -> "here"
+  ;;
+end
+
+let signin_body ~key ~how =
+  Json.to_string
+    (Json.obj [ "key", Json.str key; "how", Json.str (How.to_string how) ])
+;;
 
 let connect_body ~key ~address ~user ~token ~plaintext =
   let opt = Option.value_map ~default:`Null ~f:Json.str in
@@ -117,6 +151,13 @@ module Status = struct
         }
     | Connected of { code : string option }
     | Remote of string
+    | Signin of
+        { site : string
+        ; login : string option
+        ; waiting : string option
+        ; error : string option
+        ; expired : bool
+        }
   [@@deriving sexp_of]
 
   let of_json text =
@@ -132,6 +173,18 @@ module Status = struct
       | Some "connected" -> Some (Connected { code = string json "code" })
       | Some "remote" ->
         Option.map (string json "url") ~f:(fun url -> Remote url)
+      | Some "signin" ->
+        Option.map (string json "site") ~f:(fun site ->
+          Signin
+            { site
+            ; login = string json "login"
+            ; waiting = string json "waiting"
+            ; error = string json "error"
+            ; expired =
+                (match Json.field json "expired" with
+                 | Some `True -> true
+                 | _ -> false)
+            })
       | _ -> None)
   ;;
 end
@@ -142,15 +195,17 @@ module Connect_reply = struct
     | Refused of string
     | Plaintext of string
     | Remote of string
+    | Signin
   [@@deriving sexp_of]
 
   let of_json text =
     Option.bind (parse text) ~f:(fun json ->
       match Json.field json "ok" with
       | Some `True ->
-        (match string json "remote" with
-         | Some url -> Some (Remote url)
-         | None -> Some (Connected (string json "code")))
+        (match string json "remote", Json.field json "signin" with
+         | Some url, _ -> Some (Remote url)
+         | None, Some `True -> Some Signin
+         | None, _ -> Some (Connected (string json "code")))
       | Some `False ->
         let error =
           Option.value
@@ -160,6 +215,55 @@ module Connect_reply = struct
         (match Json.field json "plaintext" with
          | Some `True -> Some (Plaintext error)
          | _ -> Some (Refused error))
+      | _ -> None)
+  ;;
+end
+
+module Signin_page = struct
+  type t =
+    { site : string
+    ; login : string option
+    ; expired : bool
+    }
+  [@@deriving sexp_of]
+
+  let heading t = "Sign in to " ^ t.site
+
+  let explanation t =
+    (if t.expired
+     then sprintf "Your sign-in to %s has expired." t.site
+     else
+       sprintf
+         "%s is behind a sign-in%s."
+         t.site
+         (Option.value_map t.login ~default:"" ~f:(sprintf " (%s)")))
+    ^ " Sign in with your browser, where you are already signed in, or here in \
+       this window."
+  ;;
+end
+
+module Signin_reply = struct
+  type t =
+    | Remote of string
+    | Done
+    | Failed of string
+    | Cancelled
+  [@@deriving sexp_of]
+
+  let of_json text =
+    Option.bind (parse text) ~f:(fun json ->
+      match Json.field json "ok", Json.field json "cancelled" with
+      | Some `True, _ ->
+        (match string json "remote" with
+         | Some url -> Some (Remote url)
+         | None -> Some Done)
+      | Some `False, Some `True -> Some Cancelled
+      | Some `False, _ ->
+        Some
+          (Failed
+             (Option.value
+                (string json "error")
+                ~default:"Signing in did not work: try again."))
       | _ -> None)
   ;;
 end

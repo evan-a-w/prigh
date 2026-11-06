@@ -145,7 +145,8 @@ let%expect_test "the sidecar's link and answers" =
     ~f:(fun hash ->
       print_s
         [%message hash ~key:(Desktop_link.key_of_hash hash : string option)]);
-  print_endline (Desktop_link.status_body ~key:"k");
+  print_endline (Desktop_link.status_body ~key:"k" ~signin:false);
+  print_endline (Desktop_link.status_body ~key:"k" ~signin:true);
   print_endline
     (Desktop_link.connect_body
        ~key:"k"
@@ -195,6 +196,7 @@ let%expect_test "the sidecar's link and answers" =
     (#signin=x (key ()))
     ("" (key ()))
     {"key":"k"}
+    {"key":"k","signin":true}
     {"key":"k","address":"host:7790","user":null,"token":"sekrit"}
     {"key":"k","address":"host:7790","user":null,"token":null,"plaintext":true}
     ((Connect (address (host:7790)) (user ()) (error (refused))))
@@ -320,5 +322,95 @@ let%expect_test "a new window's fragment" =
      (fragment (app=desktop&shell=browser)))
     ((key ()) (backend_site false) (browser false) (fragment ()))
     ((key ()) (backend_site false) (browser true) (fragment ()))
+    |}]
+;;
+
+(* [prigh desktop -ui remote] when a sign-in proxy guards the backend's
+   site: the page here offers signing in to it. *)
+let%expect_test "the sidecar's sign-in: link, bodies, answers and text" =
+  List.iter
+    [ "#desktop=k&signin=1"; "#desktop=k"; "#signin=1"; "#signin=10"; "" ]
+    ~f:(fun hash ->
+      print_s
+        [%message
+          hash
+            ~key:(Desktop_link.key_of_hash hash : string option)
+            ~signin:(Desktop_link.signin_of_hash hash : bool)]);
+  print_endline Desktop_link.signin_path;
+  List.iter Desktop_link.How.all ~f:(fun how ->
+    print_endline (Desktop_link.signin_body ~key:"k" ~how));
+  List.iter
+    [ {|{"state":"signin","site":"ai.example.com","login":"login.example.com","waiting":null,"error":null,"expired":false}|}
+    ; {|{"state":"signin","site":"ai.example.com","login":null,"waiting":"https://ai.example.com/#cli-signin=1.s&program=desktop","error":"cancelled","expired":true}|}
+    ; {|{"state":"signin","login":"login.example.com"}|}
+    ]
+    ~f:(fun reply ->
+      print_s
+        [%sexp
+          (Desktop_link.Status.of_json reply : Desktop_link.Status.t option)]);
+  print_s
+    [%sexp
+      (Desktop_link.Connect_reply.of_json {|{"ok":true,"signin":true}|}
+       : Desktop_link.Connect_reply.t option)];
+  List.iter
+    [ {|{"ok":true,"remote":"https://ai.example.com/#app=desktop"}|}
+    ; {|{"ok":true}|}
+    ; {|{"ok":false,"cancelled":true}|}
+    ; {|{"ok":false,"error":"the page sent no sign-in cookie"}|}
+    ; {|{"ok":false}|}
+    ; "nope"
+    ]
+    ~f:(fun reply ->
+      print_s
+        [%sexp
+          (Desktop_link.Signin_reply.of_json reply
+           : Desktop_link.Signin_reply.t option)]);
+  List.iter
+    [ { Desktop_link.Signin_page.site = "ai.example.com"
+      ; login = Some "login.example.com"
+      ; expired = false
+      }
+    ; { site = "ai.example.com"; login = None; expired = false }
+    ; { site = "ai.example.com"
+      ; login = Some "login.example.com"
+      ; expired = true
+      }
+    ]
+    ~f:(fun page ->
+      printf
+        "%s\n  %s\n"
+        (Desktop_link.Signin_page.heading page)
+        (Desktop_link.Signin_page.explanation page));
+  [%expect
+    {|
+    (#desktop=k&signin=1 (key (k)) (signin true))
+    (#desktop=k (key (k)) (signin false))
+    (#signin=1 (key ()) (signin true))
+    (#signin=10 (key ()) (signin false))
+    ("" (key ()) (signin false))
+    /desktop/signin
+    {"key":"k","how":"browser"}
+    {"key":"k","how":"again"}
+    {"key":"k","how":"cancel"}
+    {"key":"k","how":"here"}
+    ((Signin (site ai.example.com) (login (login.example.com)) (waiting ())
+      (error ()) (expired false)))
+    ((Signin (site ai.example.com) (login ())
+      (waiting (https://ai.example.com/#cli-signin=1.s&program=desktop))
+      (error (cancelled)) (expired true)))
+    ()
+    (Signin)
+    ((Remote https://ai.example.com/#app=desktop))
+    (Done)
+    (Cancelled)
+    ((Failed "the page sent no sign-in cookie"))
+    ((Failed "Signing in did not work: try again."))
+    ()
+    Sign in to ai.example.com
+      ai.example.com is behind a sign-in (login.example.com). Sign in with your browser, where you are already signed in, or here in this window.
+    Sign in to ai.example.com
+      ai.example.com is behind a sign-in. Sign in with your browser, where you are already signed in, or here in this window.
+    Sign in to ai.example.com
+      Your sign-in to ai.example.com has expired. Sign in with your browser, where you are already signed in, or here in this window.
     |}]
 ;;
