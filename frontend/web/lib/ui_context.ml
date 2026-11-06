@@ -60,7 +60,7 @@ let sent_of_messages users =
 let sent_values t ~component =
   match
     List.find t.sent ~f:(fun (s : Ui_action.Sent.t) ->
-      String.equal s.component component)
+      String.equal s.call_id t.call_id && String.equal s.component component)
   with
   | Some s -> Some (Option.value s.values ~default:`Null)
   | None -> Ui_state.sending t.state ~call_id:t.call_id ~component
