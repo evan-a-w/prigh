@@ -101,6 +101,7 @@ prigh-desktop: Fix PRIGH_DESKTOP_ARGS (words as a shell splits them) and start p
 == browser: auto takes one on the PATH; closing its window stops the sidecar: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: the window's taskbar entry: WORK/data/applications/chrome-127.0.0.1__-Default.desktop
 prigh-desktop: opening the page in Google Chrome's app window (WORK/browsers/google-chrome-stable)
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
@@ -113,6 +114,7 @@ browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
+taskbar entry: Name=prigh Icon=prigh-desktop NoDisplay=true StartupWMClass=chrome-127.0.0.1__-Default
 == browser: the page's Quit (the sidecar exits) closes the browser: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
