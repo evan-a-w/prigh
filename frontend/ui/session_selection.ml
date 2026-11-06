@@ -145,53 +145,114 @@ let size sessions =
   P.Session_summary.size_string (P.Session_summary.total_bytes sessions)
 ;;
 
-let delete_question = function
+let moving_sentence t : P.Switch_to.t option -> string = function
+  | None -> ""
+  | Some New_session -> " You'll move to a new session."
+  | Some (Session path) ->
+    sprintf
+      " You'll move to %s."
+      (Option.value_map (find t path) ~default:path ~f:describe)
+;;
+
+let delete_question ?moving t = function
   | [ s ] ->
     sprintf
-      "Delete %s (%s)? Enter deletes, Esc keeps it"
+      "Delete %s (%s)?%s Enter deletes, Esc keeps it"
       (describe s)
       (size [ s ])
+      (moving_sentence t moving)
   | sessions ->
     sprintf
-      "Delete %d sessions (%s)? Enter deletes, Esc keeps them"
+      "Delete %d sessions (%s)?%s Enter deletes, Esc keeps them"
       (List.length sessions)
       (size sessions)
+      (moving_sentence t moving)
 ;;
 
 let is_current (s : P.Session_summary.t) ~current =
   Option.exists current ~f:(String.equal s.path)
 ;;
 
-let deletable sessions ~current =
-  match List.find sessions ~f:(is_current ~current) with
-  | None -> Ok sessions
-  | Some s ->
-    Error
+(* The session we are in counts this frontend among its clients. *)
+let kept_current (s : P.Session_summary.t) =
+  if s.running
+  then
+    Some
       (sprintf
-         "%s is the session you are in: switch to another one first, or leave \
-          it out"
+         "%s is the session you are in and is running: wait for it or /abort \
+          it first, or leave it out"
          (describe s))
+  else if s.clients > 1
+  then
+    Some
+      (sprintf
+         "%s is the session you are in and is open in another frontend: close \
+          it there first, or leave it out"
+         (describe s))
+  else None
+;;
+
+let deletable sessions ~current =
+  match
+    List.find_map sessions ~f:(fun s ->
+      if is_current s ~current then kept_current s else None)
+  with
+  | None -> Ok sessions
+  | Some why -> Error why
+;;
+
+let moving_to t ~deleting ~current : P.Switch_to.t option =
+  match List.find deleting ~f:(is_current ~current) with
+  | None -> None
+  | Some current ->
+    let gone (s : P.Session_summary.t) =
+      List.exists deleting ~f:(fun d -> String.equal d.path s.path)
+    in
+    let is_it (s : P.Session_summary.t) = String.equal s.path current.path in
+    let order =
+      let shown = shown t in
+      if List.exists shown ~f:is_it then shown else active_first t.sessions
+    in
+    let index =
+      Option.value_map
+        (List.findi order ~f:(fun _ s -> is_it s))
+        ~default:0
+        ~f:fst
+    in
+    Some
+      (match
+         Option.first_some
+           (List.find (List.drop order (index + 1)) ~f:(Fn.non gone))
+           (List.find (List.rev (List.take order index)) ~f:(Fn.non gone))
+       with
+       | Some s -> Session s.path
+       | None -> New_session)
 ;;
 
 let archived_to_delete t ~current =
-  List.filter (archived t) ~f:(Fn.non (is_current ~current))
+  List.filter (archived t) ~f:(fun s ->
+    not (is_current s ~current && Option.is_some (kept_current s)))
 ;;
 
 let delete_archived_question t ~current =
-  match archived_to_delete t ~current with
+  let archived = archived_to_delete t ~current in
+  let moving = moving_to t ~deleting:archived ~current in
+  match archived with
   | [] -> None
   | [ s ] ->
     Some
       (sprintf
-         "Delete the archived %s (%s)? Enter deletes, Esc keeps it"
+         "Delete the archived %s (%s)?%s Enter deletes, Esc keeps it"
          (describe s)
-         (size [ s ]))
+         (size [ s ])
+         (moving_sentence t moving))
   | archived ->
     Some
       (sprintf
-         "Delete all %d archived sessions (%s)? Enter deletes, Esc keeps them"
+         "Delete all %d archived sessions (%s)?%s Enter deletes, Esc keeps them"
          (List.length archived)
-         (size archived))
+         (size archived)
+         (moving_sentence t moving))
 ;;
 
 let marked_summary t picker =
