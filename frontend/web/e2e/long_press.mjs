@@ -88,7 +88,7 @@ if (engineName !== "firefox") options.isMobile = true;
 const context = await browser.newContext(options);
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
-page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
+page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
 page.on("pageerror", e => errors.push(`page: ${e.message}`));
 const cdp = engineName === "chromium" ? await context.newCDPSession(page) : null;
 

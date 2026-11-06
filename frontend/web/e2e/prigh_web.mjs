@@ -176,7 +176,7 @@ const errors = [];
 page.on("console", message => {
   const text = message.text();
   // The backend going away (step 7) is logged by the browser.
-  if (message.type() === "error" && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|establish a connection/.test(text)) {
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|establish a connection/.test(text)) {
     errors.push(`console: ${text}`);
   }
 });
@@ -1173,7 +1173,8 @@ try {
   // A chip's menu is as wide as the composer's box there.
   await page.locator(".composer-plus .plus").click();
   await page.locator("#chip-popover").waitFor();
-  await page.waitForTimeout(300);
+  // Its rise from the bottom over.
+  await page.locator("#chip-popover").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
   section("phone: a chip's menu");
   console.log(await popoverPlace());
   await screenshot("phone: a chip's menu");

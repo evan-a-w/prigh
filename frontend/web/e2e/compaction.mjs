@@ -47,7 +47,7 @@ const open = async viewport => {
   const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
   const page = await context.newPage();
   page.on("console", message => {
-    if (message.type() === "error" && !/favicon\.ico|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
+    if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
   });
   page.on("pageerror", error => errors.push(`page: ${error.message}`));
   return page;

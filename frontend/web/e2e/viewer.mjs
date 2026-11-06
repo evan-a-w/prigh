@@ -142,7 +142,7 @@ const visit = async (viewport, tag) => {
   const context = await browser.newContext({ viewport, hasTouch: tag === "phone", isMobile: tag === "phone" });
   context.setDefaultTimeout(20000);
   page = await context.newPage();
-  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico/.test(m.text())) errors.push(`console: ${m.text()}`); });
+  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|interactive-widget/.test(m.text())) errors.push(`console: ${m.text()}`); });
   page.on("pageerror", e => errors.push(`page: ${e.message}`));
   if (sessionUrl) {
     await page.goto(sessionUrl, { timeout: 60000 });

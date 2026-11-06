@@ -289,7 +289,7 @@
           touch "$out"
         '';
 
-        # frontend/web/e2e: Chromium and Firefox against the built backend
+        # frontend/web/e2e: Chromium, Firefox and WebKit against the built backend
         # and the installed prigh-web site.
         checks.web-e2e =
           if pkgs.stdenv.hostPlatform.isLinux then
@@ -318,6 +318,8 @@
                 export PRIGH_BACKEND=${prighBackend}/bin/prigh
                 export PRIGH_WEB_ROOT=${prighWebRoot}
                 export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
+                # WebKit (WPE) renders through EGL: Mesa's, in software.
+                export __EGL_VENDOR_LIBRARY_DIRS=${pkgs.mesa}/share/glvnd/egl_vendor.d
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
                 cp -r ${./frontend/web/e2e} e2e

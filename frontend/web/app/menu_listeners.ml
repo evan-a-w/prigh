@@ -88,6 +88,18 @@ let query_all selector =
     (Dom_html.document##querySelectorAll (Js.string selector))
 ;;
 
+(* The last text node under [node] with something in it. *)
+let rec last_text (node : Dom.node Js.t) : Dom.text Js.t option =
+  match node##.nodeType with
+  | Dom.TEXT ->
+    let text : Dom.text Js.t = Js.Unsafe.coerce node in
+    if text##.length > 0 then Some text else None
+  | _ ->
+    List.find_map
+      (List.rev (Dom.list_of_nodeList node##.childNodes))
+      ~f:last_text
+;;
+
 (* Its words: a user's bubble, a reply's text (not its tool calls' lines or
    its time), from the first to the last. *)
 let select_message n =
@@ -116,13 +128,18 @@ let select_message n =
                 [| Js.Unsafe.inject first; Js.Unsafe.inject 0 |]
               : Js.Unsafe.any);
            let last = List.last_exn texts in
+           (* At its last character: an end after its last paragraph is a
+              line break more in WebKit's selected text. *)
+           let node, offset =
+             match last_text (last :> Dom.node Js.t) with
+             | Some text -> Js.Unsafe.inject text, text##.length
+             | None -> Js.Unsafe.inject last, last##.childNodes##.length
+           in
            ignore
              (Js.Unsafe.meth_call
                 range
                 "setEnd"
-                [| Js.Unsafe.inject last
-                 ; Js.Unsafe.inject last##.childNodes##.length
-                |]
+                [| node; Js.Unsafe.inject offset |]
               : Js.Unsafe.any));
         let selection = selection () in
         ignore
