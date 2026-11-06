@@ -2859,6 +2859,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       `web_search` block gets among the message's text, from the streamed
       partial message: the work lamp while it runs, then a folded list of
       result links),
+      a `render_ui` call's components (`Ui_view`, from the protocol's
+      `Ui_spec`; a skeleton while its arguments stream, the failed card
+      when the backend refused them): `Ui_chart` (SVG in the theme's
+      `--series-N` colours, HTML tick labels, tooltips on hover, focus and
+      tap), `Ui_table`, `Ui_tree`, `Ui_media` (host images through
+      `fs_preview` links asked for as the call shows), `Ui_learn`
+      (calculator with `Ui_expr`, the backend's expression semantics;
+      flashcards; quiz) and `Ui_reply` (form, choices, checklist: sent as
+      `prompt`/`follow_up` with `ui_action`, shown as sent once the
+      reply's `ui_action` note is in the transcript). What the user did to
+      them (`Ui_event`) is `Ui_state`, the session's; their CSS is
+      `ui.css` and `ui-chart.css`, in the theme's variables only.
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
