@@ -89,7 +89,7 @@ let quitting = false;
 const errors = [];
 const watch = p => {
   p.on("console", message => {
-    if (message.type() === "error" && !quitting && !/favicon\.ico/.test(message.text()))
+    if (message.type() === "error" && !quitting && !/favicon\.ico|interactive-widget/.test(message.text()))
       errors.push(`console: ${message.text()}`);
   });
   p.on("pageerror", error => errors.push(`page: ${error.message}`));

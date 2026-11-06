@@ -89,9 +89,16 @@ const popoverOpen = () => page.locator("#chip-popover").count().then(n => n > 0)
 const swipe = (x0, y0, x1, y1, steps = 8, ms = 160) => page.evaluate(async ([x0, y0, x1, y1, steps, ms]) => {
   const target = document.elementFromPoint(x0, y0);
   const fire = (type, x, y) => {
-    const t = new Touch({ identifier: 1, target, clientX: x, clientY: y, pageX: x, pageY: y });
-    const live = type === "touchend" ? [] : [t];
-    target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, composed: true, touches: live, targetTouches: live, changedTouches: [t] }));
+    // WebKit has no Touch constructor, only the older document.createTouch.
+    let t, list = ts => ts;
+    try {
+      t = new Touch({ identifier: 1, target, clientX: x, clientY: y, pageX: x, pageY: y });
+    } catch {
+      t = document.createTouch(window, target, 1, x + scrollX, y + scrollY, x, y);
+      list = ts => document.createTouchList(...ts);
+    }
+    const live = list(type === "touchend" ? [] : [t]);
+    target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, composed: true, touches: live, targetTouches: live, changedTouches: list([t]) }));
   };
   fire("touchstart", x0, y0);
   for (let i = 1; i <= steps; i++) {

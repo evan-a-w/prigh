@@ -23,15 +23,16 @@
 # compaction.mjs, the settings page's Compaction section, then images.mjs,
 # images too large for the model and image files, on a desktop and two
 # phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
-# firefox.expected). The scripts all run at once (JOBS at a time, default:
+# firefox.expected, webkit.expected). The scripts all run at once (JOBS at a time, default:
 # the number of CPUs), each with its own backend, browser and directory;
 # their outputs are joined in the order above. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
-# PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
+# PLAYWRIGHT_BROWSERS_PATH (and, for WebKit on Linux without a system GL
+# driver, __EGL_VENDOR_LIBRARY_DIRS pointing at Mesa's egl_vendor.d), tmux (on the PATH or $PRIGH_TMUX) for the
 # terminal panel, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
 #   PRIGH_WEB_ROOT       the built site (default: the dune build)
-#   ENGINES              browsers to run (default: chromium firefox)
+#   ENGINES              browsers to run (default: chromium firefox webkit)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once
 #   SCRIPT_TIMEOUT       seconds a script may take (default 300)
@@ -54,7 +55,7 @@ test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend &&
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
 scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote desktop steer subagent_paged trim filter viewer math card status mobile long_press pwa compaction images:desktop images:phone images:small"
-engines="${ENGINES:-chromium firefox}"
+engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 run_one() {
 	# script:part runs script.mjs ENGINE part

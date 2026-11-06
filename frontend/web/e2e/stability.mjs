@@ -82,7 +82,7 @@ context.setDefaultTimeout(20000);
 const page = await context.newPage();
 const errors = [];
 page.on("console", message => {
-  if (message.type() === "error" && !/favicon\.ico/.test(message.text()))
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));

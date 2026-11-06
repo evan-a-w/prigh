@@ -107,7 +107,9 @@
 .review-file:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
 .review-file .mark { --mark-size: 13px; }
 .review-file-path { display: flex; min-width: 0; white-space: nowrap; }
-.review-file-path .dir { color: var(--faint); overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
+/* Not min-width 0: WebKit leaves a box clipping to no width out of its
+   text (innerText, copy, find); 1/64px is invisible but not empty. */
+.review-file-path .dir { color: var(--faint); overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0.02px; }
 .review-file-path .name { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .review-file.approved .review-file-path .name { color: var(--muted); }
 .review-file-counts { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
