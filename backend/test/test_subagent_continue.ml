@@ -82,7 +82,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work","max_turns":1}
     subagent_start a1: work
     --- work's request:
@@ -158,7 +158,7 @@ let%expect_test "subagent_continue's errors say what to do instead" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"quick"}
     subagent_start a1: quick
     state: running=true subagents=[a1 running]
@@ -234,7 +234,7 @@ let%expect_test "cancelling or resetting forgets an out-of-turns subagent" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"one","max_turns":1}
     subagent_start a1: one
     state: running=true subagents=[a1 running]
@@ -273,7 +273,7 @@ let%expect_test "cancelling or resetting forgets an out-of-turns subagent" =
     --- new session
     state: running=true subagents=[]
     agent_start
-    user: again
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | again
     assistant:  subagent_continue{"id":"a2"}
     tool_result subagent_continue: invalid arguments: unknown subagent "a2": only a subagent of yours that ran out of turns can be continued (those that can: none)
     assistant: ok
@@ -326,7 +326,7 @@ let%expect_test "a synchronous subagent out of turns is continued by its caller"
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]

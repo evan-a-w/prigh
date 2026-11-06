@@ -14,13 +14,15 @@ type t =
   ; tools : string list (** sorted *)
   ; plan_mode : bool
   ; client : Client_kind.t option
-    (** the kind of client the user prompted from; [None]: none said yet
-        (also in sessions from before it) *)
+    (** the kind of client the user prompted from ([Other] until one says);
+        [None]: the model was told of none yet (also in sessions from before
+        it) *)
   }
 [@@deriving sexp, jsonaf, equal]
 
 (** What a model that knows [told] is to be told about [now] ([host_name]
     names [now.host]), in this order: host, cwd, tools (added and removed),
-    plan mode, client (once [now] has one, until told). Only net changes:
+    plan mode, client (whenever [now]'s differs, so the first prompt tells
+    it). Only net changes:
     changes that cancel out give no note. *)
 val notes : told:t -> t -> host_name:string -> Injected.Note.t list

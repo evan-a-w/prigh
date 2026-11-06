@@ -91,7 +91,7 @@ let%expect_test "steering a subagent while its tool runs: after the result" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)
@@ -155,7 +155,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     request outer: u(outer)
@@ -233,7 +233,7 @@ let%expect_test "steering a subagent just as it finishes" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)
@@ -292,7 +292,7 @@ let%expect_test "steering a subagent on its last allowed turn" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work","max_turns":1}
     subagent_start a1: work
     request work: u(work)
@@ -343,7 +343,7 @@ let%expect_test "steering a finished subagent is refused; nothing runs again" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)
@@ -400,7 +400,7 @@ let%expect_test "two steers and a follow-up queued while a tool runs" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)
@@ -500,7 +500,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)
@@ -704,7 +704,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     request work: u(work)

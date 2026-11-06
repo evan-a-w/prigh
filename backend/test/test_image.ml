@@ -84,6 +84,44 @@ let show_load t ?(search_path = []) bytes =
   | exception _ -> ()
 ;;
 
+let%expect_test "SVG: the root element is <svg>" =
+  List.iter
+    [ {|<svg xmlns="http://www.w3.org/2000/svg"/>|}
+    ; "\xef\xbb\xbf  <svg>"
+    ; {|<?xml version="1.0"?>
+<!-- made by hand -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x.dtd" [ <!ENTITY a "<b>"> ]>
+<svg viewBox="0 0 1 1"></svg>|}
+    ; "<svg\n  width='1'/>"
+    ; {|<!doctype html><html><body><svg></svg></body></html>|}
+    ; {|<html><svg/></html>|}
+    ; {|<svgfoo/>|}
+    ; {|<!-- <svg> -->|}
+    ; {|<?xml version="1.0"?>|}
+    ; "text mentioning <svg>"
+    ; "<svg>\000"
+    ]
+    ~f:(fun s ->
+      printf
+        "%-30S %s\n"
+        s
+        (Option.value (Image.sniff_displayable s) ~default:"-"));
+  [%expect
+    {|
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"/>" image/svg+xml
+    "\239\187\191  <svg>"          image/svg+xml
+    "<?xml version=\"1.0\"?>\n<!-- made by hand -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"x.dtd\" [ <!ENTITY a \"<b>\"> ]>\n<svg viewBox=\"0 0 1 1\"></svg>" image/svg+xml
+    "<svg\n  width='1'/>"          image/svg+xml
+    "<!doctype html><html><body><svg></svg></body></html>" -
+    "<html><svg/></html>"          -
+    "<svgfoo/>"                    -
+    "<!-- <svg> -->"               -
+    "<?xml version=\"1.0\"?>"      -
+    "text mentioning <svg>"        -
+    "<svg>\000"                    -
+    |}]
+;;
+
 let%expect_test "small images are sent as they are" =
   with_sandbox
   @@ fun t ->

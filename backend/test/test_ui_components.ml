@@ -37,12 +37,12 @@ let%expect_test "the arguments' shape" =
           (List.init 21 ~f:(fun _ -> {|{"type": "divider"}|}))));
   [%expect
     {|
-    arguments.components: missing; render_ui needs it
-    arguments.components: has none; give at least 1
-    arguments.components: must be an array of components, not an object
-    arguments: must be an object, not an array
-    arguments.theme: render_ui does not take "theme"; it takes components
-    arguments.components: has 21 components; give at most 20
+    components: missing; render_ui needs it
+    components: has none; give at least 1
+    components: must be an array of components, not an object
+    arguments: must be an object {"components": [...]}, not an array
+    theme: render_ui does not take "theme"; it takes components
+    components: has 21 components; give at most 20
     |}]
 ;;
 
@@ -175,9 +175,7 @@ let%expect_test "text and status" =
     components[3].spark: has 1 point; give at least 2
     components[4].spark[1]: must be a number, not a string
     components[5].items[0].value: must be a string, not a number: write "3"
-    components[6].value: is 120, outside 0 to 100; give a value in that range (or set max)
-    components[7].max: must be more than 0
-    components[8].value: is -1, outside 0 to 10; give a value in that range (or set max)
+    components[7].max: is 0; give more than 0
     components[9].items: has none; give at least 1
     |}]
 ;;
@@ -444,6 +442,118 @@ let%expect_test "calculator expressions parse with the documented precedence" =
     |}]
 ;;
 
+let%expect_test "expression semantics: what the frontends compute" =
+  let inputs = function
+    | "a" -> Some 3.
+    | "b" -> Some 4.
+    | _ -> None
+  in
+  List.iter
+    [ "1 + 2 * 3"
+    ; "(1 + 2) * 3"
+    ; "10 - 4 - 3"
+    ; "12 / 3 / 2"
+    ; "-2^2"
+    ; "(-2)^2"
+    ; "2^-1"
+    ; "2^3^2"
+    ; "-a^2 + b"
+    ; "7 % 3"
+    ; "-7 % 3"
+    ; "7.5 % 2"
+    ; "2 * 7 % 4"
+    ; "1 + 2 < 4"
+    ; "a < b"
+    ; "a >= b"
+    ; "a == 3"
+    ; "a != 3"
+    ; "1 < 2 == 1"
+    ; "a > b ? 10 : 20"
+    ; "0 ? 1 : 0 ? 2 : 3"
+    ; "0.5 ? 1 : 2"
+    ; "1 / 0"
+    ; "0 / 0"
+    ; "5 % 0"
+    ; "1 / 0 > 1 ? 1 : 2"
+    ; "1 ? 2 : 1 / 0"
+    ; "1 / 0.0001"
+    ; "log(1000)"
+    ; "ln(exp(2))"
+    ; "log(0)"
+    ; "sqrt(-1)"
+    ; "sqrt(-1) < 0"
+    ; "10^400"
+    ; "pow(2, 10)"
+    ; "min(a, b, 1)"
+    ; "max(a)"
+    ; "abs(-a)"
+    ; "round(2.5)"
+    ; "round(-2.5)"
+    ; "round(2.4)"
+    ; "floor(-1.5)"
+    ; "ceil(-1.5)"
+    ; "c + 1"
+    ]
+    ~f:(fun s ->
+      match Ui_expr.parse s with
+      | Error e -> printf "%-20s error %s\n" s e
+      | Ok e ->
+        printf
+          "%-20s %s\n"
+          s
+          (Option.value_map
+             (Ui_expr.eval e ~inputs)
+             ~default:"(none)"
+             ~f:(fun f -> Float.to_string_hum ~decimals:6 ~strip_zero:true f)));
+  [%expect
+    {|
+    1 + 2 * 3            7
+    (1 + 2) * 3          9
+    10 - 4 - 3           3
+    12 / 3 / 2           2
+    -2^2                 -4
+    (-2)^2               4
+    2^-1                 0.5
+    2^3^2                512
+    -a^2 + b             -5
+    7 % 3                1
+    -7 % 3               -1
+    7.5 % 2              1.5
+    2 * 7 % 4            2
+    1 + 2 < 4            1
+    a < b                1
+    a >= b               0
+    a == 3               1
+    a != 3               0
+    1 < 2 == 1           1
+    a > b ? 10 : 20      20
+    0 ? 1 : 0 ? 2 : 3    3
+    0.5 ? 1 : 2          1
+    1 / 0                (none)
+    0 / 0                (none)
+    5 % 0                (none)
+    1 / 0 > 1 ? 1 : 2    (none)
+    1 ? 2 : 1 / 0        2
+    1 / 0.0001           10_000
+    log(1000)            3
+    ln(exp(2))           2
+    log(0)               (none)
+    sqrt(-1)             (none)
+    sqrt(-1) < 0         0
+    10^400               (none)
+    pow(2, 10)           1_024
+    min(a, b, 1)         1
+    max(a)               3
+    abs(-a)              3
+    round(2.5)           3
+    round(-2.5)          -2
+    round(2.4)           2
+    floor(-1.5)          -2
+    ceil(-1.5)           -1
+    c + 1                (none)
+    |}]
+;;
+
 let%expect_test "flashcards and quiz" =
   check
     {|{"type": "flashcards", "title": "Verbs", "cards": [{"front": "ser", "back": "to be"}]},
@@ -508,7 +618,7 @@ let%expect_test "form" =
     components[1].fields[1].name: "a" is also components[1].fields[0]'s name; give each field its own
     components[1].fields[1].options: missing; a form field needs it
     components[1].fields[2].options: a text field has no options; use kind select, radio or checkbox
-    components[1].fields[2].min: only number and slider fields take min
+    components[1].fields[2].min: only number, slider and date fields take min
     components[1].fields[3]: a slider needs min and max
     components[1].fields[4].max: is 1, not more than min 5
     components[1].fields[4].default: a number field's default must be a number, not a string
@@ -553,16 +663,17 @@ let%expect_test "choices and checklist" =
     |}]
 ;;
 
-let%expect_test "ids, nested ones too" =
+let%expect_test "interactive ids, nested ones too" =
   print_s
     [%sexp
-      (Ui_components.ids
+      (Ui_components.interactive_ids
          (Json.of_string
             {|{"components": [
                 {"type": "form", "id": "a"},
                 {"type": "card", "children": [{"type": "choices", "id": "b"}]},
-                {"type": "tabs", "tabs": [{"label": "t", "children": [{"type": "checklist", "id": "c"}]}]},
-                {"type": "accordion", "items": [{"title": "t", "children": [{"type": "divider", "id": "d"}]}]}]}|})
+                {"type": "tabs", "tabs": [{"label": "t", "children": [{"type": "checklist", "id": "c", "submit": "Send"}]}]},
+                {"type": "checklist", "id": "no-submit"},
+                {"type": "accordion", "items": [{"title": "t", "children": [{"type": "divider", "id": "d"}, {"type": "form", "id": "e"}]}]}]}|})
        : string list)];
-  [%expect {| (a b c d) |}]
+  [%expect {| (a b c e) |}]
 ;;
