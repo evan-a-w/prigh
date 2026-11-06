@@ -191,12 +191,38 @@ let tip ?(attrs = []) cls ~head rows =
     (div "ui-chart-tip-head" [ text head ] :: rows)
 ;;
 
+let label_width labels =
+  List.fold labels ~init:1 ~f:(fun acc l -> Int.max acc (String.length l))
+;;
+
+(* Along the foot, every other label hides only where they would collide:
+   [thin-B] hides them while the axis is narrower than B pixels (a container
+   query), B being the first of [breakpoints] at least the width [gaps]
+   gaps of the [longest] label take (11px monospace, 7px a character, and
+   room between). *)
+let breakpoints = [ 160; 200; 240; 280; 320; 360; 400; 480; 560; 640; 720; 800 ]
+
+let thin_class ~gaps ~longest =
+  let needed = gaps * ((longest * 7) + 8) in
+  match List.find breakpoints ~f:(fun b -> b >= needed) with
+  | Some b -> sprintf " thin-%d" b
+  | None -> " thin"
+;;
+
 let ticks_nodes ~cls ~side ticks ~lo ~hi ~unit =
+  let cls =
+    if String.equal side "left"
+    then
+      cls
+      ^ thin_class
+          ~gaps:(List.length ticks - 1)
+          ~longest:(label_width (List.map ticks ~f:(tick_text ~unit)))
+    else cls
+  in
   div
     ~attrs:[ hidden ]
     cls
     (List.mapi ticks ~f:(fun i v ->
-       (* Along the foot, a phone shows every other one. *)
        let minor =
          String.equal side "left" && List.length ticks > 4 && i % 2 = 1
        in
@@ -217,10 +243,6 @@ let grid ~side ticks ~lo ~hi =
           then "ui-chart-gridline zero"
           else "ui-chart-gridline")
          []))
-;;
-
-let label_width labels =
-  List.fold labels ~init:1 ~f:(fun acc l -> Int.max acc (String.length l))
 ;;
 
 (* ---- line, area and the bars: one value per label and series *)
@@ -438,9 +460,19 @@ let categories (chart : C.t) ~labels ~(series : C.Series.t list) =
         let base = 100. -. zero in
         let areas =
           if C.Kind.equal chart.kind Area
-          then
+          then (
+            (* The highest series' fill at the back: each fill that
+               overlaps another is over it, keeping its own tint. *)
+            let mean k =
+              let vs = Array.filter_map values.(k) ~f:Fn.id in
+              if Array.is_empty vs
+              then 0.
+              else Array.sum (module Float) vs ~f:Fn.id /. Float.of_int (Array.length vs)
+            in
             List.concat_map
-              (List.init (Array.length values) ~f:Fn.id)
+              (List.stable_sort
+                 (List.init (Array.length values) ~f:Fn.id)
+                 ~compare:(fun a b -> Float.compare (mean b) (mean a)))
               ~f:(fun k ->
                 List.map
                   (segments (pts k))
@@ -462,7 +494,7 @@ let categories (chart : C.t) ~labels ~(series : C.Series.t list) =
                             (Ui_svg.num x1)
                             (Ui_svg.num base) )
                       ]
-                      []))
+                      [])))
           else []
         in
         let strokes =
@@ -509,9 +541,13 @@ let categories (chart : C.t) ~labels ~(series : C.Series.t list) =
                [ text labels.(i) ]))
       else (
         let stride = Int.max 1 ((n + 7) / 8) in
+        let shown = List.filter (List.init n ~f:Fn.id) ~f:(fun i -> i mod stride = 0) in
         div
           ~attrs:[ hidden ]
-          "ui-chart-xaxis"
+          ("ui-chart-xaxis"
+           ^ thin_class
+               ~gaps:(List.length shown)
+               ~longest:(label_width (List.map shown ~f:(fun i -> labels.(i)))))
           (List.filter_map (List.init n ~f:Fn.id) ~f:(fun i ->
              Option.some_if
                (i mod stride = 0)

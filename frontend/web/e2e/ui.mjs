@@ -79,12 +79,22 @@ const screenshot = async (label, selector) => {
   shot++;
   const path = join(process.env.SHOTS, `${engineName}-ui-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`);
   await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
-  // A component taller than the space above the composer: its picture
-  // without the page's chrome over it.
-  if (selector) await page.locator(selector).first().screenshot({
-    path,
-    style: ".composer, .chat-chrome, .chat-tools, .scroll-bottom, .jump-rail { visibility: hidden !important; }",
-  });
+  if (selector) {
+    // The chat scrolls inside the page: a component taller than the space
+    // above the composer gets a viewport tall enough for all of it, and
+    // its picture leaves out the chrome floating over the chat.
+    const element = page.locator(selector).first();
+    const viewport = page.viewportSize();
+    const { height } = await element.boundingBox();
+    if (height + 320 > viewport.height) await page.setViewportSize({ width: viewport.width, height: Math.ceil(height) + 320 });
+    await element.scrollIntoViewIfNeeded();
+    await element.screenshot({
+      path,
+      animations: "disabled",
+      style: ".composer, .composer-wrap, .chat-chrome, .chat-tools, .jump-anchor, .jump-to-bottom, .toast { visibility: hidden !important; }",
+    });
+    await page.setViewportSize(viewport);
+  }
   else await page.screenshot({ path });
 };
 const composer = () => page.locator(".composer textarea");
@@ -182,6 +192,7 @@ try {
   await typed(0, "120");
   console.log(`slider follows: ${await ui(3).locator(".ui-slider").inputValue()}`);
   await typed(1, "");
+  await typed(1, "1.5");
 
   section("quiz, flashcards, tabs, accordion");
   await ui(3).locator(".ui-option", { hasText: "prettier" }).click();

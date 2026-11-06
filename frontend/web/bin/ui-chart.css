@@ -89,9 +89,23 @@
   box-sizing: border-box;
 }
 .ui-chart-xaxis .ui-chart-tick { max-width: var(--w, none); }
-.app.narrow .ui-chart-xaxis .ui-chart-tick.minor { display: none; }
-/* With every other label hidden, each has twice the room. */
-.app.narrow .ui-chart-xaxis .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); }
+/* Every other label hides only while they would collide (Ui_chart's
+   thin_class); then each has twice the room. */
+.ui-chart-xaxis { container: xaxis / inline-size; }
+.thin > .minor { display: none; }
+.thin > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); }
+@container xaxis (max-width: 159px) { .thin-160 > .minor { display: none; } .thin-160 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 199px) { .thin-200 > .minor { display: none; } .thin-200 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 239px) { .thin-240 > .minor { display: none; } .thin-240 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 279px) { .thin-280 > .minor { display: none; } .thin-280 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 319px) { .thin-320 > .minor { display: none; } .thin-320 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 359px) { .thin-360 > .minor { display: none; } .thin-360 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 399px) { .thin-400 > .minor { display: none; } .thin-400 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 479px) { .thin-480 > .minor { display: none; } .thin-480 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 559px) { .thin-560 > .minor { display: none; } .thin-560 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 639px) { .thin-640 > .minor { display: none; } .thin-640 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 719px) { .thin-720 > .minor { display: none; } .thin-720 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
+@container xaxis (max-width: 799px) { .thin-800 > .minor { display: none; } .thin-800 > .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); } }
 
 /* Horizontal bars: the labels down the side, the values along the foot. */
 .ui-chart[data-kind="horizontal_bar"] .ui-chart-plot {
@@ -144,7 +158,11 @@
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
-.ui-chart-fill { fill: var(--c); fill-opacity: .16; stroke: none; }
+/* Opaque tints, the highest series' at the back (Ui_chart): where fills
+   overlap, the front one keeps its own colour instead of mixing to grey.
+   The grid shows through them. */
+.ui-chart-fill { fill: color-mix(in srgb, var(--c) 22%, var(--slate)); stroke: none; }
+.ui-chart[data-kind="area"] .ui-chart-grid { z-index: 1; }
 
 /* ---- a label's column: its bars or markers, its tooltip on hover/focus */
 

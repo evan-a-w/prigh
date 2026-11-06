@@ -197,25 +197,15 @@ let steps ~title items =
     ]
 ;;
 
-let fence code =
-  let longest =
-    String.split_lines code
-    |> List.map ~f:(fun l ->
-      let l = String.strip l in
-      if String.is_prefix l ~prefix:"```"
-      then String.length (String.take_while l ~f:(Char.equal '`'))
-      else 0)
-    |> List.fold ~init:2 ~f:Int.max
-  in
-  String.make (longest + 1) '`'
-;;
-
 let code ~lang ~title code =
-  let f = fence code in
   div
     "ui-code"
-    [ title_node title
-    ; Markdown_view.render (sprintf "%s%s\n%s\n%s" f (Option.value lang ~default:"") code f)
+    [ Markdown_view.code_block
+        ?title
+        ~lang:(Option.value lang ~default:"")
+        ~text:code
+        ~closed:true
+        ()
     ]
 ;;
 
