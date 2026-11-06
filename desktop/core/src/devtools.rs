@@ -10,9 +10,18 @@
 //! - a new tab or window on another site (a link with `target=_blank`,
 //!   `window.open`) is closed, and the link opened in the system's default
 //!   browser, as the built-in window does (see [crate::navigation]);
-//! - prigh's own window (the app's, or one opened on prigh's site) going to
-//!   another site is sent back to where it was, and the link opened in the
-//!   default browser;
+//! - prigh's own window (the app's, or one opened on prigh's site) following
+//!   a link to another site (its page's `anchorClick` navigation, seen on a
+//!   DevTools session of each of prigh's windows:
+//!   `Page.frameRequestedNavigation`) is sent back to where it was, and the
+//!   link opened in the default browser;
+//! - prigh's own window going to another site on its own (an HTTP redirect,
+//!   a script's, a form's: a sign-in proxy in front of the backend's site,
+//!   then its identity provider) stays there, through every hop, until it
+//!   is back on prigh's site: the profile keeps the proxy's cookie;
+//! - whatever a site does, a window opens a site in the default browser at
+//!   most once per [crate::navigation::OPEN_GAP]: a link that comes back sooner stays in the
+//!   window (said once);
 //! - a popup on prigh's site (Open in new window) is closed and its page
 //!   opened in another app window instead: a popup has an address bar;
 //! - the browser's own pages (a new tab or window: Ctrl+T, Ctrl+N; history,
@@ -26,9 +35,10 @@
 //! `about:blank` (a popup before it loads), `chrome-error:` (a page that
 //! failed to load) and what the window would refuse are left alone.
 
-use crate::navigation::{decide, origin, Decision};
+use crate::navigation::{decide, origin, Decision, OpenGuard, Remote};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 /// What prigh's sites may do without the browser asking.
 pub const PERMISSIONS: &[&str] = &["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"];
@@ -50,10 +60,22 @@ pub enum Effect {
 struct Page {
     /// Where it last was on prigh's sites: it is one of prigh's windows.
     ours: Option<String>,
+    /// Opened by another page (a link with `target=_blank`, `window.open`),
+    /// not one of the app's launches.
+    popup: bool,
     /// Sent elsewhere already: its later events say nothing new.
     handled: Option<String>,
     /// Closed by us: its later events say nothing new.
     closing: bool,
+    /// Its DevTools session, once attached.
+    session: Option<String>,
+    attaching: bool,
+    /// The last navigation its page asked for: the reason and the address.
+    requested: Option<(String, String)>,
+    /// The site it went to on its own (a sign-in), until it is back.
+    away: Option<String>,
+    /// The remote site's cookies were given to it since it was last there.
+    cookies_given: bool,
 }
 
 /// The browser's pages, from its events.
@@ -61,9 +83,17 @@ struct Page {
 pub struct Links {
     pages: HashMap<String, Page>,
     next_id: u64,
-    /// Attaching to one of prigh's windows to send it back: the request's
-    /// id, to the address to go back to.
-    attaching: HashMap<u64, String>,
+    /// Attaching to one of prigh's windows: the request's id, to the window
+    /// and the address to send it back to, if any.
+    attaching: HashMap<u64, (String, Option<String>)>,
+    /// The DevTools sessions on prigh's windows, to their windows.
+    sessions: HashMap<String, String>,
+    /// Openings in the default browser, by window (a popup's: its opener).
+    opened: OpenGuard,
+    /// Setting the remote site's cookies: the request's id, to the windows
+    /// to load it in then.
+    setting_cookies: HashMap<u64, Vec<(String, String)>>,
+    remote: Option<Remote>,
     /// The browser context of prigh's windows: the first page's.
     context: Option<String>,
     keep_devtools: bool,
@@ -117,8 +147,9 @@ impl Links {
         (id, msg.to_string())
     }
 
-    /// A message from the browser; `ours`: the origins of prigh's sites.
-    pub fn on_message(&mut self, msg: &str, ours: &[String]) -> Vec<Effect> {
+    /// A message from the browser at `now`; `ours`: the origins of prigh's
+    /// sites.
+    pub fn on_message(&mut self, msg: &str, ours: &[String], now: Instant) -> Vec<Effect> {
         let Ok(msg) = serde_json::from_str::<Value>(msg) else { return vec![] };
         let mut out = self.grant(ours);
         if let Some(id) = msg["id"].as_u64() {
@@ -136,12 +167,36 @@ impl Links {
                         opener: info["openerId"].as_str(),
                         context: info["browserContextId"].as_str(),
                     };
-                    out.extend(self.on_page(target, ours));
+                    out.extend(self.on_page(target, ours, now));
                 }
             }
             Some("Target.targetDestroyed") => {
                 if let Some(target) = params["targetId"].as_str() {
-                    self.pages.remove(target);
+                    if let Some(Page { session: Some(s), .. }) = self.pages.remove(target) {
+                        self.sessions.remove(&s);
+                    }
+                    self.opened.forget(target);
+                }
+            }
+            Some("Target.detachedFromTarget") => {
+                if let Some(target) = params["sessionId"].as_str().and_then(|s| self.sessions.remove(s)) {
+                    if let Some(page) = self.pages.get_mut(&target) {
+                        page.session = None;
+                    }
+                }
+            }
+            // Its main frame's own navigations (not an iframe's, not a new
+            // window's).
+            Some("Page.frameRequestedNavigation") if params["disposition"] == "currentTab" => {
+                let target = msg["sessionId"].as_str().and_then(|s| self.sessions.get(s));
+                if let (Some(target), Some(reason), Some(url)) =
+                    (target, params["reason"].as_str(), params["url"].as_str())
+                {
+                    if params["frameId"].as_str() == Some(target.as_str()) {
+                        if let Some(page) = self.pages.get_mut(target) {
+                            page.requested = Some((reason.to_string(), url.to_string()));
+                        }
+                    }
                 }
             }
             Some("Browser.downloadProgress") if params["state"] == "completed" => {
@@ -166,7 +221,7 @@ impl Links {
             .collect()
     }
 
-    fn on_page(&mut self, target: Target, ours: &[String]) -> Vec<Effect> {
+    fn on_page(&mut self, target: Target, ours: &[String], now: Instant) -> Vec<Effect> {
         let Target { id, url, opener, context } = target;
         if self.pages.get(id).is_some_and(|p| p.closing) {
             return vec![];
@@ -178,13 +233,17 @@ impl Links {
                 return self.close(id, opener, "closed a page of an incognito window".to_string());
             }
         }
+        let new = !self.pages.contains_key(id);
         let page = self.pages.entry(id.to_string()).or_default();
+        if new {
+            page.popup = opener.is_some();
+        }
         if browser_page(url, self.keep_devtools) {
             return match page.ours.clone() {
                 // One of prigh's windows: back to prigh's page.
                 Some(back) if page.handled.as_deref() != Some(url) => {
                     page.handled = Some(url.to_string());
-                    vec![Effect::Send(self.send_back(id, back))]
+                    self.send_back(id, back)
                 }
                 Some(_) => vec![],
                 None => self.close(
@@ -197,7 +256,7 @@ impl Links {
         match decide(url, ours) {
             Decision::Allow => {
                 if origin(url).is_some_and(|o| ours.contains(&o)) {
-                    if opener.is_some() && page.ours.is_none() {
+                    if page.popup && page.ours.is_none() {
                         // A popup on prigh's site: an app window instead.
                         page.closing = true;
                         let (_, close) = self.command("Target.closeTarget", json!({ "targetId": id }), None);
@@ -205,17 +264,86 @@ impl Links {
                     }
                     page.ours = Some(url.to_string());
                     page.handled = None;
+                    page.requested = None;
+                    if self.remote.as_ref().is_some_and(|r| origin(&r.url) == origin(url)) {
+                        page.cookies_given = false;
+                    }
+                    let mut out = vec![];
+                    if let Some(away) = page.away.take() {
+                        out.push(Effect::Log(format!("prigh's window is back from {away}")));
+                    }
+                    if page.session.is_none() && !page.attaching {
+                        out.extend(self.attach(id, None));
+                    }
+                    return out;
                 }
                 vec![]
             }
             Decision::External if page.handled.as_deref() != Some(url) => {
                 page.handled = Some(url.to_string());
+                if page.popup && page.ours.is_none() {
+                    page.closing = true;
+                    let (_, close) = self.command("Target.closeTarget", json!({ "targetId": id }), None);
+                    let mut out = self.open_externally(opener.unwrap_or(id), url, now);
+                    out.push(Effect::Send(close));
+                    return out;
+                }
+                // One of prigh's windows, or the app's launch on its way
+                // there; while away, wherever it goes is the sign-in's.
+                if page.away.is_some() {
+                    return vec![];
+                }
+                let site = origin(url).unwrap_or_else(|| url.to_string());
+                let link = page
+                    .requested
+                    .take()
+                    .is_some_and(|(reason, to)| reason == "anchorClick" && origin(&to).as_ref() == Some(&site));
                 match page.ours.clone() {
-                    Some(back) => vec![Effect::OpenExternally(url.to_string()), Effect::Send(self.send_back(id, back))],
-                    None => {
-                        page.closing = true;
-                        let (_, close) = self.command("Target.closeTarget", json!({ "targetId": id }), None);
-                        vec![Effect::OpenExternally(url.to_string()), Effect::Send(close)]
+                    Some(back) if link => {
+                        let mut out = self.open_externally(id, url, now);
+                        if out.iter().any(|e| matches!(e, Effect::OpenExternally(_))) {
+                            out.extend(self.send_back(id, back));
+                        } else {
+                            // Too soon again: it stays.
+                            self.pages.get_mut(id).unwrap().away = Some(site);
+                        }
+                        out
+                    }
+                    ours => {
+                        let remote = self.remote.clone().filter(|r| match &ours {
+                            Some(o) => origin(o).is_some() && origin(o) == origin(&r.url),
+                            // The app's launch, on its way to the site.
+                            None => true,
+                        });
+                        let page = self.pages.get_mut(id).unwrap();
+                        match remote {
+                            Some(r) if !page.cookies_given && !r.cookies.is_empty() => {
+                                page.cookies_given = true;
+                                let back = ours.unwrap_or_else(|| r.url.clone());
+                                let mut out = vec![Effect::Log(format!(
+                                    "prigh's window went to {site}: giving it the sign-in to {}",
+                                    origin(&r.url).unwrap_or_default()
+                                ))];
+                                out.extend(self.set_cookies(&r, vec![(id.to_string(), back)]));
+                                out
+                            }
+                            Some(Remote { signin_page: Some(signin), url, .. }) => {
+                                // Until it is on prigh's sign-in page.
+                                page.away = Some(site.clone());
+                                let mut out = vec![Effect::Log(format!(
+                                    "prigh's window went to {site}: {} wants a sign-in, showing prigh's",
+                                    origin(&url).unwrap_or_default()
+                                ))];
+                                out.extend(self.send_back(id, signin));
+                                out
+                            }
+                            _ => {
+                                page.away = Some(site.clone());
+                                vec![Effect::Log(format!(
+                                    "prigh's window went to {site} on its own (a sign-in?): it stays there until it is back"
+                                ))]
+                            }
+                        }
                     }
                 }
             }
@@ -225,14 +353,83 @@ impl Links {
         }
     }
 
-    /// Attaches to one of prigh's windows, to send it back to `back`
-    /// (see [Links::on_reply]).
-    fn send_back(&mut self, target: &str, back: String) -> String {
-        let (id, attach) = self.command("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None);
-        self.attaching.insert(id, back);
-        attach
+    /// Opens `url` in the default browser for `window`, unless that window
+    /// opened its site less than [crate::navigation::OPEN_GAP] ago.
+    fn open_externally(&mut self, window: &str, url: &str, now: Instant) -> Vec<Effect> {
+        match self.opened.check(window, url, now) {
+            Ok(()) => vec![Effect::OpenExternally(url.to_string())],
+            Err(log) => log.into_iter().map(Effect::Log).collect(),
+        }
     }
 
+    /// The backend's site, as the sidecar says to show it now: with its
+    /// cookies (signed in through the default browser), prigh's windows on
+    /// the sidecar's sign-in page get them and go there.
+    pub fn set_remote(&mut self, remote: Remote) -> Vec<Effect> {
+        let signin = remote.signin_page.as_deref().and_then(origin);
+        let windows: Vec<(String, String)> = if remote.cookies.is_empty() {
+            vec![]
+        } else {
+            self.pages
+                .iter_mut()
+                .filter(|(_, p)| !p.closing && !p.popup && p.away.is_none())
+                .filter(|(_, p)| signin.is_some() && p.ours.as_deref().and_then(origin) == signin)
+                .map(|(id, p)| {
+                    // On its way there: redirected away, it is not signed in.
+                    p.cookies_given = true;
+                    p.ours = Some(remote.url.clone());
+                    (id.clone(), remote.url.clone())
+                })
+                .collect()
+        };
+        let out = if remote.cookies.is_empty() { vec![] } else { self.set_cookies(&remote, windows) };
+        self.remote = Some(remote);
+        out
+    }
+
+    fn set_cookies(&mut self, remote: &Remote, then: Vec<(String, String)>) -> Vec<Effect> {
+        let secure = remote.url.to_ascii_lowercase().starts_with("https:");
+        let site = origin(&remote.url).map(|o| o + "/").unwrap_or_else(|| remote.url.clone());
+        let cookies: Vec<Value> = remote
+            .cookies
+            .iter()
+            .map(|(name, value)| {
+                json!({ "name": name, "value": value, "url": site, "path": "/", "secure": secure, "httpOnly": true })
+            })
+            .collect();
+        let (id, set) = self.command("Storage.setCookies", json!({ "cookies": cookies }), None);
+        self.setting_cookies.insert(id, then);
+        vec![Effect::Send(set)]
+    }
+
+    /// Sends one of prigh's windows back to `back`: on its session, or once
+    /// attached (see [Links::on_reply]).
+    fn send_back(&mut self, target: &str, back: String) -> Vec<Effect> {
+        match self.pages.get(target).and_then(|p| p.session.clone()) {
+            Some(session) => {
+                let (_, navigate) = self.command("Page.navigate", json!({ "url": back }), Some(&session));
+                vec![Effect::Send(navigate)]
+            }
+            None => {
+                if let Some(entry) = self.attaching.values_mut().find(|(t, _)| t == target) {
+                    entry.1 = Some(back);
+                    return vec![];
+                }
+                self.attach(target, Some(back))
+            }
+        }
+    }
+
+    /// A session on one of prigh's windows, for the navigations its page
+    /// asks for.
+    fn attach(&mut self, target: &str, back: Option<String>) -> Vec<Effect> {
+        if let Some(page) = self.pages.get_mut(target) {
+            page.attaching = true;
+        }
+        let (id, attach) = self.command("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None);
+        self.attaching.insert(id, (target.to_string(), back));
+        vec![Effect::Send(attach)]
+    }
     /// Closes a page of the browser's own, and activates the window of
     /// prigh's it took the focus from: the one that opened it, or else the
     /// only one there is.
@@ -255,14 +452,24 @@ impl Links {
     }
 
     fn on_reply(&mut self, id: u64, msg: &Value) -> Vec<Effect> {
-        let Some(back) = self.attaching.remove(&id) else { return vec![] };
+        if let Some(then) = self.setting_cookies.remove(&id) {
+            return then.into_iter().flat_map(|(target, url)| self.send_back(&target, url)).collect();
+        }
+        let Some((target, back)) = self.attaching.remove(&id) else { return vec![] };
+        let Some(page) = self.pages.get_mut(&target) else { return vec![] };
+        page.attaching = false;
         let Some(session) = msg["result"]["sessionId"].as_str() else { return vec![] };
-        let (_, navigate) = self.command("Page.navigate", json!({ "url": back }), Some(session));
-        let (_, detach) = self.command("Target.detachFromTarget", json!({ "sessionId": session }), None);
-        vec![Effect::Send(navigate), Effect::Send(detach)]
+        page.session = Some(session.to_string());
+        self.sessions.insert(session.to_string(), target);
+        let (_, enable) = self.command("Page.enable", json!({}), Some(session));
+        let mut out = vec![Effect::Send(enable)];
+        if let Some(back) = back {
+            let (_, navigate) = self.command("Page.navigate", json!({ "url": back }), Some(session));
+            out.push(Effect::Send(navigate));
+        }
+        out
     }
 }
-
 struct Target<'a> {
     id: &'a str,
     url: &'a str,
@@ -311,12 +518,14 @@ mod tests {
         links
     }
 
-    /// The effects as JSON: `{"open": URL}`, `{"window": URL}`, `{"log":
-    /// TEXT}`, or the command sent.
-    fn run(links: &mut Links, msgs: &[String]) -> Vec<Value> {
-        let ours = OURS.map(String::from);
-        msgs.iter()
-            .flat_map(|m| links.on_message(m, &ours))
+    fn base() -> Instant {
+        static BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+        *BASE.get_or_init(Instant::now)
+    }
+
+    fn json_of(effects: Vec<Effect>) -> Vec<Value> {
+        effects
+            .into_iter()
             .map(|e| match e {
                 Effect::Send(s) => serde_json::from_str(&s).unwrap(),
                 Effect::OpenExternally(u) => json!({ "open": u }),
@@ -326,12 +535,64 @@ mod tests {
             .collect()
     }
 
-    fn close(id: u64, target: &str) -> Value {
-        json!({ "id": id, "method": "Target.closeTarget", "params": { "targetId": target } })
+    /// The effects as JSON: `{"open": URL}`, `{"window": URL}`, `{"log":
+    /// TEXT}`, or the command sent, as the browser gets them.
+    fn run_raw(links: &mut Links, msgs: &[String], secs: u64) -> Vec<Value> {
+        let ours = OURS.map(String::from);
+        let now = base() + std::time::Duration::from_secs(secs);
+        json_of(msgs.iter().flat_map(|m| links.on_message(m, &ours, now)).collect())
     }
 
-    fn activate(id: u64, target: &str) -> Value {
-        json!({ "id": id, "method": "Target.activateTarget", "params": { "targetId": target } })
+    /// [run_raw], with each window's session attached as asked (session
+    /// `S-TARGET`) and the commands' ids left out: those that attach and
+    /// enable its events are not shown.
+    fn run_at(links: &mut Links, msgs: &[String], secs: u64) -> Vec<Value> {
+        let mut out = vec![];
+        let mut queue: Vec<String> = msgs.to_vec();
+        queue.reverse();
+        while let Some(msg) = queue.pop() {
+            let mut replies = vec![];
+            for mut effect in run_raw(links, &[msg], secs) {
+                if effect["method"] == "Target.attachToTarget" {
+                    let session = format!("S-{}", effect["params"]["targetId"].as_str().unwrap());
+                    replies.push(json!({ "id": effect["id"], "result": { "sessionId": session } }).to_string());
+                    continue;
+                }
+                if effect["method"] == "Page.enable" {
+                    continue;
+                }
+                if let Some(o) = effect.as_object_mut() {
+                    o.remove("id");
+                }
+                out.push(effect);
+            }
+            replies.reverse();
+            queue.extend(replies);
+        }
+        out
+    }
+
+    fn run(links: &mut Links, msgs: &[String]) -> Vec<Value> {
+        run_at(links, msgs, 0)
+    }
+
+    fn close(target: &str) -> Value {
+        json!({ "method": "Target.closeTarget", "params": { "targetId": target } })
+    }
+
+    fn activate(target: &str) -> Value {
+        json!({ "method": "Target.activateTarget", "params": { "targetId": target } })
+    }
+
+    fn navigate(target: &str, url: &str) -> Value {
+        json!({ "method": "Page.navigate", "sessionId": format!("S-{target}"), "params": { "url": url } })
+    }
+
+    /// The page of window `target` asks to go to `url`, for `reason`.
+    fn requested(target: &str, reason: &str, url: &str) -> String {
+        json!({ "method": "Page.frameRequestedNavigation", "sessionId": format!("S-{target}"),
+                "params": { "frameId": target, "reason": reason, "url": url, "disposition": "currentTab" } })
+        .to_string()
     }
 
     #[test]
@@ -352,14 +613,15 @@ mod tests {
                     "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"] } })
         };
         // On the first message, each origin once; a new one when it comes.
-        let mut out = run(&mut links, &[json!({ "id": 1, "result": {} }).to_string(), "{}".to_string()]);
+        let mut out = run_raw(&mut links, &[json!({ "id": 1, "result": {} }).to_string(), "{}".to_string()], 0);
         out.extend(
-            links.on_message("{}", &[OURS[0].to_string(), "https://other.example".to_string()]).into_iter().map(|e| {
-                match e {
+            links
+                .on_message("{}", &[OURS[0].to_string(), "https://other.example".to_string()], base())
+                .into_iter()
+                .map(|e| match e {
                     Effect::Send(s) => serde_json::from_str::<Value>(&s).unwrap(),
                     e => panic!("{e:?}"),
-                }
-            }),
+                }),
         );
         assert_eq!(out, [grant(3, OURS[0]), grant(4, OURS[1]), grant(5, "https://other.example")]);
     }
@@ -389,7 +651,7 @@ mod tests {
         let gone = popup("Target.targetInfoChanged", "B", "https://github.com/evan-a-w/prigh");
         assert_eq!(
             run(&mut links, &[app, blank, gone.clone(), gone]),
-            [json!({ "open": "https://github.com/evan-a-w/prigh" }), close(3, "B")]
+            [json!({ "open": "https://github.com/evan-a-w/prigh" }), close("B")]
         );
     }
 
@@ -440,9 +702,9 @@ mod tests {
             run(&mut links, &msgs),
             [
                 json!({ "window": url }),
-                close(3, "B"),
+                close("B"),
                 json!({ "window": "https://ai.example.com/?session=s3" }),
-                close(4, "C"),
+                close("C"),
             ]
         );
         // The app window that opens has no opener: it stays.
@@ -476,7 +738,6 @@ mod tests {
         // Closed already: its later events change nothing.
         out.extend(run(&mut links, &[changed("T", "chrome://newtab/")]));
         let mut expected = vec![];
-        let mut id = 3;
         for (target, page) in [
             ("T", "chrome://newtab/"),
             ("H", "chrome://history/"),
@@ -492,9 +753,8 @@ mod tests {
             ("P", "chrome-extension://abc/options.html"),
         ] {
             expected.push(json!({ "log": format!("closed the browser's own page {page}") }));
-            expected.push(close(id, target));
-            expected.push(activate(id + 1, "A"));
-            id += 2;
+            expected.push(close(target));
+            expected.push(activate("A"));
         }
         assert_eq!(out, expected);
     }
@@ -513,7 +773,7 @@ mod tests {
         );
         assert_eq!(
             out,
-            [json!({ "log": "closed the browser's own page chrome://history/" }), close(3, "H"), activate(4, "A")]
+            [json!({ "log": "closed the browser's own page chrome://history/" }), close("H"), activate("A")]
         );
     }
 
@@ -537,14 +797,14 @@ mod tests {
             out,
             [
                 incognito.clone(),
-                close(3, "I"),
-                activate(4, "A"),
+                close("I"),
+                activate("A"),
                 incognito.clone(),
-                close(5, "J"),
-                activate(6, "A"),
+                close("J"),
+                activate("A"),
                 incognito,
-                close(7, "K"),
-                activate(8, "A"),
+                close("K"),
+                activate("A"),
             ]
         );
     }
@@ -565,63 +825,339 @@ mod tests {
             out,
             [
                 json!({ "log": "closed the browser's own page chrome://history/" }),
-                close(3, "O"),
-                activate(4, "B"),
+                close("O"),
+                activate("B"),
                 json!({ "log": "closed the browser's own page chrome://newtab/" }),
-                close(5, "T"),
+                close("T"),
             ]
+        );
+    }
+
+    #[test]
+    fn prighs_windows_get_a_session_for_their_pages_navigations() {
+        let mut links = links();
+        let out =
+            run_raw(&mut links, &[created("A", "http://127.0.0.1:7780/"), changed("A", "http://127.0.0.1:7780/")], 0);
+        assert_eq!(
+            out,
+            [json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
+        );
+        let out = run_raw(&mut links, &[json!({ "id": 3, "result": { "sessionId": "S" } }).to_string()], 0);
+        assert_eq!(out, [json!({ "id": 4, "method": "Page.enable", "sessionId": "S", "params": {} })]);
+        // Detached (DevTools' own window took it?): attached again when next
+        // on prigh's site.
+        let detached =
+            json!({ "method": "Target.detachedFromTarget", "params": { "sessionId": "S", "targetId": "A" } });
+        let out = run_raw(&mut links, &[detached.to_string(), changed("A", "http://127.0.0.1:7780/?session=s")], 0);
+        assert_eq!(
+            out,
+            [json!({ "id": 5, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
         );
     }
 
     #[test]
     fn prighs_window_going_to_a_browser_page_goes_back() {
         let mut links = links();
-        let out = run(
+        let out = run_raw(
             &mut links,
             &[
                 created("A", "http://127.0.0.1:7780/?session=s1"),
                 changed("A", "chrome://settings/"),
                 changed("A", "chrome://settings/"),
+                json!({ "id": 3, "result": { "sessionId": "S" } }).to_string(),
             ],
+            0,
         );
+        // Not attached yet: once it is.
         assert_eq!(
             out,
-            [json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
+            [
+                json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } }),
+                json!({ "id": 4, "method": "Page.enable", "sessionId": "S", "params": {} }),
+                json!({ "id": 5, "method": "Page.navigate", "sessionId": "S",
+                        "params": { "url": "http://127.0.0.1:7780/?session=s1" } }),
+            ]
         );
     }
 
     #[test]
-    fn prighs_window_going_elsewhere_goes_back() {
+    fn a_link_in_prighs_window_to_another_site_opens_in_the_default_browser() {
         let mut links = links();
-        let mut out = run(
+        let out = run(
             &mut links,
-            &[created("A", "http://127.0.0.1:7780/?session=s1"), changed("A", "https://example.com/docs")],
+            &[
+                created("A", "http://127.0.0.1:7780/?session=s1"),
+                requested("A", "anchorClick", "https://example.com/docs"),
+                changed("A", "https://example.com/docs"),
+                changed("A", "https://example.com/docs"),
+            ],
         );
-        out.extend(run(&mut links, &[json!({ "id": 3, "result": { "sessionId": "S" } }).to_string()]));
+        assert_eq!(
+            out,
+            [json!({ "open": "https://example.com/docs" }), navigate("A", "http://127.0.0.1:7780/?session=s1")]
+        );
+        // Back on prigh's page, it is prigh's again: a later link goes too
+        // (another site, or the same after a while).
+        let again = |links: &mut Links, to: &str, secs| {
+            run_at(
+                links,
+                &[
+                    changed("A", "http://127.0.0.1:7780/?session=s1"),
+                    requested("A", "anchorClick", to),
+                    changed("A", to),
+                ],
+                secs,
+            )
+        };
+        assert_eq!(
+            again(&mut links, "https://other.example/", 1),
+            [json!({ "open": "https://other.example/" }), navigate("A", "http://127.0.0.1:7780/?session=s1")]
+        );
+        assert_eq!(
+            again(&mut links, "https://example.com/more", 6),
+            [json!({ "open": "https://example.com/more" }), navigate("A", "http://127.0.0.1:7780/?session=s1")]
+        );
+        // An iframe's link, or one opening a new window, is not the window's.
+        let out = run_at(
+            &mut links,
+            &[
+                changed("A", "http://127.0.0.1:7780/?session=s1"),
+                json!({ "method": "Page.frameRequestedNavigation", "sessionId": "S-A",
+                        "params": { "frameId": "F", "reason": "anchorClick", "url": "https://x.example/", "disposition": "currentTab" } })
+                .to_string(),
+                json!({ "method": "Page.frameRequestedNavigation", "sessionId": "S-A",
+                        "params": { "frameId": "A", "reason": "anchorClick", "url": "https://x.example/", "disposition": "newTab" } })
+                .to_string(),
+                changed("A", "https://x.example/"),
+            ],
+            20,
+        );
         assert_eq!(
             out,
             [
-                json!({ "open": "https://example.com/docs" }),
-                json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } }),
-                json!({ "id": 4, "method": "Page.navigate", "sessionId": "S",
-                        "params": { "url": "http://127.0.0.1:7780/?session=s1" } }),
-                json!({ "id": 5, "method": "Target.detachFromTarget", "params": { "sessionId": "S" } }),
+                json!({ "log": "prigh's window went to https://x.example on its own (a sign-in?): it stays there until it is back" })
             ]
         );
-        // Back on prigh's page, it is prigh's again: a later link goes too.
-        let again = run(
+    }
+
+    #[test]
+    fn prighs_window_signs_in_to_a_proxy_in_the_window() {
+        let mut links = links();
+        // The backend's site redirects to the proxy's login, which goes to an
+        // identity provider (a link there), whose form posts back; then the
+        // proxy's callback and back to the site.
+        let out = run(
             &mut links,
-            &[changed("A", "http://127.0.0.1:7780/?session=s1"), changed("A", "https://example.com/docs")],
+            &[
+                created("A", "https://ai.example.com/#app=desktop&host=h&shell=browser"),
+                requested("A", "reload", "https://ai.example.com/#app=desktop&host=h&shell=browser"),
+                changed("A", "https://login.example.com/flow/?state=1#app=desktop&host=h&shell=browser"),
+                requested("A", "anchorClick", "https://accounts.idp.example/o/auth?x=1"),
+                changed("A", "https://accounts.idp.example/o/auth?x=1"),
+                requested("A", "formSubmissionPost", "https://login.example.com/callback?code=c"),
+                changed("A", "https://login.example.com/callback?code=c"),
+                requested("A", "scriptInitiated", "https://ai.example.com/"),
+                changed("A", "https://ai.example.com/#app=desktop&host=h&shell=browser"),
+            ],
         );
-        assert_eq!(again.len(), 2);
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
+                json!({ "log": "prigh's window is back from https://login.example.com" }),
+            ]
+        );
+        // The app's launch, redirected before it was ever on the site.
+        let out = run(&mut links, &[created("B", "https://login.example.com/flow/?state=2")]);
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" })
+            ]
+        );
+    }
+
+    #[test]
+    fn a_site_that_keeps_redirecting_has_a_bounded_number_of_effects() {
+        let mut links = self::links();
+        let mut out = run(&mut links, &[created("A", "https://ai.example.com/")]);
+        // Each time to a fresh address, for a minute: nothing opens, the
+        // window is not sent back, the log says it once.
+        for i in 0..60 {
+            out.extend(run_at(
+                &mut links,
+                &[
+                    changed("A", &format!("https://login.example.com/start?state={i}")),
+                    changed("A", &format!("https://login.example.com/flow?state={i}")),
+                ],
+                i,
+            ));
+        }
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" })
+            ]
+        );
+        // A page that keeps clicking links to a site, with fresh addresses,
+        // and the site sending it back: one opening per 5s, said once.
+        let mut links = self::links();
+        let mut out = vec![];
+        for i in 0..20 {
+            out.extend(run_at(
+                &mut links,
+                &[
+                    changed("A", "https://ai.example.com/"),
+                    requested("A", "anchorClick", &format!("https://login.example.com/?state={i}")),
+                    changed("A", &format!("https://login.example.com/?state={i}")),
+                ],
+                i / 4,
+            ));
+        }
+        let opens = out.iter().filter(|e| e.get("open").is_some()).count();
+        let navigates = out.iter().filter(|e| e["method"] == "Page.navigate").count();
+        let logs: Vec<&Value> = out.iter().filter(|e| e.get("log").is_some()).collect();
+        assert_eq!((opens, navigates), (1, 1));
+        assert_eq!(
+            logs.first().map(|l| l["log"].clone()),
+            Some(json!("https://login.example.com again within 5s: not opening it in the default browser again"))
+        );
+        // Popups to one site, again and again.
+        let mut links = self::links();
+        let mut out = run(&mut links, &[created("A", "http://127.0.0.1:7780/")]);
+        for i in 0..20 {
+            let target = format!("P{i}");
+            out.extend(run_at(
+                &mut links,
+                &[popup("Target.targetCreated", &target, &format!("https://spam.example/{i}"))],
+                i * 2,
+            ));
+        }
+        let opens: Vec<&Value> = out.iter().filter(|e| e.get("open").is_some()).collect();
+        let closes = out.iter().filter(|e| e["method"] == "Target.closeTarget").count();
+        assert_eq!(
+            opens,
+            [
+                &json!({ "open": "https://spam.example/0" }),
+                &json!({ "open": "https://spam.example/3" }),
+                &json!({ "open": "https://spam.example/6" }),
+                &json!({ "open": "https://spam.example/9" }),
+                &json!({ "open": "https://spam.example/12" }),
+                &json!({ "open": "https://spam.example/15" }),
+                &json!({ "open": "https://spam.example/18" }),
+            ]
+        );
+        assert_eq!(closes, 20);
+    }
+
+    fn remote(cookies: &[(&str, &str)]) -> Remote {
+        Remote {
+            url: "https://ai.example.com/#app=desktop&host=h".to_string(),
+            cookies: cookies.iter().map(|(n, v)| (n.to_string(), v.to_string())).collect(),
+            signin_page: Some("http://127.0.0.1:7780/#desktop=k&signin=1".to_string()),
+        }
+    }
+
+    fn set_cookies(cookies: &[(&str, &str)]) -> Value {
+        let cookies: Vec<Value> = cookies
+            .iter()
+            .map(|(n, v)| {
+                json!({ "name": n, "value": v, "url": "https://ai.example.com/", "path": "/", "secure": true, "httpOnly": true })
+            })
+            .collect();
+        json!({ "method": "Storage.setCookies", "params": { "cookies": cookies } })
+    }
+
+    #[test]
+    fn with_the_sign_in_from_the_default_browser_the_window_gets_its_cookie() {
+        let mut links = links();
+        let cookie = [("authentik_proxy", "c00k1e")];
+        // The browser has them at once (no window to send there yet).
+        let out = json_of(links.set_remote(remote(&cookie)));
+        assert_eq!(out, [json!({ "id": 3, "method": "Storage.setCookies", "params": set_cookies(&cookie)["params"] })]);
+        assert_eq!(run(&mut links, &[json!({ "id": 3, "result": {} }).to_string()]), Vec::<Value>::new());
+        // Launched on the site before they landed, redirected: them again,
+        // then the site again.
+        let out = run_raw(&mut links, &[created("A", "https://login.example.com/start?state=1")], 0);
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com: giving it the sign-in to https://ai.example.com" }),
+                json!({ "id": 4, "method": "Storage.setCookies", "params": set_cookies(&cookie)["params"] }),
+            ]
+        );
+        let out = run(&mut links, &[json!({ "id": 4, "result": {} }).to_string()]);
+        assert_eq!(out, [navigate("A", "https://ai.example.com/#app=desktop&host=h")]);
+        // The cookie did not do: prigh's sign-in page, once.
+        let out = run(&mut links, &[changed("A", "https://login.example.com/start?state=2")]);
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com: https://ai.example.com wants a sign-in, showing prigh's" }),
+                navigate("A", "http://127.0.0.1:7780/#desktop=k&signin=1"),
+            ]
+        );
+        let out = run(&mut links, &[changed("A", "http://127.0.0.1:7780/#desktop=k&signin=1")]);
+        assert_eq!(out, [json!({ "log": "prigh's window is back from https://login.example.com" })]);
+        // Signed in through the default browser: the new cookie, and the
+        // site, in the window on the sign-in page.
+        let cookie = [("authentik_proxy", "fr3sh"), ("other", "x")];
+        let out = json_of(links.set_remote(remote(&cookie)));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["params"], set_cookies(&cookie)["params"]);
+        let id = out[0]["id"].clone();
+        let out = run(&mut links, &[json!({ "id": id, "result": {} }).to_string()]);
+        assert_eq!(out, [navigate("A", "https://ai.example.com/#app=desktop&host=h")]);
+        let out = run(&mut links, &[changed("A", "https://ai.example.com/#app=desktop&host=h")]);
+        assert_eq!(out, Vec::<Value>::new());
+        // It expires later: the cookie again (it may have been the window's
+        // own that expired), then the sign-in page; never a loop.
+        let mut out = vec![];
+        for i in 0..10 {
+            for e in run_raw(&mut links, &[changed("A", &format!("https://login.example.com/start?state=x{i}"))], 0) {
+                if e["method"] == "Storage.setCookies" {
+                    out.extend(run(&mut links, &[json!({ "id": e["id"], "result": {} }).to_string()]));
+                }
+                out.push(e);
+            }
+        }
+        let navigates: Vec<Value> = out.iter().filter(|e| e["method"] == "Page.navigate").cloned().collect();
+        assert_eq!(navigates.len(), 2, "{out:#?}");
+    }
+
+    #[test]
+    fn signing_in_in_the_window_from_prighs_sign_in_page() {
+        let mut links = links();
+        links.set_remote(remote(&[]));
+        let out = run(
+            &mut links,
+            &[
+                created("A", "http://127.0.0.1:7780/#desktop=k&signin=1"),
+                // Sign in here: the page goes to the site, redirected.
+                requested("A", "scriptInitiated", "https://ai.example.com/#app=desktop&host=h"),
+                changed("A", "https://login.example.com/start?state=1"),
+                changed("A", "https://login.example.com/flow?state=1"),
+                changed("A", "https://ai.example.com/#app=desktop&host=h"),
+            ],
+        );
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
+                json!({ "log": "prigh's window is back from https://login.example.com" }),
+            ]
+        );
     }
 
     #[test]
     fn mail_links_go_to_the_default_mail_handler() {
         let mut links = links();
         assert_eq!(
-            run(&mut links, &[created("B", "mailto:me@example.com")]),
-            [json!({ "open": "mailto:me@example.com" }), close(3, "B")]
+            run(
+                &mut links,
+                &[created("A", "http://127.0.0.1:7780/"), popup("Target.targetCreated", "B", "mailto:me@example.com")]
+            ),
+            [json!({ "open": "mailto:me@example.com" }), close("B")]
         );
     }
 
@@ -636,7 +1172,7 @@ mod tests {
             json!({ "id": 99, "result": { "sessionId": "S" } }).to_string(),
         ];
         assert_eq!(run(&mut links, &msgs), Vec::<Value>::new());
-        // Forgotten: a page with that id now is a new one.
-        assert_eq!(run(&mut links, &[created("A", "https://example.com/")]).len(), 2);
+        // Forgotten: a page with that id now is a new one (here a popup).
+        assert_eq!(run(&mut links, &[popup("Target.targetCreated", "A", "https://example.com/")]).len(), 2);
     }
 }
