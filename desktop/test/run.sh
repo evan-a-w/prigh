@@ -162,7 +162,9 @@ report "browser: a second launch, then the first window closes" $code
 # closed through its DevTools as a user would close them (Xvfb has no window
 # manager to ask).
 if [ -n "${REAL_CHROMIUM:-}" ]; then
-	printf '#!%s\nexec "%s" --remote-debugging-port=9333 --no-sandbox "$@"\n' "$(command -v bash)" "$REAL_CHROMIUM" >"$work/chromium"
+	# No popup blocker: the links scenario's page opens a window as it loads.
+	printf '#!%s\nexec "%s" --remote-debugging-port=9333 --no-sandbox --disable-popup-blocking "$@"\n' \
+		"$(command -v bash)" "$REAL_CHROMIUM" >"$work/chromium"
 	chmod +x "$work/chromium"
 	rm -rf "$profile"
 	pages() {
@@ -192,6 +194,31 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	code=$?
 	sleep 0.5
 	real_report "real Chromium: the sidecar quits, Chromium closes" $code
+
+	# Links to other sites open in the default browser (xdg-open, here a
+	# stand-in), not in Chromium on prigh's profile: a new window on one is
+	# closed, and prigh's window going to one is sent back.
+	mkdir -p "$work/opener"
+	printf '#!%s\necho "default browser: $1" >>"%s"\n' "$(command -v bash)" "$work/opened" >"$work/opener/xdg-open"
+	chmod +x "$work/opener/xdg-open"
+	: >"$work/log"
+	: >"$work/opened"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_PAGE_LINKS=1 PATH="$work/opener:$PATH"
+	for _ in $(seq 300); do
+		[ "$(wc -l <"$work/opened")" = 2 ] && [ "$(grep -c '^GET / ' "$work/log")" = 2 ] &&
+			[ "$(pages | wc -w)" = 1 ] && break
+		sleep 0.1
+	done
+	urls() {
+		curl -s http://127.0.0.1:9333/json/list |
+			python3 -c 'import json, sys; print(" ".join(sorted(t["url"].split("#")[0] for t in json.load(sys.stdin) if t["type"] == "page")))'
+	}
+	echo "== real Chromium: links to other sites open in the default browser"
+	normalize <"$work/opened" | LC_ALL=C sort
+	echo "prigh's page loaded: $(grep -c '^GET / ' "$work/log") times; Chromium's windows: $(urls | normalize)"
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
+	wait "$app_pid"
+	echo "exit $?; left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
 fi
 
 # The real `prigh desktop` (run.sh's second argument: a prigh with its

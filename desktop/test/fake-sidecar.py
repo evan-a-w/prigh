@@ -12,6 +12,9 @@ $FAKE_MODE picks a behaviour:
   bad-ready    print something that is not a ready line
   ignore-eof   keep running after stdin closes (the shell terminates it)
   ignore-term  ... and after SIGTERM too (the shell must kill it)
+With $FAKE_PAGE_LINKS set, the page, once, opens a window on another site
+(http://localhost:PORT/new-window: another origin, the same server) and
+then goes to another site itself (/away), as links in prigh-web would.
 What happens is appended to $FAKE_LOG, one event per line.
 """
 
@@ -46,6 +49,16 @@ if mode == "bad-ready":
 
 PAGE = b"""<!doctype html><html><head><title>fake prigh-web</title></head>
 <body><p>fake prigh-web</p><img src="/pixel.gif" alt=""></body></html>"""
+if os.environ.get("FAKE_PAGE_LINKS"):
+    PAGE = PAGE.replace(b"</body>", b"""<script>
+addEventListener("load", () => {
+  if (location.hostname === "localhost" || sessionStorage.getItem("went")) return;
+  sessionStorage.setItem("went", "1");
+  const elsewhere = "http://localhost:" + location.port;
+  window.open(elsewhere + "/new-window", "_blank");
+  setTimeout(() => { location.href = elsewhere + "/away"; }, 1000);
+});
+</script></body>""")
 # The smallest GIF: the page's load waits for it, so a load the shell sees
 # means the webview fetched it.
 PIXEL = bytes.fromhex(
