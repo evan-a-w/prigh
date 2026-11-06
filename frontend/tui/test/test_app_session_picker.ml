@@ -88,7 +88,8 @@ let%expect_test
               "main work"
               "/src/prigh"
               (repo "/src/prigh" "/src/prigh" "main"
-               ^ {|,"worktrees":[{"path":"/wt/prigh/feat-login","branch":"feat/login","root":"/src/prigh","source":"created"},{"path":"/wt/prigh/agent-fix","branch":"agent/fix","root":"/src/prigh","source":"agent","agent":"1","task":"fix it"}]|})
+               ^ {|,"worktrees":[{"path":"/wt/prigh/feat-login","branch":"feat/login","root":"/src/prigh","source":"created"},{"path":"/wt/prigh/agent-fix","branch":"agent/fix","root":"/src/prigh","source":"agent","agent":"1","task":"fix it"}]|}
+              )
           ; session
               "7"
               "landing"
@@ -253,19 +254,62 @@ let%expect_test
       deploy       deploy it · /work
       scratch      /tmp
       release      cut it · /work
+      build fix    archived · fix the build · /work
       try a spike  archived · /old
     > /delete
     |}]
 ;;
 
-let%expect_test
-    "/delete refuses the current session up front; /delete-archived leaves it \
-     out"
-  =
+(* A session as [list_sessions] gives it, by id ([/s/<id>.jsonl]). *)
+let session ?(archived = false) ?(running = false) ?(clients = 0) id name =
+  sprintf
+    {|{"id":"%s","path":"/s/%s.jsonl","name":"%s","cwd":"/work","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:00Z","first_prompt":"go","message_count":2,"archived":%b,"running":%b,"live":%b,"clients":%d,"bytes":1000}|}
+    id
+    id
+    name
+    archived
+    running
+    (clients > 0)
+    clients
+;;
+
+let list sessions = sprintf "[%s]" (String.concat ~sep:"," sessions)
+
+(* In session "here" ([/s/here.jsonl]). *)
+let in_here () =
   let h = Test_app.connected ~width:80 ~height:14 () in
-  H.keys h "/delete 1 2";
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (Fixtures.state_json ~session:("here", "/s/here.jsonl") ());
+  h
+;;
+
+let delete h args sessions =
+  H.key h (Key.ctrl 'u');
+  H.keys h ("/delete " ^ args);
   H.enter h;
-  H.reply h (Sessions_to_delete [ "1"; "2" ]) sessions_json;
+  H.reply
+    ~quiet:true
+    h
+    (Sessions_to_delete (String.split args ~on:' '))
+    sessions
+;;
+
+let%expect_test
+    "/delete of the session you are in: you move to the next one down, else \
+     the one above, else a new session"
+  =
+  let h = in_here () in
+  delete
+    h
+    "here"
+    (list
+       [ session "up" "above"
+       ; session ~clients:1 "here" "here"
+       ; session "down" "below"
+       ]);
   H.show h;
   [%expect
     {|
@@ -273,23 +317,255 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
-    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (1 2))))
-
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
-    │ session "build fix" is the session you are in: switch to another one first,  │
-    │ or leave it out                                                              │
-    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ Delete session "here" (1000 B)? You'll move to session "below". Enter        │
+    │ deletes, Esc keeps it                                                        │
+    └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
-    > /delete 1 2▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    ? ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.esc h;
+  delete
+    h
+    "here"
+    (list [ session "up" "above"; session ~clients:1 "here" "here" ]);
+  H.show h;
+  H.esc h;
+  delete h "here" (list [ session ~clients:1 "here" "here" ]);
+  H.show h;
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ Delete session "here" (1000 B)? You'll move to session "above". Enter        │
+    │ deletes, Esc keeps it                                                        │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ Delete session "here" (1000 B)? You'll move to a new session. Enter deletes, │
+    │ Esc keeps it                                                                 │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/s/here.jsonl)) (switch_to_new true)))
+      (tag Sessions_deleted))
+    |}]
+;;
+
+let%expect_test "the move, then the list without it" =
+  let h = in_here () in
+  delete
+    h
+    "here"
+    (list
+       [ session "up" "above"
+       ; session ~clients:1 "here" "here"
+       ; session "down" "below"
+       ]);
+  H.enter h;
+  H.reply
+    h
+    Sessions_deleted
+    (sprintf
+       {|{"state":%s,"deleted":[{"path":"/s/here.jsonl","id":"here","bytes":1000}],"refused":[]}|}
+       (Fixtures.state_json
+          ~session:("down", "/s/down.jsonl")
+          ~session_name:"below"
+          ()));
+  H.reply
+    h
+    Initial_state
+    (Fixtures.state_json
+       ~session:("down", "/s/down.jsonl")
+       ~session_name:"below"
+       ());
+  H.reply h Initial_messages {|[{"role":"user","text":"below's question"}]|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/s/here.jsonl)) (switch_to /s/down.jsonl)))
+      (tag Sessions_deleted))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+
+
+
+
+
+
+
+
+      prigh in /work "below" · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ below's question
+    ───────────────────────────────────────────────── Deleted 1 session (1000 B) ───
+    > ▏
+    /work "below"  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply
+    h
+    Sessions_picker
+    (list [ session "up" "above"; session ~clients:1 "down" "below" ]);
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+      prigh in /work "below" · /help · Esc aborts · Ctrl+C twice quits
+       above ∣ 2025-06-01T10:00 ∣ 2 msgs ∣ go    /work
+    ▸* ● below ∣ 2025-06-01T10:00 ∣ 2 msgs ∣ go  /work
+    >
+    |}]
+;;
+
+let%expect_test
+    "several marked in the picker, the current among them; kept while running \
+     or open elsewhere"
+  =
+  let h = in_here () in
+  let sessions ?(running = false) ?(clients = 1) () =
+    list
+      [ session ~running ~clients "here" "here"
+      ; session "gone" "also gone"
+      ; session "next" "the next one"
+      ]
+  in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker (sessions ());
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Tab);
+  H.key h (Key.ctrl 'd');
+  H.show h;
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ Delete 2 sessions (2.0 KB)? You'll move to session "the next one". Enter     │
+    │ deletes, Esc keeps them                                                      │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/s/here.jsonl /s/gone.jsonl)) (switch_to /s/next.jsonl)))
+      (tag Sessions_deleted))
+    |}];
+  H.esc h;
+  delete h "here" (sessions ~running:true ());
+  H.show h;
+  H.esc h;
+  delete h "here" (sessions ~clients:2 ());
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ session "here" is the session you are in and is running: wait for it or      │
+    │ /abort it first, or leave it out                                             │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > /delete here▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (here))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ session "here" is the session you are in and is open in another frontend:    │
+    │ close it there first, or leave it out                                        │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > /delete here▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/delete-archived with the current session archived" =
+  let h = Test_app.connected ~width:80 ~height:14 () in
   H.keys h "/delete-archived";
   H.enter h;
   H.reply h Archived_to_delete sessions_json;
@@ -301,20 +577,22 @@ let%expect_test
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
-    │ Delete the archived session 3a (1.4 MB)? Enter deletes, Esc keeps it         │
+    │ Delete all 2 archived sessions (1.4 MB)? You'll move to session "release".   │
+    │ Enter deletes, Esc keeps them                                                │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
     (Rpc
       (method_ delete_sessions)
-      (params ((paths (/s/3a.jsonl))))
+      (params (
+        (paths (/home/u/.prigh/sessions/1.jsonl /s/3a.jsonl))
+        (switch_to /s/5.jsonl)))
       (tag Sessions_deleted))
     |}]
 ;;
