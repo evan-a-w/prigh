@@ -122,8 +122,8 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     |}]
 ;;
 
-let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
-                 while running"
+let%expect_test
+    "prompt, streaming with embedded newlines, tool call, steer while running"
   =
   let h = connected () in
   H.keys h "list the files";
@@ -512,8 +512,8 @@ let%expect_test
   [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}]
 ;;
 
-let%expect_test "login: url, masked secret prompt, answer, done switches \
-                 provider"
+let%expect_test
+    "login: url, masked secret prompt, answer, done switches provider"
   =
   let h = connected () in
   H.keys h "/login anthropic api_key";
@@ -605,8 +605,9 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
     |}]
 ;;
 
-let%expect_test "login: select prompt is a picker; Esc cancels; backend \
-                 cancellation restores"
+let%expect_test
+    "login: select prompt is a picker; Esc cancels; backend cancellation \
+     restores"
   =
   let h = connected () in
   H.event
@@ -702,8 +703,8 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
     |}]
 ;;
 
-let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
-                 dialog open"
+let%expect_test
+    "Ctrl+C clears, then warns, then quits; never quits with a dialog open"
   =
   let h = connected () in
   H.keys h "draft";
@@ -1071,11 +1072,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
 let%expect_test "a space after the argument closes its completion" =
   let h = connected () in
   H.step ~quiet:true h (Intent (Insert "/cd ~/projects"));
-  H.reply
-    ~quiet:true
-    h
-    (Dirs_for_autocomplete "~/projects")
-    {|["~/projects/"]|};
+  H.reply ~quiet:true h (Dirs_for_autocomplete "~/projects") {|["~/projects/"]|};
   H.show h;
   [%expect
     {|
@@ -1103,11 +1100,7 @@ let%expect_test "a space after the argument closes its completion" =
   (* Backspacing over the space reopens it, and so does the next character:
      paths may contain spaces. *)
   H.step ~quiet:true h (Intent Backspace);
-  H.reply
-    ~quiet:true
-    h
-    (Dirs_for_autocomplete "~/projects")
-    {|["~/projects/"]|};
+  H.reply ~quiet:true h (Dirs_for_autocomplete "~/projects") {|["~/projects/"]|};
   H.show h;
   [%expect
     {|
@@ -1144,8 +1137,7 @@ let%expect_test "a space after the argument closes its completion" =
     |}]
 ;;
 
-let%expect_test
-    "Alt+S and Esc then Enter send what is typed, not the highlight"
+let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight"
   =
   let h = connected () in
   let popup text =
@@ -1422,7 +1414,8 @@ let%expect_test "/trace shows the trace's summary" =
     Trace
     {|{"summary":"1 prompts, 2 turns, 2 model requests, 1 tool calls (12 spans)\n\nWall time 3.3s (the main agent, prompt to idle):\n  model  1.3s  39%\n  tools  2.0s  61%\n  other   0ms   0%\n","level":"default","spans":12}|};
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ┌─ Trace ──────────────────────────────────────────────────┐
     │ 1 prompts, 2 turns, 2 model requests, 1 tool calls (12   │
     │ spans)                                                   │
@@ -1444,7 +1437,8 @@ let%expect_test "/compact passes its instructions on" =
   H.enter h;
   H.keys h "/compact";
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ compact)
       (params ((instructions "keep the file names")))
@@ -1477,8 +1471,6 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks
     |}];
   H.key h (Key.ctrl 'n');
-  (* Not the session we are in. *)
-  H.key h (Key.ctrl 'd');
   H.key h (Key.plain Down);
   H.key h (Key.ctrl 'd');
   H.show h;
@@ -1666,10 +1658,11 @@ let%expect_test
     >
     deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
-  (* Not the session we are in: it says so, the picker stays, Tab unmarks
-     it. *)
+  (* The session we are in: you'd move to the next one down; Esc goes back
+     to the picker, Tab unmarks it. *)
   H.key h (Key.ctrl 'd');
   H.show h;
+  H.esc h;
   H.key h (Key.plain Home);
   H.key h (Key.plain Tab);
   H.key h (Key.plain Tab);
@@ -1681,17 +1674,12 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
-    / ▏
-     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
-      ── archived ──
-       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
-    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
-    ──── session "build fix" is the session you are in: switch to another one first, or leave it out ───
-    >
-    deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete 2 sessions (1.0 MB)? You'll move to session "deploy". Enter deletes, Esc keeps them       │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
 
 
 
@@ -2238,11 +2226,12 @@ let%expect_test "/delete completes session after session" =
 
     ▌ earlier question
       earlier answer
-    ▸ (empty)      /tmp
+    ▸ deploy       deploy it · /work
+      (empty)      /tmp
       try a spike  archived · /old
       old spike    archived · another spike · /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    > /delete 2 ▏
+    > /delete 1 ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
     |}]
 ;;
@@ -2353,8 +2342,8 @@ let%expect_test "/tree skips archived and other settings entries" =
     |}]
 ;;
 
-let%expect_test "/fork picks a user message, forks at it and prefills the \
-                 editor"
+let%expect_test
+    "/fork picks a user message, forks at it and prefills the editor"
   =
   let h = connected () in
   H.keys h "/fork";
@@ -3803,8 +3792,8 @@ let%expect_test "page_down past the bottom returns to follow" =
     |}]
 ;;
 
-let%expect_test "home/end with text in the editor move the cursor, not the \
-                 viewport"
+let%expect_test
+    "home/end with text in the editor move the cursor, not the viewport"
   =
   let h = connected ~width:100 ~height:10 () in
   H.event h (Message_start (Assistant partial));
@@ -3903,9 +3892,9 @@ let say h text =
   H.event h (Message_end (assistant text))
 ;;
 
-let%expect_test "background subagent: runs while main is idle, survives a \
-                 prompt, cancelled from the picker, delivery rendered \
-                 compactly"
+let%expect_test
+    "background subagent: runs while main is idle, survives a prompt, \
+     cancelled from the picker, delivery rendered compactly"
   =
   let h = connected ~width:100 ~height:16 () in
   H.keys h "go";
@@ -5240,8 +5229,8 @@ let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
     |}]
 ;;
 
-let%expect_test "Ctrl+X copies the last assistant message, or the focused \
-                 report"
+let%expect_test
+    "Ctrl+X copies the last assistant message, or the focused report"
   =
   let h = connected () in
   H.key h (Key.ctrl 'x');
@@ -7228,7 +7217,8 @@ let%expect_test
   =
   let h = with_agents ~width:130 ~height:16 in
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -7244,7 +7234,8 @@ let%expect_test
     |}];
   H.key h (Key.alt (Char "l"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
      Agents                     │
     ▌● main              running│
        running tools            │
@@ -7265,7 +7256,8 @@ let%expect_test
   (* Focusing an agent highlights it in the sidebar too. *)
   H.focus_agent h 1;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
      Agents                     │ ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "find all auth code in the repository"
      ● main              running│
        running tools            │
@@ -7286,7 +7278,8 @@ let%expect_test
   (* The choice holds for the run. *)
   H.step ~quiet:true h (Resize { width = 150; height = 16 });
   H.show h;
-  [%expect {|
+  [%expect
+    {|
      Agents                     │ ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "find all auth code in the repository"
      ● main              running│
        running tools            │
@@ -7306,7 +7299,8 @@ let%expect_test
     |}];
   H.key h (Key.alt (Char "l"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "find all auth code in the repository"
 
 
@@ -7331,7 +7325,8 @@ let%expect_test "sidebar: hidden below 120 columns, where nothing else changes" 
   (* Toggling says why nothing shows. *)
   H.key h (Key.alt (Char "l"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -7347,7 +7342,8 @@ let%expect_test "sidebar: hidden below 120 columns, where nothing else changes" 
     |}];
   H.key h (Key.alt (Char "l"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -7469,9 +7465,9 @@ let%expect_test "reconnect: backoff caps before integer overflow" =
     |}]
 ;;
 
-let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
-                 ignored, /retry-backend-connection retries now, success \
-                 resyncs"
+let%expect_test
+    "reconnect: backoff doubles to the 60s cap, stale replies are ignored, \
+     /retry-backend-connection retries now, success resyncs"
   =
   let h = connected ~width:70 () in
   H.step h Backend_closed;
@@ -7639,8 +7635,9 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     |}]
 ;;
 
-let%expect_test "reconnect: a session the backend no longer knows (never \
-                 saved, or deleted) is dropped instead of retried forever"
+let%expect_test
+    "reconnect: a session the backend no longer knows (never saved, or \
+     deleted) is dropped instead of retried forever"
   =
   let h = connected ~width:70 () in
   H.step h Backend_closed;
@@ -7728,8 +7725,9 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     |}]
 ;;
 
-let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
-                 still walk the prompt history"
+let%expect_test
+    "wheel scrolling moves the transcript a few lines; arrows still walk the \
+     prompt history"
   =
   let h = connected ~height:10 () in
   H.reply ~quiet:true h History {|["older prompt","newer prompt"]|};
@@ -7826,7 +7824,8 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
        ; superuser = false
        });
   show_where ~active:"client-2" ~cwd:"/home/me/d";
-  [%expect {|
+  [%expect
+    {|
     backend   /home/prigh/x    -> ~/x
     backend   /home/me/x       -> /home/me/x
     client-1  /Users/me/proj   -> ~/proj
@@ -7835,7 +7834,8 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
     client-2  /home/me/d       -> ~/d
     |}];
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -7846,8 +7846,9 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
     |}]
 ;;
 
-let%expect_test "switching tool host asks for the directory there, prefilled \
-                 with the current cwd"
+let%expect_test
+    "switching tool host asks for the directory there, prefilled with the \
+     current cwd"
   =
   let h = connected ~width:70 () in
   let state =
@@ -7953,7 +7954,9 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.mode h;
   [%expect {| editing |}];
   (* A missing directory there is created once confirmed. *)
-  let host : P.Dir_change.Target.t = Host { id = "client-1"; name = "laptop" } in
+  let host : P.Dir_change.Target.t =
+    Host { id = "client-1"; name = "laptop" }
+  in
   H.reply h (Dir_changed host) {|{"missing":"/work/src"}|};
   H.show h;
   H.key h (Key.char 'y');
@@ -8043,8 +8046,8 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 (* A tool-capable TUI sends a [host_id] in every hello; the backend lists its
    host under that id, the same across reconnects, so it stays "(here)". *)
-let%expect_test "the hello's host id marks this frontend, also after a \
-                 reconnect"
+let%expect_test
+    "the hello's host id marks this frontend, also after a reconnect"
   =
   let h = connected ~width:70 () in
   let state =
@@ -8413,8 +8416,9 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
     |}]
 ;;
 
-let%expect_test "picker: Enter with no match keeps it open; the title shows \
-                 the window for long lists"
+let%expect_test
+    "picker: Enter with no match keeps it open; the title shows the window for \
+     long lists"
   =
   let h = connected ~width:70 () in
   let many =
@@ -8484,8 +8488,8 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
     |}]
 ;;
 
-let%expect_test "Tab on an empty editor opens the command list; the list shows \
-                 its window"
+let%expect_test
+    "Tab on an empty editor opens the command list; the list shows its window"
   =
   let h = connected () in
   H.key h (Key.plain Tab);
@@ -8588,8 +8592,9 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
   [%expect {| Quit |}]
 ;;
 
-let%expect_test "scrolled up: the indicator says so, and Esc returns to the \
-                 bottom when idle (aborts when running)"
+let%expect_test
+    "scrolled up: the indicator says so, and Esc returns to the bottom when \
+     idle (aborts when running)"
   =
   let h = connected ~height:8 () in
   List.iter (List.range 0 6) ~f:(fun i ->
@@ -8625,7 +8630,8 @@ let%expect_test "scrolled up: the indicator says so, and Esc returns to the \
   H.esc h;
   [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
   print_s [%sexp (h.model.viewport : Viewport.t)];
-  [%expect {|
+  [%expect
+    {|
     (Anchored
       (top       7)
       (new_lines 0)
@@ -8817,8 +8823,8 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "/thinking lists levels in cycling order with the default \
-                 marked"
+let%expect_test
+    "/thinking lists levels in cycling order with the default marked"
   =
   let h = connected () in
   H.keys h "/thinking";
@@ -8894,8 +8900,9 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
     |}]
 ;;
 
-let%expect_test "logged-in user: shown in the status line, kept across \
-                 reconnects; /signout asks the platform"
+let%expect_test
+    "logged-in user: shown in the status line, kept across reconnects; \
+     /signout asks the platform"
   =
   let h = connected ~width:80 () in
   H.step
@@ -8941,7 +8948,8 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   print_s
     [%sexp
       (h.model.client_id : string option), (h.model.namespace : string option)];
-  [%expect {|
+  [%expect
+    {|
     ((client-2)
      (alice))
     |}];
@@ -8982,8 +8990,9 @@ let jobs_json =
   {|[{"id":"j1","command":"make test","running":true,"exit":null,"delivered":false,"elapsed":75.4,"bytes":2048,"last_line":"PASS parser"},{"id":"j2","command":"docker build .","running":false,"exit":"exited 0","delivered":true,"elapsed":3.2,"bytes":10,"last_line":null}]|}
 ;;
 
-let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
-                 output, kill, delivery"
+let%expect_test
+    "background jobs: !&, status line while idle, /jobs picker, output, kill, \
+     delivery"
   =
   let h = connected ~width:100 ~height:16 () in
   H.keys h "!&make test";
@@ -9142,8 +9151,8 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
     |}]
 ;;
 
-let%expect_test "job reports reload compactly; look-alike text stays a user \
-                 message"
+let%expect_test
+    "job reports reload compactly; look-alike text stays a user message"
   =
   let h = connected ~width:80 ~height:12 () in
   H.reply
@@ -9208,7 +9217,8 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   H.reply ~quiet:true h Initial_state (state_json ());
   H.show h;
   print_s [%sexp (App.Model.acting_as h.model : string option)];
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -9231,7 +9241,8 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
     |}];
   (* A reconnect asks to act as a again. *)
   H.step h Backend_closed;
-  [%expect {|
+  [%expect
+    {|
     (Reconnect
       (generation 1)
       (delay_ms   0)
@@ -9254,7 +9265,8 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   H.keys h "/setusr a b";
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ set_user) (params ((user s))) (tag User_switched))
     ()
 
@@ -9570,7 +9582,8 @@ let%expect_test
       String.is_prefix plain ~prefix:"prigh in"
       || String.is_prefix plain ~prefix:"~/proj"
     then print_endline (Content.to_styled [ line ]));
-  [%expect {| [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/] |}]
+  [%expect
+    {| [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/] |}]
 ;;
 
 let%expect_test

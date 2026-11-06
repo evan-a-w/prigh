@@ -431,12 +431,29 @@ The proxy must pass WebSocket upgrades (`Upgrade`, `Connection`) on `/ws`
 (prigh pings every 20s; give it a read timeout of a minute or more).
 
 If the proxy also signs users in (authentik, Authelia, oauth2-proxy,
-Cloudflare Access...), exempt `/ws` and `/terminal` from it: prigh checks
-its own token on both, and neither prigh-tui nor `prigh tool-host` can do
-a browser sign-in. prigh-tui tells you when it meets one instead of the
-WebSocket (`answered with a login page (HTTP 302 Found to https://login…)`).
-The page itself (`/`) can stay behind the sign-in. Otherwise send the
-proxy's own credentials with `prigh-tui -header 'NAME: VALUE'` (e.g. a
+Cloudflare Access...), prigh-tui, `prigh web` and `prigh tool-host` sign in
+through the browser when they meet its login instead of the WebSocket
+(`answered with a login page (HTTP 302 Found to https://login…)`; prigh-tui
+asks first). They listen on a port of 127.0.0.1 and open
+`https://prigh.example.com/#cli-signin=PORT.STATE&program=NAME`: you sign
+in to the proxy as for the page, prigh-web asks "Allow prigh-tui to sign in
+as you?", and on *Allow* it asks the server (`POST /cli-signin/grant`, with
+prigh-web's own credentials) for the `Cookie` header its request carried,
+which holds the proxy's session (HttpOnly: the page itself cannot read it),
+and hands it to the program, which sends it with each connection and saves
+it in `~/.prigh/tui-connection.sexp` (mode 0600) for next time. The proxy's
+session lasts as long as the proxy says; when it ends, the program asks
+again. Over SSH the browser is on another computer: forward the port it
+prints first (`ssh -L PORT:127.0.0.1:PORT host`). `prigh browser-signin
+-connect URL` does it by hand (it saves the cookie for the saved address).
+The server only answers the page's own requests (`Content-Type:
+application/json`, an `Origin` matching `Host` or `X-Forwarded-Host`), so
+the proxy must pass `Host` (or set `X-Forwarded-Host`) and `Cookie` through.
+
+Simpler still, exempt `/ws` and `/terminal` from the sign-in: prigh checks
+its own token on both, so nothing is lost, and the programs never meet the
+login. The page itself (`/`) can stay behind the sign-in. Otherwise send
+the proxy's own credentials with `prigh-tui -header 'NAME: VALUE'` (e.g. a
 service token; `$PRIGH_CONNECT_HEADERS` for several, one per line), or use
 an SSH tunnel to the published port.
 

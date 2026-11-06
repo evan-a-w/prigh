@@ -90,7 +90,10 @@ let choose ~home ~(flags : Saved_connection.Settings.t) ~env
     then Some Env
     else Option.map settings.token ~f:(fun _ : Source.t -> Saved file)
   in
-  { remote
+  { remote =
+      Backend_address.with_proxy_cookie
+        remote
+        (Saved_connection.proxy_cookie saved ~connect:settings.connect)
   ; credentials = { token = settings.token; user = settings.user }
   ; source
   ; token_source
@@ -124,4 +127,23 @@ let refused_hint t =
   | Some (Flag | Env | Form), Some _ ->
     "Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the \
      backend's -tokens NAME=TOKEN (or -host-tokens) entries."
+;;
+
+let remember_signin ~home remote (grant : Browser_signin.Grant.t) =
+  let open Or_error.Let_syntax in
+  let connect = Backend_address.to_string remote in
+  match%bind Saved_connection.load ~home with
+  | Some saved when String.equal saved.connect connect ->
+    let saved =
+      match saved.token with
+      | Some _ -> { saved with proxy_cookie = Some grant.proxy_cookie }
+      | None ->
+        { saved with
+          proxy_cookie = Some grant.proxy_cookie
+        ; token = grant.token
+        ; user = grant.user
+        }
+    in
+    Saved_connection.save ~home saved
+  | Some _ | None -> Ok ()
 ;;

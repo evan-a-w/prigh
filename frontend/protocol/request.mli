@@ -20,8 +20,13 @@ module Method : sig
         { path : string (** a session's path or id *)
         ; archived : bool
         }
-    | Delete_sessions of string list (** paths; see {!Delete_result} *)
-    | Delete_archived (** every session shown as archived *)
+    | Delete_sessions of
+        { paths : string list
+        ; switch_to : Switch_to.t option
+          (** where to move first if the client's session is among them *)
+        } (** see {!Delete_result} *)
+    | Delete_archived of { switch_to : Switch_to.t option }
+    (** every session shown as archived *)
     | Get_messages_page of
         { session : string (** a path or id; need not be the client's *)
         ; before : string option

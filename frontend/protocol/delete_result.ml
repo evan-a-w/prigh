@@ -35,6 +35,7 @@ end
 type t =
   { deleted : Deleted.t list
   ; refused : Refused.t list
+  ; moved_to : State.t option
   }
 [@@deriving sexp_of, equal]
 
@@ -48,8 +49,13 @@ let list j name ~f =
 let of_json j =
   let open Or_error.Let_syntax in
   let%bind deleted = list j "deleted" ~f:Deleted.of_json in
-  let%map refused = list j "refused" ~f:Refused.of_json in
-  { deleted; refused }
+  let%bind refused = list j "refused" ~f:Refused.of_json in
+  let%map moved_to =
+    match Json.field j "state" with
+    | None | Some `Null -> Ok None
+    | Some state -> Or_error.map (State.of_json state) ~f:Option.some
+  in
+  { deleted; refused; moved_to }
 ;;
 
 let summary t =

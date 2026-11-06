@@ -246,6 +246,9 @@ try {
   await theReply().click({ button: "right", position: { x: 40, y: 8 } });
   await page.locator(".context-menu.placed [data-item=copy_message]").click();
   await page.waitForFunction(() => window.copied !== undefined);
+  // The copy is made in the click; the menu closes (and gives the focus
+  // back) a frame later, which would take the next keys.
+  await page.locator(".context-menu").waitFor({ state: "detached" });
   console.log(`as written: ${await page.evaluate(r => window.copied === r, reply)}`);
 
   // A reply streamed in: drawn once it arrives.

@@ -2,7 +2,9 @@ open! Core
 open! Import
 
 let reason = function
-  | Failure message | Backend_address.Not_upgraded message -> message
+  | Failure message
+  | Backend_address.Not_upgraded message
+  | Backend_address.Signin_required message -> message
   | exn -> Net_error.to_string_hum exn
 ;;
 
@@ -89,7 +91,8 @@ let websockets ~env ~log remote =
   [ "/ws", rpc ~env ~log remote; "/terminal", terminal ~env ~log remote ]
 ;;
 
-let hop_by_hop = [ "host"; "connection"; "keep-alive"; "upgrade" ]
+(* The page's own cookies are for this site, not the backend's. *)
+let not_forwarded = [ "host"; "connection"; "keep-alive"; "upgrade"; "cookie" ]
 
 let forward
       ~env
@@ -113,7 +116,8 @@ let forward
   | upstream ->
     let headers =
       List.filter request.headers ~f:(fun (name, _) ->
-        not (List.mem hop_by_hop name ~equal:String.Caseless.equal))
+        not (List.mem not_forwarded name ~equal:String.Caseless.equal))
+      @ Backend_address.upgrade_headers remote
     in
     Eio.Flow.copy_string
       (sprintf
