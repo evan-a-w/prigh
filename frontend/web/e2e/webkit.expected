@@ -1331,15 +1331,28 @@ main
 feat/login
 <DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
 Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
+=== webkit: worktrees: deleting the session we are in: asked ===
+Delete “Tidy the docs in a worktree”?
+You'll move to “The login form”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Tidy the docs in a worktree
+<SIZE>
+Cancel
+Delete
+=== webkit: worktrees: deleting the session we are in: where we land ===
+in: The login form; the address names it: true
+=== webkit: worktrees: the session we were in deleted ===
+The login form | <age> | prigh | feat/login | 1 [selected]
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === webkit: worktrees: on a phone ===
-Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
-│ feat/login
-The login form | <age> | prigh | feat/login | 1
+The login form | <age> | prigh | feat/login | 1 [selected]
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
 === webkit: worktrees: a long press on a phone ===
-feat/login — in Tidy the docs in a worktree
+feat/login — in The login form
 ▸ Switch session here  /worktree open feat/login
 New session here  /worktree open -n feat/login
 Review changes  /review feat/login
