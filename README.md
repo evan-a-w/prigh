@@ -534,9 +534,13 @@ range from the last one (across the divider), and Delete (or the bar at
 the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
 marked ones; "Delete archived" under the archived ones
 (`/delete-archived`) every archived one. The confirmation says how many sessions and how much disk they use, and
-which ones the backend will keep (running, open in another tab or terminal,
-or the one you are in): those are not asked for, and with nothing left to
-delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
+which ones the backend will keep (running, or open in another tab or
+terminal): those are not asked for, and with nothing left to
+delete the dialog only says why (Close). Deleting the session you are in
+moves you first to the next session down the list that is not being
+deleted (else the nearest above, else a new session), and the confirmation
+says where ("You'll move to “Y”."); the backend makes the move and the
+deletion one request. `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
 repositories the sessions' worktrees belong to are listed (for their
 changes and to drop removed ones) when the session, its directory or its
