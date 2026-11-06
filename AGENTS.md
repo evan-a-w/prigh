@@ -51,7 +51,9 @@ while iterating.
   fontconfig file (without one Chromium renders no text; `./test` writes one,
   as the flake's check does), and look at the screenshots
   (`SHOTS=dir`) as well as the text diff. Its scripts all run at once, each
-  with its own backend, browser and directory, and print what they see;
+  with its own backend, browser and directory (as many at a time as the
+  CPUs and the available memory allow: `JOBS`, `MEM_PER_JOB` MiB each),
+  and print what they see;
   `ENGINE.expected` is each browser's output. Wait for a condition, not a
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
