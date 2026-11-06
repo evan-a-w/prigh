@@ -78,7 +78,8 @@ let git ~env ~cancel ?(ok_codes = [ 0 ]) ~dir args =
   | { exit = Cancelled; _ } -> raise (Failed "[cancelled]")
   | { exit = Signaled _ | Timed_out; stderr; _ } ->
     fail "git failed: %s" (String.strip stderr)
-  | exception Eio.Io _ -> fail "%s" (Git_missing.message ())
+  | exception Eio.Io _ ->
+    fail "%s" (Git_missing.message ())
 ;;
 
 let git_exn ~env ~cancel ~dir ~what args =
