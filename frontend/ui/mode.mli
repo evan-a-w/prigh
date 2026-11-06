@@ -90,6 +90,9 @@ module Confirm_action : sig
         }
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
+    | Browser_signin
+    (** a sign-in proxy guards the backend: sign in to it through the
+        browser *)
   [@@deriving sexp_of, equal]
 end
 

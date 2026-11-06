@@ -446,7 +446,7 @@ let run link =
             && Option.is_some (Backend_link.info link).address) ->
     let%bind.Deferred () = Backend_link.close link in
     Deferred.Or_error.error_string e
-  | (Rejected _ | Connected _) as first ->
+  | (Rejected _ | Connected _ | Signin_required _) as first ->
     let quit_requested = Ivar.create () in
     let on_focus = ref (fun (_ : bool) -> ()) in
     let%bind.Deferred input =
@@ -498,6 +498,7 @@ let run link =
             (Prigh_protocol.Hello_reply.of_json reply)
             ~f:(fun reply -> send (App.Action.Hello reply))
         | Rejected e -> send (App.Action.Rejected e)
+        | Signin_required why -> send (App.Action.Signin_required why)
         | Unreachable _ -> ());
        send App.Action.Start;
        Backend_link.set_notice link (fun text ->

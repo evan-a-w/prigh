@@ -2139,6 +2139,89 @@ prefer_host: host-laptop
 Sign in
 === webkit: remote: errors ===
 none
+=== webkit: cli_signin: desktop: the program ===
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui
+=== webkit: cli_signin: desktop: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+http://127.0.0.1:<PORT>/
+=== webkit: cli_signin: desktop: not signed in to prigh ===
+unauthorised: bad user name or password: sign in to prigh, then allow the program again.
+=== webkit: cli_signin: desktop: asked again, signed in ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+Allow: 44px+, on screen
+Cancel: 44px+, on screen
+overflows sideways: false
+=== webkit: cli_signin: desktop: the program's page ===
+Signed in
+prigh-tui on this computer is signed in to 127.0.0.1:<PORT>. You can close this tab.
+=== webkit: cli_signin: desktop: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+((connect ws://127.0.0.1:<PORT>/ws) (token sekrit)
+(proxy_cookie <THE PROXY'S COOKIE>))
+=== webkit: cli_signin: desktop: cancelled with Esc ===
+exit 2
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: the sign-in was cancelled in the browser
+=== webkit: cli_signin: phone: the program ===
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tool-host
+=== webkit: cli_signin: phone: asked ===
+prigh
+sign-in
+Allow prigh tool-host to connect?
+prigh tool-host on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+http://127.0.0.1:<PORT>/
+=== webkit: cli_signin: phone: not signed in to prigh ===
+unauthorised: bad user name or password: sign in to prigh, then allow the program again.
+=== webkit: cli_signin: phone: asked again, signed in ===
+prigh
+sign-in
+Allow prigh tool-host to connect?
+prigh tool-host on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+Allow: 44px+, on screen
+Cancel: 44px+, on screen
+overflows sideways: false
+=== webkit: cli_signin: phone: the program's page ===
+Signed in
+prigh tool-host on this computer is signed in to 127.0.0.1:<PORT>. You can close this tab.
+=== webkit: cli_signin: phone: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+((connect ws://127.0.0.1:<PORT>/ws) (token sekrit)
+(proxy_cookie <THE PROXY'S COOKIE>))
+=== webkit: cli_signin: phone: cancelled with Esc ===
+exit 2
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: the sign-in was cancelled in the browser
+=== webkit: cli_signin: through the proxy ===
+upgrade /ws
+POST /cli-signin/grant
+=== webkit: cli_signin: errors ===
+none
 === webkit: desktop: its stdout ===
 {"url":"http://127.0.0.1:<PORT>/#desktop=<key>"}
 === webkit: desktop: the connect form ===

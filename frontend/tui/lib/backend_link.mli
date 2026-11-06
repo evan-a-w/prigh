@@ -59,6 +59,14 @@ val create
   :  ?open_transport:
        (Endpoint.t -> Prigh_client.Transport.t Deferred.Or_error.t)
        (** default: {!Endpoint.open_} *)
+  -> ?browser_signin:
+       (connect:string
+        -> on_url:(url:string -> port:int -> unit)
+        -> (Prigh_client_unix.Browser_signin.Grant.t, string) Result.t
+             Deferred.t)
+       (** signs in to the sign-in proxy in front of a prigh-web URL; default:
+           {!Prigh_client_unix.Browser_signin.run} *)
+  -> ?open_url:(string -> unit) (** default: [xdg-open] (or [open]) *)
   -> ?spawn_worker:(unit -> Prigh_client.Transport.t Deferred.Or_error.t)
        (** default: [backend tool-host] *)
   -> ?headers:(string * string) list
@@ -86,7 +94,10 @@ val tool_host : t -> Prigh_client_unix.Tool_host.t option
     kept); those sent before this is called are delivered by it. *)
 val set_notice : t -> (string -> unit) -> unit
 
-(** Connects and sends [hello]. *)
+(** Connects and sends [hello]. A sign-in proxy's login is
+    [Signin_required]: [relink] with [Browser_signin] gets past it; the
+    proxy's cookie is sent with every connection to its address from then on
+    and saved with the connection. *)
 val start : t -> Prigh_ui.Server_link.Outcome.result Deferred.t
 
 (** After [delay_ms], {!reconnect} with the current [hello], unless a switch
