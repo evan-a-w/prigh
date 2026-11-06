@@ -2017,8 +2017,9 @@ let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
   Option.iter q.client ~f:(fun client -> t.client <- Some client);
   match q.ui_action with
   | Some action ->
-    (* A message of notes only: the answer is one too. *)
-    let notes = take_notes t @ [ action ] in
+    (* A message of notes only, the answer first so that the text starts as
+       frontends and the model expect; any change of environment follows. *)
+    let notes = action :: take_notes t in
     Message.user
       ~origin:{ Injected.empty with notes }
       (String.concat ~sep:"\n" (List.map notes ~f:(fun n -> n.text)))

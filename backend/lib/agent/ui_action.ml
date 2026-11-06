@@ -44,7 +44,7 @@ let of_json (json : Json.t) =
 
 let text t =
   sprintf
-    "The user responded through %S (render_ui call %s, component %s):\n%s"
+    "The user responded through \"%s\" (render_ui call %s, component %s):\n%s"
     t.title
     t.call_id
     t.component
@@ -71,7 +71,7 @@ let summary t =
            | `Array (_ :: _ :: _) -> sprintf "%s = [%s]" k (value v)
            | v -> sprintf "%s = %s" k (value v)))
   in
-  let line = sprintf "Sent %S: %s" t.title (value t.values) in
+  let line = sprintf "Sent \"%s\": %s" t.title (value t.values) in
   let line = String.tr line ~target:'\n' ~replacement:' ' in
   if String.length line > max_summary
   then fst (Utf8.split_incomplete_suffix (String.prefix line (max_summary - 3))) ^ "..."
