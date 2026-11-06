@@ -254,21 +254,24 @@ let%expect_test "a turn's events before the first page: asked for again" =
   let h = H.connecting () in
   H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
   (* Sent at once: the page (empty, from before the turn) is answered after
-     the turn's events reach the page. *)
+     the turn's events reach the page, which shows them meanwhile (an empty
+     session shows no loading screen). *)
   H.event
     h
     {|{"event":"message_end","message":{"role":"user","text":"hello","at":0}}|};
   H.event h (Agent_events.text_reply "Reply 0.");
   H.text h ~selector:".chat .entries";
-  [%expect {| |}];
+  [%expect {| Reply 0. |}];
   H.reply h "get_messages_page" (H.page "[]");
   [%expect
     {|
-    Scroll_to_bottom
     (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s1.jsonl) (limit 1000000)))
+     (params ((session /sessions/s1.jsonl) (limit 60)))
      (tag (Resync (session s1) (from ()))))
     |}];
+  (* The stale page does not wipe what streamed meanwhile. *)
+  H.text h ~selector:".chat .entries";
+  [%expect {| Reply 0. |}];
   H.reply
     h
     "get_messages_page"
@@ -281,8 +284,63 @@ let%expect_test "a turn's events before the first page: asked for again" =
   H.text h ~selector:".chat .entries";
   [%expect
     {|
+    Scroll_to_bottom
     hello
     00:00
     Reply 0.
+    |}]
+;;
+
+let%expect_test
+    "a turn's events before a session's first page: still loading until asked \
+     again"
+  =
+  let h = H.connecting () in
+  H.quiet h (fun () ->
+    H.reply
+      h
+      "get_state"
+      (H.state_json ~fields:[ "message_count", `Number "2" ] ()));
+  H.event h (Agent_events.text_reply "Reply 1.");
+  H.text h ~selector:".chat";
+  [%expect {| Loading the session… |}];
+  (* The page from before the turn is not shown: the turn would vanish
+     from the transcript until the second one came. *)
+  H.reply
+    h
+    "get_messages_page"
+    (H.page
+       ("["
+        ^ {|{"role":"user","text":"first","at":0}|}
+        ^ ","
+        ^ {|{"role":"assistant","content":[{"type":"text","text":"Reply 0."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}|}
+        ^ "]"));
+  H.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Resync (session s1) (from ()))))
+    Loading the session…
+    |}];
+  H.reply
+    h
+    "get_messages_page"
+    (H.page
+       ("["
+        ^ {|{"role":"user","text":"first","at":0}|}
+        ^ ","
+        ^ {|{"role":"assistant","content":[{"type":"text","text":"Reply 0."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}|}
+        ^ ","
+        ^ {|{"role":"assistant","content":[{"type":"text","text":"Reply 1."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}|}
+        ^ "]"));
+  H.text h ~selector:".chat .entries";
+  [%expect
+    {|
+    Scroll_to_bottom
+    first
+    00:00
+    Reply 0.
+    Reply 1.
     |}]
 ;;
