@@ -1383,6 +1383,17 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   user name and the token as the password), prefilled and saying what went
   wrong and what to do. What the backend accepts is saved for next time,
   and the page goes on signed in.
+- When the backend's site is behind a sign-in proxy (authentik's forward
+  auth, Cloudflare Access), the window does not go to the proxy's login,
+  which would only loop back: the page asks how to sign in to it. **Sign
+  in with your browser** (first, Enter) opens the site in the default
+  browser, where you are usually signed in already; allow prigh desktop
+  there (as for `prigh browser-signin`), and the window goes to the site
+  with the proxy's cookie, which is saved with the saved connection for next
+  time. Open it again reopens that tab; Cancel (Esc) goes back. **Sign in
+  here** goes to the site in the window, to sign in to the proxy there.
+  When the sign-in expires later, the window comes back to the same
+  choice, saying so.
 - An address without TLS on another machine (`server:7790`, `ws://`)
   would send the token and everything else in the clear, and whoever is on
   the way could run commands on this computer: the form says so and asks
