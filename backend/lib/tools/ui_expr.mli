@@ -34,11 +34,12 @@ val parse : string -> (t, string) Result.t
 val check : t -> inputs:string list -> string list
 
 (** The value of [t] given the inputs' values: the semantics the frontends
-    mirror (the backend itself only checks expressions). IEEE doubles
-    throughout: [/] by 0 is infinite or nan; [a % b] is the remainder with
-    [a]'s sign (JavaScript's [%], C's [fmod]); [^] and [pow] are powers;
-    comparisons are 1 or 0 (any comparison with nan is 0, except [!=]);
-    [c ? a : b] is [b] when [c] is 0 or nan, else [a]; [min] and [max] are
-    nan if any argument is; [round] rounds halves away from 0; [log] is
-    base 10, [ln] base e. Unknown names and functions are nan. *)
-val eval : t -> inputs:(string -> float) -> float
+    mirror (the backend itself only checks expressions). Doubles throughout;
+    [None] (no value, shown as a dash) when dividing by 0 with [/] or [%],
+    for an unknown name or function, or when the result is not finite
+    ([sqrt(-1)], [log(0)], overflow). [a % b] is the remainder with [a]'s
+    sign (C's [fmod], JavaScript's [%]); [^] and [pow] are powers;
+    comparisons are 1 or 0 (with nan, 0 but [!=] 1); [c ? a : b] is [a]
+    unless [c] is 0; [round] takes halves up (JavaScript's [Math.round]);
+    [log] is base 10, [ln] base e. *)
+val eval : t -> inputs:(string -> float option) -> float option
