@@ -2468,6 +2468,18 @@ math math-display: \sqrt{2} \approx 1.414
 markdown fits: true; page fits: true; scrolling display math: 1, auto
 === chromium: math: errors ===
 none
+=== chromium: clipboard: the page ===
+clipboard API: undefined
+=== chromium: clipboard: code block ===
+button: Copied
+focus: button; composer caret: 1-3; textareas: 1; scrolled: 0
+clipboard: "make check && echo 'all good'"
+=== chromium: clipboard: message ===
+toast: Copied the reply to the clipboard
+focus: textarea (composer); composer caret: 1-3; textareas: 1; scrolled: 0
+clipboard: "Run this:\n\n```sh\nmake check && echo 'all good'\n```\n\nThen push."
+=== chromium: clipboard: errors ===
+none
 === chromium: card: idle ===
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
