@@ -7915,8 +7915,16 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Unqueued text, Ok _ ->
     toast m (sprintf "Removed from the queue: %s" (clamp text))
   | Dequeued, Ok json ->
-    (match field json "text" with
-     | Some (`String text) ->
+    (match field json "text", field json "ui_action" with
+     | _, Some (`Object _ as action) ->
+       (* A component's answer is not given back to edit. *)
+       let summary =
+         match field action "summary" with
+         | Some (`String s) -> s
+         | _ -> "an answer"
+       in
+       toast m (sprintf "Taken out of the queue: %s" (clamp summary))
+     | Some (`String text), _ ->
        let draft =
          if String.is_empty m.draft then text else text ^ "\n\n" ^ m.draft
        in
