@@ -2102,7 +2102,8 @@ let moving_for_deletion (m : Model.t) (switch_to : Switch_to.t) =
     ( { m with pending = { m.pending with session = Some (Switching path) } }
     , fetch @ [ focus_editor ] )
   | New_session ->
-    { m with pending = { m.pending with session = Some Starting } }, [ focus_editor ]
+    ( { m with pending = { m.pending with session = Some Starting } }
+    , [ focus_editor ] )
 ;;
 
 (* The backend kept us where we were (the session was refused after all). *)
@@ -8997,9 +8998,7 @@ let dialog_accept (m : Model.t) =
         @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
       ))
   | Some (Delete target) ->
-    let paths =
-      List.map (Model.to_delete m target) ~f:(fun s -> s.path)
-    in
+    let paths = List.map (Model.to_delete m target) ~f:(fun s -> s.path) in
     let switch_to = Model.moving_to m target in
     let m, cmds = close_dialog m in
     let request : Request.Method.t option =
@@ -9013,8 +9012,7 @@ let dialog_accept (m : Model.t) =
      | Some request, None -> m, cmds @ [ call request ~tag:Sessions_deleted ]
      | Some request, Some switch_to ->
        let m, move = moving_for_deletion m switch_to in
-       ( m
-       , cmds @ (call request ~tag:(Moved_and_deleted switch_to) :: move) ))
+       m, cmds @ (call request ~tag:(Moved_and_deleted switch_to) :: move))
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow

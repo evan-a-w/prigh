@@ -98,9 +98,7 @@ let%expect_test "the next one down: asked, moved, then deleted" =
 
 let%expect_test "the last one: the one above; the only one: a new session" =
   let h =
-    H.create
-      ~sessions:(list [ H.session_json ~name:"Above" "s0"; current ])
-      ()
+    H.create ~sessions:(list [ H.session_json ~name:"Above" "s0"; current ]) ()
   in
   H.key h "Delete" ~target:(Session "s1");
   H.text h ~selector:".modal .delete-moving";
@@ -136,7 +134,8 @@ let%expect_test "the last one: the one above; the only one: a new session" =
           ()));
   where h;
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     (Set_url_session s9)
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s9.jsonl) (limit 60)))
@@ -157,8 +156,8 @@ let%expect_test "the last one: the one above; the only one: a new session" =
     |}]
 ;;
 
-let%expect_test "several marked, the current among them: the first below not \
-                 deleted"
+let%expect_test
+    "several marked, the current among them: the first below not deleted"
   =
   let h =
     H.create
@@ -222,7 +221,8 @@ let%expect_test "several marked, the current among them: the first below not \
     H.act h (Mark_session { path = "/sessions/s4.jsonl"; range = true });
     H.act h Delete_marked);
   H.text h ~selector:".modal .delete-moving";
-  [%expect {| “Main work” is the session you are in. You'll move to a new session. |}]
+  [%expect
+    {| “Main work” is the session you are in. You'll move to a new session. |}]
 ;;
 
 let%expect_test "a session that runs is kept, and so is where you are" =
@@ -297,7 +297,8 @@ let%expect_test "a session that runs is kept, and so is where you are" =
   H.fail h "delete_sessions" "no session \"/sessions/s2.jsonl\"";
   where h;
   H.text h ~selector:".toast";
-  [%expect {|
+  [%expect
+    {|
     ((in_ (s1)) (pending ()))
     Couldn't delete: no session "/sessions/s2.jsonl" (Dismiss)
     |}]
