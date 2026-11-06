@@ -234,38 +234,40 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
           <span class="ui-chart-name"> pr </span>
         </li>
       </ul>
-      <table class="sr-only">
-        <caption> Build times </caption>
-        <thead>
-          <tr>
-            <th>  </th>
-            <th> main </th>
-            <th> pr </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td> W1 </td>
-            <td> 12 s </td>
-            <td> 20 s </td>
-          </tr>
-          <tr>
-            <td> W2 </td>
-            <td> 15.5 s </td>
-            <td>  </td>
-          </tr>
-          <tr>
-            <td> W3 </td>
-            <td>  </td>
-            <td> 18 s </td>
-          </tr>
-          <tr>
-            <td> W4 </td>
-            <td> 9 s </td>
-            <td> 22 s </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="sr-only">
+        <table>
+          <caption> Build times </caption>
+          <thead>
+            <tr>
+              <th>  </th>
+              <th> main </th>
+              <th> pr </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td> W1 </td>
+              <td> 12 s </td>
+              <td> 20 s </td>
+            </tr>
+            <tr>
+              <td> W2 </td>
+              <td> 15.5 s </td>
+              <td>  </td>
+            </tr>
+            <tr>
+              <td> W3 </td>
+              <td>  </td>
+              <td> 18 s </td>
+            </tr>
+            <tr>
+              <td> W4 </td>
+              <td> 9 s </td>
+              <td> 22 s </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </figure>
     |}]
 ;;
@@ -507,25 +509,27 @@ let%expect_test "horizontal bars: labels down the side" =
       </div>
       <div aria-hidden="true" class="ui-chart-xname"> Seconds </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <table class="sr-only">
-        <caption> Horizontal bar chart </caption>
-        <thead>
-          <tr>
-            <th> Test </th>
-            <th> time </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td> parser </td>
-            <td> 4.2 </td>
-          </tr>
-          <tr>
-            <td> typer </td>
-            <td> 11 </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="sr-only">
+        <table>
+          <caption> Horizontal bar chart </caption>
+          <thead>
+            <tr>
+              <th> Test </th>
+              <th> time </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td> parser </td>
+              <td> 4.2 </td>
+            </tr>
+            <tr>
+              <td> typer </td>
+              <td> 11 </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </figure>
     |}]
 ;;
@@ -706,33 +710,35 @@ let%expect_test "donut: slices, the total in the hole, legend with shares" =
           </li>
         </ul>
       </div>
-      <table class="sr-only">
-        <caption> Disk </caption>
-        <thead>
-          <tr>
-            <th>  </th>
-            <th> Value </th>
-            <th> Share </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td> Images </td>
-            <td> 30 GB </td>
-            <td> 75.0% </td>
-          </tr>
-          <tr>
-            <td> Code </td>
-            <td> 10 GB </td>
-            <td> 25.0% </td>
-          </tr>
-          <tr>
-            <td> Empty </td>
-            <td> 0 GB </td>
-            <td> 0.0% </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="sr-only">
+        <table>
+          <caption> Disk </caption>
+          <thead>
+            <tr>
+              <th>  </th>
+              <th> Value </th>
+              <th> Share </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td> Images </td>
+              <td> 30 GB </td>
+              <td> 75.0% </td>
+            </tr>
+            <tr>
+              <td> Code </td>
+              <td> 10 GB </td>
+              <td> 25.0% </td>
+            </tr>
+            <tr>
+              <td> Empty </td>
+              <td> 0 GB </td>
+              <td> 0.0% </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </figure>
     |}]
 ;;
@@ -929,33 +935,35 @@ let%expect_test "scatter: points with tooltips, both axes" =
           <span class="ui-chart-name"> cached </span>
         </li>
       </ul>
-      <table class="sr-only">
-        <caption> Scatter chart </caption>
-        <thead>
-          <tr>
-            <th>  </th>
-            <th> Size </th>
-            <th> Time </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td> runs </td>
-            <td> 1 </td>
-            <td> 10 ms </td>
-          </tr>
-          <tr>
-            <td> runs </td>
-            <td> 4 </td>
-            <td> 30 ms </td>
-          </tr>
-          <tr>
-            <td> cached </td>
-            <td> 2 </td>
-            <td> 2 ms </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="sr-only">
+        <table>
+          <caption> Scatter chart </caption>
+          <thead>
+            <tr>
+              <th>  </th>
+              <th> Size </th>
+              <th> Time </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td> runs </td>
+              <td> 1 </td>
+              <td> 10 ms </td>
+            </tr>
+            <tr>
+              <td> runs </td>
+              <td> 4 </td>
+              <td> 30 ms </td>
+            </tr>
+            <tr>
+              <td> cached </td>
+              <td> 2 </td>
+              <td> 2 ms </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </figure>
     |}]
 ;;

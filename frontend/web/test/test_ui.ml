@@ -313,48 +313,50 @@ let%expect_test "every component" =
               <span class="ui-chart-name"> PRs </span>
             </li>
           </ul>
-          <table class="sr-only">
-            <caption> Build times by week </caption>
-            <thead>
-              <tr>
-                <th>  </th>
-                <th> main </th>
-                <th> PRs </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td> W1 </td>
-                <td> 61 s </td>
-                <td> 70 s </td>
-              </tr>
-              <tr>
-                <td> W2 </td>
-                <td> 58 s </td>
-                <td> 66 s </td>
-              </tr>
-              <tr>
-                <td> W3 </td>
-                <td>  </td>
-                <td> 63 s </td>
-              </tr>
-              <tr>
-                <td> W4 </td>
-                <td> 51 s </td>
-                <td> 60 s </td>
-              </tr>
-              <tr>
-                <td> W5 </td>
-                <td> 47 s </td>
-                <td> 55 s </td>
-              </tr>
-              <tr>
-                <td> W6 </td>
-                <td> 44 s </td>
-                <td> 52 s </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="sr-only">
+            <table>
+              <caption> Build times by week </caption>
+              <thead>
+                <tr>
+                  <th>  </th>
+                  <th> main </th>
+                  <th> PRs </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td> W1 </td>
+                  <td> 61 s </td>
+                  <td> 70 s </td>
+                </tr>
+                <tr>
+                  <td> W2 </td>
+                  <td> 58 s </td>
+                  <td> 66 s </td>
+                </tr>
+                <tr>
+                  <td> W3 </td>
+                  <td>  </td>
+                  <td> 63 s </td>
+                </tr>
+                <tr>
+                  <td> W4 </td>
+                  <td> 51 s </td>
+                  <td> 60 s </td>
+                </tr>
+                <tr>
+                  <td> W5 </td>
+                  <td> 47 s </td>
+                  <td> 55 s </td>
+                </tr>
+                <tr>
+                  <td> W6 </td>
+                  <td> 44 s </td>
+                  <td> 52 s </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </figure>
         <section class="ui-card">
           <header>
@@ -436,33 +438,35 @@ let%expect_test "every component" =
                   </li>
                 </ul>
               </div>
-              <table class="sr-only">
-                <caption> Donut chart </caption>
-                <thead>
-                  <tr>
-                    <th>  </th>
-                    <th> Value </th>
-                    <th> Share </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td> Compile </td>
-                    <td> 24 </td>
-                    <td> 53.3% </td>
-                  </tr>
-                  <tr>
-                    <td> Link </td>
-                    <td> 9 </td>
-                    <td> 20.0% </td>
-                  </tr>
-                  <tr>
-                    <td> Tests </td>
-                    <td> 12 </td>
-                    <td> 26.7% </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="sr-only">
+                <table>
+                  <caption> Donut chart </caption>
+                  <thead>
+                    <tr>
+                      <th>  </th>
+                      <th> Value </th>
+                      <th> Share </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td> Compile </td>
+                      <td> 24 </td>
+                      <td> 53.3% </td>
+                    </tr>
+                    <tr>
+                      <td> Link </td>
+                      <td> 9 </td>
+                      <td> 20.0% </td>
+                    </tr>
+                    <tr>
+                      <td> Tests </td>
+                      <td> 12 </td>
+                      <td> 26.7% </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </figure>
             <div class="tone-success ui-progress">
               <div class="ui-progress-head">
