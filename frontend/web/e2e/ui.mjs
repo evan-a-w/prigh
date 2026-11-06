@@ -96,7 +96,7 @@ const signIn = async () => {
 const ui = n => page.locator(`#chat .tool-ui[data-call=u${n}]`);
 const allShown = () => page.waitForFunction(() =>
   [1, 2, 3, 4].every(n => document.querySelector(`#chat .tool-ui[data-call=u${n}] .genui`))
-  && [...document.querySelectorAll("#chat .ui-image-frame")].every(f => f.querySelector("img")?.complete));
+  && [...document.querySelectorAll("#chat .ui-image-frame")].every(f => f.querySelector("img")));
 // What the page draws, per component kind.
 const census = () => page.evaluate(() => {
   const n = sel => document.querySelectorAll(`#chat ${sel}`).length;
@@ -140,10 +140,11 @@ try {
   const column = n => ui(1).locator(".ui-table tbody tr").evaluateAll((rows, n) => rows.map(r => r.cells[n].innerText).join(", "), 1);
   const time = ui(1).locator(".ui-table th .ui-sort", { hasText: "Time" });
   console.log(`as given: ${await column()}`);
-  await time.click();
-  console.log(`${await ui(1).locator(".ui-table th[aria-sort]").getAttribute("aria-sort")}: ${await column()}`);
-  await time.click();
-  console.log(`${await ui(1).locator(".ui-table th[aria-sort]").getAttribute("aria-sort")}: ${await column()}`);
+  for (const order of ["descending", "ascending"]) {
+    await time.click();
+    await ui(1).locator(`.ui-table th[aria-sort=${order}]`, { hasText: "Time" }).waitFor();
+    console.log(`${order}: ${await column()}`);
+  }
 
   section("chart tooltips");
   const line = ui(1).locator(".ui-chart[data-kind=line]");
@@ -152,38 +153,53 @@ try {
   console.log(`hover: ${tidy(await line.locator(".ui-chart-tip").filter({ visible: true }).first().innerText())}`);
   await screenshot("line tooltip", ".tool-ui[data-call=u1] .ui-chart[data-kind=line]");
   await page.mouse.move(0, 0);
-  await ui(1).locator(".ui-chart[data-kind=donut] [tabindex='0']").first().focus();
+  // The keyboard reaches each slice; the focused one shows in the hole.
+  await ui(1).locator(".ui-chart[data-kind=donut] .ui-chart-slice").first().focus();
   await page.keyboard.press("Tab");
-  await page.waitForFunction(() => [...document.querySelectorAll(".ui-chart[data-kind=donut] .ui-chart-tip")].some(t => t.checkVisibility()));
-  console.log(`focus: ${tidy(await ui(1).locator(".ui-chart[data-kind=donut] .ui-chart-tip").filter({ visible: true }).first().innerText())}`);
+  await page.waitForFunction(() => [...document.querySelectorAll(".ui-chart[data-kind=donut] .ui-chart-centre-item")].some(t => t.checkVisibility()));
+  console.log(`focus: ${tidy(await ui(1).locator(".ui-chart[data-kind=donut] .ui-chart-centre-item").filter({ visible: true }).first().innerText())}`);
+  await screenshot("donut focused", ".tool-ui[data-call=u1] .ui-chart[data-kind=donut]");
   await page.locator("body").focus();
   await ui(2).scrollIntoViewIfNeeded();
   await screenshot("charts", ".tool-ui[data-call=u2]");
 
   section("calculator");
   const outputs = () => ui(3).locator(".ui-calc-outputs").innerText().then(tidy);
+  const field = n => ui(3).locator(".ui-calc-field input:not([type=range])").nth(n);
+  // Typing changes the outputs in the next frame.
+  const typed = async (n, text) => {
+    const before = await outputs();
+    await field(n).fill(text);
+    await page.waitForFunction(b => document.querySelector("#chat .tool-ui[data-call=u3] .ui-calc-outputs").innerText.replace(/\s+/g, " ").trim() !== b.replace(/ \| /g, " "), before);
+    console.log(await outputs());
+  };
   console.log(await outputs());
-  await ui(3).locator(".ui-calc-field input:not([type=range])").first().fill("120");
-  console.log(await outputs());
-  await ui(3).locator(".ui-calc-field input:not([type=range])").nth(1).fill("x");
-  console.log(await outputs());
+  await typed(0, "120");
+  console.log(`slider follows: ${await ui(3).locator(".ui-slider").inputValue()}`);
+  await typed(1, "");
 
   section("quiz, flashcards, tabs, accordion");
   await ui(3).locator(".ui-option", { hasText: "prettier" }).click();
   await ui(3).locator(".ui-option", { hasText: "effects" }).click();
+  await ui(3).locator(".ui-option.correct", { hasText: "effects" }).waitFor();
   console.log(tidy(await ui(3).locator(".ui-quiz").innerText()));
   await screenshot("quiz", ".tool-ui[data-call=u3] .ui-tabs");
   await ui(3).locator(".ui-tab", { hasText: "Flashcards" }).click();
   await ui(3).locator(".ui-flash-card").click();
+  await ui(3).locator(".ui-flash-card.flipped").waitFor();
   console.log(`flipped: ${await ui(3).locator(".ui-flash-card").getAttribute("aria-label")}`);
   await screenshot("flashcard", ".tool-ui[data-call=u3] .ui-tabs");
   await ui(3).locator(".ui-tab", { hasText: "Plan" }).click();
+  await ui(3).locator(".ui-tab[aria-selected=true]", { hasText: "Plan" }).waitFor();
   console.log(tidy(await ui(3).locator(".ui-tabs [role=tabpanel]").innerText()));
   await ui(3).locator(".ui-acc-head", { hasText: "The change" }).click();
+  await ui(3).locator(".ui-acc-head[aria-expanded=true]", { hasText: "The change" }).waitFor();
   console.log(`accordion open: ${await ui(3).locator(".ui-acc-head[aria-expanded=true]").allInnerTexts()}`);
   await screenshot("learn", ".tool-ui[data-call=u3]");
 
   section("images");
+  await ui(4).locator(".ui-gallery").scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => [...document.querySelectorAll("#chat .ui-image img")].every(i => i.complete && i.naturalWidth > 0));
   console.log(await ui(4).locator(".ui-image img").evaluateAll(imgs => imgs.map(i => `${i.alt} ${i.naturalWidth}x${i.naturalHeight}`).join(", ")));
   await ui(4).locator(".ui-image img").first().click();
   await page.locator("dialog.viewer[open] .viewer-img").waitFor();
@@ -211,11 +227,12 @@ try {
   await screenshot("sent", ".tool-ui[data-call=u4]");
 
   section("after a reload");
+  const sessionUrl = page.url();
   await page.reload();
-  await signIn();
+  await composer().waitFor();
   await allShown();
   console.log(tidy(await ui(4).locator(".ui-choices").innerText()));
-  console.log(`form still open: ${await ui(4).locator(".ui-form button[type=submit]:not([disabled])").count()}`);
+  console.log(`form still open: ${await ui(4).locator(".ui-form .ui-btn.primary:not([disabled])").count()}`);
   await context.close();
 
   for (const [w, h, safe] of [[390, 844, false], [320, 640, false], [390, 844, true]]) {
@@ -230,7 +247,7 @@ try {
       const cdp = await phone.newCDPSession(page);
       await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
     }
-    await page.goto(url);
+    await page.goto(sessionUrl);
     await signIn();
     await allShown();
     section(`phone ${tag}`);
@@ -254,6 +271,7 @@ try {
 } catch (error) {
   process.exitCode = 1;
   await screenshot("failure").catch(() => {});
+  console.error(await page.evaluate(() => [...document.querySelectorAll("#chat .tool-ui")].map(t => `${t.dataset.call}: ${t.querySelector(".ui-gallery")?.outerHTML.slice(0, 1500) ?? ""}`).join("\n")).catch(e => e.message));
   console.error(errors.join("\n"));
   throw error;
 } finally {
