@@ -5,7 +5,9 @@
 //! sign-in proxy's `Cookie` header for that site, from signing in through
 //! the default browser), `"signin"` (the sidecar's page offering to sign in,
 //! for when the site wants it again) and `"here":true` (the user chose to
-//! sign in to the proxy in the window). The first is its ready line. Only
+//! sign in to the proxy in the window), or `{"url":...,"external":true}`, a
+//! page for the default browser instead (signing in there). The first is its
+//! ready line. Only
 //! flat objects of strings and other scalars are accepted: enough for the
 //! contract, with no JSON dependency.
 
@@ -20,6 +22,8 @@ pub struct Page {
     pub cookie: Option<String>,
     pub signin: Option<String>,
     pub here: bool,
+    /// For the default browser, not the window.
+    pub external: bool,
 }
 
 pub fn parse(line: &str) -> Result<Page, Error> {
@@ -40,7 +44,14 @@ pub fn parse(line: &str) -> Result<Page, Error> {
         })
     };
     if url.starts_with("http://") || url.starts_with("https://") {
-        Ok(Page { remote: flag("remote"), cookie: string("cookie"), signin: string("signin"), here: flag("here"), url })
+        Ok(Page {
+            remote: flag("remote"),
+            cookie: string("cookie"),
+            signin: string("signin"),
+            here: flag("here"),
+            external: flag("external"),
+            url,
+        })
     } else {
         Err(Error(format!("prigh desktop's ready line has a url that is not http(s): {url:?}")))
     }
@@ -186,8 +197,9 @@ mod tests {
 
     #[test]
     fn ready_lines() {
-        let page =
-            |url: &str, remote| Ok(Page { url: url.to_string(), remote, cookie: None, signin: None, here: false });
+        let page = |url: &str, remote| {
+            Ok(Page { url: url.to_string(), remote, cookie: None, signin: None, here: false, external: false })
+        };
         assert_eq!(
             parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#),
             page("http://127.0.0.1:41234/#signin=abc", false)
@@ -214,8 +226,14 @@ mod tests {
                 remote: true,
                 cookie: Some("a=b; c=d".to_string()),
                 signin: Some("http://127.0.0.1:1/#desktop=k&signin=1".to_string()),
-                here: true
+                here: true,
+                external: false
             })
+        );
+        assert!(
+            parse(r#"{"url":"https://ai.example.com/#cli-signin=1.2&program=desktop","external":true}"#)
+                .unwrap()
+                .external
         );
     }
 

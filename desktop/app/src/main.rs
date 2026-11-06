@@ -783,6 +783,14 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
 
 fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     let url = page.url.as_str();
+    if page.external {
+        // Its fragment has the sign-in's one-time state: not for the log.
+        log(format!("opening {} in the system browser to sign in", redact(url)));
+        if let Err(e) = app.opener().open_url(url, None::<&str>) {
+            log(format!("could not open {}: {e}", redact(url)));
+        }
+        return;
+    }
     let (Ok(parsed), Some(origin)) = (Url::parse(url), navigation::origin(url)) else {
         log(format!("prigh desktop's url does not parse: {url}"));
         return;
