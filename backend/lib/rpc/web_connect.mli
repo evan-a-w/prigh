@@ -36,6 +36,9 @@ module Check : sig
       | Unreachable of string
       | Refused of string (** the backend's [unauthorised: ...] *)
       | Not_prigh_web of string (** no WebSocket at the URL *)
+      | Signin_required of string
+      (** a sign-in proxy's login instead of the WebSocket
+          ({!Backend_address.Signin_required}) *)
       | Failed of string
     [@@deriving sexp_of]
   end

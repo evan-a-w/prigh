@@ -11,9 +11,9 @@ let set (el : Dom_html.element Js.t) name value =
   |> ignore
 ;;
 
-let place (anchor : Prigh_web.Context_menu.Anchor.t) =
+let place ?(id = "dialog") (anchor : Prigh_web.Context_menu.Anchor.t) =
   Browser.after_render (fun () ->
-    Option.iter (Dom_html.getElementById_opt "dialog") ~f:(fun menu ->
+    Option.iter (Dom_html.getElementById_opt id) ~f:(fun menu ->
       let x, y =
         match anchor with
         | Point { x; y } -> Float.of_int x, Float.of_int y

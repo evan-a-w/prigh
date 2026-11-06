@@ -605,11 +605,12 @@ let%expect_test "a session's items on the current session" =
     (Place_menu (Element session-s1))
     (Picker_choose delete)
     (Focus dialog)
-    Can't delete this session
+    Delete “Main work”?
     (Close (Esc))
+    You'll move to “Login form”.
+    It will be deleted, with its subagent logs: 0 B on disk. This can't be undone.
     Main work 0 B
-    “Main work” is the session you are in: it will be kept (switch to another first)
-    (Close)
+    (Cancel) (Delete)
     |}]
 ;;
 

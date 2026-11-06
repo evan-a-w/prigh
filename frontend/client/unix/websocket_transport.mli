@@ -19,7 +19,20 @@ module Refusal : sig
       redirect to [https] wants [wss://], and so on. [url] is the address as
       the user gave it, [host] its host name. *)
   val explain : url:string -> host:string -> tls:bool -> t -> string
+
+  (** Whether a refused upgrade is a sign-in proxy's login (a redirect other
+      than to [https] on [host], a 401, 403 or 407, or a web page). *)
+  val signin_page : host:string -> tls:bool -> t -> bool
 end
+
+(** What {!connect}'s error explains, when the refusal was a sign-in
+    proxy's login ({!Refusal.signin_page}): signing in through the browser
+    ([prigh browser-signin]) gets the cookie it wants. Such an error is an
+    exception's: show this, not [Error.to_string_hum]. *)
+val signin_required : Error.t -> string option
+
+(** The exception in such an error (for tests that fake {!connect}). *)
+exception Signin_required of string
 
 (** Parses [Name: value] (for [-header] and [$PRIGH_CONNECT_HEADERS]). *)
 val parse_header : string -> (string * string, string) Result.t

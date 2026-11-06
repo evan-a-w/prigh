@@ -29,6 +29,8 @@ let rec act t action =
      | Annotate_clear
      | Annotate_export
      | Place_menu _
+     | Place_field_menu _
+     | Edit_field _
      | Open_window _
      | Set_url_session _
      | Clear_text_selection

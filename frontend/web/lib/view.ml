@@ -414,5 +414,6 @@ let view (m : Model.t) ~inject ~terminal =
     ; Dialog_view.view m ~inject
     ; Files_view.dialog m ~inject
     ; Files_view.pickers
+    ; Field_menu_view.view m ~inject
     ]
 ;;

@@ -21,9 +21,17 @@ let is_rejection error =
   String.is_substring error ~substring:"unauthorised: bad user name or password"
 ;;
 
+let proxy_signin_marker = "a sign-in proxy guards it: "
+let proxy_signin_error why = proxy_signin_marker ^ why
+
+let proxy_signin_of_error error =
+  String.chop_prefix error ~prefix:proxy_signin_marker
+;;
+
 module Change = struct
   type t =
     | Connect of string option
+    | Browser_signin
     | Sign_in of
         { user : string option
         ; token : (string[@sexp.opaque])
@@ -37,6 +45,7 @@ module Outcome = struct
   type result =
     | Unreachable of string
     | Rejected of string
+    | Signin_required of string
     | Connected of P.Json.t
   [@@deriving sexp_of]
 

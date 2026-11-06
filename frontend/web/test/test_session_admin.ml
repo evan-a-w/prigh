@@ -22,7 +22,12 @@ let sessions =
            ~background:2
            ~bytes:12_000
            "s2"
-       ; H.session_json ~name:"Open elsewhere" ~live:true ~clients:1 ~bytes:3_000 "s3"
+       ; H.session_json
+           ~name:"Open elsewhere"
+           ~live:true
+           ~clients:1
+           ~bytes:3_000
+           "s3"
        ; H.session_json ~name:"Old lexer" ~archived:true ~bytes:200_000 "s4"
        ; H.session_json ~name:"Older docs" ~archived:true ~bytes:1_300_000 "s5"
        ])
@@ -55,7 +60,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   (* A session whose turn has ended but whose background work runs is
      running. *)
   H.elements h ~selector:".session-mark > *";
-  [%expect {|
+  [%expect
+    {|
     <span class="live">
     <span class="lamp">
     <span class="live">
@@ -69,7 +75,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.elements h ~selector:".sessions-divider[aria-expanded=true]";
   H.elements h ~selector:".session.archived .lamp";
   H.elements h ~selector:".session.archived .live";
-  [%expect {|
+  [%expect
+    {|
     <button type="button"
             aria-expanded="false"
             title="Show the archived sessions"
@@ -94,7 +101,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.act h Toggle_archived;
   H.key h "ArrowDown" ~target:(Session "s3");
   H.text h ~selector:".sessions";
-  [%expect {|
+  [%expect
+    {|
     (Session_nav (from (s3)) (by 1))
     (Focus session-s4)
     (Session_nav (from (s3)) (by 1))
@@ -107,7 +115,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   (* A search shows the archived sessions that match, folded or not. *)
   H.act h (Set_session_query "old");
   H.text h ~selector:".sessions";
-  [%expect {|
+  [%expect
+    {|
     (Archived 2)
     (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Older docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
@@ -118,7 +127,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
 let%expect_test "the current session is active while its subagents or jobs run" =
   let h = H.create ~sessions () in
   let state fields =
-    H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ~fields ()))
+    H.event
+      h
+      (sprintf {|{"event":"state","state":%s}|} (H.state_json ~fields ()))
   in
   state
     [ ( "subagents"
@@ -304,7 +315,8 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   H.key h "Enter" ~shift:true ~target:(Session "s5");
   H.key h " " ~target:(Session "s5");
   H.elements h ~selector:".session.marked";
-  [%expect {|
+  [%expect
+    {|
     (Mark_session (path /sessions/s3.jsonl) (range false))
     (Mark_session (path /sessions/s5.jsonl) (range true))
     (browser default)
@@ -314,7 +326,8 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     <div class="archived marked session">
     |}];
   H.elements h ~selector:".session-open[aria-checked=true]";
-  [%expect {|
+  [%expect
+    {|
     <button class="session-open">
     <button class="session-open">
     <button class="session-open">
@@ -380,7 +393,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     |}]
 ;;
 
-let%expect_test "deleting one: the current and open sessions are warned about" =
+let%expect_test "deleting one: where you move, and the open ones kept" =
   let h = H.create ~sessions () in
   H.act h (Ask_delete "/sessions/s1.jsonl");
   H.text h ~selector:".modal p";
@@ -388,7 +401,8 @@ let%expect_test "deleting one: the current and open sessions are warned about" =
   [%expect
     {|
     (Focus dialog)
-    “fix the parser bug” is the session you are in: it will be kept (switch to another first)
+    You'll move to “Release notes”.
+    It will be deleted, with its subagent logs: 3.9 KB on disk. This can't be undone.
     |}];
   H.act h Close_dialog;
   H.key h "Delete" ~target:(Session "s3");
@@ -411,7 +425,8 @@ let%expect_test "deleting one: the current and open sessions are warned about" =
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.text h ~selector:".modal";
   H.key h "Enter" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     Can't delete this session
     (Close (Esc))
