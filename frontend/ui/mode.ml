@@ -69,6 +69,7 @@ module Confirm_action = struct
     | Trim_after of string
     | Delete_sessions of
         { paths : string list
+        ; switch_to : Switch_to.t option
         ; back : Open_picker.t option
         }
     | Tool_confirm of Pending.Confirm.t

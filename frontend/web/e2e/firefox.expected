@@ -1331,15 +1331,28 @@ main
 feat/login
 <DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
 Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
+=== firefox: worktrees: deleting the session we are in: asked ===
+Delete “Tidy the docs in a worktree”?
+You'll move to “The login form”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Tidy the docs in a worktree
+<SIZE>
+Cancel
+Delete
+=== firefox: worktrees: deleting the session we are in: where we land ===
+in: The login form; the address names it: true
+=== firefox: worktrees: the session we were in deleted ===
+The login form | <age> | prigh | feat/login | 1 [selected]
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === firefox: worktrees: on a phone ===
-Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
-│ feat/login
-The login form | <age> | prigh | feat/login | 1
+The login form | <age> | prigh | feat/login | 1 [selected]
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
 === firefox: worktrees: a long press on a phone ===
-feat/login — in Tidy the docs in a worktree
+feat/login — in The login form
 ▸ Switch session here  /worktree open feat/login
 New session here  /worktree open -n feat/login
 Review changes  /review feat/login
@@ -1348,6 +1361,42 @@ Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
 Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
+=== firefox: worktrees: deleting the session we are in on a phone, 390x844: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== firefox: worktrees: deleting the session we are in on a phone, 390x844: asked ===
+deleting: The login form
+Delete “The login form”?
+You'll move to “Shopping list”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+The login form
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== firefox: worktrees: deleting the session we are in on a phone, 390x844: where we land ===
+in: Shopping list; the strip says: Shopping list; the address names it: true
+ok
+=== firefox: worktrees: deleting the session we are in on a phone, 320x640: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== firefox: worktrees: deleting the session we are in on a phone, 320x640: asked ===
+deleting: Shopping list
+Delete “Shopping list”?
+You'll move to “A landing page”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Shopping list
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== firefox: worktrees: deleting the session we are in on a phone, 320x640: where we land ===
+in: A landing page; the strip says: A landing page; the address names it: true
+ok
 === firefox: worktrees: errors ===
 none
 === firefox: review: files: changes marked ===
