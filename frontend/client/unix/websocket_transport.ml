@@ -337,9 +337,12 @@ let handshake (channel : Channel.t) ~url ~host ~tls ~authority ~path ~headers =
            "%s opened a WebSocket with the wrong Sec-WebSocket-Accept"
            host
      | Some status ->
+       let refusal = { Refusal.status; headers = answer } in
+       let why = Refusal.explain ~url ~host ~tls refusal in
        Error
-         (Error.of_string
-            (Refusal.explain ~url ~host ~tls { status; headers = answer })))
+         (if Refusal.signin_page ~host ~tls refusal
+          then Error.of_exn (Signin_required why)
+          else Error.of_string why))
 ;;
 
 let transport
