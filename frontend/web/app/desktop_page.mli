@@ -13,6 +13,9 @@ val key : unit -> string option
     {!take_hint}, which clear the fragment. *)
 val take_shell : unit -> unit
 
+(** Whether the tab is in a browser's app window (see {!take_shell}). *)
+val in_browser : unit -> bool
+
 (** Where the page goes to show [url] (the backend's own site), keeping the
     browser's app window's mark. *)
 val follow : string -> string

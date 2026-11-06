@@ -87,6 +87,10 @@ let help =
        right-click or a long press, at the pointer; with text selected, \
        right-click is the browser's, to copy it; on a phone, its Select text \
        selects its words)" )
+  ; ( "Shift+F10 / ContextMenu (in a text field, the desktop app's browser \
+       window)"
+    , "its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, \
+       Enter chooses, Esc closes); the browser's own menus are hidden there" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -250,6 +254,15 @@ let review_key (m : App.Model.t) t : App.Action.t option =
   | _ ->
     Code_review.key m.review ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
     |> Option.map ~f:(fun a -> App.Action.Review a)
+;;
+
+let field_menu_key t : App.Action.t option =
+  match t.key with
+  | "Escape" | "Tab" -> Some Close_field_menu
+  | "ArrowUp" -> Some (Field_menu_move (-1))
+  | "ArrowDown" -> Some (Field_menu_move 1)
+  | "Enter" | " " -> Some (Field_menu_choose None)
+  | _ -> None
 ;;
 
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
@@ -559,6 +572,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      included, even with a dialog or a confirmation showing. *)
   | Terminal, _, _, _ ->
     Option.some_if (terminal_toggle t) App.Action.Toggle_terminal
+  | _ when Option.is_some m.field_menu -> field_menu_key t
   | _, c :: _, _, _ -> confirm_key m c t
   | _, [], _ :: _, _ ->
     Option.map (question_key t) ~f:(fun a -> App.Action.Question a)

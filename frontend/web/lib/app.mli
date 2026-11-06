@@ -339,6 +339,12 @@ module Command : sig
     | Place_menu of Context_menu.Anchor.t
     (** the context menu, once rendered: at the anchor, kept in the
         window *)
+    | Place_field_menu of Context_menu.Anchor.t
+    (** the field's menu ({!Field_menu}), likewise *)
+    | Edit_field of Field_menu.Item.t option
+    (** the field whose menu closed, focused again (its selection as it
+        was), with the item done to it: Cut and Copy through the clipboard,
+        Paste from it at the caret, as typing would (its input event) *)
     | Open_window of string
     (** a session (its id) in a new window: a new tab in a browser, another
         window of the desktop app (sharing its tool host) *)
@@ -442,6 +448,10 @@ module Action : sig
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Set_desktop of bool (** the page runs under [prigh desktop] *)
+    | Set_browser_shell of bool
+    (** the page is in the desktop app's browser window
+        ({!Desktop_link.browser_shell_of_hash}): text fields have
+        {!Field_menu} *)
     | Quit_desktop (** Quit prigh: only under [prigh desktop] *)
     | Page_hidden of bool
     (** the tab was hidden or shown again (reconnect now, or check the socket) *)
@@ -589,6 +599,16 @@ module Action : sig
     | Open_menu of Context_menu.t
     (** a session's or worktree's context menu (right-click, Shift+F10, the
         context menu key, a long press, the row's ⋯) *)
+    | Open_field_menu of
+        { field : Field_menu.Field.t
+        ; anchor : Context_menu.Anchor.t
+        }
+    (** a text field's right-click: its menu, in the browser shell only *)
+    | Field_menu_move of int (** ↑↓ in it *)
+    | Field_menu_select of Field_menu.Item.t (** the pointer on an item *)
+    | Field_menu_choose of Field_menu.Item.t option
+    (** clicked, or Enter on the highlighted one ([None]); not disabled *)
+    | Close_field_menu (** Esc, or a click outside: nothing done *)
     | Toggle_sidebar
     | Toggle_status_tray
     (** a phone's header: the tray with the thinking level, the mode, the
@@ -777,6 +797,11 @@ module Model : sig
     ; narrow : bool
     ; desktop : bool
     (** under [prigh desktop], the desktop app: Quit prigh is offered *)
+    ; browser_shell : bool
+    (** in the desktop app's browser window: the browser's context menus
+        are hidden *)
+    ; field_menu : Field_menu.t option
+    (** a text field's context menu, over everything else *)
     ; draft : string
     ; cursor : int (** the caret's byte offset in [draft] *)
     ; completion : Completion.t option
