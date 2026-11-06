@@ -396,12 +396,12 @@ module Chart = struct
   ;;
 
   let detail t =
+    let n count one = sprintf "%d %s%s" count one (if count = 1 then "" else "s") in
     match t.data with
-    | Categories { series = [ _ ]; labels } ->
-      sprintf "%d points" (List.length labels)
+    | Categories { series = [ _ ]; labels } -> n (List.length labels) "point"
     | Categories { series; _ } -> sprintf "%d series" (List.length series)
-    | Slices slices -> sprintf "%d slices" (List.length slices)
-    | Points [ p ] -> sprintf "%d points" (List.length p.points)
+    | Slices slices -> n (List.length slices) "slice"
+    | Points [ p ] -> n (List.length p.points) "point"
     | Points series -> sprintf "%d series" (List.length series)
   ;;
 end
