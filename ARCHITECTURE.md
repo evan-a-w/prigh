@@ -43,9 +43,13 @@ the JSONL file is the durable state) and every client is attached to exactly
 one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
-a client sends `hello` first (name, cwd, whether it can run tools and its
+a client sends `hello` first (name, its kind (`client`: `web`, `tui` or
+`acp`; absent or unknown is `other`), cwd, whether it can run tools and its
 host id and home, an optional session id or path, the `-token` if the backend requires one, and
-with `-tokens` optionally the user, i.e. the namespace name).
+with `-tokens` optionally the user, i.e. the namespace name). Each
+`prompt`/`steer`/`follow_up` carries its client's kind into the agent
+(`Agent.Queued.t`'s `client`): the kind of the latest prompt's client is the
+agent's current client, which `render_ui` checks and the model is told of.
 
 ### Tool hosts
 
@@ -606,7 +610,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   installs one that forwards `on_host` tools to the session's active host.
   The context also carries `approve` (checks a model's call before it
   runs: `Some result` refuses it with that result), `ask_user` (how the
-  `ask_user` tool reaches the user) and `files` (a `File_access`: where
+  `ask_user` tool reaches the user), `ui` (what `render_ui` needs: the
+  current client and the tool host's files) and `files` (a `File_access`: where
   `read`, `edit`, `write`, `apply_patch` and `Host_ops`' `$read_file`, so
   attachments, read and write text contents; the disk by default, the
   editor's buffers for an ACP session, see `Acp`. Existence checks,
@@ -954,7 +959,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   in a list of messages, which is how `Agent` keeps it as session state
   (persisted for free, following rewinds and forks). `User_question`
   (`ask_user`'s questions, answers checked against them, the result text)
-  and `Tool_ask_user`. `Tools.interaction` holds the two; they are
+  and `Tool_ask_user`. `Tool_render_ui` shows components (charts, tables,
+  forms, ...) inline in prigh-web: frontends render them from the call's
+  arguments, like `update_plan`'s, and the model gets an acknowledgement
+  (`Shown: chart "Build times", table "Slowest tests" (12 rows).`) or every
+  problem by JSON path. `Ui_components` checks the arguments strictly
+  (`Ui_expr` parses the calculator's expressions); the context's `ui`
+  (`Ui_host`) gives the current client, and its images are read on the
+  active tool host (`Host_files`' read op, as `fs_preview` does), which must
+  have them as png, jpeg, gif, webp or svg of at most 20 MB. It is always
+  offered (the prompt prefix stays the same) but refuses unless the current
+  client is prigh-web. Answers through its interactive components come back
+  as `prompt`/`follow_up` with `ui_action` (`Ui_action`: checked against
+  the session's `render_ui` calls, becoming a user message of an
+  `Injected` `Ui_action` note). `Tools.interaction` holds the three; they are
   not tool-host tools, and `Tools.for_context` drops them for subagents,
   which cannot ask the user (nor `goal_complete`, `job_input` and the other
   background controls).
@@ -1005,11 +1023,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   changed and leave re-reading the instructions to the model's discretion,
   since they are often unchanged.
 - `Told_environment` — what the model was last told about its environment
-  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode):
+  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, the
+  kind of client, once one prompted):
   set from the current environment when the system prompt is built (plan
   mode excepted: the prompt does not describe it) and whenever notes are
   delivered, and recorded as a `Told_environment` session entry on the
-  active path. The environment notes (host, cwd, tools, plan mode) are not
+  active path. The environment notes (host, cwd, tools, plan mode, client:
+  whether it can display `render_ui`'s components) are not
   queued but derived when a user message is built, by `notes ~told now`, so
   a change made before the session is evicted, switched away from (in
   place, as the TUI does, or by another frontend), reloaded after a backend
@@ -1139,7 +1159,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks;
   image files are read like `read` does and attached as images) and
-  `images`.
+  `images`; `prompt`/`follow_up` accept `ui_action` (`{call_id, component,
+  title, values}`, with `text: ""`): the user's answer through a
+  `render_ui` component, whose text for the model is `The user responded
+  through "<title>" (render_ui call <call_id>, component <component>):`
+  and the values as compact JSON on the next line, and whose `origin` note
+  (kind `ui_action`) is titled with a summary (`Sent "Deploy options": env
+  = prod`). An unknown call or component is an error naming what exists.
   `State.usage`/`cost_usd` count every assistant message in the session file
   (all branches, also those compacted away), each at its own model's price,
   plus the `Spend` entries recorded as it happens for what the messages do
