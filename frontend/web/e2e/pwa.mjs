@@ -72,7 +72,7 @@ const page = await context.newPage();
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|NS_ERROR_CONNECTION_REFUSED|establish a connection|Failed to fetch|NetworkError|Failed to load resource/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|NS_ERROR_CONNECTION_REFUSED|establish a connection|Failed to fetch|NetworkError|Failed to load resource/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
@@ -159,8 +159,11 @@ try {
   await page.locator("form button[type=submit]").click();
   await composer().waitFor();
   // Installing fetches the whole shell: the dev build's main.bc.js is ~50 MB.
-  await page.waitForFunction(() => navigator.serviceWorker.controller?.state === "activated",
-    null, { timeout: 90000 });
+  // Controlled is enough (the worker claims the page once it has the shell):
+  // its state is not, as WebKit can lose the "activated" for a page claimed
+  // while it navigates (signing in reloads it), leaving it "activating" in
+  // that page for good though the worker is active and answering.
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 90000 });
   console.log(`controls the page: ${await page.evaluate(() => !!navigator.serviceWorker.controller)}`);
   console.log(`script: ${await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).pathname)}`);
   console.log(`scope: ${await page.evaluate(async () => new URL((await navigator.serviceWorker.ready).scope).pathname)}`);

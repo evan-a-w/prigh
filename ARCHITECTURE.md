@@ -3752,12 +3752,13 @@ size and the precompressed siblings.
 
 prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
 `web-e2e` check, against the packaged backend and site), runs
-`prigh_web.mjs` and the scripts below in Chromium and Firefox (`ENGINES`
-picks), all at once, each with its own backend, browser and directory, and
+`prigh_web.mjs` and the scripts below in Chromium, Firefox and WebKit
+(`ENGINES` picks; WebKit on Linux needs an EGL driver: without a system one
+`./test` and the check point `__EGL_VENDOR_LIBRARY_DIRS` at Mesa's), all at once, each with its own backend, browser and directory, and
 joins their outputs in a fixed order. The driver owns the backend
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
-(ids, cwd, cost, context and messages' times replaced) diffed against `chromium.expected` or `firefox.expected`:
+(ids, cwd, cost, context and messages' times replaced) diffed against `chromium.expected`, `firefox.expected` or `webkit.expected`:
 the sign-in form and signing in with the token, the session's card, a scripted
 bash call and its output, a long output folded, unfolded and folded again,
 the model `read`ing a real PNG (`png.mjs` writes

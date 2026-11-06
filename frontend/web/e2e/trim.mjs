@@ -101,7 +101,7 @@ const newPage = async options => {
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
   page.on("console", message => {
-    if (message.type() === "error" && !/favicon\.ico/.test(message.text()))
+    if (message.type() === "error" && !/favicon\.ico|interactive-widget/.test(message.text()))
       errors.push(`console: ${message.text()}`);
   });
   page.on("pageerror", error => errors.push(`page: ${error.message}`));
@@ -406,6 +406,8 @@ try {
   await choose("delete");
   await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("Step 2:"));
   await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 4);
+  // Its toast comes with the backend's answer, after the transcript changed.
+  await page.locator(".toast", { hasText: "Message deleted" }).nth(1).waitFor();
   console.log(`after deleting step 2: ${await transcript()}`);
   console.log(clean(await rail()));
   await page.locator(".toast", { hasText: "Message deleted" }).last().locator(".toast-undo").click();
@@ -484,7 +486,7 @@ try {
   page = await newPage({
     viewport: { width: 390, height: 844 },
     hasTouch: true,
-    ...(engineName === "chromium" ? { isMobile: true } : {}),
+    ...(engineName !== "firefox" ? { isMobile: true } : {}),
   });
   await signIn();
   section("phone");
