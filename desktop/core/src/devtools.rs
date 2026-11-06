@@ -362,27 +362,32 @@ impl Links {
         }
     }
 
-    /// The backend's site, as the sidecar says to show it now: with its
+    /// The backend's site, as the sidecar says to show it now. With its
     /// cookies (signed in through the default browser), prigh's windows on
-    /// the sidecar's sign-in page get them and go there.
-    pub fn set_remote(&mut self, remote: Remote) -> Vec<Effect> {
+    /// the sidecar's sign-in page get them and go there; `here` (the user
+    /// chose to sign in in the window), they go there to sign in.
+    pub fn set_remote(&mut self, remote: Remote, here: bool) -> Vec<Effect> {
         let signin = remote.signin_page.as_deref().and_then(origin);
-        let windows: Vec<(String, String)> = if remote.cookies.is_empty() {
-            vec![]
-        } else {
-            self.pages
-                .iter_mut()
-                .filter(|(_, p)| !p.closing && !p.popup && p.away.is_none())
-                .filter(|(_, p)| signin.is_some() && p.ours.as_deref().and_then(origin) == signin)
-                .map(|(id, p)| {
+        let give = !remote.cookies.is_empty();
+        let windows: Vec<(String, String)> = self
+            .pages
+            .iter_mut()
+            .filter(|(_, p)| (give || here) && !p.closing && !p.popup && p.away.is_none())
+            .filter(|(_, p)| signin.is_some() && p.ours.as_deref().and_then(origin) == signin)
+            .map(|(id, p)| {
+                if give {
                     // On its way there: redirected away, it is not signed in.
                     p.cookies_given = true;
                     p.ours = Some(remote.url.clone());
-                    (id.clone(), remote.url.clone())
-                })
-                .collect()
+                }
+                (id.clone(), remote.url.clone())
+            })
+            .collect();
+        let out = if give {
+            self.set_cookies(&remote, windows)
+        } else {
+            windows.into_iter().flat_map(|(target, url)| self.send_back(&target, url)).collect()
         };
-        let out = if remote.cookies.is_empty() { vec![] } else { self.set_cookies(&remote, windows) };
         self.remote = Some(remote);
         out
     }
@@ -1073,7 +1078,7 @@ mod tests {
         let mut links = links();
         let cookie = [("authentik_proxy", "c00k1e")];
         // The browser has them at once (no window to send there yet).
-        let out = json_of(links.set_remote(remote(&cookie)));
+        let out = json_of(links.set_remote(remote(&cookie), false));
         assert_eq!(out, [json!({ "id": 3, "method": "Storage.setCookies", "params": set_cookies(&cookie)["params"] })]);
         assert_eq!(run(&mut links, &[json!({ "id": 3, "result": {} }).to_string()]), Vec::<Value>::new());
         // Launched on the site before they landed, redirected: them again,
@@ -1102,7 +1107,7 @@ mod tests {
         // Signed in through the default browser: the new cookie, and the
         // site, in the window on the sign-in page.
         let cookie = [("authentik_proxy", "fr3sh"), ("other", "x")];
-        let out = json_of(links.set_remote(remote(&cookie)));
+        let out = json_of(links.set_remote(remote(&cookie), false));
         assert_eq!(out.len(), 1);
         assert_eq!(out[0]["params"], set_cookies(&cookie)["params"]);
         let id = out[0]["id"].clone();
@@ -1128,21 +1133,23 @@ mod tests {
     #[test]
     fn signing_in_in_the_window_from_prighs_sign_in_page() {
         let mut links = links();
-        links.set_remote(remote(&[]));
-        let out = run(
+        links.set_remote(remote(&[]), false);
+        let mut out = run(&mut links, &[created("A", "http://127.0.0.1:7780/#desktop=k&signin=1")]);
+        // Sign in here: the window goes to the site, redirected.
+        out.extend(json_of(links.set_remote(remote(&[]), true)));
+        let out_rest = run(
             &mut links,
             &[
-                created("A", "http://127.0.0.1:7780/#desktop=k&signin=1"),
-                // Sign in here: the page goes to the site, redirected.
-                requested("A", "scriptInitiated", "https://ai.example.com/#app=desktop&host=h"),
                 changed("A", "https://login.example.com/start?state=1"),
                 changed("A", "https://login.example.com/flow?state=1"),
                 changed("A", "https://ai.example.com/#app=desktop&host=h"),
             ],
         );
+        out.extend(out_rest);
         assert_eq!(
             out,
             [
+                json!({ "id": 5, "method": "Page.navigate", "sessionId": "S-A", "params": { "url": "https://ai.example.com/#app=desktop&host=h" } }),
                 json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
                 json!({ "log": "prigh's window is back from https://login.example.com" }),
             ]
