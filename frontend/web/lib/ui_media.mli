@@ -12,4 +12,8 @@ val image
   -> width:Ui_spec.Image_width.t
   -> Node.t
 
-val gallery : Ui_context.t -> title:string option -> Ui_spec.Image.t list -> Node.t
+val gallery
+  :  Ui_context.t
+  -> title:string option
+  -> Ui_spec.Image.t list
+  -> Node.t

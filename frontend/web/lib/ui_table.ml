@@ -126,7 +126,9 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
             [ Node.span [ Node.text c.label ]
             ; Node.span
                 ~attrs:
-                  [ Attr.class_ "ui-sort-mark"; Attr.create "aria-hidden" "true" ]
+                  [ Attr.class_ "ui-sort-mark"
+                  ; Attr.create "aria-hidden" "true"
+                  ]
                 [ Node.text
                     (match dir with
                      | Some `Asc -> "▲"
@@ -157,11 +159,16 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
   Node.figure
     ~attrs:[ Attr.class_ "ui-table" ]
     [ (match t.title with
-       | Some title -> Node.div ~attrs:[ Attr.class_ "ui-title" ] [ Node.text title ]
+       | Some title ->
+         Node.div ~attrs:[ Attr.class_ "ui-title" ] [ Node.text title ]
        | None -> Node.none)
     ; Node.div
-        ~attrs:[ Attr.class_ "ui-table-scroll"; Attr.tabindex 0; Attr.role "region"
-               ; Attr.create "aria-label" (Option.value t.title ~default:"Table") ]
+        ~attrs:
+          [ Attr.class_ "ui-table-scroll"
+          ; Attr.tabindex 0
+          ; Attr.role "region"
+          ; Attr.create "aria-label" (Option.value t.title ~default:"Table")
+          ]
         [ Node.table
             [ Node.thead [ Node.tr (List.map t.columns ~f:header) ]
             ; Node.tbody
@@ -171,7 +178,9 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
         ]
     ; (match t.caption with
        | Some caption ->
-         Node.figcaption ~attrs:[ Attr.class_ "ui-caption" ] [ Ui_context.md caption ]
+         Node.figcaption
+           ~attrs:[ Attr.class_ "ui-caption" ]
+           [ Ui_context.md caption ]
        | None -> Node.none)
     ]
 ;;

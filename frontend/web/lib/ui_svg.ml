@@ -10,7 +10,10 @@ let el name attrs children =
 
 let num f =
   let s = sprintf "%.2f" f in
-  let s = String.rstrip s ~drop:(Char.equal '0') |> String.rstrip ~drop:(Char.equal '.') in
+  let s =
+    String.rstrip s ~drop:(Char.equal '0')
+    |> String.rstrip ~drop:(Char.equal '.')
+  in
   if String.equal s "-0" then "0" else s
 ;;
 
@@ -33,7 +36,9 @@ let path_of_points points =
       match p with
       | None -> false
       | Some (x, y) ->
-        Buffer.add_string b (sprintf "%s%s %s " (if drawing then "L" else "M") (num x) (num y));
+        Buffer.add_string
+          b
+          (sprintf "%s%s %s " (if drawing then "L" else "M") (num x) (num y));
         true)
   in
   String.rstrip (Buffer.contents b)

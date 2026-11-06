@@ -33,7 +33,8 @@ let%expect_test "precedence and associativity" =
     ; "2 * -3"
     ; "1.5e3 + .5"
     ];
-  [%expect {|
+  [%expect
+    {|
     1 + 2 * 3                    = 7.
     (1 + 2) * 3                  = 9.
     -2^2                         = -4.
@@ -74,7 +75,8 @@ let%expect_test "comparisons, conditionals, functions" =
     ; "ln(exp(2))"
     ; "1000 * (1 + rate)^10"
     ];
-  [%expect {|
+  [%expect
+    {|
     x > 2                        = 1.
     x <= 2                       = 0.
     x == 3                       = 1.
@@ -115,7 +117,8 @@ let%expect_test "errors say what to do" =
     ; "1 $ 2"
     ; "x ? 1"
     ];
-  [%expect {|
+  [%expect
+    {|
                                  parse error: expected a number, a name or ( at 1, found the end
     1 +                          parse error: expected a number, a name or ( at 4, found the end
     (1 + 2                       parse error: expected ")" at 7, found the end

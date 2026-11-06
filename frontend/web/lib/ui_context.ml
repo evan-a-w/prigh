@@ -32,7 +32,9 @@ let create (page : Page.t) ~call_id ~fold =
   }
 ;;
 
-let get t ~path name = Ui_state.find t.state (Ui_state.key ~call_id:t.call_id ~path name)
+let get t ~path name =
+  Ui_state.find t.state (Ui_state.key ~call_id:t.call_id ~path name)
+;;
 
 let set t ~path name value =
   t.inject (Set { key = Ui_state.key ~call_id:t.call_id ~path name; value })

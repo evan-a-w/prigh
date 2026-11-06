@@ -32,7 +32,9 @@ let result ?(id = "u1") ?(is_error = false) text =
 (* The model shows [arguments]; the backend accepts them. *)
 let shown ?id ?(finish = true) h arguments =
   H.event h {|{"event":"agent_start"}|};
-  H.event h (sprintf {|{"event":"message_end","message":%s}|} (assistant ?id arguments));
+  H.event
+    h
+    (sprintf {|{"event":"message_end","message":%s}|} (assistant ?id arguments));
   H.event h (sprintf {|{"event":"tool_start","call":%s}|} (call ?id arguments));
   H.event
     h
@@ -49,7 +51,8 @@ let%expect_test "every component" =
   let h = H.create () in
   shown h components;
   H.show h ~selector:".tool-ui";
-  [%expect {|
+  [%expect
+    {|
     <div data-call="u1" class="tool-ui">
       <div class="genui ui-stack">
         <div role="note" class="tone-info ui-callout">
@@ -1025,7 +1028,8 @@ let%expect_test "every component, as text" =
   let h = H.create () in
   shown h components;
   H.text h ~selector:".tool-ui";
-  [%expect {|
+  [%expect
+    {|
     Build health
     Builds got 18% faster since dune 3.22 .
     Median build
@@ -1158,9 +1162,15 @@ let%expect_test "tree rows imply directories" =
         r.name
         (if Option.is_none r.info then "  (implied)" else ""))
   in
-  rows [ "frontend/"; "frontend/web/lib/ui_view.ml"; "backend/"; "frontend/web/x.ml" ];
+  rows
+    [ "frontend/"
+    ; "frontend/web/lib/ui_view.ml"
+    ; "backend/"
+    ; "frontend/web/x.ml"
+    ];
   rows [ "/home/u/p/a.png"; "/home/u/q/" ];
-  [%expect {|
+  [%expect
+    {|
     frontend/
       web/  (implied)
         lib/  (implied)
@@ -1185,7 +1195,8 @@ let%expect_test "sorting a table" =
   shown h table;
   let rows () = H.text h ~selector:".ui-table tbody" in
   rows ();
-  [%expect {|
+  [%expect
+    {|
     b 3.0
     a 10.0
     c —
@@ -1193,7 +1204,8 @@ let%expect_test "sorting a table" =
   H.click h ~nth:1 ~selector:".ui-sort";
   rows ();
   H.elements h ~selector:"th[aria-sort=ascending]";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/sort) (value time:desc)))
     a 10.0
     b 3.0
@@ -1202,7 +1214,8 @@ let%expect_test "sorting a table" =
   H.click h ~nth:1 ~selector:".ui-sort";
   rows ();
   H.elements h ~selector:"th[aria-sort=descending]";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/sort) (value time:asc)))
     b 3.0
     a 10.0
@@ -1210,7 +1223,8 @@ let%expect_test "sorting a table" =
     |}];
   H.click h ~selector:".ui-sort";
   rows ();
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/sort) (value name:asc)))
     a 10.0
     b 3.0
@@ -1228,7 +1242,8 @@ let%expect_test "a calculator works out as you type" =
   shown h calculator;
   let out () = H.text h ~selector:".ui-calc-outputs" in
   out ();
-  [%expect {|
+  [%expect
+    {|
     Interest
     $50.00
     Big?
@@ -1239,7 +1254,8 @@ let%expect_test "a calculator works out as you type" =
   H.input h ~selector:".ui-calc-field input" "3000";
   out ();
   H.show h ~selector:".ui-slider";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/in.p) (value 3000)))
     Interest
     $150.00
@@ -1258,7 +1274,8 @@ let%expect_test "a calculator works out as you type" =
     |}];
   H.input h ~nth:1 ~selector:".ui-calc-field input" "7.5";
   out ();
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/in.r) (value 7.5)))
     Interest
     $225.00
@@ -1269,7 +1286,8 @@ let%expect_test "a calculator works out as you type" =
     |}];
   H.input h ~nth:1 ~selector:".ui-calc-field input" "abc";
   out ();
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/in.r) (value abc)))
     Interest
     — enter a number for Rate
@@ -1282,21 +1300,26 @@ let%expect_test "a calculator works out as you type" =
 
 let%expect_test "flashcards flip and move on" =
   let h = H.create () in
-  shown h (one {|{"type":"flashcards","cards":[{"front":"One","back":"Uno"},{"front":"Two","back":"Dos"}]}|});
+  shown
+    h
+    (one
+       {|{"type":"flashcards","cards":[{"front":"One","back":"Uno"},{"front":"Two","back":"Dos"}]}|});
   let card () =
     H.names h ~selector:".ui-flash-card";
     H.elements h ~selector:".ui-flash-card";
     H.text h ~selector:".ui-count"
   in
   card ();
-  [%expect {|
+  [%expect
+    {|
     button "Card 1 of 2: front. Flip"
     <button class="ui-flash-card">
     1 / 2
     |}];
   H.click h ~selector:".ui-flash-card";
   card ();
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/flip) (value 1)))
     button "Card 1 of 2: back. Flip"
     <button class="flipped ui-flash-card">
@@ -1305,7 +1328,8 @@ let%expect_test "flashcards flip and move on" =
   H.click h ~selector:"[aria-label='Next card']";
   card ();
   H.text h ~selector:".ui-face.front";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/i) (value 1)))
     (Ui (Set (key u1/0/flip) (value 0)))
     button "Card 2 of 2: front. Flip"
@@ -1324,7 +1348,8 @@ let%expect_test "a quiz grades each answer and keeps score" =
        {|{"type":"quiz","title":"OCaml","questions":[{"question":"2+2?","options":["3","4"],"answer":1,"explanation":"Arithmetic."},{"question":"Capital of France?","options":["Paris","Rome","Oslo"],"answer":0}]}|});
   H.click h ~selector:".ui-option";
   H.text h ~selector:".ui-quiz";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/q0) (value 0)))
     OCaml
     0 / 1 correct · 1 left (Retry)
@@ -1340,7 +1365,8 @@ let%expect_test "a quiz grades each answer and keeps score" =
   H.click h ~nth:2 ~selector:".ui-option";
   H.text h ~selector:".ui-quiz";
   H.elements h ~selector:".ui-option";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/q1) (value 0)))
     OCaml
     1 / 2 correct (Retry)
@@ -1371,7 +1397,8 @@ let%expect_test "tabs and accordions" =
   H.click h ~nth:1 ~selector:".ui-tab";
   H.text h ~selector:".ui-tabs";
   H.names h ~selector:"[role=tab][aria-selected=true]";
-  [%expect {|
+  [%expect
+    {|
     (A) (B)
     first
     (Ui (Set (key u1/0/tab) (value 1)))
@@ -1387,7 +1414,8 @@ let%expect_test "tabs and accordions" =
   H.text h ~selector:".ui-accordion";
   H.click h ~selector:".ui-acc-head";
   H.text h ~selector:".ui-accordion";
-  [%expect {|
+  [%expect
+    {|
     (One)
     (Ui (Set (key u1/0/open0) (value 1)))
     (One)
@@ -1397,10 +1425,14 @@ let%expect_test "tabs and accordions" =
 
 let%expect_test "a local checklist ticks" =
   let h = H.create () in
-  shown h (one {|{"type":"checklist","title":"Todo","items":[{"text":"a"},{"text":"b","checked":true}]}|});
+  shown
+    h
+    (one
+       {|{"type":"checklist","title":"Todo","items":[{"text":"a"},{"text":"b","checked":true}]}|});
   H.click h ~selector:".ui-check-item";
   H.text h ~selector:".ui-checklist";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/c0) (value 1)))
     Todo
     2/2
@@ -1419,7 +1451,8 @@ let%expect_test "a choice is sent with ui_action, then shows as sent" =
   shown h choices;
   H.click h ~selector:".ui-choice";
   H.text h ~selector:".ui-choices";
-  [%expect {|
+  [%expect
+    {|
     (Ui
      (Send ((call_id u1) (component next) (title "What next?") (values cache))))
     Scroll_to_bottom
@@ -1440,7 +1473,8 @@ let%expect_test "a choice is sent with ui_action, then shows as sent" =
     {|{"event":"message_start","message":{"role":"user","text":"The user responded through \"What next?\" (render_ui call u1, component next):\n\"cache\"","origin":{"source":{"kind":"ui_action","title":"Sent \"What next?\": cache"}}}}|};
   H.text h ~selector:".entries";
   H.elements h ~selector:".ui-choice[disabled]";
-  [%expect {|
+  [%expect
+    {|
     What next?
     ✓ Sent
     (Cache deps) (Split e2e)
@@ -1455,9 +1489,14 @@ let%expect_test "a choice is sent with ui_action, then shows as sent" =
 let%expect_test "while the agent works, a reply is a follow-up" =
   let h = H.create () in
   shown ~finish:false h choices;
-  H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ~fields:[ "running", `True ] ()));
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json ~fields:[ "running", `True ] ()));
   H.click h ~nth:1 ~selector:".ui-choice";
-  [%expect {|
+  [%expect
+    {|
     (Ui
      (Send
       ((call_id u1) (component next) (title "What next?") (values "Split e2e"))))
@@ -1477,7 +1516,8 @@ let%expect_test "a failed send can be sent again" =
   H.click h ~selector:".ui-choice";
   H.fail h "prompt" "no such render_ui call: u1";
   H.text h ~selector:".ui-choices";
-  [%expect {|
+  [%expect
+    {|
     (Ui
      (Send ((call_id u1) (component next) (title "What next?") (values cache))))
     Scroll_to_bottom
@@ -1502,7 +1542,8 @@ let%expect_test "a form checks required fields and sends typed values" =
   shown h form;
   H.click h ~selector:".ui-actions .ui-btn";
   H.text h ~selector:".ui-actions";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/tried) (value 1)))
     Who is required (Deploy)
     |}];
@@ -1513,7 +1554,8 @@ let%expect_test "a form checks required fields and sends typed values" =
   H.input h ~selector:"input[name=who]" "me";
   H.click h ~selector:".ui-actions .ui-btn";
   H.text h ~selector:".ui-form";
-  [%expect {|
+  [%expect
+    {|
     (Ui (Set (key u1/0/f.env) (value prod)))
     (Ui (Set (key u1/0/f.replicas) (value 5)))
     (Ui (Set (key u1/0/f.notify) (value true)))
@@ -1557,14 +1599,15 @@ let%expect_test "after a reload, answered components show what was sent" =
            (Jsonaf.of_string
               (H.page
                  (sprintf
-          {|[%s,%s,{"role":"user","text":"The user responded through \"Deploy options\" (render_ui call u1, component deploy):\n{\"env\":\"prod\",\"replicas\":3,\"notify\":true,\"tags\":[\"b\"],\"who\":\"ops\"}","origin":{"source":{"kind":"ui_action","title":"Sent \"Deploy options\": env = prod, replicas = 3"}}}]|}
-          (assistant form)
-          (result "Shown: form \"Deploy options\"."))))));
+                    {|[%s,%s,{"role":"user","text":"The user responded through \"Deploy options\" (render_ui call u1, component deploy):\n{\"env\":\"prod\",\"replicas\":3,\"notify\":true,\"tags\":[\"b\"],\"who\":\"ops\"}","origin":{"source":{"kind":"ui_action","title":"Sent \"Deploy options\": env = prod, replicas = 3"}}}]|}
+                    (assistant form)
+                    (result "Shown: form \"Deploy options\".")))) ));
   H.text h ~selector:".entries";
   H.elements h ~selector:".ui-form [disabled]";
   H.show h ~selector:".ui-switch, .ui-group input";
   [%expect.unreachable]
-[@@expect.uncaught_exn {|
+[@@expect.uncaught_exn
+  {|
   ("Soup.Parse_error(\"expected tag name or '*'\")")
   Trailing output
   ---------------
@@ -1602,7 +1645,8 @@ let%expect_test "streaming, refused and cancelled calls" =
        {|{"event":"message_update","partial":%s,"delta":{"type":"tool_call_delta","index":0,"arguments":""}}|}
        (assistant {|{"components":[{"type":"ch|}));
   H.show h ~selector:".tool-ui";
-  [%expect {|
+  [%expect
+    {|
     <div class="tool-ui">
       <div role="status" aria-label="Preparing components" class="genui ui-skeleton">
         <div class="short ui-skel-line"> </div>
@@ -1623,7 +1667,8 @@ let%expect_test "streaming, refused and cancelled calls" =
   H.event h {|{"event":"agent_end","messages":[]}|};
   H.text h ~selector:".entries";
   H.elements h ~selector:".tool-ui";
-  [%expect {|
+  [%expect
+    {|
     (✕ render_ui)
     components[0].rows[2].time: give a number
     |}];
@@ -1636,11 +1681,14 @@ let%expect_test "streaming, refused and cancelled calls" =
     (sprintf
        {|{"event":"tool_end","call":%s,"result":%s}|}
        (call table)
-       (result "Nothing was shown. Fix this and call render_ui again:\n- components[0]: give rows."));
+       (result
+          "Nothing was shown. Fix this and call render_ui again:\n\
+           - components[0]: give rows."));
   H.event h {|{"event":"agent_end","messages":[]}|};
   H.text h ~selector:".entries";
   H.elements h ~selector:".tool-ui";
-  [%expect {|
+  [%expect
+    {|
     (✕ render_ui)
     Nothing was shown. Fix this and call render_ui again:
     - components[0]: give rows.
@@ -1654,7 +1702,8 @@ let%expect_test "images ask for a link as they show, and open in the viewer" =
     (one
        {|{"type":"gallery","title":"Shots","images":[{"path":"/p/a.png","caption":"Before"},{"path":"/p/b.png","alt":"After"}]}|});
   H.show h ~selector:".ui-gallery";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ fs_preview) (params ((path /p/a.png)))
      (tag (Ui_image (session s1) (path /p/a.png))))
     (Rpc (method_ fs_preview) (params ((path /p/b.png)))
@@ -1684,7 +1733,8 @@ let%expect_test "images ask for a link as they show, and open in the viewer" =
     {|{"path":"/p/a.png","name":"a.png","size":10,"kind":"image","mime":"image/png","url":"/files/download?ticket=t1"}|};
   H.fail h "fs_preview" "no such file: /p/b.png";
   H.show h ~selector:".ui-gallery";
-  [%expect {|
+  [%expect
+    {|
     <div data-viewer-group="" class="ui-gallery">
       <figure class="ui-image">
         <button type="button"

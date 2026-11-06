@@ -7,7 +7,10 @@ let title_node = function
   | None -> Node.none
 ;;
 
-let float_to_string f = Ui_format.number f |> String.filter ~f:(fun c -> not (Char.equal c ','))
+let float_to_string f =
+  Ui_format.number f |> String.filter ~f:(fun c -> not (Char.equal c ','))
+;;
+
 let input_value (i : Calculator.Input.t) ~value =
   Option.value (value i.name) ~default:(float_to_string i.default)
 ;;
@@ -80,7 +83,8 @@ let calculator (ctx : Ui_context.t) ~path (t : Calculator.t) =
                  @ bounds)
               ()
           ; (match i.unit with
-             | Some u -> Node.span ~attrs:[ Attr.class_ "ui-unit" ] [ Node.text u ]
+             | Some u ->
+               Node.span ~attrs:[ Attr.class_ "ui-unit" ] [ Node.text u ]
              | None -> Node.none)
           ]
       ; (match i.slider, i.min, i.max with
@@ -108,7 +112,9 @@ let calculator (ctx : Ui_context.t) ~path (t : Calculator.t) =
          | Error why ->
            Node.output
              ~attrs:[ Attr.class_ "ui-calc-value none"; Attr.title why ]
-             [ Node.text "—"; Node.span ~attrs:[ Attr.class_ "ui-calc-why" ] [ Node.text why ] ])
+             [ Node.text "—"
+             ; Node.span ~attrs:[ Attr.class_ "ui-calc-why" ] [ Node.text why ]
+             ])
       ]
   in
   Node.div
@@ -116,9 +122,14 @@ let calculator (ctx : Ui_context.t) ~path (t : Calculator.t) =
     [ title_node t.title
     ; Node.div
         ~attrs:[ Attr.class_ "ui-calc-body" ]
-        [ Node.div ~attrs:[ Attr.class_ "ui-calc-inputs" ] (List.map t.inputs ~f:input)
+        [ Node.div
+            ~attrs:[ Attr.class_ "ui-calc-inputs" ]
+            (List.map t.inputs ~f:input)
         ; Node.div
-            ~attrs:[ Attr.class_ "ui-calc-outputs"; Attr.create "aria-live" "polite" ]
+            ~attrs:
+              [ Attr.class_ "ui-calc-outputs"
+              ; Attr.create "aria-live" "polite"
+              ]
             (List.map (results t ~value) ~f:output)
         ]
     ]
@@ -131,18 +142,34 @@ let int_state ctx ~path name ~default =
 
 let flashcards (ctx : Ui_context.t) ~path ~title cards =
   let n = List.length cards in
-  let i = Int.clamp_exn (int_state ctx ~path "i" ~default:0) ~min:0 ~max:(Int.max 0 (n - 1)) in
-  let flipped = String.equal (Option.value (Ui_context.get ctx ~path "flip") ~default:"") "1" in
+  let i =
+    Int.clamp_exn
+      (int_state ctx ~path "i" ~default:0)
+      ~min:0
+      ~max:(Int.max 0 (n - 1))
+  in
+  let flipped =
+    String.equal
+      (Option.value (Ui_context.get ctx ~path "flip") ~default:"")
+      "1"
+  in
   let go j =
     Effect.Many
-      [ Ui_context.set ctx ~path "i" (Int.to_string j); Ui_context.set ctx ~path "flip" "0" ]
+      [ Ui_context.set ctx ~path "i" (Int.to_string j)
+      ; Ui_context.set ctx ~path "flip" "0"
+      ]
   in
   match List.nth cards i with
   | None -> Node.none
   | Some (front, back) ->
     let face cls label text =
       Node.div
-        ~attrs:[ Attr.class_ ("ui-face " ^ cls); Attr.create "aria-hidden" (Bool.to_string (Bool.( <> ) (String.equal cls "back") flipped)) ]
+        ~attrs:
+          [ Attr.class_ ("ui-face " ^ cls)
+          ; Attr.create
+              "aria-hidden"
+              (Bool.to_string (Bool.( <> ) (String.equal cls "back") flipped))
+          ]
         [ Node.span ~attrs:[ Attr.class_ "ui-face-label" ] [ Node.text label ]
         ; Ui_context.md text
         ]
@@ -164,9 +191,16 @@ let flashcards (ctx : Ui_context.t) ~path ~title cards =
       ; Node.button
           ~attrs:
             [ Attr.type_ "button"
-            ; Attr.classes ([ "ui-flash-card" ] @ if flipped then [ "flipped" ] else [])
+            ; Attr.classes
+                ([ "ui-flash-card" ] @ if flipped then [ "flipped" ] else [])
             ; Attr.create "aria-pressed" (Bool.to_string flipped)
-            ; Attr.create "aria-label" (sprintf "Card %d of %d: %s. Flip" (i + 1) n (if flipped then "back" else "front"))
+            ; Attr.create
+                "aria-label"
+                (sprintf
+                   "Card %d of %d: %s. Flip"
+                   (i + 1)
+                   n
+                   (if flipped then "back" else "front"))
             ; Attr.on_click (fun _ ->
                 Ui_context.set ctx ~path "flip" (if flipped then "0" else "1"))
             ]
@@ -176,18 +210,35 @@ let flashcards (ctx : Ui_context.t) ~path ~title cards =
           ]
       ; Node.div
           ~attrs:[ Attr.class_ "ui-flash-nav" ]
-          [ nav ~label:"Previous card" ~text:"‹ Prev" ~target:(i - 1) ~enabled:(i > 0)
+          [ nav
+              ~label:"Previous card"
+              ~text:"‹ Prev"
+              ~target:(i - 1)
+              ~enabled:(i > 0)
           ; Node.span
-              ~attrs:[ Attr.class_ "ui-count"; Attr.create "aria-live" "polite" ]
+              ~attrs:
+                [ Attr.class_ "ui-count"; Attr.create "aria-live" "polite" ]
               [ Node.text (sprintf "%d / %d" (i + 1) n) ]
-          ; nav ~label:"Next card" ~text:"Next ›" ~target:(i + 1) ~enabled:(i < n - 1)
+          ; nav
+              ~label:"Next card"
+              ~text:"Next ›"
+              ~target:(i + 1)
+              ~enabled:(i < n - 1)
           ]
       ]
 ;;
 
-let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list) =
-  let chosen k = Option.bind (Ui_context.get ctx ~path (sprintf "q%d" k)) ~f:Int.of_string_opt in
-  let answered = List.filter_mapi questions ~f:(fun k q -> Option.map (chosen k) ~f:(fun c -> c = q.answer)) in
+let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
+  =
+  let chosen k =
+    Option.bind
+      (Ui_context.get ctx ~path (sprintf "q%d" k))
+      ~f:Int.of_string_opt
+  in
+  let answered =
+    List.filter_mapi questions ~f:(fun k q ->
+      Option.map (chosen k) ~f:(fun c -> c = q.answer))
+  in
   let correct = List.count answered ~f:Fn.id in
   let total = List.length questions in
   let question k (q : Ui_spec.Question.t) =
@@ -197,25 +248,37 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
         match choice with
         | None -> []
         | Some c ->
-          if j = q.answer then [ "correct" ] else if j = c then [ "wrong" ] else [ "other" ]
+          if j = q.answer
+          then [ "correct" ]
+          else if j = c
+          then [ "wrong" ]
+          else [ "other" ]
       in
       Node.button
         ~attrs:
           ([ Attr.type_ "button"
            ; Attr.classes ([ "ui-option" ] @ state)
            ; Attr.role "radio"
-           ; Attr.create "aria-checked" (Bool.to_string (Option.equal Int.equal choice (Some j)))
+           ; Attr.create
+               "aria-checked"
+               (Bool.to_string (Option.equal Int.equal choice (Some j)))
            ]
            @
            match choice with
            | Some _ -> [ Attr.create "aria-disabled" "true" ]
            | None ->
-             [ Attr.on_click (fun _ -> Ui_context.set ctx ~path (sprintf "q%d" k) (Int.to_string j)) ])
-        [ Node.span ~attrs:[ Attr.class_ "ui-option-key" ] [ Node.text (String.of_char (Char.of_int_exn (65 + j))) ]
+             [ Attr.on_click (fun _ ->
+                 Ui_context.set ctx ~path (sprintf "q%d" k) (Int.to_string j))
+             ])
+        [ Node.span
+            ~attrs:[ Attr.class_ "ui-option-key" ]
+            [ Node.text (String.of_char (Char.of_int_exn (65 + j))) ]
         ; Node.span ~attrs:[ Attr.class_ "ui-option-text" ] [ Node.text text ]
         ; (match state with
-           | [ "correct" ] -> Node.span ~attrs:[ Attr.class_ "ui-option-mark" ] [ Node.text "✓" ]
-           | [ "wrong" ] -> Node.span ~attrs:[ Attr.class_ "ui-option-mark" ] [ Node.text "✗" ]
+           | [ "correct" ] ->
+             Node.span ~attrs:[ Attr.class_ "ui-option-mark" ] [ Node.text "✓" ]
+           | [ "wrong" ] ->
+             Node.span ~attrs:[ Attr.class_ "ui-option-mark" ] [ Node.text "✗" ]
            | _ -> Node.none)
         ]
     in
@@ -223,7 +286,9 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
       ~attrs:[ Attr.class_ "ui-question" ]
       [ Node.div
           ~attrs:[ Attr.class_ "ui-question-head" ]
-          [ Node.span ~attrs:[ Attr.class_ "ui-question-n" ] [ Node.text (sprintf "%d" (k + 1)) ]
+          [ Node.span
+              ~attrs:[ Attr.class_ "ui-question-n" ]
+              [ Node.text (sprintf "%d" (k + 1)) ]
           ; Ui_context.md q.question
           ]
       ; Node.div
@@ -232,8 +297,14 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
       ; (match choice, q.explanation with
          | Some c, explanation ->
            Node.div
-             ~attrs:[ Attr.classes [ "ui-verdict"; (if c = q.answer then "right" else "wrong") ]; Attr.create "aria-live" "polite" ]
-             [ Node.strong [ Node.text (if c = q.answer then "Correct." else "Not quite.") ]
+             ~attrs:
+               [ Attr.classes
+                   [ "ui-verdict"; (if c = q.answer then "right" else "wrong") ]
+               ; Attr.create "aria-live" "polite"
+               ]
+             [ Node.strong
+                 [ Node.text (if c = q.answer then "Correct." else "Not quite.")
+                 ]
              ; (match explanation with
                 | Some e -> Ui_context.md e
                 | None -> Node.none)
@@ -250,9 +321,14 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
             ~attrs:[ Attr.class_ "ui-score"; Attr.create "aria-live" "polite" ]
             [ Node.text
                 (if List.is_empty answered
-                 then sprintf "%d question%s" total (if total = 1 then "" else "s")
-                 else sprintf "%d / %d correct" correct (List.length answered)
-                      ^ if List.length answered < total then sprintf " · %d left" (total - List.length answered) else "")
+                 then
+                   sprintf "%d question%s" total (if total = 1 then "" else "s")
+                 else
+                   sprintf "%d / %d correct" correct (List.length answered)
+                   ^
+                   if List.length answered < total
+                   then sprintf " · %d left" (total - List.length answered)
+                   else "")
             ]
         ; (if List.is_empty answered
            then Node.none
@@ -262,10 +338,14 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
                  [ Attr.type_ "button"
                  ; Attr.class_ "ui-btn ghost small"
                  ; Attr.on_click (fun _ ->
-                     Effect.Many (List.mapi questions ~f:(fun k _ -> Ui_context.set ctx ~path (sprintf "q%d" k) "")))
+                     Effect.Many
+                       (List.mapi questions ~f:(fun k _ ->
+                          Ui_context.set ctx ~path (sprintf "q%d" k) "")))
                  ]
                [ Node.text "Retry" ])
         ]
-    ; Node.div ~attrs:[ Attr.class_ "ui-questions" ] (List.mapi questions ~f:question)
+    ; Node.div
+        ~attrs:[ Attr.class_ "ui-questions" ]
+        (List.mapi questions ~f:question)
     ]
 ;;

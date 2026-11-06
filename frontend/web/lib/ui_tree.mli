@@ -8,7 +8,8 @@ module Row : sig
   type 'a t =
     { depth : int
     ; name : string (** a directory's ends in [/] *)
-    ; path : string (** from the root, as given (implied directories end in [/]) *)
+    ; path : string
+      (** from the root, as given (implied directories end in [/]) *)
     ; dir : bool
     ; info : 'a option (** the entry's, [None] for an implied directory *)
     }

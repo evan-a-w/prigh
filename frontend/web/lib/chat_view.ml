@@ -340,11 +340,11 @@ module Deps = struct
     && Option.equal Fold.equal a.nested b.nested
     && Option.equal
          (fun (a : Ui_context.Page.t) (b : Ui_context.Page.t) ->
-           phys_equal a.state b.state
-           && phys_equal a.inject b.inject
-           && Sexp.equal
-                [%sexp (a.sent : Ui_action.Sent.t list)]
-                [%sexp (b.sent : Ui_action.Sent.t list)])
+            phys_equal a.state b.state
+            && phys_equal a.inject b.inject
+            && Sexp.equal
+                 [%sexp (a.sent : Ui_action.Sent.t list)]
+                 [%sexp (b.sent : Ui_action.Sent.t list)])
          a.ui
          b.ui
   ;;
@@ -636,8 +636,7 @@ and view
   View_cache.find
     chats
     chat
-    ~deps:
-      { Chat_deps.times; fold; menu; index; deleting; dividers; ui }
+    ~deps:{ Chat_deps.times; fold; menu; index; deleting; dividers; ui }
     ~equal:Chat_deps.equal
     ~f:(fun () ->
       entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat)

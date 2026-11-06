@@ -47,10 +47,15 @@ module Sent = struct
       | None -> text, ""
     in
     let%bind () =
-      Option.some_if (String.is_prefix first ~prefix:"The user responded through ") ()
+      Option.some_if
+        (String.is_prefix first ~prefix:"The user responded through ")
+        ()
     in
     (* The title may hold anything: the reference is the last one. *)
-    let%bind i = List.last (String.substr_index_all first ~may_overlap:false ~pattern:marker) in
+    let%bind i =
+      List.last
+        (String.substr_index_all first ~may_overlap:false ~pattern:marker)
+    in
     let inside = String.drop_prefix first (i + String.length marker) in
     let%bind inside = String.chop_suffix inside ~suffix:"):" in
     let%bind call_id, component = String.lsplit2 inside ~on:',' in
@@ -61,7 +66,9 @@ module Sent = struct
     ; component
     ; values =
         (* Compact JSON on one line; harness notes may follow it. *)
-        (let line = Option.value_map (String.lsplit2 rest ~on:'\n') ~default:rest ~f:fst in
+        (let line =
+           Option.value_map (String.lsplit2 rest ~on:'\n') ~default:rest ~f:fst
+         in
          Result.ok (Json.parse (String.strip line)))
     }
   ;;

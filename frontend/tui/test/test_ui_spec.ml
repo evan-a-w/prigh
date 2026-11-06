@@ -7,7 +7,8 @@ let parse json =
   | None -> print_endline "(not render_ui arguments)"
   | Some t ->
     print_s [%sexp (t : Ui_spec.t)];
-    List.iter (Ui_spec.summary t) ~f:(fun line -> print_endline ("[" ^ line ^ "]"))
+    List.iter (Ui_spec.summary t) ~f:(fun line ->
+      print_endline ("[" ^ line ^ "]"))
 ;;
 
 let%expect_test "components parse into their types, with their summaries" =
@@ -20,7 +21,8 @@ let%expect_test "components parse into their types, with their summaries" =
       {"type":"form","id":"deploy","title":"Deploy options","fields":[{"name":"env","kind":"select","options":["a","b"],"required":true}],"submit":"Go"},
       {"type":"tabs","tabs":[{"label":"One","children":[{"type":"markdown","text":"hi"}]}]}
     ]}|};
-  [%expect {|
+  [%expect
+    {|
     (((id ())
       (body (
         Chart (
@@ -111,7 +113,8 @@ let%expect_test "tolerant: unknown types, bad fields, not JSON" =
   parse {|{"components":"nope"}|};
   parse {|{"components":[{"type":"chart"|};
   parse {|[]|};
-  [%expect {|
+  [%expect
+    {|
     (((id ())
       (body (
         Unknown
@@ -158,7 +161,8 @@ let%expect_test "walk and image paths reach nested components" =
   List.iter (Ui_spec.walk t) ~f:(fun (path, c) ->
     printf "%s %s\n" path (Ui_spec.Component.type_name c));
   print_s [%sexp (Ui_spec.image_paths t : string list)];
-  [%expect {|
+  [%expect
+    {|
     0 card
     0.0 gallery
     0.1 accordion
@@ -178,7 +182,9 @@ let%expect_test "ui_action: the request, and finding a reply in the transcript" 
   print_endline (Json.to_string (Ui_action.to_json a));
   let text = Ui_action.message_text a in
   print_endline text;
-  let found text = print_s [%sexp (Ui_action.Sent.of_text text : Ui_action.Sent.t option)] in
+  let found text =
+    print_s [%sexp (Ui_action.Sent.of_text text : Ui_action.Sent.t option)]
+  in
   found text;
   (* As the backend sends it, with the client note after it. *)
   found (text ^ "\n[Client: the user now uses prigh-web.]");
@@ -186,9 +192,12 @@ let%expect_test "ui_action: the request, and finding a reply in the transcript" 
   found
     {|The user responded through "x (render_ui call u9, component z):" (render_ui call u2, component next):
 "cache"|};
-  found "The user responded through \"t\" (render_ui call u3, component c):\nnot json";
+  found
+    "The user responded through \"t\" (render_ui call u3, component c):\n\
+     not json";
   found "hello";
-  [%expect {|
+  [%expect
+    {|
     {"call_id":"u1","component":"deploy","title":"Deploy options","values":{"env":"prod","replicas":3}}
     The user responded through "Deploy options" (render_ui call u1, component deploy):
     {"env":"prod","replicas":3}

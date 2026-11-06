@@ -36,7 +36,9 @@ let tokenize s =
       let c = s.[i] in
       if Char.is_whitespace c
       then go (i + 1) acc
-      else if Char.is_digit c || (Char.equal c '.' && i + 1 < n && Char.is_digit s.[i + 1])
+      else if
+        Char.is_digit c
+        || (Char.equal c '.' && i + 1 < n && Char.is_digit s.[i + 1])
       then (
         let j = ref i in
         while !j < n && (Char.is_digit s.[!j] || Char.equal s.[!j] '.') do
@@ -46,7 +48,8 @@ let tokenize s =
         if !j < n && Char.equal (Char.lowercase s.[!j]) 'e'
         then (
           let k = ref (!j + 1) in
-          if !k < n && (Char.equal s.[!k] '+' || Char.equal s.[!k] '-') then incr k;
+          if !k < n && (Char.equal s.[!k] '+' || Char.equal s.[!k] '-')
+          then incr k;
           if !k < n && Char.is_digit s.[!k]
           then (
             while !k < n && Char.is_digit s.[!k] do
@@ -70,12 +73,23 @@ let tokenize s =
         | "<=" | ">=" | "==" | "!=" -> go (i + 2) ((Token.Op two, i) :: acc)
         | _ ->
           (match c with
-           | '+' | '-' | '*' | '/' | '^' | '%' | '(' | ')' | ',' | '<' | '>' | '?' | ':' ->
-             go (i + 1) ((Token.Op (String.of_char c), i) :: acc)
+           | '+'
+           | '-'
+           | '*'
+           | '/'
+           | '^'
+           | '%'
+           | '('
+           | ')'
+           | ','
+           | '<'
+           | '>'
+           | '?'
+           | ':' -> go (i + 1) ((Token.Op (String.of_char c), i) :: acc)
            | _ ->
              Or_error.errorf
-               "%C at %d: use numbers, input names, + - * / ^ %%, comparisons, ?: and \
-                functions"
+               "%C at %d: use numbers, input names, + - * / ^ %%, comparisons, \
+                ?: and functions"
                c
                (i + 1))))
   in
@@ -83,7 +97,18 @@ let tokenize s =
 ;;
 
 let functions =
-  [ "min"; "max"; "abs"; "round"; "floor"; "ceil"; "sqrt"; "pow"; "log"; "ln"; "exp" ]
+  [ "min"
+  ; "max"
+  ; "abs"
+  ; "round"
+  ; "floor"
+  ; "ceil"
+  ; "sqrt"
+  ; "pow"
+  ; "log"
+  ; "ln"
+  ; "exp"
+  ]
 ;;
 
 exception Parse_error of string
@@ -100,7 +125,12 @@ let parse s =
     let expect op =
       if Token.equal (peek ()) (Op op)
       then advance ()
-      else fail "expected %S at %d, found %s" op (pos ()) (Token.describe (peek ()))
+      else
+        fail
+          "expected %S at %d, found %s"
+          op
+          (pos ())
+          (Token.describe (peek ()))
     in
     let rec ternary () =
       let c = comparison () in
@@ -194,7 +224,11 @@ let parse s =
       | Name name ->
         advance ();
         Var name
-      | tok -> fail "expected a number, a name or ( at %d, found %s" (pos ()) (Token.describe tok)
+      | tok ->
+        fail
+          "expected a number, a name or ( at %d, found %s"
+          (pos ())
+          (Token.describe tok)
     and peek_second () =
       match !tokens with
       | _ :: (t, _) :: _ -> t
@@ -245,8 +279,14 @@ let eval t ~env =
        | "+" -> Ok (a +. b)
        | "-" -> Ok (a -. b)
        | "*" -> Ok (a *. b)
-       | "/" -> if Float.(b = 0.) then Or_error.error_string "division by zero" else Ok (a /. b)
-       | "%" -> if Float.(b = 0.) then Or_error.error_string "division by zero" else Ok (Float.mod_float a b)
+       | "/" ->
+         if Float.(b = 0.)
+         then Or_error.error_string "division by zero"
+         else Ok (a /. b)
+       | "%" ->
+         if Float.(b = 0.)
+         then Or_error.error_string "division by zero"
+         else Ok (Float.mod_float a b)
        | "^" -> Ok (a **. b)
        | "<" -> Ok (bool Float.(a < b))
        | "<=" -> Ok (bool Float.(a <= b))
@@ -260,10 +300,16 @@ let eval t ~env =
       let arity n =
         if List.length args = n
         then Ok ()
-        else Or_error.errorf "%s takes %d argument%s" f n (if n = 1 then "" else "s")
+        else
+          Or_error.errorf
+            "%s takes %d argument%s"
+            f
+            n
+            (if n = 1 then "" else "s")
       in
       (match f, args with
-       | ("min" | "max"), [] -> Or_error.errorf "%s takes at least one argument" f
+       | ("min" | "max"), [] ->
+         Or_error.errorf "%s takes at least one argument" f
        | "min", x :: xs -> Ok (List.fold xs ~init:x ~f:Float.min)
        | "max", x :: xs -> Ok (List.fold xs ~init:x ~f:Float.max)
        | "round", [ x ] -> Ok (Float.round_nearest x)

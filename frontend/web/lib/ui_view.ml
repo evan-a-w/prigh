@@ -6,7 +6,9 @@ let cache : (string * Ui_spec.t option) String.Table.t = String.Table.create ()
 
 let spec (call : Tool_call.t) =
   match Hashtbl.find cache call.id with
-  | Some (args, spec) when phys_equal args call.arguments || String.equal args call.arguments -> spec
+  | Some (args, spec)
+    when phys_equal args call.arguments || String.equal args call.arguments ->
+    spec
   | _ ->
     let spec = Ui_spec.of_arguments call.arguments in
     Hashtbl.set cache ~key:call.id ~data:(call.arguments, spec);
@@ -37,7 +39,8 @@ let spark values =
     let hi = List.fold values ~init:Float.neg_infinity ~f:Float.max in
     let span = if Float.(hi -. lo < 1e-12) then 1. else hi -. lo in
     let n = List.length values in
-    let w = 100. and h = 32. in
+    let w = 100.
+    and h = 32. in
     let pts =
       List.mapi values ~f:(fun i v ->
         Some
@@ -49,8 +52,25 @@ let spark values =
       ~cls:"ui-spark"
       ~width:w
       ~height:h
-      [ Ui_svg.el "path" [ "class", "ui-spark-area"; "d", sprintf "%s L %s %s L 0 %s Z" line (Ui_svg.num w) (Ui_svg.num h) (Ui_svg.num h) ] []
-      ; Ui_svg.el "path" [ "class", "ui-spark-line"; "d", line; "vector-effect", "non-scaling-stroke" ] []
+      [ Ui_svg.el
+          "path"
+          [ "class", "ui-spark-area"
+          ; ( "d"
+            , sprintf
+                "%s L %s %s L 0 %s Z"
+                line
+                (Ui_svg.num w)
+                (Ui_svg.num h)
+                (Ui_svg.num h) )
+          ]
+          []
+      ; Ui_svg.el
+          "path"
+          [ "class", "ui-spark-line"
+          ; "d", line
+          ; "vector-effect", "non-scaling-stroke"
+          ]
+          []
       ]
 ;;
 
@@ -59,11 +79,13 @@ let stat ~label ~value ~unit ~delta ~trend ~good ~caption ~spark:values =
     match trend, delta with
     | Some t, _ -> Some t
     | None, Some (Ui_spec.Scalar.Number f) ->
-      Some (if Float.(f > 0.) then Up else if Float.(f < 0.) then Down else Flat)
+      Some
+        (if Float.(f > 0.) then Up else if Float.(f < 0.) then Down else Flat)
     | None, Some (Text s) ->
       (match String.lstrip s with
        | s when String.is_prefix s ~prefix:"+" -> Some Up
-       | s when String.is_prefix s ~prefix:"-" || String.is_prefix s ~prefix:"−" -> Some Down
+       | s when String.is_prefix s ~prefix:"-" || String.is_prefix s ~prefix:"−"
+         -> Some Down
        | _ -> None)
     | None, None -> None
   in
@@ -118,7 +140,8 @@ let progress ~label ~value ~max ~tone ~caption =
             "ui-progress-value"
             (if Float.equal max 100.
              then Ui_format.number ~decimals:0 value ^ "%"
-             else sprintf "%s / %s" (Ui_format.number value) (Ui_format.number max))
+             else
+               sprintf "%s / %s" (Ui_format.number value) (Ui_format.number max))
         ]
     ; Node.div
         ~attrs:
@@ -132,7 +155,10 @@ let progress ~label ~value ~max ~tone ~caption =
         [ Node.div
             ~attrs:
               [ Attr.class_ "ui-bar-fill"
-              ; Attr.style (Css_gen.create ~field:"width" ~value:(sprintf "%.2f%%" (pct *. 100.)))
+              ; Attr.style
+                  (Css_gen.create
+                     ~field:"width"
+                     ~value:(sprintf "%.2f%%" (pct *. 100.)))
               ]
             []
         ]
@@ -150,7 +176,10 @@ let timeline ~title (items : Ui_spec.Item.t list) =
         (List.map items ~f:(fun i ->
            Node.li
              ~attrs:[ Attr.classes [ "ui-event"; tone_cls i.tone ] ]
-             [ Node.span ~attrs:[ Attr.class_ "ui-dot"; Attr.create "aria-hidden" "true" ] []
+             [ Node.span
+                 ~attrs:
+                   [ Attr.class_ "ui-dot"; Attr.create "aria-hidden" "true" ]
+                 []
              ; div
                  "ui-event-body"
                  [ div
@@ -173,27 +202,34 @@ let steps ~title items =
     "ui-steps"
     [ title_node title
     ; Node.ol
-        (List.map items ~f:(fun ((i : Ui_spec.Item.t), (status : Ui_spec.Step_status.t)) ->
-           let cls, mark =
-             match status with
-             | Done -> "done", Html.mark ~cls:"done" ~label:"Done" Check
-             | Current -> "now", Html.mark ~cls:"now" ~label:"In progress" Next
-             | Failed -> "failed", Html.mark ~cls:"failed" ~label:"Failed" Cross
-             | Todo -> "todo", Html.mark ~cls:"todo" ~label:"To do" Ring
-           in
-           Node.li
-             ~attrs:
-               ([ Attr.class_ ("ui-step " ^ cls) ]
-                @ match status with Current -> [ Attr.create "aria-current" "step" ] | _ -> [])
-             [ mark
-             ; div
-                 "ui-step-body"
-                 [ text "ui-step-title" i.title
-                 ; (match i.text with
-                    | Some t -> Ui_context.md ~cls:"ui-step-text" t
-                    | None -> Node.none)
-                 ]
-             ]))
+        (List.map
+           items
+           ~f:(fun ((i : Ui_spec.Item.t), (status : Ui_spec.Step_status.t)) ->
+             let cls, mark =
+               match status with
+               | Done -> "done", Html.mark ~cls:"done" ~label:"Done" Check
+               | Current ->
+                 "now", Html.mark ~cls:"now" ~label:"In progress" Next
+               | Failed ->
+                 "failed", Html.mark ~cls:"failed" ~label:"Failed" Cross
+               | Todo -> "todo", Html.mark ~cls:"todo" ~label:"To do" Ring
+             in
+             Node.li
+               ~attrs:
+                 ([ Attr.class_ ("ui-step " ^ cls) ]
+                  @
+                  match status with
+                  | Current -> [ Attr.create "aria-current" "step" ]
+                  | _ -> [])
+               [ mark
+               ; div
+                   "ui-step-body"
+                   [ text "ui-step-title" i.title
+                   ; (match i.text with
+                      | Some t -> Ui_context.md ~cls:"ui-step-text" t
+                      | None -> Node.none)
+                   ]
+               ]))
     ]
 ;;
 
@@ -211,17 +247,25 @@ let code ~lang ~title code =
 
 let tree ~title entries =
   let rows =
-    Ui_tree.rows (List.map entries ~f:(fun (path, note, tone) -> path, (note, tone)))
+    Ui_tree.rows
+      (List.map entries ~f:(fun (path, note, tone) -> path, (note, tone)))
     |> List.map ~f:(fun (r : _ Ui_tree.Row.t) ->
-      let note, tone = Option.value r.info ~default:(None, Ui_spec.Tone.Neutral) in
+      let note, tone =
+        Option.value r.info ~default:(None, Ui_spec.Tone.Neutral)
+      in
       Node.li
         ~attrs:
-          [ Attr.classes [ "ui-tree-row"; tone_cls tone; (if r.dir then "dir" else "file") ]
+          [ Attr.classes
+              [ "ui-tree-row"
+              ; tone_cls tone
+              ; (if r.dir then "dir" else "file")
+              ]
           ; Ui_style.attr [ "--depth", Int.to_string r.depth ]
           ; Attr.title r.path
           ]
         [ Node.span
-            ~attrs:[ Attr.class_ "ui-tree-icon"; Attr.create "aria-hidden" "true" ]
+            ~attrs:
+              [ Attr.class_ "ui-tree-icon"; Attr.create "aria-hidden" "true" ]
             [ (if r.dir then Html.Icon.view Folder else Node.none) ]
         ; text "ui-tree-name" r.name
         ; (match note with
@@ -238,12 +282,15 @@ let unknown type_ =
     [ Node.text
         (if String.is_empty type_
          then "A component without a type"
-         else sprintf "A %S component this page can't show: update prigh-web" type_)
+         else
+           sprintf "A %S component this page can't show: update prigh-web" type_)
     ]
 ;;
 
 let rec component (ctx : Ui_context.t) ~path (c : C.t) =
-  let children p cs = List.mapi cs ~f:(fun k c -> component ctx ~path:(sprintf "%s.%d" p k) c) in
+  let children p cs =
+    List.mapi cs ~f:(fun k c -> component ctx ~path:(sprintf "%s.%d" p k) c)
+  in
   let reply_id = Option.value c.id ~default:path in
   let reply_title = Option.value (C.title c) ~default:reply_id in
   let node =
@@ -256,7 +303,10 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
            | _ ->
              Node.header
                [ (match title with
-                  | Some t -> Node.h3 ~attrs:[ Attr.class_ "ui-card-title" ] [ Node.text t ]
+                  | Some t ->
+                    Node.h3
+                      ~attrs:[ Attr.class_ "ui-card-title" ]
+                      [ Node.text t ]
                   | None -> Node.none)
                ; (match subtitle with
                   | Some s -> Ui_context.md ~cls:"ui-sub" s
@@ -332,14 +382,22 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
            in
            let id = sprintf "ui-%s-%s-acc%d" ctx.call_id path k in
            Node.div
-             ~attrs:[ Attr.classes ([ "ui-acc-item" ] @ if opened then [ "open" ] else []) ]
+             ~attrs:
+               [ Attr.classes
+                   ([ "ui-acc-item" ] @ if opened then [ "open" ] else [])
+               ]
              [ Node.button
                  ~attrs:
                    [ Attr.type_ "button"
                    ; Attr.class_ "ui-acc-head"
                    ; Attr.create "aria-expanded" (Bool.to_string opened)
                    ; Attr.create "aria-controls" id
-                   ; Attr.on_click (fun _ -> Ui_context.set ctx ~path key (if opened then "0" else "1"))
+                   ; Attr.on_click (fun _ ->
+                       Ui_context.set
+                         ctx
+                         ~path
+                         key
+                         (if opened then "0" else "1"))
                    ]
                  [ text "ui-acc-title" item.title; text "chev" "" ]
              ; (if opened
@@ -380,14 +438,24 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
     | Badges items ->
       div
         "ui-badges"
-        (List.map items ~f:(fun (t, tone) -> Node.span ~attrs:[ Attr.classes [ "ui-badge"; tone_cls tone ] ] [ Node.text t ]))
+        (List.map items ~f:(fun (t, tone) ->
+           Node.span
+             ~attrs:[ Attr.classes [ "ui-badge"; tone_cls tone ] ]
+             [ Node.text t ]))
     | Table t -> Ui_table.view ctx ~path t
     | Chart chart -> Ui_chart.view ctx ~path chart
     | Timeline { title; items } -> timeline ~title items
     | Steps { title; items } -> steps ~title items
     | Code { lang; title; code = c } -> code ~lang ~title c
     | Diff { title; diff } ->
-      div "ui-diff" [ title_node title; Diff_view.unified ~max_rows:40 ~fold:(ctx.fold, sprintf "%s#ui%s" ctx.call_id path) diff ]
+      div
+        "ui-diff"
+        [ title_node title
+        ; Diff_view.unified
+            ~max_rows:40
+            ~fold:(ctx.fold, sprintf "%s#ui%s" ctx.call_id path)
+            diff
+        ]
     | Tree { title; entries } -> tree ~title entries
     | Image { image; width } -> Ui_media.image ctx image ~width
     | Gallery { title; images } -> Ui_media.gallery ctx ~title images
@@ -395,11 +463,33 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
     | Flashcards { title; cards } -> Ui_learn.flashcards ctx ~path ~title cards
     | Quiz { title; questions } -> Ui_learn.quiz ctx ~path ~title questions
     | Form { title; description; fields; submit } ->
-      Ui_reply.form ctx ~path ~component:reply_id ~title:reply_title ~description fields ~submit ~heading:title
+      Ui_reply.form
+        ctx
+        ~path
+        ~component:reply_id
+        ~title:reply_title
+        ~description
+        fields
+        ~submit
+        ~heading:title
     | Choices { prompt; options; multiple } ->
-      Ui_reply.choices ctx ~path ~component:reply_id ~title:reply_title ~prompt options ~multiple
+      Ui_reply.choices
+        ctx
+        ~path
+        ~component:reply_id
+        ~title:reply_title
+        ~prompt
+        options
+        ~multiple
     | Checklist { title; items; submit } ->
-      Ui_reply.checklist ctx ~path ~component:(Option.some_if (Option.is_some submit) reply_id) ~title:reply_title ~heading:title items ~submit
+      Ui_reply.checklist
+        ctx
+        ~path
+        ~component:(Option.some_if (Option.is_some submit) reply_id)
+        ~title:reply_title
+        ~heading:title
+        items
+        ~submit
     | Unknown { type_; _ } -> unknown type_
   in
   node
@@ -418,5 +508,8 @@ let skeleton () =
       ; Attr.role "status"
       ; Attr.create "aria-label" "Preparing components"
       ]
-    [ div "ui-skel-line short" []; div "ui-skel-block" []; div "ui-skel-line" [] ]
+    [ div "ui-skel-line short" []
+    ; div "ui-skel-block" []
+    ; div "ui-skel-line" []
+    ]
 ;;

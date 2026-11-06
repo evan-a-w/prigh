@@ -883,7 +883,8 @@ let render_ui ~ui ~nested ~fold ~streaming ~running (call : Tool_call.t) tool =
   let tool =
     Option.map tool ~f:(fun (t : Chat.Tool.t) ->
       match t.result with
-      | Some r when refused r -> { t with result = Some { r with is_error = true } }
+      | Some r when refused r ->
+        { t with result = Some { r with is_error = true } }
       | _ -> t)
   in
   let result = Option.bind tool ~f:(fun (t : Chat.Tool.t) -> t.result) in
@@ -902,7 +903,15 @@ let render_ui ~ui ~nested ~fold ~streaming ~running (call : Tool_call.t) tool =
   | None, _ -> card ~nested ~fold ~streaming ~running call tool
 ;;
 
-let view ?(ui = Ui_context.Page.none) ~nested ~fold ~streaming ~running call tool =
+let view
+      ?(ui = Ui_context.Page.none)
+      ~nested
+      ~fold
+      ~streaming
+      ~running
+      call
+      tool
+  =
   if String.equal call.Tool_call.name "render_ui"
   then render_ui ~ui ~nested ~fold ~streaming ~running call tool
   else card ~nested ~fold ~streaming ~running call tool

@@ -309,7 +309,8 @@ let%expect_test
     {|{"text":"","attachments":[],"ui_action":{"call_id":"c1","component":"next","summary":"Sent \"Next\": tests"}}|};
   H.text h ~selector:".toast";
   print_endline (H.model h).draft;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ dequeue) (params ()) (tag Dequeued))
     (Expire_toast (id 1) (after_ms 3180))
     Nothing is queued
