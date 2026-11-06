@@ -1630,6 +1630,24 @@ let%expect_test "streaming, refused and cancelled calls" =
   [%expect {|
     (✕ render_ui)
     components[0].rows[2].time: give a number
+    |}];
+  (* A refusal shows nothing even when it is not flagged as an error. *)
+  let h = H.create () in
+  H.event h {|{"event":"agent_start"}|};
+  H.event h (sprintf {|{"event":"message_end","message":%s}|} (assistant table));
+  H.event
+    h
+    (sprintf
+       {|{"event":"tool_end","call":%s,"result":%s}|}
+       (call table)
+       (result "Nothing was shown. Fix this and call render_ui again:\n- components[0]: give rows."));
+  H.event h {|{"event":"agent_end","messages":[]}|};
+  H.text h ~selector:".entries";
+  H.elements h ~selector:".tool-ui";
+  [%expect {|
+    (✕ render_ui)
+    Nothing was shown. Fix this and call render_ui again:
+    - components[0]: give rows.
     |}]
 ;;
 
