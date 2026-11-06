@@ -354,7 +354,11 @@ module Command : sig
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
-    | Copy of string (** to the clipboard *)
+    | Copy of
+        { text : string
+        ; copied : string (** the toast once it is there *)
+        }
+    (** to the clipboard, answered by [Copied] or [Copy_failed] *)
     | Select_message of int
     (** the text of the message of this entry, selected and left
         selectable (a phone's long press opens its menu instead) *)
@@ -455,6 +459,9 @@ module Action : sig
     (** at startup: [Notification.permission] *)
     | Notification_permission of string
     (** the browser's answer to [Request_notification_permission] *)
+    | Copied of string (** [Command.Copy] worked: its [copied] *)
+    | Copy_failed of { secure : bool }
+    (** [Command.Copy] did not: the page a secure context or not *)
     | Set_draft of string (** the caret at the end *)
     | Edit of
         { text : string

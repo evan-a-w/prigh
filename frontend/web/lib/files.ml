@@ -196,7 +196,10 @@ module Out = struct
         { text : string
         ; error : bool
         }
-    | Copy of string
+    | Copy of
+        { text : string
+        ; copied : string
+        }
     | Insert of string
     | Focus_editor
   [@@deriving sexp_of]
@@ -946,8 +949,10 @@ let update t (action : Action.t) =
   | Ask_cancel -> ask_cancel t
   | Copy_path path ->
     ( t
-    , [ Out.Copy path
-      ; toast (sprintf "Copied the path %s" (display_path t path))
+    , [ Out.Copy
+          { text = path
+          ; copied = sprintf "Copied the path %s" (display_path t path)
+          }
       ] )
   | Insert_path path -> t, [ Out.Insert ("@" ^ mention t path) ]
   | Attach name -> attach t name
