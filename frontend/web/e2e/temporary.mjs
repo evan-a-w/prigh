@@ -142,7 +142,9 @@ const screen = async (w, h, label) => {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".main.fresh .hero").waitFor();
-  await page.locator(".sessions [data-session], .sessions-empty").first().waitFor({ state: "attached" });
+  // The sidebar shows no sessions until the backend's list arrives: wait for
+  // the sessions the earlier screens saved.
+  await page.waitForFunction(n => document.querySelectorAll("[data-session]").length === n, base);
   listedBase = 0;
   listedBase = await listed();
 
