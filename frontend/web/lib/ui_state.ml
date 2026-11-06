@@ -47,7 +47,10 @@ let unsend t ~call_id ~component =
 ;;
 
 let image t path = Map.find t.images path
-let set_image t ~path image = { t with images = Map.set t.images ~key:path ~data:image }
+
+let set_image t ~path image =
+  { t with images = Map.set t.images ~key:path ~data:image }
+;;
 
 let unasked t paths =
   List.dedup_and_sort paths ~compare:String.compare

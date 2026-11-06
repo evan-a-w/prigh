@@ -7,14 +7,20 @@ let title_node = function
   | None -> Node.none
 ;;
 
-let number_text f = Ui_format.number f |> String.filter ~f:(fun c -> not (Char.equal c ','))
+let number_text f =
+  Ui_format.number f |> String.filter ~f:(fun c -> not (Char.equal c ','))
+;;
 
 (* A field's state is a string: a checkbox's is its ticked options as a
    JSON array, a toggle's [true] or [false]. *)
 let encode (f : Field.t) (j : Json.t) =
   match f.kind, j with
   | Checkbox, `Array items ->
-    Json.to_string (`Array (List.filter items ~f:(function `String _ -> true | _ -> false)))
+    Json.to_string
+      (`Array
+          (List.filter items ~f:(function
+             | `String _ -> true
+             | _ -> false)))
   | Checkbox, `String s -> Json.to_string (`Array [ `String s ])
   | Toggle, (`True | `String "true") -> "true"
   | Toggle, _ -> "false"
@@ -39,11 +45,16 @@ let initial (f : Field.t) =
 
 let ticked s =
   match Json.parse s with
-  | Ok (`Array items) -> List.filter_map items ~f:(function `String s -> Some s | _ -> None)
+  | Ok (`Array items) ->
+    List.filter_map items ~f:(function
+      | `String s -> Some s
+      | _ -> None)
   | _ -> []
 ;;
 
-let current (f : Field.t) ~value = Option.value (value f.name) ~default:(initial f)
+let current (f : Field.t) ~value =
+  Option.value (value f.name) ~default:(initial f)
+;;
 
 let form_values fields ~value =
   let rec go acc = function
@@ -65,7 +76,9 @@ let form_values fields ~value =
            | [] -> Ok None
            | l -> Ok (Some (`Array (List.map l ~f:Json.str))))
         | Text | Textarea | Select | Radio | Date ->
-          if String.is_empty (String.strip s) then Ok None else Ok (Some (Json.str s))
+          if String.is_empty (String.strip s)
+          then Ok None
+          else Ok (Some (Json.str s))
       in
       (match v with
        | Error e -> Error e
@@ -113,19 +126,30 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
     Node.label
       ~attrs:[ Attr.for_ id; Attr.class_ "ui-label" ]
       [ Node.text f.label
-      ; (if f.required then Node.span ~attrs:[ Attr.class_ "ui-req"; Attr.title "Required" ] [ Node.text " *" ] else Node.none)
+      ; (if f.required
+         then
+           Node.span
+             ~attrs:[ Attr.class_ "ui-req"; Attr.title "Required" ]
+             [ Node.text " *" ]
+         else Node.none)
       ]
   in
   let group ~role items =
     Node.div
-      ~attrs:[ Attr.class_ "ui-group"; Attr.role role; Attr.create "aria-labelledby" (id ^ "-l") ]
+      ~attrs:
+        [ Attr.class_ "ui-group"
+        ; Attr.role role
+        ; Attr.create "aria-labelledby" (id ^ "-l")
+        ]
       items
   in
   let group_label =
     Node.div
       ~attrs:[ Attr.id (id ^ "-l"); Attr.class_ "ui-label" ]
       [ Node.text f.label
-      ; (if f.required then Node.span ~attrs:[ Attr.class_ "ui-req" ] [ Node.text " *" ] else Node.none)
+      ; (if f.required
+         then Node.span ~attrs:[ Attr.class_ "ui-req" ] [ Node.text " *" ]
+         else Node.none)
       ]
   in
   let control =
@@ -144,13 +168,22 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
                ; Attr.value v
                ; on_input
                ]
-             @ (match f.kind with Number -> Attr.create "inputmode" "decimal" :: bounds | _ -> []))
+             @
+             match f.kind with
+             | Number -> Attr.create "inputmode" "decimal" :: bounds
+             | _ -> [])
           ()
       ]
     | Textarea ->
       [ label
       ; Node.textarea
-          ~attrs:(common @ [ Attr.class_ "ui-input"; Attr.value v; Attr.create "rows" "3"; on_input ])
+          ~attrs:
+            (common
+             @ [ Attr.class_ "ui-input"
+               ; Attr.value v
+               ; Attr.create "rows" "3"
+               ; on_input
+               ])
           []
       ]
     | Slider ->
@@ -158,18 +191,33 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
       ; Node.div
           ~attrs:[ Attr.class_ "ui-slider-row" ]
           [ Node.input
-              ~attrs:(common @ [ Attr.type_ "range"; Attr.class_ "ui-slider"; Attr.value v; on_input ] @ bounds)
+              ~attrs:
+                (common
+                 @ [ Attr.type_ "range"
+                   ; Attr.class_ "ui-slider"
+                   ; Attr.value v
+                   ; on_input
+                   ]
+                 @ bounds)
               ()
-          ; Node.output ~attrs:[ Attr.for_ id; Attr.class_ "ui-slider-value" ] [ Node.text v ]
+          ; Node.output
+              ~attrs:[ Attr.for_ id; Attr.class_ "ui-slider-value" ]
+              [ Node.text v ]
           ]
       ]
     | Select ->
       [ label
       ; Node.select
-          ~attrs:(common @ [ Attr.class_ "ui-input"; Attr.on_change (fun _ s -> set f.name s) ])
+          ~attrs:
+            (common
+             @ [ Attr.class_ "ui-input"
+               ; Attr.on_change (fun _ s -> set f.name s)
+               ])
           (List.map f.options ~f:(fun o ->
              Node.option
-               ~attrs:([ Attr.value o ] @ if String.equal o v then [ Attr.selected ] else [])
+               ~attrs:
+                 ([ Attr.value o ]
+                  @ if String.equal o v then [ Attr.selected ] else [])
                [ Node.text o ]))
       ]
     | Radio ->
@@ -179,10 +227,15 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
           (List.mapi f.options ~f:(fun k o ->
              let checked = String.equal o v in
              Node.label
-               ~attrs:[ Attr.classes ([ "ui-check" ] @ if checked then [ "on" ] else []) ]
+               ~attrs:
+                 [ Attr.classes
+                     ([ "ui-check" ] @ if checked then [ "on" ] else [])
+                 ]
                [ Node.input
                    ~attrs:
-                     ([ Attr.type_ "radio"; Attr.name id; Attr.id (sprintf "%s-%d" id k)
+                     ([ Attr.type_ "radio"
+                      ; Attr.name id
+                      ; Attr.id (sprintf "%s-%d" id k)
                       ; Attr.checked_prop checked
                       ; Attr.on_change (fun _ _ -> set f.name o)
                       ]
@@ -201,16 +254,25 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
              let next =
                if checked
                then List.filter on ~f:(fun x -> not (String.equal x o))
-               else List.filter f.options ~f:(fun x -> String.equal x o || List.mem on x ~equal:String.equal)
+               else
+                 List.filter f.options ~f:(fun x ->
+                   String.equal x o || List.mem on x ~equal:String.equal)
              in
              Node.label
-               ~attrs:[ Attr.classes ([ "ui-check" ] @ if checked then [ "on" ] else []) ]
+               ~attrs:
+                 [ Attr.classes
+                     ([ "ui-check" ] @ if checked then [ "on" ] else [])
+                 ]
                [ Node.input
                    ~attrs:
-                     ([ Attr.type_ "checkbox"; Attr.id (sprintf "%s-%d" id k)
+                     ([ Attr.type_ "checkbox"
+                      ; Attr.id (sprintf "%s-%d" id k)
                       ; Attr.checked_prop checked
                       ; Attr.on_change (fun _ _ ->
-                          set f.name (Json.to_string (`Array (List.map next ~f:Json.str))))
+                          set
+                            f.name
+                            (Json.to_string
+                               (`Array (List.map next ~f:Json.str))))
                       ]
                       @ disabled)
                    ()
@@ -229,7 +291,8 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
                  ; Attr.role "switch"
                  ; Attr.class_ "ui-switch"
                  ; Attr.create "aria-checked" (Bool.to_string on)
-                 ; Attr.on_click (fun _ -> set f.name (if on then "false" else "true"))
+                 ; Attr.on_click (fun _ ->
+                     set f.name (if on then "false" else "true"))
                  ]
                  @ disabled)
               [ Node.span ~attrs:[ Attr.class_ "ui-knob" ] [] ]
@@ -237,7 +300,13 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
       ]
   in
   Node.div
-    ~attrs:[ Attr.classes [ "ui-field"; "ui-field-" ^ String.lowercase (Sexp.to_string (Field.Kind.sexp_of_t f.kind)) ] ]
+    ~attrs:
+      [ Attr.classes
+          [ "ui-field"
+          ; "ui-field-"
+            ^ String.lowercase (Sexp.to_string (Field.Kind.sexp_of_t f.kind))
+          ]
+      ]
     (control
      @ [ (match f.help with
           | Some h -> Node.div ~attrs:[ Attr.class_ "ui-help" ] [ Node.text h ]
@@ -245,15 +314,31 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
        ])
 ;;
 
-let form (ctx : Ui_context.t) ~path ~component ~title ~description fields ~submit ~heading =
+let form
+      (ctx : Ui_context.t)
+      ~path
+      ~component
+      ~title
+      ~description
+      fields
+      ~submit
+      ~heading
+  =
   let sent_values = Ui_context.sent_values ctx ~component in
   let sent = Option.is_some sent_values in
   let value =
     match sent_values with
     | Some values ->
       fun name ->
-        (match List.find fields ~f:(fun (f : Field.t) -> String.equal f.name name) with
-         | Some f -> Some (Option.value_map (Json.field values name) ~default:"" ~f:(encode f))
+        (match
+           List.find fields ~f:(fun (f : Field.t) -> String.equal f.name name)
+         with
+         | Some f ->
+           Some
+             (Option.value_map
+                (Json.field values name)
+                ~default:""
+                ~f:(encode f))
          | None -> None)
     | None -> fun name -> Ui_context.get ctx ~path ("f." ^ name)
   in
@@ -261,12 +346,19 @@ let form (ctx : Ui_context.t) ~path ~component ~title ~description fields ~submi
   let tried = Option.is_some (Ui_context.get ctx ~path "tried") in
   let result = form_values fields ~value in
   Node.div
-    ~attrs:[ Attr.classes ([ "ui-form"; "ui-reply" ] @ if sent then [ "sent" ] else []) ]
-    [ Node.div ~attrs:[ Attr.class_ "ui-reply-head" ] [ title_node heading; sent_chip sent ]
+    ~attrs:
+      [ Attr.classes
+          ([ "ui-form"; "ui-reply" ] @ if sent then [ "sent" ] else [])
+      ]
+    [ Node.div
+        ~attrs:[ Attr.class_ "ui-reply-head" ]
+        [ title_node heading; sent_chip sent ]
     ; (match description with
        | Some d -> Ui_context.md ~cls:"ui-sub" d
        | None -> Node.none)
-    ; Node.div ~attrs:[ Attr.class_ "ui-fields" ] (List.map fields ~f:(field ctx ~path ~sent ~value ~set))
+    ; Node.div
+        ~attrs:[ Attr.class_ "ui-fields" ]
+        (List.map fields ~f:(field ctx ~path ~sent ~value ~set))
     ; (if sent
        then Node.none
        else
@@ -274,7 +366,9 @@ let form (ctx : Ui_context.t) ~path ~component ~title ~description fields ~submi
            ~attrs:[ Attr.class_ "ui-actions" ]
            [ (match result with
               | Error why when tried ->
-                Node.span ~attrs:[ Attr.class_ "ui-invalid"; Attr.role "alert" ] [ Node.text why ]
+                Node.span
+                  ~attrs:[ Attr.class_ "ui-invalid"; Attr.role "alert" ]
+                  [ Node.text why ]
               | _ -> Node.none)
            ; Node.button
                ~attrs:
@@ -292,15 +386,27 @@ let form (ctx : Ui_context.t) ~path ~component ~title ~description fields ~submi
 
 let tone_cls (t : Ui_spec.Tone.t) = "tone-" ^ Ui_spec.Tone.to_string t
 
-let choices (ctx : Ui_context.t) ~path ~component ~title ~prompt (options : Ui_spec.Choice.t list) ~multiple =
+let choices
+      (ctx : Ui_context.t)
+      ~path
+      ~component
+      ~title
+      ~prompt
+      (options : Ui_spec.Choice.t list)
+      ~multiple
+  =
   let sent_values = Ui_context.sent_values ctx ~component in
   let sent = Option.is_some sent_values in
   let picked =
     match sent_values with
     | Some (`String s) -> [ s ]
-    | Some (`Array items) -> List.filter_map items ~f:(function `String s -> Some s | _ -> None)
+    | Some (`Array items) ->
+      List.filter_map items ~f:(function
+        | `String s -> Some s
+        | _ -> None)
     | Some _ -> []
-    | None -> Option.value_map (Ui_context.get ctx ~path "sel") ~default:[] ~f:ticked
+    | None ->
+      Option.value_map (Ui_context.get ctx ~path "sel") ~default:[] ~f:ticked
   in
   let option (o : Ui_spec.Choice.t) =
     let on = List.mem picked o.value ~equal:String.equal in
@@ -314,31 +420,51 @@ let choices (ctx : Ui_context.t) ~path ~component ~title ~prompt (options : Ui_s
           then List.filter picked ~f:(fun v -> not (String.equal v o.value))
           else
             List.filter_map options ~f:(fun (x : Ui_spec.Choice.t) ->
-              Option.some_if (String.equal x.value o.value || List.mem picked x.value ~equal:String.equal) x.value)
+              Option.some_if
+                (String.equal x.value o.value
+                 || List.mem picked x.value ~equal:String.equal)
+                x.value)
         in
-        [ Attr.on_click (fun _ -> Ui_context.set ctx ~path "sel" (Json.to_string (`Array (List.map next ~f:Json.str)))) ])
-      else [ Attr.on_click (fun _ -> send ctx ~component ~title (Json.str o.value)) ]
+        [ Attr.on_click (fun _ ->
+            Ui_context.set
+              ctx
+              ~path
+              "sel"
+              (Json.to_string (`Array (List.map next ~f:Json.str))))
+        ])
+      else
+        [ Attr.on_click (fun _ -> send ctx ~component ~title (Json.str o.value))
+        ]
     in
     Node.button
       ~attrs:
         ([ Attr.type_ "button"
-         ; Attr.classes ([ "ui-choice"; tone_cls o.tone ] @ if on then [ "on" ] else [])
+         ; Attr.classes
+             ([ "ui-choice"; tone_cls o.tone ] @ if on then [ "on" ] else [])
          ]
-         @ (if multiple then [ Attr.create "aria-pressed" (Bool.to_string on) ] else [])
+         @ (if multiple
+            then [ Attr.create "aria-pressed" (Bool.to_string on) ]
+            else [])
          @ (if sent then [ Attr.disabled ] else [])
          @ click)
       [ (if multiple then Html.check on else Node.none)
       ; Node.span
           ~attrs:[ Attr.class_ "ui-choice-text" ]
-          [ Node.span ~attrs:[ Attr.class_ "ui-choice-label" ] [ Node.text o.label ]
+          [ Node.span
+              ~attrs:[ Attr.class_ "ui-choice-label" ]
+              [ Node.text o.label ]
           ; (match o.description with
-             | Some d -> Node.span ~attrs:[ Attr.class_ "ui-choice-desc" ] [ Node.text d ]
+             | Some d ->
+               Node.span ~attrs:[ Attr.class_ "ui-choice-desc" ] [ Node.text d ]
              | None -> Node.none)
           ]
       ]
   in
   Node.div
-    ~attrs:[ Attr.classes ([ "ui-choices"; "ui-reply" ] @ if sent then [ "sent" ] else []) ]
+    ~attrs:
+      [ Attr.classes
+          ([ "ui-choices"; "ui-reply" ] @ if sent then [ "sent" ] else [])
+      ]
     [ Node.div
         ~attrs:[ Attr.class_ "ui-reply-head" ]
         [ (match prompt with
@@ -359,16 +485,36 @@ let choices (ctx : Ui_context.t) ~path ~component ~title ~prompt (options : Ui_s
                   @
                   if List.is_empty picked
                   then [ Attr.disabled ]
-                  else [ Attr.on_click (fun _ -> send ctx ~component ~title (`Array (List.map picked ~f:Json.str))) ])
+                  else
+                    [ Attr.on_click (fun _ ->
+                        send
+                          ctx
+                          ~component
+                          ~title
+                          (`Array (List.map picked ~f:Json.str)))
+                    ])
                [ Node.text "Send" ]
            ]
        else Node.none)
     ]
 ;;
 
-let checklist (ctx : Ui_context.t) ~path ~component ~title ~heading items ~submit =
+let checklist
+      (ctx : Ui_context.t)
+      ~path
+      ~component
+      ~title
+      ~heading
+      items
+      ~submit
+  =
   let replies = Option.both component submit in
-  let sent_values = Option.bind component ~f:(fun component -> if Option.is_some submit then Ui_context.sent_values ctx ~component else None) in
+  let sent_values =
+    Option.bind component ~f:(fun component ->
+      if Option.is_some submit
+      then Ui_context.sent_values ctx ~component
+      else None)
+  in
   let sent = Option.is_some sent_values in
   let checked k (text, default) =
     match sent_values with
@@ -382,11 +528,18 @@ let checklist (ctx : Ui_context.t) ~path ~component ~title ~heading items ~submi
   let states = List.mapi items ~f:checked in
   let done_ = List.count states ~f:Fn.id in
   Node.div
-    ~attrs:[ Attr.classes ([ "ui-checklist" ] @ (if Option.is_some replies then [ "ui-reply" ] else []) @ if sent then [ "sent" ] else []) ]
+    ~attrs:
+      [ Attr.classes
+          ([ "ui-checklist" ]
+           @ (if Option.is_some replies then [ "ui-reply" ] else [])
+           @ if sent then [ "sent" ] else [])
+      ]
     [ Node.div
         ~attrs:[ Attr.class_ "ui-reply-head" ]
         [ title_node heading
-        ; Node.span ~attrs:[ Attr.class_ "ui-count" ] [ Node.text (sprintf "%d/%d" done_ (List.length items)) ]
+        ; Node.span
+            ~attrs:[ Attr.class_ "ui-count" ]
+            [ Node.text (sprintf "%d/%d" done_ (List.length items)) ]
         ; sent_chip sent
         ]
     ; Node.ul
@@ -396,14 +549,22 @@ let checklist (ctx : Ui_context.t) ~path ~component ~title ~heading items ~submi
              [ Node.button
                  ~attrs:
                    ([ Attr.type_ "button"
-                    ; Attr.classes ([ "ui-check-item" ] @ if on then [ "on" ] else [])
+                    ; Attr.classes
+                        ([ "ui-check-item" ] @ if on then [ "on" ] else [])
                     ; Attr.role "checkbox"
                     ; Attr.create "aria-checked" (Bool.to_string on)
                     ]
                     @
                     if sent
                     then [ Attr.disabled ]
-                    else [ Attr.on_click (fun _ -> Ui_context.set ctx ~path (sprintf "c%d" k) (if on then "0" else "1")) ])
+                    else
+                      [ Attr.on_click (fun _ ->
+                          Ui_context.set
+                            ctx
+                            ~path
+                            (sprintf "c%d" k)
+                            (if on then "0" else "1"))
+                      ])
                  [ Html.check on; Ui_context.md text ]
              ]))
     ; (match replies with
@@ -415,8 +576,15 @@ let checklist (ctx : Ui_context.t) ~path ~component ~title ~heading items ~submi
                  [ Attr.type_ "button"
                  ; Attr.class_ "ui-btn primary"
                  ; Attr.on_click (fun _ ->
-                     send ctx ~component ~title
-                       (`Array (List.filter_mapi items ~f:(fun k (text, _) -> Option.some_if (List.nth_exn states k) (Json.str text)))))
+                     send
+                       ctx
+                       ~component
+                       ~title
+                       (`Array
+                           (List.filter_mapi items ~f:(fun k (text, _) ->
+                              Option.some_if
+                                (List.nth_exn states k)
+                                (Json.str text)))))
                  ]
                [ Node.text label ]
            ]

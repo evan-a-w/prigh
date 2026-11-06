@@ -562,7 +562,9 @@ let render_step
          let summary = P.Ui_spec.summary spec in
          ( [ chip (plural (List.length summary) "component") ]
          , List.map summary ~f:(fun line ->
-             Log_line.indent ~depth:2 [ { text = "[" ^ line ^ "]"; style = dim } ])
+             Log_line.indent
+               ~depth:2
+               [ { text = "[" ^ line ^ "]"; style = dim } ])
            @ [ Log_line.indent
                  ~depth:2
                  [ { text = "open in prigh-web to view"; style = dim } ]

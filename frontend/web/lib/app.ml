@@ -7191,7 +7191,10 @@ let follow_ui_images (before : Model.t) ((m : Model.t), cmds) =
               | Tool_call call when String.equal call.name "render_ui" ->
                 (match Chat.tool m.chat call.id with
                  | Some { result = Some { is_error = false; _ }; _ } ->
-                   Option.value_map (Ui_view.spec call) ~default:[] ~f:Ui_spec.image_paths
+                   Option.value_map
+                     (Ui_view.spec call)
+                     ~default:[]
+                     ~f:Ui_spec.image_paths
                  | _ -> [])
               | _ -> [])
           | User _ | Shell _ | Compaction _ -> [])
@@ -7214,9 +7217,14 @@ let follow_ui_images (before : Model.t) ((m : Model.t), cmds) =
 
 let ui_image_reply (m : Model.t) ~path result =
   let image : Ui_state.Image.t =
-    match Result.map_error result ~f:Error.of_string |> Result.bind ~f:File_preview.of_json with
-    | Ok { content = Image { url = Some url; _ }; _ } -> Url (Files.link m.files url)
-    | Ok { content = Image { url = None; _ }; _ } -> Failed "Too large to preview"
+    match
+      Result.map_error result ~f:Error.of_string
+      |> Result.bind ~f:File_preview.of_json
+    with
+    | Ok { content = Image { url = Some url; _ }; _ } ->
+      Url (Files.link m.files url)
+    | Ok { content = Image { url = None; _ }; _ } ->
+      Failed "Too large to preview"
     | Ok { content = Text _ | Binary; _ } -> Failed "Not an image"
     | Error e -> Failed (Error.to_string_hum e)
   in

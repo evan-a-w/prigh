@@ -167,7 +167,9 @@ module Table = struct
   [@@deriving sexp_of]
 
   let cell row key =
-    Option.value (List.Assoc.find row ~equal:String.equal key) ~default:Cell.Null
+    Option.value
+      (List.Assoc.find row ~equal:String.equal key)
+      ~default:Cell.Null
   ;;
 
   let of_json j =
@@ -204,7 +206,10 @@ module Table = struct
                | _ -> if numeric then Right else Left)
           ; format
           ; currency =
-              Option.value_map (nonempty c "currency") ~default:"USD" ~f:String.uppercase
+              Option.value_map
+                (nonempty c "currency")
+                ~default:"USD"
+                ~f:String.uppercase
           ; decimals = int c "decimals"
           })
     in
@@ -259,9 +264,7 @@ module Chart = struct
       | Scatter -> "scatter"
     ;;
 
-    let of_string s =
-      List.find all ~f:(fun k -> String.equal (to_string k) s)
-    ;;
+    let of_string s = List.find all ~f:(fun k -> String.equal (to_string k) s)
   end
 
   module Height = struct
@@ -363,8 +366,7 @@ module Chart = struct
             let values =
               if n = 0
               then values
-              else
-                List.init n ~f:(fun k -> Option.join (List.nth values k))
+              else List.init n ~f:(fun k -> Option.join (List.nth values k))
             in
             { Series.name = name s i; values })
         in
@@ -396,7 +398,9 @@ module Chart = struct
   ;;
 
   let detail t =
-    let n count one = sprintf "%d %s%s" count one (if count = 1 then "" else "s") in
+    let n count one =
+      sprintf "%d %s%s" count one (if count = 1 then "" else "s")
+    in
     match t.data with
     | Categories { series = [ _ ]; labels } -> n (List.length labels) "point"
     | Categories { series; _ } -> sprintf "%d series" (List.length series)
@@ -792,8 +796,14 @@ module Component = struct
     | Progress { label; _ } -> Option.first_some label t.id
     | Stat { label; _ } -> Some label
     | Choices { prompt; _ } -> Option.first_some prompt t.id
-    | Grid _ | Tabs _ | Accordion _ | Divider | Markdown _ | Badges _
-    | Image _ | Unknown _ -> t.id
+    | Grid _
+    | Tabs _
+    | Accordion _
+    | Divider
+    | Markdown _
+    | Badges _
+    | Image _
+    | Unknown _ -> t.id
   ;;
 
   let children t =
@@ -819,13 +829,18 @@ module Component = struct
       | "grid" ->
         Grid
           { columns =
-              Int.clamp_exn (Option.value (int j "columns") ~default:2) ~min:1 ~max:4
+              Int.clamp_exn
+                (Option.value (int j "columns") ~default:2)
+                ~min:1
+                ~max:4
           ; children = children j
           }
       | "tabs" ->
         Tabs
           (List.mapi (objects j "tabs") ~f:(fun i tab ->
-             ( Option.value (nonempty tab "label") ~default:(sprintf "Tab %d" (i + 1))
+             ( Option.value
+                 (nonempty tab "label")
+                 ~default:(sprintf "Tab %d" (i + 1))
              , children tab )))
       | "accordion" ->
         Accordion
@@ -956,7 +971,8 @@ module Component = struct
                 let options = strings q "options" in
                 Option.some_if
                   (not (List.is_empty options))
-                  { Question.question = Option.value (str q "question") ~default:""
+                  { Question.question =
+                      Option.value (str q "question") ~default:""
                   ; options
                   ; answer = Option.value (int q "answer") ~default:0
                   ; explanation = nonempty q "explanation"
@@ -976,7 +992,11 @@ module Component = struct
               List.filter_map (list j "options") ~f:(function
                 | `String label ->
                   Some
-                    { Choice.label; value = label; description = None; tone = Neutral }
+                    { Choice.label
+                    ; value = label
+                    ; description = None
+                    ; tone = Neutral
+                    }
                 | `Object _ as o ->
                   Option.map (nonempty o "label") ~f:(fun label ->
                     { Choice.label
@@ -1035,7 +1055,11 @@ let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
 
 let rec walk_list prefix components =
   List.concat_mapi components ~f:(fun i (c : Component.t) ->
-    let path = if String.is_empty prefix then Int.to_string i else sprintf "%s.%d" prefix i in
+    let path =
+      if String.is_empty prefix
+      then Int.to_string i
+      else sprintf "%s.%d" prefix i
+    in
     (path, c)
     ::
     (match c.body with
@@ -1075,18 +1099,27 @@ let line (c : Component.t) =
            | Number f -> Float.to_string_hum ~strip_zero:true ~decimals:4 f) )
     | Table t -> Component.title c, Some (plural (List.length t.rows) "row")
     | Chart chart -> Component.title c, Some (Chart.detail chart)
-    | Card { children; _ } -> Component.title c, Some (plural (List.length children) "item")
+    | Card { children; _ } ->
+      Component.title c, Some (plural (List.length children) "item")
     | Grid { children; _ } -> None, Some (plural (List.length children) "item")
     | Tabs tabs -> None, Some (String.concat ~sep:", " (List.map tabs ~f:fst))
     | Accordion { items } -> None, Some (plural (List.length items) "section")
-    | Timeline { items; _ } -> Component.title c, Some (plural (List.length items) "event")
-    | Steps { items; _ } -> Component.title c, Some (plural (List.length items) "step")
-    | Tree { entries; _ } -> Component.title c, Some (plural (List.length entries) "entry")
-    | Gallery { images; _ } -> Component.title c, Some (plural (List.length images) "image")
-    | Flashcards { cards; _ } -> Component.title c, Some (plural (List.length cards) "card")
-    | Quiz { questions; _ } -> Component.title c, Some (plural (List.length questions) "question")
-    | Choices { options; _ } -> Component.title c, Some (plural (List.length options) "option")
-    | Checklist { items; _ } -> Component.title c, Some (plural (List.length items) "item")
+    | Timeline { items; _ } ->
+      Component.title c, Some (plural (List.length items) "event")
+    | Steps { items; _ } ->
+      Component.title c, Some (plural (List.length items) "step")
+    | Tree { entries; _ } ->
+      Component.title c, Some (plural (List.length entries) "entry")
+    | Gallery { images; _ } ->
+      Component.title c, Some (plural (List.length images) "image")
+    | Flashcards { cards; _ } ->
+      Component.title c, Some (plural (List.length cards) "card")
+    | Quiz { questions; _ } ->
+      Component.title c, Some (plural (List.length questions) "question")
+    | Choices { options; _ } ->
+      Component.title c, Some (plural (List.length options) "option")
+    | Checklist { items; _ } ->
+      Component.title c, Some (plural (List.length items) "item")
     | Code { lang; _ } -> Component.title c, lang
     | _ -> Component.title c, None
   in

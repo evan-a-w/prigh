@@ -816,7 +816,9 @@ let with_source_json ~kind ~title =
     title
 ;;
 
-let%expect_test "render_ui: a placeholder per component; client and ui_action notes" =
+let%expect_test
+    "render_ui: a placeholder per component; client and ui_action notes"
+  =
   let h = Test_app.connected ~width:72 ~height:30 () in
   let history =
     sprintf
@@ -852,7 +854,8 @@ let%expect_test "render_ui: a placeholder per component; client and ui_action no
     "u2"
     "components[0].data: give the chart's data";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -892,7 +895,8 @@ let%expect_test "render_ui in verbose: still the placeholder, not the JSON" =
     h
     (Tool_end { call; result = tool_result ~name:"render_ui" ~id:"u1" "Shown." });
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

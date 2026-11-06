@@ -308,8 +308,7 @@ module Component : sig
         ; children : t list
         }
     | Tabs of (string * t list) list
-    | Accordion of
-        { items : accordion_item list }
+    | Accordion of { items : accordion_item list }
     | Divider
     | Markdown of string
     | Callout of

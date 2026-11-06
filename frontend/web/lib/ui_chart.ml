@@ -3,7 +3,6 @@ open! Import
 module C = Ui_spec.Chart
 
 let pct f = Ui_svg.num f ^ "%"
-
 let style = Ui_style.attr
 
 let div ?(attrs = []) cls children =
@@ -467,7 +466,9 @@ let categories (chart : C.t) ~labels ~(series : C.Series.t list) =
               let vs = Array.filter_map values.(k) ~f:Fn.id in
               if Array.is_empty vs
               then 0.
-              else Array.sum (module Float) vs ~f:Fn.id /. Float.of_int (Array.length vs)
+              else
+                Array.sum (module Float) vs ~f:Fn.id
+                /. Float.of_int (Array.length vs)
             in
             List.concat_map
               (List.stable_sort
@@ -541,13 +542,16 @@ let categories (chart : C.t) ~labels ~(series : C.Series.t list) =
                [ text labels.(i) ]))
       else (
         let stride = Int.max 1 ((n + 7) / 8) in
-        let shown = List.filter (List.init n ~f:Fn.id) ~f:(fun i -> i mod stride = 0) in
+        let shown =
+          List.filter (List.init n ~f:Fn.id) ~f:(fun i -> i mod stride = 0)
+        in
         div
           ~attrs:[ hidden ]
           ("ui-chart-xaxis"
            ^ thin_class
                ~gaps:(List.length shown)
-               ~longest:(label_width (List.map shown ~f:(fun i -> labels.(i)))))
+               ~longest:(label_width (List.map shown ~f:(fun i -> labels.(i))))
+          )
           (List.filter_map (List.init n ~f:Fn.id) ~f:(fun i ->
              Option.some_if
                (i mod stride = 0)
