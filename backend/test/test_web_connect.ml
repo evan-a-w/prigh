@@ -120,6 +120,7 @@ let%expect_test "the saved connection: flags are saved, the environment is not" 
     { Saved_connection.connect = "server:7790"
     ; token = Some "sekrit"
     ; user = Some "me"
+    ; proxy_cookie = Some "proxy_session=abc"
     }
   in
   show ~saved ();
@@ -327,7 +328,8 @@ let page_hello t ~sw ~port params =
   let flow = connect t ~sw ~port in
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   let ws =
-    Websocket.connect ~reader ~flow ~host:"127.0.0.1" ~target:"/ws"
+    Websocket.connect ~reader ~flow ~host:"127.0.0.1" ~target:"/ws" ()
+    |> Result.map_error ~f:Websocket.Refusal.to_string
     |> Result.ok_or_failwith
   in
   Websocket.send_text

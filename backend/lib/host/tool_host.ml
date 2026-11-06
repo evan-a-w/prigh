@@ -584,6 +584,7 @@ let connect
       ?(heartbeat_interval = 10.)
       ?(heartbeat_timeout = 30.)
       ?(on_connect = fun () -> ())
+      ?signin
       ~backend
       ~token
       ?user
@@ -610,9 +611,12 @@ let connect
       ()
   in
   let address = Backend_address.to_string backend in
+  let backend = ref backend in
+  let token = ref token in
+  let user = ref user in
   let attempt () =
     Switch.run (fun sw ->
-      let socket = Backend_socket.connect ~env ~sw backend in
+      let socket = Backend_socket.connect ~env ~sw !backend in
       Exn.protect
         ~finally:(fun () -> Backend_socket.close socket)
         ~f:(fun () ->
@@ -624,8 +628,8 @@ let connect
             ~log
             ~on_connect
             ~address
-            ~token
-            ~user
+            ~token:!token
+            ~user:!user
             ~host_id
             ~name
             ~cwd
@@ -646,13 +650,29 @@ let connect
       log message;
       retry backoff
     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+    | exception Backend_address.Signin_required why when Option.is_some signin ->
+      (match (Option.value_exn signin) ~why !backend with
+       | Ok (grant : Browser_signin.Grant.t) ->
+         log "signed in through the browser: connecting";
+         backend
+         := Backend_address.with_proxy_cookie !backend (Some grant.proxy_cookie);
+         if Option.is_none !token
+         then (
+           token := grant.token;
+           user := grant.user);
+         loop initial_backoff
+       | Error error ->
+         log (sprintf "not signed in: %s" error);
+         retry max_backoff)
     | exception exn ->
       log
         (sprintf
            "cannot connect to %s: %s"
            address
            (match exn with
-            | Failure message | Backend_address.Not_upgraded message -> message
+            | Failure message
+    | Backend_address.Not_upgraded message
+    | Backend_address.Signin_required message -> message
             | exn -> Net_error.to_string_hum exn));
       retry backoff
   in

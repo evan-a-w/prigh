@@ -802,6 +802,11 @@ let serve_command =
                ~addr
                ~port
                ~root
+               ~routes:
+                 (Cli_signin_grant.route ~authenticate:(fun ~token ~user ->
+                    match Rpc_router.authenticate router ?user ~token () with
+                    | Ok _ -> Ok ()
+                    | Error _ -> Error User_access.unauthorised))
                ~websockets:
                  [ "/ws", Web_server.serve_rpc router
                  ; "/terminal", Web_server.serve_terminal router terminals
@@ -954,6 +959,23 @@ let tool_host_command =
            @@ fun env ->
            Tool_host.connect
              ~env
+             ~signin:(fun ~why remote ->
+               let result =
+                 Browser_signin.run_on_terminal
+                   ~env
+                   ~program:Tool_host
+                   ~say:(eprintf "prigh tool-host: %s\n%!")
+                   ~why
+                   remote
+               in
+               Result.iter result ~f:(fun grant ->
+                 match Backend_choice.remember_signin ~home remote grant with
+                 | Ok () -> ()
+                 | Error e ->
+                   eprintf
+                     "prigh tool-host: could not save the sign-in: %s\n%!"
+                     (Error.to_string_hum e));
+               result)
              ~backend:choice.remote
              ~token:choice.credentials.token
              ?user:choice.credentials.user
@@ -1135,20 +1157,60 @@ let web_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       (match Web_connect.Check.run ~env remote credentials with
-        | Ok () -> ()
-        | Error error ->
+       let check remote credentials =
+         match Web_connect.Check.run ~env remote credentials with
+         | Ok () -> ()
+         | Error error ->
+           fail
+             ~code:1
+             "%s"
+             (Web_connect.Check.explain error remote ~source credentials)
+       in
+       let first = Web_connect.Check.run ~env remote credentials in
+       let grant =
+         match first with
+         | Error (Signin_required why) ->
+           (match
+              Browser_signin.run_on_terminal
+                ~env
+                ~program:Web
+                ~say:(eprintf "prigh web: %s\n%!")
+                ~open_url:open_in_browser
+                ~why
+                remote
+            with
+            | Ok grant -> Some grant
+            | Error error -> fail ~code:1 "not signed in: %s" error)
+         | Ok () | Error _ -> None
+       in
+       let remote, (credentials : Web_connect.Credentials.t) =
+         match grant with
+         | None -> remote, credentials
+         | Some grant ->
+           ( Backend_address.with_proxy_cookie remote (Some grant.proxy_cookie)
+           , if Option.is_some credentials.token
+             then credentials
+             else { token = grant.token; user = grant.user } )
+       in
+       (match grant, first with
+        | None, Ok () -> ()
+        | None, Error error ->
           fail
             ~code:1
             "%s"
-            (Web_connect.Check.explain error remote ~source credentials));
-       Option.iter save ~f:(fun connection ->
-         match Saved_connection.save ~home connection with
+            (Web_connect.Check.explain error remote ~source credentials)
+        | Some _, _ -> check remote credentials);
+       let report_unsaved = function
          | Ok () -> ()
          | Error e ->
            eprintf
              "prigh web: cannot save the connection: %s\n%!"
-             (Error.to_string_hum e));
+             (Error.to_string_hum e)
+       in
+       Option.iter save ~f:(fun connection ->
+         report_unsaved (Saved_connection.save ~home connection));
+       Option.iter grant ~f:(fun grant ->
+         report_unsaved (Backend_choice.remember_signin ~home remote grant));
        let log line = eprintf "prigh web: %s\n%!" line in
        let listen_addr =
          match listen with
