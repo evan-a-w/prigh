@@ -134,7 +134,6 @@ let connect_abortable ~env ~sw t =
 ;;
 
 let connect ~env ~sw t = fst (connect_abortable ~env ~sw t)
-
 let with_proxy_cookie t proxy_cookie = { t with proxy_cookie }
 
 let upgrade_headers t =
@@ -149,10 +148,13 @@ exception Signin_required of string
 let signin_page t (refusal : Websocket.Refusal.t) =
   let status = Websocket.Refusal.to_string refusal in
   let html () =
-    Option.exists (Websocket.Refusal.header refusal "Content-Type") ~f:(fun ct ->
-      String.is_substring (String.lowercase ct) ~substring:"html")
+    Option.exists
+      (Websocket.Refusal.header refusal "Content-Type")
+      ~f:(fun ct -> String.is_substring (String.lowercase ct) ~substring:"html")
   in
-  match Websocket.Refusal.code refusal, Websocket.Refusal.header refusal "Location" with
+  match
+    Websocket.Refusal.code refusal, Websocket.Refusal.header refusal "Location"
+  with
   | Some code, Some location when code >= 300 && code < 400 ->
     let to_https_here =
       (not t.tls)
@@ -163,7 +165,11 @@ let signin_page t (refusal : Websocket.Refusal.t) =
     in
     Option.some_if
       (not to_https_here)
-      (sprintf "%s answered with a login page (%s to %s)" (authority t) status location)
+      (sprintf
+         "%s answered with a login page (%s to %s)"
+         (authority t)
+         status
+         location)
   | Some (401 | 403 | 407), _ ->
     Some (sprintf "%s refused the WebSocket (%s)" (authority t) status)
   | Some (400 | 404 | 426 | 502 | 503 | 504), _ -> None

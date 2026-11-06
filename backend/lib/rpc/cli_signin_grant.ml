@@ -10,7 +10,9 @@ let text ~status ~reason body =
   let response = Static_site.Response.text ~status ~reason (body ^ "\n") in
   { response with
     headers =
-      [ "Content-Type", "text/plain; charset=utf-8"; "Cache-Control", "no-store" ]
+      [ "Content-Type", "text/plain; charset=utf-8"
+      ; "Cache-Control", "no-store"
+      ]
   }
 ;;
 
@@ -53,7 +55,10 @@ let json_field json name =
   | _ -> None
 ;;
 
-let respond ~(authenticate : authenticate) (request : Web_server.Request.t) ~body
+let respond
+      ~(authenticate : authenticate)
+      (request : Web_server.Request.t)
+      ~body
   =
   let is_json =
     Option.exists (header request "Content-Type") ~f:(fun ct ->
@@ -113,7 +118,7 @@ let handle ~authenticate (request : Web_server.Request.t) ~reader flow =
     match length with
     | Some n when n >= 0 && n <= max_body ->
       respond ~authenticate request ~body:(Eio.Buf_read.take n reader)
-    | Some _ | None when not (String.equal request.meth "POST") ->
+    | (Some _ | None) when not (String.equal request.meth "POST") ->
       respond ~authenticate request ~body:""
     | Some _ | None ->
       text ~status:413 ~reason:"Content Too Large" "the body is too large"

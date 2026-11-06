@@ -3,8 +3,8 @@ open! Import
 
 let reason = function
   | Failure message
-    | Backend_address.Not_upgraded message
-    | Backend_address.Signin_required message -> message
+  | Backend_address.Not_upgraded message
+  | Backend_address.Signin_required message -> message
   | exn -> Net_error.to_string_hum exn
 ;;
 

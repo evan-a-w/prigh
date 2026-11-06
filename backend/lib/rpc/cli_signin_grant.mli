@@ -27,7 +27,8 @@ open! Import
 val path : string
 
 (** Whether [token] (and [user]) sign in; the error is shown to the page. *)
-type authenticate = token:string option -> user:string option -> (unit, string) Result.t
+type authenticate =
+  token:string option -> user:string option -> (unit, string) Result.t
 
 (** The answer to a request to {!path} with [body]. *)
 val respond
@@ -36,4 +37,7 @@ val respond
   -> body:string
   -> Static_site.Response.t
 
-val route : authenticate:authenticate -> Web_server.Request.t -> Web_server.on_http option
+val route
+  :  authenticate:authenticate
+  -> Web_server.Request.t
+  -> Web_server.on_http option

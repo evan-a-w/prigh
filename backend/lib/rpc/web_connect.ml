@@ -117,7 +117,8 @@ module Check = struct
               "no answer within %s"
               (Time_ns.Span.to_string_hum ~decimals:0 timeout)))
     | exception Backend_address.Not_upgraded why -> Error (Not_prigh_web why)
-    | exception Backend_address.Signin_required why -> Error (Signin_required why)
+    | exception Backend_address.Signin_required why ->
+      Error (Signin_required why)
     | exception exn -> Error (Unreachable (reason exn))
   ;;
 
