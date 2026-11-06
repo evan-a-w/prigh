@@ -2983,7 +2983,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       Space mark, shift-click and Shift+Space mark the range from the last
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
-      backend will keep, running, open elsewhere or our own, and the
+      backend will keep (`Model.kept_from_deletion`: running or open
+      elsewhere); when our own session is among them `Model.moving_to`
+      picks where we go (the next row down not deleted, else above, else a
+      new session), the request carries it as `switch_to`
+      (`Moved_and_deleted`: shown as a switch under way, and the reply's
+      `moved_to` state applied as `switch_session`'s), and the
       `Delete_result` reply is a toast; the current session's row shows
       its live cwd and a rename button; at its foot `Session_view.card`,
       then the account and the settings gear), `Session_view` (the
