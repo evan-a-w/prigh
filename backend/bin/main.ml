@@ -845,6 +845,143 @@ let serve_command =
          Eio.Fiber.await_cancel ())
 ;;
 
+let browser_signin_command =
+  Command.basic
+    ~summary:
+      "Sign in through the browser to the sign-in proxy (authentik, \
+       oauth2-proxy...) in front of a backend's site, and save its cookie \
+       with the saved connection"
+    ~readme:(fun () ->
+      "Opens the backend's prigh-web at a one-time sign-in link: sign in to \
+       the proxy and to prigh there, and allow the sign-in. The proxy's \
+       cookie is then saved with the connection (~/.prigh/tui-connection.sexp) \
+       for prigh-tui, prigh tool-host -remote, prigh web and prigh desktop. \
+       They also run this themselves when they meet the proxy's login page.")
+    (let%map_open.Command connect =
+       flag
+         "-connect"
+         (optional string)
+         ~doc:
+           "URL the backend's prigh-web URL (default: $PRIGH_CONNECT, else the \
+            saved connection)"
+     and program =
+       flag
+         "-program"
+         (optional string)
+         ~doc:"NAME who asks, as the page names it (tui, tool-host, web, desktop)"
+     and json =
+       flag
+         "-json"
+         no_arg
+         ~doc:
+           " print JSON lines on stdout ({\"url\", \"port\"} then the sign-in or \
+            {\"error\"}) and save nothing: for prigh-tui"
+     and no_browser =
+       flag "-no-browser" no_arg ~doc:" print the URL without opening it"
+     in
+     fun () ->
+       let home = home () in
+       let fail message =
+         if json
+         then print_endline (Jsonaf.to_string (`Object [ "error", `String message ]))
+         else eprintf "prigh browser-signin: %s\n%!" message;
+         exit 2
+       in
+       let program =
+         match program with
+         | None -> Browser_signin.Program.Tui
+         | Some name ->
+           (match Browser_signin.Program.of_string name with
+            | Some program -> program
+            | None ->
+              fail
+                (sprintf
+                   "-program %s: one of %s"
+                   name
+                   (String.concat
+                      ~sep:", "
+                      (List.map
+                         Browser_signin.Program.all
+                         ~f:Browser_signin.Program.to_string))))
+       in
+       let remote =
+         match
+           Backend_choice.choose
+             ~home
+             ~flags:{ connect; token = None; user = None }
+             ~env:(Backend_choice.env ())
+         with
+         | Ok { remote; _ } when not remote.lines -> remote
+         | Ok { remote; _ } ->
+           fail
+             (sprintf
+                "%s is a HOST:PORT: only a prigh-web URL (https://host/) can be \
+                 behind a sign-in proxy"
+                (Backend_address.to_string remote))
+         | Error e ->
+           fail
+             (Backend_choice.Error.to_string_hum
+                e
+                ~no_backend:
+                  "no backend: pass -connect https://host/ (its prigh-web URL)")
+       in
+       let open_url = if no_browser then None else Some open_in_browser in
+       let result =
+         Eio_main.run
+         @@ fun env ->
+         if json
+         then
+           Browser_signin.run ~env ~program remote ~on_url:(fun ~url ~port ->
+             print_endline
+               (Jsonaf.to_string
+                  (`Object [ "url", `String url; "port", `Number (Int.to_string port) ]));
+             Option.iter open_url ~f:(fun open_url -> open_url url))
+         else
+           Browser_signin.run_on_terminal
+             ~env
+             ~program
+             ~say:(eprintf "prigh browser-signin: %s\n%!")
+             ?open_url
+             ~why:"signing in"
+             remote
+       in
+       match result with
+       | Error error -> fail error
+       | Ok grant when json ->
+         let string = Option.value_map ~default:`Null ~f:(fun s -> `String s) in
+         print_endline
+           (Jsonaf.to_string
+              (`Object
+                  [ "proxy_cookie", `String grant.proxy_cookie
+                  ; "token", string grant.token
+                  ; "user", string grant.user
+                  ]))
+       | Ok grant ->
+         (match Saved_connection.load ~home with
+          | Ok (Some saved)
+            when String.equal saved.connect (Backend_address.to_string remote) ->
+            ()
+          | Ok _ | Error _ ->
+            (match
+               Saved_connection.save
+                 ~home
+                 { connect = Backend_address.to_string remote
+                 ; token = None
+                 ; user = None
+                 ; proxy_cookie = None
+                 }
+             with
+             | Ok () -> ()
+             | Error e -> fail (Error.to_string_hum e)));
+         (match Backend_choice.remember_signin ~home remote grant with
+          | Ok () ->
+            eprintf
+              "prigh browser-signin: signed in; saved for %s in %s\n%!"
+              (Backend_address.to_string remote)
+              (Saved_connection.file ~home)
+          | Error e -> fail (Error.to_string_hum e)))
+;;
+
 let tool_host_command =
   Command.basic
     ~summary:
@@ -2302,6 +2439,7 @@ let () =
        [ "run", run_command
        ; "serve", serve_command
        ; "tool-host", tool_host_command
+      ; "browser-signin", browser_signin_command
        ; "acp", acp_command
        ; "web", web_command
        ; "desktop", desktop_command
