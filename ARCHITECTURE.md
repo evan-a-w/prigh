@@ -3352,7 +3352,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     `Bonsai.state_machine`, executes the commands (RPCs through the
     `Client`, replies back as `Action.Reply`; `history.replaceState` for
     `?session=`, also kept as the account's last session unless acting as
-    another user; the clipboard; switching accounts, which activates one
+    another user; the clipboard (`Command.Copy`: `Browser.copy_to_clipboard`,
+    the Clipboard API in a secure context, else a hidden textarea and
+    `execCommand "copy"`, answered by `Copied` (its toast) or `Copy_failed`;
+    the key and context-menu listeners copy in the gesture itself,
+    `Gesture_copy`, as WebKit requires, and the command takes that result);
+    switching accounts, which activates one
     and loads the page for its backend and session; adding one, which
     shows the sign-in form on the next load; scrolling; `Auth_failed`
     notes its message in localStorage (`prigh-web.refused`) and reloads
