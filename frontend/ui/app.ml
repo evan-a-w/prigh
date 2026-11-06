@@ -203,7 +203,7 @@ module Connection = struct
         ; generation : int
         ; delay_ms : int
         ; session : string option
-        (** the session to resume; dropped once the backend says it no longer
+          (** the session to resume; dropped once the backend says it no longer
             exists (a never-persisted session has no file) *)
         }
     | Switching of
@@ -255,6 +255,7 @@ module Action = struct
         ; outcome : Server_link.Outcome.t
         }
     | Rejected of string
+    | Signin_required of string
     | Resize of
         { width : int
         ; height : int
@@ -380,12 +381,15 @@ let shown_queue m =
 
 let editor_row_count m =
   let inner = Int.max 1 (m.width - 2) in
-  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
-    let rec count text acc =
-      let _, rest = Text_width.take text ~width:inner in
-      if String.is_empty rest then acc + 1 else count rest (acc + 1)
-    in
-    count line 0)
+  List.sum
+    (module Int)
+    (Editor.lines m.editor)
+    ~f:(fun line ->
+      let rec count text acc =
+        let _, rest = Text_width.take text ~width:inner in
+        if String.is_empty rest then acc + 1 else count rest (acc + 1)
+      in
+      count line 0)
 ;;
 
 let layout m =
@@ -1078,10 +1082,7 @@ let forge_logout m host =
         mode =
           Confirm
             { question =
-                sprintf
-                  "Sign out of %s%s and delete its token? (y/n)"
-                  host
-                  user
+                sprintf "Sign out of %s%s and delete its token? (y/n)" host user
             ; action = Forge_logout host
             }
       }
@@ -2209,8 +2210,7 @@ let reset_session m =
         commit_draft = None
       ; mode =
           (match m.mode with
-           | Output _
-           | Pr_form _
+           | Output _ | Pr_form _
            | Picker { kind = Pull_requests; _ }
            | Confirm { action = Cd_to_checkout _; _ } -> Editing
            | mode -> mode)
@@ -2449,6 +2449,24 @@ let connected_notice m (link : Server_link.t) =
      | None, None -> sprintf "connected to %s" address)
 ;;
 
+(* A sign-in proxy in front of the backend answered with its login: no
+   retries until the user signs in through the browser (or /connect). *)
+let ask_browser_signin m ~why =
+  let m =
+    { (reset_connection m) with connection = Disconnected { reason = why } }
+  in
+  { (warn m why) with
+    mode =
+      Confirm
+        { question =
+            "A sign-in proxy guards the backend. Sign in through the browser? \
+             (y/n)"
+        ; action = Browser_signin
+        }
+  ; autocomplete = None
+  }
+;;
+
 let relinked m ~generation (outcome : Server_link.Outcome.t) =
   match m.connection with
   | Switching { generation = current; previous; notices }
@@ -2473,6 +2491,19 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
         | Reconnecting { attempt; session; _ } ->
           schedule_reconnect m ~attempt ~delay_ms:0 ~session
         | Connected | Switching _ | Disconnected _ -> m, [])
+     | Signin_required why ->
+       let m = { m with connection = previous } in
+       (match previous with
+        | Connected ->
+          ( error
+              m
+              (sprintf
+                 "%s; still on %s"
+                 why
+                 (Server_link.describe outcome.link))
+          , [] )
+        | Reconnecting _ | Switching _ | Disconnected _ ->
+          ask_browser_signin m ~why, [])
      | Rejected e when Server_link.is_rejection e -> signed_out m ~reason:e, []
      | Rejected e ->
        let m =
@@ -2527,6 +2558,11 @@ let reconnect_reply m ~generation result =
      | Error e
        when Server_link.is_rejection e && Option.is_some (remote_address m) ->
        signed_out m ~reason:e, []
+     | Error e when Option.is_some (Server_link.proxy_signin_of_error e) ->
+       ( ask_browser_signin
+           m
+           ~why:(Option.value_exn (Server_link.proxy_signin_of_error e))
+       , [] )
      | Error e when Option.is_some session && Connection.session_missing e ->
        schedule_reconnect
          (log
@@ -2738,10 +2774,10 @@ let set_default_mode m ?enabled (approval_mode : P.Approval_mode.t) =
         [ "approval_mode", str (P.Approval_mode.to_string approval_mode) ]
     ] )
 ;;
+
 let set_confirm m enabled =
   set_default_mode m ~enabled (if enabled then Ask else Auto)
 ;;
-
 
 (* Shown at once; the backend's state follows. *)
 let set_mode m (mode : Session_mode.t) =
@@ -2943,6 +2979,7 @@ let naming_command m (cmd : Commands.Parsed.t) =
           (Naming_command.fields action)
       ] )
 ;;
+
 let dictation_command m (cmd : Commands.Parsed.t) =
   match Dictation_command.parse cmd.rest with
   | Show ->
@@ -2956,7 +2993,6 @@ let dictation_command m (cmd : Commands.Parsed.t) =
           (Dictation_command.fields action)
       ] )
 ;;
-
 
 (* ---- snippets ---------------------------------------------------------- *)
 
@@ -5330,6 +5366,11 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
     | Nix_gc generations -> start_nix_gc m (Some generations)
+    | Browser_signin ->
+      relink
+        m
+        Browser_signin
+        ~doing:"signing in through the browser: follow the link it opens…"
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
     | Remove_worktree { worktree; force; back = _ } ->
@@ -5349,6 +5390,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
+    | Browser_signin ->
+      ( notice
+          m
+          "not signed in: /connect tries again (it asks again), or exempt /ws \
+           and /terminal from the proxy (see DOCKER.md)"
+      , [] )
     | Logout _
     | Forge_logout _
     | Rewind _
@@ -6725,6 +6772,7 @@ let update m (action : Action.t) =
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []
+      | Signin_required why -> ask_browser_signin m ~why, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

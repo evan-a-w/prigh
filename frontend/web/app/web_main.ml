@@ -1692,9 +1692,13 @@ let run () =
   match Desktop_page.key () with
   | Some key -> desktop key
   | None ->
-    (match Signin_link.code_of_hash (Browser.hash ()) with
-     | Some code ->
+    (match Cli_signin_page.take (), Signin_link.code_of_hash (Browser.hash ()) with
+     | Some request, _ ->
+       let settings = Settings.load () in
+       Cli_signin_page.show request ~login:settings.login ~sign_in:(fun ~error ->
+         sign_in_form settings ~notice:true ~error)
+     | None, Some code ->
        Browser.clear_hash ();
        sign_in_from_link code ~f:start
-     | None -> start ())
+     | None, None -> start ())
 ;;

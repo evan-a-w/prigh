@@ -2007,6 +2007,26 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the local tool host's id, which the page sends as `hello`'s
   `prefer_host`. A `Tool_host.connect` fiber (unless `-tools remote`) is
   the machine's tool host, by `~/.prigh/host-id`.
+- `Browser_signin` / `Cli_signin_grant` — signing a program in through
+  the browser past a sign-in proxy in front of `serve -web` (authentik,
+  oauth2-proxy...). `Backend_address.signin_page` tells such a proxy's
+  login (a redirect elsewhere, 401/403/407, an HTML page) from other
+  refused upgrades, which `Backend_socket.connect` raises as
+  `Signin_required`. `Browser_signin.run` listens on 127.0.0.1 and has the
+  user open `SITE/#cli-signin=PORT.STATE&program=NAME`; prigh-web
+  (`Cli_signin` in `frontend/web/lib`, `Cli_signin_page` in `app/`) asks
+  to allow it and `POST`s its credentials to `/cli-signin/grant`, where
+  `Cli_signin_grant` (a `routes` hook of `serve -web`) answers the
+  request's own `Cookie` header — the proxy's HttpOnly session, which the
+  page cannot read — only to the page's own request (JSON, a matching
+  `Origin`, or `Sec-Fetch-Site: same-origin`) with credentials the
+  backend accepts. The page submits it as a form to the listener, which
+  checks `state` and answers a page saying it is done. The cookie is
+  `Backend_address.proxy_cookie`, sent with every request to the site
+  (`upgrade_headers`; `Web_proxy` sends it instead of the browser's own
+  cookies) and saved in `Saved_connection`'s `proxy_cookie` for the saved
+  address. `Tool_host.connect ~signin`, `prigh web` and `prigh
+  browser-signin` (`-json` for prigh-tui) use it.
 - `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
   (which has the same module in `client/unix/`): `prigh web` resolves and
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
@@ -2222,7 +2242,8 @@ terminal frontend and `web/` prigh-web, the browser one.
   side: a masked text message per line, the server's pings answered, a
   ping after 20s of quiet and a close after 60s, so the client reconnects;
   an upgrade answered with a redirect, 401 or HTML page is explained as a
-  proxy's sign-in), over `Tls_channel` (the pure `tls` engine over Async,
+  proxy's sign-in and is a `Signin_required` error), `Browser_signin`
+  (runs `prigh browser-signin -json` for the proxy's cookie), over `Tls_channel` (the pure `tls` engine over Async,
   certificates checked against the system's CAs via `ca-certs`) for
   `wss`; both over `Channel` (a TCP byte stream with keepalive). The
   tests' servers and throwaway CA are in `client/unix/testing/` — and
@@ -2565,7 +2586,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     local for a remote backend unless `-tools` was given), sends `hello` and
     saves the connection through `Saved_connection` once it is answered
     (`resolve`'s rules for `/connect`, the new credentials for `/signin`);
-    `sign_out` forgets the token there and in the saved file. A `Closed` seen
+    `sign_out` forgets the token there and in the saved file. A sign-in
+    proxy's login is `Signin_required` (the UI asks, `Mode.Confirm
+    Browser_signin`, and answers with `relink Browser_signin`): the
+    cookie it gets is sent as a `Cookie` header to that address from then
+    on and saved with the connection; a reconnect that meets the login
+    again stops retrying and asks. A `Closed` seen
     while a newer transport is attached is dropped (`handle_incoming`), and a
     reconnect overtaken by a switch gives way.
     `Term_app.run` sends `hello` (`Backend_link.connection_hello`: with local
