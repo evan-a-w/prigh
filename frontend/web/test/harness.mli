@@ -20,11 +20,16 @@ val connecting : unit -> t
 
 val model : t -> App.Model.t
 
-(** Applies an action and prints the commands it issued. *)
+(** Applies an action and prints the commands it issued, then answers each
+    [Copy] (see [block_clipboard]). *)
 val act : t -> App.Action.t -> unit
 
 (** Runs [f] without printing the commands issued. *)
 val quiet : t -> (unit -> unit) -> unit
+
+(** From now on [Command.Copy] fails, as on a plain http address (by default
+    it works): the harness answers each with [Copied] or [Copy_failed]. *)
+val block_clipboard : t -> unit
 
 (** A key press as the page sees it (in the editor with the caret at the end,
     unless [target]): prints the action [Keys.handle] chose, and applies it. *)
