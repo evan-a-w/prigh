@@ -109,7 +109,7 @@ fake: cwd WORK/home
 fake: GET / webkit=False
 fake: GET /pixel.gif webkit=False
 fake: eof
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
@@ -124,7 +124,7 @@ fake: cwd WORK/home
 fake: GET / webkit=False
 fake: GET /pixel.gif webkit=False
 fake: exiting quit
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: SIGTERM: closing
@@ -145,7 +145,7 @@ fake: cwd WORK/home
 fake: GET / webkit=False
 fake: GET /pixel.gif webkit=False
 fake: exiting crash
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: SIGTERM: closing
@@ -177,7 +177,7 @@ browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.e
 browser: fragment 
 browser: loaded the page
 browser: SIGTERM: closing
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
@@ -197,7 +197,7 @@ browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.e
 browser: fragment 
 browser: loaded the page
 browser: SIGTERM: closing
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
@@ -214,7 +214,7 @@ fake: cwd WORK/home
 fake: GET / webkit=False
 fake: GET /pixel.gif webkit=False
 fake: eof
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: SIGTERM: closing
@@ -230,7 +230,7 @@ fake: cwd WORK/home
 fake: GET / webkit=False
 fake: GET /pixel.gif webkit=False
 fake: eof
-browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
@@ -257,6 +257,11 @@ fake: 1 GET / webkit=True
 fake: 1 GET /pixel.gif webkit=True
 fake: 1 exiting quit
 left running: 0
+== real Chromium: links to other sites open in the default browser
+default browser: http://localhost:PORT/away
+default browser: http://localhost:PORT/new-window
+prigh's page loaded: 2 times; Chromium's windows: http://127.0.0.1:PORT/
+exit 0; left running: 0
 == the real sidecar: the connect form; closing the window stops it: exit 0
 prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
