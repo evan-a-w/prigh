@@ -17,6 +17,7 @@ prints the captured panes.
   === after reply
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ hello there
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ prints the captured panes.
     /help · Esc aborts · Ctrl+C twice
     quits
   
+  • Using another client
   ▌ first
     faux reply
   ────────────────────────────────────────
@@ -42,6 +44,7 @@ prints the captured panes.
   === 100x30
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ first
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -51,13 +54,13 @@ prints the captured panes.
   === scrolled back
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ prompt 1
     faux reply
   
   ▌ prompt 2
     faux reply
-  
-  ▌ prompt 3                                                                            ↓ bottom · End
+                                                                                        ↓ bottom · End
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
