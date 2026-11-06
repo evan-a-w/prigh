@@ -190,13 +190,12 @@ let session_items (sessions : P.Session_summary.t list) =
 ;;
 
 (* The sessions a command can act on: [/archive] the active ones,
-   [/unarchive] the archived ones, [/delete] all but the current one. *)
-let sessions_for (spec : Commands.Spec.t) ~current_session sessions =
+   [/unarchive] the archived ones, [/delete] all. *)
+let sessions_for (spec : Commands.Spec.t) sessions =
   List.filter sessions ~f:(fun (s : P.Session_summary.t) ->
     match spec.name with
     | "archive" -> not s.archived
     | "unarchive" -> s.archived
-    | "delete" -> not (Option.exists current_session ~f:(String.equal s.path))
     | _ -> true)
 ;;
 
@@ -410,7 +409,6 @@ let compute_argument
       ~agents
       ~worktrees
       ~refs
-      ~current_session
       ~logged_in
       ~default_dir_host
       ~server
@@ -424,9 +422,7 @@ let compute_argument
        (match Commands.find ~superuser name with
         | None -> None
         | Some spec ->
-          let sessions =
-            Option.map sessions ~f:(sessions_for spec ~current_session)
-          in
+          let sessions = Option.map sessions ~f:(sessions_for spec) in
           (match spec.argument with
            | None -> None
            | Some kind ->
@@ -668,7 +664,6 @@ let directory ~host ~text =
 
 let compute
       ~superuser
-      ~current_session
       ~line
       ~col
       ~line_index
@@ -708,7 +703,6 @@ let compute
          ~agents
          ~worktrees
          ~refs
-         ~current_session
          ~logged_in
          ~default_dir_host
          ~server

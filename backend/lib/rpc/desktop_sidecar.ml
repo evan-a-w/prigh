@@ -390,7 +390,13 @@ let form_connect t flow json =
                t
                ~remote
                ~credentials:{ token; user }
-               ~save:(Some { Saved_connection.connect = address; token; user })
+               ~save:
+                 (Some
+                    { Saved_connection.connect = address
+                    ; token
+                    ; user
+                    ; proxy_cookie = None
+                    })
            with
            | Ok (Code code) ->
              respond_json flow (`Object [ "ok", `True; "code", `String code ])

@@ -148,6 +148,7 @@ module Reply_tag = struct
     | Dequeued
     | Unqueued of string
     | Sessions_deleted
+    | Moved_and_deleted of Switch_to.t
     | Archived_set of
         { title : string
         ; archived : bool
@@ -867,18 +868,67 @@ module Model = struct
     let current =
       Option.exists t.state ~f:(fun state -> String.equal state.session_id s.id)
     in
+    (* The session you are in counts this tab among its clients. *)
+    let others = if current then s.clients - 1 else s.clients in
     if s.running
     then Some "is running: it will be kept (wait for it or stop it first)"
-    else if current
-    then
-      Some
-        "is the session you are in: it will be kept (switch to another first)"
-    else if s.clients > 0
+    else if others > 0
     then
       Some
         "is open in another tab or terminal: it will be kept (close it there \
          first)"
     else None
+  ;;
+
+  let to_delete t (target : Dialog.Delete_target.t) =
+    (match target with
+     | Sessions paths ->
+       List.filter t.sessions ~f:(fun s ->
+         List.mem paths s.path ~equal:String.equal)
+     | Archived -> List.filter t.sessions ~f:(fun s -> s.archived))
+    |> List.filter ~f:(fun s -> Option.is_none (kept_from_deletion t s))
+  ;;
+
+  let moving_to t target : Switch_to.t option =
+    let deleted = to_delete t target in
+    let gone (s : Session_summary.t) =
+      List.exists deleted ~f:(fun d -> String.equal d.path s.path)
+    in
+    match t.state with
+    | Some state
+      when List.exists deleted ~f:(fun s -> String.equal s.id state.session_id)
+      ->
+      let is_current (s : Session_summary.t) =
+        String.equal s.id state.session_id
+      in
+      (* The sidebar's order; the whole list's when it does not show the
+         session (filtered out, or archived and folded). *)
+      let order =
+        let shown =
+          Session_list.shown
+            t.sessions
+            ~query:t.session_query
+            ~archived_open:t.archived_open
+        in
+        if List.exists shown ~f:is_current
+        then shown
+        else Session_list.shown t.sessions ~query:"" ~archived_open:true
+      in
+      let index =
+        Option.value_map
+          (List.findi order ~f:(fun _ s -> is_current s))
+          ~default:0
+          ~f:fst
+      in
+      let below = List.find (List.drop order (index + 1)) ~f:(Fn.non gone) in
+      let above =
+        List.find (List.rev (List.take order index)) ~f:(Fn.non gone)
+      in
+      Some
+        (match Option.first_some below above with
+         | Some s -> Session s.path
+         | None -> New_session)
+    | _ -> None
   ;;
 end
 
@@ -2054,6 +2104,37 @@ let switch_session (m : Model.t) path =
     , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
       @ fetch
       @ [ focus_editor ] ))
+;;
+
+(* Deleting the session we are in moves us first: the backend does both in
+   the one request, which this shows as a switch ([switch_session] or
+   [new_session]) under way. *)
+let moving_for_deletion (m : Model.t) (switch_to : Switch_to.t) =
+  let m =
+    { m with
+      sidebar_open = m.sidebar_open && not m.narrow
+    ; review_drawer = false
+    }
+  in
+  match switch_to with
+  | Session path ->
+    let m, fetch = fetch_newest m path in
+    ( { m with pending = { m.pending with session = Some (Switching path) } }
+    , fetch @ [ focus_editor ] )
+  | New_session ->
+    ( { m with pending = { m.pending with session = Some Starting } }
+    , [ focus_editor ] )
+;;
+
+(* The backend kept us where we were (the session was refused after all). *)
+let not_moving (m : Model.t) (switch_to : Switch_to.t) =
+  let ours =
+    match m.pending.session, switch_to with
+    | Some (Switching path), Session target -> String.equal path target
+    | Some Starting, New_session -> true
+    | _ -> false
+  in
+  if ours then { m with pending = { m.pending with session = None } } else m
 ;;
 
 (* The sidebar's sessions in the order it shows them. *)
@@ -7272,6 +7353,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
+  | Moved_and_deleted switch_to, Error e ->
+    error (not_moving m switch_to) (sprintf "Couldn't delete: %s" e)
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
       error
@@ -7740,6 +7823,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        in
        set_draft m draft, [ focus_editor ]
      | _ -> toast m "Nothing is queued")
+  | Moved_and_deleted switch_to, Ok json ->
+    decode m json Delete_result.of_json ~f:(fun result ->
+      let m, moved =
+        match result.moved_to with
+        | Some _ -> reply_to m Reload_state (Ok json)
+        | None -> not_moving m switch_to, []
+      in
+      let m, deleted = reply_to m Sessions_deleted (Ok json) in
+      m, moved @ deleted)
   | Sessions_deleted, Ok json ->
     decode m json Delete_result.of_json ~f:(fun result ->
       let gone =
@@ -7751,6 +7843,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         { m with
           sessions =
             List.filter m.sessions ~f:(fun s -> not (Set.mem gone s.path))
+        ; chat_cache = Set.fold gone ~init:m.chat_cache ~f:Chat_cache.remove
         ; marks =
             (* What was kept (refused, or not asked for) stays selected. *)
             (let kept = Set.diff m.marks.marked gone in
@@ -8924,22 +9017,21 @@ let dialog_accept (m : Model.t) =
         @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
       ))
   | Some (Delete target) ->
+    let paths = List.map (Model.to_delete m target) ~f:(fun s -> s.path) in
+    let switch_to = Model.moving_to m target in
     let m, cmds = close_dialog m in
-    (* What the backend would keep is not asked for. *)
-    let deletable paths =
-      List.filter paths ~f:(fun path ->
-        not
-          (List.exists m.sessions ~f:(fun s ->
-             String.equal s.path path
-             && Option.is_some (Model.kept_from_deletion m s))))
+    let request : Request.Method.t option =
+      match target, paths with
+      | Sessions _, [] -> None
+      | Sessions _, paths -> Some (Delete_sessions { paths; switch_to })
+      | Archived, _ -> Some (Delete_archived { switch_to })
     in
-    (match target with
-     | Sessions paths ->
-       (match deletable paths with
-        | [] -> m, cmds
-        | paths ->
-          m, cmds @ [ call (Delete_sessions paths) ~tag:Sessions_deleted ])
-     | Archived -> m, cmds @ [ call Delete_archived ~tag:Sessions_deleted ])
+    (match request, switch_to with
+     | None, _ -> m, cmds
+     | Some request, None -> m, cmds @ [ call request ~tag:Sessions_deleted ]
+     | Some request, Some switch_to ->
+       let m, move = moving_for_deletion m switch_to in
+       m, cmds @ (call request ~tag:(Moved_and_deleted switch_to) :: move))
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow

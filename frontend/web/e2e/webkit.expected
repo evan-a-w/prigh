@@ -1331,15 +1331,28 @@ main
 feat/login
 <DIR>/home/.prigh/worktrees/prigh/feat-login · 1 session
 Enter works there, Alt+Enter in a new session, Alt+R reviews, Delete removes, Esc closes
+=== webkit: worktrees: deleting the session we are in: asked ===
+Delete “Tidy the docs in a worktree”?
+You'll move to “The login form”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Tidy the docs in a worktree
+<SIZE>
+Cancel
+Delete
+=== webkit: worktrees: deleting the session we are in: where we land ===
+in: The login form; the address names it: true
+=== webkit: worktrees: the session we were in deleted ===
+The login form | <age> | prigh | feat/login | 1 [selected]
+│ feat/login | here [here]
+Shopping list | <age> | <DIR>/notes
+A landing page | <age> | site | trunk
 === webkit: worktrees: on a phone ===
-Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
-│ feat/login
-The login form | <age> | prigh | feat/login | 1
+The login form | <age> | prigh | feat/login | 1 [selected]
 │ feat/login | here [here]
 Shopping list | <age> | <DIR>/notes
 A landing page | <age> | site | trunk
 === webkit: worktrees: a long press on a phone ===
-feat/login — in Tidy the docs in a worktree
+feat/login — in The login form
 ▸ Switch session here  /worktree open feat/login
 New session here  /worktree open -n feat/login
 Review changes  /review feat/login
@@ -1348,6 +1361,42 @@ Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
 Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: asked ===
+deleting: The login form
+Delete “The login form”?
+You'll move to “Shopping list”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+The login form
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: where we land ===
+in: Shopping list; the strip says: Shopping list; the address names it: true
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: asked ===
+deleting: Shopping list
+Delete “Shopping list”?
+You'll move to “A landing page”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Shopping list
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: where we land ===
+in: A landing page; the strip says: A landing page; the address names it: true
+ok
 === webkit: worktrees: errors ===
 none
 === webkit: review: files: changes marked ===
@@ -2138,6 +2187,89 @@ prefer_host: host-laptop
 === webkit: remote: the spent link elsewhere ===
 Sign in
 === webkit: remote: errors ===
+none
+=== webkit: cli_signin: desktop: the program ===
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui
+=== webkit: cli_signin: desktop: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+http://127.0.0.1:<PORT>/
+=== webkit: cli_signin: desktop: not signed in to prigh ===
+unauthorised: bad user name or password: sign in to prigh, then allow the program again.
+=== webkit: cli_signin: desktop: asked again, signed in ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+Allow: 44px+, on screen
+Cancel: 44px+, on screen
+overflows sideways: false
+=== webkit: cli_signin: desktop: the program's page ===
+Signed in
+prigh-tui on this computer is signed in to 127.0.0.1:<PORT>. You can close this tab.
+=== webkit: cli_signin: desktop: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+((connect ws://127.0.0.1:<PORT>/ws) (token sekrit)
+(proxy_cookie <THE PROXY'S COOKIE>))
+=== webkit: cli_signin: desktop: cancelled with Esc ===
+exit 2
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: the sign-in was cancelled in the browser
+=== webkit: cli_signin: phone: the program ===
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tool-host
+=== webkit: cli_signin: phone: asked ===
+prigh
+sign-in
+Allow prigh tool-host to connect?
+prigh tool-host on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+http://127.0.0.1:<PORT>/
+=== webkit: cli_signin: phone: not signed in to prigh ===
+unauthorised: bad user name or password: sign in to prigh, then allow the program again.
+=== webkit: cli_signin: phone: asked again, signed in ===
+prigh
+sign-in
+Allow prigh tool-host to connect?
+prigh tool-host on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+Allow: 44px+, on screen
+Cancel: 44px+, on screen
+overflows sideways: false
+=== webkit: cli_signin: phone: the program's page ===
+Signed in
+prigh tool-host on this computer is signed in to 127.0.0.1:<PORT>. You can close this tab.
+=== webkit: cli_signin: phone: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+((connect ws://127.0.0.1:<PORT>/ws) (token sekrit)
+(proxy_cookie <THE PROXY'S COOKIE>))
+=== webkit: cli_signin: phone: cancelled with Esc ===
+exit 2
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
+prigh browser-signin: the sign-in was cancelled in the browser
+=== webkit: cli_signin: through the proxy ===
+upgrade /ws
+POST /cli-signin/grant
+=== webkit: cli_signin: errors ===
 none
 === webkit: desktop: its stdout ===
 {"url":"http://127.0.0.1:<PORT>/#desktop=<key>"}
