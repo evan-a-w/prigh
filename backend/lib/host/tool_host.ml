@@ -614,6 +614,9 @@ let connect
   let backend = ref backend in
   let token = ref token in
   let user = ref user in
+  (* A failed sign-in is not started again on its own (each one would print
+     a new address, or open another tab): the connection is retried. *)
+  let signin_failed = ref false in
   let attempt () =
     Switch.run (fun sw ->
       let socket = Backend_socket.connect ~env ~sw !backend in
@@ -650,8 +653,8 @@ let connect
       log message;
       retry backoff
     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
-    | exception Backend_address.Signin_required why when Option.is_some signin
-      ->
+    | exception Backend_address.Signin_required why
+      when Option.is_some signin && not !signin_failed ->
       (match (Option.value_exn signin) ~why !backend with
        | Ok (grant : Browser_signin.Grant.t) ->
          log "signed in through the browser: connecting";
@@ -663,7 +666,13 @@ let connect
            user := grant.user);
          loop initial_backoff
        | Error error ->
-         log (sprintf "not signed in: %s" error);
+         signin_failed := true;
+         log
+           (sprintf
+              "not signed in: %s (not asking again: sign in with `prigh \
+               browser-signin -connect %s`, then restart the tool host)"
+              error
+              (Backend_address.web_url !backend));
          retry max_backoff)
     | exception exn ->
       log
