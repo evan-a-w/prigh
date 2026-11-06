@@ -9,6 +9,8 @@ module Queued = struct
     ; source : Injected.Source.t option
     ; attachments : string list
     ; images : Image.t list
+    ; client : Client_kind.t option
+    ; ui_action : Injected.Note.t option
     }
   [@@deriving sexp_of]
 end
@@ -234,6 +236,8 @@ type t =
     (** resolved, and replaced, when the hosts or the active host change *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
+  ; mutable client : Client_kind.t option
+    (** the kind of client that sent the latest prompt, once one said *)
   ; mutable told : Told_environment.t
     (** what the model was last told, as [Session.told_environment] records
         it; the difference to now is told with the next user message *)
@@ -552,6 +556,7 @@ let environment t =
       List.map (Tools.for_model t.model t.tools) ~f:Tool.name
       |> List.dedup_and_sort ~compare:String.compare
   ; plan_mode = t.plan_mode
+  ; client = t.client
   }
 ;;
 
@@ -571,7 +576,8 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> environment t)
+      | None -> environment t);
+  t.client <- t.told.client
 ;;
 
 (* Before a change, so that a session that has not recorded what the model
@@ -1502,6 +1508,61 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
              ~move:(fun () -> activate_host t host ~cwd ~pinned:true)))
 ;;
 
+(* [render_ui]'s images are read where [fs_preview] reads them: on the
+   active tool host, in the session cwd. *)
+let ui_host t ~cancel =
+  let read_head path ~length =
+    let result =
+      active_host_exec
+        t
+        ~wait:true
+        ~cancel
+        ~on_output:ignore
+        ~call_id:"render_ui"
+        ~cwd:t.cwd
+        ~name:Host_files.read_op
+        ~arguments:
+          (`Object
+              [ "path", `String path
+              ; "offset", `Number "0"
+              ; "length", `Number (Int.to_string length)
+              ])
+        ()
+    in
+    if result.is_error
+    then
+      if String.is_prefix result.text ~prefix:"unknown host tool"
+      then
+        Or_error.errorf
+          "cannot check images on tool host %s, whose prigh is too old: \
+           update prigh there"
+          t.active_host_name
+      else Or_error.error_string result.text
+    else (
+      let open Or_error.Let_syntax in
+      let%bind json = Json.parse result.text in
+      let%bind size =
+        match Json.member "size" json with
+        | Some (`Number n) ->
+          Result.of_option
+            (Int.of_string_opt n)
+            ~error:(Error.of_string "bad size from the host")
+        | _ -> Or_error.error_string "bad reply from the host"
+      in
+      let%map data =
+        match Json.member "data" json with
+        | Some (`String data) ->
+          Result.map_error (Base64.decode data) ~f:(fun (`Msg m) ->
+            Error.of_string ("bad data from the host: " ^ m))
+        | _ -> Or_error.error_string "bad reply from the host"
+      in
+      size, data)
+  in
+  { Ui_host.client = (fun () -> Option.value t.client ~default:Other)
+  ; read_head
+  }
+;;
+
 let executor t : Tool.executor =
   fun context tool arguments ->
   let arguments =
@@ -1698,7 +1759,12 @@ let system_prompt ?(cancel = Cancellation.never) t =
     if not (Cancellation.is_cancelled cancel)
     then (
       ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
-      tell t { (environment t) with plan_mode = t.told.plan_mode });
+      tell
+        t
+        { (environment t) with
+          plan_mode = t.told.plan_mode
+        ; client = t.told.client
+        });
     text
 ;;
 
@@ -1939,7 +2005,7 @@ let take_notes t =
   let told =
     if Option.is_some (Session.system_prompt t.session)
     then t.told
-    else { now with plan_mode = t.told.plan_mode }
+    else { now with plan_mode = t.told.plan_mode; client = t.told.client }
   in
   let notes = Told_environment.notes ~told now ~host_name:t.active_host_name in
   if not (List.is_empty notes) then tell t now;
@@ -1948,16 +2014,25 @@ let take_notes t =
 
 let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
   Reminder.Tracker.user_spoke t.reminder_tracker;
-  let text = Option.value q.expanded ~default:q.text in
-  let text, attachments, attached =
-    with_attachments t ~cancel text q.attachments
-  in
-  let notes = take_notes t in
-  let origin = { Injected.notes; attachments; source = q.source } in
-  Message.user
-    ~images:(q.images @ attached)
-    ?origin:(Option.some_if (not (Injected.is_empty origin)) origin)
-    (Injected.prefix_notes notes text)
+  Option.iter q.client ~f:(fun client -> t.client <- Some client);
+  match q.ui_action with
+  | Some action ->
+    (* A message of notes only: the answer is one too. *)
+    let notes = take_notes t @ [ action ] in
+    Message.user
+      ~origin:{ Injected.empty with notes }
+      (String.concat ~sep:"\n" (List.map notes ~f:(fun n -> n.text)))
+  | None ->
+    let text = Option.value q.expanded ~default:q.text in
+    let text, attachments, attached =
+      with_attachments t ~cancel text q.attachments
+    in
+    let notes = take_notes t in
+    let origin = { Injected.notes; attachments; source = q.source } in
+    Message.user
+      ~images:(q.images @ attached)
+      ?origin:(Option.some_if (not (Injected.is_empty origin)) origin)
+      (Injected.prefix_notes notes text)
 ;;
 
 (* Spend the session's messages do not record, recorded as [Spend] entries:
@@ -2325,6 +2400,7 @@ let rec start_run
              ~cancel
              ~approve:(approve t)
              ~ask_user:(ask_user t ~cancel)
+             ~ui:(ui_host t ~cancel)
              ~execute:(executor t)
              ~background:t.background
              ~steer:(fun () ->
@@ -2898,7 +2974,8 @@ let create
     ; hosts_changed = Promise.create ()
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
-    ; told = { host = ""; cwd; tools = []; plan_mode = false }
+    ; client = None
+    ; told = { host = ""; cwd; tools = []; plan_mode = false; client = None }
     ; background =
         Background_tasks.create
           ~env
@@ -2940,7 +3017,35 @@ let create
   t
 ;;
 
-let prompt ?(attachments = []) ?(images = []) t text =
+(* What [prompt], [steer] and [follow_up] queue: the text with its skill
+   expanded, or the answer through a component. *)
+let to_queue t ~attachments ~images ~client ~ui_action text =
+  match ui_action with
+  | Some action ->
+    Or_error.map
+      (Ui_action.check action (path_messages t.session))
+      ~f:(fun () ->
+        { Queued.text = Ui_action.summary action
+        ; expanded = None
+        ; source = None
+        ; attachments = []
+        ; images = []
+        ; client
+        ; ui_action = Some (Ui_action.note action)
+        })
+  | None ->
+    Or_error.map (expand_skill t text) ~f:(fun expanded ->
+      { Queued.text
+      ; expanded
+      ; source = None
+      ; attachments
+      ; images
+      ; client
+      ; ui_action = None
+      })
+;;
+
+let prompt ?(attachments = []) ?(images = []) ?client ?ui_action t text =
   let running () =
     Or_error.error_string "a run is already in progress; use steer or follow_up"
   in
@@ -2949,17 +3054,15 @@ let prompt ?(attachments = []) ?(images = []) t text =
   else if Option.is_some (budget_exhausted t)
   then Or_error.error_string (Option.value_exn (budget_exhausted t))
   else
-    Or_error.bind (expand_skill t text) ~f:(fun skill ->
-      if is_running t
-      then running ()
-      else
-        Ok
-          (start_run t [] ~then_:(fun ~cancel ->
-             [ user_message
-                 ~cancel
-                 t
-                 { text; expanded = skill; source = None; attachments; images }
-             ])))
+    Or_error.bind
+      (to_queue t ~attachments ~images ~client ~ui_action text)
+      ~f:(fun queued ->
+        if is_running t
+        then running ()
+        else
+          Ok
+            (start_run t [] ~then_:(fun ~cancel ->
+               [ user_message ~cancel t queued ])))
 ;;
 
 let enqueue_queued t kind queued =
@@ -2970,30 +3073,29 @@ let enqueue_queued t kind queued =
   else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
 
-let enqueue t kind ?(attachments = []) ?(images = []) text =
+let enqueue t kind ?(attachments = []) ?(images = []) ?client ?ui_action text =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
-    Or_error.map (expand_skill t text) ~f:(fun skill ->
-      enqueue_queued
-        t
-        kind
-        { Queued.text; expanded = skill; source = None; attachments; images })
+    Or_error.map
+      (to_queue t ~attachments ~images ~client ~ui_action text)
+      ~f:(enqueue_queued t kind)
 ;;
 
-let steer ?attachments ?images t text =
-  enqueue t Steer ?attachments ?images text
+let steer ?attachments ?images ?client t text =
+  enqueue t Steer ?attachments ?images ?client text
 ;;
 
-let follow_up ?attachments ?images t text =
-  enqueue t Follow_up ?attachments ?images text
+let follow_up ?attachments ?images ?client ?ui_action t text =
+  enqueue t Follow_up ?attachments ?images ?client ?ui_action text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
    message is actually sent. *)
 let abort t =
   let restored =
-    List.map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) -> q.text)
+    List.filter_map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) ->
+      Option.some_if (Option.is_none q.ui_action) q.text)
   in
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
@@ -3335,6 +3437,8 @@ let command_prompt t ~text ~expanded ~source =
       ; source = Some source
       ; attachments = []
       ; images = []
+      ; client = None
+      ; ui_action = None
       };
     Ok ()
 ;;
@@ -3401,6 +3505,8 @@ let submit_review ?root t =
           ; source = Some (Review_comments { count })
           ; attachments = []
           ; images = []
+          ; client = None
+          ; ui_action = None
           };
         count)
 ;;

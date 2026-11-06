@@ -6,6 +6,7 @@ type t =
   ; cwd : string
   ; tools : string list
   ; plan_mode : bool
+  ; client : Client_kind.t option [@sexp.option] [@jsonaf.option]
   }
 [@@deriving sexp, jsonaf, equal]
 
@@ -47,5 +48,11 @@ let notes ~told now ~host_name =
         (Plan_mode { on = now.plan_mode })
         (System_prompt.plan_mode_note ~on:now.plan_mode)
   in
-  List.filter_opt [ host; cwd; tools; plan_mode ]
+  let client =
+    match now.client with
+    | Some client when not (Option.equal Client_kind.equal told.client now.client)
+      -> note (Client { client }) (System_prompt.client_note client)
+    | Some _ | None -> None
+  in
+  List.filter_opt [ host; cwd; tools; plan_mode; client ]
 ;;
