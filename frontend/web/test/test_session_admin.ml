@@ -380,7 +380,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     |}]
 ;;
 
-let%expect_test "deleting one: the current and open sessions are warned about" =
+let%expect_test "deleting one: where you move, and the open ones kept" =
   let h = H.create ~sessions () in
   H.act h (Ask_delete "/sessions/s1.jsonl");
   H.text h ~selector:".modal p";
@@ -388,7 +388,8 @@ let%expect_test "deleting one: the current and open sessions are warned about" =
   [%expect
     {|
     (Focus dialog)
-    “fix the parser bug” is the session you are in: it will be kept (switch to another first)
+    You'll move to “Release notes”.
+    It will be deleted, with its subagent logs: 3.9 KB on disk. This can't be undone.
     |}];
   H.act h Close_dialog;
   H.key h "Delete" ~target:(Session "s3");

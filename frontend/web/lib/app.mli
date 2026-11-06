@@ -168,6 +168,8 @@ module Reply_tag : sig
     | Dequeued (** [dequeue], or [remove_queued] to edit it *)
     | Unqueued of string (** [remove_queued]: its text *)
     | Sessions_deleted (** [delete_sessions] or [delete_archived] *)
+    | Moved_and_deleted of Switch_to.t
+    (** the same, moving from the session we are in to that one first *)
     | Archived_set of
         { title : string
         ; archived : bool
@@ -944,6 +946,15 @@ module Model : sig
 
   (** Why the backend keeps a session asked to be deleted, if it does. *)
   val kept_from_deletion : t -> Session_summary.t -> string option
+
+  (** The sessions that confirming the deletion of [target] deletes: those
+      the backend keeps are not asked for. *)
+  val to_delete : t -> Dialog.Delete_target.t -> Session_summary.t list
+
+  (** Where deleting [target] moves us when it deletes the session we are in:
+      the next session down the sidebar not being deleted, else the nearest
+      above, else a new session. *)
+  val moving_to : t -> Dialog.Delete_target.t -> Switch_to.t option
 end
 
 val thinking_levels : string list
