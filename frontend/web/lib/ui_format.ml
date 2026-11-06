@@ -16,13 +16,18 @@ let fixed ~decimals f =
     | Some (i, f) -> i, "." ^ f
     | None -> s, ""
   in
-  let negative = Float.(f < 0.) && not (String.for_all s ~f:(fun c -> Char.equal c '0' || Char.equal c '.')) in
+  let negative =
+    Float.(f < 0.)
+    && not (String.for_all s ~f:(fun c -> Char.equal c '0' || Char.equal c '.'))
+  in
   (if negative then "−" else "") ^ group int_part ^ frac
 ;;
 
 let strip_zeros s =
   if String.mem s '.'
-  then String.rstrip s ~drop:(Char.equal '0') |> String.rstrip ~drop:(Char.equal '.')
+  then
+    String.rstrip s ~drop:(Char.equal '0')
+    |> String.rstrip ~drop:(Char.equal '.')
   else s
 ;;
 
@@ -88,7 +93,13 @@ let nice_step raw =
   let base = 10. **. e in
   let f = raw /. base in
   let nice =
-    if Float.(f <= 1.) then 1. else if Float.(f <= 2.) then 2. else if Float.(f <= 5.) then 5. else 10.
+    if Float.(f < 1.5)
+    then 1.
+    else if Float.(f < 3.)
+    then 2.
+    else if Float.(f < 7.)
+    then 5.
+    else 10.
   in
   nice *. base
 ;;
@@ -100,7 +111,9 @@ let ticks ?(count = 5) lo hi =
     then if Float.(lo = 0.) then 0., 1. else Float.min lo 0., Float.max hi 0.
     else lo, hi
   in
-  let lo, hi = if Float.(hi -. lo < 1e-12) then lo -. 1., hi +. 1. else lo, hi in
+  let lo, hi =
+    if Float.(hi -. lo < 1e-12) then lo -. 1., hi +. 1. else lo, hi
+  in
   let step = nice_step ((hi -. lo) /. Float.of_int (Int.max 1 (count - 1))) in
   (* Within a tick of zero: from zero. *)
   let lo = if Float.(lo > 0. && lo <= step) then 0. else lo in
