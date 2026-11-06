@@ -136,7 +136,9 @@ let%expect_test "the saved connection: flags are saved, the environment is not" 
     ((settings ((connect (other:7790)) (token ()) (user ())))
      (save (((connect other:7790)))))
     ((settings ((connect (server:7790)) (token (new)) (user (me))))
-     (save (((connect server:7790) (token new) (user me)))))
+     (save
+      (((connect server:7790) (token new) (user me)
+        (proxy_cookie proxy_session=abc)))))
     ((settings ((connect (server:7790)) (token (env)) (user (me)))) (save ()))
     |}]
 ;;
