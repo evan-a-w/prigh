@@ -1740,15 +1740,20 @@ anywhere (other frontends, other sessions). In it Tab marks or unmarks a
 session (`✓`; the status line shows how many and their size), Ctrl+D
 deletes the marked sessions (or the highlighted one), Alt+A archives or
 unarchives the highlighted one, Alt+D deletes every archived session, and
-Ctrl+N shows only named ones (marks on the hidden ones stay). The session
-you are in cannot be deleted, so Ctrl+D and `/delete` say so at once and
-Alt+D leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
+Ctrl+N shows only named ones (marks on the hidden ones stay). Deleting the
+session you are in (Ctrl+D, `/delete`, or Alt+D when it is archived) moves
+you first to the next session down the list not being deleted, else the
+nearest above, else a new one, and the confirmation says where (`Delete
+session "x" (1.2 KB)? You'll move to session "y". Enter deletes, Esc keeps
+it`); the list closes, as when switching from it. While it is running or
+open in another frontend, Ctrl+D and `/delete` say so at once and Alt+D
+leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
 `/delete` completes sessions by name (or first prompt), the active ones
 first, and inserts the id. Deleting always asks first, with the count and
 the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
 them`); Esc goes back to the list unchanged. Afterwards a notice says what
-was deleted and why any session was not (it is running, open in another
-frontend, or the one you are in).
+was deleted and why any session was not (it is running or open in another
+frontend).
 
 The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 (`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
@@ -2127,7 +2132,8 @@ background subagent or job of it is going on. Deleting a session (one, a
 selection, or every archived one) removes its file and its directory
 (`~/.prigh/sessions/<stamp>_<id>/`, where per-session data is kept) and
 kills its terminal; it is refused for a session that is running, open in
-another frontend, the one you are in or the backend's `-session`. Like the
+another frontend or the backend's `-session` (deleting the one you are in
+moves you to another first). Like the
 rest of `config.json`, these settings are per namespace
 (`~/.prigh/namespaces/<name>/config.json` under `-tokens`). Mistakes in the
 file are reported (at `prigh run`'s start and as notices in the UIs) rather
