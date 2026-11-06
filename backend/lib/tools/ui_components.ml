@@ -56,11 +56,19 @@ let one_of = function
     ^ List.hd_exn rev
 ;;
 
+(* The closest candidate, a transposition ("tabel") preferring the word
+   with the same letters. *)
 let suggest candidates name =
-  match Edit_distance.closest ~n:1 candidates name with
-  | [ best ] when Edit_distance.caseless best name <= 2 ->
+  let letters s = String.to_list (String.lowercase s) |> List.sort ~compare:Char.compare in
+  let anagram =
+    List.find candidates ~f:(fun c ->
+      List.equal Char.equal (letters c) (letters name))
+  in
+  match anagram, Edit_distance.closest ~n:1 candidates name with
+  | Some best, _ -> Some (sprintf "did you mean %S?" best)
+  | None, [ best ] when Edit_distance.caseless best name <= 2 ->
     Some (sprintf "did you mean %S?" best)
-  | _ -> None
+  | None, _ -> None
 ;;
 
 let describe_json : Json.t -> string = function
@@ -72,7 +80,15 @@ let describe_json : Json.t -> string = function
   | `Array _ -> "an array"
 ;;
 
-let plural n word = if n = 1 then sprintf "1 %s" word else sprintf "%d %ss" n word
+let plural n word =
+  if n = 1
+  then sprintf "1 %s" word
+  else if String.is_suffix word ~suffix:"s"
+  then sprintf "%d %s" n word
+  else if String.is_suffix word ~suffix:"y"
+  then sprintf "%d %sies" n (String.drop_suffix word 1)
+  else sprintf "%d %ss" n word
+
 
 type ctx =
   { errors : string Queue.t
@@ -765,7 +781,7 @@ and chart ctx (o : Obj.t) =
     ignore (Obj.string o name : string option));
   ignore (Obj.enum o "height" [ "small"; "medium"; "large" ] : string option);
   let series_count = ref 0 in
-  let wrong_for kind names ~takes =
+  let wrong_for ?(o = o) kind names ~takes =
     List.iter names ~f:(fun name ->
       if List.Assoc.mem o.fields name ~equal:String.equal
       then (
@@ -784,14 +800,15 @@ and chart ctx (o : Obj.t) =
      wrong_for kind [ "slices" ] ~takes:"labels and series";
      let labels =
        Option.map (Obj.array ~required:true o "labels" ~max:200 ~noun:"label") ~f:(fun l ->
-         List.length (strings ctx l))
+         ignore (strings ctx l : string list);
+         List.length l)
      in
      let series = Obj.array ~required:true o "series" ~max:8 ~noun:"series" in
      series_count := Option.value_map series ~default:0 ~f:List.length;
      ignore
        (objects ctx (Option.value series ~default:[]) ~what:"a chart series" ~f:(fun s ->
           ignore (Obj.string ~required:true s "name" : string option);
-          wrong_for kind [ "points" ] ~takes:"values (one per label)";
+          wrong_for ~o:s kind [ "points" ] ~takes:"values (one per label)";
           match Obj.field s "values" ~required:true ~f:(fun p j -> Some (p, j)) with
           | Some (path, `Array values) ->
             List.iteri values ~f:(fun i v ->
@@ -835,7 +852,7 @@ and chart ctx (o : Obj.t) =
      let total =
        objects ctx (Option.value series ~default:[]) ~what:"a scatter series" ~f:(fun s ->
          ignore (Obj.string ~required:true s "name" : string option);
-         wrong_for kind [ "values" ] ~takes:"points ([[x, y], ...])";
+         wrong_for ~o:s kind [ "values" ] ~takes:"points ([[x, y], ...])";
          let points =
            Option.value
              (Obj.array ~required:true s "points" ~max:2000 ~noun:"point")
