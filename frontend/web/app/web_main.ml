@@ -580,7 +580,12 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Quit_desktop -> Effect.of_sync_fun Desktop_page.quit ()
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
-    | Copy text -> Effect.of_sync_fun Browser.copy_to_clipboard text
+    | Copy { text; copied } ->
+      let%bind.Effect ok = Effect.of_deferred_fun Gesture_copy.copy text in
+      inject
+        (if ok
+         then App.Action.Copied copied
+         else Copy_failed { secure = Browser.secure_context () })
     | Select_message n -> Effect.of_sync_fun Menu_listeners.select_message n
     | Switch_account account -> Effect.of_sync_fun switch_account account
     | Add_account -> Effect.of_sync_fun add_account ()
@@ -1020,7 +1025,9 @@ let install_listeners ~schedule ~current =
     | Some action ->
       Dom.preventDefault ev;
       Dom_html.stopPropagation ev;
-      current := fst (App.update !current action);
+      (let model, commands = App.update !current action in
+       Gesture_copy.in_gesture commands;
+       current := model);
       schedule action;
       Js._false
     | None -> Js._true);
@@ -1048,7 +1055,9 @@ let install_listeners ~schedule ~current =
         Dom.preventDefault ev;
         (* Bonsai applies it on the next frame: a key pressed before then must
            see its effect (e.g. Esc closing a dialog, then Ctrl+K). *)
-        current := fst (App.update !current action);
+        (let model, commands = App.update !current action in
+         Gesture_copy.in_gesture commands;
+         current := model);
         schedule action;
         reveal_selected ();
         Js._false));
@@ -1077,6 +1086,24 @@ let install_listeners ~schedule ~current =
         if Js.Opt.case ev##.target (fun () -> false) Files_widget.in_panel
         then Files_widget.choose Here (Files_widget.files_of data##.files)
         else read_images ~schedule data##.files);
+    Js._true);
+  (* A context menu's item: its copy, in the click (see [Gesture_copy]). *)
+  listen Dom_html.Event.click (fun ev ->
+    Js.Opt.iter ev##.target (fun target ->
+      Js.Opt.iter
+        (Js.Unsafe.meth_call
+           target
+           "closest"
+           [| Js.Unsafe.inject
+                (Js.string ".context-menu [data-item]:not([aria-disabled])")
+           |])
+        (fun (item : Dom_html.element Js.t) ->
+          Js.Opt.iter
+            (item##getAttribute (Js.string "data-item"))
+            (fun id ->
+              Gesture_copy.in_gesture
+                (snd
+                   (App.update !current (Picker_choose (Js.to_string id)))))));
     Js._true);
   Chat_listeners.install ~schedule;
   Gesture_listeners.install ~schedule;

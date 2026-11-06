@@ -39,17 +39,78 @@ let same_origin_ws_url () =
   sprintf "%s://%s/ws" scheme (Js.to_string location##.host)
 ;;
 
+(* Without the Clipboard API (only in secure contexts: not on a plain http
+   address other than localhost) or when it refuses: the old way, selecting
+   the text in a textarea out of sight and asking for a copy, then putting
+   back the focus and the selection. [readonly] keeps a phone's keyboard
+   shut; iOS selects only with [setSelectionRange]. *)
+let exec_copy : Js.js_string Js.t -> bool Js.t =
+  Js.Unsafe.js_expr
+    {js|(function (text) {
+  var doc = document, active = doc.activeElement, sel = doc.getSelection();
+  var ranges = [];
+  if (sel) for (var i = 0; i < sel.rangeCount; i++) ranges.push(sel.getRangeAt(i));
+  var ta = doc.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.setAttribute("aria-hidden", "true");
+  ta.tabIndex = -1;
+  ta.style.cssText =
+    "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;" +
+    "margin:0;opacity:0;pointer-events:none;font-size:16px;contain:strict";
+  doc.body.appendChild(ta);
+  var ok = false;
+  try {
+    ta.focus({ preventScroll: true });
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    ok = doc.execCommand("copy");
+  } catch (e) { ok = false; }
+  ta.remove();
+  try {
+    if (active && active !== doc.body && active.focus) active.focus({ preventScroll: true });
+    if (sel) { sel.removeAllRanges(); ranges.forEach(function (r) { sel.addRange(r); }); }
+  } catch (e) {}
+  return !!ok;
+})|js}
+;;
+
+let fallback_copy text = Js.to_bool (exec_copy (Js.string text))
+
 let copy_to_clipboard text =
   let navigator = Js.Unsafe.get Dom_html.window (Js.string "navigator") in
   let clipboard = Js.Unsafe.get navigator (Js.string "clipboard") in
-  if Js.Optdef.test clipboard
-  then
-    ignore
-      (Js.Unsafe.meth_call
-         clipboard
-         "writeText"
-         [| Js.Unsafe.inject (Js.string text) |]
-       : unit)
+  if
+    Js.Optdef.test clipboard
+    && Js.Opt.test clipboard
+    && Js.Optdef.test (Js.Unsafe.get clipboard (Js.string "writeText"))
+  then (
+    let result = Async_kernel.Ivar.create () in
+    let answer ok = Async_kernel.Ivar.fill_if_empty result ok in
+    (try
+       let promise =
+         Js.Unsafe.meth_call
+           clipboard
+           "writeText"
+           [| Js.Unsafe.inject (Js.string text) |]
+       in
+       ignore
+         (Js.Unsafe.meth_call
+            promise
+            "then"
+            [| Js.Unsafe.inject (Js.wrap_callback (fun _ -> answer true))
+             ; Js.Unsafe.inject
+                 (Js.wrap_callback (fun _ -> answer (fallback_copy text)))
+            |]
+          : Js.Unsafe.any)
+     with
+     | _ -> answer (fallback_copy text));
+    Async_kernel.Ivar.read result)
+  else Async_kernel.Deferred.return (fallback_copy text)
+;;
+
+let secure_context () =
+  Js.to_bool (Js.Unsafe.get Dom_html.window (Js.string "isSecureContext"))
 ;;
 
 (* The visual viewport is what the user actually sees: unlike the layout

@@ -298,7 +298,10 @@ module Command = struct
     | Reveal of string list
     (** scroll the main chat to a subagent's card: the call ids from the
         top-level one down *)
-    | Copy of string
+    | Copy of
+        { text : string
+        ; copied : string
+        }
     | Select_message of int
     | Switch_account of Accounts.Account.t
     | Add_account
@@ -372,6 +375,8 @@ module Action = struct
         }
     | Set_notification_permission of string
     | Notification_permission of string
+    | Copied of string
+    | Copy_failed of { secure : bool }
     | Set_draft of string
     | Edit of
         { text : string
@@ -1123,7 +1128,7 @@ let files_out (m : Model.t) (outs : Files.Out.t list) =
     | Toast { text; error } ->
       let m, more = toast m ~error text in
       m, cmds @ more
-    | Copy text -> m, cmds @ [ Command.Copy text ]
+    | Copy { text; copied } -> m, cmds @ [ Command.Copy { text; copied } ]
     | Insert text ->
       let draft =
         if
@@ -3602,8 +3607,9 @@ let copy_last (m : Model.t) =
   match last_reply m with
   | None -> error m "Nothing to copy yet: no reply in this session."
   | Some text ->
-    let m, cmds = toast m "Copied the last reply to the clipboard" in
-    m, Command.Copy text :: cmds
+    ( m
+    , [ Command.Copy { text; copied = "Copied the last reply to the clipboard" }
+      ] )
 ;;
 
 (* A newer question replaces (and cancels) the previous one. *)
@@ -8478,14 +8484,15 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
   match item, Model.message_menu m n with
   | _, None -> error m message_gone
   | Copy_message, Some msg ->
-    let m, cmds =
-      toast
-        m
-        (if msg.reply
-         then "Copied the reply to the clipboard"
-         else "Copied the message to the clipboard")
-    in
-    m, Command.Copy msg.text :: cmds
+    ( m
+    , [ Command.Copy
+          { text = msg.text
+          ; copied =
+              (if msg.reply
+               then "Copied the reply to the clipboard"
+               else "Copied the message to the clipboard")
+          }
+      ] )
   | Select_text, Some _ -> m, [ Command.Select_message n ]
   | Trim_before, Some _ -> ask_trim m (Entry n)
   | Trim_after, Some _ -> ask_trim_after m n
@@ -8538,14 +8545,12 @@ let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
       { m with review = { m.review with marked } }, []
     | Copy_paths ->
       let text = String.concat ~sep:"\n" paths in
-      let m, cmds =
-        toast
-          m
-          (match paths with
-           | [ path ] -> "Copied the path: " ^ path
-           | _ -> sprintf "Copied %d paths" (List.length paths))
+      let copied =
+        match paths with
+        | [ path ] -> "Copied the path: " ^ path
+        | _ -> sprintf "Copied %d paths" (List.length paths)
       in
-      m, Command.Copy text :: cmds
+      m, [ Command.Copy { text; copied } ]
     | Open
     | Open_window
     | Rename
@@ -8597,8 +8602,7 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
       run_plan m { switch = Some s.path; enter; run; notice }
     in
     let copy what text =
-      let m, cmds = toast m (sprintf "Copied %s: %s" what text) in
-      m, Command.Copy text :: cmds
+      m, [ Command.Copy { text; copied = sprintf "Copied %s: %s" what text } ]
     in
     (match item with
      | Open -> switch_session m s.path
@@ -9084,6 +9088,18 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match permission with
      | Granted | Default -> toast m (Page_notify.describe m.notifications)
      | Denied | Unsupported -> error m (Page_notify.describe m.notifications))
+  | Copied text -> toast m text
+  | Copy_failed { secure } ->
+    error
+      m
+      (if secure
+       then
+         "Couldn't copy: the browser refused the clipboard; select the text \
+          and copy it (Ctrl+C)"
+       else
+         "Couldn't copy: the browser blocks the clipboard on this http \
+          address; use the backend's https address, or select the text and \
+          copy it (Ctrl+C)")
   | Protocol_error e -> error m ("Protocol error: " ^ e)
   | Backend_closed ->
     (match m.connection with

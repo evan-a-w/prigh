@@ -352,9 +352,38 @@ let%expect_test "Copy: the message's text, acknowledged" =
     (Place_menu (Point (x 300) (y 120)))
     (Picker_choose copy_message)
     (Focus editor)
-    (Copy "answer 2")
+    (Copy (text "answer 2") (copied "Copied the reply to the clipboard"))
     (Expire_toast (id 0) (after_ms 2820))
     Copied the reply to the clipboard
+    |}]
+;;
+
+(* On a plain http address other than localhost the browser has no
+   clipboard API, and the fallback may fail too: no "Copied", but what to do
+   instead. *)
+let%expect_test "Copy: when the browser refuses, an error saying what to do" =
+  let h = session () in
+  H.block_clipboard h;
+  right_click h 3;
+  H.click h ~selector:".context-menu [data-item=copy_message]";
+  toasts h;
+  [%expect
+    {|
+    (Focus dialog)
+    (Place_menu (Point (x 300) (y 120)))
+    (Picker_choose copy_message)
+    (Focus editor)
+    (Copy (text "answer 2") (copied "Copied the reply to the clipboard"))
+    Couldn't copy: the browser blocks the clipboard on this http address; use the backend's https address, or select the text and copy it (Ctrl+C) (Dismiss)
+    |}];
+  (* A code block's Copy reports the same way; in a secure context the
+     browser refused for another reason. *)
+  H.act h (Copy_failed { secure = true });
+  toasts h;
+  [%expect
+    {|
+    Couldn't copy: the browser blocks the clipboard on this http address; use the backend's https address, or select the text and copy it (Ctrl+C) (Dismiss)
+    Couldn't copy: the browser refused the clipboard; select the text and copy it (Ctrl+C) (Dismiss)
     |}]
 ;;
 
@@ -389,11 +418,13 @@ let%expect_test "Copy: a reply with math copies its TeX as written" =
     (Picker_choose copy_message)
     (Focus editor)
     (Copy
-      "Area $\\pi r^2$, not $5 or $10:\
-     \n\
-     \n$$\
-     \n\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\
-     \n$$")
+     (text
+       "Area $\\pi r^2$, not $5 or $10:\
+      \n\
+      \n$$\
+      \n\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\
+      \n$$")
+     (copied "Copied the reply to the clipboard"))
     (Expire_toast (id 0) (after_ms 2820))
     |}]
 ;;
@@ -482,7 +513,7 @@ let%expect_test "a tool call's menu is its reply's" =
     {|
     (Picker_choose copy_message)
     (Focus editor)
-    (Copy Listing.)
+    (Copy (text Listing.) (copied "Copied the reply to the clipboard"))
     (Expire_toast (id 0) (after_ms 2820))
     |}]
 ;;
@@ -524,14 +555,17 @@ let%expect_test "under a filter: only what shows has a menu, acting as before" =
     |}]
 ;;
 
-let%expect_test "on a phone, Select text: a long press opens the menu, not \
-                 the browser's selection" =
+let%expect_test
+    "on a phone, Select text: a long press opens the menu, not the browser's \
+     selection"
+  =
   let h = session () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   right_click h 2;
   H.text h ~selector:".context-menu";
   H.click h ~selector:".context-menu [data-item=select_text]";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
     Your message question 2
@@ -547,7 +581,8 @@ let%expect_test "on a phone, Select text: a long press opens the menu, not \
   H.quiet h (fun () -> H.act h (Set_narrow false));
   right_click h 2;
   items h;
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
     [menuitem] div "Copy"
