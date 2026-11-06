@@ -89,7 +89,7 @@ impl Sidecar {
     fn loaded(&self, label: &str, url: &str) -> Option<String> {
         let (origins, remote) = (self.origins(), self.remote());
         let mut windows = self.windows.lock().unwrap();
-        windows.entry(label.to_string()).or_default().on_loaded(url, &origins, remote.as_ref())
+        windows.entry(label.to_string()).or_default().on_loaded(url, &origins, remote.as_ref(), Instant::now())
     }
 
     fn remote(&self) -> Option<Remote> {

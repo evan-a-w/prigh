@@ -19,6 +19,11 @@ pub enum Decision {
 
 pub const QUIT_URL: &str = "about:blank#prigh-desktop-quit";
 
+/// How long after the window says it loaded a page of prigh's that page
+/// is loaded: before, a navigation elsewhere is still its redirect (no one
+/// clicks a link on a page that quickly).
+pub const LOAD_SETTLE: Duration = Duration::from_millis(500);
+
 /// Whatever a site does, a window cannot open it in the default browser
 /// tab after tab: at most [OPEN_BURST] times within this.
 pub const OPEN_GAP: Duration = Duration::from_secs(5);
@@ -114,6 +119,10 @@ pub enum Step {
 pub struct Window {
     /// prigh's page being loaded: redirected away, it is signing in.
     pending: Option<String>,
+    /// When the window said it loaded the pending page's site: from
+    /// [LOAD_SETTLE] after that, it is loaded (the window may say so
+    /// early, as the navigation starts).
+    pending_loaded: Option<Instant>,
     /// Signing in on this site, until it is back on prigh's.
     away: Option<String>,
     /// The user chose to sign in in the window.
@@ -136,6 +145,7 @@ impl Window {
     /// The app loads `url` in the window itself (the window may not say).
     pub fn loading(&mut self, url: &str) {
         self.pending = Some(url.to_string());
+        self.pending_loaded = None;
     }
 
     /// The site's cookies are the window's now.
@@ -150,13 +160,16 @@ impl Window {
             Decision::Block => Step::Refuse(Some(format!("refused to navigate to {url}"))),
             Decision::Allow => {
                 if origin(url).is_some_and(|o| ours.contains(&o)) {
-                    self.pending = Some(url.to_string());
+                    self.loading(url);
                 }
                 Step::Allow
             }
             Decision::External if self.away.is_some() => Step::Allow,
             Decision::External => {
                 let site = origin(url).unwrap_or_else(|| url.to_string());
+                if self.pending_loaded.is_some_and(|at| now.saturating_duration_since(at) >= LOAD_SETTLE) {
+                    self.pending = None;
+                }
                 let Some(pending) = self.pending.clone() else {
                     return match self.guard.check("", url, now) {
                         Ok(()) => Step::Open(url.to_string()),
@@ -188,13 +201,14 @@ impl Window {
         }
     }
 
-    /// A page finished loading; what to log. The page before a navigation
-    /// may say so after it started: only a load on the pending page's site
-    /// ends it.
-    pub fn on_loaded(&mut self, url: &str, ours: &[String], remote: Option<&Remote>) -> Option<String> {
+    /// A page finished loading at `now`; what to log. The window may say
+    /// so of the page before a navigation after that started, with the new
+    /// address (WebKitGTK): only a load on the pending page's site, after
+    /// [LOAD_SETTLE], ends it.
+    pub fn on_loaded(&mut self, url: &str, ours: &[String], remote: Option<&Remote>, now: Instant) -> Option<String> {
         let o = origin(url)?;
         if self.pending.as_deref().is_some_and(|p| origin(p).as_ref() == Some(&o)) {
-            self.pending = None;
+            self.pending_loaded.get_or_insert(now);
         }
         if !ours.contains(&o) {
             return None;
@@ -346,7 +360,7 @@ mod tests {
             .iter()
             .map(|(step, secs)| match step.split_at(1) {
                 (">", url) => format!("{url}: {:?}", w.on_navigation(url, &ours(), remote, at(*secs))),
-                (_, url) => format!("loaded {url}: {:?}", w.on_loaded(url, &ours(), remote)),
+                (_, url) => format!("loaded {url}: {:?}", w.on_loaded(url, &ours(), remote, at(*secs))),
             })
             .collect()
     }
@@ -356,10 +370,21 @@ mod tests {
         // The window need not say that the app navigated it.
         let mut w = Window::default();
         w.loading("https://ai.example.com/#app=desktop");
-        let out = walk(&mut w, None, &[(">https://login.example.com/start?state=1", 0)]);
+        let out = walk(
+            &mut w,
+            None,
+            &[
+                // WebKitGTK: the page before says it loaded, with the new address.
+                ("=https://ai.example.com/#app=desktop", 0),
+                (">https://login.example.com/start?state=1", 0),
+            ],
+        );
         assert_eq!(
             out,
-            ["https://login.example.com/start?state=1: Away(\"the window went to https://login.example.com on its own (a sign-in?): it stays there until it is back\")"]
+            [
+                "loaded https://ai.example.com/#app=desktop: None",
+                "https://login.example.com/start?state=1: Away(\"the window went to https://login.example.com on its own (a sign-in?): it stays there until it is back\")"
+            ]
         );
     }
 
