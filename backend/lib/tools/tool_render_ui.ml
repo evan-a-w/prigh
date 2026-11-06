@@ -1,0 +1,176 @@
+open! Core
+open! Import
+
+let name = "render_ui"
+
+let description =
+  {|Shows rich components inline in the user's chat in prigh-web: charts, tables, stats, forms and more. Frontends render them from these arguments; you get a short acknowledgement. Only prigh-web displays them: on other clients the call fails, so follow the client notes and answer in text there.
+
+Use components when a visual or interactive answer is clearer than prose: comparisons, trends, structured data, choices or input from the user, multi-step plans, showing image files. Prose and markdown stay the default: don't use components for short answers or code edits, and don't repeat a component's content in prose afterwards.
+
+Arguments: {"components": [Component, ...]} (1-20 top level, 100 in all). Every component has "type" and may have "id" (unique in the call; required by form, choices and a checklist with submit). (md) strings take inline markdown. tone: neutral|info|success|warning|danger.
+
+Layout:
+- card {title?, subtitle?(md), children:[...]}
+- grid {columns? 1-4 (default 2), children} (one column on phones)
+- tabs {tabs:[{label, children}]} (2-8)
+- accordion {items:[{title, children, open?}]}
+- divider {}
+Nesting goes at most 4 levels deep, at most 20 children each.
+
+Text and status:
+- markdown {text} (full markdown)
+- callout {tone?, title?, text(md)}
+- stat {label, value (string|number), unit?, delta? ("+12%"), trend? up|down|flat, good? up|down (which trend is good), caption?(md), spark?:[number] (2-200)}
+- kv {title?, items:[{key, value(md)}]}
+- progress {label?, value, max? (default 100), tone?, caption?}
+- badges {items:[{text, tone?}]}
+
+Data:
+- table {title?, columns:[{key, label?, align? left|right|center, format? text|number|percent|currency|date|md, currency? (ISO, default USD), decimals?}], rows:[{<key>: string|number|bool|null}], sortable? (default true), caption?} (at most 12 columns, 500 rows)
+- chart {kind, title?, subtitle?, unit?, x_label?, y_label?, height? small|medium|large}
+  kind line|area|bar|stacked_bar|horizontal_bar: labels:[string] (1-200), series:[{name, values:[number|null]}] (1-8, one value per label, null = gap)
+  kind pie|donut: slices:[{label, value >= 0}] (1-12)
+  kind scatter: series:[{name, points:[[x, y]]}] (1-8, 2000 points in all)
+- timeline {title?, items:[{title, time?, text?(md), tone?}]} (1-50)
+- steps {title?, items:[{title, text?(md), status? done|current|todo|failed}]}
+- code {lang?, title?, code}
+- diff {title?, diff} (unified diff)
+- tree {title?, entries:[{path ("src/a/b.ml"; directories end with "/"), note?(md), tone?}]}
+
+Media (files on the tool host; their bytes never reach you):
+- image {path (absolute), caption?(md), alt?, width? small|medium|full} (png, jpeg, gif, webp or svg; at most 20 MB)
+- gallery {title?, images:[{path, caption?, alt?}]} (1-24)
+
+Interactive, in the browser only:
+- calculator {title?, inputs:[{name (identifier), label, default, min?, max?, step?, unit?, slider?}], outputs:[{label, expr, format? number|percent|currency|integer, decimals?, unit?}]}
+  expr: numbers, input names, + - * / ^ %, unary -, ( ), < <= > >= == != (1 or 0), c ? a : b, min(...) max(...) abs round floor ceil sqrt log (base 10) ln exp (one argument), pow(x, y).
+- flashcards {title?, cards:[{front(md), back(md)}]} (1-50)
+- quiz {title?, questions:[{question(md), options:[string] (2-6), answer (0-based index), explanation?(md)}]}
+
+Interactive, replying to you (the user's answer arrives as their next message, naming the component):
+- form {id, title?, description?(md), fields:[{name, label, kind: text|textarea|number|select|radio|checkbox|toggle|slider|date, options? (select, radio, checkbox), default?, min?, max?, step? (number, slider; a slider needs min and max), required?, placeholder?, help?}], submit? (button label)}
+- choices {id, prompt?(md), options:[{label, value?, description?, tone?}], multiple?} (buttons)
+- checklist {id?, title?, items:[{text(md), checked?}], submit?} (with submit and id, sends the checked items)
+
+Example:
+{"components": [{"type": "chart", "kind": "line", "title": "Build time", "unit": "s", "labels": ["Mon", "Tue", "Wed"], "series": [{"name": "main", "values": [61, 58, 49]}]}, {"type": "table", "title": "Slowest tests", "columns": [{"key": "test"}, {"key": "secs", "label": "Seconds", "format": "number", "decimals": 1}], "rows": [{"test": "e2e", "secs": 31.4}]}, {"type": "choices", "id": "next", "prompt": "Which should I speed up first?", "options": [{"label": "e2e"}, {"label": "unit"}]}]}|}
+;;
+
+let spec =
+  { Tool_spec.name
+  ; parallel_safe = true
+  ; on_host = false
+  ; freeform = None
+  ; destructive = Never
+  ; description
+  ; parameters =
+      `Object
+        [ "type", `String "object"
+        ; ( "properties"
+          , `Object
+              [ ( "components"
+                , `Object
+                    [ "type", `String "array"
+                    ; "description", `String "The components, shown in order"
+                    ; ( "items"
+                      , `Object
+                          [ "type", `String "object"
+                          ; ( "properties"
+                            , `Object
+                                [ ( "type"
+                                  , `Object
+                                      [ "type", `String "string"
+                                      ; ( "enum"
+                                        , `Array
+                                            (List.map Ui_components.types ~f:(fun t ->
+                                               `String t)) )
+                                      ] )
+                                ; "id", `Object [ "type", `String "string" ]
+                                ] )
+                          ; "required", `Array [ `String "type" ]
+                          ] )
+                    ] )
+              ] )
+        ; "required", `Array [ `String "components" ]
+        ]
+  }
+;;
+
+let refusal client =
+  sprintf
+    "The user is on %s, which cannot display components: answer in text."
+    (Client_kind.describe client)
+;;
+
+let head_length = 4096
+
+(* What is wrong with the image at [path] ([field] in the arguments) on the
+   tool host, if anything. *)
+let image_problem (ui : Ui_host.t) (field, path) =
+  match ui.read_head path ~length:head_length with
+  | Error e ->
+    let why = Error.to_string_hum e in
+    let why =
+      match String.substr_index why ~pattern:": read it with" with
+      | Some i -> String.prefix why i
+      | None -> why
+    in
+    Some (sprintf "%s: %s; give the absolute path of an image file" field why)
+  | Ok (size, head) ->
+    (match Image.sniff_displayable head with
+     | None ->
+       Some
+         (sprintf
+            "%s: %s is not an image (png, jpeg, gif, webp or svg); give an \
+             image file"
+            field
+            path)
+     | Some _ when size > Image.max_preview_bytes ->
+       Some
+         (sprintf
+            "%s: %s is %.1f MB, over the 20 MB that are shown; make a smaller \
+             copy and show that"
+            field
+            path
+            (Float.of_int size /. 1e6))
+     | Some _ -> None)
+;;
+
+let errors problems =
+  Tool.Result.error
+    (sprintf
+       "Nothing was shown. Fix %s and call render_ui again:\n%s"
+       (if List.length problems = 1 then "this" else "these")
+       (String.concat
+          ~sep:"\n"
+          (List.map problems ~f:(fun p ->
+             "- " ^ if String.is_suffix p ~suffix:"." then p else p ^ "."))))
+;;
+
+let ack (checked : Ui_components.Checked.t) =
+  let shown = sprintf "Shown: %s." (String.concat ~sep:", " checked.summaries) in
+  match checked.interactive with
+  | [] -> shown
+  | interactive ->
+    sprintf
+      "%s The user can answer through %s; an answer arrives as their next \
+       message."
+      shown
+      (String.concat ~sep:", " interactive)
+;;
+
+let run (context : Tool.Context.t) args =
+  let client = context.ui.client () in
+  if not (Client_kind.shows_components client)
+  then Tool.Result.error (refusal client)
+  else (
+    match Ui_components.check args ~resolve:(Tool.resolve_path context) with
+    | Error problems -> errors problems
+    | Ok checked ->
+      (match List.filter_map checked.images ~f:(image_problem context.ui) with
+       | [] -> Tool.Result.ok (ack checked)
+       | problems -> errors problems))
+;;
+
+let tool = { Tool.spec; run }

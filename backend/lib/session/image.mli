@@ -12,6 +12,13 @@ type t =
     formats models accept. *)
 val sniff : string -> string option
 
+(** [sniff], or [image/svg+xml] for an SVG document: the images frontends
+    display (from its first 4 KiB). *)
+val sniff_displayable : string -> string option
+
+(** Frontends show images up to this size (20 MB) inline. *)
+val max_preview_bytes : int
+
 (** Width and height read from the image header. *)
 val dimensions : string -> (int * int) option
 
