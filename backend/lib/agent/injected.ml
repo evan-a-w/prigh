@@ -26,6 +26,12 @@ module Note = struct
           { from_user : bool
           ; follow_up : bool
           }
+      | Client of { client : Client_kind.t }
+      | Ui_action of
+          { call_id : string
+          ; component : string
+          ; summary : string
+          }
     [@@deriving sexp, jsonaf, equal]
 
     let wire = function
@@ -34,6 +40,8 @@ module Note = struct
       | Tools _ | Editor _ -> "tools"
       | Plan_mode _ -> "plan_mode"
       | Steer _ -> "steer"
+      | Client _ -> "client"
+      | Ui_action _ -> "ui_action"
     ;;
   end
 
@@ -67,6 +75,8 @@ module Note = struct
         "%s (%s)"
         (if from_user then "You" else "Main agent")
         (if follow_up then "follow-up" else "steer")
+    | Client { client } -> "Using " ^ Client_kind.describe client
+    | Ui_action { summary; _ } -> summary
   ;;
 
   let steer ~from_user ~follow_up =

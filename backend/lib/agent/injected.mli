@@ -32,6 +32,17 @@ module Note : sig
           }
       (** a message sent to a background subagent while it works
           ({!Subagent_inbox}) *)
+      | Client of { client : Client_kind.t }
+      (** the user's kind of client changed (or prompted for the first
+          time): [System_prompt.client_note] *)
+      | Ui_action of
+          { call_id : string
+          ; component : string
+          ; summary : string
+          }
+      (** the user answered through an interactive [render_ui] component
+          ({!Ui_action}); [summary] is the title, e.g. [Sent "Deploy
+          options": env = prod] *)
     [@@deriving sexp, jsonaf, equal]
   end
 
@@ -41,7 +52,8 @@ module Note : sig
     }
   [@@deriving sexp, jsonaf, equal]
 
-  (** One line for the user, e.g. [Tools now run on laptop], [You (steer)]. *)
+  (** One line for the user, e.g. [Tools now run on laptop], [You (steer)],
+      [Using prigh-web]. *)
   val title : t -> string
 
   (** The note in front of a message sent to a subagent while it works. *)

@@ -266,7 +266,7 @@ let%expect_test "job_input on a client tool host" =
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"event","event":"tool_exec_input","host":"client-2","exec_id":"<id>/j1-1","data":"","close":true}
     {"type":"response","id":"r2","ok":true,"result":{}}
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"cat","background":true,"stdin":true}
     tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
@@ -287,7 +287,7 @@ let%expect_test "job_input on a tool host that predates it" =
     {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/j1-1","call_id":"j1","name":"bash","arguments":{"command":"cat","timeout":2592000},"cwd":"$DIR"}
     (no input reached the host)
     {"type":"response","id":"r2","ok":true,"result":{}}
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"cat","background":true,"stdin":true}
     tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}

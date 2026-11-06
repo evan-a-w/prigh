@@ -263,12 +263,12 @@ let%expect_test
     laptop hello: client_id=client-2 host_id=host-laptop
     new_session: ok
     prompt: ok
-    one: nothing told
+    one: Using another client
     set_active_host: ok
     set_mode: ok
     new_session: ok
     prompt: ok
-    elsewhere: nothing told
+    elsewhere: Using another client
     session "one" live=false
     session "elsewhere" live=true
     switch_session: ok

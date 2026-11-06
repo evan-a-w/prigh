@@ -166,8 +166,8 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     {"type":"event","event":"agent_start"}
-    {"type":"event","event":"message_start","message":{"role":"user","text":"what is here?"}}
-    {"type":"event","event":"message_end","message":{"role":"user","text":"what is here?"}}
+    {"type":"event","event":"message_start","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
+    {"type":"event","event":"message_end","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
     {"type":"event","event":"turn_start"}
     {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Looking."}}
@@ -184,15 +184,15 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Empty."}}
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
-    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
+    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     |}];
   call t h "get_messages";
   call t h "get_entries";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?","at":<at>},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash","at":<at>},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false,"at":<at>},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]}
-    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"at":<at>,"kind":"repo"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"told_environment"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
+    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]},"at":<at>},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash","at":<at>},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false,"at":<at>},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]}
+    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"at":<at>,"kind":"repo"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"told_environment"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
     |}]
 ;;
 
@@ -286,9 +286,9 @@ let%expect_test "message times: in message events, get_messages and get_entries"
   [%expect
     {|
     entry repo: at true
+    entry told_environment: at true
     entry message: at true
     entry system_prompt: at true
-    entry told_environment: at true
     entry message: at true
     |}]
 ;;
@@ -319,6 +319,8 @@ let%expect_test "prompt attachments are inlined into the user message" =
   Agent.wait_idle agent;
   [%expect
     {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     look
 
     <file path="a.txt">
@@ -366,6 +368,8 @@ let%expect_test "images: in prompts, from attachments, and refused" =
   Agent.wait_idle agent;
   [%expect
     {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     compare @shot.png
 
     <file path="shot.png">
@@ -408,7 +412,7 @@ let%expect_test "images: in prompts, from attachments, and refused" =
   (* The images are in the session and in what clients are sent. *)
   call t h "get_messages";
   [%expect
-    {| {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"compare @shot.png\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>","images":[{"mime_type":"image/gif","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"},{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"origin":{"body":"compare @shot.png","attachments":[{"path":"shot.png"}]},"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>},{"role":"user","text":"","images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]} |}]
+    {| {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ncompare @shot.png\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>","images":[{"mime_type":"image/gif","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"},{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"origin":{"body":"compare @shot.png","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}],"attachments":[{"path":"shot.png"}]},"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>},{"role":"user","text":"","images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]} |}]
 ;;
 
 let%expect_test "sessions: list, new, switch, fork, rewind" =
@@ -544,8 +548,8 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     {"type":"event","event":"agent_start"}
-    {"type":"event","event":"message_start","message":{"role":"user","text":"go"}}
-    {"type":"event","event":"message_end","message":{"role":"user","text":"go"}}
+    {"type":"event","event":"message_start","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
+    {"type":"event","event":"message_end","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
     {"type":"event","event":"turn_start"}
     {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"queue_update","steer":1,"follow_up":0,"steer_texts":["first steer"],"follow_up_texts":[]}
@@ -553,7 +557,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"event","event":"queue_update","steer":0,"follow_up":0,"steer_texts":[],"follow_up_texts":[]}
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
-    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"go"},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
+    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     |}]
 ;;
@@ -1519,6 +1523,8 @@ let%expect_test "skills: list_skills, /skill: prompts, unknown names refused" =
     | Assistant _ | Tool_result _ -> ());
   [%expect
     {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     <skill name="frontend-design" location="$DIR/.claude/skills/frontend-design/SKILL.md">
     References are relative to $DIR/.claude/skills/frontend-design.
 
@@ -1838,6 +1844,8 @@ let%expect_test "a session left to run a queued follow-up stays live" =
     , (phys_equal (Rpc_server.agent_of_client h.server other) reopened : bool)];
   [%expect
     {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     go: running in list_sessions: true
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}

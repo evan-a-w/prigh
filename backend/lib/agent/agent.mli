@@ -155,6 +155,13 @@ module Queued : sig
     ; source : Injected.Source.t option
     ; attachments : string list
     ; images : Image.t list
+    ; client : Client_kind.t option
+      (** the kind of client that sent it; when it is sent to the model it
+          becomes the agent's current client (what [render_ui] checks and
+          the model is told of) *)
+    ; ui_action : Injected.Note.t option
+      (** an answer through a component ({!Ui_action.note}): sent as that
+          note, [text] being its summary *)
     }
   [@@deriving sexp_of]
 end
@@ -254,10 +261,18 @@ val messages : t -> Message.t list
     A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
     ({!Skill.expand}); an unknown name is an error. *)
 
+(** [client] is the kind of client it comes from (see [Queued.client]).
+
+    A [ui_action] is the user's answer through a component of a [render_ui]
+    call of this session (else an error naming the call), sent instead of
+    the text ({!Ui_action}). *)
+
 (** Starts a run. Fails if one is already running. *)
 val prompt
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
+  -> ?ui_action:Ui_action.t
   -> t
   -> string
   -> unit Or_error.t
@@ -267,6 +282,7 @@ val prompt
 val steer
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
   -> t
   -> string
   -> unit Or_error.t
@@ -275,6 +291,8 @@ val steer
 val follow_up
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
+  -> ?ui_action:Ui_action.t
   -> t
   -> string
   -> unit Or_error.t
@@ -297,7 +315,7 @@ val approve_mcp
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages
-    in order, then follow-ups. Emits [Queue_update]. *)
+    in order, then follow-ups (not answers through components). Emits [Queue_update]. *)
 val abort : t -> string list
 
 (** Pops the most recently queued message: follow-ups take priority over steer

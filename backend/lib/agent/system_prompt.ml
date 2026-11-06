@@ -311,3 +311,16 @@ let plan_mode_note ~on =
     "[Plan mode is off: you can change files and run commands again, as the \
      user's approval mode allows.]"
 ;;
+
+let client_note (client : Client_kind.t) =
+  match client with
+  | Web ->
+    "[Client: the user is on prigh-web, which renders render_ui components \
+     inline: use them when a visual or interactive answer is clearer than \
+     prose.]"
+  | Tui | Acp | Other ->
+    sprintf
+      "[Client: the user is on %s, which cannot display components: do not \
+       call render_ui; answer in text (markdown is fine).]"
+      (Client_kind.describe client)
+;;

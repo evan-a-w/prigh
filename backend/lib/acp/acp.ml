@@ -231,7 +231,12 @@ let client_label t = sprintf "%s (ACP)" t.client_name
 
 let open_link t ~on_event ~on_close hello =
   Or_error.bind (t.config.connector ~on_event ~on_close) ~f:(fun link ->
-    match Rpc_client.call link "hello" (credentials t @ hello) with
+    match
+      Rpc_client.call
+        link
+        "hello"
+        ((("client", str (Client_kind.to_string Acp)) :: credentials t) @ hello)
+    with
     | Ok result -> Ok (link, result)
     | Error e ->
       Rpc_client.close link;
