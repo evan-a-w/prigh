@@ -20,8 +20,7 @@ module Refusal : sig
       the user gave it, [host] its host name. *)
   val explain : url:string -> host:string -> tls:bool -> t -> string
 
-
-(** Whether a refused upgrade is a sign-in proxy's login (a redirect other
+  (** Whether a refused upgrade is a sign-in proxy's login (a redirect other
       than to [https] on [host], a 401, 403 or 407, or a web page). *)
   val signin_page : host:string -> tls:bool -> t -> bool
 end
