@@ -10,7 +10,15 @@ val query_param : string -> string option
 (** [ws(s)://<this page's host>/ws]. *)
 val same_origin_ws_url : unit -> string
 
-val copy_to_clipboard : string -> unit
+(** Puts [text] on the clipboard: with the Clipboard API where the page has it
+    (a secure context), else (or when it refuses) by selecting it out of sight
+    and [execCommand "copy"], leaving the focus and the selection as they
+    were. Determined: whether it is there. *)
+val copy_to_clipboard : string -> bool Async_kernel.Deferred.t
+
+(** Whether the page is a secure context (https or loopback): the clipboard,
+    service worker and notifications need one. *)
+val secure_context : unit -> bool
 
 (** Runs [f] once the DOM has been patched for the state changes made so far,
     in the same frame, before the browser paints it. *)
