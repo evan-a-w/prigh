@@ -175,7 +175,7 @@ impl Links {
             let prighs = self.context.get_or_insert_with(|| context.to_string());
             // An incognito window.
             if prighs != context {
-                return self.close(id, opener);
+                return self.close(id, opener, "closed a page of an incognito window".to_string());
             }
         }
         let page = self.pages.entry(id.to_string()).or_default();
@@ -187,7 +187,11 @@ impl Links {
                     vec![Effect::Send(self.send_back(id, back))]
                 }
                 Some(_) => vec![],
-                None => self.close(id, opener),
+                None => self.close(
+                    id,
+                    opener,
+                    format!("closed the browser's own page {}", url.split(['?', '#']).next().unwrap_or(url)),
+                ),
             };
         }
         match decide(url, ours) {
@@ -232,10 +236,10 @@ impl Links {
     /// Closes a page of the browser's own, and activates the window of
     /// prigh's it took the focus from: the one that opened it, or else the
     /// only one there is.
-    fn close(&mut self, target: &str, opener: Option<&str>) -> Vec<Effect> {
+    fn close(&mut self, target: &str, opener: Option<&str>, why: String) -> Vec<Effect> {
         self.pages.entry(target.to_string()).or_default().closing = true;
         let (_, close) = self.command("Target.closeTarget", json!({ "targetId": target }), None);
-        let mut out = vec![Effect::Send(close)];
+        let mut out = vec![Effect::Log(why), Effect::Send(close)];
         let prighs: Vec<&String> =
             self.pages.iter().filter(|(_, p)| p.ours.is_some() && !p.closing).map(|(id, _)| id).collect();
         let focus = match opener.filter(|o| prighs.iter().any(|p| p == o)) {
@@ -473,7 +477,21 @@ mod tests {
         out.extend(run(&mut links, &[changed("T", "chrome://newtab/")]));
         let mut expected = vec![];
         let mut id = 3;
-        for target in ["T", "H", "J", "U", "D", "N", "L", "X", "S", "E", "V", "P"] {
+        for (target, page) in [
+            ("T", "chrome://newtab/"),
+            ("H", "chrome://history/"),
+            ("J", "chrome://downloads/"),
+            ("U", "view-source:http://127.0.0.1:7780/"),
+            ("D", "devtools://devtools/bundled/devtools_app.html"),
+            ("N", "chrome://new-tab-page/"),
+            ("L", "chrome-search://local-ntp/local-ntp.html"),
+            ("X", "chrome-untrusted://new-tab-page/one-google-bar"),
+            ("S", "brave://settings/"),
+            ("E", "edge://newtab/"),
+            ("V", "vivaldi://startpage/"),
+            ("P", "chrome-extension://abc/options.html"),
+        ] {
+            expected.push(json!({ "log": format!("closed the browser's own page {page}") }));
             expected.push(close(id, target));
             expected.push(activate(id + 1, "A"));
             id += 2;
@@ -493,12 +511,16 @@ mod tests {
                 created("H", "chrome://history/"),
             ],
         );
-        assert_eq!(out, [close(3, "H"), activate(4, "A")]);
+        assert_eq!(
+            out,
+            [json!({ "log": "closed the browser's own page chrome://history/" }), close(3, "H"), activate(4, "A")]
+        );
     }
 
     #[test]
     fn an_incognito_windows_pages_are_closed() {
         let mut links = links();
+        let incognito = json!({ "log": "closed a page of an incognito window" });
         let otr = |method: &str, target: &str, url: &str| event(method, info(target, url, None, "INCOGNITO"));
         let out = run(
             &mut links,
@@ -513,7 +535,17 @@ mod tests {
         );
         assert_eq!(
             out,
-            [close(3, "I"), activate(4, "A"), close(5, "J"), activate(6, "A"), close(7, "K"), activate(8, "A")]
+            [
+                incognito.clone(),
+                close(3, "I"),
+                activate(4, "A"),
+                incognito.clone(),
+                close(5, "J"),
+                activate(6, "A"),
+                incognito,
+                close(7, "K"),
+                activate(8, "A"),
+            ]
         );
     }
 
@@ -529,7 +561,16 @@ mod tests {
                 created("T", "chrome://newtab/"),
             ],
         );
-        assert_eq!(out, [close(3, "O"), activate(4, "B"), close(5, "T")]);
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "closed the browser's own page chrome://history/" }),
+                close(3, "O"),
+                activate(4, "B"),
+                json!({ "log": "closed the browser's own page chrome://newtab/" }),
+                close(5, "T"),
+            ]
+        );
     }
 
     #[test]

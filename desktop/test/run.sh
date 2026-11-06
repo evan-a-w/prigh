@@ -5,7 +5,8 @@
 #   desktop/test/run.sh PRIGH_DESKTOP_BINARY [PRIGH]
 #
 # REAL_CHROMIUM, if set, is a Chromium for the browser window scenarios
-# (with curl). Needs a display (run it under xvfb-run), a D-Bus session bus
+# (with curl, and openbox: a window manager for its keys). Needs a display
+# (run it under xvfb-run), a D-Bus session bus
 # (for the single-instance plugin: dbus-run-session), python3 and xdotool.
 # The flake's desktop-window check runs it that way.
 set -uo pipefail
@@ -219,6 +220,62 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
 	wait "$app_pid"
 	echo "exit $?; left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
+
+	# The window is an app's: a popup on prigh's site (Open in new window)
+	# becomes another app window, and the browser's own windows (a new tab
+	# or window, incognito, history, DevTools), opened with its keys in
+	# prigh's window, are closed, the focus back in prigh's window. Chromium
+	# takes its keys only in an active window: a window manager (openbox) for
+	# this one.
+	# SHOTS=DIR keeps screenshots (with ImageMagick's import).
+	page_list() {
+		curl -s http://127.0.0.1:9333/json/list | python3 -c '
+import json, sys
+for t in sorted(json.load(sys.stdin), key=lambda t: t["url"]):
+    if t["type"] == "page":
+        print("  " + t["url"].split("#")[0] + (", a popup" if t.get("openerId") else ""))'
+	}
+	shot() {
+		[ -n "${SHOTS:-}" ] && mkdir -p "$SHOTS" && import -window root "$SHOTS/$1.png"
+		return 0
+	}
+	: >"$work/log"
+	openbox --sm-disable >/dev/null 2>&1 &
+	wm_pid=$!
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_PAGE_POPUP=1
+	for _ in $(seq 300); do
+		[ "$(page_list | normalize)" = "$(printf '  http://127.0.0.1:PORT/\n  http://127.0.0.1:PORT/?popup=1')" ] &&
+			xdotool search --onlyvisible --name '^fake prigh-web, another window$' >/dev/null && break
+		sleep 0.1
+	done
+	echo "== real Chromium: the window is an app's"
+	echo "Open in new window: Chromium's windows:"
+	page_list | normalize
+	shot popup
+	main=$(xdotool search --onlyvisible --name '^fake prigh-web$' | head -1)
+	closed() { grep -c '^prigh-desktop: closed ' "$work/stderr"; }
+	for key in ctrl+t ctrl+n ctrl+shift+n ctrl+h F12; do
+		xdotool windowactivate --sync "$main"
+		before=$(closed)
+		xdotool key "$key"
+		# The app closed what it opened; then the page is gone, the focus back.
+		for _ in $(seq 100); do [ "$(closed)" != "$before" ] && break; sleep 0.1; done
+		for _ in $(seq 100); do
+			[ "$(page_list | wc -l)" = 2 ] && [ "$(xdotool getactivewindow)" = "$main" ] && break
+			sleep 0.1
+		done
+		shot "$key"
+		echo "$key: $(normalize <"$work/stderr" | grep '^prigh-desktop: closed ' | tail -n +$((before + 1)) |
+			sed 's/^prigh-desktop: //' | paste -sd ';' -); Chromium's windows:"
+		page_list | normalize
+		echo "  the focus in prigh's window: $([ "$(xdotool getactivewindow)" = "$main" ] && echo yes || echo no)"
+	done
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
+	wait "$app_pid"
+	echo "exit $?"
+	kill "$wm_pid"
+	wait "$wm_pid" 2>/dev/null
+	normalize <"$work/stderr" | grep -E '^prigh-desktop: ' | grep -v '/favicon.ico'
 fi
 
 # The real `prigh desktop` (run.sh's second argument: a prigh with its
