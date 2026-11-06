@@ -823,7 +823,7 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
                 window.sign_in_here();
             } else if !remote.cookies.is_empty() {
                 set_cookies(&w, &remote);
-                window.cookies_given();
+                window.cookies_given(&remote.cookies);
             }
         }
     } else {

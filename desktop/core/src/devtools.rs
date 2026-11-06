@@ -11,17 +11,19 @@
 //!   `window.open`) is closed, and the link opened in the system's default
 //!   browser, as the built-in window does (see [crate::navigation]);
 //! - prigh's own window (the app's, or one opened on prigh's site) following
-//!   a link to another site (its page's `anchorClick` navigation, seen on a
-//!   DevTools session of each of prigh's windows:
-//!   `Page.frameRequestedNavigation`) is sent back to where it was, and the
-//!   link opened in the default browser;
-//! - prigh's own window going to another site on its own (an HTTP redirect,
-//!   a script's, a form's: a sign-in proxy in front of the backend's site,
-//!   then its identity provider) stays there, through every hop, until it
-//!   is back on prigh's site: the profile keeps the proxy's cookie;
+//!   a link or its page's script to another site (an `anchorClick` or
+//!   `scriptInitiated` navigation to that site, seen on a DevTools session
+//!   of each of prigh's windows: `Page.frameRequestedNavigation`) is sent
+//!   back to where it was, and the link opened in the default browser;
+//! - prigh's own window going to another site otherwise (an HTTP redirect,
+//!   which the page does not request, a form's, a refresh: a sign-in proxy
+//!   in front of the backend's site, then its identity provider) stays
+//!   there, through every hop, until it is back on prigh's site: the
+//!   profile keeps the proxy's cookie;
 //! - whatever a site does, a window opens a site in the default browser at
-//!   most once per [crate::navigation::OPEN_GAP]: a link that comes back sooner stays in the
-//!   window (said once);
+//!   most [crate::navigation::OPEN_BURST] times within
+//!   [crate::navigation::OPEN_GAP]: a link past that stays in the window
+//!   (said once);
 //! - a popup on prigh's site (Open in new window) is closed and its page
 //!   opened in another app window instead: a popup has an address bar;
 //! - the browser's own pages (a new tab or window: Ctrl+T, Ctrl+N; history,
@@ -75,7 +77,10 @@ struct Page {
     /// The site it went to on its own (a sign-in), until it is back.
     away: Option<String>,
     /// The remote site's cookies were given to it since it was last there.
-    cookies_given: bool,
+    /// The backend's site's cookies it was given: given again only when
+    /// they are new (a sign-in since), so a site that does not take them
+    /// sends it to prigh's sign-in page instead of round and round.
+    cookies_given: Option<Vec<(String, String)>>,
 }
 
 /// The browser's pages, from its events.
@@ -265,9 +270,6 @@ impl Links {
                     page.ours = Some(url.to_string());
                     page.handled = None;
                     page.requested = None;
-                    if self.remote.as_ref().is_some_and(|r| origin(&r.url) == origin(url)) {
-                        page.cookies_given = false;
-                    }
                     let mut out = vec![];
                     if let Some(away) = page.away.take() {
                         out.push(Effect::Log(format!("prigh's window is back from {away}")));
@@ -297,7 +299,7 @@ impl Links {
                 let link = page
                     .requested
                     .take()
-                    .is_some_and(|(reason, to)| reason == "anchorClick" && origin(&to).as_ref() == Some(&site));
+                    .is_some_and(|(reason, to)| is_link(&reason) && origin(&to).as_ref() == Some(&site));
                 match page.ours.clone() {
                     Some(back) if link => {
                         let mut out = self.open_externally(id, url, now);
@@ -317,8 +319,8 @@ impl Links {
                         });
                         let page = self.pages.get_mut(id).unwrap();
                         match remote {
-                            Some(r) if !page.cookies_given && !r.cookies.is_empty() => {
-                                page.cookies_given = true;
+                            Some(r) if page.cookies_given.as_ref() != Some(&r.cookies) && !r.cookies.is_empty() => {
+                                page.cookies_given = Some(r.cookies.clone());
                                 let back = ours.unwrap_or_else(|| r.url.clone());
                                 let mut out = vec![Effect::Log(format!(
                                     "prigh's window went to {site}: giving it the sign-in to {}",
@@ -377,7 +379,7 @@ impl Links {
             .map(|(id, p)| {
                 if give {
                     // On its way there: redirected away, it is not signed in.
-                    p.cookies_given = true;
+                    p.cookies_given = Some(remote.cookies.clone());
                     p.ours = Some(remote.url.clone());
                 }
                 (id.clone(), remote.url.clone())
@@ -480,6 +482,11 @@ struct Target<'a> {
     url: &'a str,
     opener: Option<&'a str>,
     context: Option<&'a str>,
+}
+
+/// A navigation the page asked for that is a link out, not a sign-in.
+fn is_link(reason: &str) -> bool {
+    matches!(reason, "anchorClick" | "scriptInitiated")
 }
 
 #[cfg(test)]
@@ -908,7 +915,8 @@ mod tests {
                 links,
                 &[
                     changed("A", "http://127.0.0.1:7780/?session=s1"),
-                    requested("A", "anchorClick", to),
+                    // The page's script (`location.href = ...`) is one too.
+                    requested("A", if secs == 1 { "scriptInitiated" } else { "anchorClick" }, to),
                     changed("A", to),
                 ],
                 secs,
@@ -1005,7 +1013,7 @@ mod tests {
             ]
         );
         // A page that keeps clicking links to a site, with fresh addresses,
-        // and the site sending it back: one opening per 5s, said once.
+        // and the site sending it back: two openings per 5s, said once.
         let mut links = self::links();
         let mut out = vec![];
         for i in 0..20 {
@@ -1022,7 +1030,7 @@ mod tests {
         let opens = out.iter().filter(|e| e.get("open").is_some()).count();
         let navigates = out.iter().filter(|e| e["method"] == "Page.navigate").count();
         let logs: Vec<&Value> = out.iter().filter(|e| e.get("log").is_some()).collect();
-        assert_eq!((opens, navigates), (1, 1));
+        assert_eq!((opens, navigates), (2, 2));
         assert_eq!(
             logs.first().map(|l| l["log"].clone()),
             Some(json!("https://login.example.com again within 5s: not opening it in the default browser again"))
@@ -1115,8 +1123,8 @@ mod tests {
         assert_eq!(out, [navigate("A", "https://ai.example.com/#app=desktop&host=h")]);
         let out = run(&mut links, &[changed("A", "https://ai.example.com/#app=desktop&host=h")]);
         assert_eq!(out, Vec::<Value>::new());
-        // It expires later: the cookie again (it may have been the window's
-        // own that expired), then the sign-in page; never a loop.
+        // It expires later: the sign-in page (the cookie it has is the one
+        // it was given), once; never a loop.
         let mut out = vec![];
         for i in 0..10 {
             for e in run_raw(&mut links, &[changed("A", &format!("https://login.example.com/start?state=x{i}"))], 0) {
@@ -1126,8 +1134,9 @@ mod tests {
                 out.push(e);
             }
         }
-        let navigates: Vec<Value> = out.iter().filter(|e| e["method"] == "Page.navigate").cloned().collect();
-        assert_eq!(navigates.len(), 2, "{out:#?}");
+        let navigates: Vec<Value> =
+            out.iter().filter(|e| e["method"] == "Page.navigate").map(|e| e["params"]["url"].clone()).collect();
+        assert_eq!(navigates, ["http://127.0.0.1:7780/#desktop=k&signin=1"], "{out:#?}");
     }
 
     #[test]
