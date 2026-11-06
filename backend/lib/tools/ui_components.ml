@@ -59,7 +59,9 @@ let one_of = function
 (* The closest candidate, a transposition ("tabel") preferring the word
    with the same letters. *)
 let suggest candidates name =
-  let letters s = String.to_list (String.lowercase s) |> List.sort ~compare:Char.compare in
+  let letters s =
+    String.to_list (String.lowercase s) |> List.sort ~compare:Char.compare
+  in
   let anagram =
     List.find candidates ~f:(fun c ->
       List.equal Char.equal (letters c) (letters name))
@@ -88,7 +90,7 @@ let plural n word =
   else if String.is_suffix word ~suffix:"y"
   then sprintf "%d %sies" n (String.drop_suffix word 1)
   else sprintf "%d %ss" n word
-
+;;
 
 type ctx =
   { errors : string Queue.t
@@ -132,7 +134,9 @@ module Obj = struct
     | Some json -> Some json
   ;;
 
-  let missing t name = error t.ctx (at t.path name) "missing; %s needs it" t.what
+  let missing t name =
+    error t.ctx (at t.path name) "missing; %s needs it" t.what
+  ;;
 
   let field t name ~required ~f =
     match take t name with
@@ -252,7 +256,12 @@ module Obj = struct
           None)
         else Some (List.mapi items ~f:(fun i item -> nth path i, item))
       | other ->
-        error t.ctx path "must be an array of %ss, not %s" noun (describe_json other);
+        error
+          t.ctx
+          path
+          "must be an array of %ss, not %s"
+          noun
+          (describe_json other);
         None)
   ;;
 
@@ -261,7 +270,9 @@ module Obj = struct
     List.iter t.fields ~f:(fun (name, _) ->
       if not (List.mem takes name ~equal:String.equal)
       then (
-        let known = List.rev (List.filter takes ~f:(fun n -> not (String.equal n "type"))) in
+        let known =
+          List.rev (List.filter takes ~f:(fun n -> not (String.equal n "type")))
+        in
         error
           t.ctx
           (at t.path name)
@@ -302,9 +313,7 @@ let quoted = function
   | None -> ""
   | Some s ->
     let s = String.strip s in
-    let s =
-      if String.length s > 60 then String.prefix s 57 ^ "..." else s
-    in
+    let s = if String.length s > 60 then String.prefix s 57 ^ "..." else s in
     sprintf " %S" s
 ;;
 
@@ -431,7 +440,12 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
   let interactive summary = Queue.enqueue ctx.interactive summary in
   let need_id what =
     if Option.is_none id
-    then error ctx (at o.path "id") "missing; %s needs an id (unique in the call) to reply" what
+    then
+      error
+        ctx
+        (at o.path "id")
+        "missing; %s needs an id (unique in the call) to reply"
+        what
   in
   match type_ with
   | "card" ->
@@ -486,16 +500,21 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     ignore (Obj.string o "caption" : string option);
     Option.iter
       (Obj.array ~min:2 o "spark" ~max:200 ~noun:"point")
-      ~f:(List.iter ~f:(fun (path, json) ->
-        ignore (Obj.number_of ctx path json : float option)));
+      ~f:
+        (List.iter ~f:(fun (path, json) ->
+           ignore (Obj.number_of ctx path json : float option)));
     "stat" ^ quoted label
   | "kv" ->
     let title = title () in
     let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
-      (objects ctx (Option.value items ~default:[]) ~what:"a kv item" ~f:(fun item ->
-         ignore (Obj.string ~required:true item "key" : string option);
-         ignore (Obj.string ~required:true item "value" : string option))
+      (objects
+         ctx
+         (Option.value items ~default:[])
+         ~what:"a kv item"
+         ~f:(fun item ->
+           ignore (Obj.string ~required:true item "key" : string option);
+           ignore (Obj.string ~required:true item "value" : string option))
        : unit list);
     "kv" ^ quoted title ^ count (items_count items) "item"
   | "progress" ->
@@ -533,23 +552,31 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let title = title () in
     let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
-      (objects ctx (Option.value items ~default:[]) ~what:"a timeline item" ~f:(fun item ->
-         ignore (Obj.string ~required:true item "title" : string option);
-         ignore (Obj.string item "time" : string option);
-         ignore (Obj.string item "text" : string option);
-         Obj.tone item)
+      (objects
+         ctx
+         (Option.value items ~default:[])
+         ~what:"a timeline item"
+         ~f:(fun item ->
+           ignore (Obj.string ~required:true item "title" : string option);
+           ignore (Obj.string item "time" : string option);
+           ignore (Obj.string item "text" : string option);
+           Obj.tone item)
        : unit list);
     "timeline" ^ quoted title ^ count (items_count items) "item"
   | "steps" ->
     let title = title () in
     let items = Obj.array ~required:true o "items" ~max:50 ~noun:"step" in
     ignore
-      (objects ctx (Option.value items ~default:[]) ~what:"a step" ~f:(fun item ->
-         ignore (Obj.string ~required:true item "title" : string option);
-         ignore (Obj.string item "text" : string option);
-         ignore
-           (Obj.enum item "status" [ "done"; "current"; "todo"; "failed" ]
-            : string option))
+      (objects
+         ctx
+         (Option.value items ~default:[])
+         ~what:"a step"
+         ~f:(fun item ->
+           ignore (Obj.string ~required:true item "title" : string option);
+           ignore (Obj.string item "text" : string option);
+           ignore
+             (Obj.enum item "status" [ "done"; "current"; "todo"; "failed" ]
+              : string option))
        : unit list);
     "steps" ^ quoted title ^ count (items_count items) "step"
   | "code" ->
@@ -565,24 +592,35 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let title = title () in
     let entries = Obj.array ~required:true o "entries" ~max:500 ~noun:"entry" in
     ignore
-      (objects ctx (Option.value entries ~default:[]) ~what:"a tree entry" ~f:(fun e ->
-         Option.iter (Obj.string ~required:true e "path") ~f:(fun p ->
-           let path = at e.path "path" in
-           if String.is_prefix p ~prefix:"/"
-           then
-             error
-               ctx
-               path
-               "%S starts with \"/\"; give paths relative to the tree's root, \
-                e.g. \"src/main.ml\""
-               p
-           else if
-             List.exists
-               (String.split (String.chop_suffix_if_exists p ~suffix:"/") ~on:'/')
-               ~f:String.is_empty
-           then error ctx path "%S has an empty segment; separate names with one \"/\"" p);
-         ignore (Obj.string e "note" : string option);
-         Obj.tone e)
+      (objects
+         ctx
+         (Option.value entries ~default:[])
+         ~what:"a tree entry"
+         ~f:(fun e ->
+           Option.iter (Obj.string ~required:true e "path") ~f:(fun p ->
+             let path = at e.path "path" in
+             if String.is_prefix p ~prefix:"/"
+             then
+               error
+                 ctx
+                 path
+                 "%S starts with \"/\"; give paths relative to the tree's \
+                  root, e.g. \"src/main.ml\""
+                 p
+             else if
+               List.exists
+                 (String.split
+                    (String.chop_suffix_if_exists p ~suffix:"/")
+                    ~on:'/')
+                 ~f:String.is_empty
+             then
+               error
+                 ctx
+                 path
+                 "%S has an empty segment; separate names with one \"/\""
+                 p);
+           ignore (Obj.string e "note" : string option);
+           Obj.tone e)
        : unit list);
     "tree" ^ quoted title ^ count (items_count entries) "entry"
   | "image" ->
@@ -597,10 +635,14 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let title = title () in
     let images = Obj.array ~required:true o "images" ~max:24 ~noun:"image" in
     ignore
-      (objects ctx (Option.value images ~default:[]) ~what:"a gallery image" ~f:(fun i ->
-         check_image ctx i;
-         ignore (Obj.string i "caption" : string option);
-         ignore (Obj.string i "alt" : string option))
+      (objects
+         ctx
+         (Option.value images ~default:[])
+         ~what:"a gallery image"
+         ~f:(fun i ->
+           check_image ctx i;
+           ignore (Obj.string i "caption" : string option);
+           ignore (Obj.string i "alt" : string option))
        : unit list);
     "gallery" ^ quoted title ^ count (items_count images) "image"
   | "calculator" -> calculator ctx o
@@ -608,36 +650,52 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let title = title () in
     let cards = Obj.array ~required:true o "cards" ~max:50 ~noun:"card" in
     ignore
-      (objects ctx (Option.value cards ~default:[]) ~what:"a flashcard" ~f:(fun c ->
-         ignore (Obj.string ~required:true c "front" : string option);
-         ignore (Obj.string ~required:true c "back" : string option))
+      (objects
+         ctx
+         (Option.value cards ~default:[])
+         ~what:"a flashcard"
+         ~f:(fun c ->
+           ignore (Obj.string ~required:true c "front" : string option);
+           ignore (Obj.string ~required:true c "back" : string option))
        : unit list);
     "flashcards" ^ quoted title ^ count (items_count cards) "card"
   | "quiz" ->
     let title = title () in
-    let questions = Obj.array ~required:true o "questions" ~max:50 ~noun:"question" in
+    let questions =
+      Obj.array ~required:true o "questions" ~max:50 ~noun:"question"
+    in
     ignore
-      (objects ctx (Option.value questions ~default:[]) ~what:"a quiz question" ~f:(fun q ->
-         ignore (Obj.string ~required:true q "question" : string option);
-         let options =
-           Option.map
-             (Obj.array ~required:true ~min:2 q "options" ~max:6 ~noun:"option")
-             ~f:(strings ctx)
-         in
-         let answer = Obj.int ~required:true q "answer" in
-         ignore (Obj.string q "explanation" : string option);
-         match options, answer with
-         | Some options, Some answer
-           when answer < 0 || answer >= List.length options ->
-           error
-             ctx
-             (at q.path "answer")
-             "is %d, but there are %d options; give the right option's index \
-              from 0 to %d"
-             answer
-             (List.length options)
-             (List.length options - 1)
-         | _ -> ())
+      (objects
+         ctx
+         (Option.value questions ~default:[])
+         ~what:"a quiz question"
+         ~f:(fun q ->
+           ignore (Obj.string ~required:true q "question" : string option);
+           let options =
+             Option.map
+               (Obj.array
+                  ~required:true
+                  ~min:2
+                  q
+                  "options"
+                  ~max:6
+                  ~noun:"option")
+               ~f:(strings ctx)
+           in
+           let answer = Obj.int ~required:true q "answer" in
+           ignore (Obj.string q "explanation" : string option);
+           match options, answer with
+           | Some options, Some answer
+             when answer < 0 || answer >= List.length options ->
+             error
+               ctx
+               (at q.path "answer")
+               "is %d, but there are %d options; give the right option's index \
+                from 0 to %d"
+               answer
+               (List.length options)
+               (List.length options - 1)
+           | _ -> ())
        : unit list);
     "quiz" ^ quoted title ^ count (items_count questions) "question"
   | "form" ->
@@ -656,21 +714,25 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let options = Obj.array ~required:true o "options" ~max:12 ~noun:"option" in
     let values = String.Table.create () in
     ignore
-      (objects ctx (Option.value options ~default:[]) ~what:"a choice" ~f:(fun c ->
-         let label = Obj.string ~required:true c "label" in
-         let value = Obj.string c "value" in
-         ignore (Obj.string c "description" : string option);
-         Obj.tone c;
-         Option.iter (Option.first_some value label) ~f:(fun v ->
-           match Hashtbl.find values v with
-           | Some other ->
-             error
-               ctx
-               c.path
-               "sends %S like %s; give each option its own value"
-               v
-               other
-           | None -> Hashtbl.set values ~key:v ~data:c.path))
+      (objects
+         ctx
+         (Option.value options ~default:[])
+         ~what:"a choice"
+         ~f:(fun c ->
+           let label = Obj.string ~required:true c "label" in
+           let value = Obj.string c "value" in
+           ignore (Obj.string c "description" : string option);
+           Obj.tone c;
+           Option.iter (Option.first_some value label) ~f:(fun v ->
+             match Hashtbl.find values v with
+             | Some other ->
+               error
+                 ctx
+                 c.path
+                 "sends %S like %s; give each option its own value"
+                 v
+                 other
+             | None -> Hashtbl.set values ~key:v ~data:c.path))
        : unit list);
     let summary = "choices" ^ quoted (Option.first_some prompt id) in
     interactive summary;
@@ -680,12 +742,18 @@ and check_type ctx (o : Obj.t) ~type_ ~id ~depth =
     let submit = Obj.string o "submit" in
     let items = Obj.array ~required:true o "items" ~max:50 ~noun:"item" in
     ignore
-      (objects ctx (Option.value items ~default:[]) ~what:"a checklist item" ~f:(fun i ->
-         ignore (Obj.string ~required:true i "text" : string option);
-         ignore (Obj.bool i "checked" : bool option))
+      (objects
+         ctx
+         (Option.value items ~default:[])
+         ~what:"a checklist item"
+         ~f:(fun i ->
+           ignore (Obj.string ~required:true i "text" : string option);
+           ignore (Obj.bool i "checked" : bool option))
        : unit list);
     let summary =
-      "checklist" ^ quoted (Option.first_some title id) ^ count (items_count items) "item"
+      "checklist"
+      ^ quoted (Option.first_some title id)
+      ^ count (items_count items) "item"
     in
     if Option.is_some submit
     then (
@@ -701,34 +769,41 @@ and table ctx (o : Obj.t) =
   let columns = Obj.array ~required:true o "columns" ~max:12 ~noun:"column" in
   let keys = String.Table.create () in
   ignore
-    (objects ctx (Option.value columns ~default:[]) ~what:"a table column" ~f:(fun c ->
-       Option.iter (Obj.string ~required:true c "key") ~f:(fun key ->
-         match Hashtbl.find keys key with
-         | Some other ->
-           error
-             ctx
-             (at c.path "key")
-             "%S is also %s's key; give each column its own"
-             key
-             other
-         | None -> Hashtbl.set keys ~key ~data:c.path);
-       ignore (Obj.string c "label" : string option);
-       ignore (Obj.enum c "align" [ "left"; "right"; "center" ] : string option);
-       ignore
-         (Obj.enum
-            c
-            "format"
-            [ "text"; "number"; "percent"; "currency"; "date"; "md" ]
-          : string option);
-       Option.iter (Obj.string c "currency") ~f:(fun cur ->
-         if not (String.length cur = 3 && String.for_all cur ~f:Char.is_uppercase)
-         then
-           error
-             ctx
-             (at c.path "currency")
-             "%S is not an ISO currency code; write e.g. \"USD\" or \"EUR\""
-             cur);
-       ignore (Obj.int c "decimals" ~min:0 ~max:10 : int option))
+    (objects
+       ctx
+       (Option.value columns ~default:[])
+       ~what:"a table column"
+       ~f:(fun c ->
+         Option.iter (Obj.string ~required:true c "key") ~f:(fun key ->
+           match Hashtbl.find keys key with
+           | Some other ->
+             error
+               ctx
+               (at c.path "key")
+               "%S is also %s's key; give each column its own"
+               key
+               other
+           | None -> Hashtbl.set keys ~key ~data:c.path);
+         ignore (Obj.string c "label" : string option);
+         ignore
+           (Obj.enum c "align" [ "left"; "right"; "center" ] : string option);
+         ignore
+           (Obj.enum
+              c
+              "format"
+              [ "text"; "number"; "percent"; "currency"; "date"; "md" ]
+            : string option);
+         Option.iter (Obj.string c "currency") ~f:(fun cur ->
+           if
+             not
+               (String.length cur = 3 && String.for_all cur ~f:Char.is_uppercase)
+           then
+             error
+               ctx
+               (at c.path "currency")
+               "%S is not an ISO currency code; write e.g. \"USD\" or \"EUR\""
+               cur);
+         ignore (Obj.int c "decimals" ~min:0 ~max:10 : int option))
      : unit list);
   let rows =
     Option.value
@@ -773,7 +848,15 @@ and table ctx (o : Obj.t) =
 
 and chart ctx (o : Obj.t) =
   let kinds =
-    [ "line"; "area"; "bar"; "stacked_bar"; "horizontal_bar"; "pie"; "donut"; "scatter" ]
+    [ "line"
+    ; "area"
+    ; "bar"
+    ; "stacked_bar"
+    ; "horizontal_bar"
+    ; "pie"
+    ; "donut"
+    ; "scatter"
+    ]
   in
   let kind = Obj.enum ~required:true o "kind" kinds in
   let title = Obj.string o "title" in
@@ -796,79 +879,105 @@ and chart ctx (o : Obj.t) =
   in
   (match kind with
    | None -> o.takes <- [ "labels"; "series"; "slices" ] @ o.takes
-   | Some (("line" | "area" | "bar" | "stacked_bar" | "horizontal_bar") as kind) ->
+   | Some (("line" | "area" | "bar" | "stacked_bar" | "horizontal_bar") as kind)
+     ->
      wrong_for kind [ "slices" ] ~takes:"labels and series";
      let labels =
-       Option.map (Obj.array ~required:true o "labels" ~max:200 ~noun:"label") ~f:(fun l ->
-         ignore (strings ctx l : string list);
-         List.length l)
+       Option.map
+         (Obj.array ~required:true o "labels" ~max:200 ~noun:"label")
+         ~f:(fun l ->
+           ignore (strings ctx l : string list);
+           List.length l)
      in
      let series = Obj.array ~required:true o "series" ~max:8 ~noun:"series" in
      series_count := Option.value_map series ~default:0 ~f:List.length;
      ignore
-       (objects ctx (Option.value series ~default:[]) ~what:"a chart series" ~f:(fun s ->
-          ignore (Obj.string ~required:true s "name" : string option);
-          wrong_for ~o:s kind [ "points" ] ~takes:"values (one per label)";
-          match Obj.field s "values" ~required:true ~f:(fun p j -> Some (p, j)) with
-          | Some (path, `Array values) ->
-            List.iteri values ~f:(fun i v ->
-              match (v : Json.t) with
-              | `Null -> ()
-              | v -> ignore (Obj.number_of ctx (nth path i) v : float option));
-            Option.iter labels ~f:(fun labels ->
-              let n = List.length values in
-              if n <> labels
-              then
-                error
-                  ctx
-                  path
-                  "%s for %s; give one per label (null for a gap)"
-                  (plural n "value")
-                  (plural labels "label"))
-          | Some (path, other) ->
-            error ctx path "must be an array of numbers, not %s" (describe_json other)
-          | None -> ())
+       (objects
+          ctx
+          (Option.value series ~default:[])
+          ~what:"a chart series"
+          ~f:(fun s ->
+            ignore (Obj.string ~required:true s "name" : string option);
+            wrong_for ~o:s kind [ "points" ] ~takes:"values (one per label)";
+            match
+              Obj.field s "values" ~required:true ~f:(fun p j -> Some (p, j))
+            with
+            | Some (path, `Array values) ->
+              List.iteri values ~f:(fun i v ->
+                match (v : Json.t) with
+                | `Null -> ()
+                | v -> ignore (Obj.number_of ctx (nth path i) v : float option));
+              Option.iter labels ~f:(fun labels ->
+                let n = List.length values in
+                if n <> labels
+                then
+                  error
+                    ctx
+                    path
+                    "%s for %s; give one per label (null for a gap)"
+                    (plural n "value")
+                    (plural labels "label"))
+            | Some (path, other) ->
+              error
+                ctx
+                path
+                "must be an array of numbers, not %s"
+                (describe_json other)
+            | None -> ())
         : unit list)
    | Some (("pie" | "donut") as kind) ->
      wrong_for kind [ "labels"; "series" ] ~takes:"slices";
      let slices = Obj.array ~required:true o "slices" ~max:12 ~noun:"slice" in
      let values =
-       objects ctx (Option.value slices ~default:[]) ~what:"a slice" ~f:(fun s ->
-         ignore (Obj.string ~required:true s "label" : string option);
-         match Obj.number ~required:true s "value" with
-         | Some v when Float.(v < 0.) ->
-           error ctx (at s.path "value") "is %g; slices cannot be negative" v;
-           None
-         | v -> v)
+       objects
+         ctx
+         (Option.value slices ~default:[])
+         ~what:"a slice"
+         ~f:(fun s ->
+           ignore (Obj.string ~required:true s "label" : string option);
+           match Obj.number ~required:true s "value" with
+           | Some v when Float.(v < 0.) ->
+             error ctx (at s.path "value") "is %g; slices cannot be negative" v;
+             None
+           | v -> v)
      in
      if
        (not (List.is_empty values))
-       && List.for_all values ~f:(Option.value_map ~default:false ~f:Float.(fun v -> v = 0.))
+       && List.for_all
+            values
+            ~f:(Option.value_map ~default:false ~f:Float.(fun v -> v = 0.))
      then error ctx (at o.path "slices") "are all 0; give the slices' sizes"
    | Some kind ->
      wrong_for kind [ "labels"; "slices" ] ~takes:"series of points";
      let series = Obj.array ~required:true o "series" ~max:8 ~noun:"series" in
      series_count := Option.value_map series ~default:0 ~f:List.length;
      let total =
-       objects ctx (Option.value series ~default:[]) ~what:"a scatter series" ~f:(fun s ->
-         ignore (Obj.string ~required:true s "name" : string option);
-         wrong_for ~o:s kind [ "values" ] ~takes:"points ([[x, y], ...])";
-         let points =
-           Option.value
-             (Obj.array ~required:true s "points" ~max:2000 ~noun:"point")
-             ~default:[]
-         in
-         List.iter points ~f:(fun (path, p) ->
-           match (p : Json.t) with
-           | `Array [ x; y ] ->
-             ignore (Obj.number_of ctx (nth path 0) x : float option);
-             ignore (Obj.number_of ctx (nth path 1) y : float option)
-           | other ->
-             error ctx path "must be an [x, y] pair of numbers, not %s"
-               (match other with
-                | `Array l -> sprintf "an array of %d" (List.length l)
-                | other -> describe_json other));
-         List.length points)
+       objects
+         ctx
+         (Option.value series ~default:[])
+         ~what:"a scatter series"
+         ~f:(fun s ->
+           ignore (Obj.string ~required:true s "name" : string option);
+           wrong_for ~o:s kind [ "values" ] ~takes:"points ([[x, y], ...])";
+           let points =
+             Option.value
+               (Obj.array ~required:true s "points" ~max:2000 ~noun:"point")
+               ~default:[]
+           in
+           List.iter points ~f:(fun (path, p) ->
+             match (p : Json.t) with
+             | `Array [ x; y ] ->
+               ignore (Obj.number_of ctx (nth path 0) x : float option);
+               ignore (Obj.number_of ctx (nth path 1) y : float option)
+             | other ->
+               error
+                 ctx
+                 path
+                 "must be an [x, y] pair of numbers, not %s"
+                 (match other with
+                  | `Array l -> sprintf "an array of %d" (List.length l)
+                  | other -> describe_json other));
+           List.length points)
        |> List.sum (module Int) ~f:Fn.id
      in
      if total > 2000
@@ -887,52 +996,66 @@ and calculator ctx (o : Obj.t) =
   let inputs = Obj.array ~required:true o "inputs" ~max:20 ~noun:"input" in
   let names = String.Table.create () in
   ignore
-    (objects ctx (Option.value inputs ~default:[]) ~what:"a calculator input" ~f:(fun i ->
-       Option.iter (Obj.string ~required:true i "name") ~f:(fun name ->
-         let path = at i.path "name" in
-         if not (is_identifier name)
-         then
-           error
-             ctx
-             path
-             "%S is not an identifier; use letters, digits and _, e.g. \
-              \"monthly_rate\""
-             name
-         else if List.Assoc.mem Ui_expr.functions name ~equal:String.equal
-         then error ctx path "%S is a function's name; call the input something else" name
-         else (
-           match Hashtbl.find names name with
-           | Some other ->
-             error ctx path "%S is also %s's name; give each input its own" name other
-           | None -> Hashtbl.set names ~key:name ~data:i.path));
-       ignore (Obj.string ~required:true i "label" : string option);
-       let default = Obj.number ~required:true i "default" in
-       let min = Obj.number i "min" in
-       let max = Obj.number i "max" in
-       (match Obj.number i "step" with
-        | Some s when Float.(s <= 0.) ->
-          error ctx (at i.path "step") "must be more than 0"
-        | _ -> ());
-       ignore (Obj.string i "unit" : string option);
-       let slider = Option.value (Obj.bool i "slider") ~default:false in
-       if slider && (Option.is_none min || Option.is_none max)
-       then error ctx i.path "a slider needs min and max";
-       (match min, max with
-        | Some lo, Some hi when Float.(lo >= hi) ->
-          error ctx (at i.path "max") "is %g, not more than min %g" hi lo
-        | _ ->
-          Option.iter default ~f:(fun d ->
-            let below = Option.exists min ~f:(fun lo -> Float.(d < lo)) in
-            let above = Option.exists max ~f:(fun hi -> Float.(d > hi)) in
-            if below || above
-            then
-              error
-                ctx
-                (at i.path "default")
-                "is %g, outside %s to %s"
-                d
-                (Option.value_map min ~default:"-inf" ~f:(sprintf "%g"))
-                (Option.value_map max ~default:"inf" ~f:(sprintf "%g")))))
+    (objects
+       ctx
+       (Option.value inputs ~default:[])
+       ~what:"a calculator input"
+       ~f:(fun i ->
+         Option.iter (Obj.string ~required:true i "name") ~f:(fun name ->
+           let path = at i.path "name" in
+           if not (is_identifier name)
+           then
+             error
+               ctx
+               path
+               "%S is not an identifier; use letters, digits and _, e.g. \
+                \"monthly_rate\""
+               name
+           else if List.Assoc.mem Ui_expr.functions name ~equal:String.equal
+           then
+             error
+               ctx
+               path
+               "%S is a function's name; call the input something else"
+               name
+           else (
+             match Hashtbl.find names name with
+             | Some other ->
+               error
+                 ctx
+                 path
+                 "%S is also %s's name; give each input its own"
+                 name
+                 other
+             | None -> Hashtbl.set names ~key:name ~data:i.path));
+         ignore (Obj.string ~required:true i "label" : string option);
+         let default = Obj.number ~required:true i "default" in
+         let min = Obj.number i "min" in
+         let max = Obj.number i "max" in
+         (match Obj.number i "step" with
+          | Some s when Float.(s <= 0.) ->
+            error ctx (at i.path "step") "must be more than 0"
+          | _ -> ());
+         ignore (Obj.string i "unit" : string option);
+         let slider = Option.value (Obj.bool i "slider") ~default:false in
+         if slider && (Option.is_none min || Option.is_none max)
+         then error ctx i.path "a slider needs min and max";
+         match min, max with
+         | Some lo, Some hi when Float.(lo >= hi) ->
+           error ctx (at i.path "max") "is %g, not more than min %g" hi lo
+         | _ ->
+           Option.iter default ~f:(fun d ->
+             let below = Option.exists min ~f:(fun lo -> Float.(d < lo)) in
+             let above = Option.exists max ~f:(fun hi -> Float.(d > hi)) in
+             if below || above
+             then
+               error
+                 ctx
+                 (at i.path "default")
+                 "is %g, outside %s to %s"
+                 d
+                 (Option.value_map min ~default:"-inf" ~f:(sprintf "%g"))
+                 (Option.value_map max ~default:"inf" ~f:(sprintf "%g"))))
      : unit list);
   let input_names =
     List.filter_map (Option.value inputs ~default:[]) ~f:(fun (_, j) ->
@@ -945,140 +1068,159 @@ and calculator ctx (o : Obj.t) =
   in
   let outputs = Obj.array ~required:true o "outputs" ~max:20 ~noun:"output" in
   ignore
-    (objects ctx (Option.value outputs ~default:[]) ~what:"a calculator output" ~f:(fun out ->
-       ignore (Obj.string ~required:true out "label" : string option);
-       ignore
-         (Obj.enum out "format" [ "number"; "percent"; "currency"; "integer" ]
-          : string option);
-       ignore (Obj.int out "decimals" ~min:0 ~max:10 : int option);
-       ignore (Obj.string out "unit" : string option);
-       Option.iter (Obj.string ~required:true out "expr") ~f:(fun expr ->
-         let path = at out.path "expr" in
-         match Ui_expr.parse expr with
-         | Error e -> error ctx path "%s in %S" e expr
-         | Ok e ->
-           List.iter (Ui_expr.check e ~inputs:input_names) ~f:(fun problem ->
-             error ctx path "%s" problem)))
+    (objects
+       ctx
+       (Option.value outputs ~default:[])
+       ~what:"a calculator output"
+       ~f:(fun out ->
+         ignore (Obj.string ~required:true out "label" : string option);
+         ignore
+           (Obj.enum out "format" [ "number"; "percent"; "currency"; "integer" ]
+            : string option);
+         ignore (Obj.int out "decimals" ~min:0 ~max:10 : int option);
+         ignore (Obj.string out "unit" : string option);
+         Option.iter (Obj.string ~required:true out "expr") ~f:(fun expr ->
+           let path = at out.path "expr" in
+           match Ui_expr.parse expr with
+           | Error e -> error ctx path "%s in %S" e expr
+           | Ok e ->
+             List.iter (Ui_expr.check e ~inputs:input_names) ~f:(fun problem ->
+               error ctx path "%s" problem)))
      : unit list);
   "calculator" ^ quoted title
 
 and form_fields ctx (o : Obj.t) =
   let kinds =
-    [ "text"; "textarea"; "number"; "select"; "radio"; "checkbox"; "toggle"; "slider"; "date" ]
+    [ "text"
+    ; "textarea"
+    ; "number"
+    ; "select"
+    ; "radio"
+    ; "checkbox"
+    ; "toggle"
+    ; "slider"
+    ; "date"
+    ]
   in
   let fields = Obj.array ~required:true o "fields" ~max:30 ~noun:"field" in
   let names = String.Table.create () in
   ignore
-    (objects ctx (Option.value fields ~default:[]) ~what:"a form field" ~f:(fun f ->
-       Option.iter (Obj.string ~required:true f "name") ~f:(fun name ->
-         match Hashtbl.find names name with
-         | Some other ->
-           error
-             ctx
-             (at f.path "name")
-             "%S is also %s's name; give each field its own"
-             name
-             other
-         | None -> Hashtbl.set names ~key:name ~data:f.path);
-       ignore (Obj.string ~required:true f "label" : string option);
-       ignore (Obj.bool f "required" : bool option);
-       ignore (Obj.string f "placeholder" : string option);
-       ignore (Obj.string f "help" : string option);
-       let kind = Obj.enum ~required:true f "kind" kinds in
-       let with_options = [ "select"; "radio"; "checkbox" ] in
-       let numeric = [ "number"; "slider" ] in
-       let options =
-         match kind with
-         | Some k when List.mem with_options k ~equal:String.equal ->
-           Option.map
-             (Obj.array ~required:true f "options" ~max:50 ~noun:"option")
-             ~f:(strings ctx)
-         | Some k ->
-           if List.Assoc.mem f.fields "options" ~equal:String.equal
-           then (
-             f.takes <- "options" :: f.takes;
+    (objects
+       ctx
+       (Option.value fields ~default:[])
+       ~what:"a form field"
+       ~f:(fun f ->
+         Option.iter (Obj.string ~required:true f "name") ~f:(fun name ->
+           match Hashtbl.find names name with
+           | Some other ->
              error
                ctx
-               (at f.path "options")
-               "a %s field has no options; use kind select, radio or checkbox"
-               k);
-           None
-         | None ->
-           f.takes <- "options" :: f.takes;
-           None
-       in
-       let range =
-         List.map [ "min"; "max"; "step" ] ~f:(fun name ->
+               (at f.path "name")
+               "%S is also %s's name; give each field its own"
+               name
+               other
+           | None -> Hashtbl.set names ~key:name ~data:f.path);
+         ignore (Obj.string ~required:true f "label" : string option);
+         ignore (Obj.bool f "required" : bool option);
+         ignore (Obj.string f "placeholder" : string option);
+         ignore (Obj.string f "help" : string option);
+         let kind = Obj.enum ~required:true f "kind" kinds in
+         let with_options = [ "select"; "radio"; "checkbox" ] in
+         let numeric = [ "number"; "slider" ] in
+         let options =
            match kind with
-           | Some k when not (List.mem numeric k ~equal:String.equal) ->
-             if List.Assoc.mem f.fields name ~equal:String.equal
+           | Some k when List.mem with_options k ~equal:String.equal ->
+             Option.map
+               (Obj.array ~required:true f "options" ~max:50 ~noun:"option")
+               ~f:(strings ctx)
+           | Some k ->
+             if List.Assoc.mem f.fields "options" ~equal:String.equal
              then (
-               f.takes <- name :: f.takes;
+               f.takes <- "options" :: f.takes;
                error
                  ctx
-                 (at f.path name)
-                 "only number and slider fields take %s"
-                 name);
+                 (at f.path "options")
+                 "a %s field has no options; use kind select, radio or checkbox"
+                 k);
              None
-           | _ -> Obj.number f name)
-       in
-       (match kind, range with
-        | Some "slider", ([ None; _; _ ] | [ _; None; _ ]) ->
-          error ctx f.path "a slider needs min and max"
-        | _, [ Some lo; Some hi; _ ] when Float.(lo >= hi) ->
-          error ctx (at f.path "max") "is %g, not more than min %g" hi lo
-        | _, [ _; _; Some s ] when Float.(s <= 0.) ->
-          error ctx (at f.path "step") "must be more than 0"
-        | _ -> ());
-       let default_path = at f.path "default" in
-       let wrong expected (json : Json.t) =
-         error
-           ctx
-           default_path
-           "a %s field's default must be %s, not %s"
-           (Option.value kind ~default:"")
-           expected
-           (describe_json json)
-       in
-       let in_options v =
-         Option.iter options ~f:(fun options ->
-           if not (List.mem options v ~equal:String.equal)
-           then
-             error
-               ctx
-               default_path
-               "%S is not one of the options (%s)"
-               v
-               (String.concat ~sep:", " (List.map options ~f:(sprintf "%S"))))
-       in
-       ignore
-         (Obj.field f "default" ~required:false ~f:(fun _ json ->
-            (match kind, json with
-             | None, _ -> ()
-             | Some ("text" | "textarea"), `String _ -> ()
-             | Some "date", `String s -> check_date ctx default_path s
-             | Some ("select" | "radio"), `String s -> in_options s
-             | Some ("text" | "textarea" | "date" | "select" | "radio"), json ->
-               wrong "a string" json
-             | Some ("number" | "slider"), (`Number _ as json) ->
-               Option.iter (Obj.number_of ctx default_path json) ~f:(fun d ->
-                 match range with
-                 | [ lo; hi; _ ]
-                   when Option.exists lo ~f:(fun lo -> Float.(d < lo))
-                        || Option.exists hi ~f:(fun hi -> Float.(d > hi)) ->
-                   error ctx default_path "is %g, outside min to max" d
-                 | _ -> ())
-             | Some ("number" | "slider"), json -> wrong "a number" json
-             | Some "toggle", (`True | `False) -> ()
-             | Some "toggle", json -> wrong "true or false" json
-             | Some "checkbox", `Array items ->
-               List.iter
-                 (strings ctx (List.mapi items ~f:(fun i j -> nth default_path i, j)))
-                 ~f:in_options
-             | Some "checkbox", json -> wrong "an array of options" json
-             | Some _, _ -> ());
-            None)
-          : unit option))
+           | None ->
+             f.takes <- "options" :: f.takes;
+             None
+         in
+         let range =
+           List.map [ "min"; "max"; "step" ] ~f:(fun name ->
+             match kind with
+             | Some k when not (List.mem numeric k ~equal:String.equal) ->
+               if List.Assoc.mem f.fields name ~equal:String.equal
+               then (
+                 f.takes <- name :: f.takes;
+                 error
+                   ctx
+                   (at f.path name)
+                   "only number and slider fields take %s"
+                   name);
+               None
+             | _ -> Obj.number f name)
+         in
+         (match kind, range with
+          | Some "slider", ([ None; _; _ ] | [ _; None; _ ]) ->
+            error ctx f.path "a slider needs min and max"
+          | _, [ Some lo; Some hi; _ ] when Float.(lo >= hi) ->
+            error ctx (at f.path "max") "is %g, not more than min %g" hi lo
+          | _, [ _; _; Some s ] when Float.(s <= 0.) ->
+            error ctx (at f.path "step") "must be more than 0"
+          | _ -> ());
+         let default_path = at f.path "default" in
+         let wrong expected (json : Json.t) =
+           error
+             ctx
+             default_path
+             "a %s field's default must be %s, not %s"
+             (Option.value kind ~default:"")
+             expected
+             (describe_json json)
+         in
+         let in_options v =
+           Option.iter options ~f:(fun options ->
+             if not (List.mem options v ~equal:String.equal)
+             then
+               error
+                 ctx
+                 default_path
+                 "%S is not one of the options (%s)"
+                 v
+                 (String.concat ~sep:", " (List.map options ~f:(sprintf "%S"))))
+         in
+         ignore
+           (Obj.field f "default" ~required:false ~f:(fun _ json ->
+              (match kind, json with
+               | None, _ -> ()
+               | Some ("text" | "textarea"), `String _ -> ()
+               | Some "date", `String s -> check_date ctx default_path s
+               | Some ("select" | "radio"), `String s -> in_options s
+               | Some ("text" | "textarea" | "date" | "select" | "radio"), json
+                 -> wrong "a string" json
+               | Some ("number" | "slider"), (`Number _ as json) ->
+                 Option.iter (Obj.number_of ctx default_path json) ~f:(fun d ->
+                   match range with
+                   | [ lo; hi; _ ]
+                     when Option.exists lo ~f:(fun lo -> Float.(d < lo))
+                          || Option.exists hi ~f:(fun hi -> Float.(d > hi)) ->
+                     error ctx default_path "is %g, outside min to max" d
+                   | _ -> ())
+               | Some ("number" | "slider"), json -> wrong "a number" json
+               | Some "toggle", (`True | `False) -> ()
+               | Some "toggle", json -> wrong "true or false" json
+               | Some "checkbox", `Array items ->
+                 List.iter
+                   (strings
+                      ctx
+                      (List.mapi items ~f:(fun i j -> nth default_path i, j)))
+                   ~f:in_options
+               | Some "checkbox", json -> wrong "an array of options" json
+               | Some _, _ -> ());
+              None)
+            : unit option))
      : unit list)
 ;;
 
@@ -1098,7 +1240,12 @@ let check json ~resolve =
     | Some o ->
       let summaries =
         match
-          Obj.array ~required:true o "components" ~max:max_top_level ~noun:"component"
+          Obj.array
+            ~required:true
+            o
+            "components"
+            ~max:max_top_level
+            ~noun:"component"
         with
         | None -> []
         | Some items ->

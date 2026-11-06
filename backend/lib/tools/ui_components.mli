@@ -29,7 +29,10 @@ end
     [components[1].series[0].values: 11 values for 12 labels; give one per
     label]. [resolve] makes an image's relative path absolute, for the error
     that says which absolute path to use. *)
-val check : Json.t -> resolve:(string -> string) -> (Checked.t, string list) Result.t
+val check
+  :  Json.t
+  -> resolve:(string -> string)
+  -> (Checked.t, string list) Result.t
 
 (** The [id]s of the components in [render_ui]'s arguments, nested ones
     too. *)

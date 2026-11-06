@@ -96,7 +96,8 @@ let unavailable ~depth name =
   then
     Some
       "it is the main agent's (the user's plan, questions, components and \
-       goal), and you are a subagent: put what you need from the user in your report"
+       goal), and you are a subagent: put what you need from the user in your \
+       report"
   else None
 ;;
 

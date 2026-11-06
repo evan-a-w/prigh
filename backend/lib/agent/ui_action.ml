@@ -16,7 +16,8 @@ let of_json (json : Json.t) =
   in
   let string name =
     match field name with
-    | Some (`String s) when not (String.is_empty (String.strip s)) -> Ok (Some s)
+    | Some (`String s) when not (String.is_empty (String.strip s)) ->
+      Ok (Some s)
     | None | Some `Null -> Ok None
     | Some _ -> Or_error.errorf "ui_action.%s must be a non-empty string" name
   in
@@ -36,10 +37,15 @@ let of_json (json : Json.t) =
       | Some values -> Ok values
       | None -> Or_error.error_string "ui_action needs \"values\""
     in
-    { call_id; component; title = Option.value title ~default:component; values }
+    { call_id
+    ; component
+    ; title = Option.value title ~default:component
+    ; values
+    }
   | _ ->
     Or_error.error_string
-      "param \"ui_action\" must be an object {call_id, component, title, values}"
+      "param \"ui_action\" must be an object {call_id, component, title, \
+       values}"
 ;;
 
 let text t =
@@ -74,13 +80,16 @@ let summary t =
   let line = sprintf "Sent \"%s\": %s" t.title (value t.values) in
   let line = String.tr line ~target:'\n' ~replacement:' ' in
   if String.length line > max_summary
-  then fst (Utf8.split_incomplete_suffix (String.prefix line (max_summary - 3))) ^ "..."
+  then
+    fst (Utf8.split_incomplete_suffix (String.prefix line (max_summary - 3)))
+    ^ "..."
   else line
 ;;
 
 let note t =
   { Injected.Note.kind =
-      Ui_action { call_id = t.call_id; component = t.component; summary = summary t }
+      Ui_action
+        { call_id = t.call_id; component = t.component; summary = summary t }
   ; text = text t
   }
 ;;

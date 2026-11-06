@@ -32,7 +32,9 @@ let%expect_test "the arguments' shape" =
   raw
     (sprintf
        {|{"components": [%s]}|}
-       (String.concat ~sep:"," (List.init 21 ~f:(fun _ -> {|{"type": "divider"}|}))));
+       (String.concat
+          ~sep:","
+          (List.init 21 ~f:(fun _ -> {|{"type": "divider"}|}))));
   [%expect
     {|
     arguments.components: missing; render_ui needs it
@@ -45,7 +47,8 @@ let%expect_test "the arguments' shape" =
 ;;
 
 let%expect_test "types and ids" =
-  check {|{"type": "chrat"}, {"type": "sparkle"}, {"kind": "line"}, 5, {"type": 3}|};
+  check
+    {|{"type": "chrat"}, {"type": "sparkle"}, {"kind": "line"}, 5, {"type": 3}|};
   [%expect
     {|
     components[0].type: unknown type "chrat"; did you mean "chart"?
@@ -126,7 +129,9 @@ let%expect_test "layout" =
        (List.init 6 ~f:(fun _ ->
           sprintf
             {|{"type": "grid", "children": [%s]}|}
-            (String.concat ~sep:"," (List.init 20 ~f:(fun _ -> {|{"type": "divider"}|}))))));
+            (String.concat
+               ~sep:","
+               (List.init 20 ~f:(fun _ -> {|{"type": "divider"}|}))))));
   [%expect
     {| components: 126 components in all; give at most 100 (split it into several calls or show less) |}]
 ;;
@@ -312,8 +317,9 @@ let%expect_test "timeline, steps, code, diff, tree" =
     |}]
 ;;
 
-let%expect_test "images: absolute paths go to the host check, relative ones \
-                 say which to use"
+let%expect_test
+    "images: absolute paths go to the host check, relative ones say which to \
+     use"
   =
   check
     {|{"type": "image", "path": "/home/u/p/shot.png", "caption": "it", "alt": "a shot", "width": "medium"},
