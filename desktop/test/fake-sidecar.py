@@ -15,6 +15,9 @@ $FAKE_MODE picks a behaviour:
 With $FAKE_PAGE_LINKS set, the page, once, opens a window on another site
 (http://localhost:PORT/new-window: another origin, the same server) and
 then goes to another site itself (/away), as links in prigh-web would.
+With $FAKE_PAGE_POPUP set, the page, once, opens a popup on its own site
+(/?popup=1), as prigh-web's Open in new window does in a browser's app
+window.
 What happens is appended to $FAKE_LOG, one event per line.
 """
 
@@ -57,6 +60,15 @@ addEventListener("load", () => {
   const elsewhere = "http://localhost:" + location.port;
   window.open(elsewhere + "/new-window", "_blank");
   setTimeout(() => { location.href = elsewhere + "/away"; }, 1000);
+});
+</script></body>""")
+if os.environ.get("FAKE_PAGE_POPUP"):
+    PAGE = PAGE.replace(b"</body>", b"""<script>
+addEventListener("load", () => {
+  if (location.search) document.title = "fake prigh-web, another window";
+  if (location.search || sessionStorage.getItem("opened")) return;
+  sessionStorage.setItem("opened", "1");
+  window.open("/?popup=1#shell=browser", "_blank", "popup,width=600,height=400");
 });
 </script></body>""")
 # The smallest GIF: the page's load waits for it, so a load the shell sees

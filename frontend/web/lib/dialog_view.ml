@@ -291,8 +291,23 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
         List.mem paths s.path ~equal:String.equal)
     | Archived -> List.filter m.sessions ~f:(fun s -> s.archived)
   in
-  let deleted = List.filter sessions ~f:(fun s -> Option.is_none (kept m s)) in
+  let deleted = App.Model.to_delete m target in
   let count = List.length deleted in
+  let current =
+    List.find deleted ~f:(fun s ->
+      Option.exists m.state ~f:(fun state -> String.equal state.session_id s.id))
+  in
+  let moving =
+    Option.map (App.Model.moving_to m target) ~f:(function
+      | New_session -> "You'll move to a new session."
+      | Session path ->
+        sprintf
+          "You'll move to “%s”."
+          (Option.value_map
+             (List.find m.sessions ~f:(fun s -> String.equal s.path path))
+             ~default:path
+             ~f:Session_list.title))
+  in
   let size =
     Session_summary.size_string (Session_summary.total_bytes deleted)
   in
@@ -302,6 +317,8 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
       "Can't delete this session"
     | _, _ when count = 0 -> "Can't delete these sessions"
     | Archived, _ -> sprintf "Delete all %d archived sessions?" count
+    | Sessions _, [ s ] when Option.is_some current ->
+      sprintf "Delete “%s”?" (Session_list.title s)
     | Sessions _, [ _ ] -> "Delete session?"
     | Sessions _, _ -> sprintf "Delete %d sessions?" count
   in
@@ -335,7 +352,20 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
            ~danger:true
            ~inject
            (if count = 1 then "Delete" else sprintf "Delete %d" count))
-    [ (if count = 0
+    [ (match current, moving with
+       | Some s, Some moving ->
+         Node.p
+           ~attrs:[ Attr.class_ "delete-moving" ]
+           [ (match sessions with
+              | [ _ ] -> Node.text moving
+              | _ ->
+                Node.textf
+                  "“%s” is the session you are in. %s"
+                  (Session_list.title s)
+                  moving)
+           ]
+       | _ -> Node.none)
+    ; (if count = 0
        then Node.none
        else
          Node.p

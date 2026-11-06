@@ -1016,3 +1016,183 @@ let%expect_test "status line: a URL under a path, and plain ws://" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:ws://10.0.0.5:7790  user:lloyd
     |}]
 ;;
+
+let proxy_login =
+  "ai.example.com answered with a login page (HTTP 302 Found to \
+   https://auth.example.com/)"
+;;
+
+let%expect_test
+    "startup: a sign-in proxy's login asks to sign in through the browser"
+  =
+  let h = H.create ~width:80 ~height:10 () in
+  H.step h (Server_link (remote ~user:None "https://ai.example.com/"));
+  H.step h (Signin_required proxy_login);
+  H.step h Start;
+  H.show h;
+  connection h;
+  [%expect
+    {|
+    Load_history
+    ┌─ Warning ────────────────────────────────────────────────────────────────────┐
+    │ ai.example.com answered with a login page (HTTP 302 Found to                 │
+    │ https://auth.example.com/)                                                   │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ A sign-in proxy guards the backend. Sign in through the browser? (y/n)       │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    not signed in to wss://ai.example.com · /signin signs in · /connect switches server
+    (Disconnected (
+      reason
+      "ai.example.com answered with a login page (HTTP 302 Found to https://auth.example.com/)"))
+    |}];
+  (* y: the platform signs in through the browser and connects. *)
+  H.keys h "y";
+  H.show h;
+  [%expect
+    {|
+    (Relink
+      (generation 1)
+      (change     Browser_signin))
+
+
+
+
+
+
+
+    ────────────────── signing in through the browser: follow the link it opens… ───
+    > ▏
+    connecting…
+    |}];
+  relinked
+    h
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Connected (hello {|{"client_id":"c2"}|}));
+  connection h;
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    Connected
+    |}]
+;;
+
+let%expect_test "the browser sign-in declined, or failing" =
+  let h = H.create ~width:80 ~height:10 () in
+  H.step h (Server_link (remote ~user:None "https://ai.example.com/"));
+  H.step h (Signin_required proxy_login);
+  H.step h Start;
+  H.esc h;
+  H.show h;
+  connection h;
+  [%expect
+    {|
+    Load_history
+
+
+
+    ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
+    │ not signed in: /connect tries again (it asks again), or exempt /ws and       │
+    │ /terminal from the proxy (see DOCKER.md)                                     │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    not signed in to wss://ai.example.com · /signin signs in · /connect switches server
+    (Disconnected (
+      reason
+      "ai.example.com answered with a login page (HTTP 302 Found to https://auth.example.com/)"))
+    |}];
+  (* /connect asks again; the sign-in fails (cancelled in the browser): why,
+     and the question again. *)
+  H.keys h "/connect https://ai.example.com/";
+  H.enter h;
+  relinked
+    h
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Signin_required proxy_login);
+  H.keys h "y";
+  relinked
+    h
+    ~generation:2
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Signin_required
+       "not signed in through the browser: the sign-in was cancelled in the \
+        browser");
+  H.show h;
+  connection h;
+  [%expect
+    {|
+    (Relink (generation 1) (change (Connect (wss://ai.example.com/ws))))
+    (Relink
+      (generation 2)
+      (change     Browser_signin))
+
+    ┌─ Warning ────────────────────────────────────────────────────────────────────┐
+    │ not signed in through the browser: the sign-in was cancelled in the browser  │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+    │ A sign-in proxy guards the backend. Sign in through the browser? (y/n)       │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    not signed in to wss://ai.example.com · /signin signs in · /connect switches server
+    (Disconnected (
+      reason
+      "not signed in through the browser: the sign-in was cancelled in the browser"))
+    |}]
+;;
+
+let%expect_test "the proxy's cookie expires: a reconnect asks, no more retries" =
+  let h = on (remote "https://ai.example.com/") in
+  H.step ~quiet:true h Backend_closed;
+  H.reply_error h (Reconnect 1) (Server_link.proxy_signin_error proxy_login);
+  H.show h;
+  connection h;
+  [%expect
+    {|
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ A sign-in proxy guards the backend. Sign in through the browser? (y/n)                           │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ──────── ai.example.com answered with a login page (HTTP 302 Found to https://auth.example.com/) ───
+    ? ▏
+    not signed in to wss://ai.example.com · /signin signs in · /connect switches server
+    (Disconnected (
+      reason
+      "ai.example.com answered with a login page (HTTP 302 Found to https://auth.example.com/)"))
+    |}];
+  (* /connect to another server while connected: the login is an error,
+     the connection stays. *)
+  let h = on (remote "10.0.0.5:7777") in
+  H.keys h "/connect https://ai.example.com/";
+  H.enter h;
+  relinked h ~link:(remote "10.0.0.5:7777") (Signin_required proxy_login);
+  H.show h;
+  connection h;
+  [%expect
+    {|
+    (Relink (generation 1) (change (Connect (wss://ai.example.com/ws))))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ ai.example.com answered with a login page (HTTP 302 Found to https://auth.example.com/); still   │
+    │ on 10.0.0.5:7777                                                                                 │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  user:lloyd
+    Connected
+    |}]
+;;

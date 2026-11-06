@@ -18,6 +18,10 @@ type t =
   ; prefix : string
     (** the site's path without a trailing slash: [""] or e.g. ["/prigh"] *)
   ; lines : bool (** given as [HOST:PORT] *)
+  ; proxy_cookie : string option
+    (** the [Cookie] header a sign-in proxy in front of the site wants
+        ({!Browser_signin}), sent with every request to the site; never
+        printed *)
   }
 [@@deriving sexp_of, equal]
 
@@ -57,9 +61,26 @@ val connect_abortable
   -> t
   -> Eio.Flow.two_way_ty Eio.Resource.t * (unit -> unit)
 
+(** With [proxy_cookie] set (only sent to a URL's site, not a [HOST:PORT]). *)
+val with_proxy_cookie : t -> string option -> t
+
+(** What to send with each request to the site: the [Cookie] header of
+    [proxy_cookie]. *)
+val upgrade_headers : t -> (string * string) list
+
 (** Raised by {!websocket} when the server does not open the WebSocket,
     with what it answered. *)
 exception Not_upgraded of string
+
+(** Raised by {!websocket} instead of [Not_upgraded] when what answered
+    looks like a sign-in proxy's login (see {!signin_page}): signing in
+    through the browser ({!Browser_signin}) gets the cookie it wants. *)
+exception Signin_required of string
+
+(** Whether a refused upgrade is a sign-in proxy's: a redirect (other than
+    to [https] on the same host, for a [ws://] address), a 401, 403 or 407,
+    or a web page; what it answered, if so. *)
+val signin_page : t -> Websocket.Refusal.t -> string option
 
 (** The WebSocket at [path] (under [prefix]) with [query]. Raises like
     {!connect}, and [Not_upgraded]. *)

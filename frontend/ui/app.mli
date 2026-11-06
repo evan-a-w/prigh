@@ -236,7 +236,7 @@ module Connection : sig
         { generation : int
         ; previous : t (** back to it when the new server cannot be reached *)
         ; notices : string list
-        (** newest first: the new server may send some before its [hello]
+          (** newest first: the new server may send some before its [hello]
             reply, which resets the view; they are shown again after it *)
         } (** [/connect] or [/signin] under way *)
     | Disconnected of { reason : string }
@@ -273,6 +273,9 @@ module Action : sig
     | Rejected of string
     (** the first [hello] was refused: start disconnected, asking to sign
         in *)
+    | Signin_required of string
+    (** the first connection met a sign-in proxy's login (why): start
+        disconnected, offering to sign in through the browser *)
     | Resize of
         { width : int
         ; height : int
