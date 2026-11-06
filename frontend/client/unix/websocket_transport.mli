@@ -31,6 +31,9 @@ end
     exception's: show this, not [Error.to_string_hum]. *)
 val signin_required : Error.t -> string option
 
+(** The exception in such an error (for tests that fake {!connect}). *)
+exception Signin_required of string
+
 (** Parses [Name: value] (for [-header] and [$PRIGH_CONNECT_HEADERS]). *)
 val parse_header : string -> (string * string, string) Result.t
 

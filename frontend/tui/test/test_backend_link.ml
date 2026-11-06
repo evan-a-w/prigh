@@ -40,8 +40,8 @@ module Servers = struct
       | Some (`Object fields) ->
         `Object
           (List.map fields ~f:(function
-            | "home", `String _ -> "home", `String "<home>"
-            | field -> field))
+             | "home", `String _ -> "home", `String "<home>"
+             | field -> field))
       | params -> Option.value params ~default:`Null
     in
     let line = Json.to_string params in
@@ -102,10 +102,29 @@ module Servers = struct
            | _ -> respond true {|"result":null|}))
   ;;
 
+  (* [https://ai.example.com/] is behind a sign-in proxy: only its cookie
+     gets through. *)
+  let behind_proxy : Link.Endpoint.t -> bool = function
+    | Websocket { url = "https://ai.example.com/"; headers; _ } ->
+      not
+        (List.mem
+           headers
+           ("Cookie", "proxy_session=ok")
+           ~equal:[%equal: string * string])
+    | _ -> false
+  ;;
+
   let open_ t ~home endpoint =
     printf !"open %{sexp: Link.Endpoint.t}\n" endpoint;
     if Set.mem t.down (address endpoint)
     then Deferred.Or_error.error_string "Connection refused"
+    else if behind_proxy endpoint
+    then
+      return
+        (Error
+           (Error.of_exn
+              (Prigh_client_unix.Websocket_transport.Signin_required
+                 "ai.example.com answered with a login page")))
     else (
       let transport, backend = Transport.In_memory.create () in
       t.backends <- backend :: t.backends;
@@ -146,6 +165,7 @@ let make
       ?(token = None)
       ?(user = None)
       ?headers
+      ?browser_signin
       ~home
       ~servers
       ~target
@@ -154,6 +174,8 @@ let make
   =
   Link.create
     ~open_transport:(Servers.open_ servers ~home)
+    ?browser_signin
+    ~open_url:(printf "open the browser at %s\n")
     ~spawn_worker:(fun () -> Deferred.Or_error.error_string "no worker here")
     ?headers
     ~home
@@ -589,6 +611,126 @@ let%expect_test
     ws://[::1]:7790/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
     (connected "")
     ((address (ws://[::1]:7790/ws)) (user ()) (saved (ws://[::1]:7790/ws)))
+    |}];
+  return ()
+;;
+
+let%expect_test
+    "a sign-in proxy: the browser's cookie on every connection, saved"
+  =
+  with_home
+  @@ fun home ->
+  let servers = servers () in
+  let address = "https://ai.example.com/" in
+  let answer = ref (Error "the sign-in was cancelled in the browser") in
+  let browser_signin ~connect ~on_url =
+    printf "prigh browser-signin -connect %s\n" connect;
+    on_url
+      ~url:"https://ai.example.com/#cli-signin=4242.s&program=tui"
+      ~port:4242;
+    return !answer
+  in
+  let link =
+    make ~home ~servers ~browser_signin ~target:(Remote address) ~saved:None ()
+  in
+  let%bind result = Link.start link in
+  print_s [%sexp (result : Prigh_ui.Server_link.Outcome.result)];
+  [%expect
+    {|
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ()))
+    (Signin_required "ai.example.com answered with a login page")
+    |}];
+  let%bind o = Link.relink link Browser_signin in
+  outcome o;
+  [%expect
+    {|
+    prigh browser-signin -connect https://ai.example.com/
+    open the browser at https://ai.example.com/#cli-signin=4242.s&program=tui
+    ("sign in through the browser"
+     "not signed in through the browser: the sign-in was cancelled in the browser")
+    ((address (https://ai.example.com/))
+     (user  ())
+     (saved ()))
+    |}];
+  answer
+  := Ok
+       { Prigh_client_unix.Browser_signin.Grant.proxy_cookie =
+           "proxy_session=ok"
+       ; token = Some "page-token"
+       ; user = Some "alice"
+       };
+  let%bind o = Link.relink link Browser_signin in
+  outcome o;
+  saved ~home;
+  [%expect
+    {|
+    prigh browser-signin -connect https://ai.example.com/
+    open the browser at https://ai.example.com/#cli-signin=4242.s&program=tui
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ((Cookie proxy_session=ok))))
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (connected "")
+    ((address (https://ai.example.com/))
+     (user    (alice))
+     (saved   (https://ai.example.com/)))
+    ((
+      (connect      https://ai.example.com/)
+      (token        page-token)
+      (user         alice)
+      (proxy_cookie proxy_session=ok)))
+    |}];
+  (* Reconnecting (and the next start) sends the saved cookie. *)
+  let%bind o = Link.relink link (Connect (Some address)) in
+  outcome o;
+  let link =
+    make
+      ~home
+      ~servers
+      ~target:(Remote address)
+      ~token:(Some "page-token")
+      ~user:(Some "alice")
+      ~saved:(Or_error.ok_exn (Saved_connection.load ~home))
+      ()
+  in
+  let%bind result = Link.start link in
+  print_s [%sexp (result : Prigh_ui.Server_link.Outcome.result)];
+  [%expect
+    {|
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ((Cookie proxy_session=ok))))
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (connected "")
+    ((address (https://ai.example.com/))
+     (user    (alice))
+     (saved   (https://ai.example.com/)))
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ((Cookie proxy_session=ok))))
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (Connected (
+      (client_id c)
+      (namespace alice)
+      (user      alice)))
+    |}];
+  (* Signing out keeps the proxy's cookie (it is the proxy's, not prigh's). *)
+  let%bind (_ : unit Or_error.t) =
+    Link.sign_out link |> Deferred.map ~f:(Result.map_error ~f:Error.of_string)
+  in
+  saved ~home;
+  [%expect
+    {|
+    ((
+      (connect      https://ai.example.com/)
+      (user         alice)
+      (proxy_cookie proxy_session=ok)))
     |}];
   return ()
 ;;

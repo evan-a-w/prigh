@@ -32,10 +32,13 @@ module Line = struct
       in
       (match string "url", string "proxy_cookie", string "error" with
        | Some url, _, _ ->
-         Option.map (Json.int_field json "port" |> Or_error.ok) ~f:(fun port ->
-           Url { url; port })
+         Option.map
+           (Json.int_field json "port" |> Or_error.ok)
+           ~f:(fun port -> Url { url; port })
        | None, Some proxy_cookie, _ ->
-         Some (Granted { proxy_cookie; token = string "token"; user = string "user" })
+         Some
+           (Granted
+              { proxy_cookie; token = string "token"; user = string "user" })
        | None, None, Some error -> Some (Failed error)
        | None, None, None -> None)
   ;;
@@ -46,7 +49,14 @@ let run ~backend ~connect ~on_url =
     Process.create
       ~prog:backend
       ~args:
-        [ "browser-signin"; "-json"; "-no-browser"; "-program"; "tui"; "-connect"; connect ]
+        [ "browser-signin"
+        ; "-json"
+        ; "-no-browser"
+        ; "-program"
+        ; "tui"
+        ; "-connect"
+        ; connect
+        ]
       ()
   with
   | Error e ->

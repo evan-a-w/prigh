@@ -43,7 +43,9 @@ module Request = struct
     }
   [@@deriving sexp_of, equal]
 
-  let is_hex c = Char.is_digit c || Char.between (Char.lowercase c) ~low:'a' ~high:'f'
+  let is_hex c =
+    Char.is_digit c || Char.between (Char.lowercase c) ~low:'a' ~high:'f'
+  ;;
 
   let parse value ~program =
     match String.lsplit2 value ~on:'.' with
@@ -73,7 +75,11 @@ module Request = struct
   ;;
 
   let to_string t =
-    sprintf "cli-signin=%d.%s&program=%s" t.port t.state (Program.to_string t.program)
+    sprintf
+      "cli-signin=%d.%s&program=%s"
+      t.port
+      t.state
+      (Program.to_string t.program)
   ;;
 
   let of_string = of_hash
@@ -134,8 +140,8 @@ let explanation (t : Request.t) ~host ~user =
       (match user with
        | Some user -> " as " ^ user
        | None -> " with this page's sign-in")
-  ; "It gets this browser's sign-in to the site and your prigh sign-in. \
-     Allow it only if you just started it."
+  ; "It gets this browser's sign-in to the site and your prigh sign-in. Allow \
+     it only if you just started it."
   ]
 ;;
 
@@ -143,16 +149,22 @@ let grant_error ~status ~body =
   let body = String.strip body in
   match status with
   | 401 ->
-    ( (if String.is_empty body then "prigh did not accept this page's sign-in" else body)
+    ( (if String.is_empty body
+       then "prigh did not accept this page's sign-in"
+       else body)
       ^ ": sign in to prigh, then allow the program again."
     , `Sign_in )
-  | 0 -> "The server could not be reached: check the connection and try again.", `Stop
+  | 0 ->
+    ( "The server could not be reached: check the connection and try again."
+    , `Stop )
   | 404 ->
     ( "This prigh server cannot hand sign-ins to programs (it is older than \
        the program): update it, or exempt /ws and /terminal from the sign-in \
        proxy."
     , `Stop )
   | _ ->
-    ( (if String.is_empty body then sprintf "The server answered %d." status else body)
+    ( (if String.is_empty body
+       then sprintf "The server answered %d." status
+       else body)
     , `Stop )
 ;;

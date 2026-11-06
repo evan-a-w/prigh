@@ -203,7 +203,7 @@ module Connection = struct
         ; generation : int
         ; delay_ms : int
         ; session : string option
-        (** the session to resume; dropped once the backend says it no longer
+          (** the session to resume; dropped once the backend says it no longer
             exists (a never-persisted session has no file) *)
         }
     | Switching of
@@ -381,12 +381,15 @@ let shown_queue m =
 
 let editor_row_count m =
   let inner = Int.max 1 (m.width - 2) in
-  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
-    let rec count text acc =
-      let _, rest = Text_width.take text ~width:inner in
-      if String.is_empty rest then acc + 1 else count rest (acc + 1)
-    in
-    count line 0)
+  List.sum
+    (module Int)
+    (Editor.lines m.editor)
+    ~f:(fun line ->
+      let rec count text acc =
+        let _, rest = Text_width.take text ~width:inner in
+        if String.is_empty rest then acc + 1 else count rest (acc + 1)
+      in
+      count line 0)
 ;;
 
 let layout m =
@@ -1079,10 +1082,7 @@ let forge_logout m host =
         mode =
           Confirm
             { question =
-                sprintf
-                  "Sign out of %s%s and delete its token? (y/n)"
-                  host
-                  user
+                sprintf "Sign out of %s%s and delete its token? (y/n)" host user
             ; action = Forge_logout host
             }
       }
@@ -2210,8 +2210,7 @@ let reset_session m =
         commit_draft = None
       ; mode =
           (match m.mode with
-           | Output _
-           | Pr_form _
+           | Output _ | Pr_form _
            | Picker { kind = Pull_requests; _ }
            | Confirm { action = Cd_to_checkout _; _ } -> Editing
            | mode -> mode)
@@ -2495,8 +2494,16 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
      | Signin_required why ->
        let m = { m with connection = previous } in
        (match previous with
-        | Connected -> error m (sprintf "%s; still on %s" why (Server_link.describe outcome.link)), []
-        | Reconnecting _ | Switching _ | Disconnected _ -> ask_browser_signin m ~why, [])
+        | Connected ->
+          ( error
+              m
+              (sprintf
+                 "%s; still on %s"
+                 why
+                 (Server_link.describe outcome.link))
+          , [] )
+        | Reconnecting _ | Switching _ | Disconnected _ ->
+          ask_browser_signin m ~why, [])
      | Rejected e when Server_link.is_rejection e -> signed_out m ~reason:e, []
      | Rejected e ->
        let m =
@@ -2552,7 +2559,10 @@ let reconnect_reply m ~generation result =
        when Server_link.is_rejection e && Option.is_some (remote_address m) ->
        signed_out m ~reason:e, []
      | Error e when Option.is_some (Server_link.proxy_signin_of_error e) ->
-       ask_browser_signin m ~why:(Option.value_exn (Server_link.proxy_signin_of_error e)), []
+       ( ask_browser_signin
+           m
+           ~why:(Option.value_exn (Server_link.proxy_signin_of_error e))
+       , [] )
      | Error e when Option.is_some session && Connection.session_missing e ->
        schedule_reconnect
          (log
@@ -2764,10 +2774,10 @@ let set_default_mode m ?enabled (approval_mode : P.Approval_mode.t) =
         [ "approval_mode", str (P.Approval_mode.to_string approval_mode) ]
     ] )
 ;;
+
 let set_confirm m enabled =
   set_default_mode m ~enabled (if enabled then Ask else Auto)
 ;;
-
 
 (* Shown at once; the backend's state follows. *)
 let set_mode m (mode : Session_mode.t) =
@@ -2969,6 +2979,7 @@ let naming_command m (cmd : Commands.Parsed.t) =
           (Naming_command.fields action)
       ] )
 ;;
+
 let dictation_command m (cmd : Commands.Parsed.t) =
   match Dictation_command.parse cmd.rest with
   | Show ->
@@ -2982,7 +2993,6 @@ let dictation_command m (cmd : Commands.Parsed.t) =
           (Dictation_command.fields action)
       ] )
 ;;
-
 
 (* ---- snippets ---------------------------------------------------------- *)
 

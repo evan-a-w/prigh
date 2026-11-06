@@ -3,7 +3,8 @@ open Js_of_ocaml
 open Prigh_web
 
 let storage () =
-  Option.try_with (fun () -> Js.Optdef.to_option Dom_html.window##.sessionStorage)
+  Option.try_with (fun () ->
+    Js.Optdef.to_option Dom_html.window##.sessionStorage)
   |> Option.join
 ;;
 
@@ -71,8 +72,12 @@ and render request ~(login : Login.t) ~sign_in ~working ~error =
        (escape (Cli_signin.heading request))
        (String.concat
           (List.map
-             (Cli_signin.explanation request ~host:(Browser.host ()) ~user:login.user)
-             ~f:(fun line -> sprintf {|<p class="signin-sub">%s</p>|} (escape line))))
+             (Cli_signin.explanation
+                request
+                ~host:(Browser.host ())
+                ~user:login.user)
+             ~f:(fun line ->
+               sprintf {|<p class="signin-sub">%s</p>|} (escape line))))
        (escape (Option.value error ~default:""))
        (if working then " disabled" else "")
        (if working then "Allowing…" else "Allow"));
@@ -87,12 +92,12 @@ and render request ~(login : Login.t) ~sign_in ~working ~error =
   on_click "cli-signin-cancel" cancel;
   Dom_html.document##.onkeydown
   := Dom_html.handler (fun ev ->
-       match Js.Optdef.to_option ev##.key with
-       | Some key when String.equal (Js.to_string key) "Escape" ->
-         Dom_html.document##.onkeydown := Dom_html.no_handler;
-         cancel ();
-         Js._false
-       | _ -> Js._true);
+    match Js.Optdef.to_option ev##.key with
+    | Some key when String.equal (Js.to_string key) "Escape" ->
+      Dom_html.document##.onkeydown := Dom_html.no_handler;
+      cancel ();
+      Js._false
+    | _ -> Js._true);
   on_click "cli-signin-allow" (fun () ->
     if not working
     then (
@@ -120,5 +125,11 @@ and render request ~(login : Login.t) ~sign_in ~working ~error =
              | `Sign_in ->
                set_pending (Some request);
                sign_in ~error:message
-             | `Stop -> render request ~login ~sign_in ~working:false ~error:(Some message)))))
+             | `Stop ->
+               render
+                 request
+                 ~login
+                 ~sign_in
+                 ~working:false
+                 ~error:(Some message)))))
 ;;

@@ -62,7 +62,8 @@ val create
   -> ?browser_signin:
        (connect:string
         -> on_url:(url:string -> port:int -> unit)
-        -> (Prigh_client_unix.Browser_signin.Grant.t, string) Result.t Deferred.t)
+        -> (Prigh_client_unix.Browser_signin.Grant.t, string) Result.t
+             Deferred.t)
        (** signs in to the sign-in proxy in front of a prigh-web URL; default:
            {!Prigh_client_unix.Browser_signin.run} *)
   -> ?open_url:(string -> unit) (** default: [xdg-open] (or [open]) *)

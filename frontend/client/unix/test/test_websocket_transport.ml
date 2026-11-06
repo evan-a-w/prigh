@@ -246,7 +246,9 @@ let%expect_test "a proxy's answer instead of the WebSocket says what to do" =
              (match r with
               | Ok _ -> "connected"
               | Error e ->
-                (match Prigh_client_unix.Websocket_transport.signin_required e with
+                (match
+                   Prigh_client_unix.Websocket_transport.signin_required e
+                 with
                  | Some why -> "[sign in through the browser] " ^ why
                  | None -> Error.to_string_hum e))
              ~pattern:(Int.to_string (Server.port server))
