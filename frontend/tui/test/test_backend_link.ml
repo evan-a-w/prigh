@@ -134,6 +134,7 @@ let outcome (o : Prigh_ui.Server_link.Outcome.t) =
       ((match o.result with
         | Unreachable e -> "unreachable", e
         | Rejected e -> "rejected", e
+        | Signin_required why -> "sign in through the browser", why
         | Connected _ -> "connected", "")
        : string * string)];
   print_s [%sexp (o.link : Prigh_ui.Server_link.t)]
@@ -191,7 +192,11 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   @@ fun home ->
   let servers = servers () in
   let initial =
-    { Saved_connection.connect = "srv:1"; token = None; user = Some "alice" }
+    { Saved_connection.connect = "srv:1"
+    ; token = None
+    ; user = Some "alice"
+    ; proxy_cookie = None
+    }
   in
   Or_error.ok_exn (Saved_connection.save ~home initial);
   let link =

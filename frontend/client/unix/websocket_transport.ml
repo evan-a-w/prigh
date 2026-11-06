@@ -40,7 +40,8 @@ module Refusal = struct
   ;;
 
   let exempt =
-    "the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws \
+    "the proxy requires browser sign-in: sign in through the browser when \
+     prigh-tui asks (or with prigh browser-signin -connect URL), exempt /ws \
      and /terminal from it for prigh (prigh checks its own token; see \
      DOCKER.md, \"Behind a reverse proxy\"), pass the proxy's credentials with \
      -header, or use an SSH tunnel to the backend's HOST:PORT"

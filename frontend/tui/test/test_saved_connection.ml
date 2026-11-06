@@ -9,7 +9,11 @@ let show ?saved ?(flags = none) ?(env = none) ?(local = false) () =
 ;;
 
 let saved : S.t =
-  { connect = "srv:7777"; token = Some "sekrit"; user = Some "ann" }
+  { connect = "srv:7777"
+  ; token = Some "sekrit"
+  ; user = Some "ann"
+  ; proxy_cookie = None
+  }
 ;;
 
 let%expect_test "nothing saved, no flags: spawn" =
@@ -156,7 +160,8 @@ let%expect_test "save, load, forget" =
 
     mode 600
     |}];
-  ok_exn (S.save ~home { connect = "x:1"; token = None; user = None });
+  ok_exn
+    (S.save ~home { connect = "x:1"; token = None; user = None; proxy_cookie = None });
   load ();
   [%expect {| (Ok (((connect x:1)))) |}];
   ok_exn (S.forget ~home);
@@ -168,4 +173,31 @@ let%expect_test "save, load, forget" =
    | Ok _ -> print_endline "loaded?"
    | Error _ -> print_endline "error");
   [%expect {| error |}]
+;;
+
+let%expect_test "a sign-in proxy's cookie: kept for its address only" =
+  let saved = { saved with proxy_cookie = Some "proxy_session=abc" } in
+  List.iter [ Some "srv:7777"; Some "elsewhere:1"; None ] ~f:(fun connect ->
+    print_s
+      [%message
+        (connect : string option)
+          ~cookie:(S.proxy_cookie (Some saved) ~connect : string option)]);
+  (* Saved again with new credentials for the same address, it stays. *)
+  show ~saved ~flags:{ none with token = Some "new" } ();
+  [%expect {|
+    ((connect (srv:7777))
+     (cookie  (proxy_session=abc)))
+    ((connect (elsewhere:1)) (cookie ()))
+    ((connect ())
+     (cookie  ()))
+    ((settings (
+       (connect (srv:7777))
+       (token   (new))
+       (user    (ann))))
+     (save ((
+       (connect      srv:7777)
+       (token        new)
+       (user         ann)
+       (proxy_cookie proxy_session=abc)))))
+    |}]
 ;;

@@ -4,6 +4,8 @@ module Client = Prigh_client.Client
 module Transport = Prigh_client.Transport
 module Server_link = Prigh_ui.Server_link
 module Saved_connection = Prigh_client_unix.Saved_connection
+module Browser_signin = Prigh_client_unix.Browser_signin
+module Websocket_transport = Prigh_client_unix.Websocket_transport
 module Tool_host = Prigh_client_unix.Tool_host
 
 module Target = struct
@@ -134,6 +136,13 @@ type t =
   ; headers : (string * string) list
   ; hello : (string * Prigh_protocol.Json.t) list
   ; open_transport : Endpoint.t -> Transport.t Deferred.Or_error.t
+  ; browser_signin :
+      connect:string
+      -> on_url:(url:string -> port:int -> unit)
+      -> (Browser_signin.Grant.t, string) Result.t Deferred.t
+  ; open_url : string -> unit
+  ; mutable proxy_cookie : (string * string) option
+    (** the address, and the [Cookie] its sign-in proxy wants *)
   ; spawn_worker : unit -> Transport.t Deferred.Or_error.t
   ; client : Client.t
   ; mutable target : Target.t
@@ -189,14 +198,30 @@ let endpoint t ~session : Target.t -> Endpoint.t Or_error.t = function
     (match Prigh_ui.Server_address.parse address with
      | Ok { lines = true; host; port; _ } -> Ok (Tcp { host; port })
      | Ok parsed ->
-       Ok (Websocket { url = address; address = parsed; headers = t.headers })
+       let cookie =
+         match t.proxy_cookie with
+         | Some (for_, cookie) when String.equal for_ address -> [ "Cookie", cookie ]
+         | Some _ | None -> []
+       in
+       Ok (Websocket { url = address; address = parsed; headers = t.headers @ cookie })
      | Error e -> Or_error.error_string e)
 ;;
 
 let open_target ?(session = None) t target =
   match endpoint t ~session target with
-  | Error _ as e -> return e
-  | Ok endpoint -> t.open_transport endpoint
+  | Error e -> return (Error (`Failed e))
+  | Ok endpoint ->
+    (match%map t.open_transport endpoint with
+     | Ok transport -> Ok transport
+     | Error e ->
+       (match Websocket_transport.signin_required e with
+        | Some why -> Error (`Signin_required why)
+        | None -> Error (`Failed e)))
+;;
+
+let open_error = function
+  | `Failed e -> e
+  | `Signin_required why -> Error.of_string (Server_link.proxy_signin_error why)
 ;;
 
 let tools_here t =
@@ -236,8 +261,17 @@ let new_tool_host t =
   else None
 ;;
 
+let open_url url =
+  let prog = if Sys_unix.file_exists_exn "/usr/bin/open" then "open" else "xdg-open" in
+  don't_wait_for
+    (Process.run ~prog ~args:[ url ] ()
+     |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
+;;
+
 let create
       ?(open_transport = Endpoint.open_)
+      ?browser_signin
+      ?(open_url = open_url)
       ?spawn_worker
       ?(headers = [])
       ~home
@@ -260,7 +294,9 @@ let create
       | Some transport ->
         t.pending <- None;
         return (Ok transport)
-      | None -> open_target t t.target ~session:t.session)
+      | None ->
+        open_target t t.target ~session:t.session
+        >>| Result.map_error ~f:open_error)
   in
   let held_notices = Queue.create () in
   let t =
@@ -271,6 +307,18 @@ let create
     ; headers
     ; hello
     ; open_transport
+    ; browser_signin =
+        Option.value
+          browser_signin
+          ~default:(fun ~connect ~on_url -> Browser_signin.run ~backend ~connect ~on_url)
+    ; open_url
+    ; proxy_cookie =
+        (match (target : Target.t) with
+         | Spawn -> None
+         | Remote address ->
+           Option.map
+             (Saved_connection.proxy_cookie saved ~connect:(Some address))
+             ~f:(fun cookie -> address, cookie))
     ; spawn_worker =
         Option.value spawn_worker ~default:(Tool_host.spawn_worker ~backend)
     ; client
@@ -295,6 +343,11 @@ let create
 
 let greet t connected : Server_link.Outcome.result Deferred.t =
   match%bind connected with
+  | Error e
+    when Option.is_some (Server_link.proxy_signin_of_error (Error.to_string_hum e)) ->
+    return
+      (Server_link.Outcome.Signin_required
+         (Option.value_exn (Server_link.proxy_signin_of_error (Error.to_string_hum e))))
   | Error e ->
     return
       (Server_link.Outcome.Unreachable
@@ -353,6 +406,14 @@ let reconnect t ~delay_ms ~session ~as_user =
 ;;
 
 let save t (saved : Saved_connection.t) =
+  let saved =
+    { saved with
+      proxy_cookie =
+        (match t.proxy_cookie with
+         | Some (address, cookie) when String.equal address saved.connect -> Some cookie
+         | Some _ | None -> None)
+    }
+  in
   if not (Option.equal Saved_connection.equal (Some saved) t.saved)
   then (
     match Saved_connection.save ~home:t.home saved with
@@ -372,10 +433,39 @@ let drop_connection t =
   Client.disconnected t.client
 ;;
 
+(* The proxy's cookie for [address], and the page's prigh credentials when we
+   have none. *)
+let sign_in_through_browser t address =
+  let%map result =
+    t.browser_signin ~connect:address ~on_url:(fun ~url ~port ->
+      notify
+        t
+        (sprintf
+           "sign in through the browser at %s (opening it; over SSH, forward \
+            the port first: ssh -L %d:127.0.0.1:%d …)"
+           url
+           port
+           port);
+      t.open_url url)
+  in
+  Result.map result ~f:(fun (grant : Browser_signin.Grant.t) ->
+    t.proxy_cookie <- Some (address, grant.proxy_cookie);
+    let token, user =
+      match t.target, t.token with
+      | Remote current, Some token when String.equal current address ->
+        Some token, t.user
+      | _ -> grant.token, grant.user
+    in
+    token, user)
+;;
+
 let relink t (change : Server_link.Change.t) : Server_link.Outcome.t Deferred.t =
+  let unreachable e =
+    return { Server_link.Outcome.link = info t; result = Unreachable e }
+  in
   let switch =
     match change, t.target with
-    | Connect None, _ -> Ok (Target.Spawn, None, None, None)
+    | Connect None, _ -> Ok (`Now (Target.Spawn, None, None, None))
     | Connect (Some address), _ ->
       let { Saved_connection.Resolved.settings; save } =
         Saved_connection.resolve
@@ -384,32 +474,54 @@ let relink t (change : Server_link.Change.t) : Server_link.Outcome.t Deferred.t 
           ~env:{ connect = None; token = None; user = None }
           ~local:false
       in
-      Ok (Target.Remote address, settings.token, settings.user, save)
+      Ok (`Now (Target.Remote address, settings.token, settings.user, save))
     | Sign_in { user; token }, Remote address ->
       Ok
-        ( Target.Remote address
-        , Some token
-        , user
-        , Some { Saved_connection.connect = address; token = Some token; user }
-        )
+        (`Now
+            ( Target.Remote address
+            , Some token
+            , user
+            , Some
+                { Saved_connection.connect = address
+                ; token = Some token
+                ; user
+                ; proxy_cookie = None
+                } ))
+    | Browser_signin, Remote address -> Ok (`Browser address)
     | Sign_in _, Spawn ->
       Error "prigh-tui started this backend: there is nothing to sign in to"
+    | Browser_signin, Spawn ->
+      Error "prigh-tui started this backend: there is no sign-in proxy before it"
+  in
+  let%bind switch =
+    match switch with
+    | Error e -> return (Error (`Unreachable e))
+    | Ok (`Now switch) -> return (Ok switch)
+    | Ok (`Browser address) ->
+      (match%map sign_in_through_browser t address with
+       | Error e -> Error (`Not_signed_in e)
+       | Ok (token, user) ->
+         Ok
+           ( Target.Remote address
+           , token
+           , user
+           , Some { Saved_connection.connect = address; token; user; proxy_cookie = None }
+           ))
   in
   match switch with
-  | Error e ->
-    return { Server_link.Outcome.link = info t; result = Unreachable e }
+  | Error (`Not_signed_in e) ->
+    return
+      { Server_link.Outcome.link = info t
+      ; result = Signin_required (sprintf "not signed in through the browser: %s" e)
+      }
+  | Error (`Unreachable e) -> unreachable e
   | Ok (target, token, user, to_save) ->
     (match%bind open_target t target with
-     | Error e ->
-       return
-         { Server_link.Outcome.link = info t
-         ; result =
-             Unreachable
-               (sprintf
-                  "cannot reach %s: %s"
-                  (Target.describe target)
-                  (Error.to_string_hum e))
-         }
+     | Error (`Signin_required why) ->
+       return { Server_link.Outcome.link = info t; result = Signin_required why }
+     | Error (`Failed e) ->
+       unreachable
+         (sprintf "cannot reach %s: %s" (Target.describe target) (Error.to_string_hum e))
      | Ok transport ->
        let%bind () = drop_connection t in
        t.target <- target;
@@ -421,7 +533,7 @@ let relink t (change : Server_link.Change.t) : Server_link.Outcome.t Deferred.t 
        let%map result = greet t (connect_pending t) in
        (match result with
         | Connected _ -> Option.iter to_save ~f:(save t)
-        | Unreachable _ | Rejected _ -> ());
+        | Unreachable _ | Rejected _ | Signin_required _ -> ());
        { Server_link.Outcome.link = info t; result })
 ;;
 
@@ -432,7 +544,7 @@ let sign_out t =
       (Error "prigh-tui started this backend: there is nothing to sign out of")
   | Remote address ->
     t.token <- None;
-    save t { connect = address; token = None; user = t.user };
+    save t { connect = address; token = None; user = t.user; proxy_cookie = None };
     let%map () = drop_connection t in
     Ok ()
 ;;
