@@ -161,21 +161,62 @@ prigh-desktop: Fix it (programs.prigh.desktop.window and .browser in Home Manage
 prigh-desktop: Bad window setting: PRIGH_DESKTOP_WINDOW is "chrome": use auto, browser or webview
 prigh-desktop: 
 prigh-desktop: Fix it (programs.prigh.desktop.window and .browser in Home Manager) and start prigh again.
-== browser: an instance already on the profile; its window closing stops the sidecar: exit 0
+== browser: an instance left on the profile (title 1) is closed; the page opens in a new one: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: google-chrome-stable was left running on prigh's profile (pid PID): closing it
 prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
-prigh-desktop: google-chrome-stable handed the window to its instance on prigh's profile (pid PID)
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
 fake: args desktop
 fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
 fake: eof
 browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser
 browser: fragment 
 browser: loaded the page
+browser: SIGTERM: closing
 browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
-browser: handed the window to the instance on the profile
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: window closed
+== browser: an instance left on the profile (title hidden) is closed; the page opens in a new one: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: google-chrome-stable was left running on prigh's profile (pid PID): closing it
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser
+browser: fragment 
+browser: loaded the page
+browser: SIGTERM: closing
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: window closed
+left on the profile: 0
+== browser: SIGINT stops the sidecar and closes the browser: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: SIGINT: stopping prigh desktop
+prigh-desktop: prigh desktop exited: closing the browser window
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
 browser: SIGTERM: closing
 second launch: exit 0; the first still running after it: yes
 == browser: a second launch, then the first window closes: exit 0

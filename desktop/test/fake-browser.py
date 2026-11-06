@@ -8,6 +8,10 @@ then, by $FAKE_BROWSER_MODE:
   close        its window is closed at once (exits 0) (default)
   stay         stays open until SIGTERM
   close-later  stays open until $FAKE_BROWSER_CLOSE exists
+With $FAKE_BROWSER_TITLE=1 its command line becomes one string joined with
+spaces, as Chromium's does when it rewrites its process title; with
+$FAKE_BROWSER_TITLE=hidden it does not name the profile at all. Like
+Chromium it holds a file open in its profile.
 What happens is appended to $FAKE_BROWSER_LOG, one event per line.
 """
 
@@ -27,7 +31,12 @@ def log(event):
         f.write("browser: " + event + "\n")
 
 
-args = sys.argv[1:]
+title = os.environ.pop("FAKE_BROWSER_TITLE", "")
+if title in ("1", "hidden"):
+    os.environ["FAKE_BROWSER_ARGS"] = "\n".join(sys.argv[1:])
+    shown = [a for a in sys.argv[1:] if title == "1" or not a.startswith("--user-data-dir=")]
+    os.execv(sys.executable, [" ".join(["chrome"] + shown), __file__])
+args = os.environ["FAKE_BROWSER_ARGS"].split("\n") if "FAKE_BROWSER_ARGS" in os.environ else sys.argv[1:]
 log("args " + " ".join(args))
 url = next(a[len("--app="):] for a in args if a.startswith("--app="))
 profile = next(a[len("--user-data-dir="):] for a in args if a.startswith("--user-data-dir="))
@@ -44,6 +53,7 @@ os.makedirs(profile, exist_ok=True)
 if os.path.lexists(lock):
     os.remove(lock)
 os.symlink(f"{socket.gethostname()}-{os.getpid()}", lock)
+state = open(os.path.join(profile, "Local State"), "a")
 
 
 def leave(code):
