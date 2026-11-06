@@ -844,6 +844,7 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     } else {
         parsed
     };
+    sidecar.windows.lock().unwrap().entry(WINDOW.to_string()).or_default().loading(target.as_str());
     if let Err(e) = w.navigate(target) {
         log(format!("navigating to prigh-web: {e}"));
     }
@@ -862,6 +863,7 @@ fn later_in_window(app: &AppHandle, sidecar: &Arc<Sidecar>, label: &str, url: St
         }
         match Url::parse(&url) {
             Ok(parsed) => {
+                sidecar.windows.lock().unwrap().entry(label.clone()).or_default().loading(&url);
                 if let Err(e) = w.navigate(parsed) {
                     log(format!("navigating to {}: {e}", redact(&url)));
                 }
