@@ -190,7 +190,7 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	rm -rf "$profile"
 	pages() {
 		curl -s http://127.0.0.1:9333/json/list |
-			python3 -c 'import json, sys; print(" ".join(t["id"] for t in json.load(sys.stdin) if t["type"] == "page"))'
+			python3 -c 'import json, sys; print(" ".join(t["id"] for t in json.loads(sys.stdin.read() or "[]") if t["type"] == "page"))'
 	}
 	real_report() {
 		echo "== $1: exit $2"
@@ -229,7 +229,7 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	done
 	urls() {
 		curl -s http://127.0.0.1:9333/json/list |
-			python3 -c 'import json, sys; print(" ".join(sorted(t["url"].split("#")[0] for t in json.load(sys.stdin) if t["type"] == "page")))'
+			python3 -c 'import json, sys; print(" ".join(sorted(t["url"].split("#")[0] for t in json.loads(sys.stdin.read() or "[]") if t["type"] == "page")))'
 	}
 	echo "== real Chromium: links to other sites open in the default browser"
 	normalize <"$work/opened" | LC_ALL=C sort
@@ -253,7 +253,10 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	normalize <"$work/opened"
 	: >"$work/log"
 	: >"$work/opened"
-	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_MODE=proxy-browser PATH="$work/opener:$PATH"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_MODE=proxy-browser FAKE_SIGNIN_STAY=1 \
+		PATH="$work/opener:$PATH"
+	wait_for "$work/stderr" "is back from"
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
 	wait "$app_pid"
 	real_report "real Chromium: a sign-in proxy: signed in with the default browser; expired, the sign-in page" $?
 	normalize <"$work/opened"
@@ -268,7 +271,7 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	page_list() {
 		curl -s http://127.0.0.1:9333/json/list | python3 -c '
 import json, sys
-for t in sorted(json.load(sys.stdin), key=lambda t: t["url"]):
+for t in sorted(json.loads(sys.stdin.read() or "[]"), key=lambda t: t["url"]):
     if t["type"] == "page":
         print("  " + t["url"].split("#")[0] + (", a popup" if t.get("openerId") else ""))'
 	}
