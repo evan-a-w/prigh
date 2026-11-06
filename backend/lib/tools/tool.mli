@@ -52,6 +52,7 @@ and context =
       -> User_question.Reply.t
     (** asks the user (the [ask_user] tool, which passes its
         [timeout_seconds]); only the main agent can *)
+  ; ui : Ui_host.t (** for [render_ui]: the user's client, the host's files *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
@@ -85,6 +86,7 @@ module Context : sig
           -> timeout_seconds:int option
           -> User_question.t list
           -> User_question.Reply.t)
+    -> ?ui:Ui_host.t
     -> env:Env.t
     -> cwd:string
     -> unit
