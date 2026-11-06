@@ -8919,8 +8919,8 @@ let dialog_accept (m : Model.t) =
        (match deletable paths with
         | [] -> m, cmds
         | paths ->
-          m, cmds @ [ call (Delete_sessions paths) ~tag:Sessions_deleted ])
-     | Archived -> m, cmds @ [ call Delete_archived ~tag:Sessions_deleted ])
+          m, cmds @ [ call (Delete_sessions { paths; switch_to = None }) ~tag:Sessions_deleted ])
+     | Archived -> m, cmds @ [ call (Delete_archived { switch_to = None }) ~tag:Sessions_deleted ])
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow
