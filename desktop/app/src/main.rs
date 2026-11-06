@@ -17,6 +17,7 @@ use prigh_desktop_core::browser::{self, Choice, Found, Mode, Platform};
 use prigh_desktop_core::failure::{self, Failure};
 use prigh_desktop_core::launch::{self, Os};
 use prigh_desktop_core::navigation::{self, Decision};
+use prigh_desktop_core::profile;
 use prigh_desktop_core::tail::Tail;
 use prigh_desktop_core::zoom::{self, Step};
 use prigh_desktop_core::{ready, search_path};
@@ -162,6 +163,7 @@ impl BrowserWindow {
             log(format!("{} was left running on prigh's profile (pid {pid}): closing it", self.found.name));
             self.end_instance(pid);
         }
+        self.write_settings();
         log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
         let mut cmd = self.command(&url);
         // Its own process group: closing it reaches its helpers too.
@@ -224,6 +226,26 @@ impl BrowserWindow {
             log("the browser window closed: stopping prigh desktop");
             sidecar.stop();
         });
+    }
+
+    /// prigh's settings, merged into the profile's (see
+    /// [prigh_desktop_core::profile]) while no browser runs on it.
+    fn write_settings(&self) {
+        let write = |path: PathBuf, merge: &dyn Fn(Option<&str>) -> String| {
+            let existing = std::fs::read_to_string(&path).ok();
+            let tmp = path.with_extension("prigh-tmp");
+            let written = path
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| std::fs::write(&tmp, merge(existing.as_deref())))
+                .and_then(|()| std::fs::rename(&tmp, &path));
+            if let Err(e) = written {
+                log(format!("writing the browser's settings {}: {e}", path.display()));
+            }
+        };
+        let downloads = downloads_dir();
+        write(self.profile.join("Default").join("Preferences"), &|e| profile::preferences(e, &downloads));
+        write(self.profile.join("Local State"), &profile::local_state);
     }
 
     /// The browser instance running on prigh's profile: the pid in its
@@ -343,9 +365,8 @@ impl BrowserWindow {
 /// the app holds it: no port.
 #[cfg(target_os = "linux")]
 mod devtools_pipe {
-    use super::{env_flag, log, open_external, BrowserWindow, Sidecar};
+    use super::{downloads_dir, env_flag, log, open_external, BrowserWindow, Sidecar};
     use prigh_desktop_core::devtools::{Effect, Links};
-    use prigh_desktop_core::profile;
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -395,14 +416,6 @@ mod devtools_pipe {
         })
     }
 
-    /// See [profile::downloads_dir].
-    fn downloads_dir() -> String {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-        let home = var("HOME").unwrap_or_default();
-        let config = var("XDG_CONFIG_HOME").unwrap_or_else(|| format!("{home}/.config"));
-        profile::downloads_dir(&home, std::fs::read_to_string(format!("{config}/user-dirs.dirs")).ok().as_deref())
-    }
-
     impl Pipe {
         /// The browser started: follows its pages until it exits.
         pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>, window: Arc<BrowserWindow>) {
@@ -440,6 +453,14 @@ mod devtools_pipe {
             });
         }
     }
+}
+
+/// See [profile::downloads_dir].
+fn downloads_dir() -> String {
+    let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+    let home = var("HOME").or_else(|| var("USERPROFILE")).unwrap_or_default();
+    let config = var("XDG_CONFIG_HOME").unwrap_or_else(|| format!("{home}/.config"));
+    profile::downloads_dir(&home, std::fs::read_to_string(format!("{config}/user-dirs.dirs")).ok().as_deref())
 }
 
 #[cfg(unix)]
