@@ -32,12 +32,15 @@ module Check = struct
       | Unreachable of string
       | Refused of string
       | Not_prigh_web of string
+      | Signin_required of string
       | Failed of string
     [@@deriving sexp_of]
   end
 
   let reason = function
-    | Failure message | Backend_address.Not_upgraded message -> message
+    | Failure message
+    | Backend_address.Not_upgraded message
+    | Backend_address.Signin_required message -> message
     | exn -> Net_error.to_string_hum exn
   ;;
 
@@ -114,6 +117,7 @@ module Check = struct
               "no answer within %s"
               (Time_ns.Span.to_string_hum ~decimals:0 timeout)))
     | exception Backend_address.Not_upgraded why -> Error (Not_prigh_web why)
+    | exception Backend_address.Signin_required why -> Error (Signin_required why)
     | exception exn -> Error (Unreachable (reason exn))
   ;;
 
@@ -190,6 +194,15 @@ module Check = struct
          Is it prigh serve, and as new as this prigh?"
         address
         why
+    | Signin_required why ->
+      sprintf
+        "%s: a sign-in proxy guards the backend at %s, and it was not signed \
+         in through the browser\n\
+         Sign in through the browser when asked, or exempt /ws and /terminal \
+         from the proxy (prigh checks its own token there; see DOCKER.md, \
+         \"Behind a reverse proxy\")."
+        why
+        address
   ;;
 end
 

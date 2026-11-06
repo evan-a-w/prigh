@@ -102,6 +102,15 @@ val connect
   -> ?heartbeat_interval:float
   -> ?heartbeat_timeout:float
   -> ?on_connect:(unit -> unit) (** after each accepted [hello] *)
+  -> ?signin:
+       (why:string
+        -> Backend_address.t
+        -> (Browser_signin.Grant.t, string) Result.t)
+       (** when the backend's site answers with a sign-in proxy's login
+           ({!Backend_address.Signin_required}): signs in through the
+           browser; the grant's cookie goes with every connection from then
+           on, and its token and user when [token] is [None]. Without it,
+           such an answer is retried like any failure. *)
   -> backend:Backend_address.t
   -> token:string option
   -> ?user:string (** the namespace's name, sent in [hello] *)

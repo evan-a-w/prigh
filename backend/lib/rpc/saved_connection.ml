@@ -5,8 +5,9 @@ type t =
   { connect : string
   ; token : string option [@sexp.option]
   ; user : string option [@sexp.option]
+  ; proxy_cookie : string option [@sexp.option]
   }
-[@@deriving sexp, equal]
+[@@deriving sexp, equal] [@@sexp.allow_extra_fields]
 
 let file ~home = home ^/ ".prigh" ^/ "tui-connection.sexp"
 
@@ -38,6 +39,13 @@ let forget ~home =
     | () -> ()
     | exception Core_unix.Unix_error (ENOENT, _, _) -> ())
   |> Or_error.tag ~tag:path
+;;
+
+let proxy_cookie saved ~connect =
+  Option.bind saved ~f:(fun (s : t) ->
+    if Option.equal String.equal connect (Some s.connect)
+    then s.proxy_cookie
+    else None)
 ;;
 
 module Settings = struct
@@ -91,7 +99,13 @@ let resolve ~saved ~(flags : Settings.t) ~(env : Settings.t) ~local : Resolved.t
     let save =
       match connect with
       | Some connect when flagged ->
-        let t = { connect; token; user } in
+        let t =
+          { connect
+          ; token
+          ; user
+          ; proxy_cookie = from_same (fun s -> s.proxy_cookie)
+          }
+        in
         if Option.equal equal (Some t) saved then None else Some t
       | _ -> None
     in
