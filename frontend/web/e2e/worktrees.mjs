@@ -6,7 +6,8 @@
 // long press on a phone) and what they do (a new worktree, a new session
 // there, a terminal there, switching back where the session came from,
 // removal: refused with changes, then forced),
-// folding, searching, /worktree's picker, and the list on a phone. Run by
+// folding, searching, /worktree's picker, the list on a phone, and deleting
+// the session we are in (on a desktop and on phones). Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // ENGINE.expected).
 //
@@ -381,6 +382,118 @@ try {
   await phone.waitForTimeout(700);
   await row.dispatchEvent("pointerup", { pointerType: "touch", bubbles: true });
   await menuText("a long press on a phone", phone);
+  await phone.context().close();
+
+  // Deleting the session we are in on a phone, at 390x844 and 320x640 (and
+  // in Chromium as an installed PWA on a notched phone): a long press on
+  // its row, Delete… in the sheet, the dialog, and where we land. Another
+  // session first, at the top, so that the last one deleted has one to go
+  // to (up: none is below it).
+  const phoneStart = page.url();
+  await newSession(notes);
+  await send("A todo list");
+  // What is wrong on the screen: sideways overflow, and controls of the
+  // dialog (or the sheet) off screen, in the notch's or home indicator's
+  // inset, covered, or smaller than a thumb.
+  const audit = (target, scope) => target.evaluate(scope => {
+    const out = [];
+    if (document.scrollingElement.scrollWidth > innerWidth + 1)
+      out.push(`overflows sideways: ${document.scrollingElement.scrollWidth} > ${innerWidth}`);
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)";
+    document.body.append(probe);
+    const inset = { top: parseFloat(getComputedStyle(probe).paddingTop), bottom: parseFloat(getComputedStyle(probe).paddingBottom) };
+    probe.remove();
+    for (const e of document.querySelectorAll(`:is(${scope}) :is(button, [role=menuitem], .menu-item), ${scope}`)) {
+      if (!e.matches("button, [role=menuitem], .menu-item")) continue;
+      const r = e.getBoundingClientRect();
+      if (r.width < 1) continue;
+      const name = (e.getAttribute("aria-label") || e.innerText).trim().split("\n")[0];
+      // Past the edge of a scroller is scrolled to, not lost.
+      let scroller = e.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+      const box = scroller?.getBoundingClientRect();
+      if (box && (r.top < box.top - 0.5 || r.bottom > box.bottom + 0.5)) continue;
+      if (r.left < -0.5 || r.right > innerWidth + 0.5 || r.top < inset.top - 0.5 || r.bottom > innerHeight - inset.bottom + 0.5)
+        out.push(`${name}: out of the safe area`);
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit || !(e.contains(hit) || hit.contains(e))) out.push(`${name}: covered`);
+      if (r.height < (e.closest(".composer, .chat-chrome") ? 36 : 44) - 0.5) out.push(`${name}: ${Math.round(r.height)}px high`);
+    }
+    return out.length ? out.join("\n") : "ok";
+  }, scope);
+  const settled = target => target.waitForFunction(() =>
+    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  const deleteOnPhone = async (from, w, h, { pwa = false } = {}) => {
+    const tag = `${w}x${h}${pwa ? " PWA" : ""}`;
+    const context = await browser.newContext({
+      viewport: { width: w, height: h }, isMobile: engineName !== "firefox", hasTouch: true,
+    });
+    const p = await context.newPage();
+    p.on("pageerror", error => errors.push(`phone ${tag}: ${error.message}`));
+    if (pwa) {
+      const cdp = await context.newCDPSession(p);
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
+    }
+    await p.goto(from);
+    await p.locator("form input[type=password]").fill(token);
+    await p.locator("form button[type=submit]").tap();
+    await p.locator(".composer textarea").waitFor();
+    await p.locator(".chat-chrome .toggle-sidebar").tap();
+    const row = p.locator(".sidebar .session-item.selected [data-session]").first();
+    await row.waitFor();
+    await settled(p);
+    const title = await p.locator(".sidebar .session-item.selected .session-title").innerText();
+    const box = await row.boundingBox();
+    await row.dispatchEvent("pointerdown", {
+      pointerType: "touch", isPrimary: true, clientX: box.x + 30, clientY: box.y + 10, bubbles: true,
+    });
+    await p.waitForTimeout(700);
+    await row.dispatchEvent("pointerup", { pointerType: "touch", bubbles: true });
+    await p.locator(".context-menu.placed [data-item=delete]").waitFor();
+    await settled(p);
+    section(`deleting the session we are in on a phone, ${tag}: its sheet`);
+    console.log(await p.evaluate(() => {
+      const r = document.querySelector(".context-menu.placed").getBoundingClientRect();
+      return `full width: ${Math.round(r.width) === innerWidth}; at the bottom: ${Math.abs(r.bottom - innerHeight) < 1}`;
+    }));
+    console.log(await audit(p, ".context-menu.placed"));
+    await p.locator(".context-menu.placed [data-item=delete]").scrollIntoViewIfNeeded();
+    console.log(`Delete…, scrolled to: ${await audit(p, ".context-menu.placed [data-item=delete]")}`);
+    await screenshot(`phone ${tag} deleting the session we are in: its sheet`, p);
+    await p.locator(".context-menu.placed [data-item=delete]").tap();
+    await p.locator(".delete-dialog").waitFor();
+    await settled(p);
+    section(`deleting the session we are in on a phone, ${tag}: asked`);
+    console.log(`deleting: ${title}`);
+    console.log(clean(await p.locator(".delete-dialog").innerText()).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>"));
+    // Nothing to type: no keyboard comes up over it.
+    console.log(`focused: ${await p.evaluate(() => document.activeElement.matches("input, textarea") ? "a text field" : "no text field")}`);
+    console.log(await audit(p, ".delete-dialog"));
+    await screenshot(`phone ${tag} deleting the session we are in: asked`, p);
+    await p.locator(".delete-dialog .btn.danger").tap();
+    await p.locator(".toast", { hasText: "Deleted 1 session" }).first().waitFor();
+    await p.locator(".delete-dialog").waitFor({ state: "detached" });
+    await p.waitForFunction(t =>
+      [...document.querySelectorAll(".session-title")].every(e => e.innerText !== t)
+      && document.querySelector(".session-item.selected") && !document.querySelector(".session.opening"), title);
+    await settled(p);
+    section(`deleting the session we are in on a phone, ${tag}: where we land`);
+    console.log(clean(await p.evaluate(() => {
+      const id = document.querySelector(".session-item.selected [data-session]")?.dataset.session;
+      return `in: ${document.querySelector(".session-item.selected .session-title")?.innerText}; ` +
+        `the strip says: ${document.querySelector(".chrome-title")?.innerText ?? "(hidden)"}; ` +
+        `the address names it: ${new URL(location.href).searchParams.get("session") === id}`;
+    })));
+    console.log(await audit(p, ".chat-chrome, .composer"));
+    await screenshot(`phone ${tag} deleting the session we are in: landed`, p);
+    const landed = p.url();
+    await context.close();
+    return landed;
+  };
+  let at = await deleteOnPhone(phoneStart, 390, 844);
+  at = await deleteOnPhone(at, 320, 640);
+  if (engineName === "chromium") await deleteOnPhone(at, 390, 844, { pwa: true });
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
