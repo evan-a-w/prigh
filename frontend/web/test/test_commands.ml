@@ -1423,19 +1423,35 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
     Scroll_to_bottom
     (Rpc (method_ push_pref) (params ((key history) (value /copy) (max 500)))
      (tag Ignore))
-    (Copy "Fixed: the **flag** was wrong.")
+    (Copy (text "Fixed: the **flag** was wrong.")
+     (copied "Copied the last reply to the clipboard"))
     (Expire_toast (id 1) (after_ms 3020))
     |}];
   H.key h "x" ~ctrl:true;
   [%expect
     {|
     Copy_last
-    (Copy "Fixed: the **flag** was wrong.")
+    (Copy (text "Fixed: the **flag** was wrong.")
+     (copied "Copied the last reply to the clipboard"))
     (Expire_toast (id 2) (after_ms 3020))
     |}];
   (* With text selected Ctrl+X is the browser's cut. *)
   H.key h "x" ~ctrl:true ~selection:true;
-  [%expect {| (browser default) |}]
+  [%expect {| (browser default) |}];
+  toasts h;
+  (* The toast only once it is on the clipboard. *)
+  H.block_clipboard h;
+  H.key h "x" ~ctrl:true;
+  toasts h;
+  [%expect
+    {|
+    Copied the last reply to the clipboard ×2
+    Copy_last
+    (Copy (text "Fixed: the **flag** was wrong.")
+     (copied "Copied the last reply to the clipboard"))
+    Copied the last reply to the clipboard ×2
+    Couldn't copy: the browser blocks the clipboard on this http address; use the backend's https address, or select the text and copy it (Ctrl+C) (Dismiss)
+    |}]
 ;;
 
 let%expect_test "/btw: a side answer streams into a panel" =

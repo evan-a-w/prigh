@@ -194,7 +194,10 @@ module Out : sig
         { text : string
         ; error : bool
         }
-    | Copy of string
+    | Copy of
+        { text : string
+        ; copied : string (** the toast once it is there *)
+        }
     | Insert of string (** into the composer, at its end *)
     | Focus_editor
   [@@deriving sexp_of]

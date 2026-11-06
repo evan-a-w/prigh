@@ -362,6 +362,19 @@ for the WebSocket paths), or an SSH tunnel to a localhost port
 (`ssh -L 7790:localhost:7790 server`). On plain `http://` elsewhere the
 page works as before, without installing or the offline shell.
 
+Troubleshooting a backend on plain `http://` (not localhost, e.g.
+`http://100.87.39.221:7790` on a tailnet, also as the desktop app's remote
+backend): the browser treats the page as insecure, so there is no service
+worker (no installing, no offline shell, no update prompt), no browser
+notifications, and no Clipboard API. The Copy buttons fall back to the
+browser's older copy command, which works in Chrome, Edge, Firefox and
+Safari (and the desktop app's webview); if a browser refuses even that, the
+toast says "Couldn't copy" with what to do instead (select the text and
+copy it). For the rest use an `https://` address as above. The desktop
+app's browser window cannot help here: Chrome's switch that treats an http
+origin as secure shows a warning bar about an unsupported flag, so the app
+does not use it.
+
 On iPhone and iPad (iOS/iPadOS 16.4 and later), "Add to Home Screen" from
 Safari's share menu makes a standalone app, with its own storage (sign in
 once in it) and, unlike Safari's tabs, notifications: `/notify on` there
