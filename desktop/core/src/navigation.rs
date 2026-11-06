@@ -183,10 +183,14 @@ impl Window {
         }
     }
 
-    /// A page finished loading; what to log.
+    /// A page finished loading; what to log. The page before a navigation
+    /// may say so after it started: only a load on the pending page's site
+    /// ends it.
     pub fn on_loaded(&mut self, url: &str, ours: &[String], remote: Option<&Remote>) -> Option<String> {
-        self.pending = None;
         let o = origin(url)?;
+        if self.pending.as_deref().is_some_and(|p| origin(p).as_ref() == Some(&o)) {
+            self.pending = None;
+        }
         if !ours.contains(&o) {
             return None;
         }
@@ -350,9 +354,10 @@ mod tests {
             None,
             &[
                 (">tauri://localhost/index.html", 0),
-                ("=tauri://localhost/index.html", 0),
-                // The site, redirected through the proxy and back.
+                // The site, redirected through the proxy and back; the page
+                // before it says it loaded once the site's was asked for.
                 (">https://ai.example.com/#app=desktop", 0),
+                ("=tauri://localhost/index.html", 0),
                 (">https://login.example.com/start?state=1", 0),
                 (">https://idp.example/auth", 0),
                 ("=https://idp.example/auth", 0),
@@ -374,8 +379,8 @@ mod tests {
             out,
             [
                 "tauri://localhost/index.html: Allow",
-                "loaded tauri://localhost/index.html: None",
                 "https://ai.example.com/#app=desktop: Allow",
+                "loaded tauri://localhost/index.html: None",
                 "https://login.example.com/start?state=1: Away(\"the window went to https://login.example.com on its own (a sign-in?): it stays there until it is back\")",
                 "https://idp.example/auth: Allow",
                 "loaded https://idp.example/auth: None",
