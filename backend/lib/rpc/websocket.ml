@@ -235,7 +235,31 @@ let create ?(role = `Server) ~reader ~flow () =
   }
 ;;
 
-let connect ~reader ~flow ~host ~target =
+module Refusal = struct
+  type t =
+    { status : string
+    ; headers : (string * string) list
+    }
+  [@@deriving sexp_of]
+
+  let header t name =
+    List.Assoc.find t.headers ~equal:String.Caseless.equal name
+  ;;
+
+  let code t =
+    match String.lsplit2 t.status ~on:' ' with
+    | Some (code, _) -> Int.of_string_opt code
+    | None -> Int.of_string_opt t.status
+  ;;
+
+  let to_string t =
+    match code t with
+    | Some _ -> "HTTP " ^ t.status
+    | None -> t.status
+  ;;
+end
+
+let connect ?(headers = []) ~reader ~flow ~host ~target () =
   let key =
     Base64.encode_exn
       (String.init 16 ~f:(fun _ -> Char.of_int_exn (Random.int 256)))
@@ -248,15 +272,18 @@ let connect ~reader ~flow ~host ~target =
         Connection: Upgrade\r\n\
         Sec-WebSocket-Key: %s\r\n\
         Sec-WebSocket-Version: 13\r\n\
-        \r\n"
+        %s\r\n"
        target
        host
-       key)
+       key
+       (String.concat
+          (List.map headers ~f:(fun (name, value) ->
+             sprintf "%s: %s\r\n" name value))))
     flow;
   let status = Eio.Buf_read.line reader in
   let rec headers acc =
     match Eio.Buf_read.line reader with
-    | "" -> acc
+    | "" -> List.rev acc
     | line ->
       (match String.lsplit2 line ~on:':' with
        | Some (name, value) ->
@@ -271,9 +298,18 @@ let connect ~reader ~flow ~host ~target =
   | Some (_, rest) when String.is_prefix rest ~prefix:"101" ->
     if Option.equal String.equal accept (Some (accept_key key))
     then Ok (create ~role:`Client ~reader ~flow ())
-    else Error "a WebSocket handshake with the wrong Sec-WebSocket-Accept"
-  | Some (_, rest) -> Error ("HTTP " ^ String.strip rest)
-  | None -> Error (sprintf "%S, not HTTP" (String.prefix status 80))
+    else
+      Error
+        { Refusal.status =
+            "a WebSocket handshake with the wrong Sec-WebSocket-Accept"
+        ; headers
+        }
+  | Some (_, rest) -> Error { Refusal.status = String.strip rest; headers }
+  | None ->
+    Error
+      { Refusal.status = sprintf "%S, not HTTP" (String.prefix status 80)
+      ; headers = []
+      }
 ;;
 
 let send_text t text = write t { fin = true; opcode = Text; payload = text }

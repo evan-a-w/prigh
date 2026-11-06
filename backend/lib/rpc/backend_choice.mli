@@ -48,3 +48,13 @@ val choose
 (** What to do when the backend refused the credentials: where they came
     from and how to fix them there. *)
 val refused_hint : t -> string
+
+(** After signing in through the browser to [remote]: when it is the saved
+    connection's address, saves the grant's proxy cookie with it (and the
+    grant's token and user if it has no token). Another address changes
+    nothing. *)
+val remember_signin
+  :  home:string
+  -> Backend_address.t
+  -> Browser_signin.Grant.t
+  -> unit Or_error.t

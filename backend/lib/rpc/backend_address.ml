@@ -7,6 +7,7 @@ type t =
   ; port : int
   ; prefix : string
   ; lines : bool
+  ; proxy_cookie : (string[@sexp.opaque]) option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
@@ -51,6 +52,7 @@ let parse_url text =
         ; port = Option.value (Uri.port uri) ~default:(if tls then 443 else 80)
         ; prefix = path
         ; lines = false
+        ; proxy_cookie = None
         })
 ;;
 
@@ -72,6 +74,7 @@ let parse text =
            ; port
            ; prefix = ""
            ; lines = true
+           ; proxy_cookie = None
            }
        | _ -> Or_error.errorf "%S: bad port; expected %s" text expected)
     | _ -> Or_error.errorf "%S is not %s" text expected)
@@ -131,8 +134,53 @@ let connect_abortable ~env ~sw t =
 ;;
 
 let connect ~env ~sw t = fst (connect_abortable ~env ~sw t)
+let with_proxy_cookie t proxy_cookie = { t with proxy_cookie }
+
+let upgrade_headers t =
+  match t.proxy_cookie with
+  | Some cookie when not t.lines -> [ "Cookie", cookie ]
+  | Some _ | None -> []
+;;
 
 exception Not_upgraded of string
+exception Signin_required of string
+
+let signin_page t (refusal : Websocket.Refusal.t) =
+  let status = Websocket.Refusal.to_string refusal in
+  let html () =
+    Option.exists
+      (Websocket.Refusal.header refusal "Content-Type")
+      ~f:(fun ct -> String.is_substring (String.lowercase ct) ~substring:"html")
+  in
+  match
+    Websocket.Refusal.code refusal, Websocket.Refusal.header refusal "Location"
+  with
+  | Some code, Some location when code >= 300 && code < 400 ->
+    let to_https_here =
+      (not t.tls)
+      && String.is_prefix (String.lowercase location) ~prefix:"https://"
+      && String.is_substring
+           (String.lowercase location)
+           ~substring:("//" ^ String.lowercase t.host)
+    in
+    Option.some_if
+      (not to_https_here)
+      (sprintf
+         "%s answered with a login page (%s to %s)"
+         (authority t)
+         status
+         location)
+  | Some (401 | 403 | 407), _ ->
+    Some (sprintf "%s refused the WebSocket (%s)" (authority t) status)
+  | Some (400 | 404 | 426 | 502 | 503 | 504), _ -> None
+  | _ when html () ->
+    Some
+      (sprintf
+         "%s answered with a web page (%s) instead of opening the WebSocket"
+         (authority t)
+         status)
+  | _ -> None
+;;
 
 let websocket_over flow t ~path ~query =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
@@ -143,16 +191,27 @@ let websocket_over flow t ~path ~query =
          ~query:(List.map query ~f:(fun (k, v) -> k, [ v ]))
          ())
   in
-  match Websocket.connect ~reader ~flow ~host:(authority t) ~target with
+  match
+    Websocket.connect
+      ~headers:(upgrade_headers t)
+      ~reader
+      ~flow
+      ~host:(authority t)
+      ~target
+      ()
+  with
   | Ok ws -> ws
-  | Error answer ->
-    raise
-      (Not_upgraded
-         (sprintf
-            "%s did not open the WebSocket at %s: it answered %s"
-            (authority t)
-            (t.prefix ^ path)
-            answer))
+  | Error refusal ->
+    (match signin_page t refusal with
+     | Some why -> raise (Signin_required why)
+     | None ->
+       raise
+         (Not_upgraded
+            (sprintf
+               "%s did not open the WebSocket at %s: it answered %s"
+               (authority t)
+               (t.prefix ^ path)
+               (Websocket.Refusal.to_string refusal))))
 ;;
 
 let websocket ~env ~sw t ~path ~query =
