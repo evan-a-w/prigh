@@ -1361,6 +1361,42 @@ Open terminal there  /terminal <DIR>/home/.prigh/worktrees/prigh/feat-login
 Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: asked ===
+deleting: The login form
+Delete “The login form”?
+You'll move to “Shopping list”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+The login form
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 390x844: where we land ===
+in: Shopping list; the strip says: Shopping list; the address names it: true
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: its sheet ===
+full width: true; at the bottom: true
+ok
+Delete…, scrolled to: ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: asked ===
+deleting: Shopping list
+Delete “Shopping list”?
+You'll move to “A landing page”.
+It will be deleted, with its subagent logs: <SIZE> on disk. This can't be undone.
+Shopping list
+<SIZE>
+Cancel
+Delete
+focused: no text field
+ok
+=== webkit: worktrees: deleting the session we are in on a phone, 320x640: where we land ===
+in: A landing page; the strip says: A landing page; the address names it: true
+ok
 === webkit: worktrees: errors ===
 none
 === webkit: review: files: changes marked ===
