@@ -153,6 +153,15 @@ impl BrowserWindow {
         if let Err(e) = std::fs::create_dir_all(&self.profile) {
             log(format!("making the browser's profile {}: {e}", self.profile.display()));
         }
+        // One app runs at a time (single-instance), so a browser on prigh's
+        // profile now was left by an app that died (killed, or Ctrl-C in a
+        // terminal): its windows show a page whose sidecar is gone, and one
+        // handed to it would close with it, so it goes.
+        #[cfg(unix)]
+        if let Some(pid) = self.instance() {
+            log(format!("{} was left running on prigh's profile (pid {pid}): closing it", self.found.name));
+            self.end_instance(pid);
+        }
         log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
         let mut cmd = self.command(&url);
         // Its own process group: closing it reaches its helpers too.
@@ -222,9 +231,34 @@ impl BrowserWindow {
     fn runs_on_profile(&self, pid: i32) -> bool {
         // Only Linux says (in /proc) what a process runs: elsewhere a pid
         // from the lock is not trusted with a signal.
-        let wanted = format!("--user-data-dir={}", self.profile.to_string_lossy());
+        // The command line can be rewritten (its title) or reordered (a
+        // relaunch): files it holds open in the profile say it too.
         std::fs::read(format!("/proc/{pid}/cmdline"))
-            .is_ok_and(|c| c.split(|b| *b == 0).any(|arg| arg == wanted.as_bytes()))
+            .is_ok_and(|c| browser::names_profile(&c, &self.profile.to_string_lossy()))
+            || std::fs::read_dir(format!("/proc/{pid}/fd")).is_ok_and(|fds| {
+                let profile = std::fs::canonicalize(&self.profile).unwrap_or_else(|_| self.profile.clone());
+                fds.filter_map(Result::ok)
+                    .filter_map(|fd| std::fs::read_link(fd.path()).ok())
+                    .any(|target| target.starts_with(&profile))
+            })
+    }
+
+    /// Ends the instance `pid` on prigh's profile: SIGTERM, then SIGKILL.
+    #[cfg(unix)]
+    fn end_instance(&self, pid: i32) {
+        let running = || alive(pid) && self.runs_on_profile(pid);
+        unsafe { libc::kill(pid, libc::SIGTERM) };
+        let deadline = std::time::Instant::now() + BROWSER_GRACE;
+        while running() && std::time::Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(100));
+        }
+        if running() {
+            log("it did not close: killing it");
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+            while alive(pid) && std::time::Instant::now() < deadline + BROWSER_GRACE {
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
     }
 
     /// A second launch of the app: another window on the page, which the
@@ -932,6 +966,30 @@ fn macos_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     Menu::with_items(app, &[&app_menu, &edit, &view, &window])
 }
 
+/// Ctrl-C in a terminal, a SIGTERM or the terminal closing: the app stops
+/// as when its window closes (the sidecar first, then the browser), rather
+/// than dying and leaving the browser, in a process group of its own,
+/// running. Again: at once.
+#[cfg(target_os = "linux")]
+fn stop_on_signals(app: &AppHandle, sidecar: &Arc<Sidecar>) {
+    for (signal, name) in [(libc::SIGINT, "SIGINT"), (libc::SIGTERM, "SIGTERM"), (libc::SIGHUP, "SIGHUP")] {
+        let (app, sidecar) = (app.clone(), sidecar.clone());
+        glib::unix_signal_add(signal, move || {
+            if sidecar.stopping.load(Ordering::SeqCst) || sidecar.child.lock().unwrap().is_none() {
+                log(format!("{name} again: stopping now"));
+                if let Some(b) = sidecar.browser() {
+                    b.close();
+                }
+                app.exit(1);
+            } else {
+                log(format!("{name}: stopping prigh desktop"));
+                sidecar.stop();
+            }
+            glib::ControlFlow::Continue
+        });
+    }
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     linux::check_file_chooser_portal();
@@ -975,6 +1033,8 @@ fn main() {
         .setup(move |app| {
             let zoom = Arc::new(Zoom::load(app.handle()));
             app.manage(zoom.clone());
+            #[cfg(target_os = "linux")]
+            stop_on_signals(app.handle(), &setup_sidecar);
             match window_choice(app.handle()) {
                 Err(f) => {
                     let app = app.handle().clone();
