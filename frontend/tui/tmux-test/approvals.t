@@ -6,6 +6,7 @@ prints the captured panes.
   === dialog
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     running
   … bash $ echo ran-it
@@ -22,6 +23,7 @@ prints the captured panes.
   === allowed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     running
   ✓ bash $ echo ran-it
@@ -34,6 +36,7 @@ prints the captured panes.
   === denied
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     running
   ✓ bash $ echo ran-it
@@ -54,6 +57,7 @@ prints the captured panes.
   === dialog with always
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     one
   … bash $ echo first-run
@@ -70,6 +74,7 @@ prints the captured panes.
   === the second echo ran without asking
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     one
   ✓ bash $ echo first-run
@@ -88,6 +93,7 @@ prints the captured panes.
   === denied with a reason
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     one
   ✓ bash $ echo first-run
@@ -113,6 +119,7 @@ prints the captured panes.
   === Alt+M: auto-edit
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     one
   ✓ bash $ echo first-run
@@ -140,6 +147,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ◇ Plan mode on: the model was told to plan, not change files
+  ▢ Using prigh-tui
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
@@ -157,6 +165,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ◇ Plan mode on: the model was told to plan, not change files
+  ▢ Using prigh-tui
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
@@ -180,6 +189,7 @@ prints the captured panes.
   === first question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     asking
   … ask_user  waiting for your answer
@@ -198,6 +208,7 @@ prints the captured panes.
   === second question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     asking
   … ask_user  waiting for your answer
@@ -214,6 +225,7 @@ prints the captured panes.
   === answered
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  ▢ Using prigh-tui
   ▌ go
     asking
   ✓ ask_user

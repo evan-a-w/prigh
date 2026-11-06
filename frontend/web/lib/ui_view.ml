@@ -149,10 +149,10 @@ let timeline ~title (items : Ui_spec.Item.t list) =
     ; Node.ol
         (List.map items ~f:(fun i ->
            Node.li
-             ~attrs:[ Attr.class_ (tone_cls i.tone) ]
+             ~attrs:[ Attr.classes [ "ui-event"; tone_cls i.tone ] ]
              [ Node.span ~attrs:[ Attr.class_ "ui-dot"; Attr.create "aria-hidden" "true" ] []
              ; div
-                 "ui-event"
+                 "ui-event-body"
                  [ div
                      "ui-event-head"
                      [ text "ui-event-title" i.title
@@ -227,7 +227,7 @@ let tree ~title entries =
       Node.li
         ~attrs:
           [ Attr.classes [ "ui-tree-row"; tone_cls tone; (if r.dir then "dir" else "file") ]
-          ; Attr.style (Css_gen.create ~field:"--depth" ~value:(Int.to_string r.depth))
+          ; Ui_style.attr [ "--depth", Int.to_string r.depth ]
           ; Attr.title r.path
           ]
         [ Node.span
@@ -278,7 +278,7 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
       Node.div
         ~attrs:
           [ Attr.class_ "ui-grid"
-          ; Attr.style (Css_gen.create ~field:"--cols" ~value:(Int.to_string columns))
+          ; Ui_style.attr [ "--cols", Int.to_string columns ]
           ]
         (children path cs)
     | Tabs tabs ->

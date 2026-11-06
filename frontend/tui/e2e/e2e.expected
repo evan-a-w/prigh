@@ -18,7 +18,7 @@
  (session_rules ()))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
-  event user "hello there"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhello there"
   event message_end
   event message_start
   event text_delta "faux reply"
@@ -93,10 +93,21 @@
 <- get_entries: ((head <id>)
  (entries
   (((id <id>) (parent null) (at <at>) (kind repo))
-   ((id <id>) (parent <id>) (at <at>) (kind message)
-    (message ((role user) (text "hello there"))))
-   ((id <id>) (parent <id>) (at <at>) (kind system_prompt))
    ((id <id>) (parent <id>) (at <at>) (kind told_environment))
+   ((id <id>) (parent <id>) (at <at>) (kind message)
+    (message
+     ((role user)
+      (text
+        "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\
+       \n\
+       \nhello there")
+      (origin
+       ((body "hello there")
+        (notes
+         (((kind client) (title "Using another client")
+           (text
+            "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]")))))))))
+   ((id <id>) (parent <id>) (at <at>) (kind system_prompt))
    ((id <id>) (parent <id>) (at <at>) (kind message)
     (message
      ((role assistant) (content (((type text) (text "faux reply"))))
@@ -111,7 +122,7 @@
 backend exited
 <- ping: pong
 <- prompt: ()
-  event user "delegate something"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ndelegate something"
   event message_end
   event message_start
   event text_delta "delegating"
@@ -140,7 +151,7 @@ backend exited
 subagent backend exited
 <- prompt: ()
   event state running=true jobs=[]
-  event user "build it"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nbuild it"
   event message_end
   event message_start
   event text_delta "building"
@@ -165,7 +176,7 @@ subagent backend exited
 jobs backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
-  event user "sleep a bit"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nsleep a bit"
   event message_end
   event message_start
   event text_delta "sleeping"
@@ -187,7 +198,7 @@ jobs backend exited
 btw backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
-  event user "try"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ntry"
   event message_end
   event message_start
   event retry 2/6 in 1000ms after "HTTP 529: Overloaded"
@@ -238,7 +249,7 @@ retry backend exited
   (naming_model ()) (dictation_model ())))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
-  event user "fix the bug"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfix the bug"
   event message_end
   event message_start
   event text_delta ""
@@ -257,7 +268,7 @@ fallback backend exited
 <- prompt: ()
   event state running=false model=deepseek/deepseek-flash
   event state running=true model=deepseek/deepseek-flash
-  event user "go"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo"
   event message_end
   event message_start
   event text_delta "planning"
@@ -319,7 +330,7 @@ fallback backend exited
 approvals backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
-  event user "what is in @shot.png?\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>"
+  event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is in @shot.png?\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>"
   event message_end
   event message_start
   event text_delta "reading"
@@ -333,14 +344,22 @@ approvals backend exited
   event assistant_end End_turn
   event state running=false model=deepseek/deepseek-flash
 <- user: ((text
-   "what is in @shot.png?\
+   "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\
+  \n\
+  \nwhat is in @shot.png?\
   \n\
   \n<file path=\"shot.png\">\
   \nRead image file [image/png, 3x2]\
   \n</file>")
  (images
   (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84))))
- (origin ((body "what is in @shot.png?") (attachments (shot.png))))
+ (origin
+  ((body "what is in @shot.png?")
+   (notes
+    (((kind Client) (title "Using another client")
+      (text
+       "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"))))
+   (attachments (shot.png))))
  (at <at>))
 <- tool_result: ((tool_call_id i1) (tool_name read) (text "Read image file [image/png, 3x2]")
  (is_error false) (images (((mime_type image/png) (bytes 84)))) (at <at>))

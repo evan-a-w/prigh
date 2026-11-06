@@ -4,11 +4,7 @@ module C = Ui_spec.Chart
 
 let pct f = Ui_svg.num f ^ "%"
 
-let style fields =
-  Attr.style
-    (Css_gen.concat
-       (List.map fields ~f:(fun (field, value) -> Css_gen.create ~field ~value)))
-;;
+let style = Ui_style.attr
 
 let div ?(attrs = []) cls children =
   Node.div ~attrs:(Attr.class_ cls :: attrs) children

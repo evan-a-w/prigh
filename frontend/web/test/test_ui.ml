@@ -68,7 +68,7 @@ let%expect_test "every component" =
             </div>
           </div>
         </div>
-        <div class="ui-grid" style={ --cols: 3; }>
+        <div style="--cols: 3;" class="ui-grid">
           <div class="ui-stat">
             <div class="ui-stat-label"> Median build </div>
             <div class="ui-stat-row">
@@ -129,25 +129,25 @@ let%expect_test "every component" =
           <div class="ui-title"> Build times by week </div>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <div aria-hidden="true" class="ui-chart-yname"> s </div>
-          <div class="ui-chart-frame" style={ --gutter: 3ch; --rows: 6; }>
+          <div style="--gutter: 3ch; --rows: 6;" class="ui-chart-frame">
             <div aria-hidden="true" class="ui-chart-yaxis">
-              <span class="ui-chart-tick" style={ bottom: 0%; }> 40 </span>
-              <span class="ui-chart-tick" style={ bottom: 16.67%; }> 45 </span>
-              <span class="ui-chart-tick" style={ bottom: 33.33%; }> 50 </span>
-              <span class="ui-chart-tick" style={ bottom: 50%; }> 55 </span>
-              <span class="ui-chart-tick" style={ bottom: 66.67%; }> 60 </span>
-              <span class="ui-chart-tick" style={ bottom: 83.33%; }> 65 </span>
-              <span class="ui-chart-tick" style={ bottom: 100%; }> 70 </span>
+              <span style="bottom: 0%;" class="ui-chart-tick"> 40 </span>
+              <span style="bottom: 16.67%;" class="ui-chart-tick"> 45 </span>
+              <span style="bottom: 33.33%;" class="ui-chart-tick"> 50 </span>
+              <span style="bottom: 50%;" class="ui-chart-tick"> 55 </span>
+              <span style="bottom: 66.67%;" class="ui-chart-tick"> 60 </span>
+              <span style="bottom: 83.33%;" class="ui-chart-tick"> 65 </span>
+              <span style="bottom: 100%;" class="ui-chart-tick"> 70 </span>
             </div>
             <div class="ui-chart-plot">
               <div aria-hidden="true" class="ui-chart-grid">
-                <span class="ui-chart-gridline" style={ bottom: 0%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 16.67%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 33.33%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 50%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 66.67%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 83.33%; }> </span>
-                <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+                <span style="bottom: 0%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 16.67%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 33.33%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 50%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 66.67%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 83.33%;" class="ui-chart-gridline"> </span>
+                <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
               </div>
               <svg class="ui-chart-svg"
                    viewBox="0 0 100 100"
@@ -158,19 +158,16 @@ let%expect_test "every component" =
                 <path class="s2 ui-chart-line"
                       d="M8.33 0 L25 13.33 L41.67 23.33 L58.33 33.33 L75 50 L91.67 60"> </path>
               </svg>
-              <div tabindex="0"
+              <div style="left: 0%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W1: main 61 s, PRs 70 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 0%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s1 ui-chart-dot" style={ bottom: 70%; }> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 100%; }> </span>
+                <span style="bottom: 70%;" class="s1 ui-chart-dot"> </span>
+                <span style="bottom: 100%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 8.33%; }>
+              <div aria-hidden="true" style="--x: 8.33%;" class="right ui-chart-tip">
                 <div class="ui-chart-tip-head"> W1 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -183,19 +180,16 @@ let%expect_test "every component" =
                   <span class="ui-chart-value"> 70 s </span>
                 </div>
               </div>
-              <div tabindex="0"
+              <div style="left: 16.67%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W2: main 58 s, PRs 66 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 16.67%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s1 ui-chart-dot" style={ bottom: 60%; }> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 86.67%; }> </span>
+                <span style="bottom: 60%;" class="s1 ui-chart-dot"> </span>
+                <span style="bottom: 86.67%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 25%; }>
+              <div aria-hidden="true" style="--x: 25%;" class="right ui-chart-tip">
                 <div class="ui-chart-tip-head"> W2 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -208,18 +202,15 @@ let%expect_test "every component" =
                   <span class="ui-chart-value"> 66 s </span>
                 </div>
               </div>
-              <div tabindex="0"
+              <div style="left: 33.33%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W3: main no value, PRs 63 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 33.33%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 76.67%; }> </span>
+                <span style="bottom: 76.67%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 41.67%; }>
+              <div aria-hidden="true" style="--x: 41.67%;" class="right ui-chart-tip">
                 <div class="ui-chart-tip-head"> W3 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -232,19 +223,16 @@ let%expect_test "every component" =
                   <span class="ui-chart-value"> 63 s </span>
                 </div>
               </div>
-              <div tabindex="0"
+              <div style="left: 50%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W4: main 51 s, PRs 60 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 50%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s1 ui-chart-dot" style={ bottom: 36.67%; }> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 66.67%; }> </span>
+                <span style="bottom: 36.67%;" class="s1 ui-chart-dot"> </span>
+                <span style="bottom: 66.67%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 58.33%; }>
+              <div aria-hidden="true" style="--x: 58.33%;" class="left ui-chart-tip">
                 <div class="ui-chart-tip-head"> W4 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -257,19 +245,16 @@ let%expect_test "every component" =
                   <span class="ui-chart-value"> 60 s </span>
                 </div>
               </div>
-              <div tabindex="0"
+              <div style="left: 66.67%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W5: main 47 s, PRs 55 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 66.67%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s1 ui-chart-dot" style={ bottom: 23.33%; }> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 50%; }> </span>
+                <span style="bottom: 23.33%;" class="s1 ui-chart-dot"> </span>
+                <span style="bottom: 50%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 75%; }>
+              <div aria-hidden="true" style="--x: 75%;" class="left ui-chart-tip">
                 <div class="ui-chart-tip-head"> W5 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -282,19 +267,16 @@ let%expect_test "every component" =
                   <span class="ui-chart-value"> 55 s </span>
                 </div>
               </div>
-              <div tabindex="0"
+              <div style="left: 83.33%; width: 16.67%;"
+                   tabindex="0"
                    role="img"
                    aria-label="W6: main 44 s, PRs 52 s"
-                   class="ui-chart-col"
-                   style={
-                     left: 83.33%;
-                     width: 16.67%;
-                   }>
+                   class="ui-chart-col">
                 <span class="ui-chart-guide"> </span>
-                <span class="s1 ui-chart-dot" style={ bottom: 13.33%; }> </span>
-                <span class="s2 ui-chart-dot" style={ bottom: 40%; }> </span>
+                <span style="bottom: 13.33%;" class="s1 ui-chart-dot"> </span>
+                <span style="bottom: 40%;" class="s2 ui-chart-dot"> </span>
               </div>
-              <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 91.67%; }>
+              <div aria-hidden="true" style="--x: 91.67%;" class="left ui-chart-tip">
                 <div class="ui-chart-tip-head"> W6 </div>
                 <div class="s1 ui-chart-tip-row">
                   <span class="ui-chart-swatch"> </span>
@@ -309,12 +291,12 @@ let%expect_test "every component" =
               </div>
             </div>
             <div aria-hidden="true" class="ui-chart-xaxis">
-              <span class="ui-chart-tick" style={ left: 8.33%; --w: 16.67%; }> W1 </span>
-              <span class="minor ui-chart-tick" style={ left: 25%; --w: 16.67%; }> W2 </span>
-              <span class="ui-chart-tick" style={ left: 41.67%; --w: 16.67%; }> W3 </span>
-              <span class="minor ui-chart-tick" style={ left: 58.33%; --w: 16.67%; }> W4 </span>
-              <span class="ui-chart-tick" style={ left: 75%; --w: 16.67%; }> W5 </span>
-              <span class="minor ui-chart-tick" style={ left: 91.67%; --w: 16.67%; }> W6 </span>
+              <span style="left: 8.33%; --w: 16.67%;" class="ui-chart-tick"> W1 </span>
+              <span style="left: 25%; --w: 16.67%;" class="minor ui-chart-tick"> W2 </span>
+              <span style="left: 41.67%; --w: 16.67%;" class="ui-chart-tick"> W3 </span>
+              <span style="left: 58.33%; --w: 16.67%;" class="minor ui-chart-tick"> W4 </span>
+              <span style="left: 75%; --w: 16.67%;" class="ui-chart-tick"> W5 </span>
+              <span style="left: 91.67%; --w: 16.67%;" class="minor ui-chart-tick"> W6 </span>
             </div>
           </div>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -980,32 +962,30 @@ let%expect_test "every component" =
         <div class="ui-tree">
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <ul>
-            <li title="frontend/" class="dir tone-neutral ui-tree-row" style={ --depth: 0; }>
+            <li style="--depth: 0;" title="frontend/" class="dir tone-neutral ui-tree-row">
               <span aria-hidden="true" class="ui-tree-icon">
                 <icon class="folder"> </icon>
               </span>
               <span class="ui-tree-name"> frontend/ </span>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             </li>
-            <li title="frontend/web/" class="dir tone-neutral ui-tree-row" style={ --depth: 1; }>
+            <li style="--depth: 1;" title="frontend/web/" class="dir tone-neutral ui-tree-row">
               <span aria-hidden="true" class="ui-tree-icon">
                 <icon class="folder"> </icon>
               </span>
               <span class="ui-tree-name"> web/ </span>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             </li>
-            <li title="frontend/web/lib/" class="dir tone-neutral ui-tree-row" style={ --depth: 2; }>
+            <li style="--depth: 2;" title="frontend/web/lib/" class="dir tone-neutral ui-tree-row">
               <span aria-hidden="true" class="ui-tree-icon">
                 <icon class="folder"> </icon>
               </span>
               <span class="ui-tree-name"> lib/ </span>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             </li>
-            <li title="frontend/web/lib/ui_view.ml"
-                class="file tone-success ui-tree-row"
-                style={
-                  --depth: 3;
-                }>
+            <li style="--depth: 3;"
+                title="frontend/web/lib/ui_view.ml"
+                class="file tone-success ui-tree-row">
               <span aria-hidden="true" class="ui-tree-icon">
                 <Vdom.Node.none-widget> </Vdom.Node.none-widget>
               </span>
@@ -1018,7 +998,7 @@ let%expect_test "every component" =
                 </div>
               </div>
             </li>
-            <li title="backend/" class="dir tone-neutral ui-tree-row" style={ --depth: 0; }>
+            <li style="--depth: 0;" title="backend/" class="dir tone-neutral ui-tree-row">
               <span aria-hidden="true" class="ui-tree-icon">
                 <icon class="folder"> </icon>
               </span>

@@ -79,7 +79,12 @@ const screenshot = async (label, selector) => {
   shot++;
   const path = join(process.env.SHOTS, `${engineName}-ui-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`);
   await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
-  if (selector) await page.locator(selector).first().screenshot({ path });
+  // A component taller than the space above the composer: its picture
+  // without the page's chrome over it.
+  if (selector) await page.locator(selector).first().screenshot({
+    path,
+    style: ".composer, .chat-chrome, .chat-tools, .scroll-bottom, .jump-rail { visibility: hidden !important; }",
+  });
   else await page.screenshot({ path });
 };
 const composer = () => page.locator(".composer textarea");

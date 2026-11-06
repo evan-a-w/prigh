@@ -59,6 +59,8 @@ let%expect_test "comparisons, conditionals, functions" =
     ; "x > 2 ? 10 : 20"
     ; "x > 5 ? 1 : x > 2 ? 2 : 3"
     ; "1 + 2 < 4"
+    ; "3 > 2 > 1"
+    ; "1 < 2 == 1"
     ; "min(4, x, 9)"
     ; "max(1, x)"
     ; "abs(-4)"
@@ -80,6 +82,8 @@ let%expect_test "comparisons, conditionals, functions" =
     x > 2 ? 10 : 20              = 10.
     x > 5 ? 1 : x > 2 ? 2 : 3    = 2.
     1 + 2 < 4                    = 1.
+    3 > 2 > 1                    = 0.
+    1 < 2 == 1                   = 1.
     min(4, x, 9)                 = 3.
     max(1, x)                    = 3.
     abs(-4)                      = 4.
