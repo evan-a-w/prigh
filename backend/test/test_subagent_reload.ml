@@ -168,7 +168,7 @@ let%expect_test "the backend is killed while a background subagent runs" =
     hello: ok
     panel=[a1 failed (stale)] status=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -196,7 +196,7 @@ let%expect_test
     hello: ok
     panel=[a1 failed (stale)] status=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -220,7 +220,7 @@ let%expect_test "reported once: loading the session again reports nothing new" =
     hello: ok
     panel=[a1 failed (stale)] status=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -233,7 +233,7 @@ let%expect_test "reported once: loading the session again reports nothing new" =
     hello: ok
     panel=[a1 failed (stale)] status=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -270,7 +270,7 @@ let%expect_test
     panel=[a1 running] status=[a1]
     panel=[a1 complete (stale)] status=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started

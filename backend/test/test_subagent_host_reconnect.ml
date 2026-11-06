@@ -172,7 +172,7 @@ let%expect_test "a subagent's tool calls wait while its host reconnects" =
     laptop hello: client_id=client-2 host_id=host-laptop
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     {"type":"response","id":"r1","ok":true,"result":{}}
     assistant:  subagent{"task":"run the tests"}
     state: running=true subagents=[a1 running]
@@ -194,7 +194,7 @@ let%expect_test "a subagent's tool calls wait while its host reconnects" =
     subagent tool_result bash: ran on laptop in /home/me
     subagent tool_result bash: ran on laptop in /home/me
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -222,7 +222,7 @@ let%expect_test "cancelling a subagent whose call waits for its host" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -254,7 +254,7 @@ let%expect_test "a subagent's call in flight when its host restarts fails" =
     laptop hello: client_id=client-3 host_id=host-laptop
     subagent tool_result bash: [the tool host restarted during this call, so its result is lost: run it again if you still need it]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
@@ -296,7 +296,7 @@ let%expect_test
     laptop's late result: accepted
     subagent tool_result bash: tests passed
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started

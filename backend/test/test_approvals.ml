@@ -563,7 +563,7 @@ let%expect_test "plan mode: the model has no tool to leave it" =
   Or_error.ok_exn (Agent.prompt agent "plan it");
   Agent.wait_idle agent;
   [%expect
-    {| (bash read write edit ls grep find web_fetch update_plan ask_user) |}]
+    {| (bash read write edit ls grep find web_fetch update_plan ask_user render_ui) |}]
 ;;
 
 let%expect_test "plan mode switched on during a run is told between turns" =
