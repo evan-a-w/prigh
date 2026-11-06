@@ -79,6 +79,8 @@ scenario "bad PRIGH_DESKTOP_ARGS" PRIGH_DESKTOP_ARGS="-cwd 'x"
 browser="$work/browsers/google-chrome-stable"
 scenario "browser: auto takes one on the PATH; closing its window stops the sidecar" \
 	PRIGH_DESKTOP_WINDOW= PATH="$work/browsers:$PATH"
+# The desktop entry named after its Wayland app_id: prigh's name and icon.
+echo "taskbar entry: $(grep -E '^(Name|Icon|NoDisplay|StartupWMClass)=' "$XDG_DATA_HOME"/applications/*.desktop | paste -sd ' ' -)"
 scenario "browser: the page's Quit (the sidecar exits) closes the browser" \
 	PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$browser" FAKE_MODE=quit FAKE_BROWSER_MODE=stay
 scenario "browser: the sidecar fails: the browser closes, the failure is told" \
