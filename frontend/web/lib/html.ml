@@ -124,6 +124,7 @@ module Icon = struct
     | Lines
     | Ghost
     | Keep
+    | Clipboard
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -241,6 +242,8 @@ module Icon = struct
     | Ghost -> {|<circle cx="12" cy="12" r="8" stroke-dasharray="2.6 3.1"/>|}
     | Keep ->
       {|<circle cx="12" cy="12" r="8"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/>|}
+    | Clipboard ->
+      {|<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

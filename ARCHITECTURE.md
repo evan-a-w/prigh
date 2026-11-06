@@ -3624,7 +3624,20 @@ launch's browser, which only hands its window over, gets no pipe.
 `shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
 in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 (an `--app` window's history is one entry, so the page may close it), with
-"Close this window to quit prigh." if the browser refuses.
+"Close this window to quit prigh." if the browser refuses. There
+(`Model.browser_shell`, `Set_browser_shell`) the browser's context menu
+never shows: `Field_menu_listeners` cancels every `contextmenu` (window,
+capture), and one on a text field (a textarea or a text input, not
+xterm's) opens `Field_menu` (Cut, Copy, Paste, Select all; disabled
+without a selection, read-only or a password) as `Model.field_menu`, its
+own layer over any dialog (`Field_menu_view`, styled as `Context_menu_view`,
+placed by `Command.Place_field_menu`), whose keys `Keys.handle` takes
+before anything but the terminal's. Choosing or closing it is
+`Command.Edit_field`: the field focused again with its selection, then
+`navigator.clipboard` writeText/readText (the desktop app grants the
+site the clipboard) and `execCommand` insertText/delete (else
+`setRangeText` and an input event), so Bonsai's state and the field's
+undo follow.
 
 
 More windows: the page's Open in new window (`window.open` on its own site)

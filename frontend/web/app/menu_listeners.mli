@@ -4,8 +4,8 @@ open! Core
 
 (** Once rendered: the menu at its anchor (the pointer, or under an
     element), moved back into the window when it would leave it, and
-    shown. *)
-val place : Prigh_web.Context_menu.Anchor.t -> unit
+    shown. [id]: the menu's (by default the dialog's). *)
+val place : ?id:string -> Prigh_web.Context_menu.Anchor.t -> unit
 
 (** A long press (a touch held still for about half a second) on a session
     or worktree row, a review's file, or a message with a menu, is a

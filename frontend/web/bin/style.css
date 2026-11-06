@@ -25,6 +25,7 @@
                            their menu is open; the review page's pickers */
   --z-menu-surface: 52; /* a chip's menu, over its composer on a phone */
   --z-modal: 60;  /* dialogs */
+  --z-field-menu: 65; /* a text field's menu, over its dialog */
   --z-viewer: 70; /* an image, full screen */
   --z-toast: 80;  /* the toast over a dialog or a sheet */
 }
@@ -549,6 +550,10 @@ kbd {
   .context-menu .menu-item { min-height: 40px; }
 }
 @media (prefers-reduced-motion: reduce) { .context-menu { animation: none; } }
+/* A text field's menu in the desktop app's browser window (Field_menu). */
+.menu-backdrop.field-menu-backdrop { z-index: var(--z-field-menu); }
+.context-menu.field-menu { min-width: 200px; }
+.field-menu .menu-item.disabled:hover { background: none; }
 .field-note { color: var(--faint); font-size: 11.5px; }
 .worktree-dialog .field + .field { margin-top: 12px; }
 .worktree-dialog .dialog-note { margin: 12px 0 0; }

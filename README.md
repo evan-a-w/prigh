@@ -1268,6 +1268,11 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   (`~/.local/share/applications/chrome-127.0.0.1__-Default.desktop`) so
   docks and taskbars show prigh's name and icon; match the app_id in
   Hyprland or sway rules (`hyprctl clients` shows it).
+  The browser's own right-click menu never shows there (it would give away
+  that the window is Chrome): a text field's right-click (or Shift+F10)
+  opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
+  over a dialog too, and sessions, worktrees, messages and the review's
+  files have their usual menus; elsewhere a right-click does nothing.
 - **webview**: the app's own window on the system's webview (below).
 
 ```nix
