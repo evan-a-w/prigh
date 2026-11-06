@@ -289,6 +289,8 @@ module Command = struct
     | Annotate_clear
     | Annotate_export
     | Place_menu of Context_menu.Anchor.t
+    | Place_field_menu of Context_menu.Anchor.t
+    | Edit_field of Field_menu.Item.t option
     | Open_window of string
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
@@ -367,6 +369,7 @@ module Action = struct
     | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
     | Set_desktop of bool
+    | Set_browser_shell of bool
     | Quit_desktop
     | Page_hidden of bool
     | Restore_prefs of
@@ -482,6 +485,14 @@ module Action = struct
     | Ask_remove_worktree of string
     | Remove_worktree of { force : bool }
     | Open_menu of Context_menu.t
+    | Open_field_menu of
+        { field : Field_menu.Field.t
+        ; anchor : Context_menu.Anchor.t
+        }
+    | Field_menu_move of int
+    | Field_menu_select of Field_menu.Item.t
+    | Field_menu_choose of Field_menu.Item.t option
+    | Close_field_menu
     | Toggle_sidebar
     | Toggle_status_tray
     | Answer_confirm of
@@ -625,6 +636,8 @@ module Model = struct
     ; utc_offset : Time_ns.Span.t
     ; narrow : bool
     ; desktop : bool
+    ; browser_shell : bool
+    ; field_menu : Field_menu.t option
     ; draft : string
     ; cursor : int
     ; completion : Completion.t option
@@ -886,6 +899,8 @@ let init =
   ; utc_offset = Time_ns.Span.zero
   ; narrow = false
   ; desktop = false
+  ; browser_shell = false
+  ; field_menu = None
   ; draft = ""
   ; cursor = 0
   ; completion = None
@@ -9137,6 +9152,35 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_desktop desktop -> { m with desktop }, []
+  | Set_browser_shell browser_shell -> { m with browser_shell }, []
+  | Open_field_menu { field; anchor } ->
+    (match Field_menu.decide ~browser_shell:m.browser_shell (Some field) with
+     | Native | Suppress -> m, []
+     | Open field ->
+       ( { m with field_menu = Some (Field_menu.create field ~anchor) }
+       , [ Command.Place_field_menu anchor ] ))
+  | Field_menu_move delta ->
+    ( { m with
+        field_menu =
+          Option.map m.field_menu ~f:(fun f -> Field_menu.move f delta)
+      }
+    , [] )
+  | Field_menu_select item ->
+    (match Option.bind m.field_menu ~f:(fun f -> Field_menu.select f item) with
+     | None -> m, []
+     | Some f -> { m with field_menu = Some f }, [])
+  | Field_menu_choose item ->
+    (match m.field_menu with
+     | None -> m, []
+     | Some f ->
+       let item = Option.value item ~default:(Field_menu.selected f) in
+       if Field_menu.enabled f item
+       then { m with field_menu = None }, [ Command.Edit_field (Some item) ]
+       else m, [])
+  | Close_field_menu ->
+    (match m.field_menu with
+     | None -> m, []
+     | Some _ -> { m with field_menu = None }, [ Command.Edit_field None ])
   | Quit_desktop -> quit_desktop m
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
