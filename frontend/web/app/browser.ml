@@ -218,3 +218,40 @@ let visual_height () =
   Option.map (Viewport.visual ()) ~f:(fun vv ->
     Js.float_of_number (Js.Unsafe.get vv (Js.string "height")))
 ;;
+
+let post_status ~content_type ~url ~body ~f =
+  let xhr = XmlHttpRequest.create () in
+  xhr##_open (Js.string "POST") (Js.string url) Js._true;
+  xhr##setRequestHeader (Js.string "Content-Type") (Js.string content_type);
+  xhr##.onreadystatechange
+  := Js.wrap_callback (fun () ->
+       match xhr##.readyState with
+       | XmlHttpRequest.DONE ->
+         f
+           ~status:xhr##.status
+           ~body:
+             (Option.value_map
+                (Js.Opt.to_option xhr##.responseText)
+                ~default:""
+                ~f:Js.to_string)
+       | _ -> ());
+  xhr##send (Js.some (Js.string body))
+;;
+
+let submit_form ~url ~fields =
+  let document = Dom_html.document in
+  let form = Dom_html.createForm document in
+  form##.action := Js.string url;
+  form##._method := Js.string "POST";
+  form##.style##.display := Js.string "none";
+  List.iter fields ~f:(fun (name, value) ->
+    let input =
+      Dom_html.createInput ~_type:(Js.string "hidden") ~name:(Js.string name) document
+    in
+    input##.value := Js.string value;
+    Dom.appendChild form input);
+  Dom.appendChild document##.body form;
+  form##submit
+;;
+
+let host () = Js.to_string Dom_html.window##.location##.host

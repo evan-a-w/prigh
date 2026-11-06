@@ -66,3 +66,19 @@ val post
 
 val set_app_html : string -> unit
 val input_value : string -> string
+
+(** [POST]s [body] to [url] and calls [f] with the answer's status (0 when
+    there was none) and body. *)
+val post_status
+  :  content_type:string
+  -> url:string
+  -> body:string
+  -> f:(status:int -> body:string -> unit)
+  -> unit
+
+(** Navigates the page by submitting a form of [fields] to [url] with
+    [POST]. *)
+val submit_form : url:string -> fields:(string * string) list -> unit
+
+(** [location.host]. *)
+val host : unit -> string
