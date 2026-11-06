@@ -220,23 +220,20 @@ let code ~lang ~title code =
 ;;
 
 let tree ~title entries =
-  (* Each entry indented by its depth; a directory's name ends in /. *)
   let rows =
-    List.map entries ~f:(fun (path, note, tone) ->
-      let dir = String.is_suffix path ~suffix:"/" in
-      let parts = String.split (String.strip ~drop:(Char.equal '/') path) ~on:'/' in
-      let depth = List.length parts - 1 in
-      let name = Option.value (List.last parts) ~default:path in
+    Ui_tree.rows (List.map entries ~f:(fun (path, note, tone) -> path, (note, tone)))
+    |> List.map ~f:(fun (r : _ Ui_tree.Row.t) ->
+      let note, tone = Option.value r.info ~default:(None, Ui_spec.Tone.Neutral) in
       Node.li
         ~attrs:
-          [ Attr.classes [ "ui-tree-row"; tone_cls tone; (if dir then "dir" else "file") ]
-          ; Attr.style (Css_gen.create ~field:"--depth" ~value:(Int.to_string depth))
-          ; Attr.title path
+          [ Attr.classes [ "ui-tree-row"; tone_cls tone; (if r.dir then "dir" else "file") ]
+          ; Attr.style (Css_gen.create ~field:"--depth" ~value:(Int.to_string r.depth))
+          ; Attr.title r.path
           ]
         [ Node.span
             ~attrs:[ Attr.class_ "ui-tree-icon"; Attr.create "aria-hidden" "true" ]
-            [ (if dir then Html.Icon.view Folder else Node.none) ]
-        ; text "ui-tree-name" (if dir then name ^ "/" else name)
+            [ (if r.dir then Html.Icon.view Folder else Node.none) ]
+        ; text "ui-tree-name" r.name
         ; (match note with
            | Some n -> Ui_context.md ~cls:"ui-tree-note" n
            | None -> Node.none)
