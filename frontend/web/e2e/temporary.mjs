@@ -204,6 +204,9 @@ const screen = async (w, h, label) => {
     const hovered = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".popover-item:hover"), item);
     await page.mouse.click(item.x, item.y);
     await page.waitForSelector("#chip-popover", { state: "detached" });
+    // Until the backend has switched, the chip is disabled (it takes no
+    // click).
+    await page.waitForSelector(`${chip}:not(.awaiting)`);
     return { ...item, hovered };
   };
   const was = await chipLabel();
