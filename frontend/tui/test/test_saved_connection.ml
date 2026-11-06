@@ -161,7 +161,9 @@ let%expect_test "save, load, forget" =
     mode 600
     |}];
   ok_exn
-    (S.save ~home { connect = "x:1"; token = None; user = None; proxy_cookie = None });
+    (S.save
+       ~home
+       { connect = "x:1"; token = None; user = None; proxy_cookie = None });
   load ();
   [%expect {| (Ok (((connect x:1)))) |}];
   ok_exn (S.forget ~home);
@@ -184,7 +186,8 @@ let%expect_test "a sign-in proxy's cookie: kept for its address only" =
           ~cookie:(S.proxy_cookie (Some saved) ~connect : string option)]);
   (* Saved again with new credentials for the same address, it stays. *)
   show ~saved ~flags:{ none with token = Some "new" } ();
-  [%expect {|
+  [%expect
+    {|
     ((connect (srv:7777))
      (cookie  (proxy_session=abc)))
     ((connect (elsewhere:1)) (cookie ()))

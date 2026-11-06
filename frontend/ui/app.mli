@@ -236,7 +236,7 @@ module Connection : sig
         { generation : int
         ; previous : t (** back to it when the new server cannot be reached *)
         ; notices : string list
-        (** newest first: the new server may send some before its [hello]
+          (** newest first: the new server may send some before its [hello]
             reply, which resets the view; they are shown again after it *)
         } (** [/connect] or [/signin] under way *)
     | Disconnected of { reason : string }

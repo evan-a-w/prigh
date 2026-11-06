@@ -23,7 +23,10 @@ let is_rejection error =
 
 let proxy_signin_marker = "a sign-in proxy guards it: "
 let proxy_signin_error why = proxy_signin_marker ^ why
-let proxy_signin_of_error error = String.chop_prefix error ~prefix:proxy_signin_marker
+
+let proxy_signin_of_error error =
+  String.chop_prefix error ~prefix:proxy_signin_marker
+;;
 
 module Change = struct
   type t =

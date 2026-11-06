@@ -3,7 +3,9 @@ open Prigh_web
 
 let state = "0123456789abcdef0123456789abcdef"
 
-let%expect_test "the request in the fragment: only a loopback port and a hex state" =
+let%expect_test
+    "the request in the fragment: only a loopback port and a hex state"
+  =
   List.iter
     [ sprintf "#cli-signin=41234.%s&program=tui" state
     ; sprintf "#cli-signin=41234.%s&program=tool-host" state
@@ -26,9 +28,11 @@ let%expect_test "the request in the fragment: only a loopback port and a hex sta
       Option.iter request ~f:(fun request ->
         assert (
           [%equal: Cli_signin.Request.t option]
-            (Cli_signin.Request.of_string (Cli_signin.Request.to_string request))
+            (Cli_signin.Request.of_string
+               (Cli_signin.Request.to_string request))
             (Some request))));
-  [%expect {|
+  [%expect
+    {|
     (#cli-signin=41234.0123456789abcdef0123456789abcdef&program=tui
      (request
       (((port 41234) (state 0123456789abcdef0123456789abcdef) (program Tui)))))
@@ -61,12 +65,16 @@ let%expect_test "the request in the fragment: only a loopback port and a hex sta
 let%expect_test "the confirmation, the grant, the form for the listener" =
   let request =
     Option.value_exn
-      (Cli_signin.Request.of_hash (sprintf "#cli-signin=41234.%s&program=tui" state))
+      (Cli_signin.Request.of_hash
+         (sprintf "#cli-signin=41234.%s&program=tui" state))
   in
   let other = { request with program = Other } in
   print_endline (Cli_signin.heading request);
   List.iter
-    (Cli_signin.explanation request ~host:"prigh.example.com" ~user:(Some "alice"))
+    (Cli_signin.explanation
+       request
+       ~host:"prigh.example.com"
+       ~user:(Some "alice"))
     ~f:print_endline;
   print_endline (Cli_signin.heading other);
   List.iter
@@ -78,7 +86,9 @@ let%expect_test "the confirmation, the grant, the form for the listener" =
   List.iter
     [ {|{"cookie":"proxy_session=abc"}|}; {|{"cookie":""}|}; "{}"; "nope" ]
     ~f:(fun body ->
-      print_s [%message body ~cookie:(Cli_signin.cookie_of_grant body : string option)]);
+      print_s
+        [%message
+          body ~cookie:(Cli_signin.cookie_of_grant body : string option)]);
   print_endline (Cli_signin.callback_url request);
   print_s
     [%sexp
@@ -88,7 +98,8 @@ let%expect_test "the confirmation, the grant, the form for the listener" =
        : (string * string) list)];
   print_s
     [%sexp (Cli_signin.callback_fields request Cancel : (string * string) list)];
-  [%expect {|
+  [%expect
+    {|
     Allow prigh-tui to connect?
     prigh-tui on this computer wants to connect to prigh.example.com as alice.
     It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
@@ -120,10 +131,9 @@ let%expect_test "what a refused grant says" =
     ]
     ~f:(fun (status, body) ->
       let message, next = Cli_signin.grant_error ~status ~body in
-      print_s
-        [%message
-          (status : int) message (next : [ `Sign_in | `Stop ])]);
-  [%expect {|
+      print_s [%message (status : int) message (next : [ `Sign_in | `Stop ])]);
+  [%expect
+    {|
     ((status 401)
      "unauthorised: bad user name or password: sign in to prigh, then allow the program again."
      (next Sign_in))

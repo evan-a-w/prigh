@@ -246,7 +246,10 @@ let submit_form ~url ~fields =
   form##.style##.display := Js.string "none";
   List.iter fields ~f:(fun (name, value) ->
     let input =
-      Dom_html.createInput ~_type:(Js.string "hidden") ~name:(Js.string name) document
+      Dom_html.createInput
+        ~_type:(Js.string "hidden")
+        ~name:(Js.string name)
+        document
     in
     input##.value := Js.string value;
     Dom.appendChild form input);

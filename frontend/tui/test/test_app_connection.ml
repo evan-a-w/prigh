@@ -1031,7 +1031,8 @@ let%expect_test
   H.step h Start;
   H.show h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     Load_history
     ┌─ Warning ────────────────────────────────────────────────────────────────────┐
     │ ai.example.com answered with a login page (HTTP 302 Found to                 │
@@ -1050,7 +1051,8 @@ let%expect_test
   (* y: the platform signs in through the browser and connects. *)
   H.keys h "y";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Relink
       (generation 1)
       (change     Browser_signin))
@@ -1070,7 +1072,8 @@ let%expect_test
     ~link:(remote ~user:None "https://ai.example.com/")
     (Connected (hello {|{"client_id":"c2"}|}));
   connection h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -1090,7 +1093,8 @@ let%expect_test "the browser sign-in declined, or failing" =
   H.esc h;
   H.show h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     Load_history
 
 
@@ -1120,10 +1124,12 @@ let%expect_test "the browser sign-in declined, or failing" =
     ~generation:2
     ~link:(remote ~user:None "https://ai.example.com/")
     (Signin_required
-       "not signed in through the browser: the sign-in was cancelled in the browser");
+       "not signed in through the browser: the sign-in was cancelled in the \
+        browser");
   H.show h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     (Relink (generation 1) (change (Connect (wss://ai.example.com/ws))))
     (Relink
       (generation 2)
@@ -1150,7 +1156,8 @@ let%expect_test "the proxy's cookie expires: a reconnect asks, no more retries" 
   H.reply_error h (Reconnect 1) (Server_link.proxy_signin_error proxy_login);
   H.show h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ A sign-in proxy guards the backend. Sign in through the browser? (y/n)                           │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1169,7 +1176,8 @@ let%expect_test "the proxy's cookie expires: a reconnect asks, no more retries" 
   relinked h ~link:(remote "10.0.0.5:7777") (Signin_required proxy_login);
   H.show h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     (Relink (generation 1) (change (Connect (wss://ai.example.com/ws))))
 
 
