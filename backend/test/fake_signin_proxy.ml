@@ -65,7 +65,7 @@ let forward ~env ~upstream ~reader ~line ~headers flow =
     (fun () -> copy up flow)
 ;;
 
-let serve ~env ~upstream flow =
+let serve ~env ~upstream ~ws_exempt ~logins flow =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   match read_head reader with
   | exception (End_of_file | Eio.Io _) -> ()
@@ -85,20 +85,31 @@ let serve ~env ~upstream flow =
           ; "Set-Cookie", cookie ^ "; Path=/; HttpOnly; SameSite=Lax"
           ]
         ""
-    else if signed_in headers
+    else if
+      signed_in headers
+      || (ws_exempt
+          && List.exists [ "/ws"; "/terminal" ] ~f:(fun p ->
+            String.equal path p || String.is_prefix path ~prefix:(p ^ "?")))
     then forward ~env ~upstream ~reader ~line ~headers flow
-    else
+    else (
+      let location =
+        "https://login.example.com/outpost.goauthentik.io/start"
+        ^
+        match logins with
+        | None -> ""
+        | Some n ->
+          incr n;
+          sprintf "?state=login-state-%d" !n
+      in
       reply
         flow
         ~status:"302 Found"
-        ~headers:
-          [ "Location", "https://login.example.com/outpost.goauthentik.io/start"
-          ; "Content-Type", "text/html"
-          ]
-        "<html>sign in</html>"
+        ~headers:[ "Location", location; "Content-Type", "text/html" ]
+        "<html>sign in</html>")
 ;;
 
-let start ~env ~sw ~upstream =
+let start ~env ~sw ?(ws_exempt = false) ?(fresh_state = false) ~upstream () =
+  let logins = Option.some_if fresh_state (ref 0) in
   let socket =
     Eio.Net.listen
       ~sw
@@ -113,7 +124,7 @@ let start ~env ~sw ~upstream =
         ~sw
         socket
         ~on_error:(fun _ -> ())
-        (fun flow _ -> serve ~env ~upstream flow);
+        (fun flow _ -> serve ~env ~upstream ~ws_exempt ~logins flow);
       loop ()
     in
     loop ());

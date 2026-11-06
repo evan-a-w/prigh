@@ -27,14 +27,35 @@ module Page = struct
   type t =
     { url : string
     ; remote : bool
+    ; cookie : (string[@sexp.opaque]) option [@sexp.option]
+    ; signin : string option [@sexp.option]
+    ; here : bool [@sexp.bool]
+    ; external_ : bool [@sexp.bool]
     }
   [@@deriving sexp_of]
 
+  let here url =
+    { url
+    ; remote = false
+    ; cookie = None
+    ; signin = None
+    ; here = false
+    ; external_ = false
+    }
+  ;;
+
   let to_json_line t =
+    let flag name b = if b then [ name, `True ] else [] in
+    let string name =
+      Option.value_map ~default:[] ~f:(fun s -> [ name, `String s ])
+    in
     Json.to_string
       (`Object
-          (("url", `String t.url)
-           :: (if t.remote then [ "remote", `True ] else [])))
+          ((("url", `String t.url) :: flag "remote" t.remote)
+           @ string "cookie" t.cookie
+           @ string "signin" t.signin
+           @ flag "here" t.here
+           @ flag "external" t.external_))
   ;;
 end
 
@@ -49,6 +70,8 @@ module Config = struct
     ; listen : Web_connect.Listen.t
     ; root : string
     ; save : Saved_connection.t -> unit Or_error.t
+    ; remember_signin :
+        Backend_address.t -> Browser_signin.Grant.t -> unit Or_error.t
     }
 end
 
@@ -85,11 +108,48 @@ module Connected = struct
     }
 end
 
+(* A sign-in through the browser under way: the URL it opens, and the
+   answer to [/desktop/signin] once it ends. *)
+module Browser_attempt = struct
+  type t =
+    { url : string Promise.t
+    ; ended : Json.t Promise.t
+    ; cancel : unit Promise.u
+    }
+end
+
+(* What continues once signed in to the site's proxy. *)
+module Pending = struct
+  type t =
+    | Connected of Connected.t (** [/ws] needs no cookie: checked, started *)
+    | Unchecked of
+        { remote : Backend_address.t
+        ; credentials : Web_connect.Credentials.t
+        ; save : Saved_connection.t option
+        } (** [/ws] is behind the proxy too: checked once signed in *)
+
+  let remote = function
+    | Connected c -> c.remote
+    | Unchecked { remote; _ } -> remote
+  ;;
+end
+
+module Signin = struct
+  type t =
+    { pending : Pending.t
+    ; login : string option
+    ; expired : bool
+    ; mutable browser : Browser_attempt.t option
+    ; mutable error : string option
+    }
+end
+
 module State = struct
   type t =
     | Checking of unit Promise.t
     | Form of Form.t
     | Connected of Connected.t
+    | Signin of Signin.t
 end
 
 type t =
@@ -103,6 +163,7 @@ type t =
   ; mutable state : State.t
   ; quit : unit Promise.u
   ; on_page : Page.t -> unit
+  ; mutable page_url : string (** the page here, with the key *)
   }
 
 let digest s = Digestif.SHA256.to_raw_string (Digestif.SHA256.digest_string s)
@@ -119,9 +180,30 @@ let remote_url t remote =
   | Remote -> ""
 ;;
 
+let site remote = Backend_address.authority remote
+
+(* The backend's site, with the cookie its sign-in proxy wants (if any) and
+   the page here to come back to for signing in. *)
+let remote_page ?(here = false) t (remote : Backend_address.t) =
+  { Page.url = remote_url t remote
+  ; remote = true
+  ; cookie = (if here || remote.lines then None else remote.proxy_cookie)
+  ; signin = Some (t.page_url ^ "&signin=1")
+  ; here
+  ; external_ = false
+  }
+;;
+
 (* The page continues signed in, the tool host connected (or given up on
-   after [tool_host_wait]). *)
-let connected t ~remote ~(credentials : Web_connect.Credentials.t) ~save =
+   after [tool_host_wait]); without [tool_host] (it would not get past the
+   site's sign-in proxy) it is not started. *)
+let connected
+      ?(tool_host = true)
+      t
+      ~remote
+      ~(credentials : Web_connect.Credentials.t)
+      ~save
+  =
   Option.iter save ~f:(fun connection ->
     match t.config.save connection with
     | Ok () -> ()
@@ -129,6 +211,12 @@ let connected t ~remote ~(credentials : Web_connect.Credentials.t) ~save =
       t.log (sprintf "cannot save the connection: %s" (Error.to_string_hum e)));
   (match t.config.tools with
    | Remote -> t.log "tools run on the backend (-tools remote)"
+   | Local when not tool_host ->
+     t.log
+       (sprintf
+          "tools cannot run on this machine: its tool host needs the sign-in \
+           to %s too (sign in with the browser for that)"
+          (site remote))
    | Local ->
      (match
         Web_connect.start_tool_host
@@ -175,6 +263,7 @@ module Next = struct
   type t =
     | Code of string
     | Remote of string
+    | Signin (** the site's sign-in proxy first: the page here offers it *)
 end
 
 let next t (c : Connected.t) : Next.t =
@@ -182,6 +271,21 @@ let next t (c : Connected.t) : Next.t =
   | Some relay -> Code (Signin_handoff.code relay.handoff)
   | None -> Remote (remote_url t c.remote)
 ;;
+
+let to_signin ?(expired = false) t ~login pending =
+  let site = site (Pending.remote pending) in
+  t.log
+    (if expired
+     then sprintf "the sign-in to %s expired: signing in again" site
+     else
+       sprintf
+         "%s is behind a sign-in%s"
+         site
+         (Option.value_map login ~default:"" ~f:(sprintf " (%s)")));
+  t.state <- Signin { pending; login; expired; browser = None; error = None }
+;;
+
+let probe t remote = Site_probe.run ~env:t.env ~timeout:t.check_timeout remote
 
 (* Says hello to [remote]; a refusal goes back to the form, with what to do
    ([prefix] says which connection it was when not typed in). *)
@@ -209,7 +313,7 @@ let connect ?(prefix = "") t ~remote ~credentials ~save =
               ; user = credentials.user
               ; error = Some "Connecting was interrupted: connect again."
               }
-       | Form _ | Connected _ -> ());
+       | Form _ | Connected _ | Signin _ -> ());
       Promise.resolve settle ())
     ~f:(fun () ->
       match
@@ -227,6 +331,17 @@ let connect ?(prefix = "") t ~remote ~credentials ~save =
              prefix
              (Backend_address.to_string remote)
              (Exn.to_string exn))
+      | Error (Signin_required _)
+        when match t.config.ui with
+             | Remote -> true
+             | Local -> false ->
+        let login =
+          match probe t remote with
+          | Signin_required { login; _ } -> login
+          | Open | Unreachable _ -> None
+        in
+        to_signin t ~login (Unchecked { remote; credentials; save });
+        Ok Next.Signin
       | Error error ->
         (* Explained for the form, where it is shown, whatever [prefix]
            says the address came from. *)
@@ -244,12 +359,21 @@ let connect ?(prefix = "") t ~remote ~credentials ~save =
                 (Backend_address.to_string remote)
                 (Exn.to_string exn))
          | c ->
-           t.state <- Connected c;
-           let next = next t c in
-           (match next with
-            | Remote url -> t.on_page { url; remote = true }
-            | Code _ -> ());
-           Ok next))
+           (match
+              match c.relay with
+              | Some _ -> Site_probe.Result.Open
+              | None -> probe t c.remote
+            with
+            | Signin_required { why = _; login } ->
+              to_signin t ~login (Connected c);
+              Ok Next.Signin
+            | Open | Unreachable _ ->
+              t.state <- Connected c;
+              let next = next t c in
+              (match next with
+               | Remote _ -> t.on_page (remote_page t c.remote)
+               | Code _ | Signin -> ());
+              Ok next)))
 ;;
 
 (* Tokens and everything else would cross the network in the clear. *)
@@ -311,11 +435,25 @@ let field json name =
   | _ -> None
 ;;
 
-let rec status t flow =
+let confirmed json name =
+  match json with
+  | `Object fields ->
+    (match List.Assoc.find fields ~equal:String.equal name with
+     | Some `True -> true
+     | _ -> false)
+  | _ -> false
+;;
+
+(* [signin]: the window was sent back here by the site's sign-in proxy,
+   after having been signed in: its sign-in expired. *)
+let rec status t flow ~signin =
   match t.state with
   | Checking settled ->
     Promise.await settled;
-    status t flow
+    status t flow ~signin
+  | Connected ({ relay = None; _ } as c) when signin ->
+    to_signin t ~expired:true ~login:None (Connected c);
+    status t flow ~signin
   | Form { address; user; error } ->
     respond_json
       flow
@@ -341,15 +479,204 @@ let rec status t flow =
       flow
       (`Object
           [ "state", `String "remote"; "url", `String (remote_url t c.remote) ])
+  | Signin s ->
+    respond_json
+      flow
+      (`Object
+          [ "state", `String "signin"
+          ; "site", `String (site (Pending.remote s.pending))
+          ; "login", string_or_null s.login
+          ; ( "waiting"
+            , string_or_null
+                (Option.bind s.browser ~f:(fun b -> Promise.peek b.url)) )
+          ; "error", string_or_null s.error
+          ; ("expired", if s.expired then `True else `False)
+          ])
 ;;
 
-let confirmed json name =
-  match json with
-  | `Object fields ->
-    (match List.Assoc.find fields ~equal:String.equal name with
-     | Some `True -> true
-     | _ -> false)
-  | _ -> false
+let still_signing_in t (s : Signin.t) =
+  match t.state with
+  | Signin s' -> phys_equal s s'
+  | Checking _ | Form _ | Connected _ -> false
+;;
+
+let remember t remote grant =
+  match t.config.remember_signin remote grant with
+  | Ok () -> ()
+  | Error e ->
+    t.log (sprintf "cannot save the sign-in: %s" (Error.to_string_hum e))
+;;
+
+let signed_in_remote t (c : Connected.t) =
+  t.state <- Connected c;
+  t.on_page (remote_page t c.remote);
+  `Object [ "ok", `True; "remote", `String (remote_url t c.remote) ]
+;;
+
+let failed error = `Object [ "ok", `False; "error", `String error ]
+
+(* The grant's cookie for the site, and what was waiting on it. *)
+let granted t (s : Signin.t) (grant : Browser_signin.Grant.t) =
+  t.log "signed in through the browser";
+  let cookie = Some grant.proxy_cookie in
+  match s.pending with
+  | Connected c ->
+    let remote = Backend_address.with_proxy_cookie c.remote cookie in
+    remember t remote grant;
+    signed_in_remote t { c with remote }
+  | Unchecked { remote; credentials; save } ->
+    let remote = Backend_address.with_proxy_cookie remote cookie in
+    let credentials : Web_connect.Credentials.t =
+      match credentials.token with
+      | Some _ -> credentials
+      | None -> { token = grant.token; user = grant.user }
+    in
+    (match
+       Web_connect.Check.run
+         ~env:t.env
+         ~timeout:t.check_timeout
+         remote
+         credentials
+     with
+     | Ok () ->
+       let c = connected t ~remote ~credentials ~save in
+       remember t remote grant;
+       signed_in_remote t c
+     | Error (Signin_required why) ->
+       let error =
+         sprintf
+           "Signed in through the browser, but %s still asks for a sign-in: \
+            %s. Sign in again."
+           (site remote)
+           why
+       in
+       t.log error;
+       s.error <- Some error;
+       failed error
+     | Error error ->
+       let error =
+         Web_connect.Check.explain error remote ~source:Form credentials
+       in
+       t.log error;
+       t.state
+       <- Form
+            { address = Some (Backend_address.to_string remote)
+            ; user = credentials.user
+            ; error = Some error
+            };
+       failed error)
+;;
+
+let start_browser t (s : Signin.t) =
+  let url, set_url = Promise.create () in
+  let ended, set_ended = Promise.create () in
+  let cancelled, cancel = Promise.create () in
+  let attempt = { Browser_attempt.url; ended; cancel } in
+  s.browser <- Some attempt;
+  s.error <- None;
+  t.log "signing in through the browser";
+  Fiber.fork ~sw:t.sw (fun () ->
+    let outcome =
+      Fiber.first
+        (fun () ->
+           match
+             Browser_signin.run
+               ~env:t.env
+               ~program:Desktop
+               ~on_url:(fun ~url ~port:_ -> Promise.resolve set_url url)
+               (Pending.remote s.pending)
+           with
+           | result -> `Ended result
+           | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+           | exception exn -> `Ended (Error (Exn.to_string exn)))
+        (fun () ->
+           Promise.await cancelled;
+           `Cancelled)
+    in
+    s.browser <- None;
+    let answer =
+      match (outcome : [ `Cancelled | `Ended of _ ]) with
+      | _ when not (still_signing_in t s) ->
+        `Object [ "ok", `False; "cancelled", `True ]
+      | `Cancelled ->
+        t.log "the sign-in through the browser was cancelled";
+        `Object [ "ok", `False; "cancelled", `True ]
+      | `Ended (Error why) ->
+        let error =
+          sprintf
+            "Signing in through the browser did not work: %s. Try again, or \
+             sign in here."
+            why
+        in
+        t.log error;
+        s.error <- Some error;
+        failed error
+      | `Ended (Ok grant) ->
+        (match granted t s grant with
+         | answer -> answer
+         | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+         | exception exn ->
+           let error =
+             sprintf "Signed in, but starting failed: %s" (Exn.to_string exn)
+           in
+           t.log error;
+           s.error <- Some error;
+           failed error)
+    in
+    Promise.resolve set_ended answer);
+  attempt
+;;
+
+let open_in_browser t url = t.on_page { (Page.here url) with external_ = true }
+
+let cancel_browser (s : Signin.t) =
+  Option.iter s.browser ~f:(fun b ->
+    ignore (Promise.try_resolve b.cancel () : bool))
+;;
+
+let signin t flow json =
+  let respond = respond_json flow in
+  match t.state, field json "how" with
+  | Signin s, Some "browser" ->
+    let attempt =
+      match s.browser with
+      | Some attempt -> attempt
+      | None ->
+        let attempt = start_browser t s in
+        Fiber.any
+          [ (fun () -> open_in_browser t (Promise.await attempt.url))
+          ; (fun () -> ignore (Promise.await attempt.ended : Json.t))
+          ];
+        attempt
+    in
+    respond (Promise.await attempt.ended)
+  | Signin s, Some "again" ->
+    (match Option.bind s.browser ~f:(fun b -> Promise.peek b.url) with
+     | Some url ->
+       open_in_browser t url;
+       respond (`Object [ "ok", `True ])
+     | None ->
+       respond
+         (failed "No sign-in through the browser is under way: start one."))
+  | Signin s, Some "cancel" ->
+    cancel_browser s;
+    respond (`Object [ "ok", `True ])
+  | Signin s, Some "here" ->
+    cancel_browser s;
+    t.log "signing in in the window";
+    let c =
+      match s.pending with
+      | Connected c -> c
+      | Unchecked { remote; credentials; save } ->
+        connected ~tool_host:false t ~remote ~credentials ~save
+    in
+    t.state <- Connected c;
+    t.on_page (remote_page ~here:true t c.remote);
+    respond (`Object [ "ok", `True; "remote", `String (remote_url t c.remote) ])
+  | Signin _, _ ->
+    respond (failed {|"how": "browser", "again", "cancel" or "here" expected|})
+  | (Checking _ | Form _ | Connected _), _ ->
+    respond (failed "Not signing in now: reload the page.")
 ;;
 
 let form_connect t flow json =
@@ -367,6 +694,11 @@ let form_connect t flow json =
       (sprintf
          "Already connected to %s: reload the page."
          (Backend_address.to_string remote))
+  | Signin s ->
+    failed
+      (sprintf
+         "Signing in to %s: reload the page."
+         (site (Pending.remote s.pending)))
   | Form _ ->
     (match field json "address" with
      | None ->
@@ -402,6 +734,8 @@ let form_connect t flow json =
              respond_json flow (`Object [ "ok", `True; "code", `String code ])
            | Ok (Remote url) ->
              respond_json flow (`Object [ "ok", `True; "remote", `String url ])
+           | Ok Signin ->
+             respond_json flow (`Object [ "ok", `True; "signin", `True ])
            | Error error -> failed error)))
 ;;
 
@@ -451,7 +785,8 @@ let handle t (request : Web_server.Request.t) ~reader flow =
         "this is not the page prigh desktop opened: open prigh again\n"
     else (
       match String.chop_prefix request.path ~prefix:path_prefix with
-      | Some "status" -> status t flow
+      | Some "status" -> status t flow ~signin:(confirmed json "signin")
+      | Some "signin" -> signin t flow json
       | Some "connect" -> form_connect t flow json
       | Some "quit" ->
         respond_json flow (`Object [ "ok", `True ]);
@@ -477,7 +812,7 @@ let routes t (request : Web_server.Request.t) =
       (match Signin_handoff.route handoff request with
        | Some handler -> Some handler
        | None -> Web_proxy.routes ~env:t.env ~log:t.log remote request)
-    | Connected { relay = None; _ } | Checking _ | Form _ -> None)
+    | Connected { relay = None; _ } | Checking _ | Form _ | Signin _ -> None)
 ;;
 
 (* The relayed sockets go to the backend once connected; before that there
@@ -488,7 +823,7 @@ let websocket t path ~query ws =
     Option.iter
       (List.Assoc.find websockets ~equal:String.equal path)
       ~f:(fun f -> f ~query ws)
-  | Connected { relay = None; _ } | Checking _ | Form _ -> ()
+  | Connected { relay = None; _ } | Checking _ | Form _ | Signin _ -> ()
 ;;
 
 let on_lines t ~read_line ~write_line =
@@ -497,6 +832,7 @@ let on_lines t ~read_line ~write_line =
     ~connect_to:
       (match t.state with
        | Connected { remote; _ } -> Backend_address.to_string remote
+       | Signin s -> Backend_address.to_string (Pending.remote s.pending)
        | Checking _ | Form _ -> "the backend prigh desktop's window connects to")
     ~read_line
     ~write_line
@@ -543,6 +879,7 @@ let run
            ; state = Form { address = None; user = None; error = None }
            ; quit = set_quit
            ; on_page
+           ; page_url = ""
            }
          in
          let addr, port =
@@ -561,6 +898,10 @@ let run
                ~on_lines:(on_lines t)
                ())
          in
+         let url =
+           Web_server.browser_url ~host:(Web_connect.browser_host addr) ~port
+         in
+         t.page_url <- url ^ "#desktop=" ^ t.key;
          (match config.initial with
           | Form { address; user; error } ->
             t.state <- Form { address; user; error }
@@ -588,15 +929,12 @@ let run
                ignore
                  (connect t ~prefix ~remote ~credentials ~save
                   : (Next.t, string) Result.t)));
-         let url =
-           Web_server.browser_url ~host:(Web_connect.browser_host addr) ~port
-         in
          (* The key only to the shell: logs end up in files. *)
          log (sprintf "prigh-web on %s" url);
          (match t.state with
           | Connected { relay = None; _ } -> ()
-          | Connected { relay = Some _; _ } | Checking _ | Form _ ->
-            on_page { url = url ^ "#desktop=" ^ t.key; remote = false });
+          | Connected { relay = Some _; _ } | Checking _ | Form _ | Signin _ ->
+            on_page (Page.here t.page_url));
          Fiber.await_cancel ()))
     (fun () ->
        Fiber.any
