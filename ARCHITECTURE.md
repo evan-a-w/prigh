@@ -1740,7 +1740,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   [{path, id, bytes}], refused: [{path, error}]}`; `delete_session {path}`
   is the single form (its error the refusal's). A session is refused when
   it is the caller's own, the default (`-session`) one, running, open in
-  other frontends, or unknown; otherwise its files go, it leaves the agents
+  other frontends, or unknown. All three take `switch_to` (a session's
+  path or id) or `switch_to_new: true`: when the caller's own session is
+  among those deleted and would not be refused otherwise, the backend
+  first moves the caller there (as `switch_session`, or `new_session`) and
+  the reply adds that session's `state`; done in the one request, so no
+  other request can land between the move and the deletion (a `switch_to`
+  among the sessions deleted is an error, and nothing happens). Otherwise its files go, it leaves the agents
   table, and its terminal is killed (`on_session_deleted`, wired to
   `Terminals.kill` by `main`, keyed by `terminal_key`; relayed ones are
   closed with `Terminal_relay.close_key`, and every connected host that ran
