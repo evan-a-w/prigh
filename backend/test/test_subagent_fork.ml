@@ -178,7 +178,7 @@ let%expect_test
     cache_key: the caller's
     model: deepseek-flash, thinking: on
     starts with the caller's last request's messages: true
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  r1 read{"path":"notes.txt"}
     tool_result r1 read: the plan
     assistant: I know enough: forking. r2 read{"path":"other.txt"} c1 subagent{"task":"implement it","fork":true}
@@ -191,7 +191,7 @@ let%expect_test
   List.iter (Agent.messages agent) ~f:(fun m -> print_endline (message_line m));
   [%expect
     {|
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  r1 read{"path":"notes.txt"}
     tool_result r1 read: the plan
     assistant: I know enough: forking. r2 read{"path":"other.txt"} c1 subagent{"task":"implement it","fork":true}
@@ -290,7 +290,7 @@ let%expect_test
     cache_key: its own
     model: gpt-5, thinking: high
     starts with the caller's last request's messages: true
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  c1 subagent{"task":"other model","fork":true,"model":"openai/gpt-5","thinking":"high"} c2 subagent{"task":"subset","fork":true,"tools":["read","subagent"],"context":"the plan is X"}
     tool_result c1 subagent: This call started you: you are the subagent it forked from this conversation. Your task follows.
     tool_result c2 subagent: [not run here: your caller runs this call and gets its result; you, its fork, do not see it]
@@ -300,7 +300,7 @@ let%expect_test
     cache_key: its own
     model: deepseek-flash, thinking: on
     starts with the caller's last request's messages: true
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  c1 subagent{"task":"other model","fork":true,"model":"openai/gpt-5","thinking":"high"} c2 subagent{"task":"subset","fork":true,"tools":["read","subagent"],"context":"the plan is X"}
     tool_result c1 subagent: [not run here: your caller runs this call and gets its result; you, its fork, do not see it]
     tool_result c2 subagent: This call started you: you are the subagent it forked from this conversation. Your task follows.

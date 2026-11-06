@@ -97,8 +97,8 @@ let%expect_test
   send agent "three";
   [%expect
     {|
-    one: nothing told
-    elsewhere: nothing told
+    one: Using another client
+    elsewhere: Using another client
     two: Working directory is now $DIR/sub; Tools changed: apply_patch, web_search added; edit removed; Plan mode on: the model was told to plan, not change files
     three: nothing told
     |}];
@@ -142,7 +142,7 @@ let%expect_test "changes that cancel out tell nothing, across a restart too" =
   send agent "three";
   [%expect
     {|
-    one: nothing told
+    one: Using another client
     two: nothing told
     three: Tools changed: web_search added
     |}]
@@ -173,7 +173,7 @@ let%expect_test
   send agent "three";
   [%expect
     {|
-    two: nothing told
+    two: Using another client
     three: Working directory is now $DIR/sub
     |}]
 ;;
@@ -197,7 +197,7 @@ let%expect_test
   send agent "forked";
   [%expect
     {|
-    one: nothing told
+    one: Using another client
     two: Working directory is now $DIR/sub
     two again: Working directory is now $DIR/sub
     forked: Plan mode on: the model was told to plan, not change files

@@ -87,7 +87,9 @@ let%expect_test
     ((running false) (messages 2) (usage ((input 10) (output 5) (cache_read 0))))
     2
     state: running=true messages=0
-    user: hello
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    hello
     assistant: hi there
     state: running=false messages=2
     |}]
@@ -116,7 +118,9 @@ let%expect_test
   [%expect
     {|
     state: running=true messages=0
-    user: one
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    one
     queue: steer=0 follow_up=1
     assistant:
     tool_result:
@@ -151,7 +155,9 @@ let%expect_test
   [%expect
     {|
     state: running=true messages=0
-    user: one
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    one
     queue: steer=1 follow_up=0
     queue: steer=1 follow_up=1
     assistant: first done
@@ -185,7 +191,9 @@ let%expect_test "steer while running is injected after the tool results" =
   [%expect
     {|
     state: running=true messages=0
-    user: one
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    one
     queue: steer=1 follow_up=0
     assistant:
     tool_result: hi
@@ -217,7 +225,9 @@ let%expect_test "abort cancels the tool and drops queued follow-ups" =
     {|
     false
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     queue: steer=0 follow_up=1
     assistant:
     queue: steer=0 follow_up=0
@@ -268,7 +278,9 @@ let%expect_test "abort restores queued steer and follow-up messages" =
     {|
     (restored ("first steer" "second follow up"))
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     queue: steer=1 follow_up=0
     queue: steer=1 follow_up=1
     assistant:
@@ -305,7 +317,9 @@ let%expect_test "dequeue pops the most recently queued message" =
       (client ()) (ui_action ())))
     ()
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     queue: steer=1 follow_up=0
     queue: steer=1 follow_up=1
     queue: steer=1 follow_up=0
@@ -357,7 +371,9 @@ let%expect_test "remove_queued takes out one message, if it is still there" =
     ((second) (later))
     (Ok later)
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     queue: steer=1 follow_up=0
     queue: steer=2 follow_up=0
     queue: steer=2 follow_up=1
@@ -546,15 +562,24 @@ let%expect_test "new_session, switch_session, fork, rewind" =
   dump ();
   [%expect
     {|
-    ((forked_is_new true) (messages ("a again" a2)) (bad_switch true))
+    ((forked_is_new true)
+     (messages
+      ( "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\
+       \n\
+       \na again" a2))
+     (bad_switch true))
     state: running=true messages=0
-    user: a
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    a
     assistant: a1
     state: running=false messages=2
     queue: steer=0 follow_up=0
     state: running=false messages=0
     state: running=true messages=0
-    user: b
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    b
     assistant: b1
     state: running=false messages=2
     queue: steer=0 follow_up=0
@@ -563,7 +588,9 @@ let%expect_test "new_session, switch_session, fork, rewind" =
     state: running=false messages=2
     state: running=false messages=0
     state: running=true messages=0
-    user: a again
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    a again
     assistant: a2
     state: running=false messages=2
     |}]
@@ -599,11 +626,13 @@ let%expect_test "manual compaction" =
     {|
     (Error "nothing to compact: conversation is short")
     (Ok "SUMMARY OF OLD STUFF")
-    ("user: old question"
+    ("user: [Client: the user is on another client, which"
       "user: Summary of the conversation so far:\
      \nSUMMARY O" "user: recent question" "assistant: recent reply")
     state: running=true messages=0
-    user: old question
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    old question
     assistant: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     state: running=false messages=2
     state: running=true messages=2
@@ -786,7 +815,9 @@ let%expect_test "confirm_tools: denying a destructive tool continues the run" =
     (("[denied by user]" true))
     state: running=false messages=0
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     tool_result: [denied by user]
     assistant: after denial
@@ -822,7 +853,9 @@ let%expect_test "confirm_tools: allowing a destructive tool runs it" =
     (("hi\n" false))
     state: running=false messages=0
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     tool_result: hi
     assistant: done
@@ -863,7 +896,9 @@ let%expect_test "confirm_tools: summaries are path/command by tool" =
     (Ok ())
     state: running=false messages=0
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     tool_result: wrote 2 lines to $DIR/a.txt
     tool_result: --- a/a.txt
@@ -901,7 +936,9 @@ let%expect_test "confirm_tools: read is not gated" =
     (("file not found: $DIR/missing" true))
     state: running=false messages=0
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     tool_result: file not found: $DIR/missing
     assistant: done
@@ -936,7 +973,9 @@ let%expect_test "confirm_tools: abort while waiting cancels the tool" =
     (([cancelled] true))
     state: running=false messages=0
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     queue: steer=0 follow_up=0
     tool_result: [cancelled]
@@ -976,7 +1015,9 @@ let%expect_test "abort kills a tool's whole process group promptly" =
     {|
     idle within a second: true
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant:
     queue: steer=0 follow_up=0
     tool_result: started
@@ -1041,10 +1082,12 @@ let%expect_test
     {|
     requests: 2, identical system prompts: true
     system prompt mentions sub rules: false
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    first
     user: [Environment: the working directory is now $DIR/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 
     second
-    user: first
     true
     reloaded prompt identical: true
     third message carries no note: true
@@ -1110,7 +1153,10 @@ let%expect_test
     (List.all_equal systems ~equal:[%equal: string option] |> Option.is_some);
   [%expect
     {|
-    (deepseek-flash (edit) (first))
+    (deepseek-flash (edit)
+     ( "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\
+      \n\
+      \nfirst"))
     (gpt-5.4 (apply_patch web_search)
      ( "[Tools: the tools changed with the model. Now available: apply_patch, web_search. No longer available: edit.]\
       \n\
@@ -1157,7 +1203,9 @@ let%expect_test "set_active_host with a cwd validates it on the new host" =
   [%expect
     {|
     state: running=true messages=0
-    user: first
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    first
     assistant: ok
     state: running=false messages=2
     (Error "<host>: not a directory: /no/such/dir")
@@ -1270,7 +1318,9 @@ let%expect_test
     {|
     (restored (queued))
     state: running=true messages=0
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     queue: steer=1 follow_up=0
     assistant:
     queue: steer=0 follow_up=0
@@ -1359,7 +1409,9 @@ let%expect_test
     (("Fixing flaky reload tests") ("Fixing flaky reload tests"))
     (("Fixing flaky reload tests") ("Fixing flaky reload tests"))
     state: running=true messages=0
-    user: first question
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    first question
     assistant: one
     state: running=false messages=2
     state: running=false messages=2
@@ -1376,7 +1428,7 @@ let%expect_test
     user: fourth
     assistant: four
     state: running=false messages=8
-    You are prigh, a coding : first question
+    You are prigh, a coding : [Client: the user is on anothe
     You name the sessions of: User: first question||Assistan
     You are prigh, a coding : second question
     You are prigh, a coding : third question
@@ -1405,7 +1457,9 @@ let%expect_test
     {|
     ("Adding OAuth login")
     state: running=true messages=0
-    user: a
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    a
     assistant: one
     state: running=false messages=2
     notice: naming the session failed: empty reply
@@ -1428,7 +1482,9 @@ let%expect_test "auto-describe: a failed turn is not named" =
     {|
     ()
     state: running=true messages=0
-    user: a
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    a
     assistant:
     state: running=false messages=2
     |}]
@@ -1457,7 +1513,9 @@ let%expect_test "auto-describe: a session deleted meanwhile is not recreated" =
     deleted while describing
     file exists: false
     state: running=true messages=0
-    user: a
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    a
     assistant: one
     state: running=false messages=2
     state: running=false messages=2
@@ -1622,7 +1680,7 @@ let%expect_test "two prompts while attachments are read start one run" =
     {|
     (Ok ())
     (Error "a run is already in progress; use steer or follow_up")
-    user: a @notes.txt
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
     assistant: one
     user: c @notes.txt
     assistant: two

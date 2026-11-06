@@ -34,15 +34,50 @@ let sniff bytes =
 
 let max_preview_bytes = 20 * 1000 * 1000
 
+(* The root element is [<svg>], after an optional BOM, XML declaration
+   and processing instructions, comments and doctype. *)
 let is_svg bytes =
-  let head =
-    String.prefix bytes 1024
-    |> String.chop_prefix_if_exists ~prefix:"\xef\xbb\xbf"
-    |> String.lstrip
+  let head = String.prefix bytes 4096 in
+  let n = String.length head in
+  let skip_to i ~suffix =
+    match String.substr_index head ~pos:i ~pattern:suffix with
+    | Some j -> Some (j + String.length suffix)
+    | None -> None
   in
-  String.is_prefix head ~prefix:"<"
-  && String.is_substring (String.prefix bytes 4096) ~substring:"<svg"
-  && not (String.mem (String.prefix bytes 4096) '\000')
+  (* A doctype's internal subset is in brackets, which may hold [>]. *)
+  let rec skip_doctype i ~depth =
+    if i >= n
+    then None
+    else (
+      match head.[i] with
+      | '[' -> skip_doctype (i + 1) ~depth:(depth + 1)
+      | ']' -> skip_doctype (i + 1) ~depth:(depth - 1)
+      | '>' when depth <= 0 -> Some (i + 1)
+      | _ -> skip_doctype (i + 1) ~depth)
+  in
+  let at i prefix = String.is_substring_at head ~pos:i ~substring:prefix in
+  let rec root i =
+    if i >= n
+    then false
+    else if Char.is_whitespace head.[i]
+    then root (i + 1)
+    else if at i "<?"
+    then Option.value_map (skip_to i ~suffix:"?>") ~default:false ~f:root
+    else if at i "<!--"
+    then Option.value_map (skip_to (i + 4) ~suffix:"-->") ~default:false ~f:root
+    else if
+      i + 9 <= n
+      && String.Caseless.equal (String.sub head ~pos:i ~len:9) "<!DOCTYPE"
+    then Option.value_map (skip_doctype (i + 9) ~depth:0) ~default:false ~f:root
+    else
+      at i "<svg"
+      && (i + 4 >= n
+          || Char.is_whitespace head.[i + 4]
+          || Char.equal head.[i + 4] '>'
+          || Char.equal head.[i + 4] '/')
+  in
+  (not (String.mem head '\000'))
+  && root (if String.is_prefix head ~prefix:"\xef\xbb\xbf" then 3 else 0)
 ;;
 
 let sniff_displayable bytes =

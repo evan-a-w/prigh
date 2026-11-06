@@ -31,6 +31,7 @@ module Token = struct
     | Ident of string
     | Op of string (** also parentheses, [,], [?] and [:] *)
     | End
+  [@@deriving equal]
 
   let describe = function
     | Num _ -> "a number"
@@ -204,7 +205,7 @@ let parse s =
           column
           (Token.describe token)
     in
-    if Poly.equal (fst (peek ())) End
+    if Token.equal (fst (peek ())) End
     then fail "the expression is empty"
     else (
       let e = cond () in
@@ -262,4 +263,48 @@ let check t ~inputs =
   in
   go t;
   Queue.to_list errors
+;;
+
+let eval t ~inputs =
+  let truth b = if b then 1. else 0. in
+  let rec go = function
+    | Number f -> f
+    | Name name -> inputs name
+    | Neg e -> -.go e
+    | Binary (op, a, b) ->
+      let a = go a
+      and b = go b in
+      (match op with
+       | "+" -> a +. b
+       | "-" -> a -. b
+       | "*" -> a *. b
+       | "/" -> a /. b
+       | "%" -> Float.mod_float a b
+       | "^" -> a **. b
+       | "<" -> truth Float.(a < b)
+       | "<=" -> truth Float.(a <= b)
+       | ">" -> truth Float.(a > b)
+       | ">=" -> truth Float.(a >= b)
+       | "==" -> truth Float.(a = b)
+       | "!=" -> truth (not Float.(a = b))
+       | _ -> Float.nan)
+    | Cond (c, a, b) ->
+      let c = go c in
+      if Float.is_nan c || Float.(c = 0.) then go b else go a
+    | Call (name, args) ->
+      (match name, List.map args ~f:go with
+       | "min", x :: xs -> List.fold xs ~init:x ~f:Float.min
+       | "max", x :: xs -> List.fold xs ~init:x ~f:Float.max
+       | "abs", [ x ] -> Float.abs x
+       | "round", [ x ] -> Stdlib.Float.round x
+       | "floor", [ x ] -> Float.round_down x
+       | "ceil", [ x ] -> Float.round_up x
+       | "sqrt", [ x ] -> Float.sqrt x
+       | "pow", [ x; y ] -> x **. y
+       | "log", [ x ] -> Float.log10 x
+       | "ln", [ x ] -> Float.log x
+       | "exp", [ x ] -> Float.exp x
+       | _ -> Float.nan)
+  in
+  go t
 ;;

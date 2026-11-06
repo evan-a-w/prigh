@@ -535,7 +535,7 @@ let%expect_test "the next request leaves out what was deleted or trimmed" =
   [%expect
     {|
     state: messages=6 context_tokens=10 hidden=[]
-    state: messages=5 context_tokens=10 hidden=[deleted 1]
+    state: messages=5 context_tokens=0 hidden=[deleted 1]
     request: U([the convers) A[c1] T(c1) A(r1) U(q2) A(r2) U(q3)
     |}];
   (* The reply with the call goes with its result. *)
@@ -634,7 +634,7 @@ let%expect_test "/compact after a deletion: the deleted message is not carried o
     summarise: U([the convers) A(r1) U(q2) A(r2xxxxxxxxxx)
     (Ok SUMMARY)
     request: U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
-    state: messages=7 context_tokens=10 hidden=[]
+    state: messages=7 context_tokens=43 hidden=[]
     request: U(q1) U(q2) S(SUMMARY) U(q3) A(r3) U(q4) A(r4) U(q5)
     |}]
 ;;

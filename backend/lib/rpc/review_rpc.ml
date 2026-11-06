@@ -108,7 +108,7 @@ let review ?by agent ~root ~path ~action ~f =
     ~f:(fun () -> Rpc_json.review (Agent.review_state agent))
 ;;
 
-let dispatch ?by agent ~meth ~params =
+let dispatch ?by ?client agent ~meth ~params =
   let open Or_error.Let_syntax in
   match meth with
   | "get_review" -> Some (Ok (Rpc_json.review (Agent.review_state agent)))
@@ -156,7 +156,7 @@ let dispatch ?by agent ~meth ~params =
   | "review_submit" ->
     Some
       (let%bind root = optional string params "root" in
-       let%map count = Agent.submit_review ?root agent in
+       let%map count = Agent.submit_review ?client ?root agent in
        `Object [ "count", `Number (Int.to_string count) ])
   | "review_decide" ->
     Some

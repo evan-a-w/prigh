@@ -180,7 +180,7 @@ let%expect_test
   [%expect
     {|
     request: 1 messages
-      user "go"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant: a
     request: 3 messages
       user "[prigh reminder: r1, as you ended your turn (1 of 2)] Don't stop until done." <reminder: Reminder r1: Don't stop until done. (1/2)>
@@ -229,7 +229,7 @@ let%expect_test "a user message sent while it works starts the count over" =
   [%expect
     {|
     request: 1 messages
-      user "go"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant: a
     request: 3 messages
       user "[prigh reminder: r1, as you ended your turn (1 of 1)] Go on." <reminder: Reminder r1: Go on. (1/1)>
@@ -252,7 +252,7 @@ let%expect_test "not after an error, an abort, in plan mode or past the budget" 
   [%expect
     {|
     request: 1 messages
-      user "fail"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant:  ERROR HTTP 400: bad request
     |}];
   with_agent
@@ -272,7 +272,7 @@ let%expect_test "not after an error, an abort, in plan mode or past the budget" 
   [%expect
     {|
     request: 1 messages
-      user "abort me"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant:
     tool bash: [cancelled]
     |}];
@@ -295,7 +295,7 @@ let%expect_test "not after an error, an abort, in plan mode or past the budget" 
   [%expect
     {|
     request: 1 messages
-      user "spend"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant: expensive
     |}]
 ;;
@@ -320,7 +320,7 @@ let%expect_test "it waits for a running background job, then reminds" =
   [%expect
     {|
     request: 1 messages
-      user "build"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant:
     tool bash: started job j1: sleep 0.3; its output is being recorded; you will be notified wh
     request: 3 messages
@@ -380,7 +380,7 @@ let%expect_test
   [%expect
     {|
     request: 1 messages
-      user "work"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant:
     tool filler: x
     request: 3 messages
@@ -414,7 +414,7 @@ let%expect_test "a fork keeps the reminders and starts the counts over" =
   [%expect
     {|
     request: 1 messages
-      user "one"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant: a
     ((name r1) (text "Check disk usage.") (trigger (Every_turns 2)))
     request: 3 messages
@@ -462,7 +462,7 @@ let%expect_test "subagents never get reminders" =
   [%expect
     {|
     request: 1 messages
-      user "delegate"
+      user "[Client: the user is on another client, which cannot display components: do not call rende"
     assistant:
     tool subagent: started agent a1 (dig); its result will be delivered to you when it finishes: ke
     request: 4 messages

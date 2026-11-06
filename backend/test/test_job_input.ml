@@ -95,7 +95,7 @@ let%expect_test "job_input drives a job on this machine" =
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while read line; do echo \"got $line\"; done; echo bye","background":true,"stdin":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: while read line; do echo "got $line"; done; echo bye; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -136,7 +136,7 @@ let%expect_test "without stdin: true a job reads end of input at once" =
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to the end","background":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.

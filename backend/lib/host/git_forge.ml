@@ -113,8 +113,7 @@ let git ~env ~cancel ?(timeout = Time_ns.Span.of_sec 30.) ~dir args =
     raise (Failed (sprintf "git %s timed out" (String.concat ~sep:" " args)))
   | { exit = Signaled _; stderr; _ } ->
     raise (Failed ("git failed: " ^ String.strip stderr))
-  | exception Eio.Io _ ->
-    raise (Failed (Git_missing.message ()))
+  | exception Eio.Io _ -> raise (Failed (Git_missing.message ()))
 ;;
 
 module Runner = struct
