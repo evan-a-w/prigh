@@ -9,6 +9,7 @@ pub mod devtools;
 pub mod failure;
 pub mod launch;
 pub mod navigation;
+pub mod profile;
 pub mod ready;
 pub mod search_path;
 pub mod tail;
