@@ -1298,8 +1298,12 @@ let%expect_test "archived sessions and deleting them" =
   let parse s = Json.parse s |> Or_error.ok_exn in
   List.iter
     [ Request.Method.Set_archived { path = "/s/a.jsonl"; archived = true }
-    ; Delete_sessions [ "/s/a.jsonl"; "/s/b.jsonl" ]
-    ; Delete_archived
+    ; Delete_sessions
+        { paths = [ "/s/a.jsonl"; "/s/b.jsonl" ]; switch_to = None }
+    ; Delete_sessions
+        { paths = [ "/s/a.jsonl" ]; switch_to = Some (Session "/s/b.jsonl") }
+    ; Delete_archived { switch_to = None }
+    ; Delete_archived { switch_to = Some New_session }
     ]
     ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
   print_s
@@ -1323,7 +1327,7 @@ let%expect_test "archived sessions and deleting them" =
   print_s [%sexp (result : Delete_result.t)];
   print_endline (Delete_result.summary result);
   print_endline
-    (Delete_result.summary { deleted = []; refused = [] }
+    (Delete_result.summary { deleted = []; refused = []; moved_to = None }
      ^ " / "
      ^ String.concat
          ~sep:", "
@@ -1334,7 +1338,9 @@ let%expect_test "archived sessions and deleting them" =
     {|
     {"id":1,"method":"set_archived","params":{"path":"/s/a.jsonl","archived":true}}
     {"id":1,"method":"delete_sessions","params":{"paths":["/s/a.jsonl","/s/b.jsonl"]}}
+    {"id":1,"method":"delete_sessions","params":{"paths":["/s/a.jsonl"],"switch_to":"/s/b.jsonl"}}
     {"id":1,"method":"delete_archived","params":{}}
+    {"id":1,"method":"delete_archived","params":{"switch_to_new":true}}
     (Ok (
       (id   a)
       (path /p)
@@ -1365,7 +1371,8 @@ let%expect_test "archived sessions and deleting them" =
        ((path /s/b.jsonl) (id b) (bytes 2000000))))
      (refused ((
        (path /s/c.jsonl)
-       (error "session c is running: wait for it or /abort it first")))))
+       (error "session c is running: wait for it or /abort it first"))))
+     (moved_to ()))
     Deleted 2 sessions (1.9 MB)
     Not deleted: session c is running: wait for it or /abort it first
     Deleted nothing / 0 B, 1023 B, 1.0 KB, 1.4 MB, 2.8 GB

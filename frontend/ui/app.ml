@@ -5327,7 +5327,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       ( notice m "trimming…"
       , [ call (Trim_after { after }) ~tag:(Trimmed `Trim_after) ] )
     | Delete_sessions { paths; back } ->
-      back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
+      back_to m back, [ call (Delete_sessions { paths; switch_to = None }) ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
     | Nix_gc generations -> start_nix_gc m (Some generations)
     | Create_dir { target; path } ->
