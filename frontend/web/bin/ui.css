@@ -566,7 +566,7 @@ select.ui-input {
 }
 .ui-calc-output:first-child .ui-calc-value:not(.none) { color: var(--sodium); }
 .ui-calc-value.none { color: var(--faint); font-weight: 500; }
-.ui-calc-why { color: var(--brick); font-size: 12px; }
+.ui-calc-why { display: block; margin-top: 2px; color: var(--brick); font: 12px/1.4 var(--sans, inherit); }
 
 /* Quiz */
 .ui-quiz-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }

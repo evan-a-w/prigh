@@ -105,21 +105,21 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
       <div class="ui-title"> Build times </div>
       <div class="ui-chart-sub"> Last four weeks </div>
       <div aria-hidden="true" class="ui-chart-yname"> Duration (s) </div>
-      <div class="ui-chart-frame" style={ --gutter: 3ch; --rows: 4; }>
+      <div style="--gutter: 3ch; --rows: 4;" class="ui-chart-frame">
         <div aria-hidden="true" class="ui-chart-yaxis">
-          <span class="ui-chart-tick" style={ bottom: 0%; }> 5 </span>
-          <span class="ui-chart-tick" style={ bottom: 25%; }> 10 </span>
-          <span class="ui-chart-tick" style={ bottom: 50%; }> 15 </span>
-          <span class="ui-chart-tick" style={ bottom: 75%; }> 20 </span>
-          <span class="ui-chart-tick" style={ bottom: 100%; }> 25 </span>
+          <span style="bottom: 0%;" class="ui-chart-tick"> 5 </span>
+          <span style="bottom: 25%;" class="ui-chart-tick"> 10 </span>
+          <span style="bottom: 50%;" class="ui-chart-tick"> 15 </span>
+          <span style="bottom: 75%;" class="ui-chart-tick"> 20 </span>
+          <span style="bottom: 100%;" class="ui-chart-tick"> 25 </span>
         </div>
         <div class="ui-chart-plot">
           <div aria-hidden="true" class="ui-chart-grid">
-            <span class="ui-chart-gridline" style={ bottom: 0%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 25%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 50%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 75%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+            <span style="bottom: 0%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 25%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 50%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 75%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
           </div>
           <svg class="ui-chart-svg"
                viewBox="0 0 100 100"
@@ -129,19 +129,16 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
             <path class="s1 ui-chart-line" d="M12.5 65 L37.5 47.5 M87.5 80"> </path>
             <path class="s2 ui-chart-line" d="M12.5 25 M62.5 35 L87.5 15"> </path>
           </svg>
-          <div tabindex="0"
+          <div style="left: 0%; width: 25%;"
+               tabindex="0"
                role="img"
                aria-label="W1: main 12 s, pr 20 s"
-               class="ui-chart-col"
-               style={
-                 left: 0%;
-                 width: 25%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-guide"> </span>
-            <span class="s1 ui-chart-dot" style={ bottom: 35%; }> </span>
-            <span class="lone s2 ui-chart-dot" style={ bottom: 75%; }> </span>
+            <span style="bottom: 35%;" class="s1 ui-chart-dot"> </span>
+            <span style="bottom: 75%;" class="lone s2 ui-chart-dot"> </span>
           </div>
-          <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 12.5%; }>
+          <div aria-hidden="true" style="--x: 12.5%;" class="right ui-chart-tip">
             <div class="ui-chart-tip-head"> W1 </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -154,18 +151,15 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
               <span class="ui-chart-value"> 20 s </span>
             </div>
           </div>
-          <div tabindex="0"
+          <div style="left: 25%; width: 25%;"
+               tabindex="0"
                role="img"
                aria-label="W2: main 15.5 s, pr no value"
-               class="ui-chart-col"
-               style={
-                 left: 25%;
-                 width: 25%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-guide"> </span>
-            <span class="s1 ui-chart-dot" style={ bottom: 52.5%; }> </span>
+            <span style="bottom: 52.5%;" class="s1 ui-chart-dot"> </span>
           </div>
-          <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 37.5%; }>
+          <div aria-hidden="true" style="--x: 37.5%;" class="right ui-chart-tip">
             <div class="ui-chart-tip-head"> W2 </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -178,18 +172,15 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
               <span class="ui-chart-value"> — </span>
             </div>
           </div>
-          <div tabindex="0"
+          <div style="left: 50%; width: 25%;"
+               tabindex="0"
                role="img"
                aria-label="W3: main no value, pr 18 s"
-               class="ui-chart-col"
-               style={
-                 left: 50%;
-                 width: 25%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-guide"> </span>
-            <span class="s2 ui-chart-dot" style={ bottom: 65%; }> </span>
+            <span style="bottom: 65%;" class="s2 ui-chart-dot"> </span>
           </div>
-          <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 62.5%; }>
+          <div aria-hidden="true" style="--x: 62.5%;" class="left ui-chart-tip">
             <div class="ui-chart-tip-head"> W3 </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -202,19 +193,16 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
               <span class="ui-chart-value"> 18 s </span>
             </div>
           </div>
-          <div tabindex="0"
+          <div style="left: 75%; width: 25%;"
+               tabindex="0"
                role="img"
                aria-label="W4: main 9 s, pr 22 s"
-               class="ui-chart-col"
-               style={
-                 left: 75%;
-                 width: 25%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-guide"> </span>
-            <span class="lone s1 ui-chart-dot" style={ bottom: 20%; }> </span>
-            <span class="s2 ui-chart-dot" style={ bottom: 85%; }> </span>
+            <span style="bottom: 20%;" class="lone s1 ui-chart-dot"> </span>
+            <span style="bottom: 85%;" class="s2 ui-chart-dot"> </span>
           </div>
-          <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 87.5%; }>
+          <div aria-hidden="true" style="--x: 87.5%;" class="left ui-chart-tip">
             <div class="ui-chart-tip-head"> W4 </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -229,10 +217,10 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
           </div>
         </div>
         <div aria-hidden="true" class="ui-chart-xaxis">
-          <span class="ui-chart-tick" style={ left: 12.5%; --w: 25%; }> W1 </span>
-          <span class="minor ui-chart-tick" style={ left: 37.5%; --w: 25%; }> W2 </span>
-          <span class="ui-chart-tick" style={ left: 62.5%; --w: 25%; }> W3 </span>
-          <span class="minor ui-chart-tick" style={ left: 87.5%; --w: 25%; }> W4 </span>
+          <span style="left: 12.5%; --w: 25%;" class="ui-chart-tick"> W1 </span>
+          <span style="left: 37.5%; --w: 25%;" class="minor ui-chart-tick"> W2 </span>
+          <span style="left: 62.5%; --w: 25%;" class="ui-chart-tick"> W3 </span>
+          <span style="left: 87.5%; --w: 25%;" class="minor ui-chart-tick"> W4 </span>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -314,30 +302,27 @@ let%expect_test "bars: grouped, negatives from the zero line" =
     {|
     <div class="ui-chart-plot">
       <div aria-hidden="true" class="ui-chart-grid">
-        <span class="ui-chart-gridline" style={ bottom: 0%; }> </span>
-        <span class="ui-chart-gridline zero" style={ bottom: 33.33%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 66.67%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+        <span style="bottom: 0%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 33.33%;" class="ui-chart-gridline zero"> </span>
+        <span style="bottom: 66.67%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <div tabindex="0"
+      <div style="left: 0%; width: 50%;"
+           tabindex="0"
            role="img"
            aria-label="Q1: a 10%, b 3%"
-           class="ui-chart-col"
-           style={
-             left: 0%;
-             width: 50%;
-           }>
+           class="ui-chart-col">
         <span class="ui-chart-group">
           <span class="ui-chart-slot">
-            <span class="end s1 ui-chart-bar" style={ bottom: 33.33%; height: 66.67%; }> </span>
+            <span style="bottom: 33.33%; height: 66.67%;" class="end s1 ui-chart-bar"> </span>
           </span>
           <span class="ui-chart-slot">
-            <span class="end s2 ui-chart-bar" style={ bottom: 33.33%; height: 20%; }> </span>
+            <span style="bottom: 33.33%; height: 20%;" class="end s2 ui-chart-bar"> </span>
           </span>
         </span>
       </div>
-      <div aria-hidden="true" class="right ui-chart-tip" style={ --x: 25%; }>
+      <div aria-hidden="true" style="--x: 25%;" class="right ui-chart-tip">
         <div class="ui-chart-tip-head"> Q1 </div>
         <div class="s1 ui-chart-tip-row">
           <span class="ui-chart-swatch"> </span>
@@ -350,22 +335,19 @@ let%expect_test "bars: grouped, negatives from the zero line" =
           <span class="ui-chart-value"> 3% </span>
         </div>
       </div>
-      <div tabindex="0"
+      <div style="left: 50%; width: 50%;"
+           tabindex="0"
            role="img"
            aria-label="Q2: a −5%, b no value"
-           class="ui-chart-col"
-           style={
-             left: 50%;
-             width: 50%;
-           }>
+           class="ui-chart-col">
         <span class="ui-chart-group">
           <span class="ui-chart-slot">
-            <span class="end neg s1 ui-chart-bar" style={ bottom: 0%; height: 33.33%; }> </span>
+            <span style="bottom: 0%; height: 33.33%;" class="end neg s1 ui-chart-bar"> </span>
           </span>
           <span class="ui-chart-slot"> </span>
         </span>
       </div>
-      <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 75%; }>
+      <div aria-hidden="true" style="--x: 75%;" class="left ui-chart-tip">
         <div class="ui-chart-tip-head"> Q2 </div>
         <div class="s1 ui-chart-tip-row">
           <span class="ui-chart-swatch"> </span>
@@ -395,30 +377,27 @@ let%expect_test "stacked bars: a total in the tooltip" =
     {|
     <div class="ui-chart-plot">
       <div aria-hidden="true" class="ui-chart-grid">
-        <span class="ui-chart-gridline" style={ bottom: 0%; }> </span>
-        <span class="ui-chart-gridline zero" style={ bottom: 25%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 50%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 75%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+        <span style="bottom: 0%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 25%;" class="ui-chart-gridline zero"> </span>
+        <span style="bottom: 50%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 75%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <div tabindex="0"
+      <div style="left: 0%; width: 100%;"
+           tabindex="0"
            role="img"
            aria-label="Mon: a $2, b $3, c −$1"
-           class="ui-chart-col"
-           style={
-             left: 0%;
-             width: 100%;
-           }>
+           class="ui-chart-col">
         <span class="ui-chart-group">
           <span class="ui-chart-slot">
-            <span class="s1 ui-chart-bar" style={ bottom: 25%; height: 25%; }> </span>
-            <span class="end s2 ui-chart-bar" style={ bottom: 50%; height: 37.5%; }> </span>
-            <span class="end neg s3 ui-chart-bar" style={ bottom: 12.5%; height: 12.5%; }> </span>
+            <span style="bottom: 25%; height: 25%;" class="s1 ui-chart-bar"> </span>
+            <span style="bottom: 50%; height: 37.5%;" class="end s2 ui-chart-bar"> </span>
+            <span style="bottom: 12.5%; height: 12.5%;" class="end neg s3 ui-chart-bar"> </span>
           </span>
         </span>
       </div>
-      <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 50%; }>
+      <div aria-hidden="true" style="--x: 50%;" class="left ui-chart-tip">
         <div class="ui-chart-tip-head"> Mon </div>
         <div class="s1 ui-chart-tip-row">
           <span class="ui-chart-swatch"> </span>
@@ -461,37 +440,34 @@ let%expect_test "horizontal bars: labels down the side" =
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div aria-hidden="true" class="ui-chart-yname"> Test </div>
-      <div class="ui-chart-frame" style={ --gutter: 7ch; --rows: 2; }>
+      <div style="--gutter: 7ch; --rows: 2;" class="ui-chart-frame">
         <div aria-hidden="true" class="ui-chart-cats ui-chart-yaxis">
-          <span class="ui-chart-tick" style={ top: 25%; }> parser </span>
-          <span class="ui-chart-tick" style={ top: 75%; }> typer </span>
+          <span style="top: 25%;" class="ui-chart-tick"> parser </span>
+          <span style="top: 75%;" class="ui-chart-tick"> typer </span>
         </div>
         <div class="ui-chart-plot">
           <div aria-hidden="true" class="ui-chart-grid">
-            <span class="ui-chart-gridline zero" style={ left: 0%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 16.67%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 33.33%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 50%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 66.67%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 83.33%; }> </span>
-            <span class="ui-chart-gridline" style={ left: 100%; }> </span>
+            <span style="left: 0%;" class="ui-chart-gridline zero"> </span>
+            <span style="left: 16.67%;" class="ui-chart-gridline"> </span>
+            <span style="left: 33.33%;" class="ui-chart-gridline"> </span>
+            <span style="left: 50%;" class="ui-chart-gridline"> </span>
+            <span style="left: 66.67%;" class="ui-chart-gridline"> </span>
+            <span style="left: 83.33%;" class="ui-chart-gridline"> </span>
+            <span style="left: 100%;" class="ui-chart-gridline"> </span>
           </div>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <div tabindex="0"
+          <div style="top: 0%; height: 50%;"
+               tabindex="0"
                role="img"
                aria-label="parser: 4.2"
-               class="ui-chart-col"
-               style={
-                 top: 0%;
-                 height: 50%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-group">
               <span class="ui-chart-slot">
-                <span class="end s1 ui-chart-bar" style={ left: 0%; width: 35%; }> </span>
+                <span style="left: 0%; width: 35%;" class="end s1 ui-chart-bar"> </span>
               </span>
             </span>
           </div>
-          <div aria-hidden="true" class="below ui-chart-tip" style={ --y: 50%; }>
+          <div aria-hidden="true" style="--y: 50%;" class="below ui-chart-tip">
             <div class="ui-chart-tip-head"> parser </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -499,21 +475,18 @@ let%expect_test "horizontal bars: labels down the side" =
               <span class="ui-chart-value"> 4.2 </span>
             </div>
           </div>
-          <div tabindex="0"
+          <div style="top: 50%; height: 50%;"
+               tabindex="0"
                role="img"
                aria-label="typer: 11"
-               class="ui-chart-col"
-               style={
-                 top: 50%;
-                 height: 50%;
-               }>
+               class="ui-chart-col">
             <span class="ui-chart-group">
               <span class="ui-chart-slot">
-                <span class="end s1 ui-chart-bar" style={ left: 0%; width: 91.67%; }> </span>
+                <span style="left: 0%; width: 91.67%;" class="end s1 ui-chart-bar"> </span>
               </span>
             </span>
           </div>
-          <div aria-hidden="true" class="above ui-chart-tip" style={ --y: 50%; }>
+          <div aria-hidden="true" style="--y: 50%;" class="above ui-chart-tip">
             <div class="ui-chart-tip-head"> typer </div>
             <div class="s1 ui-chart-tip-row">
               <span class="ui-chart-swatch"> </span>
@@ -523,13 +496,13 @@ let%expect_test "horizontal bars: labels down the side" =
           </div>
         </div>
         <div aria-hidden="true" class="ui-chart-values ui-chart-xaxis">
-          <span class="ui-chart-tick" style={ left: 0%; }> 0 </span>
-          <span class="minor ui-chart-tick" style={ left: 16.67%; }> 2 </span>
-          <span class="ui-chart-tick" style={ left: 33.33%; }> 4 </span>
-          <span class="minor ui-chart-tick" style={ left: 50%; }> 6 </span>
-          <span class="ui-chart-tick" style={ left: 66.67%; }> 8 </span>
-          <span class="minor ui-chart-tick" style={ left: 83.33%; }> 10 </span>
-          <span class="ui-chart-tick" style={ left: 100%; }> 12 </span>
+          <span style="left: 0%;" class="ui-chart-tick"> 0 </span>
+          <span style="left: 16.67%;" class="minor ui-chart-tick"> 2 </span>
+          <span style="left: 33.33%;" class="ui-chart-tick"> 4 </span>
+          <span style="left: 50%;" class="minor ui-chart-tick"> 6 </span>
+          <span style="left: 66.67%;" class="ui-chart-tick"> 8 </span>
+          <span style="left: 83.33%;" class="minor ui-chart-tick"> 10 </span>
+          <span style="left: 100%;" class="ui-chart-tick"> 12 </span>
         </div>
       </div>
       <div aria-hidden="true" class="ui-chart-xname"> Seconds </div>
@@ -569,14 +542,14 @@ let%expect_test "many labels: every few on the axis, dense markers" =
   [%expect
     {|
     <div aria-hidden="true" class="ui-chart-xaxis">
-      <span class="ui-chart-tick" style={ left: 1%; --w: 14%; }> d0 </span>
-      <span class="minor ui-chart-tick" style={ left: 15%; --w: 14%; }> d7 </span>
-      <span class="ui-chart-tick" style={ left: 29%; --w: 14%; }> d14 </span>
-      <span class="minor ui-chart-tick" style={ left: 43%; --w: 14%; }> d21 </span>
-      <span class="ui-chart-tick" style={ left: 57%; --w: 14%; }> d28 </span>
-      <span class="minor ui-chart-tick" style={ left: 71%; --w: 14%; }> d35 </span>
-      <span class="ui-chart-tick" style={ left: 85%; --w: 14%; }> d42 </span>
-      <span class="minor ui-chart-tick" style={ left: 99%; --w: 14%; }> d49 </span>
+      <span style="left: 1%; --w: 14%;" class="ui-chart-tick"> d0 </span>
+      <span style="left: 15%; --w: 14%;" class="minor ui-chart-tick"> d7 </span>
+      <span style="left: 29%; --w: 14%;" class="ui-chart-tick"> d14 </span>
+      <span style="left: 43%; --w: 14%;" class="minor ui-chart-tick"> d21 </span>
+      <span style="left: 57%; --w: 14%;" class="ui-chart-tick"> d28 </span>
+      <span style="left: 71%; --w: 14%;" class="minor ui-chart-tick"> d35 </span>
+      <span style="left: 85%; --w: 14%;" class="ui-chart-tick"> d42 </span>
+      <span style="left: 99%; --w: 14%;" class="minor ui-chart-tick"> d49 </span>
     </div>
     |}];
   let c =
@@ -603,9 +576,9 @@ let%expect_test "a single point, and gaps leave lone points marked" =
     {|
     <div class="ui-chart-plot">
       <div aria-hidden="true" class="ui-chart-grid">
-        <span class="ui-chart-gridline zero" style={ bottom: 0%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 50%; }> </span>
-        <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+        <span style="bottom: 0%;" class="ui-chart-gridline zero"> </span>
+        <span style="bottom: 50%;" class="ui-chart-gridline"> </span>
+        <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
       </div>
       <svg class="ui-chart-svg"
            viewBox="0 0 100 100"
@@ -614,18 +587,15 @@ let%expect_test "a single point, and gaps leave lone points marked" =
            preserveAspectRatio="none">
         <path class="s1 ui-chart-line" d="M50 25"> </path>
       </svg>
-      <div tabindex="0"
+      <div style="left: 0%; width: 100%;"
+           tabindex="0"
            role="img"
            aria-label="only: 3"
-           class="ui-chart-col"
-           style={
-             left: 0%;
-             width: 100%;
-           }>
+           class="ui-chart-col">
         <span class="ui-chart-guide"> </span>
-        <span class="lone s1 ui-chart-dot" style={ bottom: 75%; }> </span>
+        <span style="bottom: 75%;" class="lone s1 ui-chart-dot"> </span>
       </div>
-      <div aria-hidden="true" class="left ui-chart-tip" style={ --x: 50%; }>
+      <div aria-hidden="true" style="--x: 50%;" class="left ui-chart-tip">
         <div class="ui-chart-tip-head"> only </div>
         <div class="s1 ui-chart-tip-row">
           <span class="ui-chart-swatch"> </span>
@@ -859,37 +829,34 @@ let%expect_test "scatter: points with tooltips, both axes" =
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div aria-hidden="true" class="ui-chart-yname"> Time (ms) </div>
-      <div class="ui-chart-frame" style={ --gutter: 3ch; }>
+      <div style="--gutter: 3ch;" class="ui-chart-frame">
         <div aria-hidden="true" class="ui-chart-yaxis">
-          <span class="ui-chart-tick" style={ bottom: 0%; }> 0 </span>
-          <span class="ui-chart-tick" style={ bottom: 33.33%; }> 10 </span>
-          <span class="ui-chart-tick" style={ bottom: 66.67%; }> 20 </span>
-          <span class="ui-chart-tick" style={ bottom: 100%; }> 30 </span>
+          <span style="bottom: 0%;" class="ui-chart-tick"> 0 </span>
+          <span style="bottom: 33.33%;" class="ui-chart-tick"> 10 </span>
+          <span style="bottom: 66.67%;" class="ui-chart-tick"> 20 </span>
+          <span style="bottom: 100%;" class="ui-chart-tick"> 30 </span>
         </div>
         <div class="ui-chart-plot">
           <div aria-hidden="true" class="ui-chart-grid">
-            <span class="ui-chart-gridline zero" style={ bottom: 0%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 33.33%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 66.67%; }> </span>
-            <span class="ui-chart-gridline" style={ bottom: 100%; }> </span>
+            <span style="bottom: 0%;" class="ui-chart-gridline zero"> </span>
+            <span style="bottom: 33.33%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 66.67%;" class="ui-chart-gridline"> </span>
+            <span style="bottom: 100%;" class="ui-chart-gridline"> </span>
           </div>
           <div aria-hidden="true" class="ui-chart-vgrid">
             <div aria-hidden="true" class="ui-chart-grid">
-              <span class="ui-chart-gridline zero" style={ left: 0%; }> </span>
-              <span class="ui-chart-gridline" style={ left: 25%; }> </span>
-              <span class="ui-chart-gridline" style={ left: 50%; }> </span>
-              <span class="ui-chart-gridline" style={ left: 75%; }> </span>
-              <span class="ui-chart-gridline" style={ left: 100%; }> </span>
+              <span style="left: 0%;" class="ui-chart-gridline zero"> </span>
+              <span style="left: 25%;" class="ui-chart-gridline"> </span>
+              <span style="left: 50%;" class="ui-chart-gridline"> </span>
+              <span style="left: 75%;" class="ui-chart-gridline"> </span>
+              <span style="left: 100%;" class="ui-chart-gridline"> </span>
             </div>
           </div>
-          <span tabindex="0"
+          <span style="left: 25%; bottom: 33.33%;"
+                tabindex="0"
                 role="img"
                 aria-label="runs: Size 1, Time 10 ms"
-                class="s1 ui-chart-pt"
-                style={
-                  left: 25%;
-                  bottom: 33.33%;
-                }>
+                class="s1 ui-chart-pt">
             <div aria-hidden="true" class="above right ui-chart-tip">
               <div class="ui-chart-tip-head"> runs </div>
               <div class="plain ui-chart-tip-row">
@@ -904,14 +871,11 @@ let%expect_test "scatter: points with tooltips, both axes" =
               </div>
             </div>
           </span>
-          <span tabindex="0"
+          <span style="left: 100%; bottom: 100%;"
+                tabindex="0"
                 role="img"
                 aria-label="runs: Size 4, Time 30 ms"
-                class="s1 ui-chart-pt"
-                style={
-                  left: 100%;
-                  bottom: 100%;
-                }>
+                class="s1 ui-chart-pt">
             <div aria-hidden="true" class="below left ui-chart-tip">
               <div class="ui-chart-tip-head"> runs </div>
               <div class="plain ui-chart-tip-row">
@@ -926,14 +890,11 @@ let%expect_test "scatter: points with tooltips, both axes" =
               </div>
             </div>
           </span>
-          <span tabindex="0"
+          <span style="left: 50%; bottom: 6.67%;"
+                tabindex="0"
                 role="img"
                 aria-label="cached: Size 2, Time 2 ms"
-                class="s2 ui-chart-pt"
-                style={
-                  left: 50%;
-                  bottom: 6.67%;
-                }>
+                class="s2 ui-chart-pt">
             <div aria-hidden="true" class="above left ui-chart-tip">
               <div class="ui-chart-tip-head"> cached </div>
               <div class="plain ui-chart-tip-row">
@@ -950,11 +911,11 @@ let%expect_test "scatter: points with tooltips, both axes" =
           </span>
         </div>
         <div aria-hidden="true" class="ui-chart-values ui-chart-xaxis">
-          <span class="ui-chart-tick" style={ left: 0%; }> 0 </span>
-          <span class="minor ui-chart-tick" style={ left: 25%; }> 1 </span>
-          <span class="ui-chart-tick" style={ left: 50%; }> 2 </span>
-          <span class="minor ui-chart-tick" style={ left: 75%; }> 3 </span>
-          <span class="ui-chart-tick" style={ left: 100%; }> 4 </span>
+          <span style="left: 0%;" class="ui-chart-tick"> 0 </span>
+          <span style="left: 25%;" class="minor ui-chart-tick"> 1 </span>
+          <span style="left: 50%;" class="ui-chart-tick"> 2 </span>
+          <span style="left: 75%;" class="minor ui-chart-tick"> 3 </span>
+          <span style="left: 100%;" class="ui-chart-tick"> 4 </span>
         </div>
       </div>
       <div aria-hidden="true" class="ui-chart-xname"> Size </div>

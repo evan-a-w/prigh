@@ -113,12 +113,14 @@ let parse s =
         If (c, a, b))
       else c
     and comparison () =
-      let a = additive () in
-      match peek () with
-      | Op (("<" | "<=" | ">" | ">=" | "==" | "!=") as op) ->
-        advance ();
-        Bin (op, a, additive ())
-      | _ -> a
+      let rec loop a =
+        match peek () with
+        | Op (("<" | "<=" | ">" | ">=" | "==" | "!=") as op) ->
+          advance ();
+          loop (Bin (op, a, additive ()))
+        | _ -> a
+      in
+      loop (additive ())
     and additive () =
       let rec loop a =
         match peek () with
