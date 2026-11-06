@@ -475,6 +475,7 @@ let%expect_test "expression semantics: what the frontends compute" =
     ; "0 / 0"
     ; "5 % 0"
     ; "1 / 0 > 1 ? 1 : 2"
+    ; "1 ? 2 : 1 / 0"
     ; "1 / 0.0001"
     ; "log(1000)"
     ; "ln(exp(2))"
@@ -532,6 +533,7 @@ let%expect_test "expression semantics: what the frontends compute" =
     0 / 0                (none)
     5 % 0                (none)
     1 / 0 > 1 ? 1 : 2    (none)
+    1 ? 2 : 1 / 0        2
     1 / 0.0001           10_000
     log(1000)            3
     ln(exp(2))           2
