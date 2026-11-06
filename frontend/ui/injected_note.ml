@@ -17,6 +17,8 @@ let glyph : P.Origin.Kind.t -> string = function
   | Review -> "⚑"
   | Init -> "▤"
   | Review_comments -> "✎"
+  | Client -> "▢"
+  | Ui_action -> "↵"
   | Other "steer" -> "→"
   | Other _ -> "•"
 ;;

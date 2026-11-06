@@ -8,8 +8,11 @@ open! Import
     is working, so a call without a result is still to get one. [nested]
     renders a subagent's transcript. Outputs fold as [fold] says, under the
     call's id. *)
+(** A [render_ui] call shows its components ({!Ui_view}) with [ui]'s state
+    (default none). *)
 val view
-  :  nested:(Chat.Subagent.t -> Node.t)
+  :  ?ui:Ui_context.Page.t
+  -> nested:(Chat.Subagent.t -> Node.t)
   -> fold:Fold.t
   -> streaming:bool
   -> running:bool

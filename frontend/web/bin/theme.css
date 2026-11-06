@@ -177,3 +177,24 @@
 [data-accent="pink"] { --sodium: var(--accent-pink); }
 [data-accent="teal"] { --sodium: var(--accent-teal); }
 [data-accent="yellow"] { --sodium: var(--accent-yellow); }
+
+/* Charts' series (ui.css), on <html>: the accent first, then the other
+   presets as this theme draws them, so every theme gets a palette tuned to
+   its ground. A preset accent swaps places with orange so no colour comes
+   twice. */
+:root {
+  --series-1: var(--sodium);
+  --series-2: var(--accent-blue);
+  --series-3: var(--accent-green);
+  --series-4: var(--accent-purple);
+  --series-5: var(--accent-pink);
+  --series-6: var(--accent-teal);
+  --series-7: var(--accent-yellow);
+  --series-8: var(--muted);
+}
+[data-accent="blue"] { --series-2: var(--accent-orange); }
+[data-accent="green"] { --series-3: var(--accent-orange); }
+[data-accent="purple"] { --series-4: var(--accent-orange); }
+[data-accent="pink"] { --series-5: var(--accent-orange); }
+[data-accent="teal"] { --series-6: var(--accent-orange); }
+[data-accent="yellow"] { --series-7: var(--accent-orange); }

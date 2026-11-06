@@ -259,6 +259,18 @@ module Reply_tag : sig
     (** the session's messages after reconnecting, from the first one on show
         ([from], when older ones are not loaded): merged into the transcript
         on show *)
+    | Ui_sent of
+        { session : string
+        ; call_id : string
+        ; component : string
+        }
+    (** a reply through a [render_ui] component: it can send again if this
+        fails *)
+    | Ui_image of
+        { session : string
+        ; path : string
+        }
+    (** [fs_preview] for an image a [render_ui] call shows *)
     | Resync_pending
     | Answer
     (** to a confirmation or a question: asked again when it does not
@@ -655,6 +667,7 @@ module Action : sig
         } (** the saved sign-ins, from the page *)
     | Open_accounts (** the account menu *)
     | Cycle_verbosity
+    | Ui of Ui_event.t (** to a [render_ui] component *)
     | Toggle_fold of string
     (** a tool output's [Fold.key], clicked: shown in full, or folded again *)
     | Cycle_model of int (** through the scoped models, forwards or back *)
@@ -821,6 +834,7 @@ module Model : sig
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
       (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)
+    ; ui : Ui_state.t (** the [render_ui] components', per session *)
     ; transcript_filter : Transcript_filter.t
       (** [/filter]: the kinds on show, a preference of this browser's *)
     ; config : Config.t option
