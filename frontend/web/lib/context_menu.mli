@@ -44,7 +44,9 @@ type t =
 module Item : sig
   type t =
     | Open (** switch to the session *)
-    | Open_tab (** the session in a new browser tab *)
+    | Open_window
+    (** the session in a new window: a new tab in a browser, another window
+        in the desktop app *)
     | Rename
     | Fork
     | New_worktree
@@ -104,7 +106,7 @@ module Message : sig
     ; newest : bool (** nothing after it to trim *)
     ; running : bool (** a run is in progress: it cannot change *)
     ; select : bool
-    (** offer Select text: on a phone, where a long press opens the menu
+      (** offer Select text: on a phone, where a long press opens the menu
         rather than selecting *)
     }
   [@@deriving sexp_of, equal]

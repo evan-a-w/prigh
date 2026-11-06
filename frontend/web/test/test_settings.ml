@@ -29,9 +29,6 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
     Layout
-    Tabs
-    The open sessions as tabs over the chat (not on a phone).
-    (Turn session tabs on (/tabs on))
     Transcript detail This browser
     How much of tool calls and thinking the transcript shows (Ctrl+O) .
     (Quiet) (Normal) (Verbose)
@@ -286,7 +283,6 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
@@ -302,7 +298,6 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
-    [switch] button "Tabs" -- Turn session tabs on (/tabs on)
     [group] div "Transcript detail"
     -- Sessions
     button "Use this session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on (/change_default)
@@ -514,7 +509,9 @@ let%expect_test "/settings completes the sections" =
     |}]
 ;;
 
-let%expect_test "a phone: the list of sections, one a level down, back to the list" =
+let%expect_test
+    "a phone: the list of sections, one a level down, back to the list"
+  =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.act h Open_settings;
@@ -530,7 +527,8 @@ let%expect_test "a phone: the list of sections, one a level down, back to the li
   H.type_ h "/settings account";
   H.act h Send;
   H.text h ~selector:".settings-dialog .modal-head h2";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     Settings
     (Close (Esc))

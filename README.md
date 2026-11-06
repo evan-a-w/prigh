@@ -506,7 +506,7 @@ not connected, switching back says so; when its directory is gone,
 Right-click a session or a worktree (or press Shift+F10 or the context
 menu key on it, long-press it on a phone, or use the ⋯ that shows while
 pointing at a session) for its menu; each item names the command that
-does the same. A session's: Open, Open in new tab, Rename… (`/name`),
+does the same. A session's: Open, Open in new window (see below), Rename… (`/name`),
 Fork… (`/fork`), New worktree… (`/worktree new`: a branch, and a base that
 defaults to the session's branch; Enter creates it under `worktrees_dir`
 and the session moves there), Review changes (`/review`), Open in file
@@ -859,9 +859,9 @@ the settings gear; the account menu also has Settings and Commands and keys
 The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
-phone): **Appearance** (the theme and accent, session tabs (`/tabs`),
-transcript detail (`/verbosity`)), **Behaviour** (tool confirmation
-(`/confirm`); notifications, on or off, and what to do when the browser has
+phone): **Appearance** (the theme and accent, transcript detail
+(`/verbosity`)), **Behaviour** (tool confirmation (`/confirm`);
+notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
@@ -870,21 +870,13 @@ opens it at a section; on the list, the arrows, Home and End move between
 sections. It opens where you left it. Esc closes it; its controls keep it
 open; the keyboard shortcuts are in its footer.
 
-Session tabs (off by default; the settings page's Tabs switch or `/tabs
-on|off`, saved for your account, so they follow you to other browsers and
-devices) put the open sessions in a strip over the chat, like a browser's
-tabs. Opening a session (the sidebar, the palette, `/resume`, a new one)
-opens or focuses its tab. Each says the session's title and how it stands:
-the lamp while it runs, a warning when it waits for you (a confirmation or
-a question), a red cross when its last reply failed, a green tick when it
-finished while you were in another. A click switches to it; its ×, a middle
-click or Alt+W closes it (closing the current one moves to its neighbour,
-the last one to the empty state); drag a tab to move it; Alt+Shift+] and
-Alt+Shift+[ step through them and Alt+Shift+1…9 picks the Nth. Which tabs
-are open, and their order, are kept with the setting; archiving or deleting
-a session closes its tab. On a phone there are no tabs (the sidebar's
-sessions are a tap away); switching through tabs is switching sessions as
-ever, so nothing of the session you leave stays behind.
+Open in new window (a session's menu, or Ctrl+click (⌘-click), or a
+middle click on it in the sidebar) opens the session in another window
+while this one stays where it is: in a browser, a new tab; in the desktop
+app, another of its windows, on the same `prigh desktop` and tool host (in
+its own window, another app window; in a browser's app window, a popup
+without tabs or address bar). The desktop app ends when its last window
+closes. Each window remembers its own draft and scroll.
 
 Themes: `original` (graphite with the warm sodium accent, the default),
 `dark` (neutral greys: the accent is the only colour but diffs' and
@@ -1185,18 +1177,66 @@ need its `-web` port.
 ## Desktop app
 
 prigh-desktop is prigh-web in a window of its own: a small native app
-([Tauri](https://tauri.app), `desktop/`) on the system's webview, which runs
+([Tauri](https://tauri.app), `desktop/`), showing it in an installed
+Chromium-family browser's app window or on the system's webview, which runs
 `prigh desktop` while it is open and stops it when the window closes. `prigh
-desktop` serves prigh-web for the saved backend (or asks which one to
-connect to) and is this machine's tool host, so the window is a
-frontend whose sessions run their tools here, as a TUI's do.
+desktop` connects to the saved backend (or asks which one to connect to)
+and is this machine's tool host, so the window is a frontend whose sessions
+run their tools here, as a TUI's do.
+
+What the window shows (`-ui`, `programs.prigh.desktop.ui`):
+
+- **remote** (the default): the backend's own prigh-web, e.g.
+  `https://ai.example.com/`. You sign in there (once: it remembers you) and
+  get the backend's version of prigh-web; sessions you start prefer this
+  machine's tool host (`#app=desktop&host=ID` in the address tells the page
+  which it is, with a backend whose prigh-web knows it).
+- **local**: prigh-web served by this prigh on `127.0.0.1`, relayed to the
+  backend and signed in for you (`prigh web -connect`'s way): this prigh's
+  version of prigh-web, and no sign-in of its own.
+
+Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
+
+- **auto** (the default): on Linux, an installed Chromium-family browser's
+  app window when there is one, else the app's own; elsewhere the app's own
+  (WebView2 is Chromium already, and on macOS a browser keeps running when
+  its last window closes, so closing the window would not end the app).
+- **browser**: an installed Chromium-family browser's app window (`--app`,
+  no tabs or address bar): Google Chrome, Chromium, Brave, Microsoft Edge
+  or Vivaldi, the first found on the PATH or where the system installs them,
+  or the one `PRIGH_DESKTOP_BROWSER` / `programs.prigh.desktop.browser`
+  names. It is the browser itself, so its speed, GPU, zoom, find,
+  drag-and-drop and file pickers are the browser's. It runs with a profile
+  of prigh's own (in the app's data directory, e.g.
+  `~/.local/share/io.github.evan-a-w.prigh/browser`): its own cookies,
+  sign-ins, extensions and settings, apart from your usual profile; you
+  sign in to the backend once there. The app has no window of its own then:
+  closing the browser's window (its last one) stops `prigh desktop`, and
+  `prigh desktop` stopping (Quit prigh, a failure, Ctrl-C in the terminal
+  it runs in) closes the browser. On the backend's own site Quit prigh
+  closes the window, which does the same. A browser left running on prigh's
+  profile (by an app that was killed) is closed when the app starts. Links
+  to other sites open in your default browser (`xdg-open` on Linux), with
+  your own profile, as in the app's own window: the app watches the
+  browser's windows (its DevTools, on a pipe only the app holds, no port)
+  and closes a new tab or window on another site, or sends prigh's window
+  back, opening the link in your browser instead (Linux only: elsewhere
+  they open in the browser on prigh's profile).
+  Window managers see the class `prigh` on X11; on Wayland Chromium names
+  an app window's app_id after the site (e.g. `chrome-ai.example.com__-Default`),
+  so match that in Hyprland or sway rules (`hyprctl clients` shows it).
+- **webview**: the app's own window on the system's webview (below).
 
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
 programs.prigh.enable = true;          # prigh on the PATH
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/Applications
+# programs.prigh.desktop.ui = "local";                           # see above (default "remote")
+# programs.prigh.desktop.window = "webview";                     # see above (default "auto")
+# programs.prigh.desktop.browser = pkgs.chromium;                # instead of the first one found
 # programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
+# programs.prigh.desktop.useSystemNixpkgs = true;                # slow window on NixOS? see below
 # programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
 ```
 
@@ -1207,11 +1247,15 @@ artifacts: `.deb`/`.AppImage`, `.dmg`, `.msi`/`.exe`); those contain only
 the app, which then runs the `prigh` on the PATH (as the login shell sets
 it), so install prigh as well.
 
-- **The engine is the system's webview**: WKWebView (Safari's engine) on
-  macOS, WebView2 (Edge's Chromium) on Windows, WebKitGTK on Linux (a
-  library Nix provides, not your browser). Links to other sites open in
+- **The webview** (`webview`, or `auto` without a browser): WKWebView
+  (Safari's engine) on macOS, WebView2 (Edge's Chromium) on Windows,
+  WebKitGTK on Linux (a library Nix provides, not your browser). Links to other sites open in
   your browser; downloads go to the Downloads folder; prigh-web may use the
   microphone (dictation), notifications and the clipboard without asking.
+- **Like a browser**: Ctrl (⌘) with `+`/`=`, `-` and `0` zoom, as do
+  Ctrl+scroll and a touchpad pinch; the zoom is remembered. F11 is
+  fullscreen. Files dropped on the window reach the page (attachments,
+  the Files panel), and file pickers are the system's.
 - **Quitting**: closing the window, Quit prigh (the account menu, the ⋯
   sheet, `/quit`) or Ctrl+Q / ⌘Q stop `prigh desktop`, its tool host and
   what its tools started, then the app.
@@ -1221,16 +1265,36 @@ it), so install prigh as well.
   github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
   prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
   opens the page through WSL's localhost forwarding (on by default).
-- **Settings** (environment variables; Home Manager sets the first two):
+- **Settings** (environment variables; Home Manager sets all but the WSL
+  one):
   `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
   Windows, in WSL), `PRIGH_DESKTOP_ARGS` arguments for `prigh desktop`
   (split like a shell's words: `-cwd '/my proj' -name laptop`),
-  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default).
+  `PRIGH_DESKTOP_WSL_DISTRO` the WSL distribution (default: WSL's default),
+  `PRIGH_DESKTOP_WINDOW` and `PRIGH_DESKTOP_BROWSER` (above).
   Never put a token in Home Manager options or `PRIGH_DESKTOP_ARGS` in Nix:
   the store is world-readable (the module refuses `-token`); sign in from
   the app, which saves the connection like prigh-tui.
-- **One window**: starting the app again focuses the open one. Its size and
-  position are remembered.
+- **One app**: starting it again focuses the open window (in a browser, opens
+  another window on the page). The app's own window's size and position are
+  remembered.
+- **Slow on Linux?** A browser's window (`auto` with one installed) is the
+  quickest. WebKitGTK is asked to draw with the GPU, but on NixOS
+  it can only when its Mesa matches the system's driver
+  (`/run/opengl-driver`); from prigh's pinned nixpkgs it may not, and it
+  quietly draws on the CPU. `PRIGH_DESKTOP_GPU_INFO=1 prigh-desktop` shows
+  WebKit's graphics page (`webkit://gpu`): look at the hardware
+  acceleration and the GL renderer (`llvmpipe` means the CPU). The cure is
+  building the app with your nixpkgs: `programs.prigh.desktop.useSystemNixpkgs
+  = true`, or `inputs.prigh.inputs.nixpkgs.follows = "nixpkgs"` in your
+  flake (both build it from source).
+- **File chooser**: the window's is GTK's own, unless `GTK_USE_PORTAL=1`
+  (NixOS's old `xdg.portal.gtkUsePortal` sets it) asks for
+  xdg-desktop-portal's. With that set and no portal that has a FileChooser
+  running (Hyprland's own portal has none), GTK opens nothing at all; the
+  app checks at start, says so on stderr and uses GTK's chooser instead. For
+  the portal's chooser, run one: on NixOS `xdg.portal = { enable = true;
+  extraPortals = [ pkgs.xdg-desktop-portal-gtk ]; };`.
 - **A blank or flickering window on Linux** (WebKitGTK with some GPU drivers,
   NVIDIA in particular): set `WEBKIT_DISABLE_DMABUF_RENDERER=1`
   (`programs.prigh.desktop.disableDmabuf = true`).
@@ -1259,6 +1323,11 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`, for the window to open;
   everything else goes to stderr. It serves on `127.0.0.1:7780`, else the
   next free port, else any (`-listen HOST:PORT` to choose).
+- With `-ui remote` (the default), once it is connected it prints another,
+  `{"url":"https://backend/#app=desktop&host=ID","remote":true}`: the
+  backend's own prigh-web, which the window goes to (the connect form, when
+  there is one, is still its own page). The backend's page quits the app
+  by going to `about:blank#prigh-desktop-quit`, which the window catches.
 - The backend is `-connect`/`-token`/`-user`, else `$PRIGH_CONNECT`/`_TOKEN`/
   `_USER`, else the saved connection, by the TUI's rules, as for `prigh
   web`. When there is none, or it cannot be reached, refuses the login or
@@ -2295,7 +2364,6 @@ it.
 | `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
-| `/tabs [on\|off]` (prigh-web) | show the open sessions as tabs over the chat, saved for your account; alone, says whether they are on |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
@@ -2816,12 +2884,15 @@ against the real backend, its scripts all at once; the flake runs it as a
 check.
 
 The desktop app has two: `cargo test -p prigh-desktop-core` in `desktop/`
-(the decisions: how `prigh desktop` is started, its ready line, where the
-window may go, the error dialogs; `./test` runs it), and
-`desktop/test/run.sh`, the app in a real window against a fake `prigh
-desktop` for the failure paths and, given a prigh, the real one for a
+(the decisions: how `prigh desktop` is started, its ready line, which
+window and browser, where the window may go, the error dialogs; `./test`
+runs it), and `desktop/test/run.sh`, the app in a real window against a
+fake `prigh desktop` for the failure paths, in a browser's window (a fake
+browser, `fake-browser.py`, that keeps a profile lock as Chromium does,
+and a real Chromium, `REAL_CHROMIUM`, closed through its DevTools) and, given a prigh, the real one for a
 `prigh serve -web` backend (`desktop/test/probe.js` drives the page: the
-connect form, closing the window, signing in, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
+connect form, closing the window, signing in, a chip's menu chosen from
+with the real pointer (xdotool) at 100% and 125% zoom, `/quit`) (the flake's `desktop-window` check runs it under Xvfb; it prints
 a transcript compared with `desktop/test/expected.txt`).
 
 ## Layout

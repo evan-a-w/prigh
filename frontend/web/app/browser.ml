@@ -183,6 +183,8 @@ let clear_hash () =
           (Js.to_string location##.pathname ^ Js.to_string location##.search)))
 ;;
 
+let navigate url = Dom_html.window##.location##replace (Js.string url)
+
 let post ~content_type ~url ~body ~f =
   let xhr = XmlHttpRequest.create () in
   xhr##_open (Js.string "POST") (Js.string url) Js._true;

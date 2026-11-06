@@ -85,8 +85,8 @@ let help =
   ; ( "Shift+F10 / ContextMenu (on a message)"
     , "its menu: copy, trim everything before or after it, delete it (also \
        right-click or a long press, at the pointer; with text selected, \
-       right-click is the browser's, to copy it; on a phone, its Select \
-       text selects its words)" )
+       right-click is the browser's, to copy it; on a phone, its Select text \
+       selects its words)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -101,17 +101,14 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
-  ; ( "Alt+Shift+] Alt+Shift+[ / Alt+Shift+1…9 / Alt+W (session tabs)"
-    , "the next or previous tab, the Nth, close this one (/tabs on; also its \
-       ×, a middle click; drag a tab to move it)" )
   ; ( "Enter / Alt+Enter (steering a subagent)"
     , "send it a message: at its next step / when it ends its turn (its Steer \
        button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
   ; ( "Ctrl+Shift+O"
-    , "a new temporary session (/temporary): not saved or listed, deleted \
-       when you leave it; on the new-session screen, its Temporary chip" )
+    , "a new temporary session (/temporary): not saved or listed, deleted when \
+       you leave it; on the new-session screen, its Temporary chip" )
   ; ( "Ctrl+Shift+F"
     , "open or close the file browser (/files): ↑↓ select, Enter opens, \
        Backspace goes up, F2 renames, Delete deletes, Esc closes" )
@@ -162,6 +159,8 @@ let help =
   ; ( "↑↓ ←→ Home End (settings' sections)"
     , "show the previous / next section, or the first / last (/settings \
        SECTION opens at one)" )
+  ; ( "Ctrl+click / ⌘-click / middle click (a session in the sidebar)"
+    , "open it in a new window (its menu's Open in new window)" )
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
     , "allow once, always allow (its rules, this session), deny, deny saying \
@@ -360,27 +359,6 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "PageUp", None when plain t -> Some (Scroll_chat (-1))
   | "PageDown", None when plain t -> Some (Scroll_chat 1)
   | _ -> None
-;;
-
-(* The session tabs' keys (not on a phone, which shows none): Alt+Shift+]
-   [ and Alt+Shift+1…9 by the keys' positions, beside the agents panel's Alt
-   ones. *)
-let tabs_key (m : App.Model.t) t : App.Action.t option =
-  let alt_shift = t.alt && t.shift && not (t.ctrl || t.meta) in
-  if (not m.tabs.enabled) || m.narrow
-  then None
-  else (
-    match t.code with
-    | "BracketRight" when alt_shift -> Some (Step_tab 1)
-    | "BracketLeft" when alt_shift -> Some (Step_tab (-1))
-    | code when alt_shift && String.is_prefix code ~prefix:"Digit" ->
-      (match
-         Int.of_string_opt (String.chop_prefix_exn code ~prefix:"Digit")
-       with
-       | Some n when n >= 1 -> Some (Nth_tab n)
-       | Some _ | None -> None)
-    | _ when alt_letter t "w" -> Some (Close_tab None)
-    | _ -> None)
 ;;
 
 (* The agents panel's keys: the TUI's Alt+digit, but not its Shift+Tab (the
@@ -648,7 +626,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      (* Code selected in the review or a preview: comment on it. *)
      | "c" when plain t && commenting m t -> Some (Review Start_comment)
      | _ ->
-       (match Option.first_some (tabs_key m t) (agents_key m t), t.target with
+       (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
         | None, Session_search -> session_search_key t
