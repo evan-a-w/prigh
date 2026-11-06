@@ -13,4 +13,5 @@ pub mod profile;
 pub mod ready;
 pub mod search_path;
 pub mod tail;
+pub mod taskbar;
 pub mod zoom;

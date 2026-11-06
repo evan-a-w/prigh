@@ -164,6 +164,8 @@ impl BrowserWindow {
             self.end_instance(pid);
         }
         self.write_settings();
+        #[cfg(target_os = "linux")]
+        self.write_taskbar_entry(&url);
         log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
         let mut cmd = self.command(&url);
         // Its own process group: closing it reaches its helpers too.
@@ -246,6 +248,33 @@ impl BrowserWindow {
         let downloads = downloads_dir();
         write(self.profile.join("Default").join("Preferences"), &|e| profile::preferences(e, &downloads));
         write(self.profile.join("Local State"), &profile::local_state);
+    }
+
+    /// The desktop entry named after the window's app_id on Wayland (see
+    /// [prigh_desktop_core::taskbar]), in the user's applications.
+    #[cfg(target_os = "linux")]
+    fn write_taskbar_entry(&self, url: &str) {
+        let Some(app_id) = prigh_desktop_core::taskbar::app_id(&self.found.program, url) else { return };
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let Some(data) = var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| format!("{h}/.local/share"))) else {
+            return;
+        };
+        // How the app was started: makeWrapper's wrapper passes its own path.
+        let exec = std::env::args()
+            .next()
+            .filter(|a| !a.contains('/') || a.starts_with('/'))
+            .or_else(|| std::env::current_exe().ok().map(|p| p.display().to_string()))
+            .unwrap_or_else(|| "prigh-desktop".into());
+        let path = PathBuf::from(data).join("applications").join(format!("{app_id}.desktop"));
+        let entry = prigh_desktop_core::taskbar::desktop_entry(&app_id, &exec);
+        if std::fs::read_to_string(&path).ok().as_deref() == Some(&entry) {
+            return;
+        }
+        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| std::fs::write(&path, entry));
+        match written {
+            Ok(()) => log(format!("the window's taskbar entry: {}", path.display())),
+            Err(e) => log(format!("writing the window's taskbar entry {}: {e}", path.display())),
+        }
     }
 
     /// The browser instance running on prigh's profile: the pid in its
