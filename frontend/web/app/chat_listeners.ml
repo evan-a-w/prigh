@@ -18,7 +18,7 @@ let set_label (button : Dom_html.element Js.t) ~copied =
   := Js.some (Js.string (if copied then "Copied" else "Copy"))
 ;;
 
-let copy (ev : Dom_html.mouseEvent Js.t) =
+let copy ~schedule (ev : Dom_html.mouseEvent Js.t) =
   let open Option.Let_syntax in
   ignore
     (let%bind target = Js.Opt.to_option ev##.target in
@@ -28,14 +28,20 @@ let copy (ev : Dom_html.mouseEvent Js.t) =
        Js.Opt.to_option (block##querySelector (Js.string ".copy-text"))
        |> Option.bind ~f:(fun el -> Js.Opt.to_option el##.textContent)
      in
-     let clipboard = Js.Unsafe.get Dom_html.window##.navigator "clipboard" in
-     ignore
-       (Js.Unsafe.meth_call clipboard "writeText" [| Js.Unsafe.inject text |]
-        : Js.Unsafe.any);
-     set_label button ~copied:true;
-     ignore
-       (Dom_html.setTimeout (fun () -> set_label button ~copied:false) 1500.
-        : Dom_html.timeout_id_safe)
+     Async_kernel.upon
+       (Browser.copy_to_clipboard (Js.to_string text))
+       (function
+         | true ->
+           set_label button ~copied:true;
+           ignore
+             (Dom_html.setTimeout
+                (fun () -> set_label button ~copied:false)
+                1500.
+              : Dom_html.timeout_id_safe)
+         | false ->
+           schedule
+             (Prigh_web.App.Action.Copy_failed
+                { secure = Browser.secure_context () }))
      : unit option)
 ;;
 
@@ -155,7 +161,7 @@ let install ~schedule =
          Js._true
        : Dom_html.event_listener_id)
   in
-  listen Dom_html.Event.click copy;
+  listen Dom_html.Event.click (copy ~schedule);
   listen Dom_html.Event.click (toggle_fold ~schedule);
   listen (Dom.Event.make "contextmenu") (context_menu ~schedule);
   listen Dom_html.Event.click (hidden_action ~schedule);

@@ -575,7 +575,7 @@ let%expect_test "a session's items on the current session" =
     (Place_menu (Element session-s1))
     (Picker_choose copy_path)
     (Focus editor)
-    (Copy /home/u/src/prigh)
+    (Copy (text /home/u/src/prigh) (copied "Copied the path: /home/u/src/prigh"))
     (Expire_toast (id 0) (after_ms 2860))
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
@@ -583,7 +583,7 @@ let%expect_test "a session's items on the current session" =
     (Place_menu (Element session-s1))
     (Picker_choose copy_id)
     (Focus editor)
-    (Copy s1)
+    (Copy (text s1) (copied "Copied the session id: s1"))
     (Expire_toast (id 1) (after_ms 2500))
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
@@ -701,7 +701,8 @@ let%expect_test "a worktree's menu and its items" =
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose copy_path)
     (Focus editor)
-    (Copy /home/u/.prigh/worktrees/prigh/feat-login)
+    (Copy (text /home/u/.prigh/worktrees/prigh/feat-login)
+     (copied "Copied the path: /home/u/.prigh/worktrees/prigh/feat-login"))
     (Expire_toast (id 0) (after_ms 3820))
     |}];
   on_login "switch_here";
