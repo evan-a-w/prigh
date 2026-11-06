@@ -29,34 +29,41 @@ let%expect_test "backend addresses: HOST:PORT and prigh-web URLs" =
             spec
               (t : Backend_address.t)
               ~to_string:(Backend_address.to_string t : string)
-              ~authority:(Backend_address.authority t : string)]
+              ~authority:(Backend_address.authority t : string)
+              ~web_url:(Backend_address.web_url t : string)]
       | Error e -> print_s [%message spec (e : Error.t)]);
   [%expect
     {|
     (server:7790
      (t ((tls false) (host server) (port 7790) (prefix "") (lines true)))
-     (to_string server:7790) (authority server:7790))
+     (to_string server:7790) (authority server:7790)
+     (web_url http://server:7790/))
     (:7777
      (t ((tls false) (host 127.0.0.1) (port 7777) (prefix "") (lines true)))
-     (to_string 127.0.0.1:7777) (authority 127.0.0.1:7777))
+     (to_string 127.0.0.1:7777) (authority 127.0.0.1:7777)
+     (web_url http://127.0.0.1:7777/))
     ([::1]:7790 (t ((tls false) (host ::1) (port 7790) (prefix "") (lines true)))
-     (to_string [::1]:7790) (authority [::1]:7790))
+     (to_string [::1]:7790) (authority [::1]:7790) (web_url http://[::1]:7790/))
     (ws://server:7790/ws
      (t ((tls false) (host server) (port 7790) (prefix "") (lines false)))
-     (to_string ws://server:7790/ws) (authority server:7790))
+     (to_string ws://server:7790/ws) (authority server:7790)
+     (web_url http://server:7790/))
     (wss://example.com/ws
      (t ((tls true) (host example.com) (port 443) (prefix "") (lines false)))
-     (to_string wss://example.com/ws) (authority example.com))
+     (to_string wss://example.com/ws) (authority example.com)
+     (web_url https://example.com/))
     (https://example.com/prigh/
      (t ((tls true) (host example.com) (port 443) (prefix /prigh) (lines false)))
-     (to_string wss://example.com/prigh/ws) (authority example.com))
+     (to_string wss://example.com/prigh/ws) (authority example.com)
+     (web_url https://example.com/prigh/))
     (wss://example.com:8443/prigh/ws
      (t
       ((tls true) (host example.com) (port 8443) (prefix /prigh) (lines false)))
-     (to_string wss://example.com:8443/prigh/ws) (authority example.com:8443))
+     (to_string wss://example.com:8443/prigh/ws) (authority example.com:8443)
+     (web_url https://example.com:8443/prigh/))
     (http://server
      (t ((tls false) (host server) (port 80) (prefix "") (lines false)))
-     (to_string ws://server/ws) (authority server))
+     (to_string ws://server/ws) (authority server) (web_url http://server/))
     (server
      (e
       "\"server\" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)"))
@@ -656,12 +663,22 @@ module Desktop = struct
     ; ended : Desktop_sidecar.Ended.t Eio.Promise.or_exn
     ; close_stdin : unit -> unit
     ; saved : Saved_connection.t Queue.t
+    ; pages : Desktop_sidecar.Page.t Queue.t (** said after the first *)
     }
 
-  let start ?(tools = Web_connect.Tools.Local) ?save t ~sw ~logs initial =
+  let start
+        ?(ui = Desktop_sidecar.Ui.Local)
+        ?(tools = Web_connect.Tools.Local)
+        ?save
+        t
+        ~sw
+        ~logs
+        initial
+    =
     let saved = Queue.create () in
     let config : Desktop_sidecar.Config.t =
       { initial
+      ; ui
       ; tools
       ; name = "laptop"
       ; host_id = "host-laptop"
@@ -676,7 +693,8 @@ module Desktop = struct
     in
     Core_unix.mkdir_p config.cwd;
     let stdin, stdin_writer = Eio_unix.pipe sw in
-    let url, set_url = Eio.Promise.create () in
+    let first, set_first = Eio.Promise.create () in
+    let pages = Queue.create () in
     let ended =
       Eio.Fiber.fork_promise ~sw (fun () ->
         Desktop_sidecar.run
@@ -684,35 +702,58 @@ module Desktop = struct
           ~tool_host_wait:(Time_ns.Span.of_sec 10.)
           ~check_timeout:(Time_ns.Span.of_sec 5.)
           ~log:(Queue.enqueue logs)
-          ~on_url:(Eio.Promise.resolve set_url)
+          ~on_page:(fun page ->
+            if not (Eio.Promise.try_resolve set_first page)
+            then Queue.enqueue pages page)
           ~stdin
           config)
     in
-    let url = Eio.Promise.await url in
-    let port =
-      String.lsplit2_exn url ~on:':'
-      |> snd
-      |> String.lsplit2_exn ~on:':'
-      |> snd
-      |> String.lsplit2_exn ~on:'/'
-      |> fst
-      |> Int.of_string
-    in
-    let key = String.lsplit2_exn url ~on:'=' |> snd in
-    printf
-      "url: %s\n"
-      (url
-       |> String.substr_replace_all
-            ~pattern:(sprintf ":%d/" port)
-            ~with_:":PORT/"
-       |> String.substr_replace_all ~pattern:key ~with_:"<key>");
-    { url
-    ; key
-    ; port
-    ; ended
-    ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
-    ; saved
-    }
+    let (first : Desktop_sidecar.Page.t) = Eio.Promise.await first in
+    let url = first.url in
+    if first.remote
+    then (
+      printf "first page: %s\n" (Desktop_sidecar.Page.to_json_line first);
+      { url
+      ; key = ""
+      ; port = 0
+      ; ended
+      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+      ; saved
+      ; pages
+      })
+    else (
+      let port =
+        String.lsplit2_exn url ~on:':'
+        |> snd
+        |> String.lsplit2_exn ~on:':'
+        |> snd
+        |> String.lsplit2_exn ~on:'/'
+        |> fst
+        |> Int.of_string
+      in
+      let key = String.lsplit2_exn url ~on:'=' |> snd in
+      printf
+        "url: %s\n"
+        (url
+         |> String.substr_replace_all
+              ~pattern:(sprintf ":%d/" port)
+              ~with_:":PORT/"
+         |> String.substr_replace_all ~pattern:key ~with_:"<key>");
+      { url
+      ; key
+      ; port
+      ; ended
+      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+      ; saved
+      ; pages
+      })
+  ;;
+
+  (* The pages said since, as the shell reads them. *)
+  let show_pages d =
+    Queue.iter d.pages ~f:(fun page ->
+      printf "page: %s\n" (Desktop_sidecar.Page.to_json_line page));
+    Queue.clear d.pages
   ;;
 
   (* A [POST] of [fields] (and the key, unless [key] says otherwise) to
@@ -996,6 +1037,182 @@ let%expect_test
     url: http://127.0.0.1:PORT/#desktop=<key>
     status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":"me","error":"The saved connection (~/.prigh/tui-connection.sexp) did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
     Stdin_closed
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote: the connect form, then the backend's own \
+     prigh-web; nothing relayed here"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      t
+      ~sw
+      ~logs
+      (Form { address = None; user = None; error = None })
+  in
+  let here = backend_spec backend_port in
+  ignore (Desktop.post t ~sw d "status" [] : string option);
+  ignore
+    (Desktop.post
+       t
+       ~sw
+       d
+       "connect"
+       [ "address", `String (sprintf "ws://%s/ws" here)
+       ; "token", `String "sekrit"
+       ]
+     : string option);
+  Desktop.show_pages d;
+  ignore (Desktop.post t ~sw d "status" [] : string option);
+  (* The page here signs nothing in and relays nothing: the window is on
+     the backend's site. *)
+  post_code t ~sw ~port:d.port "anything";
+  page_hello t ~sw ~port:d.port {|{"name": "prigh-web", "token": "sekrit"}|};
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connect","address":null,"user":null,"error":null}
+    connect HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
+    page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
+    status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
+    HTTP/1.1 405 Method Not Allowed
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 19
+      body: method not allowed
+
+    (closed)
+    (((connect ws://127.0.0.1:PORT/ws) (token sekrit)))
+    Stdin_closed
+    prigh-web on http://127.0.0.1:SITE/
+    tool host: connected to ws://127.0.0.1:PORT/ws as client-N
+    tools run on this machine, in $DIR/here
+    connected to ws://127.0.0.1:PORT/ws
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote with a working saved connection: straight to the \
+     backend's site"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let start ~tools spec =
+    let d =
+      Desktop.start
+        ~ui:Remote
+        ~tools
+        t
+        ~sw
+        ~logs
+        (Check
+           { remote = address spec
+           ; credentials = { token = Some "sekrit"; user = None }
+           ; source = Saved "~/.prigh/tui-connection.sexp"
+           ; save = None
+           })
+    in
+    Desktop.show_pages d;
+    d.close_stdin ();
+    print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)]
+  in
+  start ~tools:Local (backend_spec backend_port);
+  start ~tools:Remote (sprintf "ws://127.0.0.1:%d/ws" backend_port);
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
+    Stdin_closed
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true}
+    Stdin_closed
+    tool host: connected to 127.0.0.1:PORT as client-N
+    tools run on this machine, in $DIR/here
+    connected to 127.0.0.1:PORT
+    prigh-web on http://127.0.0.1:SITE/
+    tools run on the backend (-tools remote)
+    connected to ws://127.0.0.1:PORT/ws
+    prigh-web on http://127.0.0.1:SITE/
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote with a saved connection that fails: the form here"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = address "127.0.0.1:1"
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Flag
+         ; save = None
+         })
+  in
+  ignore (Desktop.post t ~sw d "status" [] : string option);
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":null,"error":"-connect did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    Stdin_closed
+    |}]
+;;
+
+let%expect_test "the remote site's URL, from each form of address" =
+  List.iter
+    [ "server:7790"
+    ; "ws://server:7790/ws"
+    ; "wss://ai.example.com/ws"
+    ; "https://ai.example.com/"
+    ; "https://example.com/prigh/"
+    ; "wss://example.com:8443/prigh/ws"
+    ; "[::1]:7790"
+    ]
+    ~f:(fun spec ->
+      printf
+        "%s -> %s\n"
+        spec
+        (Backend_address.web_url (Or_error.ok_exn (Backend_address.parse spec))));
+  [%expect
+    {|
+    server:7790 -> http://server:7790/
+    ws://server:7790/ws -> http://server:7790/
+    wss://ai.example.com/ws -> https://ai.example.com/
+    https://ai.example.com/ -> https://ai.example.com/
+    https://example.com/prigh/ -> https://example.com/prigh/
+    wss://example.com:8443/prigh/ws -> https://example.com:8443/prigh/
+    [::1]:7790 -> http://[::1]:7790/
     |}]
 ;;
 

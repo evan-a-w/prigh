@@ -1,9 +1,10 @@
 // Temporary sessions, on a desktop (1280x800) and two phones by touch
 // (390x844, 320x640): the new-session screen (its heading, the tray and its
-// Temporary chip), a temporary session started from it, its pill, a reload
-// that comes back to it, leaving it (a toast, and nothing left on disk or in
-// the sidebar), keeping one (in the sidebar, saved), and leaving one that
-// works (the confirmation, then the work stopped). Run by prigh_web.sh;
+// Temporary chip, a chip's menu chosen from with the mouse), a temporary
+// session started from it, its pill, a reload that comes back to it,
+// leaving it (a toast, and nothing left on disk or in the sidebar), keeping
+// one (in the sidebar, saved), and leaving one that works (the
+// confirmation, then the work stopped). Run by prigh_web.sh;
 // prints normalised results (the expected output is in ENGINE.expected)
 // and, with SHOTS, screenshots (also in the three themes, landscape and as
 // an installed PWA).
@@ -141,7 +142,9 @@ const screen = async (w, h, label) => {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".main.fresh .hero").waitFor();
-  await page.locator(".sessions [data-session], .sessions-empty").first().waitFor({ state: "attached" });
+  // The sidebar shows no sessions until the backend's list arrives: wait for
+  // the sessions the earlier screens saved.
+  await page.waitForFunction(n => document.querySelectorAll("[data-session]").length === n, base);
   listedBase = 0;
   listedBase = await listed();
 
@@ -164,6 +167,51 @@ const screen = async (w, h, label) => {
     innerHeight - document.querySelector(".composer").getBoundingClientRect().bottom < 2));
   say("controls:", await reachable(".tray button, .composer .send"));
   await shoot("1-new");
+
+  // The real pointer (not element.click()): a menu under its own backdrop
+  // shows, and takes no hover or click.
+  section(`${label}: a chip's menu`);
+  const chip = phone ? ".model-chip" : ".thinking-chip";
+  const chipLabel = () => page.evaluate(sel => document.querySelector(sel).textContent.trim(), chip);
+  const middle = sel => page.evaluate(sel => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }, sel);
+  // Clicks the menu's item called name, or else the first unmarked one in
+  // view; says what is under the pointer there, and which was marked.
+  const settled = () => page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  const choose = async name => {
+    await settled();
+    const at = await middle(chip);
+    await page.mouse.click(at.x, at.y);
+    await page.locator("#chip-popover").waitFor();
+    await settled();
+    const item = await page.evaluate(name => {
+      const list = document.querySelector("#chip-popover .popover-items").getBoundingClientRect();
+      const items = [...document.querySelectorAll("#chip-popover .popover-item")];
+      const named = i => i.querySelector(".menu-label").textContent.trim();
+      const item = name ? items.find(i => named(i) === name)
+        : items.find(i => { const r = i.getBoundingClientRect(); return !i.matches(".marked") && r.top >= list.top && r.bottom <= list.bottom; });
+      item.scrollIntoView({ block: "nearest" });
+      const r = item.getBoundingClientRect();
+      const x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const marked = items.find(i => i.classList.contains("marked"));
+      return { name: named(item), marked: marked && named(marked), x, y,
+        under: document.elementFromPoint(x, y)?.closest(".popover-item") === item ? "the item"
+          : String(document.elementFromPoint(x, y)?.closest(".popover-item, .menu-backdrop")?.className) };
+    }, name);
+    await page.mouse.move(item.x, item.y);
+    const hovered = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".popover-item:hover"), item);
+    await page.mouse.click(item.x, item.y);
+    await page.waitForSelector("#chip-popover", { state: "detached" });
+    return { ...item, hovered };
+  };
+  const was = await chipLabel();
+  const chosen = await choose();
+  say("under the pointer on", `${chosen.name}:`, chosen.under, ...(phone ? [] : [`(hovered: ${chosen.hovered})`]));
+  const after = await chipLabel();
+  const back = await choose(chosen.marked);
+  say("the chip:", after === was ? "unchanged" : "changed", back.marked === chosen.name ? `(${chosen.name} chosen)` : "(nothing chosen)");
   if (process.env.SHOTS)
     for (const theme of ["light", "original", "dark"]) {
       await page.evaluate(theme => document.documentElement.setAttribute("data-theme", theme), theme);

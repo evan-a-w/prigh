@@ -564,7 +564,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Annotate_clear -> Effect.of_sync_fun Annotate_widget.clear ()
     | Annotate_export -> Effect.of_sync_fun Annotate_widget.export ()
     | Place_menu anchor -> Effect.of_sync_fun Menu_listeners.place anchor
-    | Open_tab session ->
+    | Open_window session ->
       Effect.of_sync_fun
         (fun () ->
            let location = Dom_html.window##.location in
@@ -574,12 +574,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
                "session"
                session
            in
-           ignore
-             (Dom_html.window##open_
-                (Js.string (Js.to_string location##.pathname ^ search))
-                (Js.string "_blank")
-                Js.null
-              : Dom_html.window Js.t Js.opt))
+           Desktop_page.open_window (Js.to_string location##.pathname ^ search))
         ()
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
@@ -1626,6 +1621,8 @@ let rec desktop_form
                      ([%equal: string option] unencrypted (Some address))
                    ~f:(function
                    | Some (Connected code) -> signed_in_by_desktop code
+                   | Some (Remote url) ->
+                     Browser.navigate (Desktop_page.follow url)
                    | Some (Refused error) ->
                      desktop_form
                        ~key
@@ -1656,12 +1653,15 @@ let desktop key =
     | Some (Connect { address; user; error }) ->
       desktop_form ~key ~address ~user ~error ()
     | Some (Connected { code }) -> signed_in_by_desktop code
+    | Some (Remote url) -> Browser.navigate (Desktop_page.follow url)
     | None -> desktop_lost ())
 ;;
 
 let run () =
   Async_js.init ();
   Service_worker.register ();
+  Desktop_page.take_shell ();
+  Desktop_page.take_hint ();
   match Desktop_page.key () with
   | Some key -> desktop key
   | None ->

@@ -216,8 +216,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
                 ~elided:(String.length head, 12, String.length whole)
             ])));
   Harness.text h ~selector:".tool";
-  [%expect
-    {| (✓ bash seq 12) |}];
+  [%expect {| (✓ bash seq 12) |}];
   (* Unfolded, the rest is fetched (once), the gap saying how much. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Load_output "c1");
@@ -234,8 +233,7 @@ let%expect_test "a long output comes cut, whole when unfolded" =
     (Jsonaf.to_string (`Object [ "text", `String whole ]));
   Harness.text h ~selector:".tool .output";
   print_s [%sexp (Set.to_list (Harness.model h).outputs_loading : string list)];
-  [%expect
-    {| () |}];
+  [%expect {| () |}];
   (* Folded and unfolded again: it is whole now. *)
   Harness.act h (Toggle_fold "c1");
   Harness.act h (Toggle_fold "c1");
@@ -497,10 +495,10 @@ let%expect_test "reconnecting with older pages loaded" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
@@ -573,10 +571,10 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.tabs web.open-tabs web.review history
-         web.migrated web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.review history web.migrated web.sidebar-width
+         web.files-width web.files-preview-width web.agents-width
+         web.terminal-height web.review-chat-width web.review-files-width
+         web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))

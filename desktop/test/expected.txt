@@ -18,6 +18,18 @@ fake: cwd WORK/home
 fake: GET / webkit=True
 fake: GET /pixel.gif webkit=True
 fake: exiting quit
+== the backend's own site (-ui remote), quitting from it: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: showing the backend's prigh-web at http://localhost:PORT/
+prigh-desktop: the page's Quit: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=True
+fake: GET /pixel.gif webkit=True
+fake: backend GET /
+fake: eof
 == the sidecar fails after it was ready: exit 4
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
@@ -86,8 +98,172 @@ prigh-desktop: Install prigh (`nix profile install github:evan-a-w/prigh`, or pr
 prigh-desktop: Bad PRIGH_DESKTOP_ARGS: $PRIGH_DESKTOP_ARGS: unterminated ' in "-cwd 'x"
 prigh-desktop: 
 prigh-desktop: Fix PRIGH_DESKTOP_ARGS (words as a shell splits them) and start prigh again.
+== browser: auto takes one on the PATH; closing its window stops the sidecar: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in Google Chrome's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: window closed
+== browser: the page's Quit (the sidecar exits) closes the browser: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: prigh desktop exited: closing the browser window
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: exiting quit
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: SIGTERM: closing
+== browser: the sidecar fails: the browser closes, the failure is told: exit 4
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: prigh desktop exited: closing the browser window
+prigh-desktop: prigh stopped: prigh desktop stopped with an error (exit code 4).
+prigh-desktop: 
+prigh-desktop: Fix what it says, then start prigh again.
+prigh-desktop: 
+prigh-desktop: It said:
+prigh-desktop: fake sidecar: serving on PORT
+prigh-desktop: prigh desktop: the backend went away
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: exiting crash
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: SIGTERM: closing
+== browser: none installed: exit 2
+prigh-desktop: No browser for prigh: PRIGH_DESKTOP_WINDOW is browser, but no Chromium-family browser was found (Google Chrome, Chromium, Brave, Microsoft Edge or Vivaldi).
+prigh-desktop: 
+prigh-desktop: Install one, set PRIGH_DESKTOP_BROWSER to one's path (programs.prigh.desktop.browser), or use the built-in window: PRIGH_DESKTOP_WINDOW=auto or webview.
+== browser: PRIGH_DESKTOP_BROWSER is not one: exit 2
+prigh-desktop: Bad window setting: PRIGH_DESKTOP_BROWSER is "/no/such/chrome", which is not an executable
+prigh-desktop: 
+prigh-desktop: Fix it (programs.prigh.desktop.window and .browser in Home Manager) and start prigh again.
+== bad PRIGH_DESKTOP_WINDOW: exit 2
+prigh-desktop: Bad window setting: PRIGH_DESKTOP_WINDOW is "chrome": use auto, browser or webview
+prigh-desktop: 
+prigh-desktop: Fix it (programs.prigh.desktop.window and .browser in Home Manager) and start prigh again.
+== browser: an instance left on the profile (title 1) is closed; the page opens in a new one: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: google-chrome-stable was left running on prigh's profile (pid PID): closing it
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser
+browser: fragment 
+browser: loaded the page
+browser: SIGTERM: closing
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: window closed
+== browser: an instance left on the profile (title hidden) is closed; the page opens in a new one: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: google-chrome-stable was left running on prigh's profile (pid PID): closing it
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/ --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser
+browser: fragment 
+browser: loaded the page
+browser: SIGTERM: closing
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: window closed
+left on the profile: 0
+== browser: SIGINT stops the sidecar and closes the browser: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: SIGINT: stopping prigh desktop
+prigh-desktop: prigh desktop exited: closing the browser window
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: SIGTERM: closing
+second launch: exit 0; the first still running after it: yes
+== browser: a second launch, then the first window closes: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=False
+fake: GET /pixel.gif webkit=False
+fake: eof
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto --remote-debugging-pipe
+browser: fragment desktop=0123abcd&shell=browser
+browser: loaded the page
+browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user-data-dir=WORK/data/io.github.evan-a-w.prigh/browser --no-first-run --no-default-browser-check --class=prigh --ozone-platform-hint=auto
+browser: handed the window to the instance on the profile
+browser: window closed
+second launch: exit 0; windows: 2
+== real Chromium: two windows; closing both stops the sidecar: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in chromium's app window (WORK/chromium)
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: 2 GET / webkit=True
+fake: 2 GET /pixel.gif webkit=True
+fake: 1 eof
+left running: 0
+== real Chromium: the sidecar quits, Chromium closes: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in chromium's app window (WORK/chromium)
+prigh-desktop: prigh desktop exited: closing the browser window
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: 1 GET / webkit=True
+fake: 1 GET /pixel.gif webkit=True
+fake: 1 exiting quit
+left running: 0
+== real Chromium: links to other sites open in the default browser
+default browser: http://localhost:PORT/away
+default browser: http://localhost:PORT/new-window
+prigh's page loaded: 2 times; Chromium's windows: http://127.0.0.1:PORT/
+exit 0; left running: 0
 == the real sidecar: the connect form; closing the window stops it: exit 0
-prigh-desktop: starting PRIGH desktop -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
 prigh-desktop: the window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
@@ -96,7 +272,7 @@ page: connect form: Connect to a backend
 saved connection: no
 left running: nothing
 == the real sidecar: signed in with the form; the page's /quit ends the app: exit 0
-prigh-desktop: starting PRIGH desktop -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
 prigh-desktop: prigh desktop exited (exit status: 0)
 sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-2
@@ -106,5 +282,78 @@ sidecar: prigh desktop: quit from the page
 sidecar: prigh desktop: quit
 page: connect form: Connect to a backend
 page: signed in
+saved connection: yes
+left running: nothing
+== the real sidecar: a chip's menu, chosen with the real pointer: exit 0
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-5
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: quit from the page
+sidecar: prigh desktop: quit
+page: signed in
+page: menu: the thinking chip's menu shows (5 levels), on screen: true; off reachable: true
+page: menu: the pointer over off: hovered true
+page: menu: clicked off: the menu closed, the chip says off
+saved connection: yes
+left running: nothing
+== the real sidecar at 125% zoom: a chip's menu, chosen with the real pointer: exit 0
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-8
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: quit from the page
+sidecar: prigh desktop: quit
+page: signed in
+page: menu: the thinking chip's menu shows (5 levels), on screen: true; off reachable: true
+page: menu: the pointer over off: hovered true
+page: menu: clicked off: the menu closed, the chip says off
+saved connection: yes
+left running: nothing
+== the real sidecar, -ui remote: the backend's own site; its /quit ends the app: exit 0
+prigh-desktop: starting PRIGH desktop -ui remote -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: showing the backend's prigh-web at http://127.0.0.1:PORT/
+prigh-desktop: the page's Quit: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-11
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: stdin closed: the window is gone
+page: the backend's sign-in, on the backend
+page: signed in
+saved connection: yes
+left running: nothing
+== the real sidecar: Open in new window opens another app window; one sidecar: exit 0
+prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening another window on http://127.0.0.1:PORT/?session=ID
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-15
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: quit from the page
+sidecar: prigh desktop: quit
+page: signed in
+page: window: the other window: on ?session=, desktop mode true, composer true
+page: window: the first window still works: true
+saved connection: yes
+left running: nothing
+== the real sidecar, -ui remote: Open in new window on the backend's site: exit 0
+prigh-desktop: starting PRIGH desktop -ui remote -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
+prigh-desktop: showing the backend's prigh-web at http://127.0.0.1:PORT/
+prigh-desktop: opening another window on http://127.0.0.1:PORT/?session=ID
+prigh-desktop: the page's Quit: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+sidecar: prigh desktop: tool host: connected to 127.0.0.1:PORT as client-19
+sidecar: prigh desktop: tools run on this machine, in WORK/laptop-cwd
+sidecar: prigh desktop: connected to 127.0.0.1:PORT
+sidecar: prigh desktop: stdin closed: the window is gone
+page: signed in
+page: window: the other window: on ?session=, desktop mode true, composer true
+page: window: the first window still works: true
 saved connection: yes
 left running: nothing

@@ -165,6 +165,8 @@ let%expect_test "the sidecar's link and answers" =
     ; {|{"state":"connect","address":null,"user":null,"error":null}|}
     ; {|{"state":"connected","address":"host:7790","code":"c0de"}|}
     ; {|{"state":"connected","address":"host:7790","code":null}|}
+    ; {|{"state":"remote","url":"https://ai.example.com/#app=desktop&host=laptop"}|}
+    ; {|{"state":"remote"}|}
     ; {|{"state":"other"}|}
     ; "not json"
     ]
@@ -174,6 +176,7 @@ let%expect_test "the sidecar's link and answers" =
           (Desktop_link.Status.of_json reply : Desktop_link.Status.t option)]);
   List.iter
     [ {|{"ok":true,"code":"c0de"}|}
+    ; {|{"ok":true,"remote":"https://ai.example.com/#app=desktop"}|}
     ; {|{"ok":false,"error":"cannot reach the backend"}|}
     ; {|{"ok":false,"error":"not encrypted","plaintext":true}|}
     ; {|{"ok":false}|}
@@ -198,12 +201,124 @@ let%expect_test "the sidecar's link and answers" =
     ((Connect (address ()) (user ()) (error ())))
     ((Connected (code (c0de))))
     ((Connected (code ())))
+    ((Remote https://ai.example.com/#app=desktop&host=laptop))
+    ()
     ()
     ()
     ((Connected (c0de)))
+    ((Remote https://ai.example.com/#app=desktop))
     ((Refused "cannot reach the backend"))
     ((Plaintext "not encrypted"))
     ((Refused "The backend did not accept the connection."))
     ()
+    |}]
+;;
+
+let%expect_test "the backend's own site opened by the desktop app" =
+  List.iter
+    [ "#app=desktop&host=host-laptop"
+    ; "#app=desktop&host=my%20laptop%2Fhome"
+    ; "#app=desktop&host=a+b%zz%4"
+    ; "#app=desktop"
+    ; "#app=desktop&host="
+    ; "#host=laptop"
+    ; "#app=other&host=laptop"
+    ; "#desktop=k"
+    ; ""
+    ]
+    ~f:(fun hash ->
+      print_s
+        [%message
+          hash
+            ~hint:(Desktop_link.Hint.of_hash hash : Desktop_link.Hint.t option)]);
+  print_endline Desktop_link.quit_url;
+  [%expect
+    {|
+    (#app=desktop&host=host-laptop (hint (((host (host-laptop))))))
+    (#app=desktop&host=my%20laptop%2Fhome (hint (((host ("my laptop/home"))))))
+    (#app=desktop&host=a+b%zz%4 (hint (((host (a+b%zz%4))))))
+    (#app=desktop (hint (((host ())))))
+    (#app=desktop&host= (hint (((host ())))))
+    (#host=laptop (hint ()))
+    (#app=other&host=laptop (hint ()))
+    (#desktop=k (hint ()))
+    ("" (hint ()))
+    about:blank#prigh-desktop-quit
+    |}]
+;;
+
+let%expect_test "in an installed browser's app window" =
+  List.iter
+    [ "#desktop=k&shell=browser"
+    ; "#app=desktop&host=laptop&shell=browser"
+    ; "#shell=browser"
+    ; "#desktop=k"
+    ; "#shell=browsers"
+    ; ""
+    ]
+    ~f:(fun hash ->
+      print_s
+        [%message
+          hash ~browser:(Desktop_link.browser_shell_of_hash hash : bool)]);
+  List.iter
+    [ "https://ai.example.com/#app=desktop&host=laptop"
+    ; "https://ai.example.com/"
+    ; "https://ai.example.com/#"
+    ]
+    ~f:(fun url ->
+      print_s
+        [%message
+          url
+            ~browser:(Desktop_link.follow ~browser:true url : string)
+            ~webview:(Desktop_link.follow ~browser:false url : string)]);
+  [%expect
+    {|
+    (#desktop=k&shell=browser (browser true))
+    (#app=desktop&host=laptop&shell=browser (browser true))
+    (#shell=browser (browser true))
+    (#desktop=k (browser false))
+    (#shell=browsers (browser false))
+    ("" (browser false))
+    (https://ai.example.com/#app=desktop&host=laptop
+     (browser https://ai.example.com/#app=desktop&host=laptop&shell=browser)
+     (webview https://ai.example.com/#app=desktop&host=laptop))
+    (https://ai.example.com/ (browser https://ai.example.com/#shell=browser)
+     (webview https://ai.example.com/))
+    (https://ai.example.com/# (browser https://ai.example.com/#shell=browser)
+     (webview https://ai.example.com/#))
+    |}]
+;;
+
+(* Open in new window under the desktop app: the new window's fragment puts
+   it in desktop mode too (it does not get the opener's sessionStorage). *)
+let%expect_test "a new window's fragment" =
+  List.iter
+    [ Some "k", false, false
+    ; Some "k", false, true
+    ; None, true, false
+    ; None, true, true
+    ; None, false, false
+    ; None, false, true
+    ]
+    ~f:(fun (key, backend_site, browser) ->
+      print_s
+        [%message
+          ""
+            (key : string option)
+            (backend_site : bool)
+            (browser : bool)
+            ~fragment:
+              (Desktop_link.window_fragment ~key ~backend_site ~browser
+               : string option)]);
+  [%expect
+    {|
+    ((key (k)) (backend_site false) (browser false) (fragment (desktop=k)))
+    ((key (k)) (backend_site false) (browser true)
+     (fragment (desktop=k&shell=browser)))
+    ((key ()) (backend_site true) (browser false) (fragment (app=desktop)))
+    ((key ()) (backend_site true) (browser true)
+     (fragment (app=desktop&shell=browser)))
+    ((key ()) (backend_site false) (browser false) (fragment ()))
+    ((key ()) (backend_site false) (browser true) (fragment ()))
     |}]
 ;;

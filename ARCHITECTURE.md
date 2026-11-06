@@ -2035,7 +2035,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   first, and stops everything under its switch. The CLI resolves the
   initial connection with `Backend_choice` (none or a bad one: the form)
   and prints the URL as a JSON line on stdout; its log leaves the key
-  out.
+  out. Under `-ui remote` (the default) `Connected` has no relay or
+  handoff: once connected (at start, or from the form, whose answers then
+  carry `remote`) it prints a second line, the backend's own prigh-web
+  (`Backend_address.web_url`) with `#app=desktop&host=ID` and
+  `"remote":true`, and the window goes there.
 - `Local_site` — what `prigh web`'s and `prigh desktop`'s sites
   (`Web_server.listen ~local:true`) accept: they relay to a backend and run
   this machine's tool host, so another page reaching them could run
@@ -3300,25 +3304,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
-    - Session tabs: `Session_tabs` (pure) holds whether they are on (the
-      `web.tabs` preference, `/tabs on|off` and the settings' switch) and
-      the open sessions' ids in order (`web.open-tabs`), restored from the
-      browser's cache and then the backend's preferences, and saved
-      (`to_save`) only once those arrived (`load`), so a page that has not
-      heard them yet never overwrites another browser's. `update` keeps
-      the tabs in step (`follow_tabs`): the current session gains a tab
-      when it changes, except a new session started by closing the last
-      tab (`Blank`), which stays out, showing the empty state, until it is
-      listed; `list_sessions` (`listed`) closes the tabs of sessions
-      deleted or archived and, from its `running`, `waiting` and `failed`,
-      marks those whose work finished while out of sight (`finished`, cleared
-      when seen). Closing, `Step_tab`, `Nth_tab` and dropping a dragged
-      tab (`Drag_tab`, `Drop_tab`: HTML drag and drop, the page's
-      `dragover` already allows drops) only switch sessions through
-      `switch_session`/`New_session`, so switching still resets everything
-      of the old session; steps count from the session being switched to,
-      so keys pressed in a row each move on. `Session_tabs_view` renders
-      the strip (none when off or narrow: a phone keeps its slim bar).
+    - Open in new window: `Command.Open_window` (the session menu's item,
+      `Action.Open_session_window` from a Ctrl/⌘- or middle click in the
+      sidebar) opens the page on `?session=ID` in another window
+      (`Desktop_page.open_window`). A new window gets none of the opener's
+      sessionStorage, so under the desktop app the URL carries the
+      fragment that puts it in desktop mode too
+      (`Desktop_link.window_fragment`: `desktop=KEY` on the sidecar's
+      page, `app=desktop` on the backend's site, plus `shell=browser`); in
+      a browser's app window it asks for a `popup` (no tabs or address
+      bar) the size of this one.
     - Installing: `Model.update_ready` is the update notice (one, over
       the toasts, until answered): `Update_ready` raises it, `Apply_update`
       emits `Command.Apply_update`, `Dismiss_update` drops it. `app/`'s
@@ -3467,9 +3462,12 @@ terminal frontend and `web/` prigh-web, the browser one.
 
 A Rust workspace, apart from the dune projects: `core/` (the decisions,
 without a window, unit-tested) and `app/` (the Tauri v2 shell,
-`prigh-desktop`). The shell has no frontend of its own: `ui/index.html` is
+`prigh-desktop`). The shell shows prigh-web in its own window (the system
+webview) or an installed browser's app window (below), and has no
+frontend of its own: `ui/index.html` is
 a blank page shown while `prigh desktop` starts, then the window navigates
-to the URL it reports, and prigh-web there is the whole UI.
+to the URL it reports, and prigh-web there (the sidecar's, or the
+backend's own under `-ui remote`) is the whole UI.
 
 The sidecar contract (the shell's only coupling to the backend):
 
@@ -3479,24 +3477,104 @@ The sidecar contract (the shell's only coupling to the backend):
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
   home directory, with stdin a pipe it holds open;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
-  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs` accepts only http(s) on a loopback host;
-  anything else ends the app with a dialog); stderr is its log, of which the
-  shell keeps the last 30 lines for the error dialog;
+  (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
+  first must be http(s) on a loopback host, anything else ends the app with
+  a dialog); later lines `{"url":"https://…","remote":true}` send the
+  window to the backend's own prigh-web, whose origin then counts as the
+  app's too; stderr is its log, of which the shell keeps the last 30 lines
+  for the error dialog;
 - it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
   failure.
 
 The window closing closes the pipe, waits up to 5 s and then kills the
 sidecar; the sidecar exiting ends the app (after a dialog, from
 `core/failure.rs`, when it failed or never became ready). Navigation stays on
-the sidecar's origin (`core/navigation.rs`); other links and new windows go
-to the system browser through the opener plugin. Downloads are saved in the
+the origins the sidecar named (`core/navigation.rs`); other links and new
+windows go to the system browser through the opener plugin;
+`about:blank#prigh-desktop-quit` is the backend's page quitting (it cannot
+reach the sidecar from another origin), and stops the sidecar as closing
+the window does. Downloads are saved in the
 Downloads folder. The page has no Tauri IPC: the window is created in
 `main.rs` with no capabilities for remote URLs, so prigh-web is an ordinary
-page there. Plugins: single-instance (a second launch focuses the window),
+page there. Plugins: single-instance (a second launch focuses the window,
+or opens another browser window),
 window-state (size and position), opener, dialog.
 
+The window is a browser as far as is cheap: Tauri's drop handler is off,
+so drops reach the page; Ctrl/⌘ with `+`/`=`, `-`, `0`, Ctrl+scroll and a
+pinch zoom the page in steps (`core/zoom.rs`), remembered in the app's
+config directory (`zoom`); F11 toggles fullscreen. On Linux (`mod linux`)
+WebKitGTK's hardware acceleration is set to always (Tauri leaves its
+default, on demand) and zoom applies to the whole page; at start the app
+checks, when `GTK_USE_PORTAL` asks GTK for xdg-desktop-portal's file
+chooser, that a portal with a FileChooser answers, and otherwise unsets it
+(GTK would open nothing) and says so; `PRIGH_DESKTOP_GPU_INFO=1` opens `webkit://gpu` instead
+of the sidecar's page. Nix: `nix/desktop.nix` is the app as a function of
+`pkgs`, so the Home Manager module can build it with the system's nixpkgs
+(`useSystemNixpkgs`): WebKitGTK draws with the GPU only when its Mesa
+matches the driver NixOS installs.
+
+The browser window (`core/browser.rs`; `PRIGH_DESKTOP_WINDOW`
+auto|browser|webview, `PRIGH_DESKTOP_BROWSER`): before the window is made,
+`window_choice` looks for a Chromium-family browser (the explicit one, else
+by name on the PATH plus the usual install directories, without the login
+shell; on macOS in `/Applications`, on Windows under `%ProgramFiles%` and
+`%LocalAppData%`); `auto` takes one only on Linux. Then the shell makes no
+window: the first page line runs `BROWSER --app=URL#…&shell=browser
+--user-data-dir=<app data>/browser --no-first-run
+--no-default-browser-check` (`--class=prigh --ozone-platform-hint=auto` on
+Linux) in a process group of its own, and later page lines are left to the
+page, which goes there itself (`Desktop_page.follow` keeps `shell=browser`
+on the backend's URL). The profile of prigh's own makes it an instance of
+its own, which exits when its last window closes: that exit stops the
+sidecar, as a window closing does. One app runs at a time, so an instance
+already on the profile at launch was left by an app that died: the shell
+SIGTERMs it (then SIGKILLs it) before starting the browser, since a window
+handed to it would show a page whose sidecar is gone. The instance is the
+pid in the profile's `SingletonLock`, trusted only while that process runs
+on the profile: its `/proc/PID/cmdline` names it (NUL-separated, or one
+space-joined string once Chrome rewrites its title: `browser::names_profile`)
+or it holds files open in it (`/proc/PID/fd`), for a command line
+reordered by a relaunch. Should a launch still hand its window over (a race
+with another launcher), the shell waits for that instance instead. SIGINT,
+SIGTERM and SIGHUP stop the app as its window closing does (the sidecar,
+then the browser, which is in a process group of its own and would
+otherwise outlive a Ctrl-C); a second signal exits at once. The
+sidecar exiting SIGTERMs (then, after 3 s, SIGKILLs) the browser's process
+group while the process we started is unreaped, and the instance we handed
+the window to; never another. A second launch runs the browser again on the
+same URL and profile, which opens another window in the running instance.
+On Linux the browser it starts gets `--remote-debugging-pipe` (its fd 3
+reads DevTools commands, fd 4 writes replies and events, NUL-separated;
+`devtools_pipe` dups pipes there in `pre_exec`): no port, so nothing else
+on the machine can drive it, and Chrome allows it on a non-default
+profile. `devtools::Links` turns its target events into effects:
+`Target.setDiscoverTargets`, then for each page target whose URL
+`navigation::decide` sends elsewhere (`External`), the link to the default
+browser (the opener plugin: `xdg-open`) and either `Target.closeTarget` (a
+new tab or window: a `target=_blank` link, `window.open`) or, for a target
+last seen on prigh's sites (its window, a popup on its site),
+`Target.attachToTarget` and `Page.navigate` back to that page. prigh's
+sites, `about:blank` and `chrome:` pages stay. A second launch's browser,
+which only hands its window over, gets no pipe.
+`shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
+in sessionStorage) that on the backend's site Quit prigh is `window.close()`
+(an `--app` window's history is one entry, so the page may close it), with
+"Close this window to quit prigh." if the browser refuses.
+
+
+More windows: the page's Open in new window (`window.open` on its own site)
+reaches the app's window as `on_new_window`; one `navigation::decide`
+allows becomes another app window (`main-N`, built off the callback's
+thread, with the same handlers and zoom), not a webview Tauri makes on its
+own, and the request is refused. All the windows share the one sidecar and
+tool host; the app stops it when the last closes (`ExitRequested`).
+Zoom applies to every window. In a browser's app window the page opens a
+popup in the same instance, which the shell already waits for.
+
 Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
-page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit`; the
+page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit` (on
+the backend's own site, `Desktop_page` goes to the quit URL instead); the
 sidecar exits 0 and so does the app. On macOS the app menu (needed for
 WKWebView's Edit shortcuts) takes ⌘Q: its Quit stops the sidecar as closing
 the window does. Either way the sidecar ends first and the app follows.
@@ -3504,14 +3582,16 @@ the window does. Either way the sidecar ends first and the app follows.
 Test hooks (environment): `PRIGH_DESKTOP_NO_DIALOG` logs failures instead of
 showing dialogs, `PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD` closes the window once
 the page loaded, `PRIGH_DESKTOP_TEST_SCRIPT=FILE` evaluates FILE on each of
-the sidecar's pages, which may close the window by going to
+the sidecar's pages, which may close its window by going to
 `about:blank#prigh-desktop-test-close`.
 
-Packaging: the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
+Packaging (`nix/desktop.nix`): the flake's `prigh-desktop-unwrapped` (cargo-tauri's build hook;
 on Linux `wrapGAppsHook3` with WebKitGTK 4.1 and glib-networking, on macOS
 `$out/Applications/prigh.app`) and `prigh-desktop`, wrapped with
-`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh`, with the desktop entry
-and hicolor icons. `nix/home-manager.nix` is `homeManagerModules.default`
+`PRIGH_DESKTOP_BACKEND` set to the flake's `prigh` (and `PRIGH_DESKTOP_ARGS`,
+`PRIGH_DESKTOP_WINDOW` and `PRIGH_DESKTOP_BROWSER` from `.override { ui;
+window; browser; extraArgs; }`), with the desktop entry and hicolor
+icons. `nix/home-manager.nix` is `homeManagerModules.default`
 (`programs.prigh`). `.github/workflows/desktop.yml` builds the installers
 for Linux, macOS and Windows.
 

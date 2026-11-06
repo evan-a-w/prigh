@@ -195,11 +195,6 @@ let argument_items
         ~detail:(Settings_section.about section)
         ~search:(arg ^ " " ^ Settings_section.name section)
         arg)
-  | Tabs ->
-    simple
-      [ "on", "the open sessions as tabs over the chat"
-      ; "off", "no tabs: switch from the sidebar"
-      ]
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create
