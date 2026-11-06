@@ -1215,7 +1215,13 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   `prigh desktop` stopping (Quit prigh, a failure, Ctrl-C in the terminal
   it runs in) closes the browser. On the backend's own site Quit prigh
   closes the window, which does the same. A browser left running on prigh's
-  profile (by an app that was killed) is closed when the app starts.
+  profile (by an app that was killed) is closed when the app starts. Links
+  to other sites open in your default browser (`xdg-open` on Linux), with
+  your own profile, as in the app's own window: the app watches the
+  browser's windows (its DevTools, on a pipe only the app holds, no port)
+  and closes a new tab or window on another site, or sends prigh's window
+  back, opening the link in your browser instead (Linux only: elsewhere
+  they open in the browser on prigh's profile).
   Window managers see the class `prigh` on X11; on Wayland Chromium names
   an app window's app_id after the site (e.g. `chrome-ai.example.com__-Default`),
   so match that in Hyprland or sway rules (`hyprctl clients` shows it).

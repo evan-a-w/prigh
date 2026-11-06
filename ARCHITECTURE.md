@@ -3544,6 +3544,19 @@ sidecar exiting SIGTERMs (then, after 3 s, SIGKILLs) the browser's process
 group while the process we started is unreaped, and the instance we handed
 the window to; never another. A second launch runs the browser again on the
 same URL and profile, which opens another window in the running instance.
+On Linux the browser it starts gets `--remote-debugging-pipe` (its fd 3
+reads DevTools commands, fd 4 writes replies and events, NUL-separated;
+`devtools_pipe` dups pipes there in `pre_exec`): no port, so nothing else
+on the machine can drive it, and Chrome allows it on a non-default
+profile. `devtools::Links` turns its target events into effects:
+`Target.setDiscoverTargets`, then for each page target whose URL
+`navigation::decide` sends elsewhere (`External`), the link to the default
+browser (the opener plugin: `xdg-open`) and either `Target.closeTarget` (a
+new tab or window: a `target=_blank` link, `window.open`) or, for a target
+last seen on prigh's sites (its window, a popup on its site),
+`Target.attachToTarget` and `Page.navigate` back to that page. prigh's
+sites, `about:blank` and `chrome:` pages stay. A second launch's browser,
+which only hands its window over, gets no pipe.
 `shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
 in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 (an `--app` window's history is one entry, so the page may close it), with
