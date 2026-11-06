@@ -283,6 +283,8 @@ module Client = struct
     ; mutable wanted_host_id : string option
       (** [hello]'s [host_id], also while a newer connection holds it *)
     ; mutable name : string
+    ; mutable kind : Client_kind.t
+      (** [hello]'s [client]: its prompts are from this kind of client *)
     ; mutable tools : bool
     ; mutable features : string list
       (** [hello]'s [features]: what the host supports beyond the basics
@@ -1011,6 +1013,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; host_id = sprintf "client-%d" t.client_seq
     ; wanted_host_id = None
     ; name = sprintf "client-%d" t.client_seq
+    ; kind = Other
     ; tools = false
     ; features = []
     ; cwd = None
@@ -1572,6 +1575,7 @@ let hello t (client : Client.t) params =
       | `String cwd -> client.cwd <- Some cwd
       | _ -> ());
     client.home <- string "home";
+    client.kind <- Client_kind.of_hello (string "client");
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
       let claimed =
         match string "host_id" with
@@ -2617,18 +2621,45 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | _ -> None
 ;;
 
-let dispatch agent login ~meth ~params : Json.t Or_error.t =
+let ui_action_param params ~meth =
+  match param params "ui_action" with
+  | None | Some `Null -> Ok None
+  | Some _ when String.equal meth "steer" ->
+    Or_error.error_string
+      "steer does not take ui_action: send it with prompt, or follow_up while \
+       a run is in progress"
+  | Some json ->
+    Or_error.bind (Ui_action.of_json json) ~f:(fun action ->
+      match param params "text" with
+      | None | Some (`String "") -> Ok (Some action)
+      | Some _ ->
+        Or_error.error_string
+          "a prompt with ui_action takes no text: send text \"\"")
+;;
+
+let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
   match meth with
   | "ping" -> ok (`String "pong")
   | ("prompt" | "steer" | "follow_up") as meth ->
     let open Or_error.Let_syntax in
-    let%bind text = string_param params "text" in
+    let%bind ui_action = ui_action_param params ~meth in
+    let%bind text =
+      match ui_action with
+      | Some _ -> Ok ""
+      | None -> string_param params "text"
+    in
     let%bind attachments = string_list_param params "attachments" in
     let%bind images = images_param ~env:(Agent.env agent) params in
+    let client = client.kind in
     (match meth with
-     | "prompt" -> unit_result (Agent.prompt ~attachments ~images agent text)
-     | "steer" -> unit_result (Agent.steer ~attachments ~images agent text)
-     | _ -> unit_result (Agent.follow_up ~attachments ~images agent text))
+     | "prompt" ->
+       unit_result
+         (Agent.prompt ~attachments ~images ~client ?ui_action agent text)
+     | "steer" ->
+       unit_result (Agent.steer ~attachments ~images ~client agent text)
+     | _ ->
+       unit_result
+         (Agent.follow_up ~attachments ~images ~client ?ui_action agent text))
   | "list_skills" ->
     Or_error.map (Agent.skills agent) ~f:(fun skills ->
       `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
@@ -3075,7 +3106,7 @@ let handle t client (request : Json.t) : Json.t =
                      (Git_rpc.dispatch agent ~meth ~params))
               with
               | Some result -> result
-              | None -> dispatch agent t.login ~meth ~params))
+              | None -> dispatch agent t.login ~client ~meth ~params))
        with
        | result -> result
        | exception exn ->

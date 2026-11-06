@@ -32,6 +32,25 @@ let sniff bytes =
   else None
 ;;
 
+let max_preview_bytes = 20 * 1000 * 1000
+
+let is_svg bytes =
+  let head =
+    String.prefix bytes 1024
+    |> String.chop_prefix_if_exists ~prefix:"\xef\xbb\xbf"
+    |> String.lstrip
+  in
+  String.is_prefix head ~prefix:"<"
+  && String.is_substring (String.prefix bytes 4096) ~substring:"<svg"
+  && not (String.mem (String.prefix bytes 4096) '\000')
+;;
+
+let sniff_displayable bytes =
+  match sniff bytes with
+  | Some mime -> Some mime
+  | None -> if is_svg bytes then Some "image/svg+xml" else None
+;;
+
 let dimensions bytes =
   let len = String.length bytes in
   let byte i = Char.to_int bytes.[i] in

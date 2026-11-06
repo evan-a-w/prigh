@@ -224,7 +224,9 @@ let%expect_test
     prigh: closing the connection of laptop: no reply for 30s
     tool_result: [the tool host "laptop" stopped responding (no reply for 30s), so it was disconnected and this call's result is lost: pick another host with /host, or wait for it to reconnect and run it again]
     ((active_host host-laptop) (active_host_name (laptop)) (hosts (<host>)))
-    saved user: go
+    saved user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     saved assistant: Tool_use
     saved tool_result: [the tool host "laptop" stopped responding (no reply for 30s), so it was disconnected and this call's result is lost: pick another host with /host, or wait for it to reconnect and run it again]
     saved assistant: End_turn
@@ -321,7 +323,9 @@ let%expect_test
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     running=true
-    saved user: remember me
+    saved user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    remember me
     listed=true
     |}];
   ignore (Agent.abort agent : string list);
@@ -331,7 +335,9 @@ let%expect_test
   [%expect
     {|
     running=false
-    saved user: remember me
+    saved user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    remember me
     saved assistant: Aborted
     |}]
 ;;
