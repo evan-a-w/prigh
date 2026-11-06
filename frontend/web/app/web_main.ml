@@ -967,7 +967,11 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
           | None, false -> 0
           | None, true -> n - 1
         in
-        stops.(target)##focus;
+        let stop = stops.(target) in
+        (* WebKit does not focus a scroller without a tabindex. *)
+        if not (Js.to_bool (stop##hasAttribute (Js.string "tabindex")))
+        then stop##setAttribute (Js.string "tabindex") (Js.string "-1");
+        stop##focus;
         true))
 ;;
 

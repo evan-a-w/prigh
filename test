@@ -7,7 +7,7 @@
 #   ./test           the quick run, before pushing: the browser e2e in Chromium
 #   ./test --full    everything, before merging: every dune test run again,
 #                    even those dune has a result for, and the browser e2e in
-#                    Chromium and Firefox (what the flake's checks run)
+#                    Chromium, Firefox and WebKit (what the flake's checks run)
 #
 # Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
 # comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
@@ -23,7 +23,7 @@ force=()
 case "${1:-}" in
 "") ;;
 --full)
-	engines="chromium firefox"
+	engines="chromium firefox webkit"
 	force=(--force)
 	;;
 *)
@@ -41,6 +41,13 @@ if [ -z "${PLAYWRIGHT_MODULE:-}" ] || [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ]; th
 		--inputs-from "$root" nixpkgs#playwright-test nixpkgs#playwright-driver.browsers)
 	export PLAYWRIGHT_MODULE="${playwright[0]}/lib/node_modules/playwright/index.mjs"
 	export PLAYWRIGHT_BROWSERS_PATH="${playwright[1]}"
+fi
+# WebKit (WPE) renders through EGL: without a system OpenGL driver
+# (/run/opengl-driver on NixOS) glvnd finds no EGL vendor and WebKit aborts.
+if [[ $engines == *webkit* ]] && [ "$(uname)" = Linux ] && [ -z "${__EGL_VENDOR_LIBRARY_DIRS:-}" ]; then
+	mesa="$(nix build --accept-flake-config --no-link --print-out-paths \
+		--inputs-from "$root" nixpkgs#mesa)"
+	export __EGL_VENDOR_LIBRARY_DIRS="$mesa/share/glvnd/egl_vendor.d"
 fi
 export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT

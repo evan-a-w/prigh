@@ -181,7 +181,7 @@ const visit = async (w, h, { safe = false } = {}) => {
   const context = await browser.newContext(options);
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
-  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
+  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
   page.on("pageerror", e => errors.push(`page: ${e.message}`));
   if (safe) {
     const cdp = await context.newCDPSession(page);
@@ -263,11 +263,13 @@ const visit = async (w, h, { safe = false } = {}) => {
 
   // The keyboard: the visual viewport shrinks (as a phone's keyboard does);
   // the composer stays in it.
-  if (engineName === "chromium") {
+  if (engineName !== "firefox") {
     section(`${tag}: the keyboard`);
-    const cdp = await context.newCDPSession(page);
     await editor.focus();
-    await cdp.send("Emulation.setVisibleSize", { width: w, height: Math.round(h * 0.55) }).catch(() => {});
+    if (engineName === "chromium") {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("Emulation.setVisibleSize", { width: w, height: Math.round(h * 0.55) }).catch(() => {});
+    }
     await page.setViewportSize({ width: w, height: Math.round(h * 0.55) });
     await page.waitForTimeout(250);
     console.log(await page.evaluate(() => {

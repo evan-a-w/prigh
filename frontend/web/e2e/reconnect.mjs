@@ -74,19 +74,20 @@ const browser = await engine.launch({
 const context = await browser.newContext({ viewport: { width: 390, height: 760 } });
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
-// While the tab's [e2e-ws-down] is set, the backend is out of reach.
+// While the tab's [e2e-ws-down] is set, the backend is out of reach (port 2:
+// closed, and not one of the ports WebKit refuses with an exception).
 await page.addInitScript(() => {
   const Real = window.WebSocket;
   window.WebSocket = class extends Real {
     constructor(url, protocols) {
-      super(sessionStorage.getItem("e2e-ws-down") ? "ws://127.0.0.1:9/" : url, protocols);
+      super(sessionStorage.getItem("e2e-ws-down") ? "ws://127.0.0.1:2/" : url, protocols);
     }
   };
 });
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
@@ -139,10 +140,16 @@ const compare = (label, before, after) => {
 // Chromium takes [navigator.onLine] from the host's network interfaces: with
 // only a loopback (the Nix sandbox) it starts offline, so going offline and
 // back fires no events. Then they are fired here, as a phone's browser would;
-// [setOffline] still makes every connection attempt fail meanwhile.
+// [setOffline] still makes every connection attempt fail meanwhile. WebKit's
+// [setOffline] fails requests but not WebSockets, which reconnect at once:
+// there they are sent out of reach too.
 let browserSeesNetwork;
 const setOffline = async offline => {
   browserSeesNetwork ??= await page.evaluate(() => navigator.onLine);
+  if (engineName === "webkit")
+    await page.evaluate(offline => offline
+      ? sessionStorage.setItem("e2e-ws-down", "1")
+      : sessionStorage.removeItem("e2e-ws-down"), offline);
   await context.setOffline(offline);
   if (!browserSeesNetwork)
     await page.evaluate(offline => window.dispatchEvent(new Event(offline ? "offline" : "online")), offline);

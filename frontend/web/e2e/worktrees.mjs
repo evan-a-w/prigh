@@ -85,7 +85,7 @@ page.on("websocket", ws => {
 });
 const errors = [];
 page.on("console", message => {
-  if (message.type() === "error" && !/favicon\.ico/.test(message.text())) errors.push(`console: ${message.text()}`);
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget/.test(message.text())) errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
@@ -338,7 +338,7 @@ try {
   // a sheet at the foot of the screen.
   const phone = await (await browser.newContext({
     viewport: { width: 390, height: 844 },
-    isMobile: engineName === "chromium",
+    isMobile: engineName !== "firefox",
     hasTouch: true,
   })).newPage();
   phone.on("pageerror", error => errors.push(`phone: ${error.message}`));

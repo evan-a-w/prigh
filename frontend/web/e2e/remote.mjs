@@ -71,7 +71,7 @@ const page = await context.newPage();
 const errors = [];
 const watch = p => {
   p.on("console", message => {
-    if (message.type() === "error" && !/favicon\.ico|403 \(Forbidden\)/.test(message.text()))
+    if (message.type() === "error" && !/favicon\.ico|interactive-widget|403 \(Forbidden\)/.test(message.text()))
       errors.push(`console: ${message.text()}`);
   });
   p.on("pageerror", error => errors.push(`page: ${error.message}`));

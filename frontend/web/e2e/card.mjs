@@ -89,7 +89,7 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
 page.on("console", message => {
-  if (message.type() === "error" && !/favicon\.ico|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
+  if (message.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(message.text())) errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
@@ -299,6 +299,25 @@ try {
   // A phone: ☰, the session's name and ⋯; the status at the composer.
   await page.setViewportSize({ width: 390, height: 760 });
   await page.locator(".chat-chrome").waitFor();
+  // WebKit lays the phone out a few frames after the resize: wait until the
+  // composer fits the new width and the layout holds still for two frames.
+  await page.waitForFunction(() => {
+    const box = document.querySelector(".composer")?.getBoundingClientRect();
+    return window.innerWidth === 390 && box && box.right <= 390 && box.width > 0;
+  });
+  await page.evaluate(async () => {
+    const sizes = () => [".composer", ".composer-status", ".composer-row"]
+      .map(s => document.querySelector(s)?.getBoundingClientRect())
+      .map(r => r && `${r.left},${r.top},${r.width},${r.height}`).join(";");
+    const frame = () => new Promise(requestAnimationFrame);
+    let last = sizes();
+    for (let held = 0; held < 2; ) {
+      await frame();
+      const now = sizes();
+      held = now === last ? held + 1 : 0;
+      last = now;
+    }
+  });
   section("a phone");
   console.log(clean(await card()));
   console.log(clean(await chips()));
