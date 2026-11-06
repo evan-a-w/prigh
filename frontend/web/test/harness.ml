@@ -6,11 +6,12 @@ type t =
   { mutable model : App.Model.t
   ; mutable pending : (string * App.Reply_tag.t) list
   ; mutable quiet : bool
+  ; mutable clipboard : bool
   }
 
 let model t = t.model
 
-let act t action =
+let rec act t action =
   let model, commands = App.update t.model action in
   t.model <- model;
   List.iter commands ~f:(fun (command : App.Command.t) ->
@@ -62,8 +63,16 @@ let act t action =
      | Auth_failed _
      | Remember_temporary _
      | Apply_update -> ());
-    if not t.quiet then print_s [%sexp (command : App.Command.t)])
+    if not t.quiet then print_s [%sexp (command : App.Command.t)]);
+  List.iter commands ~f:(function
+    | Copy { copied; _ } ->
+      act
+        t
+        (if t.clipboard then Copied copied else Copy_failed { secure = false })
+    | _ -> ())
 ;;
+
+let block_clipboard t = t.clipboard <- false
 
 let quiet t f =
   let was = t.quiet in
@@ -324,7 +333,7 @@ let key
 let type_ t text = act t (Edit { text; cursor = String.length text })
 
 let connecting () =
-  let t = { model = App.init; pending = []; quiet = true } in
+  let t = { model = App.init; pending = []; quiet = true; clipboard = true } in
   act t Start;
   t.quiet <- false;
   t
@@ -348,7 +357,9 @@ let newest s : App.Reply_tag.t =
 ;;
 
 let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
-  let t = { model = App.init; pending = []; quiet = not verbose } in
+  let t =
+    { model = App.init; pending = []; quiet = not verbose; clipboard = true }
+  in
   act t Start;
   reply t "get_state" state;
   reply t "list_models" models_json;
