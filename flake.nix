@@ -344,6 +344,7 @@
                   pkgs.python3
                   pkgs.curl
                   pkgs.procps
+                  pkgs.openbox
                 ];
                 __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
                 LIBGL_ALWAYS_SOFTWARE = "1";

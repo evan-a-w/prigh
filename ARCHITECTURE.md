@@ -3559,9 +3559,25 @@ profile. `devtools::Links` turns its target events into effects:
 browser (the opener plugin: `xdg-open`) and either `Target.closeTarget` (a
 new tab or window: a `target=_blank` link, `window.open`) or, for a target
 last seen on prigh's sites (its window, a popup on its site),
-`Target.attachToTarget` and `Page.navigate` back to that page. prigh's
-sites, `about:blank` and `chrome:` pages stay. A second launch's browser,
-which only hands its window over, gets no pipe.
+`Target.attachToTarget` and `Page.navigate` back to that page. The
+browser's own pages (`devtools::browser_page`: `chrome:`, `chrome-search:`,
+`chrome-untrusted:`, `devtools:`, `view-source:`, `chrome-extension:` and
+the other browsers' schemes; a new tab or tabbed window is one, on its new
+tab page) and every page in a browser context other than the first one
+seen (incognito) are closed the same way, then `Target.activateTarget`
+refocuses the opener or prigh's only window (with several, the window
+manager picks); DevTools stays with `PRIGH_DESKTOP_DEVTOOLS=1`. A popup
+that reaches prigh's site (`openerId`, from `about:blank`, which stays
+until then) is closed and its URL opened as another `--app` window
+(`Effect::OpenWindow`, `BrowserWindow::window_on`: a launch handed to the
+instance). It also sends `Browser.setDownloadBehavior` (the downloads
+directory, `profile::downloads_dir`) and `Browser.grantPermissions` for
+prigh's origins as it learns them. Before each launch
+`BrowserWindow::write_settings` merges `profile::preferences` and
+`profile::local_state` into the profile (each setting set at its dotted path,
+the user's other settings kept), and on Linux `taskbar::app_id` names the
+desktop entry the app writes for the window's Wayland app_id. A second
+launch's browser, which only hands its window over, gets no pipe.
 `shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
 in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 (an `--app` window's history is one entry, so the page may close it), with
@@ -3575,7 +3591,7 @@ thread, with the same handlers and zoom), not a webview Tauri makes on its
 own, and the request is refused. All the windows share the one sidecar and
 tool host; the app stops it when the last closes (`ExitRequested`).
 Zoom applies to every window. In a browser's app window the page opens a
-popup in the same instance, which the shell already waits for.
+popup, which on Linux becomes another app window in the same instance (above).
 
 Quitting: on Linux and Windows the app has no menu, so Ctrl+Q reaches the
 page, whose Quit (also `/quit` and the menus) `POST`s `/desktop/quit` (on

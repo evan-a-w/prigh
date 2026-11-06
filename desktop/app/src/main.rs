@@ -17,6 +17,7 @@ use prigh_desktop_core::browser::{self, Choice, Found, Mode, Platform};
 use prigh_desktop_core::failure::{self, Failure};
 use prigh_desktop_core::launch::{self, Os};
 use prigh_desktop_core::navigation::{self, Decision};
+use prigh_desktop_core::profile;
 use prigh_desktop_core::tail::Tail;
 use prigh_desktop_core::zoom::{self, Step};
 use prigh_desktop_core::{ready, search_path};
@@ -162,6 +163,9 @@ impl BrowserWindow {
             log(format!("{} was left running on prigh's profile (pid {pid}): closing it", self.found.name));
             self.end_instance(pid);
         }
+        self.write_settings();
+        #[cfg(target_os = "linux")]
+        self.write_taskbar_entry(&url);
         log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
         let mut cmd = self.command(&url);
         // Its own process group: closing it reaches its helpers too.
@@ -183,7 +187,7 @@ impl BrowserWindow {
         *self.child.lock().unwrap() = Some(child.clone());
         #[cfg(target_os = "linux")]
         if let Some(pipe) = devtools {
-            pipe.watch(app.clone(), sidecar.clone());
+            pipe.watch(app.clone(), sidecar.clone(), self.clone());
         }
         // Browsers say a lot on stderr: only kept, for when it fails.
         let tail = Arc::new(Mutex::new(Tail::new(20)));
@@ -224,6 +228,53 @@ impl BrowserWindow {
             log("the browser window closed: stopping prigh desktop");
             sidecar.stop();
         });
+    }
+
+    /// prigh's settings, merged into the profile's (see
+    /// [prigh_desktop_core::profile]) while no browser runs on it.
+    fn write_settings(&self) {
+        let write = |path: PathBuf, merge: &dyn Fn(Option<&str>) -> String| {
+            let existing = std::fs::read_to_string(&path).ok();
+            let tmp = path.with_extension("prigh-tmp");
+            let written = path
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| std::fs::write(&tmp, merge(existing.as_deref())))
+                .and_then(|()| std::fs::rename(&tmp, &path));
+            if let Err(e) = written {
+                log(format!("writing the browser's settings {}: {e}", path.display()));
+            }
+        };
+        let downloads = downloads_dir();
+        write(self.profile.join("Default").join("Preferences"), &|e| profile::preferences(e, &downloads));
+        write(self.profile.join("Local State"), &profile::local_state);
+    }
+
+    /// The desktop entry named after the window's app_id on Wayland (see
+    /// [prigh_desktop_core::taskbar]), in the user's applications.
+    #[cfg(target_os = "linux")]
+    fn write_taskbar_entry(&self, url: &str) {
+        let Some(app_id) = prigh_desktop_core::taskbar::app_id(&self.found.program, url) else { return };
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let Some(data) = var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| format!("{h}/.local/share"))) else {
+            return;
+        };
+        // How the app was started: makeWrapper's wrapper passes its own path.
+        let exec = std::env::args()
+            .next()
+            .filter(|a| !a.contains('/') || a.starts_with('/'))
+            .or_else(|| std::env::current_exe().ok().map(|p| p.display().to_string()))
+            .unwrap_or_else(|| "prigh-desktop".into());
+        let path = PathBuf::from(data).join("applications").join(format!("{app_id}.desktop"));
+        let entry = prigh_desktop_core::taskbar::desktop_entry(&app_id, &exec);
+        if std::fs::read_to_string(&path).ok().as_deref() == Some(&entry) {
+            return;
+        }
+        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| std::fs::write(&path, entry));
+        match written {
+            Ok(()) => log(format!("the window's taskbar entry: {}", path.display())),
+            Err(e) => log(format!("writing the window's taskbar entry {}: {e}", path.display())),
+        }
     }
 
     /// The browser instance running on prigh's profile: the pid in its
@@ -269,11 +320,17 @@ impl BrowserWindow {
         }
     }
 
-    /// A second launch of the app: another window on the page, which the
-    /// browser hands to its running instance.
+    /// A second launch of the app: another window on the page.
     fn another_window(&self) {
-        let Some(url) = self.url.lock().unwrap().clone() else { return };
-        match self.command(&url).stderr(Stdio::null()).spawn() {
+        if let Some(url) = self.url.lock().unwrap().clone() {
+            self.window_on(&url);
+        }
+    }
+
+    /// Another app window on `url`: a launch of the browser on the
+    /// profile, which hands it to the running instance.
+    fn window_on(&self, url: &str) {
+        match self.command(url).stderr(Stdio::null()).spawn() {
             Ok(mut c) => {
                 thread::spawn(move || {
                     let _ = c.wait();
@@ -333,11 +390,12 @@ impl BrowserWindow {
 
 /// The browser's DevTools on a pipe (`--remote-debugging-pipe`: it reads
 /// commands on its fd 3 and writes on its fd 4), for where its links go
-/// (see [prigh_desktop_core::devtools]). Only the app holds it: no port.
+/// and which of its windows stay (see [prigh_desktop_core::devtools]). Only
+/// the app holds it: no port.
 #[cfg(target_os = "linux")]
 mod devtools_pipe {
-    use super::{open_external, Sidecar};
-    use prigh_desktop_core::devtools::{self, Effect, Links};
+    use super::{downloads_dir, env_flag, log, open_external, BrowserWindow, Sidecar};
+    use prigh_desktop_core::devtools::{Effect, Links};
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -389,15 +447,18 @@ mod devtools_pipe {
 
     impl Pipe {
         /// The browser started: follows its pages until it exits.
-        pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>) {
+        pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>, window: Arc<BrowserWindow>) {
             let Pipe { mut to_browser, from_browser, theirs } = self;
             drop(theirs);
             thread::spawn(move || {
                 let mut send = |msg: &str| {
                     let _ = to_browser.write_all(msg.as_bytes()).and_then(|()| to_browser.write_all(b"\0"));
                 };
-                send(&devtools::discover());
-                let mut links = Links::new();
+                let downloads = downloads_dir();
+                let mut links = Links::new(env_flag("PRIGH_DESKTOP_DEVTOOLS"));
+                for command in links.start(&downloads) {
+                    send(&command);
+                }
                 let mut reader = BufReader::new(from_browser);
                 let mut msg = Vec::new();
                 while reader.read_until(0, &mut msg).is_ok_and(|n| n > 0) {
@@ -409,6 +470,11 @@ mod devtools_pipe {
                         match effect {
                             Effect::Send(command) => send(&command),
                             Effect::OpenExternally(url) => open_external(&app, &url),
+                            Effect::OpenWindow(url) => {
+                                log("a popup on prigh's site: opening it in another app window");
+                                window.window_on(&url)
+                            }
+                            Effect::Log(text) => log(text),
                         }
                     }
                     msg.clear();
@@ -416,6 +482,14 @@ mod devtools_pipe {
             });
         }
     }
+}
+
+/// See [profile::downloads_dir].
+fn downloads_dir() -> String {
+    let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+    let home = var("HOME").or_else(|| var("USERPROFILE")).unwrap_or_default();
+    let config = var("XDG_CONFIG_HOME").unwrap_or_else(|| format!("{home}/.config"));
+    profile::downloads_dir(&home, std::fs::read_to_string(format!("{config}/user-dirs.dirs")).ok().as_deref())
 }
 
 #[cfg(unix)]

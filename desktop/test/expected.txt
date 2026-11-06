@@ -101,6 +101,7 @@ prigh-desktop: Fix PRIGH_DESKTOP_ARGS (words as a shell splits them) and start p
 == browser: auto takes one on the PATH; closing its window stops the sidecar: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: the window's taskbar entry: WORK/data/applications/chrome-127.0.0.1__-Default.desktop
 prigh-desktop: opening the page in Google Chrome's app window (WORK/browsers/google-chrome-stable)
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
@@ -113,6 +114,7 @@ browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
+taskbar entry: Name=prigh Icon=prigh-desktop NoDisplay=true StartupWMClass=chrome-127.0.0.1__-Default
 == browser: the page's Quit (the sidecar exits) closes the browser: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
@@ -262,6 +264,42 @@ default browser: http://localhost:PORT/away
 default browser: http://localhost:PORT/new-window
 prigh's page loaded: 2 times; Chromium's windows: http://127.0.0.1:PORT/
 exit 0; left running: 0
+== real Chromium: the window is an app's
+Open in new window: Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+ctrl+t: closed the browser's own page chrome://newtab/; Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+  the focus in prigh's window: yes
+ctrl+n: closed the browser's own page chrome://newtab/; Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+  the focus in prigh's window: yes
+ctrl+shift+n: closed a page of an incognito window; Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+  the focus in prigh's window: yes
+ctrl+h: closed the browser's own page chrome://history/; Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+  the focus in prigh's window: yes
+F12: closed the browser's own page devtools://devtools/bundled/devtools_app.html; Chromium's windows:
+  http://127.0.0.1:PORT/
+  http://127.0.0.1:PORT/?popup=1
+  the focus in prigh's window: yes
+exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in chromium's app window (WORK/chromium)
+prigh-desktop: a popup on prigh's site: opening it in another app window
+prigh-desktop: closed the browser's own page chrome://newtab/
+prigh-desktop: closed the browser's own page chrome://newtab/
+prigh-desktop: closed a page of an incognito window
+prigh-desktop: closed the browser's own page chrome://history/
+prigh-desktop: closed the browser's own page devtools://devtools/bundled/devtools_app.html
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
 == the real sidecar: the connect form; closing the window stops it: exit 0
 prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
