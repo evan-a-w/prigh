@@ -114,8 +114,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             if "signin=1" in hash_:
                 log(f"the page is at {hash_}")
-                log("exiting: the sign-in page")
-                os._exit(0)
+                if not os.environ.get("FAKE_SIGNIN_STAY"):
+                    log("exiting: the sign-in page")
+                    os._exit(0)
             return
         if self.path == "/remote":
             remote_line_printed.wait()
