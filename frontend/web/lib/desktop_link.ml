@@ -163,3 +163,13 @@ module Connect_reply = struct
       | _ -> None)
   ;;
 end
+
+let window_fragment ~key ~backend_site ~browser =
+  let mode =
+    match key with
+    | Some key -> Some ("desktop=" ^ key)
+    | None -> Option.some_if backend_site "app=desktop"
+  in
+  Option.map mode ~f:(fun mode ->
+    if browser then mode ^ "&shell=browser" else mode)
+;;

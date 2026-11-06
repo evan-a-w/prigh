@@ -6,8 +6,7 @@ open! Import
     follow the user from browser to browser and change live in the others:
     the theme and accent, notifications, the transcript's verbosity, the
     prompt history (shared with the TUI), the panels' sizes, whether the
-    terminal is open, which of the sidebar's projects are folded, and the
-    session tabs. The
+    terminal is open and which of the sidebar's projects are folded. The
     browser caches them ([Command.Cache_prefs]) for the first paint and for
     backends that keep none.
 
@@ -25,12 +24,6 @@ module Key : sig
 
   (** The sidebar's sessions whose worktrees are folded away: their ids. *)
   val folded : string
-
-  (** Whether session tabs are on ([/tabs]). *)
-  val tabs : string
-
-  (** The open session tabs: their ids, in order. *)
-  val open_tabs : string
 
   (** What the review page compared last ({!Review_memory}). *)
   val review : string

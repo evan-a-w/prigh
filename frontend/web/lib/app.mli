@@ -339,7 +339,9 @@ module Command : sig
     | Place_menu of Context_menu.Anchor.t
     (** the context menu, once rendered: at the anchor, kept in the
         window *)
-    | Open_tab of string (** a session (its id) in a new browser tab *)
+    | Open_window of string
+    (** a session (its id) in a new window: a new tab in a browser, another
+        window of the desktop app (sharing its tool host) *)
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
@@ -479,6 +481,9 @@ module Action : sig
     | Leave_keep (** leaving while it works: keep it, then leave *)
     | Leave_delete (** leaving while it works: delete it *)
     | Switch_session of string (** path *)
+    | Open_session_window of string
+    (** a session (its id) in a new window ({!Command.Open_window}): a
+        Ctrl or Cmd click or a middle click on it in the sidebar *)
     | Ask_delete of string
     (** path; the marked sessions instead when it is one of them *)
     | Select_sessions of bool (** the sidebar's selection mode, on or off *)
@@ -560,15 +565,6 @@ module Action : sig
     | Toggle_folded of string
     (** fold or unfold the worktrees under a session of the sidebar (by its
         id) *)
-    | Set_tabs of bool (** [/tabs on|off], the settings' switch *)
-    | Close_tab of string option
-    (** a session's tab, by id, or the current one's; closing the current
-        one moves to its neighbour, the last one to a new session *)
-    | Step_tab of int (** the next (1) or previous (-1) tab *)
-    | Nth_tab of int (** the [n]th tab (1-based) *)
-    | Drag_tab of string option (** a tab picked up, or put down *)
-    | Drop_tab of string option
-    (** the dragged tab dropped before this one's, or at the end *)
     | New_session_in of string
     (** a new session working in this directory (a worktree) *)
     | New_worktree (** its dialog: the session moves into the worktree *)
@@ -835,7 +831,6 @@ module Model : sig
     ; folded : String.Set.t
       (** the sidebar's sessions whose worktrees are folded away, by id (a
           preference) *)
-    ; tabs : Session_tabs.t (** the session tabs ([/tabs]) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t

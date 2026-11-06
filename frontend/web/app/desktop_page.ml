@@ -123,3 +123,33 @@ let quit () =
     Browser.navigate Desktop_link.quit_url
   | None -> ()
 ;;
+
+(* Another window: in a browser, a new tab; in the desktop app, another of
+   its windows (the window catches the page's new window), in desktop mode
+   too; in a browser's app window, a popup (no tabs, no address bar) in the
+   same browser, which keeps the app running while it is open. *)
+let open_window url =
+  let fragment =
+    Desktop_link.window_fragment
+      ~key:(stored ())
+      ~backend_site:(on_backend_site ())
+      ~browser:(in_browser ())
+  in
+  let url =
+    Option.value_map fragment ~default:url ~f:(fun f -> url ^ "#" ^ f)
+  in
+  let features =
+    if in_browser ()
+    then
+      Js.Opt.return
+        (Js.string
+           (sprintf
+              "popup,width=%d,height=%d"
+              Dom_html.window##.outerWidth
+              Dom_html.window##.outerHeight))
+    else Js.null
+  in
+  ignore
+    (Dom_html.window##open_ (Js.string url) (Js.string "_blank") features
+     : Dom_html.window Js.t Js.opt)
+;;

@@ -36,7 +36,6 @@ let popup (m : App.Model.t) ~inject =
       | Argument Review -> "Review"
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
-      | Argument Tabs -> "Session tabs"
       | Argument Settings -> "Settings sections"
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
@@ -154,7 +153,8 @@ let images (m : App.Model.t) ~inject =
                     ; Attr.title
                         (sprintf
                            "Too large for the model (%s). Downsize it here, or \
-                            send it as it is and prigh tries to send it smaller"
+                            send it as it is and prigh tries to send it \
+                            smaller"
                            why)
                     ; Attr.create
                         "aria-label"
@@ -202,8 +202,7 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     button
       ~cls:"chip-button model-chip"
-      ~title:
-        (sprintf "%s: switch model (Ctrl+L)" state.model.name)
+      ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
       [ span ~cls:"chip-label" (model_label m state.model.name)
@@ -541,47 +540,45 @@ let view (m : App.Model.t) ~inject =
                               [ icon Stop ]
                           else Node.none)
                        ; (if sending
-                            then
-                              button
-                                ~cls:"primary round send busy"
-                                ~title:"Sending…"
-                                ~label:"Sending"
-                                ~disabled:true
-                                ~attrs:[ Attr.create "aria-busy" "true" ]
-                                ~on_click:Effect.Ignore
-                                [ Html.lamp () ]
-                            else if stops
-                            then
-                              (* Nothing to steer with: the one button stops. *)
-                              button
-                                ~cls:"primary round stop"
-                                ~title:"Stop (Esc)"
-                                ~label:"Stop"
-                                ~on_click:(inject Action.Abort)
-                                [ icon Stop ]
-                            else
-                              button
-                                ~cls:"primary round send"
-                                ~title:
-                                  (match steered m with
-                                   | _ when not connected ->
-                                     "Not connected to the backend"
-                                   | Some id -> sprintf "Steer %s (Enter)" id
-                                   | None when running -> "Steer (Enter)"
-                                   | None -> "Send (Enter)")
-                                ~label:
-                                  (if running || Option.is_some (steered m)
-                                   then "Steer"
-                                   else "Send")
-                                ~disabled:((not has_input) || not connected)
-                                ~on_click:(inject Action.Send)
-                                [ icon Send ])
+                          then
+                            button
+                              ~cls:"primary round send busy"
+                              ~title:"Sending…"
+                              ~label:"Sending"
+                              ~disabled:true
+                              ~attrs:[ Attr.create "aria-busy" "true" ]
+                              ~on_click:Effect.Ignore
+                              [ Html.lamp () ]
+                          else if stops
+                          then
+                            (* Nothing to steer with: the one button stops. *)
+                            button
+                              ~cls:"primary round stop"
+                              ~title:"Stop (Esc)"
+                              ~label:"Stop"
+                              ~on_click:(inject Action.Abort)
+                              [ icon Stop ]
+                          else
+                            button
+                              ~cls:"primary round send"
+                              ~title:
+                                (match steered m with
+                                 | _ when not connected ->
+                                   "Not connected to the backend"
+                                 | Some id -> sprintf "Steer %s (Enter)" id
+                                 | None when running -> "Steer (Enter)"
+                                 | None -> "Send (Enter)")
+                              ~label:
+                                (if running || Option.is_some (steered m)
+                                 then "Steer"
+                                 else "Send")
+                              ~disabled:((not has_input) || not connected)
+                              ~on_click:(inject Action.Send)
+                              [ icon Send ])
                        ]
                 ]
             ]
         ]
-    ; (if App.fresh m
-       then rest (Temporary_view.tray m ~inject)
-       else Node.none)
+    ; (if App.fresh m then rest (Temporary_view.tray m ~inject) else Node.none)
     ]
 ;;

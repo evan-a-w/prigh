@@ -358,36 +358,33 @@ let view (m : Model.t) ~inject ~terminal =
                   ; "landing", m.landing
                   ]
               ]
-            (List.map
-               ~f:under_drawer
-               (Option.to_list (Session_tabs_view.view m ~inject))
-             @ [ layered modal_composer (Session_view.chrome m ~inject) ]
+            ([ layered modal_composer (Session_view.chrome m ~inject) ]
              @ List.map
                  ~f:under_drawer
                  [ banner m ~inject
-                  ; div
-                      ~cls:"chat-frame"
-                      [ Node.div
-                          ~attrs:
-                            [ Attr.classes
-                                [ "chat"
-                                ; "verbosity-"
-                                  ^ Prigh_ui.Verbosity.name m.verbosity
-                                ]
-                            ; Attr.id "chat"
-                            ; Attr.role "region"
-                            ; Attr.create "aria-label" "Transcript"
-                            ; Attr.tabindex 0
-                            ; (if Option.is_some (loading m)
-                               then Attr.create "aria-busy" "true"
-                               else Attr.empty)
-                            ]
-                          [ chat; jump_to_bottom m ~inject ]
-                      ; (match loading m with
-                         | Some _ -> Node.none
-                         | None -> Jump_view.view m ~inject)
-                      ]
-                  ]
+                 ; div
+                     ~cls:"chat-frame"
+                     [ Node.div
+                         ~attrs:
+                           [ Attr.classes
+                               [ "chat"
+                               ; "verbosity-"
+                                 ^ Prigh_ui.Verbosity.name m.verbosity
+                               ]
+                           ; Attr.id "chat"
+                           ; Attr.role "region"
+                           ; Attr.create "aria-label" "Transcript"
+                           ; Attr.tabindex 0
+                           ; (if Option.is_some (loading m)
+                              then Attr.create "aria-busy" "true"
+                              else Attr.empty)
+                           ]
+                         [ chat; jump_to_bottom m ~inject ]
+                     ; (match loading m with
+                        | Some _ -> Node.none
+                        | None -> Jump_view.view m ~inject)
+                     ]
+                 ]
              @ [ toasts m ~inject ]
              @ [ under_drawer (Btw_view.view m ~inject)
                ; layered modal_composer (Composer_view.view m ~inject)

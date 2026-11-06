@@ -5,7 +5,7 @@ module Action = App.Action
 
 let item_icon : Context_menu.Item.t -> Icon.t = function
   | Open -> Arrow_down
-  | Open_tab -> External
+  | Open_window -> External
   | Rename -> Pencil
   | Fork -> Fork
   | New_worktree -> Branch_plus
@@ -142,7 +142,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
   (* Separated: going there, changing it, looking at it, copying, and the
      destructive ones. *)
   let group : Context_menu.Item.t -> int = function
-    | Switch_back | Open | Open_tab | Switch_here | New_session_here -> 0
+    | Switch_back | Open | Open_window | Switch_here | New_session_here -> 0
     | Rename | Fork | New_worktree | Create_pr | Trim_before | Trim_after -> 1
     | Review | Files | Terminal -> 2
     | Copy_path | Copy_id | Copy_message | Select_text -> 3

@@ -288,3 +288,37 @@ let%expect_test "in an installed browser's app window" =
      (webview https://ai.example.com/#))
     |}]
 ;;
+
+(* Open in new window under the desktop app: the new window's fragment puts
+   it in desktop mode too (it does not get the opener's sessionStorage). *)
+let%expect_test "a new window's fragment" =
+  List.iter
+    [ Some "k", false, false
+    ; Some "k", false, true
+    ; None, true, false
+    ; None, true, true
+    ; None, false, false
+    ; None, false, true
+    ]
+    ~f:(fun (key, backend_site, browser) ->
+      print_s
+        [%message
+          ""
+            (key : string option)
+            (backend_site : bool)
+            (browser : bool)
+            ~fragment:
+              (Desktop_link.window_fragment ~key ~backend_site ~browser
+               : string option)]);
+  [%expect
+    {|
+    ((key (k)) (backend_site false) (browser false) (fragment (desktop=k)))
+    ((key (k)) (backend_site false) (browser true)
+     (fragment (desktop=k&shell=browser)))
+    ((key ()) (backend_site true) (browser false) (fragment (app=desktop)))
+    ((key ()) (backend_site true) (browser true)
+     (fragment (app=desktop&shell=browser)))
+    ((key ()) (backend_site false) (browser false) (fragment ()))
+    ((key ()) (backend_site false) (browser true) (fragment ()))
+    |}]
+;;

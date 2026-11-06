@@ -28,7 +28,7 @@ let act t action =
      | Annotate_clear
      | Annotate_export
      | Place_menu _
-     | Open_tab _
+     | Open_window _
      | Set_url_session _
      | Clear_text_selection
      | Expire_toast _
@@ -605,6 +605,38 @@ let right_click ?nth ?(at = 0, 0) t ~selector =
           , Js_of_ocaml.Js.Unsafe.inject
               (Js_of_ocaml.Js.wrap_callback (fun () -> ())) )
         ])
+;;
+
+let mouse_event ?nth t ~selector ~event_name fields =
+  let noop =
+    Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.wrap_callback (fun () -> ()))
+  in
+  interact ?nth t ~selector ~f:(fun node ->
+    Node_helpers.trigger
+      node
+      ~event_name
+      ~extra_fields:
+        (fields @ [ "preventDefault", noop; "stopPropagation", noop ]))
+;;
+
+let modified_click ?nth ?(ctrl = false) ?(meta = false) t ~selector =
+  let bool b = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.bool b) in
+  mouse_event
+    ?nth
+    t
+    ~selector
+    ~event_name:"onclick"
+    [ "ctrlKey", bool ctrl; "metaKey", bool meta; "shiftKey", bool false ]
+;;
+
+let middle_click ?nth t ~selector =
+  mouse_event
+    ?nth
+    t
+    ~selector
+    ~event_name:"onmousedown"
+    [ "button", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.number_of_float 1.)
+    ]
 ;;
 
 let input ?nth t ~selector text =

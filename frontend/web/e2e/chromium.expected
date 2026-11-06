@@ -1213,45 +1213,9 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
 none
-=== chromium: tabs: off by default ===
-(no tabs)
-switch: false
-=== chromium: tabs: on ===
-* New session
-=== chromium: tabs: three sessions ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-* List the files (Waiting for you: a confirmation or a question)
-=== chromium: tabs: another browser ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-  List the files (Waiting for you: a confirmation or a question)
-* New session
-=== chromium: tabs: switched from the keyboard ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-* List the files
-=== chromium: tabs: dragged ===
-* List the files
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-saved: web.tabs=true web.open-tabs=3
-=== chromium: tabs: reloaded ===
-* List the files
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-=== chromium: tabs: closed ===
-* Read the README
-sidebar: 3 sessions
-=== chromium: tabs: phone ===
-(no tabs)
-=== chromium: tabs: off ===
-(no tabs); saved: web.tabs=undefined web.open-tabs=1
-=== chromium: tabs: errors ===
-none
 === chromium: worktrees: a session's menu ===
 Tidy the docs in a worktree — prigh — main
-▸ Open in new tab
+▸ Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -1296,7 +1260,7 @@ Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
 === chromium: worktrees: from the keyboard ===
 A landing page — site — trunk
 Open  Enter
-▸ Open in new tab
+▸ Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -1322,7 +1286,7 @@ Tidy the docs in a worktree
 === chromium: worktrees: a switched session's menu ===
 Tidy the docs in a worktree — prigh — docs
 ▸ Switch back to main  /worktree back
-Open in new tab
+Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -2764,7 +2728,7 @@ no menu
 === chromium: long press: Delete ===
 your messages: make the port configurable
 === chromium: long press: a session in the drawer ===
-menu: open_tab, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
 === chromium: long press: a worktree in the drawer ===
 menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === chromium: long press: a file of the review ===
