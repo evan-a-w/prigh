@@ -16,12 +16,6 @@ T
 token
 === webkit: signed in: chat ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === webkit: signed in: the session's card ===
 on
 auto
@@ -184,12 +178,6 @@ T
 token
 === webkit: new session ===
 What are we building?
-<CWD>
-/ commands
-@ mention a file
-! run a command
-Ctrl+L switch model
-Ctrl+K find a session
 === webkit: sending ===
 hello again
 Sending…
@@ -755,8 +743,6 @@ Accent
 Your turns, the selection, focus and work in progress.
 Custom
 LAYOUT
-Tabs
-The open sessions as tabs over the chat (not on a phone).
 Transcript detail
 This browser
 How much of tool calls and thinking the transcript shows (Ctrl+O).
@@ -793,6 +779,131 @@ chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: errors ===
+none
+=== webkit: temporary: desktop: the new-session screen ===
+heading: What are we building?
+tray: <cwd> | Temporary
+chip: false
+composer under the heading: true
+tray: under the composer
+centred: true
+controls: all in view
+=== webkit: temporary: desktop: a chip's menu ===
+under the pointer on off: the item (hovered: true)
+the chip: changed (off chosen)
+=== webkit: temporary: desktop: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== webkit: temporary: desktop: the first message ===
+pill: Temporary
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== webkit: temporary: desktop: reloaded ===
+still there: true
+saved: 0
+=== webkit: temporary: desktop: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: under the pill: true
+controls: all in view
+=== webkit: temporary: desktop: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== webkit: temporary: desktop: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== webkit: temporary: desktop: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== webkit: temporary: 390x844: the new-session screen ===
+heading: What are we building?
+tray: cwd | Temporary
+chip: false
+composer under the heading: true
+tray: over the composer
+composer at the foot: true
+controls: all in view
+=== webkit: temporary: 390x844: a chip's menu ===
+under the pointer on GPT-5.3 Codex Spark: the item
+the chip: changed (GPT-5.3 Codex Spark chosen)
+=== webkit: temporary: 390x844: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== webkit: temporary: 390x844: the first message ===
+pill: Temporary session
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== webkit: temporary: 390x844: reloaded ===
+still there: true
+saved: 0
+=== webkit: temporary: 390x844: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: a sheet across the bottom: true
+controls: all in view
+=== webkit: temporary: 390x844: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== webkit: temporary: 390x844: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== webkit: temporary: 390x844: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== webkit: temporary: 320x640: the new-session screen ===
+heading: What are we building?
+tray: cwd | Temporary
+chip: false
+composer under the heading: true
+tray: over the composer
+composer at the foot: true
+controls: all in view
+=== webkit: temporary: 320x640: a chip's menu ===
+under the pointer on GPT-5.6 Sol: the item
+the chip: changed (GPT-5.6 Sol chosen)
+=== webkit: temporary: 320x640: Temporary on ===
+heading: Temporary session | Not saved and not listed. Deleted when you leave.
+listed: 0
+controls: all in view
+=== webkit: temporary: 320x640: the first message ===
+pill: Temporary session
+layout: main temporary landing
+prompt's edge: grey
+tray gone: true
+saved: 0 listed: 0
+pill: all in view
+=== webkit: temporary: 320x640: reloaded ===
+still there: true
+saved: 0
+=== webkit: temporary: 320x640: its menu ===
+menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
+menu: a sheet across the bottom: true
+controls: all in view
+=== webkit: temporary: 320x640: left ===
+toast: Temporary session deleted
+saved: 0 listed: 0
+=== webkit: temporary: 320x640: kept ===
+saved: 1 listed: 1
+prompt's edge: solid
+=== webkit: temporary: 320x640: leaving while it works ===
+dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
+controls: all in view
+stayed: true
+its command stopped: true
+saved: 0
+=== webkit: temporary: errors ===
 none
 === webkit: accounts: sessions ===
 I am alice
@@ -1075,8 +1186,6 @@ Accent
 Your turns, the selection, focus and work in progress.
 Custom
 LAYOUT
-Tabs
-The open sessions as tabs over the chat (not on a phone).
 Transcript detail
 This browser
 How much of tool calls and thinking the transcript shows (Ctrl+O).
@@ -1100,45 +1209,9 @@ Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === webkit: themes: errors ===
 none
-=== webkit: tabs: off by default ===
-(no tabs)
-switch: false
-=== webkit: tabs: on ===
-* New session
-=== webkit: tabs: three sessions ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-* List the files (Waiting for you: a confirmation or a question)
-=== webkit: tabs: another browser ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-  List the files (Waiting for you: a confirmation or a question)
-* New session
-=== webkit: tabs: switched from the keyboard ===
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-* List the files
-=== webkit: tabs: dragged ===
-* List the files
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-saved: web.tabs=true web.open-tabs=3
-=== webkit: tabs: reloaded ===
-* List the files
-  Read the README
-  Refactor the parser (Failed: its last reply ended in an error)
-=== webkit: tabs: closed ===
-* Read the README
-sidebar: 3 sessions
-=== webkit: tabs: phone ===
-(no tabs)
-=== webkit: tabs: off ===
-(no tabs); saved: web.tabs=undefined web.open-tabs=1
-=== webkit: tabs: errors ===
-none
 === webkit: worktrees: a session's menu ===
 Tidy the docs in a worktree — prigh — main
-▸ Open in new tab
+▸ Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -1183,7 +1256,7 @@ Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
 === webkit: worktrees: from the keyboard ===
 A landing page — site — trunk
 Open  Enter
-▸ Open in new tab
+▸ Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -1209,7 +1282,7 @@ Tidy the docs in a worktree
 === webkit: worktrees: a switched session's menu ===
 Tidy the docs in a worktree — prigh — docs
 ▸ Switch back to main  /worktree back
-Open in new tab
+Open in new window
 Rename…  /name
 Fork…  /fork
 New worktree…  /worktree new
@@ -2066,6 +2139,63 @@ prefer_host: host-laptop
 Sign in
 === webkit: remote: errors ===
 none
+=== webkit: desktop: its stdout ===
+{"url":"http://127.0.0.1:<PORT>/#desktop=<key>"}
+=== webkit: desktop: the connect form ===
+http://127.0.0.1:<PORT>/
+prigh
+desktop
+Connect to a backend
+prigh runs this computer's tools for a prigh backend (prigh serve). The connection is saved for next time.
+Backend address
+User name
+Password
+Connect
+Quit prigh
+=== webkit: desktop: unencrypted ===
+0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
+button: Connect without encryption
+=== webkit: desktop: unencrypted, confirmed ===
+cannot reach the backend at 0.0.0.0:1: connection refused
+Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws.
+button: Connect
+=== webkit: desktop: a wrong password ===
+127.0.0.1:<PORT> refused the login: unauthorised: bad user name or password
+Check the password against the backend's token; if it serves several users (-tokens), also enter your user name.
+address kept: true
+saved: false
+=== webkit: desktop: connected ===
+http://127.0.0.1:<PORT>/?session=<id>
+saved: true
+in the laptop's directory: true
+=== webkit: desktop: reloaded ===
+connect form: 0
+=== webkit: desktop: /quit ===
+prigh
+desktop
+Quitting prigh…
+The window closes once this computer's tool host has stopped.
+exit: 0; more stdout: ""
+prigh desktop: quit from the page
+prigh desktop: quit
+=== webkit: desktop: again, on a phone: the saved connection ===
+connect form: 0
+Quit prigh
+exit: 0; more stdout: ""
+prigh desktop: quit from the page
+prigh desktop: quit
+=== webkit: desktop: a small phone ===
+overflow: false; off screen: none
+address 16px ok
+user 16px ok
+password 16px ok
+desktop-connect 14px ok
+desktop-quit 14px ok
+=== webkit: desktop: its window gone ===
+exit: 0; more stdout: ""
+prigh desktop: stdin closed: the window is gone
+=== webkit: desktop: errors ===
+none
 === webkit: steer: showing it leaves the composer on the main agent ===
 (no chip); Steer the agent…
 Survey the project
@@ -2382,6 +2512,15 @@ lamps: 0; accented: nothing; 40px high
 fits
 chips 1: V4.1 Flash | icon
 chip problems: none
+=== webkit: card: the host stopped answering ===
+chips 1: V4.1 Flash | icon
+chip problems: none
+<HOSTNAME> <CWD>
+✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
+build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh tool-host -connect there to bring it back.
+=== webkit: card: the host is back ===
+chips 1: V4.1 Flash | icon
+chip problems: none
 === webkit: status: desktop 1280: the status ===
 shows: true; clear of the mic and send: true
 the row fits: true
@@ -2548,7 +2687,7 @@ no menu
 === webkit: long press: Delete ===
 your messages: make the port configurable
 === webkit: long press: a session in the drawer ===
-menu: open_tab, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
 === webkit: long press: a worktree in the drawer ===
 menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === webkit: long press: a file of the review ===

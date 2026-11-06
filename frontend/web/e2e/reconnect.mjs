@@ -140,10 +140,16 @@ const compare = (label, before, after) => {
 // Chromium takes [navigator.onLine] from the host's network interfaces: with
 // only a loopback (the Nix sandbox) it starts offline, so going offline and
 // back fires no events. Then they are fired here, as a phone's browser would;
-// [setOffline] still makes every connection attempt fail meanwhile.
+// [setOffline] still makes every connection attempt fail meanwhile. WebKit's
+// [setOffline] fails requests but not WebSockets, which reconnect at once:
+// there they are sent out of reach too.
 let browserSeesNetwork;
 const setOffline = async offline => {
   browserSeesNetwork ??= await page.evaluate(() => navigator.onLine);
+  if (engineName === "webkit")
+    await page.evaluate(offline => offline
+      ? sessionStorage.setItem("e2e-ws-down", "1")
+      : sessionStorage.removeItem("e2e-ws-down"), offline);
   await context.setOffline(offline);
   if (!browserSeesNetwork)
     await page.evaluate(offline => window.dispatchEvent(new Event(offline ? "offline" : "online")), offline);

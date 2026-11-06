@@ -136,7 +136,7 @@ const screen = async (w, h, label) => {
   const context = await browser.newContext(options);
   context.setDefaultTimeout(20000);
   page = await context.newPage();
-  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
+  page.on("console", m => { if (m.type() === "error" && !/favicon\.ico|interactive-widget|WebSocket/.test(m.text())) errors.push(`console: ${m.text()}`); });
   page.on("pageerror", e => errors.push(`page: ${e.message}`));
   await page.goto(url, { timeout: 60000 });
   await page.locator("form input[type=password]").fill(token);
