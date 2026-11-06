@@ -32,3 +32,14 @@ val parse : string -> (t, string) Result.t
     names, unknown functions, wrong argument counts, each saying what
     exists. *)
 val check : t -> inputs:string list -> string list
+
+(** The value of [t] given the inputs' values: the semantics the frontends
+    mirror (the backend itself only checks expressions). Doubles throughout;
+    [None] (no value, shown as a dash) when dividing by 0 with [/] or [%],
+    for an unknown name or function, or when the result is not finite
+    ([sqrt(-1)], [log(0)], overflow). [a % b] is the remainder with [a]'s
+    sign (C's [fmod], JavaScript's [%]); [^] and [pow] are powers;
+    comparisons are 1 or 0 (with nan, 0 but [!=] 1); [c ? a : b] is [a]
+    unless [c] is 0; [round] takes halves up (JavaScript's [Math.round]);
+    [log] is base 10, [ln] base e. *)
+val eval : t -> inputs:(string -> float option) -> float option

@@ -249,12 +249,16 @@ let%expect_test
     user build it
     assistant calls [c1]
       result c1: [interrupted: prigh stopped before this tool call returned (e.g. the backend restarted), so whether it ran, and what it did, is unknown: check before relying on it]
-    user did it work?
+    user [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    did it work?
     session:
     user build it
     assistant calls [c1]
       result c1: [interrupted: prigh stopped before this tool call returned (e.g. the backend restarted), so whether it ran, and what it did, is unknown: check before relying on it]
-    user did it work?
+    user [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    did it work?
     assistant calls []
     |}]
 ;;

@@ -151,7 +151,7 @@ let%expect_test "background bash returns at once; the exit report starts a turn"
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: build it
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo finished; exit 3","background":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -168,7 +168,7 @@ let%expect_test "background bash returns at once; the exit report starts a turn"
     [job j1 exited 3 after Ns, 9 bytes; lines 1-1 of 1] while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…
     finished
     --- messages
-    user: build it
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo finished; exit 3","background":true}
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant: started it
@@ -223,7 +223,7 @@ let%expect_test "job_output, job_status and job_kill" =
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait","background":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -253,7 +253,7 @@ let%expect_test "job_output, job_status and job_kill" =
     state: running=false subagents=[] jobs=[]
     sleep still alive: false
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait","background":true}
     tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  bash{"command":"sleep 0.3; echo hi","background":true}
@@ -319,7 +319,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
     state: running=true subagents=[a1 running] jobs=[]
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -336,7 +336,7 @@ let%expect_test
     agent_end
     state: running=false subagents=[] jobs=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -398,7 +398,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate1 ]; do sleep 0.02; done; echo one","background":true} bash{"command":"while [ ! -f gate2 ]; do sleep 0.02; done; echo two","background":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -426,7 +426,7 @@ let%expect_test
     agent_end
     state: running=false subagents=[] jobs=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate1 ]; do sleep 0.02; done; echo one","background":true} bash{"command":"while [ ! -f gate2 ]; do sleep 0.02; done; echo two","background":true}
     tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     tool_result bash: started job j2: while [ ! -f gate2 ]; do sleep 0.02; done; echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
@@ -859,7 +859,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"build"}
       a1: agent_start
       a1: user: build

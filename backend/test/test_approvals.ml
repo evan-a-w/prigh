@@ -522,6 +522,7 @@ let%expect_test
     update_plan {"explanation":"first pass","plan":[{"step":"read the code", -> Plan updated (1 of 3 steps completed)
     user message sent:
     [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one) and ask the user about anything unclear with ask_user. Keep the steps in update_plan. When the plan is ready, present it as your reply (concise: the steps and the files they touch), then stop and wait. Do not implement any of it: do not change files, worktrees or pull requests (they are refused) and do not run commands that change anything. Only the user turns plan mode off, when they want the plan implemented: do not try to leave plan mode or ask them to.]
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
 
     add a feature
     true
@@ -615,7 +616,7 @@ let%expect_test "plan mode switched on during a run is told between turns" =
     {|
     bash ->
     write -> [plan mode] Plan mode is on: you are pla
-    user: go
+    user: [Client: the user is on another client,
     user: [Plan mode is on: you are planning, not
     |}]
 ;;

@@ -493,7 +493,7 @@ let%expect_test "the next request starts at the trim; undo brings it back" =
     {|
     state: messages=6 context_tokens=10 trim=none
     (Ok 4)
-    state: messages=2 context_tokens=5 trim=4 messages, ~5 tokens
+    state: messages=2 context_tokens=0 trim=4 messages, ~38 tokens
     request: U(q2) A(r2) U(q3)
     |}];
   print_s
@@ -505,7 +505,7 @@ let%expect_test "the next request starts at the trim; undo brings it back" =
   [%expect
     {|
     (Ok 4)
-    state: messages=8 context_tokens=15 trim=none
+    state: messages=8 context_tokens=48 trim=none
     request: U(q1) A[c1] T(c1) A(r1) U(q2) A(r2) U(q3) A(r3) U(q4)
     |}]
 ;;
@@ -570,7 +570,7 @@ let%expect_test "/compact after a trim summarises only what is after it" =
     summarise: U(q2) A(r2xxxxxxxxxx)
     (Ok SUMMARY)
     request: U(q2) S(SUMMARY) U(q3) A(r3) U(q4)
-    state: messages=6 context_tokens=10 trim=2 messages, ~0 tokens
+    state: messages=6 context_tokens=10 trim=2 messages, ~33 tokens
     |}];
   (* Undoing the trim puts q1 back ahead of the carried-over q2 and the
      summary. *)
@@ -695,10 +695,10 @@ let%expect_test "a trim before a reply: the model gets a user turn ahead of it" 
   print_points agent;
   [%expect
     {|
-    point 1 (r1): 1 messages, ~0 tokens
-    point 2 (q2): 2 messages, ~0 tokens
-    point 3 (bash): 3 messages, ~0 tokens
-    point 5 (r2): 5 messages, ~5 tokens
+    point 1 (r1): 1 messages, ~33 tokens
+    point 2 (q2): 2 messages, ~33 tokens
+    point 3 (bash): 3 messages, ~33 tokens
+    point 5 (r2): 5 messages, ~38 tokens
     |}];
   (* At the reply with the call: its result goes with it. *)
   print_trimmed agent ~before:(reply_entry agent "c1");
@@ -706,8 +706,8 @@ let%expect_test "a trim before a reply: the model gets a user turn ahead of it" 
   run agent "q3";
   [%expect
     {|
-    (Ok (3 0))
-    state: messages=3 context_tokens=10 trim=3 messages, ~0 tokens
+    (Ok (3 33))
+    state: messages=3 context_tokens=0 trim=3 messages, ~33 tokens
     request: U([the convers) A[c1] T(c1) A(r2) U(q3)
     |}];
   (* Trims stack; undo cancels the latest. *)
@@ -722,7 +722,7 @@ let%expect_test "a trim before a reply: the model gets a user turn ahead of it" 
     (Ok (2 5))
     request: U([the convers) A(r2) U(q3) A(r3) U(q4)
     request: U([the convers) A[c1] T(c1) A(r2) U(q3) A(r3) U(q4) A(r4) U(q5)
-    state: messages=12 context_tokens=10 trim=none
+    state: messages=12 context_tokens=43 trim=none
     |}]
 ;;
 
@@ -760,9 +760,9 @@ let%expect_test "a trim before a reply, with compactions" =
   print_state agent;
   [%expect
     {|
-    (Ok (4 10))
+    (Ok (4 43))
     request: U([the convers) A(r3) U(q4) A(r4) U(q5)
-    state: messages=5 context_tokens=10 trim=4 messages, ~10 tokens
+    state: messages=5 context_tokens=10 trim=4 messages, ~43 tokens
     |}];
   (* A compaction now summarises only what is after the trim (the provider
      puts the user turn ahead of it too). *)

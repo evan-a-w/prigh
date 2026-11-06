@@ -17,20 +17,24 @@ type t =
   ; title : string
   ; values : Json.t
   }
+[@@deriving sexp_of]
 
 (** [{call_id, component, title, values}]; [title] may be missing (then the
-    component's id). *)
+    component's id). Ids with control characters are refused; the title's
+    runs of whitespace and control characters become one space. *)
 val of_json : Json.t -> t Or_error.t
 
 (** The message's text, as above. *)
 val text : t -> string
 
 (** One line for the user, e.g. [Sent "Deploy options": env = prod,
-    replicas = 3]. *)
+    replicas = 3]; at most 160 bytes. *)
 val summary : t -> string
 
 val note : t -> Injected.Note.t
 
-(** Fails unless [call_id] is a [render_ui] call in [messages] that has a
-    component [component], saying which there are. *)
+(** Fails unless [call_id] is a [render_ui] call in [messages] whose result
+    is not an error and that has an interactive component (a form, choices,
+    a checklist with [submit]) with the id [component], saying which there
+    are. *)
 val check : t -> Message.t list -> unit Or_error.t

@@ -112,8 +112,7 @@ let git ~env ~cancel ?(ok_codes = [ 0 ]) ~dir args =
   | { exit = Cancelled; _ } -> raise (Failed "[cancelled]")
   | { exit = Signaled _ | Timed_out; stderr; _ } ->
     raise (Failed ("git failed: " ^ String.strip stderr))
-  | exception Eio.Io _ ->
-    raise (Failed (Git_missing.message ()))
+  | exception Eio.Io _ -> raise (Failed (Git_missing.message ()))
 ;;
 
 let string_arg arguments name =

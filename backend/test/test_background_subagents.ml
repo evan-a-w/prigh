@@ -153,7 +153,7 @@ let%expect_test "spawning returns at once; a finished agent starts a turn" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look around"}
     subagent_start a1: look around
     state: running=true subagents=[a1 running]
@@ -171,7 +171,7 @@ let%expect_test "spawning returns at once; a finished agent starts a turn" =
     agent_end
     state: running=false subagents=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look around"}
     tool_result subagent: started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started it
@@ -222,7 +222,7 @@ let%expect_test "a report arriving mid-run is injected after the tool results" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"one"} subagent{"task":"two"}
     subagent_start a1: one
     state: running=true subagents=[a1 running]
@@ -242,7 +242,7 @@ let%expect_test "a report arriving mid-run is injected after the tool results" =
     agent_end
     state: running=false subagents=[]
     --- last request
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"one"} subagent{"task":"two"}
     tool_result subagent: started agent a1 (one); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     tool_result subagent: started agent a2 (two); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -288,7 +288,7 @@ let%expect_test "subagent_status and subagent_cancel" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"quick"} subagent{"task":"slow"}
     subagent_start a1: quick
     state: running=true subagents=[a1 running]
@@ -318,7 +318,7 @@ let%expect_test "subagent_status and subagent_cancel" =
     agent_end
     state: running=false subagents=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"quick"} subagent{"task":"slow"}
     tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -374,7 +374,7 @@ let%expect_test "aborting the main turn leaves subagents running" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"background"}
     subagent_start a1: background
     state: running=true subagents=[a1 running]
@@ -392,7 +392,7 @@ let%expect_test "aborting the main turn leaves subagents running" =
     agent_end
     state: running=false subagents=[]
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"background"}
     tool_result subagent: started agent a1 (background); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:
@@ -428,7 +428,7 @@ let%expect_test "reports ready at an abort wait for the next prompt" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"quick"}
     subagent_start a1: quick
     state: running=true subagents=[a1 running]
@@ -471,7 +471,7 @@ let%expect_test "cancel_subagent delivers the partial report; usage rolls up" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"stuck"}
     subagent_start a1: stuck
     state: running=true subagents=[a1 running]
@@ -543,7 +543,7 @@ let%expect_test "nested subagents stay synchronous; ids continue after reload" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
@@ -628,7 +628,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look"}
     subagent_start a1: look
     state: running=true subagents=[a1 running]
@@ -641,7 +641,7 @@ let%expect_test
     agent_start
     user: [subagent a1 finished] look | look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     --- request
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look"}
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: spawned
@@ -654,7 +654,7 @@ let%expect_test
     agent_start
     user: next
     --- request
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant: spawned
     user: [subagent a1 finished] look | look report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant: noted
@@ -692,7 +692,7 @@ let%expect_test "new_session in a single-agent embedding drops running agents" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"doomed"}
     subagent_start a1: doomed
     state: running=true subagents=[a1 running]
@@ -805,7 +805,7 @@ let%expect_test
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
     state: running=true subagents=[a1 running]
@@ -888,7 +888,7 @@ let%expect_test "messages a subagent never took are reported, not lost" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"stuck"}
     subagent_start a1: stuck
     state: running=true subagents=[a1 running]
@@ -959,7 +959,7 @@ let%expect_test "the main agent messages a running subagent" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"work"}
     subagent_start a1: work
       [a1] user: work

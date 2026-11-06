@@ -31,6 +31,7 @@ module Token = struct
     | Ident of string
     | Op of string (** also parentheses, [,], [?] and [:] *)
     | End
+  [@@deriving equal]
 
   let describe = function
     | Num _ -> "a number"
@@ -204,7 +205,7 @@ let parse s =
           column
           (Token.describe token)
     in
-    if Poly.equal (fst (peek ())) End
+    if Token.equal (fst (peek ())) End
     then fail "the expression is empty"
     else (
       let e = cond () in
@@ -262,4 +263,50 @@ let check t ~inputs =
   in
   go t;
   Queue.to_list errors
+;;
+
+let eval t ~inputs =
+  let open Option.Let_syntax in
+  let truth b = if b then 1. else 0. in
+  let rec go = function
+    | Number f -> Some f
+    | Name name -> inputs name
+    | Neg e -> go e >>| Float.neg
+    | Binary (op, a, b) ->
+      let%bind a = go a in
+      let%bind b = go b in
+      (match op with
+       | "+" -> Some (a +. b)
+       | "-" -> Some (a -. b)
+       | "*" -> Some (a *. b)
+       | "/" -> Option.some_if Float.(b <> 0.) (a /. b)
+       | "%" -> Option.some_if Float.(b <> 0.) (Float.mod_float a b)
+       | "^" -> Some (a **. b)
+       | "<" -> Some (truth Float.(a < b))
+       | "<=" -> Some (truth Float.(a <= b))
+       | ">" -> Some (truth Float.(a > b))
+       | ">=" -> Some (truth Float.(a >= b))
+       | "==" -> Some (truth Float.(a = b))
+       | "!=" -> Some (truth Float.(a <> b))
+       | _ -> None)
+    | Cond (c, a, b) ->
+      let%bind c = go c in
+      if Float.(c <> 0.) then go a else go b
+    | Call (name, args) ->
+      let%bind args = Option.all (List.map args ~f:go) in
+      (match name, args with
+       | "min", x :: xs -> Some (List.fold xs ~init:x ~f:Float.min)
+       | "max", x :: xs -> Some (List.fold xs ~init:x ~f:Float.max)
+       | "abs", [ x ] -> Some (Float.abs x)
+       | "round", [ x ] -> Some (Float.round_nearest x)
+       | "floor", [ x ] -> Some (Float.round_down x)
+       | "ceil", [ x ] -> Some (Float.round_up x)
+       | "sqrt", [ x ] -> Some (Float.sqrt x)
+       | "pow", [ x; y ] -> Some (x **. y)
+       | "log", [ x ] -> Some (Float.log10 x)
+       | "ln", [ x ] -> Some (Float.log x)
+       | "exp", [ x ] -> Some (Float.exp x)
+       | _ -> None)
+  in
+  go t |> Option.filter ~f:Float.is_finite
 ;;

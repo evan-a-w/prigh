@@ -153,12 +153,17 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
   write t "src/a.ml" "let a = 1\n";
   write t "shot.png" (Image_fixtures.bytes Image_fixtures.png_3x2);
   write t "blob.bin" (binary 1000);
+  write
+    t
+    "logo.svg"
+    {|<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>|};
+  write t "page.html" {|<!doctype html><html><body><svg></svg></body></html>|};
   let (_ : string) = [%expect.output] in
   ignore (call t h "fs_list" "{}" : Json.t);
   ignore (call t h "fs_list" {|{"path": "src", "hidden": true}|} : Json.t);
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR","parent":"$PARENT","home":"$HOME","entries":[{"name":"blob.bin","kind":"file","size":1000,"mtime":<ms>},{"name":"notes.txt","kind":"file","size":6,"mtime":<ms>},{"name":"shot.png","kind":"file","size":84,"mtime":<ms>},{"name":"src","kind":"dir","mtime":<ms>}],"total":4,"hidden":0}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR","parent":"$PARENT","home":"$HOME","entries":[{"name":"blob.bin","kind":"file","size":1000,"mtime":<ms>},{"name":"logo.svg","kind":"file","size":62,"mtime":<ms>},{"name":"notes.txt","kind":"file","size":6,"mtime":<ms>},{"name":"page.html","kind":"file","size":52,"mtime":<ms>},{"name":"shot.png","kind":"file","size":84,"mtime":<ms>},{"name":"src","kind":"dir","mtime":<ms>}],"total":6,"hidden":0}}
     {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/src","parent":"$DIR","home":"$HOME","entries":[{"name":"a.ml","kind":"file","size":10,"mtime":<ms>}],"total":1,"hidden":0}}
     |}];
   (* Previews: text inline, an image by a reusable inline link, a binary
@@ -166,6 +171,9 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
   ignore (call t h "fs_preview" {|{"path": "notes.txt"}|} : Json.t);
   let image = call t h "fs_preview" {|{"path": "shot.png"}|} in
   ignore (call t h "fs_preview" {|{"path": "blob.bin"}|} : Json.t);
+  (* An SVG is an image; HTML holding an <svg> is text, not an image. *)
+  ignore (call t h "fs_preview" {|{"path": "logo.svg"}|} : Json.t);
+  ignore (call t h "fs_preview" {|{"path": "page.html"}|} : Json.t);
   let url = result_string image "url" in
   show ~body:false t (get t ~sw ~port url);
   print_s [%sexp (String.length (get t ~sw ~port url).body : int)];
@@ -174,6 +182,8 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
     {"type":"response","id":"r","ok":true,"result":{"path":"notes.txt","name":"notes.txt","size":6,"mtime":<ms>,"kind":"text","text":"hello\n","truncated":false,"md5":"<id><id>"}}
     {"type":"response","id":"r","ok":true,"result":{"path":"shot.png","name":"shot.png","size":84,"mtime":<ms>,"kind":"image","mime":"image/png","url":"/files/download?ticket=<ticket>"}}
     {"type":"response","id":"r","ok":true,"result":{"path":"blob.bin","name":"blob.bin","size":1000,"mtime":<ms>,"kind":"binary"}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"logo.svg","name":"logo.svg","size":62,"mtime":<ms>,"kind":"image","mime":"image/svg+xml","url":"/files/download?ticket=<ticket>"}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"page.html","name":"page.html","size":52,"mtime":<ms>,"kind":"text","text":"<!doctype html><html><body><svg></svg></body></html>","truncated":false,"md5":"<id><id>"}}
     HTTP/1.1 200 OK
       Access-Control-Allow-Origin: *
       Cache-Control: no-store

@@ -111,7 +111,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: build it
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
     assistant:  bash{"command":"echo quick"}
     tool_output c1: quick
     tool_result bash: quick
@@ -136,7 +136,7 @@ let%expect_test
     2
     3
     --- messages
-    user: build it
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
     assistant:  bash{"command":"echo quick"}
     tool_result bash: quick
     assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after; seq 1 3; exit 2"}
@@ -186,7 +186,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
     state: running=true subagents=[a1 running] jobs=[]
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -241,7 +241,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo never"}
     tool_result bash: [cancelled]
     agent_end
@@ -273,7 +273,7 @@ let%expect_test
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo after the abort"}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
@@ -315,7 +315,7 @@ let%expect_test "waiting for approval does not count" =
     {|
     --- allowed after 1.5s
     --- messages
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"sleep 0.1; echo ran"}
     tool_result bash: ran
     assistant: done
@@ -447,7 +447,7 @@ let%expect_test "job ids continue past moved calls after a reload" =
     print_endline (clean t (message_line m)));
   [%expect
     {|
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo one"}
     tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: ok

@@ -44,12 +44,17 @@ one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
 a client sends `hello` first (name, its kind (`client`: `web`, `tui` or
-`acp`; absent or unknown is `other`), cwd, whether it can run tools and its
+`acp`; absent or unknown is `other`; a later `hello` without it keeps the
+kind), cwd, whether it can run tools and its
 host id and home, an optional session id or path, the `-token` if the backend requires one, and
 with `-tokens` optionally the user, i.e. the namespace name). Each
 `prompt`/`steer`/`follow_up` carries its client's kind into the agent
 (`Agent.Queued.t`'s `client`): the kind of the latest prompt's client is the
-agent's current client, which `render_ui` checks and the model is told of.
+agent's current client, which `render_ui` checks and the model is told of
+(`other` until a client says: a session whose model was never told one, also
+one saved by a prigh from before the field, gets the note with its next
+prompt). Command prompts (`review`, `init`, `review_submit`) carry their
+client's kind too.
 
 ### Tool hosts
 
@@ -966,8 +971,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   problem by JSON path. `Ui_components` checks the arguments strictly
   (`Ui_expr` parses the calculator's expressions); the context's `ui`
   (`Ui_host`) gives the current client, and its images are read on the
-  active tool host (`Host_files`' read op, as `fs_preview` does), which must
-  have them as png, jpeg, gif, webp or svg of at most 20 MB. It is always
+  active tool host (`Host_files`' stat and read ops, as `fs_preview` does:
+  symlinks followed, side by side, without waiting for a host that is away),
+  which must have them as regular files of png, jpeg, gif, webp or svg (its
+  root element `<svg`, `Image.sniff_displayable`) of at most 20 MB. A host
+  that is away or too old fails the call with that, not per image;
+  `Ui_expr.eval` is the expressions' reference semantics, which the
+  frontends mirror. It is always
   offered (the prompt prefix stays the same) but refuses unless the current
   client is prigh-web. Answers through its interactive components come back
   as `prompt`/`follow_up` with `ui_action` (`Ui_action`: checked against
@@ -1165,7 +1175,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   through "<title>" (render_ui call <call_id>, component <component>):`
   and the values as compact JSON on the next line, and whose `origin` note
   (kind `ui_action`) is titled with a summary (`Sent "Deploy options": env
-  = prod`). An unknown call or component is an error naming what exists.
+  = prod`; the title's runs of whitespace and control characters become one
+  space). An unknown or failed call, a component that does not reply (only
+  forms, choices and checklists with `submit` do: the error names those
+  there are), ids with control characters, and `attachments` or `images`
+  alongside are errors. A queued answer is not given back to edit:
+  `dequeue`/`remove_queued` return it with `text: ""` and `ui_action:
+  {call_id, component, summary}`, and `abort` does not restore it.
   `State.usage`/`cost_usd` count every assistant message in the session file
   (all branches, also those compacted away), each at its own model's price,
   plus the `Spend` entries recorded as it happens for what the messages do
@@ -1797,7 +1813,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
   `follow_up`, `abort`, `dequeue`, `remove_queued` (`{queue: "steer" |
   "follow_up", index, text?}`, returning `{text, attachments}` like
-  `dequeue`), `steer_agent` (`{agent_id, text, mode?: "steer" |
+  `dequeue`, plus `ui_action` for an answer through a component), `steer_agent` (`{agent_id, text, mode?: "steer" |
   "follow_up"}`: a message for a running background subagent),
   `dequeue_agent` (`{agent_id}`: `{text}` or null), `remove_agent_queued`
   (`{agent_id, queue, index, text?}`: `{text}`), `cancel_subagent`, `list_subagents`,

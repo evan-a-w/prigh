@@ -333,6 +333,8 @@ let%expect_test "agent: /skill:NAME expands on the host; unknown names fail" =
   print_endline (mask t (last_user_text request));
   [%expect
     {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     <skill name="review" location="$DIR/.prigh/skills/review/SKILL.md">
     References are relative to $DIR/.prigh/skills/review.
 

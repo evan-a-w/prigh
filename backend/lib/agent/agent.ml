@@ -10,7 +10,7 @@ module Queued = struct
     ; attachments : string list
     ; images : Image.t list
     ; client : Client_kind.t option
-    ; ui_action : Injected.Note.t option
+    ; ui_action : Ui_action.t option
     }
   [@@deriving sexp_of]
 end
@@ -556,7 +556,7 @@ let environment t =
       List.map (Tools.for_model t.model t.tools) ~f:Tool.name
       |> List.dedup_and_sort ~compare:String.compare
   ; plan_mode = t.plan_mode
-  ; client = t.client
+  ; client = Some (Option.value t.client ~default:Other)
   }
 ;;
 
@@ -576,7 +576,7 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> environment t);
+      | None -> { (environment t) with client = None });
   t.client <- t.told.client
 ;;
 
@@ -1509,52 +1509,68 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
 ;;
 
 (* [render_ui]'s images are read where [fs_preview] reads them: on the
-   active tool host, in the session cwd. *)
+   active tool host, in the session cwd; like it, without waiting for a host
+   that is away. *)
 let ui_host t ~cancel =
-  let read_head path ~length =
-    let result =
-      active_host_exec
-        t
-        ~wait:true
-        ~cancel
-        ~on_output:ignore
-        ~call_id:"render_ui"
-        ~cwd:t.cwd
-        ~name:Host_files.read_op
-        ~arguments:
-          (`Object
-              [ "path", `String path
-              ; "offset", `Number "0"
-              ; "length", `Number (Int.to_string length)
-              ])
-        ()
-    in
-    if result.is_error
-    then
-      if String.is_prefix result.text ~prefix:"unknown host tool"
-      then
-        Or_error.errorf
-          "cannot check images on tool host %s, whose prigh is too old: update \
-           prigh there"
-          t.active_host_name
-      else Or_error.error_string result.text
-    else
-      let open Or_error.Let_syntax in
-      let%bind json = Json.parse result.text in
+  let read_head path ~length : (int * string, Ui_host.Problem.t) Result.t =
+    match await_active_host t ~wait:false ~cancel with
+    | Error message -> Error (Host message)
+    | Ok host ->
+      let call name arguments : (Json.t, Ui_host.Problem.t) Result.t =
+        let result =
+          host_exec_with_stdin
+            t
+            host
+            ~cancel
+            ~on_output:ignore
+            ~call_id:"render_ui"
+            ~cwd:t.cwd
+            ~name
+            ~arguments:(`Object (("path", `String path) :: arguments))
+            ()
+        in
+        if not result.is_error
+        then
+          Result.map_error (Json.parse result.text) ~f:(fun _ ->
+            Ui_host.Problem.File "bad reply from the tool host")
+        else if
+          String.is_prefix
+            result.text
+            ~prefix:(sprintf "unknown host tool %S" name)
+        then
+          Error
+            (Host
+               (sprintf
+                  "tool host %s runs a prigh too old to show its files: update \
+                   prigh there"
+                  host.name))
+        else Error (File (String.strip result.text))
+      in
+      let open Result.Let_syntax in
+      let%bind stat = call Host_files.stat_op [] in
+      let%bind () =
+        match Json.member "kind" stat with
+        | Some (`String "file") -> Ok ()
+        | Some (`String "dir") ->
+          Error (Ui_host.Problem.File (path ^ " is a directory"))
+        | _ -> Error (Ui_host.Problem.File (path ^ " is not a regular file"))
+      in
+      let%bind read =
+        call
+          Host_files.read_op
+          [ "offset", `Number "0"; "length", `Number (Int.to_string length) ]
+      in
+      let bad = Ui_host.Problem.File "bad reply from the tool host" in
       let%bind size =
-        match Json.member "size" json with
-        | Some (`Number n) ->
-          Result.of_option
-            (Int.of_string_opt n)
-            ~error:(Error.of_string "bad size from the host")
-        | _ -> Or_error.error_string "bad reply from the host"
+        match Json.member "size" read with
+        | Some (`Number n) -> Result.of_option (Int.of_string_opt n) ~error:bad
+        | _ -> Error bad
       in
       let%map data =
-        match Json.member "data" json with
+        match Json.member "data" read with
         | Some (`String data) ->
-          Result.map_error (Base64.decode data) ~f:(fun (`Msg m) ->
-            Error.of_string ("bad data from the host: " ^ m))
-        | _ -> Or_error.error_string "bad reply from the host"
+          Result.map_error (Base64.decode data) ~f:(fun _ -> bad)
+        | _ -> Error bad
       in
       size, data
   in
@@ -2019,7 +2035,7 @@ let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
   | Some action ->
     (* A message of notes only, the answer first so that the text starts as
        frontends and the model expect; any change of environment follows. *)
-    let notes = action :: take_notes t in
+    let notes = Ui_action.note action :: take_notes t in
     Message.user
       ~origin:{ Injected.empty with notes }
       (String.concat ~sep:"\n" (List.map notes ~f:(fun n -> n.text)))
@@ -3022,6 +3038,10 @@ let create
    expanded, or the answer through a component. *)
 let to_queue t ~attachments ~images ~client ~ui_action text =
   match ui_action with
+  | Some _ when not (List.is_empty attachments && List.is_empty images) ->
+    Or_error.error_string
+      "a prompt with ui_action takes no attachments or images: send them in a \
+       message of their own"
   | Some action ->
     Or_error.map
       (Ui_action.check action (path_messages t.session))
@@ -3032,7 +3052,7 @@ let to_queue t ~attachments ~images ~client ~ui_action text =
         ; attachments = []
         ; images = []
         ; client
-        ; ui_action = Some (Ui_action.note action)
+        ; ui_action = Some action
         })
   | None ->
     Or_error.map (expand_skill t text) ~f:(fun expanded ->
@@ -3426,7 +3446,7 @@ let remove_worktree ?cwd t ~path ~force =
 
 (* A command's prompt: sent now when idle, otherwise after the current run
    like a follow-up. *)
-let command_prompt t ~text ~expanded ~source =
+let command_prompt ?client t ~text ~expanded ~source =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
@@ -3438,13 +3458,13 @@ let command_prompt t ~text ~expanded ~source =
       ; source = Some source
       ; attachments = []
       ; images = []
-      ; client = None
+      ; client
       ; ui_action = None
       };
     Ok ()
 ;;
 
-let review t ~args =
+let review ?client t ~args =
   let open Or_error.Let_syntax in
   let first, rest = Review.split_args args in
   let%bind target, diff, instructions =
@@ -3469,14 +3489,16 @@ let review t ~args =
   then Or_error.error_string (Review.nothing_to_review target ~root:diff.root)
   else
     command_prompt
+      ?client
       t
       ~text:(String.strip ("/review " ^ String.strip args))
       ~expanded:(Review.prompt ~target ~instructions diff)
       ~source:(Review { target = Review.Target.describe target })
 ;;
 
-let init t =
+let init ?client t =
   command_prompt
+    ?client
     t
     ~text:"/init"
     ~expanded:(Init_prompt.prompt ~cwd:t.cwd)
@@ -3485,7 +3507,7 @@ let init t =
 
 let review_state t = t.review
 
-let submit_review ?root t =
+let submit_review ?client ?root t =
   match budget_exhausted t with
   | Some reason -> Or_error.error_string reason
   | None ->
@@ -3506,7 +3528,7 @@ let submit_review ?root t =
           ; source = Some (Review_comments { count })
           ; attachments = []
           ; images = []
-          ; client = None
+          ; client
           ; ui_action = None
           };
         count)
