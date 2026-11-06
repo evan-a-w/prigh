@@ -167,6 +167,10 @@ impl BrowserWindow {
         // Its own process group: closing it reaches its helpers too.
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+        #[cfg(target_os = "linux")]
+        let devtools = devtools_pipe::attach(&mut cmd)
+            .map_err(|e| log(format!("no DevTools pipe (links will open in its own windows): {e}")))
+            .ok();
         let child = match SharedChild::spawn(&mut cmd) {
             Ok(c) => Arc::new(c),
             Err(e) => {
@@ -177,6 +181,10 @@ impl BrowserWindow {
             }
         };
         *self.child.lock().unwrap() = Some(child.clone());
+        #[cfg(target_os = "linux")]
+        if let Some(pipe) = devtools {
+            pipe.watch(app.clone(), sidecar.clone());
+        }
         // Browsers say a lot on stderr: only kept, for when it fails.
         let tail = Arc::new(Mutex::new(Tail::new(20)));
         if let Some(s) = child.take_stderr() {
@@ -319,6 +327,93 @@ impl BrowserWindow {
         if let Some(c) = child {
             log("prigh desktop exited: closing the browser window");
             let _ = c.kill();
+        }
+    }
+}
+
+/// The browser's DevTools on a pipe (`--remote-debugging-pipe`: it reads
+/// commands on its fd 3 and writes on its fd 4), for where its links go
+/// (see [prigh_desktop_core::devtools]). Only the app holds it: no port.
+#[cfg(target_os = "linux")]
+mod devtools_pipe {
+    use super::{open_external, Sidecar};
+    use prigh_desktop_core::devtools::{self, Effect, Links};
+    use std::fs::File;
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+    use std::os::unix::process::CommandExt;
+    use std::process::Command;
+    use std::sync::Arc;
+    use std::thread;
+    use tauri::AppHandle;
+
+    pub struct Pipe {
+        to_browser: File,
+        from_browser: File,
+        /// The browser's ends, closed here once it has them.
+        theirs: [OwnedFd; 2],
+    }
+
+    fn pipe() -> std::io::Result<(OwnedFd, OwnedFd)> {
+        let mut fds = [0; 2];
+        if unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC) } != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(unsafe { (OwnedFd::from_raw_fd(fds[0]), OwnedFd::from_raw_fd(fds[1])) })
+    }
+
+    /// Gives the browser `cmd` starts the pipe.
+    pub fn attach(cmd: &mut Command) -> std::io::Result<Pipe> {
+        let (commands_read, commands_write) = pipe()?;
+        let (events_read, events_write) = pipe()?;
+        let (read, write) = (commands_read.as_raw_fd(), events_write.as_raw_fd());
+        cmd.arg("--remote-debugging-pipe");
+        unsafe {
+            cmd.pre_exec(move || {
+                // Above 4 first, so that neither is overwritten by the
+                // other's dup2; dup2 clears close-on-exec on 3 and 4.
+                let read = libc::fcntl(read, libc::F_DUPFD_CLOEXEC, 5);
+                let write = libc::fcntl(write, libc::F_DUPFD_CLOEXEC, 5);
+                if read < 0 || write < 0 || libc::dup2(read, 3) < 0 || libc::dup2(write, 4) < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            })
+        };
+        Ok(Pipe {
+            to_browser: File::from(commands_write),
+            from_browser: File::from(events_read),
+            theirs: [commands_read, events_write],
+        })
+    }
+
+    impl Pipe {
+        /// The browser started: follows its pages until it exits.
+        pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>) {
+            let Pipe { mut to_browser, from_browser, theirs } = self;
+            drop(theirs);
+            thread::spawn(move || {
+                let mut send = |msg: &str| {
+                    let _ = to_browser.write_all(msg.as_bytes()).and_then(|()| to_browser.write_all(b"\0"));
+                };
+                send(&devtools::discover());
+                let mut links = Links::new();
+                let mut reader = BufReader::new(from_browser);
+                let mut msg = Vec::new();
+                while reader.read_until(0, &mut msg).is_ok_and(|n| n > 0) {
+                    if msg.last() == Some(&0) {
+                        msg.pop();
+                    }
+                    let text = String::from_utf8_lossy(&msg);
+                    for effect in links.on_message(&text, &sidecar.origins()) {
+                        match effect {
+                            Effect::Send(command) => send(&command),
+                            Effect::OpenExternally(url) => open_external(&app, &url),
+                        }
+                    }
+                    msg.clear();
+                }
+            });
         }
     }
 }
