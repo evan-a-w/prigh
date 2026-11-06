@@ -14,5 +14,6 @@ val parse : string -> t Or_error.t
 (** The input names it reads. *)
 val names : t -> string list
 
-(** A name [env] does not know is an error; so is dividing by zero. *)
+(** A name [env] does not know is an error; so are dividing by zero and a
+    result that is not a finite number. *)
 val eval : t -> env:(string -> float option) -> float Or_error.t

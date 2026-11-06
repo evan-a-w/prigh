@@ -59,7 +59,10 @@ module Sent = struct
     in
     { call_id = String.strip call_id
     ; component
-    ; values = Result.ok (Json.parse (String.strip rest))
+    ; values =
+        (* Compact JSON on one line; harness notes may follow it. *)
+        (let line = Option.value_map (String.lsplit2 rest ~on:'\n') ~default:rest ~f:fst in
+         Result.ok (Json.parse (String.strip line)))
     }
   ;;
 end

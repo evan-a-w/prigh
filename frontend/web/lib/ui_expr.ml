@@ -283,5 +283,6 @@ let eval t ~env =
             | _ -> Float.exp x)
        | _ -> arity 1 |> Or_error.map ~f:(fun () -> 0.))
   in
-  go t
+  let%bind v = go t in
+  if Float.is_finite v then Ok v else Or_error.error_string "not a real number"
 ;;

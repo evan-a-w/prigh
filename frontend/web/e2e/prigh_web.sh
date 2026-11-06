@@ -59,7 +59,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote desktop steer subagent_paged trim filter viewer math clipboard card status mobile long_press pwa compaction images:desktop images:phone images:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote desktop steer subagent_paged trim filter viewer math clipboard card status mobile long_press pwa compaction images:desktop images:phone images:small ui"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
