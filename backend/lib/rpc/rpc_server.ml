@@ -1838,8 +1838,8 @@ module Deleted = struct
 end
 
 (* Deletes the session's files and everything kept for it in memory. *)
-let delete_saved t client (summary : Session.Summary.t) =
-  match refusal t client summary with
+let delete_saved ?leaving t client (summary : Session.Summary.t) =
+  match refusal ?leaving t client summary with
   | Some refused -> Or_error.error_string refused
   | None ->
     Or_error.try_with (fun () ->
@@ -1908,7 +1908,7 @@ let delete_many ?switch_to t client keys =
       List.map keys ~f:(fun key ->
         ( key
         , Or_error.bind (find_saved t key) ~f:(fun summary ->
-            delete_saved t client summary) ))
+            delete_saved ~leaving:(Option.is_some switch_to) t client summary) ))
     in
     let deleted = List.filter_map results ~f:(fun (_, r) -> Result.ok r) in
     if not (List.is_empty deleted) then sessions_changed t;
@@ -2527,7 +2527,9 @@ let dispatch_server t (client : Client.t) ~meth ~params
        let%bind switch_to = Switch_to.of_params params in
        let%bind state = leave_for_deletion t client ~switch_to [ key ] in
        let%map (_ : Deleted.t) =
-         Or_error.bind (find_saved t key) ~f:(delete_saved t client)
+         Or_error.bind
+           (find_saved t key)
+           ~f:(delete_saved ~leaving:(Option.is_some switch_to) t client)
        in
        sessions_changed t;
        Option.value state ~default:(`Object []))
