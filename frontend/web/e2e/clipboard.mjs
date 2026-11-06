@@ -85,16 +85,20 @@ const screenshot = async label => {
 
 const composer = () => page.locator(".composer textarea");
 const theReply = () => page.locator("#chat .msg.assistant", { hasText: "Then push." });
-// What is on the clipboard: pasted into the composer, which is then emptied
-// again (its draft as it was).
+// What is on the clipboard as plain text: what a paste into the composer
+// gets (and does not insert).
 const pasted = async () => {
   await composer().focus();
-  await composer().fill("");
+  await composer().evaluate(ta => {
+    window.pastedText = undefined;
+    ta.addEventListener("paste", ev => {
+      window.pastedText = ev.clipboardData.getData("text/plain");
+      ev.preventDefault();
+    }, { once: true });
+  });
   await page.keyboard.press("ControlOrMeta+v");
-  await page.waitForFunction(() => document.querySelector(".composer textarea").value !== "");
-  const text = await composer().inputValue();
-  await composer().fill("");
-  return JSON.stringify(text);
+  await page.waitForFunction(() => window.pastedText !== undefined);
+  return JSON.stringify(await page.evaluate(() => window.pastedText));
 };
 // Where the focus is and what is selected, and no textarea left behind.
 const state = () => page.evaluate(() => {
