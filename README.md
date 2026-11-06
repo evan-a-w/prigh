@@ -1389,7 +1389,7 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   in with your browser** (first, Enter) opens the site in the default
   browser, where you are usually signed in already; allow prigh desktop
   there (as for `prigh browser-signin`), and the window goes to the site
-  with the proxy's cookie, which is saved with the saved connection for next
+  with the proxy's cookie, which is kept in the saved connection for next
   time. Open it again reopens that tab; Cancel (Esc) goes back. **Sign in
   here** goes to the site in the window, to sign in to the proxy there.
   When the sign-in expires later, the window comes back to the same
