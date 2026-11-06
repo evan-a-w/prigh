@@ -245,7 +245,10 @@ let%expect_test "a proxy's answer instead of the WebSocket says what to do" =
           (String.substr_replace_all
              (match r with
               | Ok _ -> "connected"
-              | Error e -> Error.to_string_hum e)
+              | Error e ->
+                (match Prigh_client_unix.Websocket_transport.signin_required e with
+                 | Some why -> "[sign in through the browser] " ^ why
+                 | None -> Error.to_string_hum e))
              ~pattern:(Int.to_string (Server.port server))
              ~with_:"PORT");
         print_endline "";
@@ -253,13 +256,13 @@ let%expect_test "a proxy's answer instead of the WebSocket says what to do" =
   in
   [%expect
     {|
-    localhost answered with a login page (HTTP 302 Found to https://login.example.com/outpost.goauthentik.io/start?rd=https://ai.example.com/ws): the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT (authentik: add ^/(ws|terminal)(\?.*)?$ to the proxy provider's Unauthenticated Paths)
+    [sign in through the browser] localhost answered with a login page (HTTP 302 Found to https://login.example.com/outpost.goauthentik.io/start?rd=https://ai.example.com/ws): the proxy requires browser sign-in: sign in through the browser when prigh-tui asks (or with prigh browser-signin -connect URL), exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT (authentik: add ^/(ws|terminal)(\?.*)?$ to the proxy provider's Unauthenticated Paths)
 
-    localhost answered with a login page (HTTP 302 Found to https://sso.example.com/oauth2/sign_in): the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT
+    [sign in through the browser] localhost answered with a login page (HTTP 302 Found to https://sso.example.com/oauth2/sign_in): the proxy requires browser sign-in: sign in through the browser when prigh-tui asks (or with prigh browser-signin -connect URL), exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT
 
-    localhost refused the WebSocket (HTTP 401 Unauthorized, WWW-Authenticate: Basic realm="authentik"): the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT
+    [sign in through the browser] localhost refused the WebSocket (HTTP 401 Unauthorized, WWW-Authenticate: Basic realm="authentik"): the proxy requires browser sign-in: sign in through the browser when prigh-tui asks (or with prigh browser-signin -connect URL), exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT
 
-    localhost answered with a web page (HTTP 200 OK, text/html; charset=utf-8) instead of opening the WebSocket: if it is a login page, the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT; otherwise check that ws://localhost:PORT/ws goes to prigh's -web port
+    [sign in through the browser] localhost answered with a web page (HTTP 200 OK, text/html; charset=utf-8) instead of opening the WebSocket: if it is a login page, the proxy requires browser sign-in: sign in through the browser when prigh-tui asks (or with prigh browser-signin -connect URL), exempt /ws and /terminal from it for prigh (prigh checks its own token; see DOCKER.md, "Behind a reverse proxy"), pass the proxy's credentials with -header, or use an SSH tunnel to the backend's HOST:PORT; otherwise check that ws://localhost:PORT/ws goes to prigh's -web port
 
     localhost redirects to HTTPS (HTTP 301 Moved Permanently to https://localhost/ws): connect with wss:// (or https://) instead of ws://localhost:PORT/ws
 

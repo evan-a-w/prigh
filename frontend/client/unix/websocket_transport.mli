@@ -27,7 +27,8 @@ end
 
 (** What {!connect}'s error explains, when the refusal was a sign-in
     proxy's login ({!Refusal.signin_page}): signing in through the browser
-    ([prigh browser-signin]) gets the cookie it wants. *)
+    ([prigh browser-signin]) gets the cookie it wants. Such an error is an
+    exception's: show this, not [Error.to_string_hum]. *)
 val signin_required : Error.t -> string option
 
 (** Parses [Name: value] (for [-header] and [$PRIGH_CONNECT_HEADERS]). *)

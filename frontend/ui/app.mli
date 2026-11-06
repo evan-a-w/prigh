@@ -273,6 +273,9 @@ module Action : sig
     | Rejected of string
     (** the first [hello] was refused: start disconnected, asking to sign
         in *)
+    | Signin_required of string
+    (** the first connection met a sign-in proxy's login (why): start
+        disconnected, offering to sign in through the browser *)
     | Resize of
         { width : int
         ; height : int
