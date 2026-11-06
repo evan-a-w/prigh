@@ -91,9 +91,9 @@ let with_session ?tools replies f =
   f { S.sandbox; h; requests }
 ;;
 
-let%expect_test "hello's client: a TUI and prigh-web on one session; the \
-                 latest prompt's client decides, and the model is told of \
-                 each switch"
+let%expect_test
+    "hello's client: a TUI and prigh-web on one session; the latest prompt's \
+     client decides, and the model is told of each switch"
   =
   let chart =
     {|{"type": "chart", "kind": "bar", "title": "Build times", "labels": ["a", "b"],
@@ -167,8 +167,9 @@ let%expect_test "hello's client: a TUI and prigh-web on one session; the \
     |}]
 ;;
 
-let%expect_test "the told client survives a reload: no note for the same \
-                 client, one for another"
+let%expect_test
+    "the told client survives a reload: no note for the same client, one for \
+     another"
   =
   with_session (fun _ -> List.init 3 ~f:(fun _ -> Reply.text "ok"))
   @@ fun s ->
@@ -177,7 +178,11 @@ let%expect_test "the told client survives a reload: no note for the same \
   S.print_last_turn s;
   let path = (Agent.state (S.agent s)).session_path in
   S.call_as s s.h.client "new_session";
-  S.call_as s s.h.client ~params:(sprintf {|{"path": %S}|} path) "switch_session";
+  S.call_as
+    s
+    s.h.client
+    ~params:(sprintf {|{"path": %S}|} path)
+    "switch_session";
   S.call_as s s.h.client ~params:{|{"text": "two"}|} "prompt";
   S.print_last_turn s;
   S.call_as s s.h.client ~params:{|{"client": "tui"}|} "hello";
@@ -287,8 +292,8 @@ let%expect_test "images are checked on the tool host" =
     |}]
 ;;
 
-let%expect_test "answers through components: the exact text, the origin, and \
-                 errors"
+let%expect_test
+    "answers through components: the exact text, the origin, and errors"
   =
   let form =
     {|{"type": "form", "id": "deploy", "title": "Deploy options",
@@ -321,8 +326,10 @@ let%expect_test "answers through components: the exact text, the origin, and \
       ~params:(sprintf {|{"text": %s, "ui_action": {%s}}|} text fields)
       meth
   in
-  action {|"call_id": "c9", "component": "deploy", "title": "Deploy options", "values": {}|};
-  action {|"call_id": "c1", "component": "deplyo", "title": "Deploy options", "values": {}|};
+  action
+    {|"call_id": "c9", "component": "deploy", "title": "Deploy options", "values": {}|};
+  action
+    {|"call_id": "c1", "component": "deplyo", "title": "Deploy options", "values": {}|};
   action ~text:{|"hi"|} {|"call_id": "c1", "component": "deploy", "values": {}|};
   action ~meth:"steer" {|"call_id": "c1", "component": "deploy", "values": {}|};
   action {|"call_id": "c1", "component": "deploy"|};
@@ -358,9 +365,11 @@ let%expect_test "answers through components: the exact text, the origin, and \
    | Message.User u -> print_endline u.text
    | _ -> print_endline "not a user message");
   let user =
-    List.find_map_exn (List.rev (Agent.messages (S.agent s))) ~f:(function
-      | Message.User u -> Some u
-      | _ -> None)
+    List.find_map_exn
+      (List.rev (Agent.messages (S.agent s)))
+      ~f:(function
+        | Message.User u -> Some u
+        | _ -> None)
   in
   print_endline (Json.to_string (Message.jsonaf_of_t (User user)));
   Queue.clear s.requests;
@@ -389,7 +398,8 @@ let%expect_test "answers through components: the exact text, the origin, and \
          | Some (`String "user") ->
            Some
              (`Object
-                 (List.filter fields ~f:(fun (k, _) -> not (String.equal k "at"))))
+                 (List.filter fields ~f:(fun (k, _) ->
+                    not (String.equal k "at"))))
          | _ -> None)
       | _ -> None)
   in

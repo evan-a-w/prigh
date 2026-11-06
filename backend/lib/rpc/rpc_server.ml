@@ -2637,9 +2637,7 @@ let ui_action_param params ~meth =
           "a prompt with ui_action takes no text: send text \"\"")
 ;;
 
-let dispatch agent login ~(client : Client.t) ~meth ~params
-  : Json.t Or_error.t
-  =
+let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
   match meth with
   | "ping" -> ok (`String "pong")
   | ("prompt" | "steer" | "follow_up") as meth ->

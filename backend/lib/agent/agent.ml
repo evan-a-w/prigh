@@ -1534,11 +1534,11 @@ let ui_host t ~cancel =
       if String.is_prefix result.text ~prefix:"unknown host tool"
       then
         Or_error.errorf
-          "cannot check images on tool host %s, whose prigh is too old: \
-           update prigh there"
+          "cannot check images on tool host %s, whose prigh is too old: update \
+           prigh there"
           t.active_host_name
       else Or_error.error_string result.text
-    else (
+    else
       let open Or_error.Let_syntax in
       let%bind json = Json.parse result.text in
       let%bind size =
@@ -1556,7 +1556,7 @@ let ui_host t ~cancel =
             Error.of_string ("bad data from the host: " ^ m))
         | _ -> Or_error.error_string "bad reply from the host"
       in
-      size, data)
+      size, data
   in
   { Ui_host.client = (fun () -> Option.value t.client ~default:Other)
   ; read_head

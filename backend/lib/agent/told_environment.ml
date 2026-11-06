@@ -50,8 +50,9 @@ let notes ~told now ~host_name =
   in
   let client =
     match now.client with
-    | Some client when not (Option.equal Client_kind.equal told.client now.client)
-      -> note (Client { client }) (System_prompt.client_note client)
+    | Some client
+      when not (Option.equal Client_kind.equal told.client now.client) ->
+      note (Client { client }) (System_prompt.client_note client)
     | Some _ | None -> None
   in
   List.filter_opt [ host; cwd; tools; plan_mode; client ]

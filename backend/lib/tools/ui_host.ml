@@ -8,6 +8,7 @@ type t =
 
 let none =
   { client = (fun () -> Other)
-  ; read_head = (fun _ ~length:_ -> Or_error.error_string "no tool host to read files on")
+  ; read_head =
+      (fun _ ~length:_ -> Or_error.error_string "no tool host to read files on")
   }
 ;;

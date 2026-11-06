@@ -83,8 +83,9 @@ let spec =
                                       [ "type", `String "string"
                                       ; ( "enum"
                                         , `Array
-                                            (List.map Ui_components.types ~f:(fun t ->
-                                               `String t)) )
+                                            (List.map
+                                               Ui_components.types
+                                               ~f:(fun t -> `String t)) )
                                       ] )
                                 ; "id", `Object [ "type", `String "string" ]
                                 ] )
@@ -149,7 +150,9 @@ let errors problems =
 ;;
 
 let ack (checked : Ui_components.Checked.t) =
-  let shown = sprintf "Shown: %s." (String.concat ~sep:", " checked.summaries) in
+  let shown =
+    sprintf "Shown: %s." (String.concat ~sep:", " checked.summaries)
+  in
   match checked.interactive with
   | [] -> shown
   | interactive ->

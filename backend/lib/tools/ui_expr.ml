@@ -56,7 +56,9 @@ let tokenize s =
       let c = s.[i] in
       if Char.is_whitespace c
       then go (i + 1) acc
-      else if Char.is_digit c || (Char.equal c '.' && i + 1 < n && Char.is_digit s.[i + 1])
+      else if
+        Char.is_digit c
+        || (Char.equal c '.' && i + 1 < n && Char.is_digit s.[i + 1])
       then (
         let j = ref i in
         let digits () =
@@ -120,7 +122,11 @@ let parse s =
       then advance ()
       else (
         let token, column = peek () in
-        fail "expected %S at column %d, found %s" op column (Token.describe token))
+        fail
+          "expected %S at column %d, found %s"
+          op
+          column
+          (Token.describe token))
     in
     let rec cond () =
       let c = comparison () in
