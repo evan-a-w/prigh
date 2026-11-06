@@ -2346,12 +2346,18 @@ terminal frontend and `web/` prigh-web, the browser one.
     `Picker.Item.section` keeps them apart, also when filtering, and
     `Render` draws the divider). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
-    highlighted) sessions and Alt+D every archived one but the current, with
-    the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
-    confirmed and the picker as `Open_picker`, so Esc and Enter go back to
-    it); the session you are in is refused up front
-    (`Session_selection.deletable`), and the `delete_sessions` reply
-    (`Delete_result`) is the notice, refusals included. Alt+A flips `archived` in the picker at once
+    highlighted) sessions and Alt+D every archived one, with the count and
+    `bytes` (`Confirm_action.Delete_sessions` carries the paths confirmed,
+    the `switch_to` and the picker as `Open_picker`, so Esc and Enter go
+    back to it). When the session you are in is among them,
+    `Session_selection.moving_to` picks the next one down the picker's
+    order not being deleted (else the nearest above, else a new session),
+    the question names it and the request carries it as `switch_to`; while
+    it is running or open in another frontend (`clients > 1`: it counts us)
+    it is refused up front (`Session_selection.deletable`) and Alt+D leaves
+    it out. The `delete_sessions` reply (`Delete_result`) is the notice,
+    refusals included; with `moved_to` it closes the picker and resets the
+    session as a `switch_session` reply does (`reset_session`). Alt+A flips `archived` in the picker at once
     and sends `set_archived` (a refusal refetches the list). `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
