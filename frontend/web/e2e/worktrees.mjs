@@ -340,18 +340,20 @@ try {
   await choose("delete");
   await page.locator(".delete-dialog").waitFor();
   await page.waitForTimeout(300); // its fade in
-  await show("deleting the session we are in: asked", ".delete-dialog");
+  section("deleting the session we are in: asked");
+  console.log(clean(await page.locator(".delete-dialog").innerText()).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>"));
+  await screenshot("deleting the session we are in: asked");
   await page.locator(".delete-dialog .btn.danger").click();
   await toastHas("Deleted 1 session");
   await first.waitFor({ state: "detached" });
-  await page.waitForFunction(() => {
-    const row = document.querySelector(".session-item.selected .session");
-    return row && !row.classList.contains("opening")
-      && new URL(location.href).searchParams.get("session") === row.dataset.session;
-  });
+  await page.waitForFunction(() =>
+    document.querySelector(".session-item.selected") && !document.querySelector(".session.opening"));
   section("deleting the session we are in: where we land");
-  console.log(clean(await page.evaluate(() =>
-    `in: ${document.querySelector(".session-item.selected .session-title")?.innerText}; the address names it`)));
+  console.log(clean(await page.evaluate(() => {
+    const id = document.querySelector(".session-item.selected [data-session]")?.dataset.session;
+    return `in: ${document.querySelector(".session-item.selected .session-title")?.innerText}; ` +
+      `the address names it: ${new URL(location.href).searchParams.get("session") === id}`;
+  })));
   await page.mouse.move(1000, 400);
   await tree("the session we were in deleted");
 
