@@ -29,7 +29,7 @@
 /* The panels. */
 .genui > :is(.ui-card, .ui-chart, .ui-table, .ui-calc, .ui-quiz, .ui-flash, .ui-reply,
   .ui-checklist, .ui-kv, .ui-steps, .ui-timeline, .ui-tree, .ui-tabs, .ui-accordion,
-  .ui-gallery-wrap, .ui-stat),
+  .ui-gallery-wrap, .ui-stat, .ui-progress),
 .ui-grid > :is(.ui-card, .ui-stat, .ui-chart, .ui-table, .ui-calc, .ui-kv, .ui-steps,
   .ui-timeline, .ui-tree, .ui-checklist, .ui-reply, .ui-quiz, .ui-flash, .ui-progress) {
   background: var(--slate);
@@ -76,6 +76,8 @@
   .ui-grid:has(> .ui-stat + .ui-stat):not(:has(> :not(.ui-stat))) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* An odd one out takes the whole row. */
+  .ui-grid > .ui-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 
 .ui-divider { border: 0; border-top: 1px solid var(--rule); margin: 2px 0; }
@@ -324,7 +326,6 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) .ui-sort-mark { opacity
 .ui-step-text { color: var(--muted); font-size: 13px; line-height: 1.5; }
 
 .ui-code .code { margin: 0; }
-.ui-code .ui-title { margin-bottom: 6px; }
 .ui-diff { min-width: 0; }
 
 .ui-tree ul { list-style: none; margin: 0; padding: 0; font: 13px/1.5 var(--mono); }
@@ -807,7 +808,8 @@ select.ui-input {
 
 /* Phones: less padding, touch-sized targets. */
 .app.narrow .genui > :is(.ui-card, .ui-chart, .ui-calc, .ui-quiz, .ui-flash, .ui-reply,
-  .ui-checklist, .ui-kv, .ui-steps, .ui-timeline, .ui-tree, .ui-gallery-wrap, .ui-stat),
+  .ui-checklist, .ui-kv, .ui-steps, .ui-timeline, .ui-tree, .ui-gallery-wrap, .ui-stat,
+  .ui-progress),
 .app.narrow .ui-grid > :not(.ui-table) { padding: 12px; }
 .app.narrow .ui-tabpanel { padding: 12px; }
 .app.narrow .ui-acc-head { min-height: 44px; padding: 8px 12px; }

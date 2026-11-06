@@ -216,7 +216,7 @@ let%expect_test "line: axes, columns with markers and tooltips, legend, table" =
             </div>
           </div>
         </div>
-        <div aria-hidden="true" class="ui-chart-xaxis">
+        <div aria-hidden="true" class="thin-160 ui-chart-xaxis">
           <span style="left: 12.5%; --w: 25%;" class="ui-chart-tick"> W1 </span>
           <span style="left: 37.5%; --w: 25%;" class="minor ui-chart-tick"> W2 </span>
           <span style="left: 62.5%; --w: 25%;" class="ui-chart-tick"> W3 </span>
@@ -495,7 +495,7 @@ let%expect_test "horizontal bars: labels down the side" =
             </div>
           </div>
         </div>
-        <div aria-hidden="true" class="ui-chart-values ui-chart-xaxis">
+        <div aria-hidden="true" class="thin-160 ui-chart-values ui-chart-xaxis">
           <span style="left: 0%;" class="ui-chart-tick"> 0 </span>
           <span style="left: 16.67%;" class="minor ui-chart-tick"> 2 </span>
           <span style="left: 33.33%;" class="ui-chart-tick"> 4 </span>
@@ -541,7 +541,7 @@ let%expect_test "many labels: every few on the axis, dense markers" =
           [ "v", List.init 50 ~f:(fun i -> Some (Float.of_int i)) ]));
   [%expect
     {|
-    <div aria-hidden="true" class="ui-chart-xaxis">
+    <div aria-hidden="true" class="thin-240 ui-chart-xaxis">
       <span style="left: 1%; --w: 14%;" class="ui-chart-tick"> d0 </span>
       <span style="left: 15%; --w: 14%;" class="minor ui-chart-tick"> d7 </span>
       <span style="left: 29%; --w: 14%;" class="ui-chart-tick"> d14 </span>
@@ -910,7 +910,7 @@ let%expect_test "scatter: points with tooltips, both axes" =
             </div>
           </span>
         </div>
-        <div aria-hidden="true" class="ui-chart-values ui-chart-xaxis">
+        <div aria-hidden="true" class="thin-160 ui-chart-values ui-chart-xaxis">
           <span style="left: 0%;" class="ui-chart-tick"> 0 </span>
           <span style="left: 25%;" class="minor ui-chart-tick"> 1 </span>
           <span style="left: 50%;" class="ui-chart-tick"> 2 </span>

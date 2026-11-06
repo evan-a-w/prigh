@@ -550,6 +550,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   color: var(--faint);
 }
 .code-lang { font-family: var(--mono); }
+.code-title { color: var(--muted); font-weight: 600; }
+.code-title + .code-lang { margin: 0 auto 0 8px; }
 .copy {
   border: 0;
   background: transparent;

@@ -4,7 +4,7 @@ module H = Harness
 (* Every component render_ui has, as the model sends them (e2e/ui.mjs shows
    the same call). *)
 let components =
-  {|{"components":[{"type":"callout","tone":"info","title":"Build health","text":"Builds got **18% faster** since `dune 3.22`."},{"type":"grid","columns":3,"children":[{"type":"stat","label":"Median build","value":42.5,"unit":"s","delta":"-18%","trend":"down","good":"down","caption":"last 30 days","spark":[60,58,55,51,49,47,44,42.5]},{"type":"stat","label":"Pass rate","value":"97.2%","delta":"+1.4","trend":"up","good":"up"},{"type":"stat","label":"Flaky tests","value":3,"trend":"flat"}]},{"type":"chart","kind":"line","title":"Build times by week","unit":"s","labels":["W1","W2","W3","W4","W5","W6"],"series":[{"name":"main","values":[61,58,null,51,47,44]},{"name":"PRs","values":[70,66,63,60,55,52]}]},{"type":"card","title":"Breakdown","subtitle":"Where the time goes","children":[{"type":"chart","kind":"donut","slices":[{"label":"Compile","value":24},{"label":"Link","value":9},{"label":"Tests","value":12}]},{"type":"progress","label":"Coverage","value":78,"tone":"success","caption":"target 80%"}]},{"type":"table","id":"slow","title":"Slowest tests","columns":[{"key":"name","label":"Test"},{"key":"time","label":"Time","format":"number","decimals":1},{"key":"share","label":"Share","format":"percent"},{"key":"ok","label":"Passing"}],"rows":[{"name":"e2e/mobile","time":31.2,"share":0.21,"ok":true},{"name":"tmux/agents","time":18.04,"share":0.12,"ok":false},{"name":"web/test","time":9.5,"share":0.064,"ok":true}]},{"type":"tabs","tabs":[{"label":"Steps","children":[{"type":"steps","items":[{"title":"Profile","status":"done"},{"title":"Cache deps","status":"current","text":"Use `nix` binary cache"},{"title":"Split e2e","status":"todo"}]}]},{"label":"Timeline","children":[{"type":"timeline","items":[{"title":"Started","time":"09:12"},{"title":"Regression found","time":"10:40","tone":"danger","text":"in `tmux` tests"}]}]}]},{"type":"kv","title":"Machine","items":[{"key":"CPU","value":"16 cores"},{"key":"OS","value":"NixOS"}]},{"type":"badges","items":[{"text":"ocaml"},{"text":"passing","tone":"success"},{"text":"flaky","tone":"warning"}]},{"type":"calculator","title":"Cache savings","inputs":[{"name":"builds","label":"Builds a day","default":40,"min":0,"max":200,"step":1,"slider":true},{"name":"minutes","label":"Minutes saved","default":1.5,"unit":"min"}],"outputs":[{"label":"Hours a month","expr":"builds * minutes * 30 / 60","decimals":1,"unit":"h"},{"label":"Worth it","expr":"builds * minutes > 30 ? 1 : 0","format":"integer"}]},{"type":"quiz","questions":[{"question":"Which tool formats OCaml?","options":["ocamlformat","prettier"],"answer":0,"explanation":"`ocamlformat`."}]},{"type":"flashcards","cards":[{"front":"What is **Eio**?","back":"Effects-based IO for OCaml 5."},{"front":"Bonsai?","back":"Incremental UI."}]},{"type":"choices","id":"next","prompt":"What next?","options":[{"label":"Cache deps","description":"fastest win"},{"label":"Split e2e","tone":"warning"}]},{"type":"form","id":"deploy","title":"Deploy options","fields":[{"name":"env","label":"Environment","kind":"select","options":["staging","prod"],"default":"staging"},{"name":"replicas","label":"Replicas","kind":"number","default":2,"min":1,"max":9},{"name":"notify","label":"Notify team","kind":"toggle","default":true},{"name":"note","label":"Note","kind":"textarea","placeholder":"Optional"}],"submit":"Deploy"},{"type":"checklist","title":"Before release","items":[{"text":"Run `./test --full`","checked":true},{"text":"Update docs"}]},{"type":"accordion","items":[{"title":"Code","open":true,"children":[{"type":"code","lang":"sh","code":"dune build @runtest"}]},{"title":"Diff","children":[{"type":"diff","diff":"--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n"}]}]},{"type":"tree","entries":[{"path":"frontend/"},{"path":"frontend/web/lib/ui_view.ml","note":"new","tone":"success"},{"path":"backend/"}]},{"type":"divider"},{"type":"markdown","text":"That's all \u2014 see the **table** above."},{"type":"sparkle"}]}|}
+  {|{"components":[{"type":"callout","tone":"info","title":"Build health","text":"Builds got **18% faster** since `dune 3.22`."},{"type":"grid","columns":3,"children":[{"type":"stat","label":"Median build","value":42.5,"unit":"s","delta":"-18%","trend":"down","good":"down","caption":"last 30 days","spark":[60,58,55,51,49,47,44,42.5]},{"type":"stat","label":"Pass rate","value":"97.2%","delta":"+1.4","trend":"up","good":"up"},{"type":"stat","label":"Flaky tests","value":3,"trend":"flat"}]},{"type":"chart","kind":"line","title":"Build times by week","unit":"s","labels":["W1","W2","W3","W4","W5","W6"],"series":[{"name":"main","values":[61,58,null,51,47,44]},{"name":"PRs","values":[70,66,63,60,55,52]}]},{"type":"card","title":"Breakdown","subtitle":"Where the time goes","children":[{"type":"chart","kind":"donut","slices":[{"label":"Compile","value":24},{"label":"Link","value":9},{"label":"Tests","value":12}]},{"type":"progress","label":"Coverage","value":78,"tone":"success","caption":"target 80%"}]},{"type":"table","id":"slow","title":"Slowest tests","columns":[{"key":"name","label":"Test"},{"key":"time","label":"Time","format":"number","decimals":1},{"key":"share","label":"Share","format":"percent"},{"key":"ok","label":"Passing"}],"rows":[{"name":"e2e/mobile","time":31.2,"share":0.21,"ok":true},{"name":"tmux/agents","time":18.04,"share":0.12,"ok":false},{"name":"web/test","time":9.5,"share":0.064,"ok":true}]},{"type":"tabs","tabs":[{"label":"Steps","children":[{"type":"steps","items":[{"title":"Profile","status":"done"},{"title":"Cache deps","status":"current","text":"Use `nix` binary cache"},{"title":"Split e2e","status":"todo"}]}]},{"label":"Timeline","children":[{"type":"timeline","items":[{"title":"Started","time":"09:12"},{"title":"Regression found","time":"10:40","tone":"danger","text":"in `tmux` tests"}]}]}]},{"type":"kv","title":"Machine","items":[{"key":"CPU","value":"16 cores"},{"key":"OS","value":"NixOS"}]},{"type":"badges","items":[{"text":"ocaml"},{"text":"passing","tone":"success"},{"text":"flaky","tone":"warning"}]},{"type":"calculator","title":"Cache savings","inputs":[{"name":"builds","label":"Builds a day","default":40,"min":0,"max":200,"step":1,"slider":true},{"name":"minutes","label":"Minutes saved","default":1.5,"unit":"min"}],"outputs":[{"label":"Hours a month","expr":"builds * minutes * 30 / 60","decimals":1,"unit":"h"},{"label":"Worth it","expr":"builds * minutes > 30 ? 1 : 0","format":"integer"}]},{"type":"quiz","questions":[{"question":"Which tool formats OCaml?","options":["ocamlformat","prettier"],"answer":0,"explanation":"`ocamlformat`."}]},{"type":"flashcards","cards":[{"front":"What is **Eio**?","back":"Effects-based IO for OCaml 5."},{"front":"Bonsai?","back":"Incremental UI."}]},{"type":"choices","id":"next","prompt":"What next?","options":[{"label":"Cache deps","description":"fastest win"},{"label":"Split e2e","tone":"warning"}]},{"type":"form","id":"deploy","title":"Deploy options","fields":[{"name":"env","label":"Environment","kind":"select","options":["staging","prod"],"default":"staging"},{"name":"replicas","label":"Replicas","kind":"number","default":2,"min":1,"max":9},{"name":"notify","label":"Notify team","kind":"toggle","default":true},{"name":"note","label":"Note","kind":"textarea","placeholder":"Optional"}],"submit":"Deploy"},{"type":"checklist","title":"Before release","items":[{"text":"Run `./test --full`","checked":true},{"text":"Update docs"}]},{"type":"accordion","items":[{"title":"Code","open":true,"children":[{"type":"code","lang":"sh","title":"Run the tests","code":"dune build @runtest"}]},{"title":"Diff","children":[{"type":"diff","diff":"--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n"}]}]},{"type":"tree","entries":[{"path":"frontend/"},{"path":"frontend/web/lib/ui_view.ml","note":"new","tone":"success"},{"path":"backend/"}]},{"type":"divider"},{"type":"markdown","text":"That's all \u2014 see the **table** above."},{"type":"sparkle"}]}|}
 ;;
 
 let call ?(id = "u1") arguments =
@@ -290,7 +290,7 @@ let%expect_test "every component" =
                 </div>
               </div>
             </div>
-            <div aria-hidden="true" class="ui-chart-xaxis">
+            <div aria-hidden="true" class="thin-160 ui-chart-xaxis">
               <span style="left: 8.33%; --w: 16.67%;" class="ui-chart-tick"> W1 </span>
               <span style="left: 25%; --w: 16.67%;" class="minor ui-chart-tick"> W2 </span>
               <span style="left: 41.67%; --w: 16.67%;" class="ui-chart-tick"> W3 </span>
@@ -930,19 +930,15 @@ let%expect_test "every component" =
             </button>
             <div id="ui-u1-14-acc0" class="ui-acc-body ui-stack">
               <div class="ui-code">
-                <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-                <div class="markdown">
-                  <div class="md-part">
-                    <div class="code copyable">
-                      <div class="code-head">
-                        <span class="code-lang"> sh </span>
-                        <button type="button" title="Copy" class="copy"> Copy </button>
-                      </div>
-                      <pre class="copy-text">
-                        <code class="language-sh"> dune build @runtest </code>
-                      </pre>
-                    </div>
+                <div class="code copyable">
+                  <div class="code-head">
+                    <span class="code-title"> Run the tests </span>
+                    <span class="code-lang"> sh </span>
+                    <button type="button" title="Copy" class="copy"> Copy </button>
                   </div>
+                  <pre class="copy-text">
+                    <code class="language-sh"> dune build @runtest </code>
+                  </pre>
                 </div>
               </div>
             </div>
@@ -1138,7 +1134,7 @@ let%expect_test "every component, as text" =
     (☑ Run ./test --full)
     (☐ Update docs)
     (Code)
-    sh (Copy)
+    Run the tests sh (Copy)
     dune build @runtest
     (Diff)
     frontend/
