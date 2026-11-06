@@ -28,6 +28,13 @@ printf '#!%s\nexec %s %s "$@"\n' "$(command -v bash)" "$(command -v python3)" "$
 	>"$work/browsers/google-chrome-stable"
 chmod +x "$work/browsers/google-chrome-stable"
 export PRIGH_DESKTOP_NO_DIALOG=1
+# The default browser (xdg-open, which the app's opener runs): a stand-in
+# that says what it opened in $work/opened, and allows a sign-in there.
+mkdir -p "$work/opener"
+printf '#!%s\nexec %s %s %s "$@"\n' "$(command -v bash)" "$(command -v python3)" "$here/fake-default-browser.py" \
+	"$work/opened" >"$work/opener/xdg-open"
+chmod +x "$work/opener/xdg-open"
+: >"$work/opened"
 # dbus-run-session gives two addresses, each with its server's GUID; zbus
 # (the single-instance plugin) pairs the first with the wrong GUID and goes
 # without. A desktop session's bus has one.
@@ -57,13 +64,24 @@ scenario() {
 	return 0
 }
 normalize() {
-	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#' -e 's#\(pid [0-9]+\)#(pid PID)#g' -e 's#session=[A-Za-z0-9_.-]+#session=ID#g'
+	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#' -e 's#\(pid [0-9]+\)#(pid PID)#g' -e 's#session=[A-Za-z0-9_.-]+#session=ID#g' -e 's#cli-signin=[0-9]+#cli-signin=PORT#'
 }
 
 scenario "the window shows the page; closing it stops the sidecar" \
 	PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD=1 PRIGH_DESKTOP_ARGS="-cwd '/a b' -name laptop"
 scenario "the page's Quit: the sidecar exits 0, so does the app" FAKE_MODE=quit
 scenario "the backend's own site (-ui remote), quitting from it" FAKE_MODE=remote
+# The backend's site behind a sign-in proxy (authentik, as a user saw it
+# loop: each visit a 302 to its login with a new state, which the window
+# opened in the default browser, over and over).
+signin_scenario() {
+	: >"$work/opened"
+	scenario "$@" PATH="$work/opener:$PATH"
+	normalize <"$work/opened"
+}
+signin_scenario "a sign-in proxy: the window signs in there, and is back on the site" FAKE_MODE=proxy
+signin_scenario "a sign-in proxy: signed in with the default browser, the cookie lands in the window; expired, the sidecar's sign-in page" \
+	FAKE_MODE=proxy-browser
 scenario "the sidecar fails after it was ready" FAKE_MODE=crash
 scenario "the sidecar fails before it is ready" FAKE_MODE=fail
 scenario "the sidecar prints something else" FAKE_MODE=bad-ready
@@ -201,9 +219,6 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	# Links to other sites open in the default browser (xdg-open, here a
 	# stand-in), not in Chromium on prigh's profile: a new window on one is
 	# closed, and prigh's window going to one is sent back.
-	mkdir -p "$work/opener"
-	printf '#!%s\necho "default browser: $1" >>"%s"\n' "$(command -v bash)" "$work/opened" >"$work/opener/xdg-open"
-	chmod +x "$work/opener/xdg-open"
 	: >"$work/log"
 	: >"$work/opened"
 	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_PAGE_LINKS=1 PATH="$work/opener:$PATH"
@@ -222,6 +237,26 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
 	wait "$app_pid"
 	echo "exit $?; left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
+
+	# The backend's site behind a sign-in proxy, in Chromium: the window
+	# signs in there (the proxy's redirects are not links); signed in with
+	# the default browser, the cookie lands in the window (through its
+	# DevTools), and once it has expired the window is on the sidecar's
+	# sign-in page (where the fake quits).
+	: >"$work/log"
+	: >"$work/opened"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_MODE=proxy PATH="$work/opener:$PATH"
+	wait_for "$work/log" "with the cookie: the page"
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
+	wait "$app_pid"
+	real_report "real Chromium: a sign-in proxy: the window signs in there, and is back on the site" $?
+	normalize <"$work/opened"
+	: >"$work/log"
+	: >"$work/opened"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_MODE=proxy-browser PATH="$work/opener:$PATH"
+	wait "$app_pid"
+	real_report "real Chromium: a sign-in proxy: signed in with the default browser; expired, the sign-in page" $?
+	normalize <"$work/opened"
 
 	# The window is an app's: a popup on prigh's site (Open in new window)
 	# becomes another app window, and the browser's own windows (a new tab

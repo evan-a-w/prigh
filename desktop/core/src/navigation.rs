@@ -19,14 +19,19 @@ pub enum Decision {
 
 pub const QUIT_URL: &str = "about:blank#prigh-desktop-quit";
 
-/// The least time between two openings of one site in the default browser
-/// by one window: whatever a site does, it cannot open tab after tab.
+/// Whatever a site does, a window cannot open it in the default browser
+/// tab after tab: at most [OPEN_BURST] times within this.
 pub const OPEN_GAP: Duration = Duration::from_secs(5);
+
+/// How many times one window may open one site in the default browser
+/// within [OPEN_GAP] (a link that opens a window and then another).
+pub const OPEN_BURST: usize = 2;
 
 /// When each window last opened each site in the default browser.
 #[derive(Default)]
 pub struct OpenGuard {
-    opened: HashMap<(String, String), (Instant, bool)>,
+    /// The times within the last [OPEN_GAP], and whether refusing was said.
+    opened: HashMap<(String, String), (Vec<Instant>, bool)>,
 }
 
 impl OpenGuard {
@@ -34,21 +39,19 @@ impl OpenGuard {
     /// it may again).
     pub fn check(&mut self, window: &str, url: &str, now: Instant) -> Result<(), Option<String>> {
         let site = origin(url).unwrap_or_else(|| url.to_string());
-        match self.opened.get_mut(&(window.to_string(), site.clone())) {
-            Some((at, told)) if now.saturating_duration_since(*at) < OPEN_GAP => {
-                if std::mem::replace(told, true) {
-                    Err(None)
-                } else {
-                    Err(Some(format!(
-                        "{site} again within {}s: not opening it in the default browser again",
-                        OPEN_GAP.as_secs()
-                    )))
-                }
-            }
-            _ => {
-                self.opened.insert((window.to_string(), site), (now, false));
-                Ok(())
-            }
+        let (times, told) = self.opened.entry((window.to_string(), site.clone())).or_default();
+        times.retain(|at| now.saturating_duration_since(*at) < OPEN_GAP);
+        if times.len() < OPEN_BURST {
+            times.push(now);
+            *told = false;
+            Ok(())
+        } else if std::mem::replace(told, true) {
+            Err(None)
+        } else {
+            Err(Some(format!(
+                "{site} again within {}s: not opening it in the default browser again",
+                OPEN_GAP.as_secs()
+            )))
         }
     }
 
@@ -115,8 +118,12 @@ pub struct Window {
     away: Option<String>,
     /// The user chose to sign in in the window.
     here: bool,
-    /// The remote site's cookies were given since it last loaded.
-    cookies_given: bool,
+    /// The backend's site's cookies it was given: given again only when
+    /// they are new (a sign-in since), not whenever the site loads (a
+    /// refused load may say it finished), so a site that does not take
+    /// them sends the window to prigh's sign-in page instead of round and
+    /// round.
+    cookies_given: Option<Vec<(String, String)>>,
     guard: OpenGuard,
 }
 
@@ -127,8 +134,8 @@ impl Window {
     }
 
     /// The site's cookies are the window's now.
-    pub fn cookies_given(&mut self) {
-        self.cookies_given = true;
+    pub fn cookies_given(&mut self, cookies: &[(String, String)]) {
+        self.cookies_given = Some(cookies.to_vec());
     }
 
     /// A navigation to `url` at `now`; `ours`: the origins of prigh's sites.
@@ -153,8 +160,12 @@ impl Window {
                 };
                 let from_remote = remote.filter(|r| origin(&pending).is_some() && origin(&pending) == origin(&r.url));
                 match from_remote {
-                    Some(r) if !self.here && !self.cookies_given && !r.cookies.is_empty() => {
-                        self.cookies_given = true;
+                    Some(r)
+                        if !self.here
+                            && self.cookies_given.as_deref() != Some(&r.cookies[..])
+                            && !r.cookies.is_empty() =>
+                    {
+                        self.cookies_given = Some(r.cookies.clone());
                         Step::Cookies { url: pending }
                     }
                     Some(Remote { signin_page: Some(page), .. }) if !self.here => {
@@ -180,7 +191,6 @@ impl Window {
             return None;
         }
         if remote.is_some_and(|r| origin(&r.url).as_ref() == Some(&o)) {
-            self.cookies_given = false;
             self.here = false;
         }
         self.away.take().map(|away| format!("the window is back from {away}"))
@@ -353,6 +363,7 @@ mod tests {
                 (">https://github.com/evan-a-w/prigh", 1),
                 (">https://github.com/evan-a-w/prigh/pulls", 2),
                 (">https://github.com/x", 3),
+                (">https://github.com/z", 4),
                 (">https://github.com/y", 7),
                 (">mailto:a@b", 7),
                 (">file:///etc/passwd", 7),
@@ -372,8 +383,9 @@ mod tests {
                 "https://ai.example.com/: Allow",
                 "loaded https://ai.example.com/: Some(\"the window is back from https://login.example.com\")",
                 "https://github.com/evan-a-w/prigh: Open(\"https://github.com/evan-a-w/prigh\")",
-                "https://github.com/evan-a-w/prigh/pulls: Refuse(Some(\"https://github.com again within 5s: not opening it in the default browser again\"))",
-                "https://github.com/x: Refuse(None)",
+                "https://github.com/evan-a-w/prigh/pulls: Open(\"https://github.com/evan-a-w/prigh/pulls\")",
+                "https://github.com/x: Refuse(Some(\"https://github.com again within 5s: not opening it in the default browser again\"))",
+                "https://github.com/z: Refuse(None)",
                 "https://github.com/y: Open(\"https://github.com/y\")",
                 "mailto:a@b: Open(\"mailto:a@b\")",
                 "file:///etc/passwd: Refuse(Some(\"refused to navigate to file:///etc/passwd\"))",
@@ -444,7 +456,7 @@ mod tests {
                 ("=https://login.example.com/flow", 0),
                 (">https://ai.example.com/", 0),
                 ("=https://ai.example.com/", 0),
-                // Expired later: the cookie once more, then the page.
+                // Expired later: the cookie it was given, so the page.
                 (">https://ai.example.com/", 0),
                 (">https://login.example.com/start?state=4", 0),
                 (">https://ai.example.com/", 0),
@@ -460,7 +472,7 @@ mod tests {
                 "https://ai.example.com/: Allow",
                 "loaded https://ai.example.com/: Some(\"the window is back from https://login.example.com\")",
                 "https://ai.example.com/: Allow",
-                "https://login.example.com/start?state=4: Cookies { url: \"https://ai.example.com/\" }",
+                "https://login.example.com/start?state=4: SignIn { url: \"http://127.0.0.1:7780/#desktop=k&signin=1\" }",
                 "https://ai.example.com/: Allow",
                 "https://login.example.com/start?state=5: SignIn { url: \"http://127.0.0.1:7780/#desktop=k&signin=1\" }",
             ]
