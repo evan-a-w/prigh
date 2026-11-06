@@ -163,14 +163,18 @@ let legend items =
 
 let data_table ~caption ~head rows =
   let cells tag = List.map ~f:(fun c -> Node.create tag [ text c ]) in
-  Node.create
-    "table"
-    ~attrs:[ Attr.class_ "sr-only" ]
-    [ Node.create "caption" [ text caption ]
-    ; Node.create "thead" [ Node.create "tr" (cells "th" head) ]
-    ; Node.create
-        "tbody"
-        (List.map rows ~f:(fun row -> Node.create "tr" (cells "td" row)))
+  (* In a box of its own: Firefox draws a table's caption outside the
+     table's clip. *)
+  div
+    "sr-only"
+    [ Node.create
+        "table"
+        [ Node.create "caption" [ text caption ]
+        ; Node.create "thead" [ Node.create "tr" (cells "th" head) ]
+        ; Node.create
+            "tbody"
+            (List.map rows ~f:(fun row -> Node.create "tr" (cells "td" row)))
+        ]
     ]
 ;;
 
