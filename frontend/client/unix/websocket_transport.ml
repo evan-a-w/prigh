@@ -25,6 +25,20 @@ module Refusal = struct
     | None -> false
   ;;
 
+  let signin_page ~host ~tls t =
+    match code t, header t "Location" with
+    | Some code, Some location when code >= 300 && code < 400 ->
+      not
+        ((not tls)
+         && String.is_prefix (String.lowercase location) ~prefix:"https://"
+         && String.is_substring
+              (String.lowercase location)
+              ~substring:("//" ^ String.lowercase host))
+    | Some (401 | 403 | 407), _ -> true
+    | Some (400 | 404 | 426 | 502 | 503 | 504), _ -> false
+    | _ -> is_html t
+  ;;
+
   let exempt =
     "the proxy requires browser sign-in, which prigh-tui cannot do: exempt /ws \
      and /terminal from it for prigh (prigh checks its own token; see \
@@ -110,6 +124,14 @@ module Refusal = struct
         status
   ;;
 end
+
+exception Signin_required of string
+
+let signin_required error =
+  match Error.to_exn error with
+  | Signin_required why -> Some why
+  | _ -> None
+;;
 
 let parse_header text =
   match String.lsplit2 text ~on:':' with
