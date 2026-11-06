@@ -110,20 +110,35 @@ report() {
 }
 profile="$XDG_DATA_HOME/io.github.evan-a-w.prigh/browser"
 
-# An instance left on prigh's profile (by an app that was killed) takes the
-# window: the app waits for that instance instead.
+# An instance left on prigh's profile by an app that died: closed, and the
+# page opens in a new one (handed to it, the window would go with it). Found
+# whether its command line is one string (Chrome rewrites its title) or does
+# not name the profile at all (by the files it holds open there).
+for title in 1 hidden; do
+	: >"$work/log"
+	: >"$work/browser-log"
+	FAKE_BROWSER_LOG="$work/browser-log" FAKE_BROWSER_MODE=stay FAKE_BROWSER_TITLE=$title "$browser" \
+		--app=http://127.0.0.1:9/ --user-data-dir="$profile" &
+	stale=$!
+	wait_for "$work/browser-log" "loaded the page"
+	browser_app FAKE_BROWSER_MODE=close
+	wait "$app_pid"
+	code=$?
+	wait "$stale"
+	report "browser: an instance left on the profile (title $title) is closed; the page opens in a new one" $code
+done
+
+# Ctrl-C (SIGINT) in the terminal it runs in: the app stops as when its
+# window closes, the browser with it (it is in a process group of its own).
 : >"$work/log"
 : >"$work/browser-log"
-FAKE_BROWSER_LOG="$work/browser-log" FAKE_BROWSER_MODE=stay "$browser" \
-	--app=http://127.0.0.1:9/ --user-data-dir="$profile" &
-stale=$!
+browser_app FAKE_BROWSER_MODE=stay
 wait_for "$work/browser-log" "loaded the page"
-browser_app FAKE_BROWSER_MODE=close
-wait_for "$work/stderr" "handed the window"
-kill -TERM "$stale"
-wait "$stale"
+kill -INT "$(pgrep -P "$app_pid")"
 wait "$app_pid"
-report "browser: an instance already on the profile; its window closing stops the sidecar" $?
+code=$?
+echo "left on the profile: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
+report "browser: SIGINT stops the sidecar and closes the browser" $code
 
 # A second launch opens another window in the running browser, and its
 # launcher exiting at once does not end the app.
