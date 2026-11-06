@@ -325,7 +325,7 @@ module Deps = struct
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     ; more : More.t option
     ; filter : Transcript_filter.t
-    ; ui : (Ui_state.t * Ui_action.Sent.t list) option
+    ; ui : Ui_context.Page.t option
       (** with a [render_ui] call: what its components show *)
     }
 
@@ -339,11 +339,12 @@ module Deps = struct
     && List.equal Bool.equal a.expanded b.expanded
     && Option.equal Fold.equal a.nested b.nested
     && Option.equal
-         (fun (s, sent) (s', sent') ->
-           phys_equal s s'
+         (fun (a : Ui_context.Page.t) (b : Ui_context.Page.t) ->
+           phys_equal a.state b.state
+           && phys_equal a.inject b.inject
            && Sexp.equal
-                [%sexp (sent : Ui_action.Sent.t list)]
-                [%sexp (sent' : Ui_action.Sent.t list)])
+                [%sexp (a.sent : Ui_action.Sent.t list)]
+                [%sexp (b.sent : Ui_action.Sent.t list)])
          a.ui
          b.ui
   ;;
@@ -357,7 +358,7 @@ module Chat_deps = struct
     ; index : Message_index.t option
     ; deleting : Int.Set.t
     ; dividers : Divider.t list
-    ; ui : Ui_state.t
+    ; ui : Ui_context.Page.t
     }
 
   let equal a b =
@@ -367,7 +368,8 @@ module Chat_deps = struct
     && Option.equal phys_equal a.index b.index
     && Set.equal a.deleting b.deleting
     && List.equal Divider.equal a.dividers b.dividers
-    && phys_equal a.ui b.ui
+    && phys_equal a.ui.Ui_context.Page.state b.ui.state
+    && phys_equal a.ui.inject b.ui.inject
   ;;
 end
 
@@ -576,7 +578,7 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
             (List.exists tools ~f:(fun tool ->
                Option.exists tool ~f:(fun t ->
                  String.equal t.call.name "render_ui")))
-            (ui.Ui_context.Page.state, ui.sent)
+            ui
       }
     ~equal:Deps.equal
     ~f:(fun () ->
@@ -635,7 +637,7 @@ and view
     chats
     chat
     ~deps:
-      { Chat_deps.times; fold; menu; index; deleting; dividers; ui = ui.state }
+      { Chat_deps.times; fold; menu; index; deleting; dividers; ui }
     ~equal:Chat_deps.equal
     ~f:(fun () ->
       entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat)

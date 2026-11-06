@@ -808,3 +808,100 @@ let%expect_test
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
+
+let with_source_json ~kind ~title =
+  sprintf
+    {|{"role":"user","text":"x","origin":{"source":{"kind":"%s","title":"%s"}}}|}
+    kind
+    title
+;;
+
+let%expect_test "render_ui: a placeholder per component; client and ui_action notes" =
+  let h = Test_app.connected ~width:72 ~height:30 () in
+  let history =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         [ with_source_json
+             ~kind:"client"
+             ~title:"Client: now prigh-web (was the TUI)"
+         ; reply "noted"
+         ; with_source_json
+             ~kind:"ui_action"
+             ~title:"Sent \\\"Deploy options\\\": env = prod"
+         ; reply "deploying"
+         ])
+  in
+  H.reply ~quiet:true h Initial_messages history;
+  let run ?(is_error = false) arguments id result =
+    let call = tool_call ~name:"render_ui" ~arguments id in
+    H.event h (Tool_start call);
+    H.event
+      h
+      (Tool_end
+         { call; result = tool_result ~name:"render_ui" ~is_error ~id result })
+  in
+  run
+    {|{"components":[{"type":"chart","kind":"line","title":"Build time","labels":["1","2"],"series":[{"name":"a","values":[1,2]},{"name":"b","values":[2,1]}]},{"type":"table","title":"Slowest","columns":[{"key":"a"}],"rows":[{"a":1},{"a":2},{"a":3}]},{"type":"form","id":"deploy","title":"Deploy options","fields":[{"name":"env"}]},{"type":"card","children":[{"type":"quiz","questions":[{"question":"?","options":["a","b"],"answer":0}]}]}]}|}
+    "u1"
+    "Shown.";
+  run
+    ~is_error:true
+    {|{"components":[{"type":"chart"}]}|}
+    "u2"
+    "components[0].data: give the chart's data";
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▢ Client: now prigh-web (was the TUI)
+      noted
+
+    ↵ Sent "Deploy options": env = prod
+      deploying
+    ✓ render_ui  4 components
+        [chart: Build time · 2 series]
+        [table: Slowest · 3 rows]
+        [form: Deploy options]
+        [card · 1 item]
+        open in prigh-web to view
+    ✕ render_ui
+        components[0].data: give the chart's data
+    ────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "render_ui in verbose: still the placeholder, not the JSON" =
+  let h = Test_app.connected ~width:72 ~height:16 () in
+  H.keys h "/verbosity verbose";
+  H.enter h;
+  let call =
+    tool_call
+      ~name:"render_ui"
+      ~arguments:{|{"components":[{"type":"markdown","text":"hi"}]}|}
+      "u1"
+  in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (Tool_end { call; result = tool_result ~name:"render_ui" ~id:"u1" "Shown." });
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ✓ render_ui  1 component
+        [markdown: hi]
+        open in prigh-web to view
+    ──────────────────────────────── view: verbose — everything is shown ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;

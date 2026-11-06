@@ -654,3 +654,8 @@ let input ?nth t ~selector text =
   interact ?nth t ~selector ~f:(fun node ->
     Node_helpers.User_actions.input_text node ~text)
 ;;
+
+let change ?nth t ~selector value =
+  interact ?nth t ~selector ~f:(fun node ->
+    Node_helpers.User_actions.change node ~value)
+;;
