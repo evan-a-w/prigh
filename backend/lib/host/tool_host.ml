@@ -650,7 +650,8 @@ let connect
       log message;
       retry backoff
     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
-    | exception Backend_address.Signin_required why when Option.is_some signin ->
+    | exception Backend_address.Signin_required why when Option.is_some signin
+      ->
       (match (Option.value_exn signin) ~why !backend with
        | Ok (grant : Browser_signin.Grant.t) ->
          log "signed in through the browser: connecting";
@@ -671,8 +672,8 @@ let connect
            address
            (match exn with
             | Failure message
-    | Backend_address.Not_upgraded message
-    | Backend_address.Signin_required message -> message
+            | Backend_address.Not_upgraded message
+            | Backend_address.Signin_required message -> message
             | exn -> Net_error.to_string_hum exn));
       retry backoff
   in

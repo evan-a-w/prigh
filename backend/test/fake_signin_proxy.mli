@@ -1,7 +1,6 @@
 open! Core
 open! Prigh
 
-
 (** A sign-in proxy as authentik's forward auth behaves, for tests: in front
     of a prigh site on [upstream], it passes a request on (WebSocket upgrades
     too) only with the cookie [proxy_session=<session>], redirects anything

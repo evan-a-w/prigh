@@ -50,7 +50,12 @@ module Grant : sig
 end
 
 (** The page's URL for a listener on [port] with [state]. *)
-val url : Backend_address.t -> program:Program.t -> port:int -> state:string -> string
+val url
+  :  Backend_address.t
+  -> program:Program.t
+  -> port:int
+  -> state:string
+  -> string
 
 (** Listens on [127.0.0.1] (any port), calls [on_url] with {!url} and the port, and
     serves until the page posts the sign-in (or cancels it: [Error]).

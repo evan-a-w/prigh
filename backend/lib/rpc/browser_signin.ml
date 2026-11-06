@@ -70,7 +70,8 @@ let page ~status ~reason ~title text =
   ; headers =
       [ "Content-Type", "text/html; charset=utf-8"
       ; "Cache-Control", "no-store"
-      ; "Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'"
+      ; ( "Content-Security-Policy"
+        , "default-src 'none'; style-src 'unsafe-inline'" )
       ; "Referrer-Policy", "no-referrer"
       ]
   ; content_length = Some (String.length body)
@@ -103,7 +104,8 @@ let answer ~state ~program ~host (request : Web_server.Request.t) ~reader =
       name
   in
   if not (String.equal request.path "/callback")
-  then `Continue (page ~status:404 ~reason:"Not Found" ~title:"Not here" elsewhere)
+  then
+    `Continue (page ~status:404 ~reason:"Not Found" ~title:"Not here" elsewhere)
   else if not (String.equal request.meth "POST")
   then
     `Continue
@@ -152,8 +154,8 @@ let answer ~state ~program ~host (request : Web_server.Request.t) ~reader =
                 ~reason:"OK"
                 ~title:"Signed in"
                 (sprintf
-                   "%s on this computer is signed in to %s. You can close \
-                    this tab."
+                   "%s on this computer is signed in to %s. You can close this \
+                    tab."
                    name
                    host)
             , Ok

@@ -31,7 +31,8 @@ let reply flow ~status ~headers body =
        "HTTP/1.1 %s\r\n%sContent-Length: %d\r\nConnection: close\r\n\r\n%s"
        status
        (String.concat
-          (List.map headers ~f:(fun (name, value) -> sprintf "%s: %s\r\n" name value)))
+          (List.map headers ~f:(fun (name, value) ->
+             sprintf "%s: %s\r\n" name value)))
        (String.length body)
        body)
     flow
@@ -51,7 +52,8 @@ let forward ~env ~upstream ~reader ~line ~headers flow =
        "%s\r\n%s\r\n"
        line
        (String.concat
-          (List.map headers ~f:(fun (name, value) -> sprintf "%s: %s\r\n" name value))))
+          (List.map headers ~f:(fun (name, value) ->
+             sprintf "%s: %s\r\n" name value))))
     up;
   let copy src dst =
     try Eio.Flow.copy src dst with
@@ -131,12 +133,18 @@ let request ~env ~port ?(headers = []) ?(body = "") ~meth target =
   in
   Eio.Flow.copy_string
     (sprintf
-       "%s %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n%sContent-Length: %d\r\n\r\n%s"
+       "%s %s HTTP/1.1\r\n\
+        Host: 127.0.0.1:%d\r\n\
+        Connection: close\r\n\
+        %sContent-Length: %d\r\n\
+        \r\n\
+        %s"
        meth
        target
        port
        (String.concat
-          (List.map headers ~f:(fun (name, value) -> sprintf "%s: %s\r\n" name value)))
+          (List.map headers ~f:(fun (name, value) ->
+             sprintf "%s: %s\r\n" name value)))
        (String.length body)
        body)
     flow;
