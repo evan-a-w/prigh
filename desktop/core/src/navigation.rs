@@ -133,6 +133,11 @@ impl Window {
         self.here = true;
     }
 
+    /// The app loads `url` in the window itself (the window may not say).
+    pub fn loading(&mut self, url: &str) {
+        self.pending = Some(url.to_string());
+    }
+
     /// The site's cookies are the window's now.
     pub fn cookies_given(&mut self, cookies: &[(String, String)]) {
         self.cookies_given = Some(cookies.to_vec());
@@ -344,6 +349,18 @@ mod tests {
                 (_, url) => format!("loaded {url}: {:?}", w.on_loaded(url, &ours(), remote)),
             })
             .collect()
+    }
+
+    #[test]
+    fn a_page_the_app_loads_itself_is_pending_too() {
+        // The window need not say that the app navigated it.
+        let mut w = Window::default();
+        w.loading("https://ai.example.com/#app=desktop");
+        let out = walk(&mut w, None, &[(">https://login.example.com/start?state=1", 0)]);
+        assert_eq!(
+            out,
+            ["https://login.example.com/start?state=1: Away(\"the window went to https://login.example.com on its own (a sign-in?): it stays there until it is back\")"]
+        );
     }
 
     #[test]
