@@ -93,6 +93,8 @@ Reminder r1 removed
 Reminder r2 removed
 status: no reminders
 === chromium: bash run ===
+•
+Using another client
 count some lines
 <TIME>
 let me look
@@ -342,6 +344,8 @@ Cancel
 Create folder and switch
 created on the host: true
 === chromium: an environment note above the prompt ===
+client closed: •
+Using another client
 cwd closed: ⌂
 Working directory is now <CWD>/sub
 === chromium: the prompt shows only what was typed ===

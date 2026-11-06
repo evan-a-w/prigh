@@ -146,7 +146,8 @@ const close = async () => {
 };
 const selected = () => page.evaluate(() => JSON.stringify(String(getSelection())));
 
-const user = n => page.locator("#chat .msg.user[tabindex]").nth(n);
+// Your messages, one with notes (in a .msg.noted around it) too.
+const user = n => page.locator("#chat .msg[tabindex]:has(.bubble)").nth(n);
 const reply = text => page.locator("#chat .msg[tabindex]").filter({ hasText: text }).last();
 
 try {
@@ -257,8 +258,8 @@ try {
   await page.locator(".context-menu [data-item=delete]").tap();
   await page.waitForFunction(() => !document.querySelector("#chat")?.innerText.includes("and a second question"));
   await page.locator(".toast", { hasText: "Message deleted" }).waitFor({ state: "attached" });
-  await page.waitForFunction(() => document.querySelectorAll("#chat .msg.user[tabindex] .bubble").length === 1);
-  console.log(`your messages: ${await page.locator("#chat .msg.user[tabindex] .bubble").evaluateAll(es => es.map(e => e.innerText.trim()).join(" | "))}`);
+  await page.waitForFunction(() => document.querySelectorAll("#chat .msg[tabindex] .bubble").length === 1);
+  console.log(`your messages: ${await page.locator("#chat .msg[tabindex] .bubble").evaluateAll(es => es.map(e => e.innerText.trim()).join(" | "))}`);
 
   section("a session in the drawer");
   await page.getByRole("button", { name: "Sessions" }).first().tap();
