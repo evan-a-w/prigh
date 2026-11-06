@@ -287,7 +287,6 @@ try {
 } catch (error) {
   process.exitCode = 1;
   await screenshot("failure").catch(() => {});
-  console.error(await page.evaluate(() => [...document.querySelectorAll("#chat .tool-ui")].map(t => `${t.dataset.call}: ${t.querySelector(".ui-gallery")?.outerHTML.slice(0, 1500) ?? ""}`).join("\n")).catch(e => e.message));
   console.error(errors.join("\n"));
   throw error;
 } finally {
