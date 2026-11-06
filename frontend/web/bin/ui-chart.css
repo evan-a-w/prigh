@@ -1,1 +1,451 @@
-/* render_ui charts (Ui_chart): series colours are theme.css's --series-N. */
+/* render_ui charts (Ui_chart): series colours are theme.css's --series-N.
+   The plot is a box of percentages: lines and areas are an SVG stretched to
+   it, bars, markers, ticks and tooltips are HTML placed over it, so text
+   and dots keep their size whatever the width. */
+
+.ui-chart {
+  --h: 220px;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ui-chart.h-small { --h: 140px; }
+.ui-chart.h-large { --h: 320px; }
+.app.narrow .ui-chart { --h: 180px; }
+.app.narrow .ui-chart.h-small { --h: 120px; }
+.app.narrow .ui-chart.h-large { --h: 240px; }
+
+.ui-chart .s1 { --c: var(--series-1); }
+.ui-chart .s2 { --c: var(--series-2); }
+.ui-chart .s3 { --c: var(--series-3); }
+.ui-chart .s4 { --c: var(--series-4); }
+.ui-chart .s5 { --c: var(--series-5); }
+.ui-chart .s6 { --c: var(--series-6); }
+.ui-chart .s7 { --c: var(--series-7); }
+.ui-chart .s8 { --c: var(--series-8); }
+/* Slices past the eighth reuse a colour, lighter. */
+.ui-chart .alt.s1 { --c: color-mix(in srgb, var(--series-1) 55%, var(--slate)); }
+.ui-chart .alt.s2 { --c: color-mix(in srgb, var(--series-2) 55%, var(--slate)); }
+.ui-chart .alt.s3 { --c: color-mix(in srgb, var(--series-3) 55%, var(--slate)); }
+.ui-chart .alt.s4 { --c: color-mix(in srgb, var(--series-4) 55%, var(--slate)); }
+
+.ui-chart-sub { margin-top: -4px; color: var(--muted); font-size: 12.5px; }
+.ui-chart-yname, .ui-chart-xname {
+  font: 11px/1.3 var(--mono);
+  color: var(--faint);
+}
+.ui-chart-xname { text-align: center; }
+.ui-chart-empty {
+  padding: 22px 12px;
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-control);
+  color: var(--faint);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* ---- axes and plot */
+
+.ui-chart-frame {
+  display: grid;
+  grid-template-columns: min(var(--gutter), 40%) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 6px;
+  font: 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  /* Room for the last value tick to centre on the plot's edge. */
+  padding-right: 4px;
+}
+.ui-chart-frame:has(.ui-chart-values) { padding-right: 2.5ch;
+}
+.ui-chart-yaxis { grid-column: 1; grid-row: 1; position: relative; }
+.ui-chart-plot {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  height: var(--h);
+}
+.ui-chart-xaxis { grid-column: 2; grid-row: 2; position: relative; height: 13px; }
+
+.ui-chart-yaxis .ui-chart-tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+.ui-chart-xaxis .ui-chart-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+.ui-chart-xaxis .ui-chart-tick { max-width: var(--w, none); }
+.app.narrow .ui-chart-xaxis .ui-chart-tick.minor { display: none; }
+/* With every other label hidden, each has twice the room. */
+.app.narrow .ui-chart-xaxis .ui-chart-tick { max-width: calc(var(--w, 50%) * 2); }
+
+/* Horizontal bars: the labels down the side, the values along the foot. */
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-plot {
+  height: max(var(--h), calc(var(--rows) * 26px));
+}
+.ui-chart-cats .ui-chart-tick {
+  transform: translateY(-50%);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.ui-chart-grid, .ui-chart-vgrid { position: absolute; inset: 0; pointer-events: none; }
+.ui-chart-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.ui-chart-gridline.zero { border-top-color: var(--rule-2); }
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-gridline,
+.ui-chart-vgrid .ui-chart-gridline {
+  top: 0;
+  bottom: 0;
+  left: auto;
+  right: auto;
+  width: 0;
+  height: auto;
+  border-top: none;
+  border-left: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-gridline.zero { border-left-color: var(--rule-2); }
+.ui-chart-vgrid .ui-chart-gridline { border-left-style: dashed; opacity: .6; }
+
+.ui-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ui-chart-line {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.ui-chart-fill { fill: var(--c); fill-opacity: .16; stroke: none; }
+
+/* ---- a label's column: its bars or markers, its tooltip on hover/focus */
+
+.ui-chart-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  outline: none;
+  border-radius: var(--r-chip);
+}
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-col { top: auto; bottom: auto; left: 0; right: 0; }
+.ui-chart-col:hover,
+.ui-chart-col:focus-visible { background: color-mix(in srgb, var(--chalk) 5%, transparent); }
+.ui-chart-col:focus-visible { box-shadow: inset 0 0 0 2px var(--sodium); }
+
+.ui-chart-group {
+  position: absolute;
+  inset: 0 18%;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+}
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-group {
+  inset: 16% 0;
+  flex-direction: column;
+}
+.ui-chart-slot { position: relative; flex: 1 1 0; max-width: 44px; height: 100%; }
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-slot { max-width: none; max-height: 22px; width: 100%; height: auto; }
+.ui-chart-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--c);
+  min-height: 1px;
+}
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-bar { top: 0; bottom: 0; left: auto; right: auto; min-height: 0; min-width: 1px; }
+.ui-chart-bar.end { border-radius: 3px 3px 0 0; }
+.ui-chart-bar.neg.end { border-radius: 0 0 3px 3px; }
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-bar.end { border-radius: 0 3px 3px 0; }
+.ui-chart[data-kind="horizontal_bar"] .ui-chart-bar.neg.end { border-radius: 3px 0 0 3px; }
+/* Stacked segments: a hairline of the card between them. */
+.ui-chart[data-kind="stacked_bar"] .ui-chart-bar { box-shadow: 0 0 0 .5px var(--slate); }
+.ui-chart-col:hover .ui-chart-bar,
+.ui-chart-col:focus-visible .ui-chart-bar { filter: brightness(1.12) saturate(1.05); }
+
+.ui-chart-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: 1px dashed var(--rule-2);
+  visibility: hidden;
+}
+.ui-chart-dot {
+  position: absolute;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin: 0 0 -3.5px -3.5px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 2px var(--slate);
+}
+.ui-chart.dense .ui-chart-dot:not(.lone) { visibility: hidden; }
+.ui-chart-col:hover .ui-chart-guide,
+.ui-chart-col:focus-visible .ui-chart-guide,
+.ui-chart-col:hover .ui-chart-dot,
+.ui-chart-col:focus-visible .ui-chart-dot { visibility: visible; }
+.ui-chart-col:hover .ui-chart-dot,
+.ui-chart-col:focus-visible .ui-chart-dot { transform: scale(1.35); }
+
+/* ---- tooltips: prigh's floating cards */
+
+.ui-chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: none;
+  width: max-content;
+  max-width: 240px;
+  box-sizing: border-box;
+  padding: 7px 10px 8px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  box-shadow: var(--float-shadow);
+  font: 12px/1.45 var(--sans);
+  color: var(--chalk);
+  pointer-events: none;
+  text-align: left;
+}
+.ui-chart-col:hover + .ui-chart-tip,
+.ui-chart-col:focus-visible + .ui-chart-tip,
+.ui-chart-pt:hover > .ui-chart-tip,
+.ui-chart-pt:focus-visible > .ui-chart-tip { display: block; }
+/* Beside the column's centre, on the side with room. */
+.ui-chart-plot > .ui-chart-tip { top: 4px; }
+.ui-chart-plot > .ui-chart-tip.right {
+  left: calc(var(--x) + 12px);
+  max-width: min(240px, calc(100% - var(--x) - 14px));
+}
+.ui-chart-plot > .ui-chart-tip.left {
+  right: calc(100% - var(--x) + 12px);
+  max-width: min(240px, calc(var(--x) - 14px));
+}
+.ui-chart-plot > .ui-chart-tip.below { top: calc(var(--y) + 4px); right: 4px; }
+.ui-chart-plot > .ui-chart-tip.above { top: auto; bottom: calc(100% - var(--y) + 4px); right: 4px; }
+.ui-chart-tip-head {
+  margin-bottom: 3px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ui-chart-tip-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 7px;
+  color: var(--muted);
+}
+.ui-chart-tip-row .ui-chart-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-chart-tip-row .ui-chart-value {
+  color: var(--chalk);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  padding-left: 8px;
+}
+.ui-chart-tip-row.total { margin-top: 2px; padding-top: 3px; border-top: 1px solid var(--rule); }
+.ui-chart-tip-row.total .ui-chart-swatch,
+.ui-chart-tip-row.plain .ui-chart-swatch { visibility: hidden; width: 0; }
+.ui-chart-tip-row.plain { column-gap: 0; }
+
+.ui-chart-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--c);
+  flex: none;
+}
+
+/* ---- scatter */
+
+.ui-chart-pt {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: 0 0 -3.5px -3.5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 80%, transparent);
+  box-shadow: 0 0 0 1px var(--slate);
+  outline: none;
+}
+.ui-chart-pt:hover, .ui-chart-pt:focus-visible {
+  z-index: 3;
+  background: var(--c);
+  box-shadow: 0 0 0 2px var(--slate), 0 0 0 3.5px var(--c);
+}
+.ui-chart-pt:focus-visible { box-shadow: 0 0 0 2px var(--slate), 0 0 0 4px var(--sodium); }
+.ui-chart-pt > .ui-chart-tip.right { left: 12px; }
+.ui-chart-pt > .ui-chart-tip.left { right: 12px; }
+.ui-chart-pt > .ui-chart-tip.below { top: -2px; }
+.ui-chart-pt > .ui-chart-tip.above { bottom: -2px; }
+
+/* ---- pie and donut */
+
+.ui-chart-round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 24px;
+}
+.ui-chart-disc {
+  position: relative;
+  flex: none;
+  width: min(100%, 200px);
+  aspect-ratio: 1;
+}
+.ui-chart.h-small .ui-chart-disc { width: min(100%, 140px); }
+.ui-chart.h-large .ui-chart-disc { width: min(100%, 260px); }
+.ui-chart-disc .ui-chart-svg { position: static; display: block; overflow: visible; pointer-events: auto; }
+.ui-chart-slice {
+  fill: var(--c);
+  stroke: var(--slate);
+  stroke-width: .8;
+  stroke-linejoin: round;
+  outline: none;
+  cursor: default;
+}
+.ui-chart-disc:has(.ui-chart-slice:hover, .ui-chart-slice:focus-visible) .ui-chart-slice:not(:hover, :focus-visible) { opacity: .4; }
+.ui-chart-slice:focus-visible { stroke: var(--sodium); stroke-width: 1.5; }
+
+.ui-chart-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+}
+.ui-chart-total, .ui-chart-centre-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  max-width: 54%;
+}
+.ui-chart-total .ui-chart-value, .ui-chart-centre-item .ui-chart-value {
+  font: 600 15px/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--chalk);
+}
+.ui-chart-total .ui-chart-name, .ui-chart-centre-item .ui-chart-share { font: 11px/1.3 var(--mono); color: var(--faint); }
+.ui-chart-centre-item .ui-chart-name {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.ui-chart-centre-item { display: none; }
+/* A pie has no hole: what is hovered shows on a card over it. */
+.ui-chart[data-kind="pie"] .ui-chart-centre-item { max-width: 70%; }
+.ui-chart[data-kind="pie"] .ui-chart-centre-item {
+  padding: 6px 10px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  box-shadow: var(--float-shadow);
+}
+.ui-chart-disc:has(.ui-chart-slice:hover, .ui-chart-slice:focus-visible) .ui-chart-total { display: none; }
+.ui-chart-disc:has(.n1:hover, .n1:focus-visible) .ui-chart-centre-item.n1,
+.ui-chart-disc:has(.n2:hover, .n2:focus-visible) .ui-chart-centre-item.n2,
+.ui-chart-disc:has(.n3:hover, .n3:focus-visible) .ui-chart-centre-item.n3,
+.ui-chart-disc:has(.n4:hover, .n4:focus-visible) .ui-chart-centre-item.n4,
+.ui-chart-disc:has(.n5:hover, .n5:focus-visible) .ui-chart-centre-item.n5,
+.ui-chart-disc:has(.n6:hover, .n6:focus-visible) .ui-chart-centre-item.n6,
+.ui-chart-disc:has(.n7:hover, .n7:focus-visible) .ui-chart-centre-item.n7,
+.ui-chart-disc:has(.n8:hover, .n8:focus-visible) .ui-chart-centre-item.n8,
+.ui-chart-disc:has(.n9:hover, .n9:focus-visible) .ui-chart-centre-item.n9,
+.ui-chart-disc:has(.n10:hover, .n10:focus-visible) .ui-chart-centre-item.n10,
+.ui-chart-disc:has(.n11:hover, .n11:focus-visible) .ui-chart-centre-item.n11,
+.ui-chart-disc:has(.n12:hover, .n12:focus-visible) .ui-chart-centre-item.n12 { display: flex; }
+
+/* ---- legend */
+
+.ui-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ui-chart-legend li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ui-chart-legend .ui-chart-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-chart-legend .ui-chart-value,
+.ui-chart-legend .ui-chart-share { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
+.ui-chart-legend .ui-chart-value { color: var(--chalk); }
+.ui-chart-legend .ui-chart-share { color: var(--faint); }
+/* Beside a pie: one slice a row, values in columns. */
+.ui-chart-round .ui-chart-legend {
+  flex: 1 1 180px;
+  max-width: 360px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 5px 8px;
+  align-items: center;
+}
+.ui-chart-round .ui-chart-legend li { display: contents; }
+.ui-chart-round .ui-chart-legend .ui-chart-value,
+.ui-chart-round .ui-chart-legend .ui-chart-share { text-align: right; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-chart-dot, .ui-chart-slice, .ui-chart-bar { transition: transform .12s ease, opacity .12s ease, filter .12s ease; }
+}
+
+/* Touch: a tap focuses (without :focus-visible), and shows what a hover
+   would. */
+@media (hover: none) {
+  .ui-chart-col:focus + .ui-chart-tip,
+  .ui-chart-pt:focus > .ui-chart-tip { display: block; }
+  .ui-chart-col:focus .ui-chart-guide,
+  .ui-chart-col:focus .ui-chart-dot { visibility: visible; transform: scale(1.35); }
+  .ui-chart-col:focus { background: color-mix(in srgb, var(--chalk) 5%, transparent); }
+  .ui-chart-disc:has(.ui-chart-slice:focus) .ui-chart-total { display: none; }
+  .ui-chart-disc:has(.ui-chart-slice:focus) .ui-chart-slice:not(:focus) { opacity: .4; }
+  .ui-chart-disc:has(.n1:focus) .ui-chart-centre-item.n1,
+  .ui-chart-disc:has(.n2:focus) .ui-chart-centre-item.n2,
+  .ui-chart-disc:has(.n3:focus) .ui-chart-centre-item.n3,
+  .ui-chart-disc:has(.n4:focus) .ui-chart-centre-item.n4,
+  .ui-chart-disc:has(.n5:focus) .ui-chart-centre-item.n5,
+  .ui-chart-disc:has(.n6:focus) .ui-chart-centre-item.n6,
+  .ui-chart-disc:has(.n7:focus) .ui-chart-centre-item.n7,
+  .ui-chart-disc:has(.n8:focus) .ui-chart-centre-item.n8,
+  .ui-chart-disc:has(.n9:focus) .ui-chart-centre-item.n9,
+  .ui-chart-disc:has(.n10:focus) .ui-chart-centre-item.n10,
+  .ui-chart-disc:has(.n11:focus) .ui-chart-centre-item.n11,
+  .ui-chart-disc:has(.n12:focus) .ui-chart-centre-item.n12 { display: flex; }
+}
