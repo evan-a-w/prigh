@@ -874,8 +874,29 @@ let card
           else [])))
 ;;
 
-let view ~nested ~fold ~streaming ~running call tool =
-  card ~nested ~fold ~streaming ~running call tool
+(* A [render_ui] call shows its components once the backend accepted them;
+   a skeleton until then, and a failed call's card if it refused them. *)
+let render_ui ~ui ~nested ~fold ~streaming ~running (call : Tool_call.t) tool =
+  let result = Option.bind tool ~f:(fun (t : Chat.Tool.t) -> t.result) in
+  let shown =
+    match result with
+    | Some r when (not r.is_error) && not (cancelled r) -> Ui_view.spec call
+    | _ -> None
+  in
+  match shown, result with
+  | Some spec, _ ->
+    Node.div
+      ~attrs:[ Attr.class_ "tool-ui"; Attr.create "data-call" call.id ]
+      [ Ui_view.view (Ui_context.create ui ~call_id:call.id ~fold) spec ]
+  | None, None when streaming || running ->
+    Node.div ~attrs:[ Attr.class_ "tool-ui" ] [ Ui_view.skeleton () ]
+  | None, _ -> card ~nested ~fold ~streaming ~running call tool
+;;
+
+let view ?(ui = Ui_context.Page.none) ~nested ~fold ~streaming ~running call tool =
+  if String.equal call.Tool_call.name "render_ui"
+  then render_ui ~ui ~nested ~fold ~streaming ~running call tool
+  else card ~nested ~fold ~streaming ~running call tool
 ;;
 
 let server_tool ~fold ~running (s : Content.Server_tool.t) =

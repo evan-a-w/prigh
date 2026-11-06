@@ -325,6 +325,8 @@ module Deps = struct
     ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     ; more : More.t option
     ; filter : Transcript_filter.t
+    ; ui : (Ui_state.t * Ui_action.Sent.t list) option
+      (** with a [render_ui] call: what its components show *)
     }
 
   let equal a b =
@@ -336,6 +338,14 @@ module Deps = struct
     && Message_time.equal a.times b.times
     && List.equal Bool.equal a.expanded b.expanded
     && Option.equal Fold.equal a.nested b.nested
+    && Option.equal
+         (fun (s, sent) (s', sent') ->
+           phys_equal s s'
+           && Sexp.equal
+                [%sexp (sent : Ui_action.Sent.t list)]
+                [%sexp (sent' : Ui_action.Sent.t list)])
+         a.ui
+         b.ui
   ;;
 end
 
@@ -347,6 +357,7 @@ module Chat_deps = struct
     ; index : Message_index.t option
     ; deleting : Int.Set.t
     ; dividers : Divider.t list
+    ; ui : Ui_state.t
     }
 
   let equal a b =
@@ -356,16 +367,24 @@ module Chat_deps = struct
     && Option.equal phys_equal a.index b.index
     && Set.equal a.deleting b.deleting
     && List.equal Divider.equal a.dividers b.dividers
+    && phys_equal a.ui b.ui
   ;;
 end
+
+let ui_sent chat =
+  Ui_context.sent_of_messages
+    (List.filter_map (Chat.entries chat) ~f:(function
+       | Chat.Entry.User u -> Some u
+       | Assistant _ | Shell _ | Compaction _ -> None))
+;;
 
 let entries : (Chat.Entry.t, Deps.t) View_cache.t = View_cache.create ()
 let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 
-let rec nested ~fold times (s : Chat.Subagent.t) =
-  view ~fold:(Fold.scoped fold s.agent_id) times s.chat
+let rec nested ~ui ~fold times (s : Chat.Subagent.t) =
+  view ~ui ~fold:(Fold.scoped fold s.agent_id) times s.chat
 
-and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
+and assistant ~ui ~fold times chat (message : Message.Assistant.t) ~streaming =
   let count = List.length message.content in
   let blocks =
     List.mapi message.content ~f:(fun i content ->
@@ -380,7 +399,8 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
       | Thinking text -> thinking ~live:(streaming && last) text
       | Tool_call call ->
         Tool_view.view
-          ~nested:(nested ~fold times)
+          ~ui
+          ~nested:(nested ~ui ~fold times)
           ~fold
           ~streaming:(streaming && last)
           ~running:(Chat.running chat)
@@ -435,7 +455,7 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
             else footer times message)
          ])
 
-and render_entry ~fold times chat (entry : Chat.Entry.t) =
+and render_entry ~ui ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u when not (Fold.shows fold (user_kind u)) -> Node.none
   | Shell _ when not (Fold.shows fold Tools) -> Node.none
@@ -477,7 +497,8 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
     div
       "msg shell"
       [ Tool_view.view
-          ~nested:(nested ~fold times)
+          ~ui
+          ~nested:(nested ~ui ~fold times)
           ~fold
           ~streaming:false
           ~running:
@@ -488,11 +509,11 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
       ]
   | Compaction summary -> compaction summary
   | Assistant { message; streaming } ->
-    assistant ~fold times chat message ~streaming
+    assistant ~ui ~fold times chat message ~streaming
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
+and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
   let span = Option.bind index ~f:(fun index -> Message_index.span index n) in
   let more : More.t option =
     match span, entry with
@@ -550,10 +571,16 @@ and entry ?menu ?index ~fold times chat ~n (entry : Chat.Entry.t) =
             fold
       ; more
       ; filter = Fold.filter fold
+      ; ui =
+          Option.some_if
+            (List.exists tools ~f:(fun tool ->
+               Option.exists tool ~f:(fun t ->
+                 String.equal t.call.name "render_ui")))
+            (ui.Ui_context.Page.state, ui.sent)
       }
     ~equal:Deps.equal
     ~f:(fun () ->
-      let node = render_entry ~fold times chat entry in
+      let node = render_entry ~ui ~fold times chat entry in
       let places =
         (if Jump.landmark entry
          then [ Attr.create "data-entry" (Int.to_string n) ]
@@ -595,6 +622,7 @@ and keyed key (node : Node.t) : Node.t =
 (* Days are marked where they change, not above the first message: its time
    already says which day it is. *)
 and view
+      ?(ui = Ui_context.Page.none)
       ?(fold = Fold.default)
       ?menu
       ?index
@@ -606,15 +634,16 @@ and view
   View_cache.find
     chats
     chat
-    ~deps:{ Chat_deps.times; fold; menu; index; deleting; dividers }
+    ~deps:
+      { Chat_deps.times; fold; menu; index; deleting; dividers; ui = ui.state }
     ~equal:Chat_deps.equal
     ~f:(fun () ->
-      entries_view ?menu ?index ~deleting ~dividers ~fold times chat)
+      entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat)
 
 (* What a trim after a message keeps out of the context: a divider where it
    was, with Show (the messages below it, dimmed and read-only) or Hide, and
    Undo; the page's click listener turns them into actions. *)
-and divider ~fold times (d : Divider.t) =
+and divider ~ui ~fold times (d : Divider.t) =
   let h = d.hidden in
   let label = Trim.label ~messages:h.messages ~tokens:h.tokens in
   let busy text =
@@ -698,17 +727,18 @@ and divider ~fold times (d : Divider.t) =
                    "trimmed-note"
                    "Kept in the transcript only; the model no longer sees them."
                ]
-           ; view ~fold times chat
+           ; view ~ui ~fold times chat
            ]
        | Folded | Loading -> Node.none)
     ]
 
-and entries_view ?menu ?index ~deleting ~dividers ~fold times chat =
+and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
+  let ui = { ui with Ui_context.Page.sent = ui_sent chat } in
   let dividers_after n =
     List.filter_map dividers ~f:(fun (d : Divider.t) ->
       Option.some_if
         (d.after = n)
-        (keyed ("hidden-" ^ d.hidden.entry) (divider ~fold times d)))
+        (keyed ("hidden-" ^ d.hidden.entry) (divider ~ui ~fold times d)))
   in
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
@@ -737,7 +767,7 @@ and entries_view ?menu ?index ~deleting ~dividers ~fold times chat =
               (dividers_after i)
               (keyed
                  (Int.to_string i)
-                 (entry ?menu ?index ~fold times chat ~n:i e)
+                 (entry ?menu ?index ~ui ~fold times chat ~n:i e)
                :: rev_nodes) )))
   in
   div "entries" (List.rev rev_nodes)

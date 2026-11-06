@@ -242,6 +242,11 @@ let transcript (m : Model.t) ~inject =
         | Some _ -> [ Trim_view.view m ~inject ]
         | None -> [])
      @ [ Chat_view.view
+           ~ui:
+             { state = m.ui
+             ; inject = (fun e -> inject (Action.Ui e))
+             ; sent = []
+             }
            ~fold:(Model.fold m)
            ?menu:
              (match m.dialog with

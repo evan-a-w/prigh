@@ -227,6 +227,15 @@ module Reply_tag = struct
         }
     (** the session's messages after reconnecting, [from] the first one on
         show *)
+    | Ui_sent of
+        { session : string
+        ; call_id : string
+        ; component : string
+        }
+    | Ui_image of
+        { session : string
+        ; path : string
+        }
     | Resync_pending
     | Answer
     (** to a confirmation or a question: asked again when it does not
@@ -544,6 +553,7 @@ module Action = struct
         }
     | Open_accounts
     | Cycle_verbosity
+    | Ui of Ui_event.t
     | Toggle_fold of string
     | Cycle_model of int
     | Cycle_thinking
@@ -654,6 +664,7 @@ module Model = struct
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
+    ; ui : Ui_state.t
     ; transcript_filter : Transcript_filter.t
     ; config : Config.t option
     ; btw : Btw.t option
@@ -915,6 +926,7 @@ let init =
   ; agents = Agents.empty
   ; verbosity = Normal
   ; folds = String.Set.empty
+  ; ui = Ui_state.empty
   ; transcript_filter = Transcript_filter.all
   ; config = None
   ; btw = None
@@ -1378,6 +1390,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; trimmed = Trimmed.empty
       ; outputs_loading = String.Set.empty
       ; folds = String.Set.empty
+      ; ui = Ui_state.empty
       ; confirms = []
       ; confirm_reason = None
       ; questions = []
@@ -3998,6 +4011,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; landing = false
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
+    ; ui = Ui_state.empty
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
@@ -7036,6 +7050,83 @@ let review_files_menu (m : Model.t) paths : Context_menu.Files.t option =
       })
 ;;
 
+(* ---- render_ui components *)
+
+(* A reply through a component goes like a message from the composer: a
+   prompt, or a follow-up while the agent works. *)
+let ui_send (m : Model.t) (a : Ui_action.t) =
+  match m.state with
+  | None -> error m "Not connected: wait for the backend, then send again"
+  | Some state ->
+    let method_ = if Model.running m then "follow_up" else "prompt" in
+    ( { m with ui = Ui_state.send m.ui a }
+    , [ Command.Scroll_to_bottom
+      ; rpc
+          method_
+          [ "text", str ""; "ui_action", Ui_action.to_json a ]
+          ~tag:
+            (Ui_sent
+               { session = state.session_id
+               ; call_id = a.call_id
+               ; component = a.component
+               })
+      ] )
+;;
+
+let ui_event (m : Model.t) (e : Ui_event.t) =
+  match e with
+  | Set { key; value } -> { m with ui = Ui_state.set m.ui ~key value }, []
+  | Send a -> ui_send m a
+;;
+
+(* The images the transcript's [render_ui] calls show: asked for as they
+   appear (each session afresh: the links expire). *)
+let follow_ui_images (before : Model.t) ((m : Model.t), cmds) =
+  if phys_equal before.chat m.chat && phys_equal before.ui m.ui
+  then m, cmds
+  else (
+    match m.state with
+    | None -> m, cmds
+    | Some state ->
+      let paths =
+        List.concat_map (Chat.entries m.chat) ~f:(function
+          | Assistant { message; _ } ->
+            List.concat_map message.content ~f:(function
+              | Tool_call call when String.equal call.name "render_ui" ->
+                (match Chat.tool m.chat call.id with
+                 | Some { result = Some { is_error = false; _ }; _ } ->
+                   Option.value_map (Ui_view.spec call) ~default:[] ~f:Ui_spec.image_paths
+                 | _ -> [])
+              | _ -> [])
+          | User _ | Shell _ | Compaction _ -> [])
+      in
+      (match Ui_state.unasked m.ui paths with
+       | [] -> m, cmds
+       | paths ->
+         let ui =
+           List.fold paths ~init:m.ui ~f:(fun ui path ->
+             Ui_state.set_image ui ~path Loading)
+         in
+         ( { m with ui }
+         , cmds
+           @ List.map paths ~f:(fun path ->
+             rpc
+               "fs_preview"
+               [ "path", str path ]
+               ~tag:(Ui_image { session = state.session_id; path })) )))
+;;
+
+let ui_image_reply (m : Model.t) ~path result =
+  let image : Ui_state.Image.t =
+    match Result.map_error result ~f:Error.of_string |> Result.bind ~f:File_preview.of_json with
+    | Ok { content = Image { url = Some url; _ }; _ } -> Url (Files.link m.files url)
+    | Ok { content = Image { url = None; _ }; _ } -> Failed "Too large to preview"
+    | Ok { content = Text _ | Binary; _ } -> Failed "Not an image"
+    | Error e -> Failed (Error.to_string_hum e)
+  in
+  { m with ui = Ui_state.set_image m.ui ~path image }, []
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -7350,6 +7441,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
   | Steered _, Ok _ ->
     { m with pending = In_flight.answered m.pending ~failed:None }, []
+  | (Ui_sent { session; _ } | Ui_image { session; _ }), _
+    when not (String.equal session (session_id m)) -> m, []
+  | Ui_sent _, Ok _ -> m, []
+  | Ui_sent { call_id; component; _ }, Error e ->
+    error
+      { m with ui = Ui_state.unsend m.ui ~call_id ~component }
+      (sprintf "Not sent: %s. Send it again" e)
+  | Ui_image { path; _ }, result -> ui_image_reply m ~path result
   | Sent { text; images }, Error "backend closed" ->
     let prompt = { In_flight.Prompt.text; images } in
     let pending = In_flight.answered m.pending ~failed:(Some prompt) in
@@ -9557,6 +9656,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with accounts; account = current }, []
   | Open_accounts -> open_dialog m (account_menu m)
   | Cycle_verbosity -> set_verbosity m (Prigh_ui.Verbosity.next m.verbosity)
+  | Ui e -> ui_event m e
   | Toggle_fold key ->
     let folds =
       if Set.mem m.folds key
@@ -9757,6 +9857,7 @@ and update_unguarded (m : Model.t) (action : Action.t) =
   in
   let m', cmds = follow_worktrees m (m', cmds) in
   let m', cmds = follow_recipient (m', cmds) in
+  let m', cmds = follow_ui_images m (m', cmds) in
   let m', cmds = settle m' cmds in
   let look = Model.look m' in
   if
