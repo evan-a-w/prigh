@@ -150,7 +150,12 @@ the system's CAs (`$SSL_CERT_FILE` names another bundle). The connection
 answers the server's pings and pings it when quiet, and like a TCP one it
 reconnects when it drops. A proxy that wants a browser sign-in (a redirect
 to a login page, a 401, an HTML page instead of the WebSocket upgrade) is
-reported as such: exempt `/ws` and `/terminal` from it (prigh checks its
+reported as such, and prigh-tui offers to sign in through the browser: it
+opens prigh-web on that site, which asks you to allow it and hands it the
+proxy's cookie (saved with the connection, sent with every connection;
+`prigh web` and `prigh tool-host` do the same without asking, and `prigh
+browser-signin -connect URL` by hand; DOCKER.md, "Behind a reverse proxy",
+has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
 own token there; DOCKER.md shows how for authentik, Caddy, nginx and
 Traefik), send its credentials with `-header 'NAME: VALUE'` (repeatable;
 `$PRIGH_CONNECT_HEADERS`, one per line; never saved), or use an SSH tunnel
