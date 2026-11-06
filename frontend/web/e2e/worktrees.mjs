@@ -334,6 +334,27 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector(".picker-dialog", { state: "detached" });
 
+  // Deleting the session we are in, from its menu: the confirmation says
+  // where we go (the next one down), and we land there as it goes.
+  await first.locator(".session").click({ button: "right", position: { x: 60, y: 12 } });
+  await choose("delete");
+  await page.locator(".delete-dialog").waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("deleting the session we are in: asked", ".delete-dialog");
+  await page.locator(".delete-dialog .btn.danger").click();
+  await toastHas("Deleted 1 session");
+  await first.waitFor({ state: "detached" });
+  await page.waitForFunction(() => {
+    const row = document.querySelector(".session-item.selected .session");
+    return row && !row.classList.contains("opening")
+      && new URL(location.href).searchParams.get("session") === row.dataset.session;
+  });
+  section("deleting the session we are in: where we land");
+  console.log(clean(await page.evaluate(() =>
+    `in: ${document.querySelector(".session-item.selected .session-title")?.innerText}; the address names it`)));
+  await page.mouse.move(1000, 400);
+  await tree("the session we were in deleted");
+
   // On a phone: the sidebar over the chat; a long press opens a row's menu,
   // a sheet at the foot of the screen.
   const phone = await (await browser.newContext({
