@@ -2328,6 +2328,94 @@ exit: 0; more stdout: ""
 prigh desktop: stdin closed: the window is gone
 === webkit: desktop: errors ===
 none
+=== webkit: desktop_signin: its stdout ===
+page line: {"url":"http://127.0.0.1:<PORT>/#desktop=<key>"}
+=== webkit: desktop_signin: the choice ===
+prigh
+desktop
+Sign in to 127.0.0.1:<PORT>
+127.0.0.1:<PORT> is behind a sign-in (auth.example.com). Sign in with your browser, where you are already signed in, or here in this window.
+Sign in with your browser
+Sign in here
+Quit prigh
+Sign in with your browser: 44px+, on screen
+Sign in here: 34px, on screen
+Quit prigh: 34px, on screen
+overflows sideways: false
+focused: desktop-signin-browser
+page line: {"url":"http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=desktop","external":true}
+=== webkit: desktop_signin: waiting ===
+prigh
+desktop
+Sign in to 127.0.0.1:<PORT>
+Waiting for you to allow it in your browser…
+Open it again
+Cancel
+Open it again: 44px+, on screen
+Cancel: 34px, on screen
+overflows sideways: false
+focused: desktop-signin-again
+=== webkit: desktop_signin: cancelled with Esc ===
+prigh
+desktop
+Sign in to 127.0.0.1:<PORT>
+127.0.0.1:<PORT> is behind a sign-in (auth.example.com). Sign in with your browser, where you are already signed in, or here in this window.
+Sign in with your browser
+Sign in here
+Quit prigh
+page line: {"url":"http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=desktop","external":true}
+=== webkit: desktop_signin: opened again ===
+page line: {"url":"http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=desktop","external":true}
+=== webkit: desktop_signin: the default browser asks ===
+prigh
+sign-in
+Allow prigh desktop to connect?
+prigh desktop on this computer wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+Signed in
+prigh desktop on this computer is signed in to 127.0.0.1:<PORT>. You can close this tab.
+=== webkit: desktop_signin: signed in: the window goes to the site ===
+page line: {"url":"http://127.0.0.1:<PORT>/#app=desktop&host=host-laptop","remote":true,"cookie":"<THE PROXY'S COOKIE>","signin":"http://127.0.0.1:<PORT>/#desktop=<key>&signin=1"}
+http://127.0.0.1:<PORT>/
+the site's sign-in to prigh: 1
+=== webkit: desktop_signin: expired ===
+prigh
+desktop
+Sign in to 127.0.0.1:<PORT>
+Your sign-in to 127.0.0.1:<PORT> has expired. Sign in with your browser, where you are already signed in, or here in this window.
+Sign in with your browser
+Sign in here
+Quit prigh
+=== webkit: desktop_signin: expired, on a 390x844 phone ===
+Sign in with your browser: 44px+, on screen
+Sign in here: 44px+, on screen
+Quit prigh: 44px+, on screen
+overflows sideways: false
+focused: desktop-signin-browser
+=== webkit: desktop_signin: expired, on a 320x640 phone ===
+Sign in with your browser: 44px+, on screen
+Sign in here: 44px+, on screen
+Quit prigh: 44px+, on screen
+overflows sideways: false
+focused: desktop-signin-browser
+=== webkit: desktop_signin: in the window ===
+page line: {"url":"http://127.0.0.1:<PORT>/#app=desktop&host=host-laptop","remote":true,"signin":"http://127.0.0.1:<PORT>/#desktop=<key>&signin=1","here":true}
+=== webkit: desktop_signin: its window gone ===
+exit: 0
+prigh desktop: connected to ws://127.0.0.1:<PORT>/ws
+prigh desktop: 127.0.0.1:<PORT> is behind a sign-in (auth.example.com)
+prigh desktop: prigh-web on http://127.0.0.1:<PORT>/
+prigh desktop: signing in through the browser
+prigh desktop: the sign-in through the browser was cancelled
+prigh desktop: signing in through the browser
+prigh desktop: signed in through the browser
+prigh desktop: the sign-in to 127.0.0.1:<PORT> expired: signing in again
+prigh desktop: signing in in the window
+prigh desktop: stdin closed: the window is gone
+=== webkit: desktop_signin: errors ===
+none
 === webkit: steer: showing it leaves the composer on the main agent ===
 (no chip); Steer the agent…
 Survey the project
