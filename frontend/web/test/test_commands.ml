@@ -204,6 +204,7 @@ let%expect_test "/help <command> and /hotkeys" =
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
+    Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)

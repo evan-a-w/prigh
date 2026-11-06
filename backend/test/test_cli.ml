@@ -645,3 +645,158 @@ let%expect_test "desktop: the URL as a JSON line; stdin closing ends it" =
     prigh desktop: stopped by a signal
     |}]
 ;;
+
+(* authentik in front of the site: the tool host meets its login page,
+   prints the browser sign-in's URL and waits; a browser (simulated here)
+   signs in to the proxy, allows the sign-in on prigh-web's page, which asks
+   prigh for the proxy's cookie and posts it to the tool host's listener;
+   the tool host connects with it, saves it, and needs no sign-in next
+   time. *)
+let%expect_test
+    "tool-host -remote behind a sign-in proxy signs in through the browser"
+  =
+  with_sandbox
+  @@ fun t ->
+  let server =
+    spawn t [ "serve"; "-faux"; "-web"; "127.0.0.1:0"; "-token"; "good" ]
+  in
+  let lines (p : Core_unix.Process_info.t) =
+    let err = Core_unix.in_channel_of_descr p.stderr in
+    fun () ->
+      Eio_unix.run_in_systhread (fun () -> In_channel.input_line err)
+      |> Option.value_exn
+  in
+  let server_line = lines server in
+  let rec web_port () =
+    let line = server_line () in
+    match
+      String.chop_prefix line ~prefix:"prigh: prigh-web on http://127.0.0.1:"
+    with
+    | Some rest -> Int.of_string (String.chop_suffix_exn rest ~suffix:"/")
+    | None -> web_port ()
+  in
+  let upstream = web_port () in
+  Eio.Switch.run
+  @@ fun sw ->
+  let proxy = Fake_signin_proxy.start ~env:t.env ~sw ~upstream in
+  let site = sprintf "ws://127.0.0.1:%d/ws" proxy in
+  let hide = ref [ Int.to_string proxy, "PROXY" ] in
+  let show line =
+    print_endline
+      (mask
+         t
+         (List.fold !hide ~init:line ~f:(fun s (pattern, with_) ->
+            String.substr_replace_all s ~pattern ~with_)))
+  in
+  write
+    t
+    ".prigh/tui-connection.sexp"
+    (sprintf "((connect %s) (token good))" site);
+  let host = spawn t [ "tool-host"; "-remote"; "-name"; "box" ] in
+  let host_line = lines host in
+  let rec signin_url () =
+    let line = host_line () in
+    match String.substr_index line ~pattern:"#cli-signin=" with
+    | None ->
+      show line;
+      signin_url ()
+    | Some i ->
+      let value = String.drop_prefix line (i + String.length "#cli-signin=") in
+      let value = fst (String.lsplit2_exn value ~on:'&') in
+      let port, state = String.lsplit2_exn value ~on:'.' in
+      hide := !hide @ [ port, "LISTENER"; state, "STATE" ];
+      show line;
+      Int.of_string port, state
+  in
+  let listener, state = signin_url () in
+  let rec until_waiting () =
+    let line = host_line () in
+    show line;
+    if not (String.is_substring line ~substring:"Waiting") then until_waiting ()
+  in
+  until_waiting ();
+  let request ?headers ?body ~port meth target =
+    let response =
+      Fake_signin_proxy.request ~env:t.env ~port ?headers ?body ~meth target
+    in
+    let headers_text, body =
+      match String.substr_index response ~pattern:"\r\n\r\n" with
+      | Some i -> String.prefix response i, String.drop_prefix response (i + 4)
+      | None -> response, ""
+    in
+    show ("< " ^ List.hd_exn (String.split_lines headers_text));
+    List.iter (String.split_lines headers_text) ~f:(fun line ->
+      if String.is_prefix line ~prefix:"Set-Cookie" then show ("< " ^ line));
+    body
+  in
+  print_endline "browser: signs in to the proxy";
+  ignore (request ~port:proxy "GET" "/login" : string);
+  print_endline "browser: Allow on prigh-web's page asks for the grant";
+  let grant =
+    request
+      ~port:proxy
+      ~headers:
+        [ "Cookie", Fake_signin_proxy.cookie
+        ; "Origin", sprintf "http://127.0.0.1:%d" proxy
+        ; "Content-Type", "application/json"
+        ]
+      ~body:{|{"token":"good","user":null}|}
+      "POST"
+      Cli_signin_grant.path
+  in
+  show grant;
+  let cookie =
+    match Jsonaf.of_string grant with
+    | `Object [ ("cookie", `String cookie) ] -> cookie
+    | _ -> failwith grant
+  in
+  print_endline "browser: posts it to the tool host";
+  ignore
+    (request
+       ~port:listener
+       ~headers:[ "Content-Type", "application/x-www-form-urlencoded" ]
+       ~body:
+         (Uri.encoded_of_query
+            [ "state", [ state ]; "cookie", [ cookie ]; "token", [ "good" ] ])
+       "POST"
+       "/callback"
+     : string);
+  let rec until_connected next =
+    let line = next () in
+    show
+      (String.split line ~on:' '
+       |> List.take_while ~f:(Fn.non (String.equal "as"))
+       |> String.concat ~sep:" ");
+    if not (String.is_substring line ~substring:"connected to")
+    then until_connected next
+  in
+  until_connected host_line;
+  stop host;
+  show (read t ".prigh/tui-connection.sexp");
+  print_endline "next time: the saved cookie";
+  let host = spawn t [ "tool-host"; "-remote"; "-name"; "box" ] in
+  until_connected (lines host);
+  stop host;
+  stop server;
+  [%expect
+    {|
+    prigh tool-host: 127.0.0.1:PROXY answered with a login page (HTTP 302 Found to https://login.example.com/outpost.goauthentik.io/start): sign in through the browser: open
+    http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=tool-host
+    (Over SSH, forward the port to the browser's computer first: ssh -L LISTENER:127.0.0.1:LISTENER ...) Waiting for the sign-in...
+    browser: signs in to the proxy
+    < HTTP/1.1 302 Found
+    < Set-Cookie: proxy_session=s3cret-session; Path=/; HttpOnly; SameSite=Lax
+    browser: Allow on prigh-web's page asks for the grant
+    < HTTP/1.1 200 OK
+    {"cookie":"proxy_session=s3cret-session"}
+    browser: posts it to the tool host
+    < HTTP/1.1 200 OK
+    prigh tool-host: signed in through the browser: connecting
+    prigh tool-host: connected to ws://127.0.0.1:PROXY/ws
+    ((connect ws://127.0.0.1:PROXY/ws) (token good)
+     (proxy_cookie proxy_session=s3cret-session))
+
+    next time: the saved cookie
+    prigh tool-host: connected to ws://127.0.0.1:PROXY/ws
+    |}]
+;;

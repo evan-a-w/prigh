@@ -19,8 +19,11 @@ module Method = struct
         { path : string
         ; archived : bool
         }
-    | Delete_sessions of string list
-    | Delete_archived
+    | Delete_sessions of
+        { paths : string list
+        ; switch_to : Switch_to.t option
+        }
+    | Delete_archived of { switch_to : Switch_to.t option }
     | Get_messages_page of
         { session : string
         ; before : string option
@@ -168,7 +171,7 @@ module Method = struct
     | Mcp_approve _ -> "mcp_approve"
     | Set_archived _ -> "set_archived"
     | Delete_sessions _ -> "delete_sessions"
-    | Delete_archived -> "delete_archived"
+    | Delete_archived _ -> "delete_archived"
     | Get_messages_page _ -> "get_messages_page"
     | Get_outline _ -> "get_outline"
     | Get_trim_points -> "get_trim_points"
@@ -242,7 +245,6 @@ module Method = struct
   let params = function
     | List_skills
     | List_mcp { reconnect = false }
-    | Delete_archived
     | Forge_status
     | Get_review
     | Nix_store_status
@@ -297,7 +299,10 @@ module Method = struct
       [ "source", Json.str source; "server", Json.str server ]
     | Set_archived { path; archived } ->
       [ "path", Json.str path; "archived", Json.bool archived ]
-    | Delete_sessions paths -> [ "paths", `Array (List.map paths ~f:Json.str) ]
+    | Delete_sessions { paths; switch_to } ->
+      ("paths", `Array (List.map paths ~f:Json.str))
+      :: Switch_to.params switch_to
+    | Delete_archived { switch_to } -> Switch_to.params switch_to
     | Get_messages_page { session; before; from; limit } ->
       [ "session", Json.str session ]
       @ Option.value_map before ~default:[] ~f:(fun b ->

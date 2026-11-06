@@ -564,6 +564,16 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Annotate_clear -> Effect.of_sync_fun Annotate_widget.clear ()
     | Annotate_export -> Effect.of_sync_fun Annotate_widget.export ()
     | Place_menu anchor -> Effect.of_sync_fun Menu_listeners.place anchor
+    | Place_field_menu anchor ->
+      Effect.of_sync_fun
+        (Menu_listeners.place ~id:Prigh_web.Field_menu_view.id)
+        anchor
+    | Edit_field item ->
+      (match%bind.Effect
+         Effect.of_deferred_fun Field_menu_listeners.edit item
+       with
+       | None -> Effect.Ignore
+       | Some text -> inject (App.Action.Show_toast { text; error = true }))
     | Open_window session ->
       Effect.of_sync_fun
         (fun () ->
@@ -1126,6 +1136,7 @@ let install_listeners ~schedule ~current =
   Jump_listeners.install ();
   Selection_listeners.install ~schedule;
   Menu_listeners.install ();
+  Field_menu_listeners.install ~schedule;
   Review_margin.install ();
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
@@ -1445,6 +1456,7 @@ let run_app (settings : Settings.t) =
             });
        schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Set_desktop (Desktop_page.active ()));
+       schedule (App.Action.Set_browser_shell (Desktop_page.in_browser ()));
        schedule
          (App.Action.Set_notification_permission
             (Page_notifications.permission ()));
@@ -1692,9 +1704,13 @@ let run () =
   match Desktop_page.key () with
   | Some key -> desktop key
   | None ->
-    (match Signin_link.code_of_hash (Browser.hash ()) with
-     | Some code ->
+    (match Cli_signin_page.take (), Signin_link.code_of_hash (Browser.hash ()) with
+     | Some request, _ ->
+       let settings = Settings.load () in
+       Cli_signin_page.show request ~login:settings.login ~sign_in:(fun ~error ->
+         sign_in_form settings ~notice:true ~error)
+     | None, Some code ->
        Browser.clear_hash ();
        sign_in_from_link code ~f:start
-     | None -> start ())
+     | None, None -> start ())
 ;;

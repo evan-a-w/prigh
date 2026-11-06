@@ -1699,6 +1699,39 @@ let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
 ;;
 
+(* A temporary session is not saved or listed, and ends when its client
+   leaves it ([attach]), or [temporary_grace] after the last one went. Its
+   ledger exists from the start, so that a restart knows to clean up. *)
+let new_session t (client : Client.t) ~temporary =
+  let start = start_location t client ~cwd:(own_cwd client) in
+  let cwd =
+    match start with
+    | Some (_, cwd) -> cwd
+    | None -> (Agent.state client.agent).cwd
+  in
+  let session = Session.create ~dir:t.sessions_dir ~cwd ~temporary () in
+  let key = Option.some_if temporary (Pkce.random_hex 16) in
+  Option.iter key ~f:(fun key ->
+    Hashtbl.set
+      t.temporaries
+      ~key:(Session.id session)
+      ~data:{ Temporary.key; away = None; written = [] };
+    try
+      Temporary_ledger.write
+        ~dir:t.ledger_dir
+        { id = Session.id session; leftovers = [] }
+    with
+    | exn ->
+      eprintf
+        "prigh: the ledger of a temporary session: %s\n%!"
+        (Exn.to_string exn));
+  start_agent t session start |> attach t client;
+  match attached_state client, key with
+  | `Object fields, Some key ->
+    `Object (fields @ [ "temporary_key", `String key ])
+  | state, _ -> state
+;;
+
 (* Sessions from before repositories were recorded (or whose host could not
    tell) on the backend's own host: their cwd is looked up here, once. *)
 let with_repo t (s : Session.Summary.t) =
@@ -1770,11 +1803,20 @@ let is_active agent =
   Agent.is_running agent || Agent.has_running_background agent
 ;;
 
-(* Why [client] may not delete [summary], if it may not. *)
-let refusal t (client : Client.t) (summary : Session.Summary.t) =
+(* Why [client] may not delete [summary], if it may not. [leaving]: as if
+   [client] had moved to another session first. *)
+let refusal
+      ?(leaving = false)
+      t
+      (client : Client.t)
+      (summary : Session.Summary.t)
+  =
   let name = display summary in
   let agent = Hashtbl.find t.agents summary.id in
-  if String.equal (session_id client.agent) summary.id
+  let others agent =
+    List.filter (clients_of t agent) ~f:(fun c -> not (phys_equal c client))
+  in
+  if (not leaving) && String.equal (session_id client.agent) summary.id
   then
     Some
       (sprintf "%s is the session you are in: switch to another one first" name)
@@ -1791,12 +1833,12 @@ let refusal t (client : Client.t) (summary : Session.Summary.t) =
     match agent with
     | Some agent when is_active agent ->
       Some (sprintf "%s is running: wait for it or /abort it first" name)
-    | Some agent when not (List.is_empty (clients_of t agent)) ->
+    | Some agent when not (List.is_empty (others agent)) ->
       Some
         (sprintf
            "%s is open in %d other frontend(s): close it there first"
            name
-           (List.length (clients_of t agent)))
+           (List.length (others agent)))
     | Some _ | None -> None)
 ;;
 
@@ -1817,8 +1859,8 @@ module Deleted = struct
 end
 
 (* Deletes the session's files and everything kept for it in memory. *)
-let delete_saved t client (summary : Session.Summary.t) =
-  match refusal t client summary with
+let delete_saved ?leaving t client (summary : Session.Summary.t) =
+  match refusal ?leaving t client summary with
   | Some refused -> Or_error.error_string refused
   | None ->
     Or_error.try_with (fun () ->
@@ -1834,30 +1876,83 @@ let delete_saved t client (summary : Session.Summary.t) =
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
 
-(* One [sessions_changed] for the lot. *)
-let delete_many t client keys =
-  let results =
-    List.map keys ~f:(fun key ->
-      ( key
-      , Or_error.bind (find_saved t key) ~f:(fun summary ->
-          delete_saved t client summary) ))
+module Switch_to = struct
+  type t =
+    | Session of string
+    | New_session
+
+  let of_params params =
+    let open Or_error.Let_syntax in
+    let%bind session = string_param_opt params "switch_to" in
+    let%map new_ = bool_param params "switch_to_new" ~default:false in
+    match session, new_ with
+    | Some key, _ -> Some (Session key)
+    | None, true -> Some New_session
+    | None, false -> None
+  ;;
+end
+
+(* Deleting the session [client] is in moves it to [switch_to] first, in
+   the same request so that nothing comes between, unless the session would
+   be kept anyway: then the client stays. The reply then has the new
+   session's state, as [switch_session]'s does. *)
+let leave_for_deletion t (client : Client.t) ~switch_to keys =
+  let current = session_id client.agent in
+  let ids =
+    List.filter_map keys ~f:(fun key ->
+      Result.ok (find_saved t key)
+      |> Option.map ~f:(fun (s : Session.Summary.t) -> s.id, s))
   in
-  let deleted = List.filter_map results ~f:(fun (_, r) -> Result.ok r) in
-  if not (List.is_empty deleted) then sessions_changed t;
-  `Object
-    [ "deleted", `Array (List.map deleted ~f:Deleted.to_json)
-    ; ( "refused"
-      , `Array
-          (List.filter_map results ~f:(fun (key, r) ->
-             match r with
-             | Ok _ -> None
-             | Error e ->
-               Some
-                 (`Object
-                     [ "path", `String key
-                     ; "error", `String (Error.to_string_hum e)
-                     ]))) )
-    ]
+  match List.Assoc.find ids current ~equal:String.equal, switch_to with
+  | None, _ | _, None -> Ok None
+  | Some summary, Some (switch_to : Switch_to.t) ->
+    if Option.is_some (refusal ~leaving:true t client summary)
+    then Ok None
+    else (
+      match switch_to with
+      | New_session -> Ok (Some (new_session t client ~temporary:false))
+      | Session key ->
+        Or_error.bind (find_agent t client key) ~f:(fun target ->
+          if List.Assoc.mem ids (session_id target) ~equal:String.equal
+          then
+            Or_error.error_string
+              "switch_to is among the sessions to delete: name another one"
+          else (
+            attach t client target;
+            Ok (Some (attached_state client)))))
+;;
+
+(* One [sessions_changed] for the lot. *)
+let delete_many ?switch_to t client keys =
+  Or_error.map (leave_for_deletion t client ~switch_to keys) ~f:(fun state ->
+    let results =
+      List.map keys ~f:(fun key ->
+        ( key
+        , Or_error.bind (find_saved t key) ~f:(fun summary ->
+            delete_saved ~leaving:(Option.is_some switch_to) t client summary) ))
+    in
+    let deleted = List.filter_map results ~f:(fun (_, r) -> Result.ok r) in
+    if not (List.is_empty deleted) then sessions_changed t;
+    let state =
+      match state with
+      | Some (`Object fields) -> fields
+      | Some _ | None -> []
+    in
+    `Object
+      (state
+       @ [ "deleted", `Array (List.map deleted ~f:Deleted.to_json)
+         ; ( "refused"
+           , `Array
+               (List.filter_map results ~f:(fun (key, r) ->
+                  match r with
+                  | Ok _ -> None
+                  | Error e ->
+                    Some
+                      (`Object
+                          [ "path", `String key
+                          ; "error", `String (Error.to_string_hum e)
+                          ]))) )
+         ]))
 ;;
 
 let set_archived t ~key ~archived =
@@ -2332,39 +2427,6 @@ let prefs t client ~meth ~params =
        `Object [ "value", list ])
 ;;
 
-(* A temporary session is not saved or listed, and ends when its client
-   leaves it ([attach]), or [temporary_grace] after the last one went. Its
-   ledger exists from the start, so that a restart knows to clean up. *)
-let new_session t (client : Client.t) ~temporary =
-  let start = start_location t client ~cwd:(own_cwd client) in
-  let cwd =
-    match start with
-    | Some (_, cwd) -> cwd
-    | None -> (Agent.state client.agent).cwd
-  in
-  let session = Session.create ~dir:t.sessions_dir ~cwd ~temporary () in
-  let key = Option.some_if temporary (Pkce.random_hex 16) in
-  Option.iter key ~f:(fun key ->
-    Hashtbl.set
-      t.temporaries
-      ~key:(Session.id session)
-      ~data:{ Temporary.key; away = None; written = [] };
-    try
-      Temporary_ledger.write
-        ~dir:t.ledger_dir
-        { id = Session.id session; leftovers = [] }
-    with
-    | exn ->
-      eprintf
-        "prigh: the ledger of a temporary session: %s\n%!"
-        (Exn.to_string exn));
-  start_agent t session start |> attach t client;
-  match attached_state client, key with
-  | `Object fields, Some key ->
-    `Object (fields @ [ "temporary_key", `String key ])
-  | state, _ -> state
-;;
-
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2481,25 +2543,32 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "get_tool_output" -> Some (tool_output t client params)
   | "delete_session" ->
     Some
-      (Or_error.bind (string_param params "path") ~f:(fun key ->
-         Or_error.map
-           (Or_error.bind (find_saved t key) ~f:(delete_saved t client))
-           ~f:(fun (_ : Deleted.t) ->
-             sessions_changed t;
-             `Object [])))
+      (let open Or_error.Let_syntax in
+       let%bind key = string_param params "path" in
+       let%bind switch_to = Switch_to.of_params params in
+       let%bind state = leave_for_deletion t client ~switch_to [ key ] in
+       let%map (_ : Deleted.t) =
+         Or_error.bind
+           (find_saved t key)
+           ~f:(delete_saved ~leaving:(Option.is_some switch_to) t client)
+       in
+       sessions_changed t;
+       Option.value state ~default:(`Object []))
   | "delete_sessions" ->
     Some
-      (Or_error.map
-         (string_list_param params "paths")
-         ~f:(delete_many t client))
+      (let open Or_error.Let_syntax in
+       let%bind keys = string_list_param params "paths" in
+       let%bind switch_to = Switch_to.of_params params in
+       delete_many ?switch_to t client keys)
   | "delete_archived" ->
     Some
-      (ok
-         (delete_many
-            t
-            client
-            (List.filter_map (listings t client) ~f:(fun (l : Listing.t) ->
-               Option.some_if l.archived l.summary.path))))
+      (Or_error.bind (Switch_to.of_params params) ~f:(fun switch_to ->
+         delete_many
+           ?switch_to
+           t
+           client
+           (List.filter_map (listings t client) ~f:(fun (l : Listing.t) ->
+              Option.some_if l.archived l.summary.path))))
   | "set_archived" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->

@@ -12,6 +12,9 @@ type t =
   { connect : string
   ; token : string option
   ; user : string option
+  ; proxy_cookie : string option
+    (** the [Cookie] header for a sign-in proxy in front of [connect],
+        from signing in through the browser *)
   }
 [@@deriving sexp, equal]
 
@@ -25,6 +28,9 @@ val save : home:string -> t -> unit Or_error.t
 
 (** Removes the saved connection, if any. *)
 val forget : home:string -> unit Or_error.t
+
+(** The saved [proxy_cookie] if [connect] is the saved address. *)
+val proxy_cookie : t option -> connect:string option -> string option
 
 module Settings : sig
   type t =

@@ -74,16 +74,36 @@ val read : t -> [ `Text of string | `Binary of string ] option
 (** [read], skipping binary messages. *)
 val read_text : t -> string option
 
+(** What a server answered instead of switching protocols. *)
+module Refusal : sig
+  type t =
+    { status : string
+      (** the status line after the HTTP version, or what was wrong *)
+    ; headers : (string * string) list
+    }
+  [@@deriving sexp_of]
+
+  val header : t -> string -> string option
+
+  (** The status code, if it was HTTP. *)
+  val code : t -> int option
+
+  (** [HTTP 302 Found], or what was wrong. *)
+  val to_string : t -> string
+end
+
 (** The client's side of the opening handshake over [flow] (a [GET] of
-    [target] from [host]), then [create ~role:`Client]. [Error] says what the
-    server answered instead of switching protocols. Raises what reading and
-    writing [flow] raise. *)
+    [target] from [host], with [headers], e.g. a proxy's [Cookie]), then
+    [create ~role:`Client]. [Error] is what the server answered instead of
+    switching protocols. Raises what reading and writing [flow] raise. *)
 val connect
-  :  reader:Eio.Buf_read.t
+  :  ?headers:(string * string) list
+  -> reader:Eio.Buf_read.t
   -> flow:_ Eio.Flow.sink
   -> host:string
   -> target:string
-  -> (t, string) Result.t
+  -> unit
+  -> (t, Refusal.t) Result.t
 
 val send_text : t -> string -> unit
 val send_binary : t -> string -> unit
