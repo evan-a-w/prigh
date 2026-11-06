@@ -40,7 +40,12 @@
 use crate::navigation::{decide, origin, Decision, OpenGuard, Remote};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// A window away signing in that goes to this many pages within
+/// [ROUND_WINDOW] is going round in circles: it is sent back to prigh's.
+pub const ROUND_HOPS: usize = 12;
+pub const ROUND_WINDOW: Duration = Duration::from_secs(10);
 
 /// What prigh's sites may do without the browser asking.
 pub const PERMISSIONS: &[&str] = &["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"];
@@ -76,6 +81,10 @@ struct Page {
     requested: Option<(String, String)>,
     /// The site it went to on its own (a sign-in), until it is back.
     away: Option<String>,
+    /// When it went from page to page while away, lately: a sign-in that
+    /// goes round and round (a cookie the site does not take) is stopped.
+    hops: Vec<Instant>,
+    round_told: bool,
     /// The remote site's cookies were given to it since it was last there.
     /// The backend's site's cookies it was given: given again only when
     /// they are new (a sign-in since), so a site that does not take them
@@ -292,8 +301,28 @@ impl Links {
                 }
                 // One of prigh's windows, or the app's launch on its way
                 // there; while away, wherever it goes is the sign-in's.
-                if page.away.is_some() {
-                    return vec![];
+                if let Some(away) = page.away.clone() {
+                    page.hops.retain(|at| now.saturating_duration_since(*at) < ROUND_WINDOW);
+                    page.hops.push(now);
+                    if page.hops.len() < ROUND_HOPS {
+                        return vec![];
+                    }
+                    page.hops.clear();
+                    // prigh's sign-in page, which stays put; without one,
+                    // prigh's site would only send it round again.
+                    let Some(signin) = self.remote.as_ref().and_then(|r| r.signin_page.clone()) else {
+                        if std::mem::replace(&mut page.round_told, true) {
+                            return vec![];
+                        }
+                        return vec![Effect::Log(format!(
+                            "prigh's window keeps going round {away}: its sign-in does not stick"
+                        ))];
+                    };
+                    let mut out = vec![Effect::Log(format!(
+                        "prigh's window keeps going round {away} (its sign-in does not stick): showing prigh's sign-in page"
+                    ))];
+                    out.extend(self.send_back(id, signin));
+                    return out;
                 }
                 let site = origin(url).unwrap_or_else(|| url.to_string());
                 let link = page
@@ -992,6 +1021,7 @@ mod tests {
 
     #[test]
     fn a_site_that_keeps_redirecting_has_a_bounded_number_of_effects() {
+        const SIGNIN: &str = "http://127.0.0.1:7780/#desktop=k&signin=1";
         let mut links = self::links();
         let mut out = run(&mut links, &[created("A", "https://ai.example.com/")]);
         // Each time to a fresh address, for a minute: nothing opens, the
@@ -1009,7 +1039,31 @@ mod tests {
         assert_eq!(
             out,
             [
-                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" })
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
+                json!({ "log": "prigh's window keeps going round https://login.example.com: its sign-in does not stick" })
+            ]
+        );
+        // With prigh's sign-in page, it goes there (which stays put): here
+        // from the sidecar's page, as a page's script would go.
+        let mut links = self::links();
+        links.set_remote(
+            Remote { url: "https://ai.example.com/".into(), cookies: vec![], signin_page: Some(SIGNIN.into()) },
+            false,
+        );
+        let mut out = run(&mut links, &[created("A", "http://127.0.0.1:7780/?session=s1")]);
+        for i in 0..=ROUND_HOPS {
+            out.extend(run_at(&mut links, &[changed("A", &format!("https://login.example.com/start?state={i}"))], 0));
+        }
+        let navigates: Vec<Value> =
+            out.iter().filter(|e| e["method"] == "Page.navigate").map(|e| e["params"]["url"].clone()).collect();
+        assert_eq!(navigates, [SIGNIN], "{out:#?}");
+        out.extend(run(&mut links, &[changed("A", SIGNIN)]));
+        assert_eq!(
+            out.iter().filter_map(|e| e["log"].as_str()).collect::<Vec<_>>(),
+            [
+                "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back",
+                "prigh's window keeps going round https://login.example.com (its sign-in does not stick): showing prigh's sign-in page",
+                "prigh's window is back from https://login.example.com"
             ]
         );
         // A page that keeps clicking links to a site, with fresh addresses,
