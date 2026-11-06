@@ -90,7 +90,7 @@ if mode == "proxy":
     # (as prigh-web's does), once the shell has been told (it asks first).
     PAGE = PAGE.replace(b"</body>", b"""<script>
 addEventListener("load", async () => {
-  if (!location.hash.includes("shell=browser")) return;
+  if (!location.hash.includes("shell=browser") || location.hash.includes("signin=1")) return;
   location.href = await (await fetch("/remote")).text();
 });
 </script></body>""")

@@ -125,6 +125,8 @@ pub struct Window {
     pending_loaded: Option<Instant>,
     /// Signing in on this site, until it is back on prigh's.
     away: Option<String>,
+    /// When it went from page to page while away, lately.
+    hops: Vec<Instant>,
     /// The user chose to sign in in the window.
     here: bool,
     /// The backend's site's cookies it was given: given again only when
@@ -164,7 +166,21 @@ impl Window {
                 }
                 Step::Allow
             }
-            Decision::External if self.away.is_some() => Step::Allow,
+            Decision::External if self.away.is_some() => {
+                // Going round and round (a cookie the site does not take):
+                // prigh's sign-in page, which stays put.
+                self.hops.retain(|at| now.saturating_duration_since(*at) < crate::devtools::ROUND_WINDOW);
+                self.hops.push(now);
+                match remote.and_then(|r| r.signin_page.clone()) {
+                    Some(url) if self.hops.len() >= crate::devtools::ROUND_HOPS => {
+                        self.hops.clear();
+                        self.away = None;
+                        self.pending = None;
+                        Step::SignIn { url }
+                    }
+                    _ => Step::Allow,
+                }
+            }
             Decision::External => {
                 let site = origin(url).unwrap_or_else(|| url.to_string());
                 if self.pending_loaded.is_some_and(|at| now.saturating_duration_since(at) >= LOAD_SETTLE) {
@@ -363,6 +379,25 @@ mod tests {
                 (_, url) => format!("loaded {url}: {:?}", w.on_loaded(url, &ours(), remote, at(*secs))),
             })
             .collect()
+    }
+
+    #[test]
+    fn a_sign_in_that_goes_round_and_round_ends_on_prighs_sign_in_page() {
+        let mut w = Window::default();
+        w.sign_in_here();
+        w.loading(SITE);
+        let remote = remote(false);
+        let mut steps = vec![];
+        for i in 0..=crate::devtools::ROUND_HOPS {
+            steps.push(format!(">https://login.example.com/start?state={i}"));
+        }
+        let steps: Vec<(&str, u64)> = steps.iter().map(|s| (s.as_str(), 0)).collect();
+        let out = walk(&mut w, Some(&remote), &steps);
+        assert_eq!(out.iter().filter(|s| s.ends_with(": Allow")).count(), crate::devtools::ROUND_HOPS - 1);
+        assert_eq!(
+            out.last().unwrap(),
+            &format!("https://login.example.com/start?state=12: SignIn {{ url: \"{LOCAL}&signin=1\" }}")
+        );
     }
 
     #[test]
