@@ -20,8 +20,4 @@ module Result : sig
 end
 
 (** Gives up after [timeout] (default 15s) as [Unreachable]. *)
-val run
-  :  env:Env.t
-  -> ?timeout:Time_ns.Span.t
-  -> Backend_address.t
-  -> Result.t
+val run : env:Env.t -> ?timeout:Time_ns.Span.t -> Backend_address.t -> Result.t

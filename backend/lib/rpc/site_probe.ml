@@ -32,14 +32,16 @@ let read_head reader : Response.t =
     | "" -> location
     | line ->
       (match String.lsplit2 line ~on:':' with
-       | Some (name, value) when String.Caseless.equal (String.strip name) "Location"
-         -> headers (Some (String.strip value))
+       | Some (name, value)
+         when String.Caseless.equal (String.strip name) "Location" ->
+         headers (Some (String.strip value))
        | Some _ | None -> headers location)
   in
   let location = headers None in
   match code with
   | Some code -> { code; status; location }
-  | None -> failwithf "the server answered %S, not HTTP" (String.prefix status 80) ()
+  | None ->
+    failwithf "the server answered %S, not HTTP" (String.prefix status 80) ()
 ;;
 
 let get ~env (remote : Backend_address.t) ~target =
@@ -48,7 +50,11 @@ let get ~env (remote : Backend_address.t) ~target =
   let flow = Backend_address.connect ~env ~sw remote in
   Eio.Flow.copy_string
     (sprintf
-       "GET %s HTTP/1.1\r\nHost: %s\r\n%sAccept: text/html\r\nConnection: close\r\n\r\n"
+       "GET %s HTTP/1.1\r\n\
+        Host: %s\r\n\
+        %sAccept: text/html\r\n\
+        Connection: close\r\n\
+        \r\n"
        target
        (Backend_address.authority remote)
        (String.concat
@@ -99,10 +105,11 @@ let rec probe ~env ~hops (remote : Backend_address.t) (url : Uri.t) =
                here
                response.status
                (Uri.to_string (Uri.with_query next []))
-         ; login = Option.map (Uri.host next) ~f:(fun host ->
-             match Uri.port next with
-             | Some port -> sprintf "%s:%d" host port
-             | None -> host)
+         ; login =
+             Option.map (Uri.host next) ~f:(fun host ->
+               match Uri.port next with
+               | Some port -> sprintf "%s:%d" host port
+               | None -> host)
          })
   | (401 | 403 | 407), _ ->
     Signin_required
@@ -112,8 +119,7 @@ let rec probe ~env ~hops (remote : Backend_address.t) (url : Uri.t) =
   | _ -> Open
 ;;
 
-let run ~env ?(timeout = Time_ns.Span.of_sec 15.) (remote : Backend_address.t)
-  =
+let run ~env ?(timeout = Time_ns.Span.of_sec 15.) (remote : Backend_address.t) =
   if remote.lines
   then Result.Open
   else (

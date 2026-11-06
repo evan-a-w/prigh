@@ -678,7 +678,7 @@ let%expect_test
   let upstream = web_port () in
   Eio.Switch.run
   @@ fun sw ->
-  let proxy = Fake_signin_proxy.start ~env:t.env ~sw ~upstream in
+  let proxy = Fake_signin_proxy.start ~env:t.env ~sw ~upstream () in
   let site = sprintf "ws://127.0.0.1:%d/ws" proxy in
   let hide = ref [ Int.to_string proxy, "PROXY" ] in
   let show line =
