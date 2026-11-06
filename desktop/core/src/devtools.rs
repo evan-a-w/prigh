@@ -1052,12 +1052,19 @@ mod tests {
             opens,
             [
                 &json!({ "open": "https://spam.example/0" }),
+                &json!({ "open": "https://spam.example/1" }),
                 &json!({ "open": "https://spam.example/3" }),
+                &json!({ "open": "https://spam.example/4" }),
                 &json!({ "open": "https://spam.example/6" }),
+                &json!({ "open": "https://spam.example/7" }),
                 &json!({ "open": "https://spam.example/9" }),
+                &json!({ "open": "https://spam.example/10" }),
                 &json!({ "open": "https://spam.example/12" }),
+                &json!({ "open": "https://spam.example/13" }),
                 &json!({ "open": "https://spam.example/15" }),
+                &json!({ "open": "https://spam.example/16" }),
                 &json!({ "open": "https://spam.example/18" }),
+                &json!({ "open": "https://spam.example/19" }),
             ]
         );
         assert_eq!(closes, 20);
