@@ -8,7 +8,7 @@
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -580,7 +580,7 @@ impl Zoom {
             *level = zoom::step(*level, step);
             *level
         };
-        if let Some(w) = app.get_webview_window(WINDOW) {
+        for w in app.webview_windows().values() {
             if let Err(e) = w.set_zoom(level) {
                 log(format!("zooming to {level}: {e}"));
             }
@@ -597,8 +597,32 @@ impl Zoom {
     }
 }
 
-fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>, zoom: Arc<Zoom>) -> tauri::Result<()> {
-    let (nav_app, nav_sidecar) = (app.clone(), sidecar.clone());
+/// Labels of the windows after the first ([WINDOW]).
+static WINDOWS: AtomicUsize = AtomicUsize::new(1);
+
+/// Another window on the page's site (the page's Open in new window), with
+/// the same sidecar: the app ends when the last window closes. Off the
+/// webview's callback, which building a window from would deadlock.
+fn another_app_window(app: &AppHandle, sidecar: Arc<Sidecar>, url: Url) {
+    let app = app.clone();
+    thread::spawn(move || {
+        let Some(zoom) = app.try_state::<Arc<Zoom>>().map(|z| z.inner().clone()) else { return };
+        let label = format!("{WINDOW}-{}", WINDOWS.fetch_add(1, Ordering::SeqCst));
+        log(format!("opening another window on {}", redact(url.as_str())));
+        if let Err(e) = build_window(&app, sidecar, zoom, &label, WebviewUrl::External(url)) {
+            log(format!("opening another window: {e}"));
+        }
+    });
+}
+
+fn build_window(
+    app: &AppHandle,
+    sidecar: Arc<Sidecar>,
+    zoom: Arc<Zoom>,
+    label: &str,
+    url: WebviewUrl,
+) -> tauri::Result<()> {
+    let (nav_app, nav_sidecar, nav_label) = (app.clone(), sidecar.clone(), label.to_string());
     let (new_app, new_sidecar) = (app.clone(), sidecar.clone());
     let gpu_info = cfg!(target_os = "linux") && env_flag("PRIGH_DESKTOP_GPU_INFO");
     let perm_sidecar = sidecar.clone();
@@ -611,7 +635,7 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>, zoom: Arc<Zoom>) -> taur
         .filter(|p| !p.is_empty())
         .map(|p| std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("PRIGH_DESKTOP_TEST_SCRIPT {p}: {e}")));
     let test_close = test_script.is_some();
-    let window = WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, label, url)
         .title("prigh")
         .inner_size(1200.0, 800.0)
         .min_inner_size(320.0, 480.0)
@@ -623,7 +647,7 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>, zoom: Arc<Zoom>) -> taur
         .zoom_hotkeys_enabled(true)
         .on_navigation(move |url| match navigation::decide(url.as_str(), &nav_sidecar.origins()) {
             _ if test_close && url.as_str() == TEST_CLOSE_URL => {
-                if let Some(w) = nav_app.get_webview_window(WINDOW) {
+                if let Some(w) = nav_app.get_webview_window(&nav_label) {
                     let _ = w.close();
                 }
                 false
@@ -645,7 +669,10 @@ fn build_window(app: &AppHandle, sidecar: Arc<Sidecar>, zoom: Arc<Zoom>) -> taur
             }
         })
         .on_new_window(move |url, _| match navigation::decide(url.as_str(), &new_sidecar.origins()) {
-            Decision::Allow => NewWindowResponse::Allow,
+            Decision::Allow => {
+                another_app_window(&new_app, new_sidecar.clone(), url);
+                NewWindowResponse::Deny
+            }
             Decision::Quit => {
                 new_sidecar.stop();
                 NewWindowResponse::Deny
@@ -768,6 +795,10 @@ mod linux {
             settings.set_enable_smooth_scrolling(true);
             // Zoom scales the whole page, as a browser's does.
             settings.set_zoom_text_only(false);
+            // The page opens a window (Open in new window) from an effect run
+            // after the click, which WebKit no longer counts as the user's;
+            // the shell's on_new_window still decides where it goes.
+            settings.set_javascript_can_open_windows_automatically(true);
         }
         webview.connect_run_file_chooser(|_, request| {
             log(format!(
@@ -930,7 +961,7 @@ fn main() {
     };
     let app = builder
         .plugin(tauri_plugin_single_instance::init(move |app, _, _| {
-            if let Some(w) = app.get_webview_window(WINDOW) {
+            if let Some(w) = app.get_webview_window(WINDOW).or_else(|| app.webview_windows().into_values().next()) {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
@@ -951,7 +982,13 @@ fn main() {
                     return Ok(());
                 }
                 Ok(Some(b)) => *setup_sidecar.browser.lock().unwrap() = Some(b),
-                Ok(None) => build_window(app.handle(), setup_sidecar.clone(), zoom)?,
+                Ok(None) => build_window(
+                    app.handle(),
+                    setup_sidecar.clone(),
+                    zoom,
+                    WINDOW,
+                    WebviewUrl::App("index.html".into()),
+                )?,
             }
             start_sidecar(app.handle().clone(), setup_sidecar.clone());
             Ok(())

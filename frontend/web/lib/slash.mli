@@ -20,7 +20,6 @@ module Argument : sig
     | Mode
     | Plan
     | Notify (** [on] or [off] *)
-    | Tabs (** [on] or [off] *)
     | Settings (** a section of the settings page *)
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)

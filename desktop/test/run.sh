@@ -56,7 +56,7 @@ scenario() {
 	return 0
 }
 normalize() {
-	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#' -e 's#\(pid [0-9]+\)#(pid PID)#g'
+	sed -E -e "s#$work#WORK#g" -e "s#${real:-/nonexistent}#PRIGH#g" -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:PORT#g'  -e 's#localhost:[0-9]+#localhost:PORT#g' -e 's#serving on [0-9]+#serving on PORT#' -e 's#\(pid [0-9]+\)#(pid PID)#g' -e 's#session=[A-Za-z0-9_.-]+#session=ID#g'
 }
 
 scenario "the window shows the page; closing it stops the sidecar" \
@@ -190,7 +190,7 @@ HOME="$work/server-home" "$real" serve -web 127.0.0.1:0 -faux -token sekrit \
 	-cwd "$work/server-home" 2>"$work/server.err" &
 server=$!
 report_port_file="$work/report-port"
-# POST /pointer "move|click X Y" (the window's pixels) moves the real
+# POST /pointer "move|click|ctrlclick X Y" (the window's pixels) moves the real
 # pointer there, and clicks, with xdotool; anything else is a report line.
 python3 - "$work/reports" "$report_port_file" <<'PY' &
 import http.server, subprocess, sys
@@ -207,7 +207,8 @@ def window():
 def pointer(what, x, y):
     wx, wy, _ = window()
     move = ["xdotool", "mousemove", "--sync", str(wx + int(x)), str(wy + int(y))]
-    subprocess.run(move + (["click", "1"] if what == "click" else []), check=True)
+    act = {"click": ["click", "1"], "ctrlclick": ["keydown", "ctrl", "click", "1", "keyup", "ctrl"]}
+    subprocess.run(move + act.get(what, []), check=True)
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode()
@@ -273,3 +274,5 @@ echo 1.25 >"$zoom_file"
 real_scenario "the real sidecar at 125% zoom: a chip's menu, chosen with the real pointer" menu local
 rm "$zoom_file"
 real_scenario "the real sidecar, -ui remote: the backend's own site; its /quit ends the app" quit remote
+real_scenario "the real sidecar: Open in new window opens another app window; one sidecar" window local
+real_scenario "the real sidecar, -ui remote: Open in new window on the backend's site" window remote

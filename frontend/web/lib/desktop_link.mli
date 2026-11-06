@@ -37,6 +37,18 @@ val shell_storage_key : string
     sidecar's page goes to (the backend's own site), so that page knows too. *)
 val follow : browser:bool -> string -> string
 
+(** The fragment of a new window of the desktop app's page (Open in new
+    window), so that it is in the desktop app too: a new window does not get
+    the opener's sessionStorage. The run's [key] on [prigh desktop]'s page,
+    [app=desktop] on the backend's own site ([backend_site]), with
+    [shell=browser] in a browser's app window. [None]: not in the desktop
+    app. *)
+val window_fragment
+  :  key:string option
+  -> backend_site:bool
+  -> browser:bool
+  -> string option
+
 (** Where the backend's page goes to quit the app: the window catches it (the
     page cannot reach [prigh desktop] from another origin). *)
 val quit_url : string
