@@ -6,6 +6,7 @@ type t =
   ; model : Model.t option
   ; mask_observations : bool
   ; computer_screenshots : int
+  ; computer_screenshots_max : int
   }
 [@@deriving sexp_of]
 
@@ -14,6 +15,7 @@ let window_only =
   ; model = None
   ; mask_observations = true
   ; computer_screenshots = 3
+  ; computer_screenshots_max = 8
   }
 ;;
 

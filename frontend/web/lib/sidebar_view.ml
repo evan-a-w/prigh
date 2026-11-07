@@ -211,6 +211,8 @@ module Row = struct
     ; worktrees : Session_worktrees.Node.t list
     ; folded : bool (** its worktrees *)
     ; entering : string option
+    ; matched : (int * int) list (** in the title, by the search *)
+    ; snippet : Session_hits.Snippet.t option (** of its messages, likewise *)
     }
   [@@deriving equal]
 end
@@ -254,6 +256,16 @@ let swipe_actions ~inject (s : Session_summary.t) =
     ]
 ;;
 
+(* What the search matched, marked. *)
+let marked_text ?(before = []) ~cls text ranges =
+  Node.span
+    ~attrs:[ Attr.class_ cls; Attr.create "dir" "auto" ]
+    (before
+     @ List.map (Prigh_ui.Session_search.pieces text ranges) ~f:(function
+       | `Plain, s -> Node.text s
+       | `Match, s -> Node.create "mark" [ Node.text s ]))
+;;
+
 let row ~inject (s : Session_summary.t) (row : Row.t) =
   let { Row.selected
       ; running
@@ -268,6 +280,8 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
       ; worktrees
       ; folded
       ; entering
+      ; matched
+      ; snippet
       }
     =
     row
@@ -388,48 +402,52 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                [ Node.span
-                    ~attrs:
-                      [ Attr.class_ "session-title"; Attr.create "dir" "auto" ]
-                    ((if Session_list.is_pinned s
-                      then
-                        [ Node.span
-                            ~attrs:
-                              [ Attr.class_ "session-pin"
-                              ; Attr.role "img"
-                              ; Attr.create "aria-label" "Pinned"
-                              ; Attr.title "Pinned to the top (P unpins)"
-                              ]
-                            [ icon Pin ]
-                        ]
-                      else [])
-                     @ [ Node.text title ])
-                ; div
-                    ~cls:"session-meta"
-                    [ span ~cls:"session-age" age
-                    ; place ?host_home s ~cwd
-                    ; Option.value_map home ~default:Node.none ~f:(fun h ->
-                        span
-                          ~cls:"session-home"
-                          ~attrs:
-                            [ Attr.title
-                                (sprintf
-                                   "Switched into worktrees from %s: Switch \
-                                    back (/worktree back) returns"
-                                   (home_relative ?host_home h.cwd))
-                            ]
-                          (Option.value_exn
-                             (Session_worktrees.home
-                                ~tilde:(home_relative ?host_home)
-                                (Some h))))
-                    ; (if selecting
+                ((marked_text
+                    ~cls:"session-title"
+                    ~before:
+                      (if Session_list.is_pinned s
                        then
-                         span
-                           ~cls:"session-size"
-                           (Session_summary.size_string s.bytes)
-                       else Node.none)
-                    ]
-                ]
+                         [ Node.span
+                             ~attrs:
+                               [ Attr.class_ "session-pin"
+                               ; Attr.role "img"
+                               ; Attr.create "aria-label" "Pinned"
+                               ; Attr.title "Pinned to the top (P unpins)"
+                               ]
+                             [ icon Pin ]
+                         ]
+                       else [])
+                    title
+                    matched
+                  :: Option.to_list
+                       (Option.map snippet ~f:(fun s ->
+                          marked_text ~cls:"session-snippet" s.text s.ranges)))
+                 @ [ div
+                       ~cls:"session-meta"
+                       [ span ~cls:"session-age" age
+                       ; place ?host_home s ~cwd
+                       ; Option.value_map home ~default:Node.none ~f:(fun h ->
+                           span
+                             ~cls:"session-home"
+                             ~attrs:
+                               [ Attr.title
+                                   (sprintf
+                                      "Switched into worktrees from %s: Switch \
+                                       back (/worktree back) returns"
+                                      (home_relative ?host_home h.cwd))
+                               ]
+                             (Option.value_exn
+                                (Session_worktrees.home
+                                   ~tilde:(home_relative ?host_home)
+                                   (Some h))))
+                       ; (if selecting
+                          then
+                            span
+                              ~cls:"session-size"
+                              (Session_summary.size_string s.bytes)
+                          else Node.none)
+                       ]
+                   ])
             ]
         ; (if selecting then Node.none else fold)
         ; (if selecting
@@ -454,7 +472,13 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
     ]
 ;;
 
-let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
+let session
+      (m : App.Model.t)
+      ~inject
+      ~current
+      (found : Prigh_ui.Session_search.Result.t)
+  =
+  let s = found.session in
   let selected = Option.equal String.equal current (Some s.id) in
   let cwd =
     (* The current session's as it is now: [/cd] moves it. *)
@@ -490,6 +514,8 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
           s
     ; folded = Set.mem m.folded s.id
     ; entering = Worktrees.entering m.worktrees
+    ; matched = found.title
+    ; snippet = found.snippet
     }
   in
   View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () ->
@@ -633,7 +659,10 @@ let user_footer (m : App.Model.t) ~inject =
 
 let view (m : App.Model.t) ~inject =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
-  let sessions = Session_list.filter m.sessions ~query:m.session_query in
+  let content = m.session_hits in
+  let sessions =
+    Session_list.filter ?content m.sessions ~query:m.session_query
+  in
   Node.aside
     ~attrs:[ Attr.class_ "sidebar"; Attr.id "sidebar" ]
     [ div
@@ -695,11 +724,15 @@ let view (m : App.Model.t) ~inject =
          | [], _ ->
            [ div
                ~cls:"sessions-empty"
-               [ Node.textf "Nothing matches “%s”." m.session_query ]
+               [ Node.textf
+                   "No sessions match “%s”. Search looks in titles and \
+                    messages."
+                   (String.strip m.session_query)
+               ]
            ]
          | _, _ ->
            let { Session_list.Sections.pinned; active; archived } =
-             Session_list.sections m.sessions ~query:m.session_query
+             Session_list.sections ?content m.sessions ~query:m.session_query
            in
            let shown =
              Session_list.archived_shown
@@ -729,7 +762,11 @@ let view (m : App.Model.t) ~inject =
                   @
                   if m.marks.selecting
                   then []
-                  else [ delete_archived ~inject archived ]
+                  else
+                    [ delete_archived
+                        ~inject
+                        (List.map archived ~f:(fun r -> r.session))
+                    ]
                 else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
     ; user_footer m ~inject

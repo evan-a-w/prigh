@@ -1590,6 +1590,40 @@ let%expect_test
   H.show h;
   [%expect
     {|
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query s)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query sp)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query spi)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query spik)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query spike)
+        (limit 50)))
+      (tag Session_hits))
+
+
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -1597,8 +1631,8 @@ let%expect_test
     Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / spike▏
       ── archived ──
-    ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
-       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ▸  old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     >
     deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
@@ -2283,28 +2317,52 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
     |}];
   let h = sessions_open () in
-  H.keys h "d";
+  H.keys h "2025";
   H.key h (Key.plain Tab);
   H.show h;
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query 2)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query 20)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query 202)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query 2025)
+        (limit 50)))
+      (tag Session_hits))
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
-    / d▏
-     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
-     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    / 2025▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸  ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  $0.01  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+    deepseek-flash  $0.01  1 marked (2.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.event h Sessions_changed;
   [%expect
@@ -2328,17 +2386,17 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
-    / d▏
-     ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    / 2025▏
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
-    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
-     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+    ▸  ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  $0.01  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+    deepseek-flash  $0.01  1 marked (2.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}]
 ;;
 

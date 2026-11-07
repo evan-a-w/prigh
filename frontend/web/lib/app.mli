@@ -154,6 +154,9 @@ module Reply_tag : sig
         ; draft : string (** what was sent, as typed *)
         } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
+    | Session_hits of int
+    (** [search_sessions] for this search of the sidebar's; stale ones are
+        ignored *)
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string
@@ -334,6 +337,10 @@ module Command : sig
         { id : int
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
+    | Search_sessions_later of
+        { search : int
+        ; after_ms : int
+        } (** [Search_sessions search] after [after_ms]: typing debounced *)
     | Focus of string (** the element with this id, once rendered *)
     | Clear_text_selection (** the page's selected text, unselected *)
     | Place_popover
@@ -685,6 +692,9 @@ module Action : sig
         ; error : bool
         }
     | Dismiss_toast of int
+    | Search_sessions of int
+    (** the sidebar's search [Search_sessions_later] scheduled: the backend
+        searches the messages unless the query changed since *)
     | Update_ready
     (** from the page: a new build's service worker is installed, waiting for
         the page to reload into it *)
@@ -864,6 +874,9 @@ module Model : sig
           and the settings: {!Action.Toggle_status_tray}) *)
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_query : string
+    ; session_hits : Session_hits.t option
+      (** the backend's search of the messages for [session_query] *)
+    ; session_search : int (** counts the searches typed *)
     ; archived_open : bool (** the sidebar shows the archived sessions *)
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t

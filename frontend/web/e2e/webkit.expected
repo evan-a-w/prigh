@@ -2660,6 +2660,31 @@ note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === webkit: filter: errors ===
 none
+=== webkit: search: a title and a reply ===
+[Port] the tmux tests
+where does the server listen?
+    …can make the listen [port] configurable through the config file: add a `[port]` key.
+=== webkit: search: the messages, once typing pauses ===
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+=== webkit: search: nothing matches ===
+No sessions match “zebra quokka”. Search looks in titles and messages.
+=== webkit: search: Esc clears the search ===
+query: ""; rows: 3
+=== webkit: search: 390x844 ===
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+page overflows sideways: false
+sidebar overflows sideways: false
+snippet inside the screen: true
+=== webkit: search: 320x640 ===
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+page overflows sideways: false
+sidebar overflows sideways: false
+snippet inside the screen: true
+=== webkit: search: errors ===
+none
 === webkit: viewer: desktop: fit ===
 thumbnails: 3, named: View [image: image/png, 4.1 KB]
 focused: Close

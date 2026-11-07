@@ -236,7 +236,9 @@ let%expect_test "search: by repository, branch and worktree" =
   H.text h ~selector:".session-title";
   [%expect
     {|
+    (Search_sessions_later (search 1) (after_ms 150))
     Main work
+    (Search_sessions_later (search 2) (after_ms 150))
     New hero
     |}]
 ;;

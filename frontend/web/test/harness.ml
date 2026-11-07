@@ -35,6 +35,7 @@ let rec act t action =
      | Set_url_session _
      | Clear_text_selection
      | Expire_toast _
+     | Search_sessions_later _
      | Focus _
      | Set_caret _
      | Cache_prefs _

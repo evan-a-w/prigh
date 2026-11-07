@@ -17,6 +17,7 @@ let danger =
       ; destructive = Always
       ; on_host = false
       ; freeform = None
+      ; native = None
       }
   ; run = (fun _ _ -> Tool.Result.ok "done it")
   }
