@@ -130,6 +130,10 @@ let bindings =
       Toggle_archived
       "/sessions: archive or unarchive the highlighted session"
   ; b
+      [ Key.alt (Char "t") ]
+      Toggle_pinned
+      "/sessions: pin the highlighted session to the top, or unpin it"
+  ; b
       [ Key.alt (Char "r") ]
       Review_highlighted
       "/worktree: review the highlighted worktree's changes"
@@ -185,6 +189,7 @@ let list_help =
          cancel · /jobs: kill · /queue, /remind, /worktree: remove" )
     ; "Tab", "/sessions: mark or unmark the highlighted session"
     ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
+    ; "Alt+T", "/sessions: pin or unpin the highlighted session"
     ; "Alt+R", "/worktree: review the highlighted worktree's changes"
     ; "Alt+D", "/sessions: delete every archived session"
     ; ( "Ctrl+N"
