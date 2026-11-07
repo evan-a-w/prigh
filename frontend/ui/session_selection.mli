@@ -1,7 +1,8 @@
 open! Core
 open! Import
 
-(** The [/sessions] picker's data: active sessions first, each with its
+(** The [/sessions] picker's data: the pinned sessions first (under a
+    divider), then the others, each with its
     repository and branch and its worktrees ({!Session_worktrees}), then
     the archived ones after a divider, dimmed. Also what its keys, [/delete] and
     [/delete-archived] act on and the confirmations they ask. *)
@@ -31,8 +32,12 @@ val find : t -> string -> P.Session_summary.t option
 (** What Ctrl+D deletes: the marked sessions, else the highlighted one. *)
 val targets : t -> Picker.t -> P.Session_summary.t list
 
-(** As if archived (or unarchived) already, so the picker shows it at once. *)
+(** As if archived (or unarchived) already, so the picker shows it at once;
+    archiving unpins. *)
 val set_archived : t -> path:string -> archived:bool -> t
+
+(** As if pinned (or unpinned) already; pinning unarchives. *)
+val set_pinned : t -> path:string -> pinned:bool -> t
 
 val remove : t -> paths:string list -> t
 

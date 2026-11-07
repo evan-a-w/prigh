@@ -255,8 +255,8 @@ let every =
   ; c
       "sessions"
       ""
-      "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D \
-       deletes all archived, Ctrl+N named)"
+      "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T \
+       pins, Alt+D deletes all archived, Ctrl+N named)"
   ; c
       ~argument:Argument.Sessions
       "archive"
@@ -267,6 +267,17 @@ let every =
       "unarchive"
       "[session]"
       "unarchive a session (the current one without an argument)"
+  ; c
+      ~argument:Argument.Sessions
+      "pin"
+      "[session]"
+      "pin a session to the top of /sessions, where it is never archived for \
+       being idle (the current one without an argument)"
+  ; c
+      ~argument:Argument.Sessions
+      "unpin"
+      "[session]"
+      "unpin a session (the current one without an argument)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
       ~argument:Argument.Agents
