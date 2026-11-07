@@ -23,18 +23,48 @@ use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 struct Bus {
     daemon: Child,
     address: String,
+    dir: std::path::PathBuf,
 }
 
 impl Drop for Bus {
     fn drop(&mut self) {
         let _ = self.daemon.kill();
         let _ = self.daemon.wait();
+        let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
 
+/// A bus of its own (not the system's session config, which a build
+/// sandbox may not be able to follow).
 fn bus() -> Option<Bus> {
+    static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("prigh-computer-bus-{}-{n}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = dir.join("bus.conf");
+    std::fs::write(
+        &config,
+        format!(
+            r#"<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <listen>unix:path={}</listen>
+  <auth>EXTERNAL</auth>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+"#,
+            dir.join("bus").display()
+        ),
+    )
+    .unwrap();
     let mut daemon = match Command::new("dbus-daemon")
-        .args(["--session", "--nofork", "--nopidfile", "--print-address=1"])
+        .arg(format!("--config-file={}", config.display()))
+        .args(["--nofork", "--nopidfile", "--print-address=1"])
         .stdout(Stdio::piped())
         .spawn()
     {
@@ -47,7 +77,9 @@ fn bus() -> Option<Bus> {
     };
     let mut line = String::new();
     std::io::BufReader::new(daemon.stdout.take().unwrap()).read_line(&mut line).unwrap();
-    Some(Bus { daemon, address: line.trim().to_string() })
+    let address = line.trim().to_string();
+    assert!(!address.is_empty(), "dbus-daemon printed no address");
+    Some(Bus { daemon, address, dir })
 }
 
 #[derive(Default)]
