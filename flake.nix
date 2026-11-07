@@ -182,6 +182,7 @@
         desktopVersion = desktop.version;
         prighDesktopUnwrapped = desktop.unwrapped;
         prighDesktop = desktop.wrapped;
+        prighComputer = desktop.computer;
       in
       {
         legacyPackages = frontendScope;
@@ -192,6 +193,9 @@
           backend = prighBackend;
           prigh-desktop = prighDesktop;
           prigh-desktop-unwrapped = prighDesktopUnwrapped;
+        }
+        // lib.optionalAttrs isLinux {
+          prigh-computer = prighComputer;
         };
 
         apps.default = {
@@ -377,6 +381,32 @@
           else
             pkgs.runCommand "prigh-desktop-window-skipped" { } ''touch "$out"'';
 
+        # desktop/computer/test: prigh-computer on a headless sway (wlroots)
+        # and Xvfb (X11), each with an app printing the input it gets, and
+        # an exec through `prigh tool-host -computer`.
+        checks.computer-use =
+          if isLinux then
+            pkgs.runCommand "prigh-computer-use"
+              {
+                nativeBuildInputs = [
+                  pkgs.sway-unwrapped
+                  pkgs.wev
+                  pkgs.xorg.xvfb
+                  pkgs.xorg.xev
+                  pkgs.procps
+                ];
+              }
+              ''
+                cp -r ${./desktop/computer/test} test
+                chmod -R u+w test
+                patchShebangs test
+                bash test/run.sh ${prighComputer}/bin/prigh-computer > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
+                diff -u test/expected.txt actual.txt
+                touch "$out"
+              ''
+          else
+            pkgs.runCommand "prigh-computer-use-skipped" { } ''touch "$out"'';
+
         # nix/home-manager.nix, evaluated with stand-ins for the two Home
         # Manager options it sets.
         checks.home-manager-module =
@@ -417,6 +447,7 @@
                     "/my proj"
                   ];
                   disableDmabuf = true;
+                  computerUse = true;
                   window = "browser";
                   browser = pkgs.writeShellScriptBin "my-chrome" "";
                 };
@@ -467,9 +498,12 @@
             grep -q 'WEBKIT_DISABLE_DMABUF_RENDERER.*1' "$wrapper"
             grep -q 'PRIGH_DESKTOP_WINDOW.*browser' "$wrapper"
             grep -q 'PRIGH_DESKTOP_BROWSER.*/bin/my-chrome' "$wrapper"
+            grep -q "PRIGH_DESKTOP_ARGS.*/my proj.* -computer" "$wrapper"
+            grep -q 'PRIGH_COMPUTER.*${prighComputer}/bin/prigh-computer' "$wrapper"
             # the default: auto
             grep -q 'PRIGH_DESKTOP_WINDOW.*auto' ${localUi}/bin/prigh-desktop
             ! grep -q PRIGH_DESKTOP_BROWSER ${localUi}/bin/prigh-desktop
+            ! grep -q -- '-computer\|PRIGH_COMPUTER' ${localUi}/bin/prigh-desktop
             grep -q 'PRIGH_DESKTOP_ARGS.*-ui local' ${localUi}/bin/prigh-desktop
             # built from this nixpkgs: the same derivation as the flake's here
             test "${systemNixpkgs.unwrapped}" = "${prighDesktopUnwrapped}"

@@ -26,6 +26,7 @@ wheel (axis, value120) (0, 240)
 {"cursor":{"x":100,"y":50},"id":5,"ok":true,"real":{"x":200,"y":100},"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"scrolled 0,2 at (100, 50)"}
 {"cursor":{"x":100,"y":50},"id":6,"ok":true,"screenshot":{"data":"…","height":72,"mime_type":"image/png","width":128},"text":"zoomed into [0, 0, 64, 36]"}
 -- xev received:
+key Shift_L state 0x0
 button 1 at 640,360 state 0x0
 key h state 0x0
 key e state 0x0
