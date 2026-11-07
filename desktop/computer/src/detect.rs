@@ -1,8 +1,9 @@
 //! Which backend drives this desktop. On Linux: a Wayland compositor with
 //! wlroots' virtual-pointer and screencopy protocols (Hyprland, sway,
 //! river, ...) is driven through them; otherwise an X11 session through
-//! XTEST. GNOME and KDE on Wayland need xdg-desktop-portal (RemoteDesktop
-//! and ScreenCast), and macOS and Windows their own backends: follow-ups.
+//! XTEST. On macOS: ScreenCaptureKit and Quartz events. GNOME and KDE on
+//! Wayland need xdg-desktop-portal (RemoteDesktop and ScreenCast), and
+//! Windows its own backend: follow-ups.
 
 use crate::backend::Backend;
 
@@ -11,6 +12,7 @@ pub enum Kind {
     Fake,
     Wlroots,
     X11,
+    Macos,
 }
 
 impl Kind {
@@ -20,7 +22,8 @@ impl Kind {
             "fake" => Ok(Some(Kind::Fake)),
             "wlroots" => Ok(Some(Kind::Wlroots)),
             "x11" => Ok(Some(Kind::X11)),
-            other => Err(format!("--backend {other:?}: use auto, wlroots, x11 or fake")),
+            "macos" => Ok(Some(Kind::Macos)),
+            other => Err(format!("--backend {other:?}: use auto, wlroots, x11, macos or fake")),
         }
     }
 }
@@ -40,11 +43,7 @@ pub struct Environment {
 pub fn decide(env: &Environment) -> Result<Kind, String> {
     match env.os {
         "linux" | "freebsd" | "openbsd" | "netbsd" => {}
-        "macos" => {
-            return Err("computer use on macOS is not supported yet (it is planned: a follow-up adds a \
-                        ScreenCaptureKit and CGEvent backend)"
-                .into())
-        }
+        "macos" => return Ok(Kind::Macos),
         "windows" => {
             return Err(
                 "computer use on Windows is not supported yet (it is planned: a follow-up adds a Windows backend)"
@@ -97,9 +96,25 @@ pub fn open(kind: Option<Kind>, options: &Options) -> Result<Box<dyn Backend>, S
         Kind::Wlroots => Ok(Box::new(crate::wlroots::Wlroots::connect()?)),
         #[cfg(target_os = "linux")]
         Kind::X11 => Ok(Box::new(crate::x11::X11::connect()?)),
+        #[cfg(target_os = "macos")]
+        Kind::Macos => Ok(Box::new(crate::macos::Macos::connect()?)),
         #[cfg(not(target_os = "linux"))]
-        Kind::Wlroots | Kind::X11 => Err(decide(&current()).err().unwrap_or_else(|| "not supported here".into())),
+        Kind::Wlroots | Kind::X11 => Err(unavailable(kind)),
+        #[cfg(not(target_os = "macos"))]
+        Kind::Macos => Err(unavailable(kind)),
     }
+}
+
+/// A backend this build lacks, asked for with --backend.
+#[allow(dead_code)]
+fn unavailable(kind: Kind) -> String {
+    let (name, os) = match kind {
+        Kind::Wlroots => ("wlroots", "Linux"),
+        Kind::X11 => ("x11", "Linux"),
+        Kind::Macos => ("macos", "macOS"),
+        Kind::Fake => ("fake", "every system"),
+    };
+    format!("--backend {name} works only on {os}, not on {}", std::env::consts::OS)
 }
 
 pub fn current() -> Environment {
@@ -146,11 +161,12 @@ mod tests {
         assert!(decide(&env(true, false, None, Some(Err("refused".into())))).unwrap_err().contains("refused"));
         assert!(decide(&env(false, false, None, None)).unwrap_err().starts_with("no desktop to control"));
         let mac = Environment { os: "macos", ..Default::default() };
-        assert!(decide(&mac).unwrap_err().contains("macOS is not supported yet"));
+        assert_eq!(decide(&mac), Ok(Kind::Macos));
         let win = Environment { os: "windows", ..Default::default() };
         assert!(decide(&win).unwrap_err().contains("Windows is not supported yet"));
         assert_eq!(Kind::parse("auto"), Ok(None));
         assert_eq!(Kind::parse("x11"), Ok(Some(Kind::X11)));
+        assert_eq!(Kind::parse("macos"), Ok(Some(Kind::Macos)));
         assert!(Kind::parse("mac").is_err());
     }
 }

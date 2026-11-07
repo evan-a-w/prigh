@@ -2649,9 +2649,11 @@ name = "prigh-computer"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "image",
  "libc",
  "memmap2",
+ "objc2",
  "serde",
  "serde_json",
  "wayland-client",
