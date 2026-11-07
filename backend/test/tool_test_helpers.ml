@@ -141,6 +141,7 @@ let filler =
       ; destructive = Never
       ; on_host = false
       ; freeform = None
+      ; native = None
       }
   ; run =
       (fun _ args ->

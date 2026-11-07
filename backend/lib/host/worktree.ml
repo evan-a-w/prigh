@@ -606,6 +606,7 @@ let op_tool name =
       ; destructive = Never
       ; on_host = true
       ; freeform = None
+      ; native = None
       }
   ; run =
       (fun (context : Tool.Context.t) arguments ->
