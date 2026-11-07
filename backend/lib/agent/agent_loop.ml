@@ -379,8 +379,9 @@ let run
       (* Images over the model's limit are sent downscaled. *)
       let fit_images () =
         let messages =
-          Computer_screenshots.keep_last
-            config.compaction.computer_screenshots
+          Computer_screenshots.prune
+            ~min:config.compaction.computer_screenshots
+            ~max:config.compaction.computer_screenshots_max
             !messages
         in
         let limit =

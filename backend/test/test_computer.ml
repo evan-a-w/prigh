@@ -429,7 +429,7 @@ let%expect_test "the tool is offered only while the host runs it" =
 ;;
 
 let%expect_test
-    "a sequence of actions: real coordinates, older screenshots omitted"
+    "a sequence of actions: real coordinates, every screenshot under the cap"
   =
   let call id args = Reply.tool_call ~id ~name:"computer" ~arguments:args () in
   with_agent
@@ -470,15 +470,15 @@ let%expect_test
       sees w4: wait 0.01s | waited | cursor at (640, 312)
     assistant:
     --- request
-      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 | [screenshot omitted]
+      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
       sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees t3: type “hello” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees w4: wait 0.01s | waited | cursor at (640, 312)
       sees k5: key Return | cursor at (640, 312) | screenshot 1280×800 <screenshot>
     assistant:
     --- request
-      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 | [screenshot omitted]
-      sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 | [screenshot omitted]
+      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
+      sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees t3: type “hello” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees w4: wait 0.01s | waited | cursor at (640, 312)
       sees k5: key Return | cursor at (640, 312) | screenshot 1280×800 <screenshot>
@@ -525,5 +525,115 @@ let%expect_test "the user taking over stops the run" =
       sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
       sees c2: [interrupted] you moved the mouse: stopped (computer use paused until the next prompt)
     assistant: never asked
+    |}]
+;;
+
+let%expect_test "screenshots are pruned in batches, keeping the prefix" =
+  let min = 3
+  and max = 8 in
+  print_endline "n  omitted  kept";
+  List.iter (List.range 0 20) ~f:(fun n ->
+    let omitted = Computer_screenshots.omitted ~min ~max n in
+    printf "%-2d %-8d %d\n" n omitted (n - omitted));
+  [%expect
+    {|
+    n  omitted  kept
+    0  0        0
+    1  0        1
+    2  0        2
+    3  0        3
+    4  0        4
+    5  0        5
+    6  0        6
+    7  0        7
+    8  0        8
+    9  6        3
+    10 6        4
+    11 6        5
+    12 6        6
+    13 6        7
+    14 6        8
+    15 12       3
+    16 12       4
+    17 12       5
+    18 12       6
+    19 12       7
+    |}];
+  (* A computer-use loop: each step adds the model's call and its result
+     (every fourth a wait, without a screenshot). The request differs from
+     the one before only from where it was cut. *)
+  let image = { Image.mime_type = "image/png"; data = "AAAA" } in
+  let step i =
+    let id = sprintf "c%d" i in
+    let wait = i % 4 = 3 in
+    [ Message.Assistant
+        { content =
+            [ Tool_call
+                { id
+                ; name = "computer"
+                ; arguments =
+                    (if wait
+                     then {|{"action":"wait","seconds":1}|}
+                     else {|{"action":"screenshot"}|})
+                }
+            ]
+        ; stop_reason = Tool_use
+        ; usage = Usage.zero
+        ; model = "anthropic/claude-sonnet-4-6"
+        }
+    ; Tool_result
+        { tool_call_id = id
+        ; tool_name = "computer"
+        ; text = (if wait then "wait 1s" else "screenshot")
+        ; is_error = false
+        ; images = (if wait then [] else [ image ])
+        }
+    ]
+  in
+  let messages = ref [ Message.user "go" ] in
+  let previous = ref [] in
+  print_endline "step  sent images  first changed message (-: only appended)";
+  for i = 1 to 20 do
+    messages := !messages @ step i;
+    let sent = Computer_screenshots.prune ~min ~max !messages in
+    let images =
+      List.sum (module Int) sent ~f:(function
+        | Tool_result r -> List.length r.images
+        | _ -> 0)
+    in
+    let first_changed =
+      List.findi !previous ~f:(fun i m ->
+        not (Message.equal m (List.nth_exn sent i)))
+      |> Option.map ~f:fst
+    in
+    printf
+      "%-5d %-12d %s\n"
+      i
+      images
+      (Option.value_map first_changed ~default:"-" ~f:Int.to_string);
+    previous := sent
+  done;
+  [%expect {|
+    step  sent images  first changed message (-: only appended)
+    1     1            -
+    2     2            -
+    3     2            -
+    4     3            -
+    5     4            -
+    6     5            -
+    7     5            -
+    8     6            -
+    9     7            -
+    10    8            -
+    11    8            -
+    12    3            2
+    13    4            -
+    14    5            -
+    15    5            -
+    16    6            -
+    17    7            -
+    18    8            -
+    19    8            -
+    20    3            18
     |}]
 ;;
