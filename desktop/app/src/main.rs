@@ -648,6 +648,14 @@ fn sidecar_path() -> String {
     )
 }
 
+/// `prigh-computer.exe` next to the app (the Windows installers bundle
+/// it), for computer use from WSL.
+fn bundled_computer() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let helper = exe.parent()?.join("prigh-computer.exe");
+    helper.is_file().then(|| helper.to_string_lossy().into_owned())
+}
+
 fn is_executable(path: &str) -> bool {
     #[cfg(unix)]
     {
@@ -678,6 +686,9 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
             backend: std::env::var("PRIGH_DESKTOP_BACKEND").ok(),
             args: std::env::var("PRIGH_DESKTOP_ARGS").ok(),
             wsl_distro: std::env::var("PRIGH_DESKTOP_WSL_DISTRO").ok(),
+            bundled_computer: if OS == Os::Windows { bundled_computer() } else { None },
+            computer: std::env::var("PRIGH_COMPUTER").ok(),
+            wslenv: std::env::var("WSLENV").ok(),
         };
         let plan = launch::plan(OS, &env, |name| search_path::find(name, path.as_deref().unwrap_or(""), is_executable));
         let plan = match plan {
@@ -686,8 +697,12 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
             Err(launch::Error::BadArgs(e)) => return fail(&app, Failure::BadArgs(e), 2),
         };
         log(format!("starting {} {}", plan.program, plan.args.join(" ")));
+        for (k, v) in &plan.env {
+            log(format!("with {k}={v}"));
+        }
         let mut cmd = Command::new(&plan.program);
         cmd.args(&plan.args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.envs(plan.env.iter().map(|(k, v)| (k, v)));
         if let Some(path) = &path {
             cmd.env("PATH", path);
         }
