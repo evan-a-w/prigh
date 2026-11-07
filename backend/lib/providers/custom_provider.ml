@@ -188,6 +188,7 @@ let model t ?listed id =
         (get (fun o -> o.cost))
         ~default:{ Model.Cost.input = 0.; output = 0.; cache_read = 0. }
   ; supports_images = Option.value (get (fun o -> o.images)) ~default:true
+  ; native_computer = None
   }
 ;;
 

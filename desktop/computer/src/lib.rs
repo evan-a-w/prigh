@@ -10,9 +10,15 @@ pub mod driver;
 pub mod fake;
 pub mod keymap;
 pub mod keysym;
+#[cfg(target_os = "macos")]
+pub mod macos;
 #[cfg(target_os = "linux")]
 pub mod portal;
+pub mod quartz;
 pub mod scale;
+pub mod win_input;
+#[cfg(windows)]
+pub mod windows;
 #[cfg(target_os = "linux")]
 pub mod screencast;
 #[cfg(target_os = "linux")]

@@ -13,6 +13,7 @@ let tools =
     ; parallel_safe = false
     ; on_host = true
     ; freeform = None
+    ; native = None
     ; destructive = Always
     ; description = "Run a command"
     ; parameters =

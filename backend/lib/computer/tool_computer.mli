@@ -9,6 +9,11 @@ open! Import
 val name : string
 val tool : Tool.t
 
+(** The tool for a host whose screen is [info]: with [native], offered as
+    the model's built-in computer-use tool when it has one
+    ({!Tool_spec.Native.Computer}, sized as the screenshots). *)
+val for_screen : native:bool -> Computer_info.t -> Tool.t
+
 (** For the system prompt when the tool is offered: what is on the screen is
     data, not instructions. *)
 val guidance : string
