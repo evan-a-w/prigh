@@ -982,6 +982,34 @@ let browser_signin_command =
           | Error e -> fail (Error.to_string_hum e)))
 ;;
 
+module Computer_flag = struct
+  let param =
+    Command.Param.flag
+      "-computer"
+      Command.Param.no_arg
+      ~doc:
+        " let sessions see and drive this machine's desktop (the computer \
+         tool), through prigh-computer ($PRIGH_COMPUTER, else on PATH)"
+  ;;
+
+  (* Off, with the reason on stderr, when there is no screen to control. *)
+  let enable ~env ~sw ~log on =
+    if not on
+    then None
+    else (
+      match Computer_helper.enable ~env ~sw with
+      | Ok helper ->
+        log
+          (sprintf
+             "computer use is on: %s"
+             (Computer_info.to_string_hum (Computer_helper.info helper)));
+        Some helper
+      | Error e ->
+        log (sprintf "computer use is off: %s" (Error.to_string_hum e));
+        None)
+  ;;
+end
+
 let tool_host_command =
   Command.basic
     ~summary:
@@ -1035,14 +1063,19 @@ let tool_host_command =
          "-cwd"
          (optional string)
          ~doc:"DIR the host's directory (default: the current one)"
+     and computer = Computer_flag.param
      in
      fun () ->
        if Option.is_none connect && not remote
        then
          Eio_main.run
          @@ fun env ->
+         Eio.Switch.run
+         @@ fun sw ->
          Tool_host.run
            ~env
+           ?computer:
+             (Computer_flag.enable ~env ~sw ~log:(eprintf "prigh tool-host: %s\n%!") computer)
            ~input:(Eio.Stdenv.stdin env)
            ~output:(Eio.Stdenv.stdout env)
            ()
@@ -1094,8 +1127,12 @@ let tool_host_command =
          let refused =
            Eio_main.run
            @@ fun env ->
+           Eio.Switch.run
+           @@ fun sw ->
            Tool_host.connect
              ~env
+             ?computer:
+               (Computer_flag.enable ~env ~sw ~log:(eprintf "prigh tool-host: %s\n%!") computer)
              ~signin:(fun ~why remote ->
                let result =
                  Browser_signin.run_on_terminal
@@ -1238,6 +1275,7 @@ let web_command =
             build)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the page in a browser"
+     and computer = Computer_flag.param
      in
      fun () ->
        let home = home () in
@@ -1366,6 +1404,7 @@ let web_command =
              ; name = Option.value name ~default:(Core_unix.gethostname ())
              ; host_id
              ; cwd
+             ; computer = Computer_flag.enable ~env ~sw ~log computer
              ; listen
              ; root
              })
@@ -1465,6 +1504,7 @@ let desktop_command =
          ~doc:
            "DIR the built prigh-web site (default: $PRIGH_WEB_ROOT or the dune \
             build)"
+     and computer = Computer_flag.param
      in
      fun () ->
        let home = home () in
@@ -1537,6 +1577,9 @@ let desktop_command =
        let ended =
          Eio_main.run
          @@ fun env ->
+         Eio.Switch.run
+         @@ fun sw ->
+         let computer = Computer_flag.enable ~env ~sw ~log computer in
          listen_or_exit ~flag:"-listen" listen_addr (fun () ->
            Desktop_sidecar.run
              ~env
@@ -1554,6 +1597,7 @@ let desktop_command =
              ; name = Option.value name ~default:(Core_unix.gethostname ())
              ; host_id
              ; cwd
+             ; computer
              ; listen
              ; root
              ; save = Saved_connection.save ~home

@@ -48,6 +48,9 @@ module Worker : sig
     -> sw:Switch.t
     -> terminals:Terminals.t Lazy.t
     -> mcp:Mcp_hub.t
+    -> ?computer:Computer_helper.t
+         (** runs the [computer] tool; without it, the tool says computer
+             use is off *)
     -> default_cwd:string
     -> ?files:
          (session_id:string option -> call_id:string option -> File_access.t)
@@ -67,11 +70,16 @@ end
 (** What a tool host announces in [hello]'s [features]. *)
 val features : string list
 
+(** Said in [features] (with [hello]'s [computer], its
+    {!Computer_info}) by a host that runs the [computer] tool. *)
+val computer_feature : string
+
 (** Serves JSON lines until [input] ends. [terminals] defaults to
     {!Terminals.create}'s defaults, created on first use. *)
 val run
   :  env:Env.t
   -> ?terminals:Terminals.t Lazy.t
+  -> ?computer:Computer_helper.t
   -> input:_ Eio.Flow.source
   -> output:_ Eio.Flow.sink
   -> unit
@@ -102,6 +110,8 @@ val connect
   -> ?heartbeat_interval:float
   -> ?heartbeat_timeout:float
   -> ?on_connect:(unit -> unit) (** after each accepted [hello] *)
+  -> ?computer:Computer_helper.t
+       (** runs the [computer] tool, said in [hello] *)
   -> ?signin:
        (why:string
         -> Backend_address.t

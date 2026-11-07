@@ -100,6 +100,7 @@ module Tool_host_config : sig
     ; name : string
     ; host_id : string
     ; cwd : string
+    ; computer : Computer_helper.t option
     }
 end
 
@@ -122,6 +123,8 @@ module Config : sig
     ; name : string (** the tool host's *)
     ; host_id : string
     ; cwd : string (** the tool host's *)
+    ; computer : Computer_helper.t option
+      (** the tool host runs the [computer] tool with it (-computer) *)
     ; listen : Listen.t
     ; root : string (** the built site *)
     }
