@@ -166,15 +166,28 @@ let request t ~cancel json =
        | json -> json)
   in
   let attempt () =
+    let started () =
+      let transport = t.start () in
+      t.running <- Some transport;
+      transport
+    in
     let transport =
       match t.running with
       | Some transport -> transport
-      | None ->
-        let transport = t.start () in
-        t.running <- Some transport;
+      | None -> started ()
+    in
+    (* A helper that died since the last action never saw this one: send it
+       to a new one. *)
+    let transport =
+      match transport.send line with
+      | () -> transport
+      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+      | exception _ ->
+        stop t;
+        let transport = started () in
+        transport.send line;
         transport
     in
-    transport.send line;
     let rec reply () =
       match transport.receive () with
       | None -> Error "prigh-computer exited"
