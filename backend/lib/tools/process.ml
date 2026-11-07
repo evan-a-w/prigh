@@ -36,6 +36,7 @@ let run
       ?(cancel = Cancellation.never)
       ?(on_stdout = ignore)
       ?(on_stderr = ignore)
+      ?(merge_stderr = false)
       ~prog
       ~args
       ()
@@ -45,7 +46,7 @@ let run
   let mgr = Eio.Stdenv.process_mgr env in
   let stdin_r, stdin_w = Eio_unix.pipe sw in
   let stdout_r, stdout_w = Eio_unix.pipe sw in
-  let stderr_r, stderr_w = Eio_unix.pipe sw in
+  let stderr = if merge_stderr then None else Some (Eio_unix.pipe sw) in
   let process_env =
     if List.is_empty extra_env
     then None
@@ -67,7 +68,12 @@ let run
       ~fds:
         [ 0, Eio_unix.Resource.fd stdin_r, `Blocking
         ; 1, Eio_unix.Resource.fd stdout_w, `Blocking
-        ; 2, Eio_unix.Resource.fd stderr_w, `Blocking
+        ; ( 2
+          , Eio_unix.Resource.fd
+              (match stderr with
+               | Some (_, stderr_w) -> stderr_w
+               | None -> stdout_w)
+          , `Blocking )
         ]
       ?env:process_env
       (prog :: args)
@@ -82,7 +88,7 @@ let run
     if not !reaped then Signal_unix.send_i Signal.kill group);
   Eio.Flow.close stdin_r;
   Eio.Flow.close stdout_w;
-  Eio.Flow.close stderr_w;
+  Option.iter stderr ~f:(fun (_, stderr_w) -> Eio.Flow.close stderr_w);
   (* The child may exit without reading its input; that must not be an error. *)
   (match input with
    | None ->
@@ -110,7 +116,9 @@ let run
   let drain () =
     Fiber.both
       (fun () -> pump stdout_r ~on_data:on_stdout)
-      (fun () -> pump stderr_r ~on_data:on_stderr)
+      (fun () ->
+         Option.iter stderr ~f:(fun (stderr_r, _) ->
+           pump stderr_r ~on_data:on_stderr))
   in
   let wait () =
     drain ();
