@@ -263,3 +263,89 @@ let%expect_test "before: one subsequence over everything" =
     "xyz" (0)
     |}]
 ;;
+
+let render_ranges text ranges =
+  String.concat
+    (List.map (Session_search.pieces text ranges) ~f:(function
+       | `Plain, s -> s
+       | `Match, s -> "[" ^ s ^ "]"))
+;;
+
+let why (w : Session_search.Why.t) =
+  sprintf
+    "%s:%s/%s"
+    w.word
+    (Sexp.to_string (Session_search.Field.sexp_of_t w.field))
+    (Sexp.to_string (Session_search.Kind.sexp_of_t w.kind))
+;;
+
+let%expect_test "after: every word, in any field, best field and match first" =
+  List.iter queries ~f:(fun query ->
+    let ranked = Session_search.sessions ~query sessions in
+    printf "%S (%d)\n" query (List.length ranked);
+    List.iteri ranked ~f:(fun i (r : Session_search.Result.t) ->
+      if i < 4
+      then
+        printf
+          "  %s %3d %s  (%s)\n"
+          r.session.id
+          r.score
+          (render_ranges (Session_search.title r.session) r.title)
+          (String.concat ~sep:" " (List.map r.why ~f:why)));
+    if List.length ranked > 4 then printf "  ...\n");
+  [%expect {|
+    "port" (3)
+      s02  40 Make the [port] configurable  (port:Name/Exact)
+      s06  30 [port] the tmux tests to the private socket  (port:Prompt/Exact)
+      s09  30 configure the reverse proxy for the web server [port]  (port:Prompt/Exact)
+    "port config" (2)
+      s02  72 Make the [port] [config]urable  (port:Name/Exact config:Name/Prefix)
+      s09  54 [config]ure the reverse proxy for the web server [port]  (port:Prompt/Exact config:Prompt/Prefix)
+    "config port" (2)
+      s02  72 Make the [port] [config]urable  (config:Name/Prefix port:Name/Exact)
+      s09  54 [config]ure the reverse proxy for the web server [port]  (config:Prompt/Prefix port:Prompt/Exact)
+    "configurable port" (1)
+      s02  80 Make the [port] [configurable]  (configurable:Name/Exact port:Name/Exact)
+    "websocket" (1)
+      s01  40 Fix flaky [websocket] reconnect  (websocket:Name/Exact)
+    "web socket" (1)
+      s01  56 Fix flaky [websocket] reconnect  (web:Name/Prefix socket:Name/Substring)
+    "reconect" (1)
+      s01  16 Fix flaky websocket [reconnect]  (reconect:Name/Typo)
+    "compaction plan" (1)
+      s03  60 why does the [compaction] summary lose the [plan]?  (compaction:Prompt/Exact plan:Prompt/Exact)
+    "plan compaction" (1)
+      s03  60 why does the [compaction] summary lose the [plan]?  (plan:Prompt/Exact compaction:Prompt/Exact)
+    "sesion search" (2)
+      s04  56 [Session] [search]  (sesion:Name/Typo search:Name/Exact)
+      s11  56 [Session] [search]  (sesion:Name/Typo search:Name/Exact)
+    "search" (2)
+      s04  40 Session [search]  (search:Name/Exact)
+      s11  40 Session [search]  (search:Name/Exact)
+    "cfg" (3)
+      s02  12 Make the port [c]on[f]i[g]urable  (cfg:Name/Subsequence)
+      s05  12 [C]on[f]i[g]ure nix cache  (cfg:Name/Subsequence)
+      s09   9 [c]on[f]i[g]ure the reverse proxy for the web server port  (cfg:Prompt/Subsequence)
+    "ws" (1)
+      s01  10 Fix flaky websocket reconnect  (ws:Place/Exact)
+    "e" (1)
+      s08  24 Anthropic retry on overload  (e:Prompt/Prefix)
+    "pr" (11)
+      s02  24 Make the port configurable  (pr:Prompt/Prefix)
+      s04  24 Session search  (pr:Prompt/Prefix)
+      s05  24 Configure nix cache  (pr:Prompt/Prefix)
+      s06  24 port the tmux tests to the [pr]ivate socket  (pr:Prompt/Prefix)
+      ...
+    "nix" (1)
+      s05  40 Configure [nix] cache  (nix:Name/Exact)
+    "dotfiles cache" (1)
+      s05  50 Configure nix [cache]  (dotfiles:Place/Exact cache:Name/Exact)
+    "phone overflow" (1)
+      s07  64 [Phone] layout of the sidebar  (phone:Name/Exact overflow:Prompt/Prefix)
+    "retry anthropic" (1)
+      s08  80 [Anthropic] [retry] on overload  (retry:Name/Exact anthropic:Name/Exact)
+    "pinned" (1)
+      s10  40 Compaction keeps [pinned] messages  (pinned:Name/Exact)
+    "xyz" (0)
+    |}]
+;;
