@@ -498,7 +498,9 @@ mod tests {
             r#"not json"#,
             r#"{"id":15,"op":"fake_log"}"#,
         ];
-        let out: Vec<String> = lines.iter().map(|l| ask(&mut d, l)).collect();
+        let platform = format!(r#""platform":"{}""#, std::env::consts::OS);
+        let out: Vec<String> =
+            lines.iter().map(|l| ask(&mut d, l).replace(&platform, r#""platform":"linux""#)).collect();
         let expected = [
             r#"{"id":1,"info":{"backend":"fake","detail":"in-memory framebuffer","height":400,"output":"FAKE-1","platform":"linux","scale":1.0,"scaled_height":200,"scaled_width":320,"width":640},"ok":true}"#,
             r#"{"cursor":{"x":160,"y":100},"id":2,"ok":true,"screenshot":{"data":"…","height":200,"mime_type":"image/png","width":320},"text":"screenshot"}"#,
