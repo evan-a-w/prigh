@@ -55,3 +55,7 @@ val tools_changed_note : added:string list -> removed:string list -> string
 (** When plan mode is switched on or off (before the next message, or
     between turns of a run). *)
 val plan_mode_note : on:bool -> string
+
+(** When the user's kind of client changes (and with the first prompt from
+    one): whether [render_ui]'s components can be shown. *)
+val client_note : Client_kind.t -> string

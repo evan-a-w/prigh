@@ -155,6 +155,13 @@ module Queued : sig
     ; source : Injected.Source.t option
     ; attachments : string list
     ; images : Image.t list
+    ; client : Client_kind.t option
+      (** the kind of client that sent it; when it is sent to the model it
+          becomes the agent's current client (what [render_ui] checks and
+          the model is told of) *)
+    ; ui_action : Ui_action.t option
+      (** an answer through a component: sent as its {!Ui_action.note},
+          [text] being its summary *)
     }
   [@@deriving sexp_of]
 end
@@ -254,10 +261,18 @@ val messages : t -> Message.t list
     A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
     ({!Skill.expand}); an unknown name is an error. *)
 
+(** [client] is the kind of client it comes from (see [Queued.client]).
+
+    A [ui_action] is the user's answer through a component of a [render_ui]
+    call of this session (else an error naming the call), sent instead of
+    the text ({!Ui_action}). *)
+
 (** Starts a run. Fails if one is already running. *)
 val prompt
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
+  -> ?ui_action:Ui_action.t
   -> t
   -> string
   -> unit Or_error.t
@@ -267,6 +282,7 @@ val prompt
 val steer
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
   -> t
   -> string
   -> unit Or_error.t
@@ -275,6 +291,8 @@ val steer
 val follow_up
   :  ?attachments:string list
   -> ?images:Image.t list
+  -> ?client:Client_kind.t
+  -> ?ui_action:Ui_action.t
   -> t
   -> string
   -> unit Or_error.t
@@ -297,11 +315,13 @@ val approve_mcp
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages
-    in order, then follow-ups. Emits [Queue_update]. *)
+    in order, then follow-ups (not answers through components). Emits [Queue_update]. *)
 val abort : t -> string list
 
 (** Pops the most recently queued message: follow-ups take priority over steer
-    messages. Emits [Queue_update] when a message was removed. *)
+    messages. Emits [Queue_update] when a message was removed. An answer
+    through a component ([ui_action]) is dropped like the others; callers
+    do not give it back to edit. *)
 val dequeue : t -> Queued.t option
 
 (** Removes the [index]th (from 0) message of a queue, if it is still there
@@ -562,11 +582,11 @@ val remove_worktree
     (all of [ARGS] otherwise) is extra instructions. The message is
     [Review.prompt] with the [Review] source; while a run is in progress it
     waits like a follow-up. Refused when there is nothing to review. *)
-val review : t -> args:string -> unit Or_error.t
+val review : ?client:Client_kind.t -> t -> args:string -> unit Or_error.t
 
 (** [/init]: a run asking the model to write or improve [AGENTS.md]
     ({!Init_prompt}), queued like [review]. *)
-val init : t -> unit Or_error.t
+val init : ?client:Client_kind.t -> t -> unit Or_error.t
 
 (** {2 Review: comments and approvals}
 
@@ -586,7 +606,7 @@ val update_review
     ({!Review_state.submit}) as a message with the [Review_comments] source,
     steering a running agent or starting a run; the comments it covers
     (with [root], those on that worktree). *)
-val submit_review : ?root:string -> t -> int Or_error.t
+val submit_review : ?client:Client_kind.t -> ?root:string -> t -> int Or_error.t
 
 (** Like [update_review], then records a {!Review_snapshot} of the file
     [path] of the worktree [root] for [action] (by the user [by]): [text],

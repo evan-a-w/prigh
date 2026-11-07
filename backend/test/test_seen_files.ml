@@ -272,7 +272,7 @@ let%expect_test "an agent's reads let it write; its subagents share what it saw"
     {|
     state: running=true subagents=[] jobs=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  write{"path":"plan.md","content":"mine\n"}
     tool_result write: refusing to overwrite $DIR/plan.md: it already exists and you have not read it in this session. Read $DIR/plan.md first, then write it again (or edit it to change parts of it)
     assistant:  read{"path":"plan.md"}

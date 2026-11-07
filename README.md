@@ -2842,6 +2842,15 @@ Codex) is session state: the status line shows `plan 2/5: current step`
 (`(+2 running)` when several run in parallel) while steps remain, `/todos` shows it whole, and the transcript shows every
 update as a checklist.
 
+In prigh-web the model can also show its answer as components, inline in
+the chat (`render_ui`): charts, tables, stats, timelines, diffs, file
+trees, images and galleries of files on the tool host, calculators,
+flashcards and quizzes, and forms, choices and checklists you answer
+through (your answer is sent as your next message, and the component shows
+what you sent). The model is told which frontend you prompt from, and in
+prigh-tui or an editor it answers in text instead (a component it showed
+earlier is a one-line placeholder there).
+
 With `ask_user` the model asks you one or more questions, each with
 optional choices (one, or several to pick) and room for your own answer. A
 dialog takes the keyboard: ↑/↓ choose, Space picks, typing writes your own

@@ -119,7 +119,9 @@ let%expect_test "a run hands over down the chain and carries on" =
   Agent.wait_idle agent;
   [%expect
     {|
-    request to openai-codex/gpt-6-sol, last user: fix the bug
+    request to openai-codex/gpt-6-sol, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    fix the bug
     assistant (gpt-6-sol):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: openai-codex/gpt-6-sol: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-opus-5-5
     request to anthropic/claude-opus-5-5, last user: [prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
@@ -145,7 +147,9 @@ let%expect_test "a hand-over never shows the agent idle in between" =
   [%expect
     {|
     state: running=true model=openai-codex/gpt-6-sol
-    request to openai-codex/gpt-6-sol, last user: go
+    request to openai-codex/gpt-6-sol, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant (gpt-6-sol):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: openai-codex/gpt-6-sol: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-opus-5-5
     state: running=true model=anthropic/claude-opus-5-5
@@ -169,7 +173,9 @@ let%expect_test "the end of the chain stops; other errors never hand over" =
   Agent.wait_idle agent;
   [%expect
     {|
-    request to openai-codex/gpt-6-sol, last user: go
+    request to openai-codex/gpt-6-sol, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant (gpt-6-sol):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: openai-codex/gpt-6-sol: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-opus-5-5
     request to anthropic/claude-opus-5-5, last user: [prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
@@ -200,7 +206,9 @@ let%expect_test "a model outside the chain hands over to the chain's first" =
   Agent.wait_idle agent;
   [%expect
     {|
-    request to deepseek/deepseek-v4-pro, last user: go
+    request to deepseek/deepseek-v4-pro, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant (deepseek-v4-pro):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: deepseek/deepseek-v4-pro: HTTP 429: The usage limit has been reached (usage limit reached); handing over to openai-codex/gpt-6-sol
     request to openai-codex/gpt-6-sol, last user: [prigh: deepseek/deepseek-v4-pro cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so openai-codex/gpt-6-sol takes over this conversation from here. Carry on with the task where it left off.]
@@ -215,7 +223,9 @@ let%expect_test "no chain: the error stands" =
   Agent.wait_idle agent;
   [%expect
     {|
-    request to deepseek/deepseek-flash, last user: go
+    request to deepseek/deepseek-flash, last user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     assistant (deepseek-flash):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: deepseek/deepseek-flash: the usage limit is reached and the provider did not say when it resets, so the run will not resume by itself; send a message to try again, or /model picks another model
     |}]

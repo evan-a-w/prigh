@@ -9,6 +9,7 @@ prints the captured panes.
   === after fg (repainted)
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ before
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ prints the captured panes.
   === editor works
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ before
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ prints the captured panes.
   === submitted as one message
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ line one
   ▌ line two
   ▌ line three

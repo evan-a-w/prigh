@@ -160,9 +160,9 @@ let%expect_test
     messages before: 2
     ["Header",{"id":"<id>","cwd":"$DIR","created_at":"<time>"}]
     ["Entry",{"id":"<id>","parent":null,"at":<at>,"payload":["Repo",{"cwd"
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Told_envir
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["System_pro
-    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Told_envir
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[
     {"type":"response","id":"r1","ok":true,"result":{"btw_id":"btw-1","text":"It said hello.","usage":{"input":100,"output":10,"cache_read":0},"cost_usd":4.2e-05}}
     {"type":"event","event":"btw_delta","btw_id":"btw-1","delta":"It "}
@@ -171,7 +171,7 @@ let%expect_test
     session file only gained:
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Spend",{"u
     model=deepseek-flash thinking=Off tools=0 system=<prigh system prompt>
-    user: say hello
+    user: [Client: the user is on another client, which cannot display component
     assistant: Hello there.
     user: <btw>The user asks a side question (/btw) while you may be in the midd
     state: message_count=2 usage=((input 110)(output 15)(cache_read 0))
@@ -278,7 +278,7 @@ let%expect_test
     running: true
     {"type":"response","id":"r1","ok":true,"result":{"btw_id":"btw-1","text":"I am listing files and about to echo.","usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06}}
     model=deepseek-flash thinking=Off tools=0 system=<prigh system prompt>
-    user: list and echo
+    user: [Client: the user is on another client, which cannot display component
     assistant: Listing, then echoing. [call c1 ls] [call c2 bash]
     tool_result c1: ".prigh/\nsessions/\n"
     tool_result c2: "[still running: no result yet]"
@@ -286,7 +286,7 @@ let%expect_test
     other client saw btw_delta: false
     still running: true
     {"type":"response","id":"r1","ok":true,"result":{}}
-    user: list and echo
+    user: [Client: the user is on another client, which cannot display component
     assistant: Listing, then echoing. [call c1 ls] [call c2 bash]
     tool_result c1: ".prigh/\nsessions/\n"
     tool_result c2: "hi\n"

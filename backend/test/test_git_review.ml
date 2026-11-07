@@ -192,7 +192,13 @@ let%expect_test "/review: uncommitted changes, a base, instructions, nothing" =
   [%expect
     {|
     ok
-    (((source (Review (target "uncommitted changes")))))
+    (((notes
+       (((kind (Client (client Other)))
+         (text
+          "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"))))
+      (source (Review (target "uncommitted changes")))))
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     [prigh review] Review the uncommitted changes (staged, unstaged and untracked files) in the git repository at $DIR and give prioritised findings.
 
     This is a review only: do not modify any files.
@@ -289,7 +295,12 @@ let%expect_test "/review and /init wait for a running turn like a follow-up" =
     {|
     ok
     (() (/init))
-    ()
+    (((notes
+       (((kind (Client (client Other)))
+         (text
+          "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"))))))
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
     sleep
     assistant:
     assistant: slept

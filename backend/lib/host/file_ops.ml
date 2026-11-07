@@ -3,7 +3,7 @@ open! Import
 
 let max_upload = 2 * 1024 * 1024 * 1024
 let max_preview = 256 * 1024
-let max_image_preview = 20 * 1000 * 1000
+let max_image_preview = Image.max_preview_bytes
 let uploads_dir = ".prigh/uploads"
 
 (* How many chunks may be on their way to or from a host. *)
@@ -78,7 +78,7 @@ let preview agent ~path ~image_url =
   in
   return
     (`Object
-        (match Image.sniff data with
+        (match Image.sniff_displayable data with
          | Some mime when size > max_image_preview ->
            common "image" @ [ "mime", `String mime; "too_large", `True ]
          | Some mime ->
