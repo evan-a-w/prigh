@@ -515,6 +515,35 @@ model: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === firefox: phone: a chip's menu ===
 attach's menu: a sheet across the bottom; focus in it: true
+=== firefox: pinned ===
+Pinned
+1
+one more
+<AGE>
+cwd
+main
+Recent
+2
+count some lines
+<AGE>
+cwd
+main
+hello again
+<AGE>
+<CWD>
+pin: Pinned
+=== firefox: unpinned ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+hello again
+<AGE>
+<CWD>
 === firefox: archived, folded ===
 one more
 <AGE>
@@ -1224,6 +1253,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === firefox: worktrees: the new worktree dialog ===
@@ -1269,6 +1299,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === firefox: worktrees: Esc changed nothing ===
@@ -1295,6 +1326,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === firefox: worktrees: switched back ===
@@ -2963,7 +2995,7 @@ no menu
 === firefox: long press: Delete ===
 your messages: make the port configurable
 === firefox: long press: a session in the drawer ===
-menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, pin, archive, delete; a sheet at the bottom: true
 === firefox: long press: a worktree in the drawer ===
 menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === firefox: long press: a file of the review ===
