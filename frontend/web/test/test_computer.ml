@@ -26,11 +26,11 @@ let tool_end ?id ?(is_error = false) ?(images = true) arguments text =
      else "")
 ;;
 
-let shot action =
-  sprintf "%s\ncursor at (640, 312)\nscreenshot 1280×800" action
-;;
+let shot action = sprintf "%s\ncursor at (640, 312)\nscreenshot 1280×800" action
 
-let%expect_test "the card: the action, the screen after it with the point marked" =
+let%expect_test
+    "the card: the action, the screen after it with the point marked"
+  =
   Chat_harness.show
     ~selector:".tool"
     (Chat_harness.chat
@@ -41,7 +41,11 @@ let%expect_test "the card: the action, the screen after it with the point marked
            ~id:"c2"
            {|{"action":"type","text":"hello"}|}
            (shot "typed 5 characters")
-       ; tool_end ~id:"c3" ~images:false {|{"action":"wait","seconds":2}|} "waited 2s"
+       ; tool_end
+           ~id:"c3"
+           ~images:false
+           {|{"action":"wait","seconds":2}|}
+           "waited 2s"
        ; tool_end
            ~id:"c4"
            ~is_error:true
@@ -50,7 +54,8 @@ let%expect_test "the card: the action, the screen after it with the point marked
            "[interrupted] you moved the mouse: stopped (computer use paused \
             until the next prompt)"
        ]);
-  [%expect {|
+  [%expect
+    {|
     <div class="ok open tool tool-computer">
       <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
@@ -144,7 +149,8 @@ let%expect_test "while streaming: the action so far, running" =
        ~running:true
        [ {|{"type":"event","event":"tool_start","call":{"id":"c1","name":"computer","arguments":"{\"action\":\"scroll\",\"x\":10,\"y\":20,\"dy\":3}"}}|}
        ]);
-  [%expect {|
+  [%expect
+    {|
     <div class="running tool tool-computer">
       <div class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
@@ -160,7 +166,7 @@ let running = sprintf {|{"event":"state","state":%s}|}
 let state ~running =
   H.state_json
     ~fields:
-      [ "running", if running then `True else `False
+      [ ("running", if running then `True else `False)
       ; "active_host", `String "host-1"
       ; ( "hosts"
         , Jsonaf.of_string
@@ -196,7 +202,8 @@ let%expect_test "the banner: while a run drives the screen; Stop aborts it" =
   H.names h ~selector:".computer-banner button";
   [%expect {| button "Stop" -- Stop the agent (Esc) |}];
   H.click h ~selector:".computer-banner-stop";
-  [%expect {|
+  [%expect
+    {|
     Abort
     (Rpc (method_ abort) (params ()) (tag Restored))
     |}];

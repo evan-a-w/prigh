@@ -354,8 +354,7 @@ let present
       match result with
       | None -> []
       | Some { is_error = true; _ } -> [ error_body ]
-      | Some { images = []; text; _ } ->
-        [ span "caption" (String.strip text) ]
+      | Some { images = []; text; _ } -> [ span "caption" (String.strip text) ]
       | Some { images = shot :: _; text; _ } ->
         let size =
           match Computer_action.screenshot_size text with
@@ -394,7 +393,10 @@ let present
           | _ -> lines
         in
         [ Node.div
-            ~attrs:[ Attr.class_ "screen"; Attr.create Image_view.group_attribute "" ]
+            ~attrs:
+              [ Attr.class_ "screen"
+              ; Attr.create Image_view.group_attribute ""
+              ]
             [ Node.button
                 ~attrs:
                   [ Attr.type_ "button"
@@ -404,14 +406,14 @@ let present
                   ; Attr.create Image_view.viewer_attribute ""
                   ]
                 ([ Node.img
-                    ~attrs:
-                      [ Attr.class_ "thumb"
-                      ; Attr.src (Image_view.src shot)
-                      ; Attr.alt "the screen after the action"
-                      ]
-                    ()
-                ]
-                @ mark)
+                     ~attrs:
+                       [ Attr.class_ "thumb"
+                       ; Attr.src (Image_view.src shot)
+                       ; Attr.alt "the screen after the action"
+                       ]
+                     ()
+                 ]
+                 @ mark)
             ]
         ; span "caption" (String.concat ~sep:"\n" caption)
         ]

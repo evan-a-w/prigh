@@ -154,9 +154,13 @@ let clicks ~button ~count =
 
 let scroll_amount ~dx ~dy =
   let part n ~neg ~pos =
-    if n = 0 then None else Some (sprintf "%s%d" (if n < 0 then neg else pos) (abs n))
+    if n = 0
+    then None
+    else Some (sprintf "%s%d" (if n < 0 then neg else pos) (abs n))
   in
-  match List.filter_opt [ part dy ~neg:"↑" ~pos:"↓"; part dx ~neg:"←" ~pos:"→" ] with
+  match
+    List.filter_opt [ part dy ~neg:"↑" ~pos:"↓"; part dx ~neg:"←" ~pos:"→" ]
+  with
   | [] -> "0"
   | parts -> String.concat ~sep:" " parts
 ;;
@@ -197,8 +201,11 @@ let render ~point t =
   | Type text -> "type " ^ quoted text
   | Key combo -> "key " ^ combo
   | Hold_key { combo; duration } ->
-    "hold " ^ combo ^ Option.value_map duration ~default:"" ~f:(fun d -> " " ^ seconds d)
-  | Wait s -> "wait" ^ Option.value_map s ~default:"" ~f:(fun s -> " " ^ seconds s)
+    "hold "
+    ^ combo
+    ^ Option.value_map duration ~default:"" ~f:(fun d -> " " ^ seconds d)
+  | Wait s ->
+    "wait" ^ Option.value_map s ~default:"" ~f:(fun s -> " " ^ seconds s)
   | Zoom region ->
     sprintf
       "zoom [%s]"
@@ -211,8 +218,11 @@ let describe = render ~point:Point.to_string
 let compact = render ~point:Point.compact
 
 let point = function
-  | Click { at; _ } | Move at | Scroll { at; _ } | Mouse_down { at; _ } | Mouse_up { at; _ }
-    -> at
+  | Click { at; _ }
+  | Move at
+  | Scroll { at; _ }
+  | Mouse_down { at; _ }
+  | Mouse_up { at; _ } -> at
   | Drag points -> List.last points
   | Screenshot
   | Type _
