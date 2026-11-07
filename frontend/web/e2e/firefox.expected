@@ -2825,7 +2825,7 @@ on keyboard focus (Context 36% full): true
 the context opens: Session
 === firefox: status: 390x844: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
 === firefox: status: 390x844: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask
@@ -2847,7 +2847,7 @@ the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
 === firefox: status: 320x640: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, server-laptop, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
 === firefox: status: 320x640: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask
