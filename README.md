@@ -1458,8 +1458,8 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   neither seen nor driven, and windows of programs run as administrator
   get no input from a helper that is not elevated (UIPI; it refuses
   rather than let Windows drop the input silently: run the desktop app as
-  administrator to drive those too). It has been tested on Wine and the
-  CI's Windows runner (Notepad), not yet by hand on a real desktop.
+  administrator to drive those too). It has been tested only on the CI's
+  Windows runner (Notepad), never on a real Windows desktop.
 - **GNOME and KDE on Wayland, and macOS** are not supported yet:
   it says so (on GNOME or KDE, log in to an X11 session meanwhile).
   `--backend auto|wlroots|x11|windows|fake` (or `$PRIGH_COMPUTER_BACKEND`)
