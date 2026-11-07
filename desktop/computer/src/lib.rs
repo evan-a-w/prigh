@@ -10,7 +10,11 @@ pub mod driver;
 pub mod fake;
 pub mod keymap;
 pub mod keysym;
+#[cfg(target_os = "linux")]
+pub mod portal;
 pub mod scale;
+#[cfg(target_os = "linux")]
+pub mod screencast;
 #[cfg(target_os = "linux")]
 pub mod wlroots;
 #[cfg(target_os = "linux")]
