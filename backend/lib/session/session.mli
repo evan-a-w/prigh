@@ -73,6 +73,9 @@ module Entry : sig
       | Archived of { archived : bool }
       (** archived or unarchived by hand (see {!Summary.is_archived}); not
           copied by [fork] *)
+      | Pinned of { pinned : bool }
+      (** pinned or unpinned by hand: the last one on any branch counts (see
+          {!pinned}); not copied by [fork] *)
       | Spend of
           { usage : Usage.t
           ; cost_usd : float
@@ -414,7 +417,15 @@ val append_message : t -> ?at:float -> Message.t -> Entry.t
 val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
+(** Archiving a pinned session unpins it too. *)
 val set_archived : t -> archived:bool -> Entry.t
+
+(** The last [Pinned] entry, on any branch; [false] without one. *)
+val pinned : t -> bool
+
+(** Pinning a session archived by hand unarchives it too (which counts as
+    activity, as unarchiving does). Returns the [Pinned] entry. *)
+val set_pinned : t -> pinned:bool -> Entry.t
 val add_spend : t -> usage:Usage.t -> cost_usd:float -> Entry.t
 
 (** The [Spend] entries' total, on every branch. *)
@@ -487,6 +498,7 @@ module Summary : sig
     ; parent : string option
     ; archived : bool option
       (** the last [Archived] entry, when it comes after the last message *)
+    ; pinned : bool (** {!pinned} *)
     ; last_activity : float
       (** seconds since the epoch: the last message's time (else the file's
           mtime), or a later unarchiving *)
@@ -498,7 +510,7 @@ module Summary : sig
     }
   [@@deriving sexp_of]
 
-  (** Never while [active] (a run or background work going on); else
+  (** Never while [active] (a run or background work going on) or pinned; else
       archived by hand, or automatically when the last activity is more than
       [archive_after_days] days before [now] (seconds; [0] days: never). *)
   val is_archived

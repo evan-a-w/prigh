@@ -57,6 +57,7 @@ type t =
   | Jump_to_bottom
   (** Ctrl+End or a click on the indicator: back to the bottom, following *)
   | Toggle_archived (** Alt+A in the sessions picker *)
+  | Toggle_pinned (** Alt+T in the sessions picker: pin to the top *)
   | Review_highlighted (** Alt+R in the worktrees picker: review it *)
   | Toggle_sidebar (** Alt+L: the agents sidebar on wide terminals *)
 [@@deriving sexp_of, equal, compare]

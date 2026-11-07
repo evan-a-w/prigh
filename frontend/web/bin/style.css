@@ -376,6 +376,13 @@ kbd {
 .sessions-divider:hover { color: var(--muted); }
 .sessions-divider:hover .divider-rule { background: var(--rule-2); }
 .sessions-divider:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+/* Pinned and Recent: the same rule, as headings, not buttons. */
+.sessions-group { cursor: default; padding-right: 9px; }
+.sessions-group:first-child { margin-top: 2px; }
+.sessions-group:hover { color: var(--faint); }
+.sessions-group:hover .divider-rule { background: var(--rule); }
+.session-pin { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--sodium); }
+.session-pin .icon { width: 12px; height: 12px; }
 .delete-archived {
   align-self: flex-start;
   margin: 2px 0 0 14px;
@@ -568,6 +575,7 @@ kbd {
 .delete-row.kept { opacity: 0.6; }
 .delete-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .delete-size, .delete-more { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.delete-pinned { color: var(--sodium); font-size: 12px; }
 .delete-more { padding: 3px 8px; }
 .delete-warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border: 1px solid var(--brick-line); background: var(--brick-wash); border-radius: var(--r-control); color: var(--chalk); font-size: 13px; }
 

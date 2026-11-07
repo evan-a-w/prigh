@@ -26,10 +26,10 @@ mkdirSync(sessions, { recursive: true });
 mkdirSync(cwd, { recursive: true });
 setTimeout(() => { console.error("search.mjs: timed out"); process.exit(2); }, 240000).unref();
 
-// Two saved sessions; the third is made in the page, its reply the only
-// place "configurable" is said.
+// Three saved sessions, two of them pinned; the fourth is made in the page,
+// its reply and the pinned checklist's the only places "configurable" is said.
 const usage = { input: 1200, output: 300, cache_read: 0 };
-const writeSession = (sid, name, minutesAgo, messages) => {
+const writeSession = (sid, name, minutesAgo, messages, { pinned = false } = {}) => {
   let seq = 0;
   let parent = null;
   let at = Math.floor(Date.now() / 1000) - minutesAgo * 60;
@@ -41,6 +41,7 @@ const writeSession = (sid, name, minutesAgo, messages) => {
     parent = eid;
   };
   entry(["Name", { name }]);
+  if (pinned) entry(["Pinned", { pinned: true }]);
   for (const m of messages) entry(["Message", m]);
   writeFileSync(join(sessions, `20261001-100000000_${sid}.jsonl`), lines.join("\n") + "\n");
 };
@@ -48,11 +49,15 @@ const reply = text => ["Assistant", { content: [["Text", text]], stop_reason: ["
 writeSession("a1a1a1a1a1a1a1a1", "Port the tmux tests", 60, [
   ["User", { text: "move the tmux tests to a private socket" }],
   reply("Done: they use tmux -L now."),
-]);
+], { pinned: true });
 writeSession("b2b2b2b2b2b2b2b2", "Release notes", 120, [
   ["User", { text: "write the release notes" }],
   reply("Here are the notes for this release."),
 ]);
+writeSession("c3c3c3c3c3c3c3c3", "Deploy checklist", 180, [
+  ["User", { text: "what must the deploy check?" }],
+  reply("That the port stays configurable, and the certificates are fresh."),
+], { pinned: true });
 writeFileSync(
   join(dir, "script.json"),
   JSON.stringify([
@@ -122,12 +127,16 @@ const signIn = async () => {
   await page.locator(".composer textarea").waitFor();
 };
 
-// Each row: its title, then its passage, the marked words in [..].
-const rows = () => page.locator(".sessions .session").evaluateAll(es => es.map(e => {
+// Each group's heading, then its rows: the title (after "📌 " when it shows
+// the pin), then its passage, the marked words in [..].
+const rows = () => page.locator(".sessions .sessions-group, .sessions .session").evaluateAll(es => es.map(e => {
+  if (e.matches(".sessions-group"))
+    return `-- ${e.querySelector(".divider-label").textContent} ${e.querySelector(".divider-count").textContent} --`;
   const marked = el => el
     ? [...el.childNodes].map(n => (n.nodeName === "MARK" ? `[${n.textContent}]` : n.textContent)).join("")
     : null;
-  const title = marked(e.querySelector(".session-title"));
+  const pin = e.querySelector(".session-title .session-pin") ? "📌 " : "";
+  const title = pin + marked(e.querySelector(".session-title")).trim();
   const snippet = marked(e.querySelector(".session-snippet"));
   return snippet ? `${title}\n    ${snippet}` : title;
 }).join("\n"));
@@ -137,6 +146,13 @@ const search = async (query, options = {}) => {
 };
 
 const query = "configurable port";
+// Both passages that say it: the pinned checklist's and the new session's.
+const configurableTwice = (options = {}) =>
+  page.waitForFunction(
+    () => [...document.querySelectorAll(".session-snippet mark")].filter(m => m.textContent === "configurable").length === 2,
+    null,
+    options,
+  );
 
 try {
   await open({ viewport: { width: 1280, height: 800 } });
@@ -150,12 +166,12 @@ try {
 
   section("a title and a reply");
   await search("port");
-  await page.locator(".session-snippet").waitFor();
+  await page.waitForFunction(() => document.querySelectorAll(".session-snippet").length === 2);
   console.log(await rows());
 
   section("the messages, once typing pauses");
   await search(query);
-  await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor();
+  await configurableTwice();
   console.log(await rows());
   await screenshot("desktop found");
 
@@ -186,7 +202,7 @@ try {
     for (let attempt = 0; ; attempt++) {
       try {
         await search(query, { timeout: 4000 });
-        await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor({ timeout: 4000 });
+        await configurableTwice({ timeout: 4000 });
         break;
       } catch (e) {
         if (attempt >= 3) throw e;
@@ -197,11 +213,12 @@ try {
     console.log(await page.evaluate(() => {
       const doc = document.documentElement;
       const sidebar = document.querySelector(".sidebar");
-      const s = document.querySelector(".session-snippet").getBoundingClientRect();
+      const inside = [...document.querySelectorAll(".session-snippet")].map(e => e.getBoundingClientRect())
+        .every(s => s.left >= 0 && s.right <= innerWidth && s.top >= 0 && s.bottom <= innerHeight);
       return [
         `page overflows sideways: ${doc.scrollWidth > doc.clientWidth}`,
         `sidebar overflows sideways: ${sidebar.scrollWidth > sidebar.clientWidth}`,
-        `snippet inside the screen: ${s.left >= 0 && s.right <= innerWidth && s.top >= 0 && s.bottom <= innerHeight}`,
+        `snippets inside the screen: ${inside}`,
       ].join("\n");
     }));
     await screenshot(`${w}x${h} found`);

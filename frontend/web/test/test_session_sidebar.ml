@@ -265,6 +265,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     <div id="dialog"
@@ -343,6 +344,11 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
         </div>
       </div>
       <div class="menu-section">
+        <div role="menuitem" data-item="pin" class="menu-item" @on_click @on_mouseenter>
+          <icon class="pin"> </icon>
+          <span class="menu-label"> Pin to top </span>
+          <kbd class="menu-command"> P </kbd>
+        </div>
         <div role="menuitem" data-item="archive" class="menu-item" @on_click @on_mouseenter>
           <icon class="archive"> </icon>
           <span class="menu-label"> Archive </span>
@@ -388,6 +394,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     Close_dialog
@@ -406,6 +413,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     Close_dialog
@@ -424,6 +432,7 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     [menuitem] div "Open terminal there /terminal"
     [menuitem] div "Copy path"
     [menuitem] div "Copy session id"
+    [menuitem] div "Pin to top P"
     [menuitem] div "Archive A"
     [menuitem] div "Delete\226\128\166 Delete"
     |}]
@@ -944,6 +953,7 @@ let%expect_test
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     Close_dialog
@@ -964,6 +974,7 @@ let%expect_test
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     Close_dialog
@@ -983,6 +994,7 @@ let%expect_test
     Open terminal there /terminal
     Copy path
     Copy session id
+    Pin to top P
     Archive A
     Delete… Delete
     |}]

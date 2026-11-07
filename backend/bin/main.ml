@@ -1991,13 +1991,14 @@ let print_summary (s : Session.Summary.t) =
        String.prefix (String.strip p) 60))
 ;;
 
-(* Archived sessions come last under their own heading, as in the
-   frontends' pickers. Without a server, no session counts as active. *)
+(* Pinned sessions come first and archived ones last, under their own
+   headings, as in the frontends' pickers. Without a server, no session
+   counts as active. *)
 let sessions_list_command =
   Command.basic
     ~summary:
-      "List saved sessions, the archived ones (by hand, or idle for the \
-       config's archive_after_days) last"
+      "List saved sessions, the pinned ones first and the archived ones (by \
+       hand, or idle for the config's archive_after_days) last"
     (Command.Param.return (fun () ->
        let archive_after_days =
          match Config.load ~home:(home ()) with
@@ -2019,6 +2020,14 @@ let sessions_list_command =
                ~archive_after_days
                ~active:false)
        in
+       let pinned, current =
+         List.partition_tf current ~f:(fun (s : Session.Summary.t) -> s.pinned)
+       in
+       if not (List.is_empty pinned)
+       then (
+         printf "pinned:\n";
+         List.iter pinned ~f:print_summary;
+         if not (List.is_empty current) then printf "sessions:\n");
        List.iter current ~f:print_summary;
        if not (List.is_empty archived)
        then (

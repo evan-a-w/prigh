@@ -1408,7 +1408,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
   mode (`approval`), rules the user allowed for the session (`allow_rule`),
-  `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
+  `Archived {archived}` (archived or unarchived by hand; archiving appends
+  `Pinned {pinned = false}` too), `Pinned {pinned}` (pinned to the top,
+  never archived for being idle; pinning unarchives), `Spend {usage,
   cost_usd}` (what the messages do not record: subagents' responses,
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
@@ -1828,8 +1830,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   reply ended in an error), `live` (with `clients` and `waiting`, its
   confirmations and questions waiting for the user, when live), `running` (a
   turn or background work), `background` (running background subagents +
-  jobs, 0 when not loaded) and `archived` (computed with the namespace's
-  current `config.json`, reread per call). `set_archived {path, archived}`
+  jobs, 0 when not loaded), `pinned` and `archived` (computed with the
+  namespace's current `config.json`, reread per call; never for a pinned
+  session). `set_pinned {path, pinned}` appends a `Pinned` entry as
+  `set_archived` does its own (an unpin counts as activity for
+  `archive_after_days`); frontends treat a summary without `pinned` as a
+  backend that cannot pin. `set_archived {path, archived}`
   (`path`: a session file or id) appends an `Archived` entry, through the
   live agent's session if loaded; archiving an active session is refused.
   `delete_sessions {paths}` and `delete_archived {}` answer `{deleted:
@@ -1880,6 +1886,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Session_search` keeps an inverted index in memory, re-reading only the
   files that changed), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
+  `set_pinned`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
   `get_message_points`,
@@ -2352,7 +2359,7 @@ terminal frontend and `web/` prigh-web, the browser one.
   `File_listing` and `File_preview`, the review's `Review` and
   `Review_comment`) and the `Request` encoder (`Request.Method` has typed
   constructors for `list_skills`, `list_mcp`, `mcp_approve`,
-  `set_archived`, `delete_sessions`, `delete_archived`, the review's
+  `set_archived`, `set_pinned`, `delete_sessions`, `delete_archived`, the review's
   methods, `fs_preview` and `fs_write`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
@@ -2498,7 +2505,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     it out. The `delete_sessions` reply (`Delete_result`) is the notice,
     refusals included; with `moved_to` it closes the picker and resets the
     session as a `switch_session` reply does (`reset_session`). Alt+A flips `archived` in the picker at once
-    and sends `set_archived` (a refusal refetches the list). `/archive`,
+    and sends `set_archived` (a refusal refetches the list); Alt+T does the
+    same with `pinned` and `set_pinned`, and the picker's sections are
+    pinned, the rest, archived. `/pin`, `/unpin`, `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
     `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
@@ -3130,7 +3139,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       PATH`, `/terminal PATH`, `/pr new`), or a notice; "New session here"
       is `New_session_in` (`new_session` then `set_cwd`), Remove
       `Ask_remove_worktree` (the listing's entry, else the session's record
-      with its repository, which `remove_worktree` gets as `cwd`). Then a
+      with its repository, which `remove_worktree` gets as `cwd`). The
+      pinned sessions come first under a "Pinned" heading, the others under
+      "Recent" (`Session_list.sections`, also while searching, best match first
+      within each group, content hits included; no headings when none is pinned;
+      Pin/Unpin in the menu, P, `/pin`, `/unpin` send `set_pinned`, at once,
+      a refusal refetching the list; hidden when the summaries have no
+      `pinned`). Then a
       divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
       the list's order, which keyboard navigation and selection ranges
