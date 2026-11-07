@@ -80,6 +80,10 @@ val right_click : ?nth:int -> ?at:int * int -> t -> selector:string -> unit
 (** Types [text] into the [nth] field [selector] matches, as its new value. *)
 val input : ?nth:int -> t -> selector:string -> string -> unit
 
+(** Fires the [nth] [selector]'s change event with [value] (a [<select>]'s
+    choice, or ["on"]/[""] for a checkbox, which is ticked or not to match). *)
+val change : ?nth:int -> t -> selector:string -> string -> unit
+
 (** The page as indented HTML; [selector] picks part of it. *)
 val show : ?selector:string -> t -> unit
 

@@ -300,6 +300,24 @@ let%expect_test
     (Rpc (method_ dequeue) (params ()) (tag Dequeued))
     (Expire_toast (id 0) (after_ms 2500))
     Nothing is queued
+    |}];
+  (* A component's queued answer is not given back to edit. *)
+  H.act h Dequeue;
+  H.reply
+    h
+    "dequeue"
+    {|{"text":"","attachments":[],"ui_action":{"call_id":"c1","component":"next","summary":"Sent \"Next\": tests"}}|};
+  H.text h ~selector:".toast";
+  print_endline (H.model h).draft;
+  [%expect
+    {|
+    (Rpc (method_ dequeue) (params ()) (tag Dequeued))
+    (Expire_toast (id 1) (after_ms 3180))
+    Nothing is queued
+    Taken out of the queue: Sent "Next": tests
+    also check the docs
+
+    draft
     |}]
 ;;
 

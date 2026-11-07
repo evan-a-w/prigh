@@ -83,6 +83,18 @@
   (copy ../status.css status.css)))
 
 (rule
+ (target ui-chart.css)
+ (deps ../ui-chart.css)
+ (action
+  (copy ../ui-chart.css ui-chart.css)))
+
+(rule
+ (target ui.css)
+ (deps ../ui.css)
+ (action
+  (copy ../ui.css ui.css)))
+
+(rule
  (target temporary.css)
  (deps ../temporary.css)
  (action
@@ -228,6 +240,8 @@
   forge.css
   status.css
   temporary.css
+  ui.css
+  ui-chart.css
   phone.css
   recursive-sans.woff2
   recursive-mono.woff2
@@ -272,6 +286,8 @@
   (forge.css as web/forge.css)
   (status.css as web/status.css)
   (temporary.css as web/temporary.css)
+  (ui.css as web/ui.css)
+  (ui-chart.css as web/ui-chart.css)
   (phone.css as web/phone.css)
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)

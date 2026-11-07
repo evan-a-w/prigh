@@ -94,7 +94,7 @@ prints the captured panes.
     tools now run on <host> in $TMP/cwd
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ hello
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ prints the captured panes.
     tools now run on <host> in $TMP/cwd
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ hello
     faux reply
   ▸ ws://127.0.0.1:<port>/ws  the current server
@@ -135,7 +135,7 @@ prints the captured panes.
   === prigh-cwd-2 answers
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ hello
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────

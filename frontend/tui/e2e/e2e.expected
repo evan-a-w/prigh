@@ -356,7 +356,7 @@ approvals backend exited
  (origin
   ((body "what is in @shot.png?")
    (notes
-    (((kind (Other client)) (title "Using another client")
+    (((kind Client) (title "Using another client")
       (text
        "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"))))
    (attachments (shot.png))))

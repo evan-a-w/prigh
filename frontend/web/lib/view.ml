@@ -220,6 +220,19 @@ let echoes (m : Model.t) =
            ]))
 ;;
 
+(* The components' [inject], the same closure while [inject] is: the chat's
+   view cache keeps a component's handlers until it changes. *)
+let ui_inject =
+  let last = ref None in
+  fun inject ->
+    match !last with
+    | Some (i, ui) when phys_equal i inject -> ui
+    | _ ->
+      let ui e = inject (Action.Ui e) in
+      last := Some (inject, ui);
+      ui
+;;
+
 (* What is loaded of the transcript, after how much is not. *)
 let transcript (m : Model.t) ~inject =
   let index = Model.message_index m in
@@ -242,6 +255,7 @@ let transcript (m : Model.t) ~inject =
         | Some _ -> [ Trim_view.view m ~inject ]
         | None -> [])
      @ [ Chat_view.view
+           ~ui:{ state = m.ui; inject = ui_inject inject; sent = [] }
            ~fold:(Model.fold m)
            ?menu:
              (match m.dialog with
