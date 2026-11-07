@@ -17,6 +17,7 @@ while iterating.
 | `frontend/tui/` | the terminal frontend (`prigh-tui`): `lib/`, `bin/`, `test/`, `e2e/`, `tmux-test/` | OxCaml 5.2, Bonsai_term | `cd frontend && dune build @tui/test/runtest` (unit tests only) |
 | `frontend/web/` | prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`, `e2e/` | OxCaml 5.2, Bonsai_web | `cd frontend && dune build @web/test/runtest ./web/bin/site`; e2e: `ENGINES=chromium bash frontend/web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `desktop/` | prigh-desktop, the Tauri v2 window running `prigh desktop`: `core/` (logic), `app/` (shell), `test/` (window and browser window vs a fake sidecar) | Rust, Tauri | `nix develop .#desktop`, then `cd desktop && cargo test`; window: `nix build .#checks.x86_64-linux.desktop-window` |
+| `desktop/computer/` | `prigh-computer`, the computer-use helper a tool host started with `-computer` drives (fake, wlroots, X11 backends) | Rust | `cd desktop && cargo test -p prigh-computer`; on headless sway and Xvfb: `nix build .#checks.x86_64-linux.computer-use` |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 

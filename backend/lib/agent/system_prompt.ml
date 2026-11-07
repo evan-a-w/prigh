@@ -93,6 +93,7 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
      ; "- Ask before destructive or irreversible actions."
      ]
+     @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
      @ (if has "worktree"
         then
           [ ("- To work on a separate branch, use the worktree tool"
@@ -273,9 +274,15 @@ let tools_changed_note ~added ~removed =
     | tools -> [ sprintf " %s: %s." label (String.concat ~sep:", " tools) ]
   in
   String.concat
-    ([ "[Tools: the tools changed with the model." ]
+    ([ (if List.mem (added @ removed) Tool_computer.name ~equal:String.equal
+        then "[Tools: the tools changed with the tool host."
+        else "[Tools: the tools changed with the model.")
+     ]
      @ section "Now available" added
      @ section "No longer available" removed
+     @ (if List.mem added Tool_computer.name ~equal:String.equal
+        then [ " " ^ Tool_computer.guidance ]
+        else [])
      @ [ "]" ])
 ;;
 

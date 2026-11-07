@@ -128,7 +128,7 @@ module Note = struct
            | None
              when String.is_prefix
                     line
-                    ~prefix:"[Tools: the tools changed with the model." ->
+                    ~prefix:"[Tools: the tools changed with " ->
              let names label =
                match String.substr_index line ~pattern:label with
                | None -> []

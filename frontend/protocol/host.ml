@@ -7,6 +7,7 @@ type t =
   ; session_id : string option
   ; session_name : string option
   ; home : string option
+  ; computer : Computer.t option
   }
 [@@deriving sexp_of, equal]
 
@@ -20,5 +21,9 @@ let of_json j =
   let%bind session_id = Json.string_opt_field j "session_id" in
   let%bind session_name = Json.string_opt_field j "session_name" in
   let%map home = Json.string_opt_field j "home" in
-  { id; name; cwd; session_id; session_name; home }
+  let computer =
+    Option.bind (Json.field j "computer") ~f:(fun c ->
+      Result.ok (Computer.of_json c))
+  in
+  { id; name; cwd; session_id; session_name; home; computer }
 ;;

@@ -11,6 +11,9 @@ type t =
   ; home : string option
     (** its home directory, for showing paths under it as [~]; absent from
         older backends and tool hosts *)
+  ; computer : Computer.t option
+    (** it offers computer use (started with [-computer]): the screen it
+        controls; absent otherwise *)
   }
 [@@deriving sexp_of, equal]
 

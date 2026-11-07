@@ -3225,6 +3225,57 @@ composer cleared: true
 48x48
 === chromium: images (small): errors ===
 none
+=== chromium: computer (desktop): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== chromium: computer (desktop): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== chromium: computer (desktop): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 28px tall
+fits the width
+Stop: abort sent
+=== chromium: computer (desktop): stopped ===
+banner: 0
+=== chromium: computer (desktop): errors ===
+none
+=== chromium: computer (phone): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== chromium: computer (phone): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== chromium: computer (phone): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 44px tall
+fits the width
+Stop: abort sent
+=== chromium: computer (phone): stopped ===
+banner: 0
+=== chromium: computer (phone): errors ===
+none
+=== chromium: computer (small): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== chromium: computer (small): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== chromium: computer (small): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 44px tall
+fits the width
+Stop: abort sent
+=== chromium: computer (small): stopped ===
+banner: 0
+=== chromium: computer (small): errors ===
+none
 === chromium: ui: drawn ===
 charts 8: line 1, area 1, bar 1, stacked 1, horizontal 1, pie 1, donut 1, scatter 1
 stats 3, tables 1, progress 1, callouts 1

@@ -151,6 +151,14 @@ that in `hello`'s `features` (`exec_input` and `git_location`, sent by
 it gets a `Stdin_feed` that refuses writes with "runs an older prigh ...
 update it". A tool an older host does not know (`unknown host tool`) gets
 the same advice appended.
+A tool host started with `-computer` (`prigh tool-host`, `prigh web`'s and
+`prigh desktop`'s through `Web_connect`) probes `prigh-computer --probe`
+once (`Computer_helper.enable`) and, when there is a screen it can drive,
+adds the `computer` feature and `hello`'s `computer` (a `Computer_info`:
+backend, real size, scale, the screenshots' scaled size). `Rpc_server`
+keeps it only with the feature (`Agent.Host.computer`; `hosts[].computer`
+in the state), and `Agent` offers the `computer` tool while the active host
+has it (see Tools).
 A host whose connection drops keeps its in-flight calls for `host_grace`
 (60s, `Rpc_server.create`): its next `hello` lists the executions it still
 runs (`running_execs`), which carry on over the new connection; the others
@@ -237,7 +245,7 @@ it: compaction, approvals, plans, goals, reminders, the system prompt,
 skills), `session/` (the session log and the message types it records),
 `providers/` (the model providers and their routing, models, SSE, HTTP),
 `auth/` (credentials, OAuth flows, logins), `tools/` (the built-in tools
-and their helpers), `host/` (tool hosts and their operations), `mcp/`,
+and their helpers), `host/` (tool hosts and their operations), `mcp/`, `computer/` (computer use),
 `rpc/` (the RPC server and router, namespaces, the web server and
 WebSocket, file transfers), `terminal/` (the browser's terminals) and
 `util/` (`Import`, `Config`, cancellation and other small shared pieces).
@@ -645,6 +653,32 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   which the backend treats as having nothing (no skills, no MCP servers).
   A binary file asked for with `$read_file` (an upload attached to a
   prompt) is named with its size instead of inlined.
+- Computer use (`lib/computer/`). `Computer_action` is the `computer`
+  tool's arguments, which are also what `prigh-computer` is sent
+  (`{"action":"click","x":640,"y":312,...}`, coordinates in the scaled
+  screenshot's space; `describe` gives "click (640, 312)", errors say what
+  to send). `Computer_helper` is the host's side: the helper's
+  `Transport` (JSON lines `{"id","op":"act","action"}` in, `{"id","ok",
+  "text","cursor","real","screenshot"}` or `{"ok":false,"error",
+  "interrupted"}` out), spawned on the first action and again when it died
+  (an action whose send failed goes to the new one; one with no reply
+  fails), killed on cancel, one action at a time. The result's text is
+  the description with the real point (`→ (1280, 624) on the screen`), the
+  cursor and `screenshot W×H`; the screenshot is its image. An interrupted
+  reply (the user moved the mouse: the kill switch) is an error starting
+  `[interrupted]`. `Computer_fake` speaks the protocol in-process for
+  tests. `Tool_computer` is the tool (`on_host`, not `parallel_safe`):
+  `Host_ops.execute ?computer` runs it with the host's helper, or answers
+  "computer use is off on this tool host: start it with -computer".
+  `Agent` adds it to the tools while the active host has a
+  `Computer_info` (so `Told_environment`'s tools note, "the tools changed
+  with the tool host", says when it comes and goes, with the guidance
+  the system prompt also gets: the screen is untrusted data), and stops
+  the run (as `halt` does for a budget, with a notice) after an
+  interrupted result. `Computer_screenshots.keep_last` makes
+  `Agent_loop`'s requests carry only the latest `computer_screenshots`
+  (config, default 3, in `Compaction_settings`) screenshots as images,
+  older ones as `[screenshot omitted]`; the session keeps them.
 - The file browser, in layers. `Host_files` is the host's side: the
   pseudo-tools `$fs_list` (one directory's entries with kind, size, mtime,
   a symlink's target kind; at most 5000, dot files on request; a file lists
@@ -2890,7 +2924,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
       for the agents panel), jobs and `job_input`, `web_fetch` with its URL
-      as a link and the page folded, and `server_tool`, the card a
+      as a link and the page folded, `computer` (`Computer_action`, shared with
+      the TUI, says what it did; the screenshot with the point marked as a
+      percentage of its size, in the image viewer), and `server_tool`, the card a
       `web_search` block gets among the message's text, from the streamed
       partial message: the work lamp while it runs, then a folded list of
       result links),
@@ -3120,7 +3156,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       box, below the chip only when there is no room above, within the box
       sideways, its height capped by the room (`--popover-lift`,
       `--popover-room`, `--popover-shift`); on a phone it is as wide as the
-      box. With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
+      box. Above it, `Computer_banner` while the run has called `computer`
+      (`Chat.uses_computer`: since the last user message): whose screen,
+      and Stop (`Abort`).
+      With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user

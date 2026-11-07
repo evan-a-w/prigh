@@ -319,7 +319,9 @@ let state (s : Agent.State.t) =
                 ; "session_name", opt h.session_name
                 ]
                 @ Option.value_map h.home ~default:[] ~f:(fun home ->
-                  [ "home", str home ])))) )
+                  [ "home", str home ])
+                @ Option.value_map h.computer ~default:[] ~f:(fun info ->
+                  [ "computer", Computer_info.to_json info ])))) )
     ; ( "subagents"
       , `Array
           (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->

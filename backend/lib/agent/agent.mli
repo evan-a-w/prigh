@@ -25,6 +25,9 @@ module Host : sig
     ; git_location : bool [@sexp.bool]
       (** it runs [$git_location] (the [git_location] feature): sessions
           record where their cwd there is in git *)
+    ; computer : Computer_info.t option [@sexp.option]
+      (** it runs the [computer] tool on this screen (its [hello]'s
+          [computer]: started with [-computer]) *)
     }
   [@@deriving sexp_of, equal]
 

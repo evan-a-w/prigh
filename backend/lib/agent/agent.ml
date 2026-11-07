@@ -69,6 +69,7 @@ module Host = struct
     ; home : string option [@sexp.option]
     ; exec_input : bool [@sexp.bool]
     ; git_location : bool [@sexp.bool]
+    ; computer : Computer_info.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -329,6 +330,7 @@ let backend_host t =
   ; home = Sys.getenv "HOME"
   ; exec_input = false (* runs in this process: no messages *)
   ; git_location = true
+  ; computer = None (* never the backend: only a tool host opted in *)
   }
 ;;
 
@@ -340,6 +342,20 @@ let hosts t =
       | None -> h)
   in
   if t.backend_host_enabled then backend_host t :: clients else clients
+;;
+
+(* The screen the active host lets sessions drive ([-computer]), while it
+   is connected. *)
+let active_computer t =
+  List.find_map t.hosts ~f:(fun (h : Host.t) ->
+    if String.equal h.id t.active_host then h.computer else None)
+;;
+
+(* The built-in tools, with [computer] while the active host runs it. *)
+let own_tools t =
+  if Option.is_some (active_computer t)
+  then t.tools @ [ Tool_computer.tool ]
+  else t.tools
 ;;
 
 let find_branch t ~cwd =
@@ -553,7 +569,7 @@ let environment t =
   { Told_environment.host = t.active_host
   ; cwd = t.cwd
   ; tools =
-      List.map (Tools.for_model t.model t.tools) ~f:Tool.name
+      List.map (Tools.for_model t.model (own_tools t)) ~f:Tool.name
       |> List.dedup_and_sort ~compare:String.compare
   ; plan_mode = t.plan_mode
   ; client = Some (Option.value t.client ~default:Other)
@@ -1639,7 +1655,7 @@ let instructions t ~cancel ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
-let tools t = Tools.for_model t.model (t.tools @ t.mcp_tools)
+let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
 
 let build_system_prompt ?(cancel = Cancellation.never) t =
   let { Host_ops.Instructions.files; nix; skills } =
@@ -1956,6 +1972,7 @@ let compaction_settings t =
       Option.bind t.config.compaction_model ~f:(fun name ->
         Result.ok (Model_registry.resolve t.models name))
   ; mask_observations = t.config.mask_observations
+  ; computer_screenshots = t.config.computer_screenshots
   }
 ;;
 
@@ -2458,7 +2475,11 @@ let rec start_run
                  Error e)
              ~mask:(fun ~through _messages -> mask_session session ~through)
              ~halt:(fun () ->
-               let reason = budget_exhausted t in
+               let reason =
+                 match !halted with
+                 | Some _ as interrupted -> interrupted
+                 | None -> budget_exhausted t
+               in
                Option.iter reason ~f:(fun r -> halted := Some r);
                reason)
              ~emit:(fun event ->
@@ -2476,6 +2497,19 @@ let rec start_run
                  then (
                    broadcast t (Compacted { summary });
                    state_changed t)
+               | Message_end (Tool_result r as m)
+                 when String.equal r.tool_name Tool_computer.name
+                      && r.is_error
+                      && String.is_prefix
+                           r.text
+                           ~prefix:Computer_helper.interrupted_prefix ->
+                 (* The user took the mouse or keyboard: they want control. *)
+                 halted
+                 := Some
+                      "computer use stopped: you moved the mouse or pressed a \
+                       key on the controlled screen. Send a message to go on.";
+                 ignore (Session.append_message session m : Session.Entry.t);
+                 broadcast t (Loop event)
                | Message_end m ->
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)

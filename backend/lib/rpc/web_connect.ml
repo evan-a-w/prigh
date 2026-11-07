@@ -269,6 +269,7 @@ module Config = struct
     ; name : string
     ; host_id : string
     ; cwd : string
+    ; computer : Computer_helper.t option
     ; listen : Listen.t
     ; root : string
     }
@@ -311,6 +312,7 @@ module Tool_host_config = struct
     ; name : string
     ; host_id : string
     ; cwd : string
+    ; computer : Computer_helper.t option
     }
 end
 
@@ -325,6 +327,7 @@ let start_tool_host ~env ~sw ~log ~wait (config : Tool_host_config.t) =
         ~env
         ~log:(fun line -> log ("tool host: " ^ line))
         ~on_connect:(fun () -> settle `Connected)
+        ?computer:config.computer
         ~backend:config.remote
         ~token:config.credentials.token
         ?user:config.credentials.user
@@ -381,6 +384,7 @@ let start
          ; name = config.name
          ; host_id = config.host_id
          ; cwd = config.cwd
+         ; computer = config.computer
          }
         :> [ `Connected | `Connecting | `Refused of string | `Off ])
   in

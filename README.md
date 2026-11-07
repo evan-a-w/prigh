@@ -1287,6 +1287,7 @@ programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/App
 # programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
 # programs.prigh.desktop.useSystemNixpkgs = true;                # slow window on NixOS? see below
 # programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
+# programs.prigh.desktop.computerUse = true;                     # the agent may drive this desktop (below)
 ```
 
 Without Home Manager, `nix profile install github:evan-a-w/prigh#prigh-desktop`
@@ -1420,6 +1421,79 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   another host name (DNS rebinding) or from another page (`Origin`, which
   matters most for WebSockets, which browsers open to any address) is
   refused.
+
+### The desktop's screen, mouse and keyboard: `prigh-computer`
+
+`prigh-computer` (`desktop/computer`, flake package `prigh-computer`) is
+the helper behind the `computer` tool: the tool host (`prigh tool-host
+-computer`, `prigh desktop -computer`) runs it and talks JSON lines with
+it on stdio. It takes screenshots of the screen (scaled so that the long
+side is at most `--max-long-side` (1280) and the pixels at most
+`--max-pixels` (1150000), the aspect kept; the model's coordinates are in
+that scaled space and mapped back to real pixels, HiDPI included), and
+moves and clicks the mouse, scrolls, drags and types any Unicode text.
+The tool host finds it as `$PRIGH_COMPUTER`, else `prigh-computer` on the
+PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
+
+- **Wayland, wlroots compositors** (Hyprland, sway, river, ...):
+  wlr-screencopy, the virtual pointer and the virtual keyboard (with a
+  keymap made for the characters typed, as `wtype` does). It controls
+  one output: the focused one (Hyprland and sway say which), else the
+  first.
+- **X11**: XTEST and the root window, cropped to the primary monitor;
+  characters the keyboard map lacks go through spare keycodes.
+- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
+  it says so (on GNOME or KDE, log in to an X11 session meanwhile).
+  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+  overrides the detection; `prigh-computer --probe` prints what it
+  found, or what is missing.
+- **Kill switch**: when the mouse is not where the helper left it, the
+  user has moved it: the action stops and computer use pauses until the
+  next prompt.
+
+In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
+`programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
+`PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
+with `prigh-computer` on the PATH (`nix profile install
+github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+-p prigh-computer` in `desktop/` (in `./test`) and the flake's
+`computer-use` check, which drives a headless sway and Xvfb and compares
+the input an app received (`desktop/computer/test/expected.txt`).
+
+In prigh-web each `computer` call is a card: what it did ("click (640,
+312)", "type “hello”", "key ctrl+t", "scroll ↓3 at (x, y)", ...) and the
+screen after it, with the point it acted on marked; tap the screenshot for
+the image viewer. While a run is driving the screen (it called `computer`
+since your last message), a strip over the composer says "prigh is
+controlling <host>" with Stop, which aborts the run as Esc does. The TUI
+shows a line per action (`computer click 640,312  → screenshot
+1280×800`).
+
+#### Turning computer use on, and what keeps it safe
+
+Computer use is off unless the tool host that owns the screen opts in:
+`prigh tool-host -computer` (with `-connect`/`-remote`, or as the stdio
+worker), `prigh web -computer` (the tool host it runs here) or `prigh
+desktop -computer`. The host probes `prigh-computer` once at start and
+says what it found (`computer use is on: wlroots (Hyprland), 2560×1440
+shown as 1280×720`, or why it is off); a call to a host without it
+answers "computer use is off on this tool host: start it with -computer".
+The backend's own host never offers it.
+
+- The `computer` tool is offered only while the session's active host
+  runs it; switching to it (or away) tells the model the tool came (or
+  went), with the guidance below.
+- The system prompt says the screen is the user's real desktop, that
+  what is on it is untrusted data (never instructions), and to ask before
+  anything irreversible or sensitive.
+- Moving the mouse stops the run at once ("computer use stopped: you
+  moved the mouse ..."); the next message goes on. Esc or Stop abort as
+  for any run.
+- Each action's result carries a screenshot, but requests send only the
+  latest `computer_screenshots` (config, default 3) as images; older ones
+  are sent as `[screenshot omitted]`. The session keeps them all.
+- Platforms: Linux on wlroots compositors and X11 (above); the rest say
+  they are not supported yet.
 
 ## Editors (ACP)
 
@@ -2165,6 +2239,8 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
+`computer_screenshots` (default 3: how many of the latest `computer`
+screenshots requests carry as images, see "Turning computer use on"),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:

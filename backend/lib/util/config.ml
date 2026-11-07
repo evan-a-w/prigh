@@ -43,6 +43,7 @@ type t =
   ; auto_background_seconds : float
   ; generate_model : string option
   ; mask_observations : bool
+  ; computer_screenshots : int
   ; compact_at_tokens : int
   ; compaction_model : string option
   ; naming_model : string option
@@ -72,6 +73,7 @@ let default =
   ; auto_background_seconds = 30.
   ; generate_model = None
   ; mask_observations = true
+  ; computer_screenshots = 3
   ; compact_at_tokens = 200_000
   ; compaction_model = None
   ; naming_model = None
@@ -137,6 +139,7 @@ let to_json t =
       , `Number (sprintf "%g" t.auto_background_seconds) )
     ; "generate_model", option (fun s -> `String s) t.generate_model
     ; ("mask_observations", if t.mask_observations then `True else `False)
+    ; "computer_screenshots", `Number (Int.to_string t.computer_screenshots)
     ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
     ; "naming_model", option (fun s -> `String s) t.naming_model
@@ -337,6 +340,20 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.mask_observations must be a boolean"
     in
+    let%bind computer_screenshots =
+      let error () =
+        Or_error.error_string
+          "config.computer_screenshots must be a whole number, 0 or more (the \
+           latest screenshots of the computer tool sent to the model)"
+      in
+      match find "computer_screenshots" with
+      | None | Some `Null -> Ok default.computer_screenshots
+      | Some (`Number n) ->
+        (match Int.of_string_opt n with
+         | Some n when n >= 0 -> Ok n
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
     let%bind snippets =
       Snippet.list_of_json (Option.value (find "snippets") ~default:`Null)
     in
@@ -384,6 +401,7 @@ let of_json json =
     ; auto_background_seconds
     ; generate_model
     ; mask_observations
+    ; computer_screenshots
     ; compact_at_tokens
     ; compaction_model
     ; naming_model

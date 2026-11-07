@@ -398,6 +398,7 @@ let start
     ; tools
     ; name = "laptop"
     ; host_id = "host-laptop"
+    ; computer = None
     ; cwd = t.dir ^/ "here"
     ; listen = At (Eio.Net.Ipaddr.V4.loopback, 0)
     ; root = site t
@@ -601,6 +602,7 @@ let%expect_test "prigh web: the first free port from the default" =
     ; tools = Remote
     ; name = "laptop"
     ; host_id = "host-laptop"
+    ; computer = None
     ; cwd = t.dir
     ; listen = From (Eio.Net.Ipaddr.V4.loopback, backend_port)
     ; root = site t
@@ -695,6 +697,7 @@ module Desktop = struct
       ; tools
       ; name = "laptop"
       ; host_id = "host-laptop"
+      ; computer = None
       ; cwd = t.dir ^/ "here"
       ; listen = At (Eio.Net.Ipaddr.V4.loopback, 0)
       ; root = site t

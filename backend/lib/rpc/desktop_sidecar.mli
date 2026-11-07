@@ -133,6 +133,7 @@ module Config : sig
     ; host_id : string
     ; cwd : string (** the tool host's *)
     ; listen : Web_connect.Listen.t
+    ; computer : Computer_helper.t option
     ; root : string (** the built site *)
     ; save : Saved_connection.t -> unit Or_error.t
     ; remember_signin :

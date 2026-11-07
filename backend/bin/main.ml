@@ -849,14 +849,14 @@ let browser_signin_command =
   Command.basic
     ~summary:
       "Sign in through the browser to the sign-in proxy (authentik, \
-       oauth2-proxy...) in front of a backend's site, and save its cookie \
-       with the saved connection"
+       oauth2-proxy...) in front of a backend's site, and save its cookie with \
+       the saved connection"
     ~readme:(fun () ->
       "Opens the backend's prigh-web at a one-time sign-in link: sign in to \
-       the proxy and to prigh there, and allow the sign-in. The proxy's \
-       cookie is then saved with the connection (~/.prigh/tui-connection.sexp) \
-       for prigh-tui, prigh tool-host -remote, prigh web and prigh desktop. \
-       They also run this themselves when they meet the proxy's login page.")
+       the proxy and to prigh there, and allow the sign-in. The proxy's cookie \
+       is then saved with the connection (~/.prigh/tui-connection.sexp) for \
+       prigh-tui, prigh tool-host -remote, prigh web and prigh desktop. They \
+       also run this themselves when they meet the proxy's login page.")
     (let%map_open.Command connect =
        flag
          "-connect"
@@ -868,14 +868,15 @@ let browser_signin_command =
        flag
          "-program"
          (optional string)
-         ~doc:"NAME who asks, as the page names it (tui, tool-host, web, desktop)"
+         ~doc:
+           "NAME who asks, as the page names it (tui, tool-host, web, desktop)"
      and json =
        flag
          "-json"
          no_arg
          ~doc:
-           " print JSON lines on stdout ({\"url\", \"port\"} then the sign-in or \
-            {\"error\"}) and save nothing: for prigh-tui"
+           " print JSON lines on stdout ({\"url\", \"port\"} then the sign-in \
+            or {\"error\"}) and save nothing: for prigh-tui"
      and no_browser =
        flag "-no-browser" no_arg ~doc:" print the URL without opening it"
      in
@@ -883,7 +884,9 @@ let browser_signin_command =
        let home = home () in
        let fail message =
          if json
-         then print_endline (Jsonaf.to_string (`Object [ "error", `String message ]))
+         then
+           print_endline
+             (Jsonaf.to_string (`Object [ "error", `String message ]))
          else eprintf "prigh browser-signin: %s\n%!" message;
          exit 2
        in
@@ -915,8 +918,8 @@ let browser_signin_command =
          | Ok { remote; _ } ->
            fail
              (sprintf
-                "%s is a HOST:PORT: only a prigh-web URL (https://host/) can be \
-                 behind a sign-in proxy"
+                "%s is a HOST:PORT: only a prigh-web URL (https://host/) can \
+                 be behind a sign-in proxy"
                 (Backend_address.to_string remote))
          | Error e ->
            fail
@@ -934,7 +937,10 @@ let browser_signin_command =
            Browser_signin.run ~env ~program remote ~on_url:(fun ~url ~port ->
              print_endline
                (Jsonaf.to_string
-                  (`Object [ "url", `String url; "port", `Number (Int.to_string port) ]));
+                  (`Object
+                      [ "url", `String url
+                      ; "port", `Number (Int.to_string port)
+                      ]));
              Option.iter open_url ~f:(fun open_url -> open_url url))
          else
            Browser_signin.run_on_terminal
@@ -959,8 +965,8 @@ let browser_signin_command =
        | Ok grant ->
          (match Saved_connection.load ~home with
           | Ok (Some saved)
-            when String.equal saved.connect (Backend_address.to_string remote) ->
-            ()
+            when String.equal saved.connect (Backend_address.to_string remote)
+            -> ()
           | Ok _ | Error _ ->
             (match
                Saved_connection.save
@@ -981,6 +987,34 @@ let browser_signin_command =
               (Saved_connection.file ~home)
           | Error e -> fail (Error.to_string_hum e)))
 ;;
+
+module Computer_flag = struct
+  let param =
+    Command.Param.flag
+      "-computer"
+      Command.Param.no_arg
+      ~doc:
+        " let sessions see and drive this machine's desktop (the computer \
+         tool), through prigh-computer ($PRIGH_COMPUTER, else on PATH)"
+  ;;
+
+  (* Off, with the reason on stderr, when there is no screen to control. *)
+  let enable ~env ~sw ~log on =
+    if not on
+    then None
+    else (
+      match Computer_helper.enable ~env ~sw with
+      | Ok helper ->
+        log
+          (sprintf
+             "computer use is on: %s"
+             (Computer_info.to_string_hum (Computer_helper.info helper)));
+        Some helper
+      | Error e ->
+        log (sprintf "computer use is off: %s" (Error.to_string_hum e));
+        None)
+  ;;
+end
 
 let tool_host_command =
   Command.basic
@@ -1035,14 +1069,22 @@ let tool_host_command =
          "-cwd"
          (optional string)
          ~doc:"DIR the host's directory (default: the current one)"
-     in
+     and computer = Computer_flag.param in
      fun () ->
        if Option.is_none connect && not remote
        then
          Eio_main.run
          @@ fun env ->
+         Eio.Switch.run
+         @@ fun sw ->
          Tool_host.run
            ~env
+           ?computer:
+             (Computer_flag.enable
+                ~env
+                ~sw
+                ~log:(eprintf "prigh tool-host: %s\n%!")
+                computer)
            ~input:(Eio.Stdenv.stdin env)
            ~output:(Eio.Stdenv.stdout env)
            ()
@@ -1094,8 +1136,16 @@ let tool_host_command =
          let refused =
            Eio_main.run
            @@ fun env ->
+           Eio.Switch.run
+           @@ fun sw ->
            Tool_host.connect
              ~env
+             ?computer:
+               (Computer_flag.enable
+                  ~env
+                  ~sw
+                  ~log:(eprintf "prigh tool-host: %s\n%!")
+                  computer)
              ~signin:(fun ~why remote ->
                let result =
                  Browser_signin.run_on_terminal
@@ -1236,9 +1286,8 @@ let web_command =
          ~doc:
            "DIR the built prigh-web site (default: $PRIGH_WEB_ROOT or the dune \
             build)"
-     and open_browser =
-       flag "-open" no_arg ~doc:" open the page in a browser"
-     in
+     and open_browser = flag "-open" no_arg ~doc:" open the page in a browser"
+     and computer = Computer_flag.param in
      fun () ->
        let home = home () in
        let fail ?(code = 2) fmt =
@@ -1366,6 +1415,7 @@ let web_command =
              ; name = Option.value name ~default:(Core_unix.gethostname ())
              ; host_id
              ; cwd
+             ; computer = Computer_flag.enable ~env ~sw ~log computer
              ; listen
              ; root
              })
@@ -1465,7 +1515,7 @@ let desktop_command =
          ~doc:
            "DIR the built prigh-web site (default: $PRIGH_WEB_ROOT or the dune \
             build)"
-     in
+     and computer = Computer_flag.param in
      fun () ->
        let home = home () in
        let fail message =
@@ -1537,6 +1587,9 @@ let desktop_command =
        let ended =
          Eio_main.run
          @@ fun env ->
+         Eio.Switch.run
+         @@ fun sw ->
+         let computer = Computer_flag.enable ~env ~sw ~log computer in
          listen_or_exit ~flag:"-listen" listen_addr (fun () ->
            Desktop_sidecar.run
              ~env
@@ -1554,6 +1607,7 @@ let desktop_command =
              ; name = Option.value name ~default:(Core_unix.gethostname ())
              ; host_id
              ; cwd
+             ; computer
              ; listen
              ; root
              ; save = Saved_connection.save ~home
@@ -2440,7 +2494,7 @@ let () =
        [ "run", run_command
        ; "serve", serve_command
        ; "tool-host", tool_host_command
-      ; "browser-signin", browser_signin_command
+       ; "browser-signin", browser_signin_command
        ; "acp", acp_command
        ; "web", web_command
        ; "desktop", desktop_command

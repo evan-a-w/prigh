@@ -138,3 +138,7 @@ val find_tool : t -> agent_id:string option -> call_id:string -> Tool.t option
 (** Gives a call's result its whole [text], once fetched in place of what was
     [elided]. *)
 val set_output : t -> agent_id:string option -> call_id:string -> string -> t
+
+(** Whether the agent called [computer] (drove the user's screen) since the
+    last user message: the current run is controlling a computer. *)
+val uses_computer : t -> bool
