@@ -33,20 +33,18 @@ let query_words query =
   |> List.rev
 ;;
 
-(* Whether [a] and [b] are at most one insertion, deletion, substitution or
-   transposition of adjacent letters apart. *)
-let within_one_edit a b =
-  let la = String.length a
-  and lb = String.length b in
+(* Whether [a] and the first [lb] bytes of [b] are at most one insertion,
+   deletion, substitution or transposition of adjacent letters apart. *)
+let within_one_edit a b ~lb =
+  let la = String.length a in
   let rec common i =
     if i < la && i < lb && Char.equal a.[i] b.[i] then common (i + 1) else i
   in
   let i = common 0 in
-  let rest_equal ia ib =
-    la - ia = lb - ib
-    && String.equal
-         (String.sub a ~pos:ia ~len:(la - ia))
-         (String.sub b ~pos:ib ~len:(lb - ib))
+  let rec rest_equal ia ib =
+    if ia >= la
+    then ib >= lb
+    else ib < lb && Char.equal a.[ia] b.[ib] && rest_equal (ia + 1) (ib + 1)
   in
   if i = la && i = lb
   then true
@@ -64,30 +62,43 @@ let within_one_edit a b =
   else false
 ;;
 
+let substring_index v ~w =
+  let lv = String.length v
+  and lw = String.length w in
+  let rec matches_at i j =
+    j >= lw || (Char.equal v.[i + j] w.[j] && matches_at i (j + 1))
+  in
+  let rec from i =
+    if i + lw > lv then None else if matches_at i 0 then Some i else from (i + 1)
+  in
+  from 0
+;;
+
 (* How [w] (a query word) matches [v] (a word of the text): its score and the
    part of [v] that matched, (offset, length). *)
 let kind ~w v =
   let lw = String.length w
   and lv = String.length v in
-  if String.equal w v
+  if lv < lw - 1
+  then None
+  else if String.equal w v
   then Some (10, (0, lv))
   else if String.is_prefix v ~prefix:w
   then Some (8, (0, lw))
   else (
-    let substring =
-      if lw >= 3 then String.substr_index v ~pattern:w else None
-    in
-    match substring with
+    match if lw >= 3 then substring_index v ~w else None with
     | Some i -> Some (6, (i, lw))
     | None ->
       if lw >= 4
-      then
-        List.find_map
-          [ lw; lw - 1; lw + 1 ]
-          ~f:(fun len ->
-            if len <= lv && within_one_edit w (String.sub v ~pos:0 ~len)
-            then Some (4, (0, len))
-            else None)
+      then (
+        let typo len = len <= lv && within_one_edit w v ~lb:len in
+        if typo lw
+        then Some (4, (0, lw))
+        else if typo (lw - 1)
+        then Some (4, (0, lw - 1))
+        else if typo (lw + 1)
+        then Some (4, (0, lw + 1))
+        else None)
       else None)
 ;;
 
@@ -158,23 +169,48 @@ module Doc = struct
   ;;
 end
 
+(* The letters in a word, a bit each, to rule out most words at a glance. *)
+let letters w =
+  String.fold w ~init:0 ~f:(fun acc c ->
+    let bit =
+      match c with
+      | 'a' .. 'z' -> Char.to_int c - Char.to_int 'a'
+      | '0' .. '9' -> 26 + Char.to_int c - Char.to_int '0'
+      | _ -> 36 + (Char.to_int c land 15)
+    in
+    acc lor (1 lsl bit))
+;;
+
+module Posting = struct
+  type t =
+    { letters : int
+    ; docs : int Int.Table.t (** by [Doc.num], the word's best weight there *)
+    }
+end
+
 type t =
   { docs : Doc.t String.Table.t (** by path *)
-  ; postings : int Int.Table.t String.Table.t
+  ; postings : Posting.t String.Table.t
     (** each word's sessions (by [Doc.num]) with its best weight in them *)
-  ; mutable next : int
+  ; mutable next : int (** the highest [Doc.num] given *)
+  ; mutable free : int list (** [Doc.num]s given back by [remove] *)
   }
 
 let create () =
-  { docs = String.Table.create (); postings = String.Table.create (); next = 0 }
+  { docs = String.Table.create ()
+  ; postings = String.Table.create ()
+  ; next = 0
+  ; free = []
+  }
 ;;
 
 let remove t (doc : Doc.t) =
   Hashtbl.remove t.docs doc.path;
+  t.free <- doc.num :: t.free;
   Hashtbl.iter_keys doc.words ~f:(fun w ->
     match Hashtbl.find t.postings w with
     | None -> ()
-    | Some docs ->
+    | Some { docs; _ } ->
       Hashtbl.remove docs doc.num;
       if Hashtbl.is_empty docs then Hashtbl.remove t.postings w)
 ;;
@@ -183,7 +219,9 @@ let add t (doc : Doc.t) =
   Hashtbl.set t.docs ~key:doc.path ~data:doc;
   Hashtbl.iteri doc.words ~f:(fun ~key:w ~data:weight ->
     Hashtbl.set
-      (Hashtbl.find_or_add t.postings w ~default:Int.Table.create)
+      (Hashtbl.find_or_add t.postings w ~default:(fun () ->
+         { Posting.letters = letters w; docs = Int.Table.create () }))
+        .docs
       ~key:doc.num
       ~data:weight)
 ;;
@@ -216,22 +254,32 @@ let refresh t ~sessions ~load =
         (* [load] may let another search index it meanwhile. *)
         drop ();
         Option.iter loaded ~f:(fun session ->
-          t.next <- t.next + 1;
-          add t (Doc.create ~num:t.next ~summary ~size ~mtime session))))
+          let num =
+            match t.free with
+            | num :: rest ->
+              t.free <- rest;
+              num
+            | [] ->
+              t.next <- t.next + 1;
+              t.next
+          in
+          add t (Doc.create ~num ~summary ~size ~mtime session))))
 ;;
 
 (* Each session's best score for [w]: one look at every distinct word. *)
 let scores t ~w =
-  let best = Int.Table.create () in
-  Hashtbl.iteri t.postings ~f:(fun ~key:v ~data:docs ->
-    match kind ~w v with
-    | None -> ()
-    | Some (k, _) ->
-      Hashtbl.iteri docs ~f:(fun ~key:num ~data:weight ->
-        let score = k * weight in
-        Hashtbl.update best num ~f:(function
-          | Some b -> Int.max b score
-          | None -> score)));
+  let best = Array.create ~len:(t.next + 1) 0 in
+  let wanted = letters w in
+  Hashtbl.iteri t.postings ~f:(fun ~key:v ~data:{ letters; docs } ->
+    (* Every match but a typo has all of [w]'s letters; a typo all but one. *)
+    let missing = wanted land lnot letters in
+    if missing land (missing - 1) = 0
+    then (
+      match kind ~w v with
+      | None -> ()
+      | Some (k, _) ->
+        Hashtbl.iteri docs ~f:(fun ~key:num ~data:weight ->
+          best.(num) <- Int.max best.(num) (k * weight))));
   best
 ;;
 
@@ -390,28 +438,15 @@ let search t ~sessions ~load ~query ~limit =
   | [] -> []
   | ws ->
     refresh t ~sessions ~load;
-    let tables =
-      List.map ws ~f:(fun w -> scores t ~w)
-      |> List.sort ~compare:(fun a b ->
-        Int.compare (Hashtbl.length a) (Hashtbl.length b))
-    in
+    let tables = List.map ws ~f:(fun w -> scores t ~w) in
     let totals =
-      match tables with
-      | [] -> []
-      | smallest :: others ->
-        Hashtbl.fold smallest ~init:[] ~f:(fun ~key:num ~data:score acc ->
-          match
-            List.fold_until
-              others
-              ~init:score
-              ~f:(fun sum table ->
-                match Hashtbl.find table num with
-                | Some s -> Continue (sum + s)
-                | None -> Stop None)
-              ~finish:Option.some
-          with
-          | Some total -> (num, total) :: acc
-          | None -> acc)
+      List.filter_map
+        (List.range 1 (t.next + 1))
+        ~f:(fun num ->
+          if List.for_all tables ~f:(fun best -> best.(num) > 0)
+          then
+            Some (num, List.sum (module Int) tables ~f:(fun best -> best.(num)))
+          else None)
     in
     let by_num = Int.Table.create () in
     Hashtbl.iter t.docs ~f:(fun (doc : Doc.t) ->
