@@ -123,3 +123,56 @@ let%expect_test
     No sessions match “zzz”. Search looks in titles and messages.
     |}]
 ;;
+
+let%expect_test
+    "on a phone, a search typed while the session is still arriving stays, its \
+     results shown"
+  =
+  let h = H.connecting () in
+  H.quiet h (fun () ->
+    H.act h (Set_narrow true);
+    H.act h Toggle_sidebar);
+  H.act h (Set_session_query "port config");
+  H.act h (Search_sessions 1);
+  [%expect
+    {|
+    (Search_sessions_later (search 1) (after_ms 150))
+    (Rpc (method_ search_sessions) (params ((query "port config") (limit 50)))
+     (tag (Session_hits 1)))
+    |}];
+  H.quiet h (fun () ->
+    H.reply h "get_state" (H.state_json ());
+    H.reply h "list_models" H.models_json;
+    H.reply h "auth_status" H.auth_json;
+    H.reply h "get_config" H.config_json;
+    H.reply h "forge_status" H.forges_json;
+    H.reply h "get_messages_page" (H.page "[]");
+    H.reply
+      h
+      "get_pending"
+      {|{"steer_texts":[],"follow_up_texts":[],"confirms":[],"questions":[]}|};
+    H.reply h "get_prefs" {|{"prefs":{"web.migrated":true}}|};
+    H.reply h "list_sessions" sessions;
+    H.act h (Tick H.now));
+  H.reply h "search_sessions" (hits ~query:"port config");
+  print_s
+    [%sexp
+      ((H.model h).session_query : string), ((H.model h).sidebar_open : bool)];
+  H.show h ~selector:"#session-search";
+  H.text h ~selector:".session-main";
+  [%expect
+    {|
+    ("port config" true)
+    <input id="session-search"
+           type="search"
+           placeholder="Search sessions"
+           aria-label="Search sessions"
+           autocomplete="off"
+           #value="port config"
+           @on_input/>
+    Make the port config urable
+    1h ago /work
+    fix the parser bug …then make the port config urable via the config file
+    2h ago /work
+    |}]
+;;

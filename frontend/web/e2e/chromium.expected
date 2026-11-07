@@ -2658,12 +2658,14 @@ No sessions match “zebra quokka”. Search looks in titles and messages.
 === chromium: search: Esc clears the search ===
 query: ""; rows: 3
 === chromium: search: 390x844 ===
+once the session is in, the search box: "configurable port"
 where does the server listen?
     …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false
 sidebar overflows sideways: false
 snippet inside the screen: true
 === chromium: search: 320x640 ===
+once the session is in, the search box: "configurable port"
 where does the server listen?
     …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false

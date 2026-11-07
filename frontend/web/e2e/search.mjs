@@ -131,9 +131,9 @@ const rows = () => page.locator(".sessions .session").evaluateAll(es => es.map(e
   const snippet = marked(e.querySelector(".session-snippet"));
   return snippet ? `${title}\n    ${snippet}` : title;
 }).join("\n"));
-const search = async (query, options = {}) => {
-  await page.locator("#session-search").fill(query, options);
-  await page.waitForFunction(q => document.querySelector("#session-search")?.value === q, query, options);
+const search = async query => {
+  await page.locator("#session-search").fill(query);
+  await page.waitForFunction(q => document.querySelector("#session-search").value === q, query);
 };
 
 const query = "configurable port";
@@ -176,23 +176,17 @@ try {
     if (engineName !== "firefox") options.isMobile = true;
     await open(options);
     await signIn();
-    // The session rejoined, its state in: it resets the search.
-    await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("through the config file"));
+    // Typed while the session rejoins: its state arriving keeps the search.
+    // The drawer is inert until the tap is rendered: a fill before that
+    // types nowhere.
     await page.getByRole("button", { name: "Sessions" }).first().tap();
-    await page.locator("#session-search").waitFor();
+    await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open #session-search:not([inert] *)"));
     await page.locator(".session", { hasText: "Release notes" }).waitFor();
-    // Just signed in, the page may still reset the search box once as the
-    // session's state arrives (it may reload): type again until the passage shows.
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await search(query, { timeout: 4000 });
-        await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor({ timeout: 4000 });
-        break;
-      } catch (e) {
-        if (attempt >= 3) throw e;
-      }
-    }
+    await search(query);
+    await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor();
+    await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("through the config file"));
     section(`${w}x${h}`);
+    console.log(`once the session is in, the search box: "${await page.locator("#session-search").inputValue()}"`);
     console.log(await rows());
     console.log(await page.evaluate(() => {
       const doc = document.documentElement;
