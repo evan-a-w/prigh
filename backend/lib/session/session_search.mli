@@ -16,7 +16,9 @@ open! Core
     The index is kept in memory and brought up to date on each search: only
     the session files whose size, modification time or name changed are read
     again; an inverted index (word to sessions) means a query looks at each
-    distinct word once rather than at every text. *)
+    distinct word once rather than at every text. The backend builds it in
+    the background as it starts ({!index}), so that the first search does
+    not read every session. *)
 
 type t
 
@@ -56,6 +58,20 @@ val search
   -> query:string
   -> limit:int
   -> Hit.t list
+
+(** Brings the index up to date with [sessions ()] as [search] would,
+    calling [yield] after each session so that other work goes on meanwhile.
+    A [search] meanwhile waits for it to finish, then answers from the whole
+    index; another [index] meanwhile waits for this one. *)
+val index
+  :  t
+  -> sessions:(unit -> Session.Summary.t list)
+  -> load:(Session.Summary.t -> Session.t option)
+  -> yield:(unit -> unit)
+  -> unit
+
+(** How many sessions are in the index. *)
+val indexed : t -> int
 
 (** The words of [s], as text and queries are split. *)
 val words : string -> string list

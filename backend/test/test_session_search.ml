@@ -309,3 +309,109 @@ let%expect_test "search_sessions: the RPC, live sessions" =
     {"query":"listen","hits":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","score":40,"snippet":null}]}
     |}]
 ;;
+
+let%expect_test "index: yields as it goes; a search meanwhile waits for it" =
+  with_sandbox
+  @@ fun t ->
+  let port =
+    saved t ~at:300. [ Message.user "make the listen port configurable" ]
+  in
+  let _compaction =
+    saved t ~at:200. [ Message.user "the compaction summary loses the plan" ]
+  in
+  let _phone = saved t ~at:100. [ Message.user "the phone layout overflows" ] in
+  let index = Session_search.create () in
+  let loads = ref 0 in
+  let load (s : Session.Summary.t) =
+    incr loads;
+    Result.ok (Session.load s.path)
+  in
+  let sessions () = Session.list ~dir:(sessions_dir t) in
+  let paused, resume = Eio.Promise.create () in
+  let yields = ref 0 in
+  let yield () =
+    incr yields;
+    printf "index: yields after %d sessions (%d read)\n" !yields !loads;
+    if !yields = 1 then Eio.Promise.await paused
+  in
+  let search query =
+    let read = ref 0 in
+    let hits =
+      Session_search.search
+        index
+        ~sessions:(sessions ())
+        ~load:(fun s ->
+          incr read;
+          load s)
+        ~query
+        ~limit:5
+    in
+    printf
+      "search %S: %d hits, %d sessions read by the search\n"
+      query
+      (List.length hits)
+      !read
+  in
+  Eio.Fiber.all
+    [ (fun () ->
+        Session_search.index index ~sessions ~load ~yield;
+        printf "index: done, %d sessions\n" (Session_search.indexed index))
+    ; (fun () ->
+        print_endline "search: starts while the index is paused";
+        search "plan")
+    ; (fun () ->
+        print_endline "index: resumed";
+        Eio.Promise.resolve resume ())
+    ];
+  [%expect
+    {|
+    index: yields after 1 sessions (1 read)
+    search: starts while the index is paused
+    index: resumed
+    index: yields after 2 sessions (2 read)
+    index: yields after 3 sessions (3 read)
+    index: done, 3 sessions
+    search "plan": 1 hits, 0 sessions read by the search
+    |}];
+  (* Kept up to date: only what changed is read again. *)
+  ignore
+    (Session.append_message
+       port
+       ~at:400.
+       (Message.user "and the kubernetes manifest")
+     : Session.Entry.t);
+  search "kubernetes";
+  search "kubernetes";
+  Session_search.index index ~sessions ~load ~yield:ignore;
+  printf
+    "index again: %d sessions, %d read in all\n"
+    (Session_search.indexed index)
+    !loads;
+  [%expect
+    {|
+    search "kubernetes": 1 hits, 1 sessions read by the search
+    search "kubernetes": 1 hits, 0 sessions read by the search
+    index again: 3 sessions, 4 read in all
+    |}]
+;;
+
+let%expect_test "start_indexing: the index is built without a search" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  ignore
+    (saved t ~at:200. [ Message.user "make the port configurable" ] : Session.t);
+  ignore (saved t ~at:100. [ Message.user "the phone layout" ] : Session.t);
+  let server = server t ~sw in
+  Rpc_server.start_indexing server;
+  printf "at start: %d\n" (Rpc_server.indexed_sessions server);
+  (* Waits for the indexing under way rather than starting another. *)
+  Rpc_server.index_sessions server;
+  printf "indexed: %d\n" (Rpc_server.indexed_sessions server);
+  [%expect
+    {|
+    at start: 0
+    indexed: 2
+    |}]
+;;

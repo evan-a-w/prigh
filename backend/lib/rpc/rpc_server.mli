@@ -94,6 +94,18 @@ val restore_resumes : t -> unit
     when they connect). *)
 val clean_leftovers : t -> unit
 
+(** Builds [search_sessions]' index of the saved sessions in a fiber of its
+    own that yields after each session, so that the backend serves its
+    clients meanwhile; a search meanwhile waits for it. *)
+val start_indexing : t -> unit
+
+(** [start_indexing]'s work, returning when it is done (or, if it is under
+    way, when it finishes). *)
+val index_sessions : t -> unit
+
+(** How many sessions [search_sessions]' index has. *)
+val indexed_sessions : t -> int
+
 (** Registers a client whose outgoing lines go through [send]; it starts
     in a new session in [cwd] (or the default one). With [signed_in] (the
     router checked its credentials) it needs no token in [hello], and can
