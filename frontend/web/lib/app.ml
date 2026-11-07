@@ -9498,7 +9498,7 @@ let update_connected (m : Model.t) (action : Action.t) =
       ( m
       , [ rpc
             "search_sessions"
-            [ "query", Json.str m.session_query; "limit", Json.int 50 ]
+            (Session_hits.params ~query:m.session_query ~limit:50)
             ~tag:(Session_hits search)
         ] )
     else m, []

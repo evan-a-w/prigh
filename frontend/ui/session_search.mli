@@ -63,6 +63,23 @@ val words : string -> string list
     a query without words. *)
 val score : query:string -> (Field.t * string) list -> Match.t option
 
+(** Where the words of [query] match in [text], whether or not all do. *)
+val ranges : query:string -> string -> (int * int) list
+
+(** [items] matching [query] in their [fields], or found by the backend
+    ([content], by [path], when for the same words), with their score and
+    the backend's snippet, best first, else in the given order. *)
+val rank
+  :  ?content:P.Session_hits.t
+  -> query:string
+  -> 'a list
+  -> fields:('a -> (Field.t * string) list)
+  -> path:('a -> string)
+  -> ('a * int * P.Session_hits.Snippet.t option) list
+
+(** Whether two queries have the same words, in any order. *)
+val same_words : string -> string -> bool
+
 (** [text] with [(start, length)] [ranges] cut out: the plain and the matched
     pieces, in order. *)
 val pieces : string -> (int * int) list -> ([ `Plain | `Match ] * string) list
@@ -82,9 +99,12 @@ end
 (** The name, else the description or first prompt. *)
 val title : P.Session_summary.t -> string
 
+(** What {!sessions} searches of a session. *)
+val fields : P.Session_summary.t -> (Field.t * string) list
+
 (** The sessions matching [query], best first, merged with the hits of the
     backend's content search when [content] is for the same words (a reply
-    to an older query is ignored); all of them, in the given order, for an
+    to an older query is ignored), ties to the most recently updated; all of them, in the given order, for an
     empty query. *)
 val sessions
   :  ?content:P.Session_hits.t

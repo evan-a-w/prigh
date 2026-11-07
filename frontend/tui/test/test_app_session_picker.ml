@@ -121,11 +121,100 @@ let%expect_test
        backend ∣ 2025-06-06T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh/backend
        notes ∣ 2025-06-05T10:00 ∣ 2 msgs ∣ go              /home/u/notes
     >
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query s)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query si)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query sit)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query site)
+        (limit 50)))
+      (tag Session_hits))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     ▸  landing ∣ 2025-06-07T10:00 ∣ 2 msgs ∣ site ⎇ trunk ∣ go  /src/site
-       main work ∣ 2025-06-08T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh · ⎇ feat/login · ⎇ agent/f…
     >
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query sit)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query si)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query s)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query a)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query ag)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query age)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agen)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/f)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/fi)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/fix)
+        (limit 50)))
+      (tag Session_hits))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     ▸  main work ∣ 2025-06-08T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh · ⎇ feat/login · ⎇ agent/f…
