@@ -69,6 +69,7 @@ module Host = struct
     ; home : string option [@sexp.option]
     ; exec_input : bool [@sexp.bool]
     ; git_location : bool [@sexp.bool]
+    ; computer : Computer_info.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -329,6 +330,7 @@ let backend_host t =
   ; home = Sys.getenv "HOME"
   ; exec_input = false (* runs in this process: no messages *)
   ; git_location = true
+  ; computer = None (* never the backend: only a tool host opted in *)
   }
 ;;
 

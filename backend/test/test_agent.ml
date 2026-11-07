@@ -1648,6 +1648,7 @@ let with_remote_agent replies f =
       ; home = Some t.dir
       ; exec_input = false
       ; git_location = false
+      ; computer = None
       }
     ];
   f t agent

@@ -70,10 +70,6 @@ end
 (** What a tool host announces in [hello]'s [features]. *)
 val features : string list
 
-(** Said in [features] (with [hello]'s [computer], its
-    {!Computer_info}) by a host that runs the [computer] tool. *)
-val computer_feature : string
-
 (** Serves JSON lines until [input] ends. [terminals] defaults to
     {!Terminals.create}'s defaults, created on first use. *)
 val run
