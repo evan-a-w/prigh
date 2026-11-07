@@ -166,13 +166,22 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     |}];
   H.act h (Set_session_query "lexr");
   H.text h ~selector:".session-title";
-  [%expect {| Refactor the lexer |}];
+  [%expect {|
+    (Search_sessions_later (search 1) (after_ms 150))
+    Refactor the lexe r
+    |}];
   H.act h (Set_session_query "docs");
   H.text h ~selector:".session-title";
-  [%expect {| Release notes |}];
+  [%expect {|
+    (Search_sessions_later (search 2) (after_ms 150))
+    Release notes
+    |}];
   H.act h (Set_session_query "zzz");
   H.text h ~selector:".sessions";
-  [%expect {| Nothing matches “zzz”. |}];
+  [%expect {|
+    (Search_sessions_later (search 3) (after_ms 150))
+    No sessions match “zzz”. Search looks in titles and messages.
+    |}];
   H.act h (Set_session_query "");
   H.text h ~selector:".session-title";
   [%expect
@@ -713,15 +722,15 @@ let%expect_test
     {|
     Open_sessions
     (Focus session-search)
-    Release notes
-    Refactor the lexer
-    fix the parser bug
+    (Search_sessions_later (search 1) (after_ms 150))
+    Re lease notes
+    Re factor the lexer
     (Session_nav (from ()) (by 1))
     (Focus session-s2)
     (Session_nav (from (s2)) (by 1))
     (Focus session-s3)
     (Session_nav (from (s3)) (by 1))
-    (Focus session-s1)
+    (Focus session-s3)
     (Session_nav (from (s2)) (by -1))
     (Focus session-search)
     (Session_nav (from (s2)) (by -1))

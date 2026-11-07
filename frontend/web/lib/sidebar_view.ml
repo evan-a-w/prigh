@@ -401,10 +401,11 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                [ marked_text ~cls:"session-title" title matched
-                ; Option.value_map snippet ~default:Node.none ~f:(fun s ->
-                    marked_text ~cls:"session-snippet" s.text s.ranges)
-                ; div
+                (marked_text ~cls:"session-title" title matched
+                 :: Option.to_list
+                      (Option.map snippet ~f:(fun s ->
+                         marked_text ~cls:"session-snippet" s.text s.ranges))
+                 @ [ div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
                     ; place ?host_home s ~cwd
@@ -429,7 +430,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                            (Session_summary.size_string s.bytes)
                        else Node.none)
                     ]
-                ]
+                   ])
             ]
         ; (if selecting then Node.none else fold)
         ; (if selecting
