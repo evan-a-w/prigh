@@ -58,4 +58,4 @@ let of_json j =
   { query; hits }
 ;;
 
-let params ~query ~limit = Json.obj [ "query", Json.str query; "limit", Json.int limit ]
+let params ~query ~limit = [ "query", Json.str query; "limit", Json.int limit ]

@@ -38,6 +38,7 @@ module Reply_tag : sig
     | Models_after_login of string (** provider *)
     | Sessions_picker
     | Sessions_cache
+    | Session_hits (** [search_sessions], for the [/sessions] picker *)
     | Session_stats
     | Trace
     | Entries_for_fork

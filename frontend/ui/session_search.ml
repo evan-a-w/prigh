@@ -243,6 +243,56 @@ let pieces text ranges =
   go 0 ranges []
 ;;
 
+let ranges ~query text =
+  match score ~query [ Field.Name, text ] with
+  | Some { ranges = [ r ]; _ } -> r
+  | Some _ | None ->
+    (* Not every word is in [text]: what is. *)
+    List.concat_map (words query) ~f:(fun w ->
+      match score ~query:w [ Field.Name, text ] with
+      | Some { ranges = [ r ]; _ } -> r
+      | Some _ | None -> [])
+    |> merge_ranges
+;;
+
+let same_words a b =
+  [%equal: string list]
+    (List.sort (words a) ~compare:String.compare)
+    (List.sort (words b) ~compare:String.compare)
+;;
+
+let rank ?content ~query items ~fields ~path =
+  if List.is_empty (words query)
+  then List.map items ~f:(fun item -> item, 0, None)
+  else (
+    let hits =
+      match content with
+      | Some (c : P.Session_hits.t) when same_words c.query query ->
+        String.Map.of_alist_reduce
+          (List.map c.hits ~f:(fun (h : P.Session_hits.Hit.t) -> h.path, h))
+          ~f:(fun a _ -> a)
+      | Some _ | None -> String.Map.empty
+    in
+    List.filter_map items ~f:(fun item ->
+      let local = score ~query (fields item) in
+      let hit = Map.find hits (path item) in
+      match local, hit with
+      | None, None -> None
+      | _ ->
+        let local_score =
+          Option.value_map local ~default:0 ~f:(fun (m : Match.t) -> m.score)
+        in
+        let hit_score =
+          Option.value_map hit ~default:0 ~f:(fun (h : P.Session_hits.Hit.t) ->
+            h.score)
+        in
+        Some
+          ( item
+          , Int.max local_score hit_score
+          , Option.bind hit ~f:(fun h -> h.snippet) ))
+    |> List.stable_sort ~compare:(fun (_, a, _) (_, b, _) -> Int.compare b a))
+;;
+
 module Result = struct
   type t =
     { session : P.Session_summary.t
@@ -260,41 +310,24 @@ let title (s : P.Session_summary.t) =
   | _ -> P.Session_summary.blurb s
 ;;
 
-let session_match ~query (s : P.Session_summary.t) =
-  let title = title s in
-  let named =
-    Option.exists s.name ~f:(fun n -> not (String.is_empty (String.strip n)))
-  in
-  let others =
-    [ Field.Prompt, Option.value s.first_prompt ~default:""
+let named (s : P.Session_summary.t) =
+  Option.exists s.name ~f:(fun n -> not (String.is_empty (String.strip n)))
+;;
+
+(* Unnamed, the title is the blurb, which is searched as what it is. *)
+let fields (s : P.Session_summary.t) =
+  (if named s then [ Field.Name, title s ] else [])
+  @ [ Field.Prompt, Option.value s.first_prompt ~default:""
     ; Text, Option.value s.description ~default:""
     ; Place, s.cwd
     ; Place, Option.value (Session_worktrees.place s) ~default:""
     ]
-    @ List.map s.worktrees ~f:(fun w -> Field.Place, P.Session_worktree.label w)
-  in
-  (* Unnamed, the title is the blurb, which is searched as what it is. *)
-  let fields = if named then (Field.Name, title) :: others else others in
-  Option.map (score ~query fields) ~f:(fun (m : Match.t) ->
-    let title_ranges =
-      if named
-      then List.hd m.ranges |> Option.value ~default:[]
-      else (
-        match
-          List.find_map (List.zip_exn fields m.ranges) ~f:(fun ((f, text), r) ->
-            if
-              (Field.equal f Prompt || Field.equal f Text)
-              && String.equal
-                   (String.concat ~sep:" " (String.split_lines text))
-                   title
-              && not (String.is_empty text)
-            then Some r
-            else None)
-        with
-        | Some r -> r
-        | None -> [])
-    in
-    m, title_ranges)
+  @ List.map s.worktrees ~f:(fun w -> Field.Place, P.Session_worktree.label w)
+;;
+
+let by_recency sessions =
+  List.stable_sort sessions ~compare:(fun (a : P.Session_summary.t) b ->
+    [%compare: string option] b.updated_at a.updated_at)
 ;;
 
 let sessions ?content ~query sessions =
@@ -302,44 +335,22 @@ let sessions ?content ~query sessions =
   then
     List.map sessions ~f:(fun session ->
       { Result.session; score = 0; title = []; snippet = None; why = [] })
-  else (
-    let hits =
-      match content with
-      | Some (c : P.Session_hits.t)
-        when [%equal: string list]
-               (List.sort (words c.query) ~compare:String.compare)
-               (List.sort (words query) ~compare:String.compare) ->
-        String.Map.of_alist_reduce
-          (List.map c.hits ~f:(fun (h : P.Session_hits.Hit.t) -> h.path, h))
-          ~f:(fun a _ -> a)
-      | Some _ | None -> String.Map.empty
-    in
-    List.filter_map sessions ~f:(fun (session : P.Session_summary.t) ->
-      let local = session_match ~query session in
-      let hit = Map.find hits session.path in
-      match local, hit with
-      | None, None -> None
-      | _ ->
-        let local_score =
-          Option.value_map local ~default:0 ~f:(fun ((m : Match.t), _) ->
-            m.score)
-        in
-        let hit_score =
-          Option.value_map hit ~default:0 ~f:(fun (h : P.Session_hits.Hit.t) ->
-            h.score)
-        in
-        Some
-          { Result.session
-          ; score = Int.max local_score hit_score
-          ; title = Option.value_map local ~default:[] ~f:snd
-          ; snippet = Option.bind hit ~f:(fun h -> h.snippet)
-          ; why =
-              Option.value_map local ~default:[] ~f:(fun ((m : Match.t), _) ->
-                m.why)
-          })
-    |> List.stable_sort ~compare:(fun (a : Result.t) (b : Result.t) ->
-      match Int.compare b.score a.score with
-      | 0 ->
-        [%compare: string option] b.session.updated_at a.session.updated_at
-      | c -> c))
+  else
+    rank
+      ?content
+      ~query
+      (by_recency sessions)
+      ~fields
+      ~path:(fun (s : P.Session_summary.t) -> s.path)
+    |> List.map ~f:(fun (session, total, snippet) ->
+      { Result.session
+      ; score = total
+      ; title = ranges ~query (title session)
+      ; snippet
+      ; why =
+          Option.value_map
+            (score ~query (fields session))
+            ~default:[]
+            ~f:(fun (m : Match.t) -> m.why)
+      })
 ;;

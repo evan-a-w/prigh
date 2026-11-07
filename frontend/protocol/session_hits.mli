@@ -29,4 +29,4 @@ type t =
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t
-val params : query:string -> limit:int -> Json.t
+val params : query:string -> limit:int -> (string * Json.t) list
