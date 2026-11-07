@@ -53,9 +53,14 @@ val to_anthropic : toolset:bool -> string -> string * Json.t
 (** {2 OpenAI} *)
 
 (** The stored arguments of one action of a [computer_call]; the first of
-    a call's actions carries its [pending_safety_checks]. *)
-val of_openai : ?safety_checks:Json.t list -> Json.t -> string
+    a call's actions carries its [pending_safety_checks]. [item_id]: the
+    [computer_call] item's [id]. *)
+val of_openai
+  :  ?item_id:string
+  -> ?safety_checks:Json.t list
+  -> Json.t
+  -> string
 
 (** The action to replay stored [arguments] as, with the call's
-    [pending_safety_checks] if it had any. *)
-val to_openai : string -> Json.t * Json.t list
+    [pending_safety_checks] and its item's [id] if it had them. *)
+val to_openai : string -> Json.t * Json.t list * string option
