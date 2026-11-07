@@ -1,11 +1,4 @@
-      // Past the edge of a scroller (or into its padding, as a sheet scrolls
-      // under the home indicator) is scrolled to, not lost.
-      let scroller = e.parentElement;
-      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
-      const box = scroller?.getBoundingClientRect();
-      const padding = scroller && scroller.scrollHeight > scroller.clientHeight
-        ? parseFloat(getComputedStyle(scroller).paddingBottom) : 0;
-      if (box && (r.top < box.top - 0.5 || r.bottom > box.bottom - padding + 0.5)) continue;// Sessions and the worktrees that matter to them, against real git
+// Sessions and the worktrees that matter to them, against real git
 // repositories: a flat list of sessions, each with its repository and
 // branch, its worktrees under it (one made for a subagent, one made from the
 // session's menu, one moved into that has uncommitted changes, one shared
