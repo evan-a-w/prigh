@@ -54,9 +54,23 @@ let
       pkgs.rustPlatform.bindgenHook
     ];
     buildInputs = [ pkgs.pipewire ];
-    # the fake portal test runs a private bus
-    nativeCheckInputs = [ pkgs.dbus ];
-    env.PRIGH_REQUIRE_DBUS = "1";
+    # tests/portal.rs runs a fake portal on a private bus; tests/screencast.rs
+    # a private PipeWire (with wireplumber) and a GStreamer test screen
+    nativeCheckInputs = [
+      pkgs.dbus
+      pkgs.pipewire
+      pkgs.wireplumber
+      pkgs.gst_all_1.gstreamer
+    ];
+    env = {
+      PRIGH_REQUIRE_DBUS = "1";
+      PRIGH_REQUIRE_PIPEWIRE = "1";
+      GST_PLUGIN_SYSTEM_PATH_1_0 = lib.makeSearchPath "lib/gstreamer-1.0" [
+        pkgs.pipewire
+        pkgs.gst_all_1.gstreamer.out
+        pkgs.gst_all_1.gst-plugins-base
+      ];
+    };
     meta = {
       description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, xdg-desktop-portal, X11)";
       mainProgram = "prigh-computer";
