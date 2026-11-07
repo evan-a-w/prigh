@@ -32,7 +32,8 @@ val dom_id : string -> string
 module Sections : sig
   type t =
     { pinned : Prigh_ui.Session_search.Result.t list
-    ; active : Prigh_ui.Session_search.Result.t list (** the others not archived *)
+    ; active : Prigh_ui.Session_search.Result.t list
+      (** the others not archived *)
     ; archived : Prigh_ui.Session_search.Result.t list
     }
 end
