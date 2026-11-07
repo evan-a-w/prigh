@@ -1,33 +1,32 @@
 open! Core
 open! Import
+module Session_search = Prigh_ui.Session_search
 
-let title (s : Session_summary.t) =
-  match s.name with
-  | Some name when not (String.is_empty (String.strip name)) -> name
-  | _ -> Session_summary.blurb s
+let title = Session_search.title
+
+let results ?content sessions ~query =
+  Session_search.sessions ?content ~query sessions
 ;;
 
-let filter sessions ~query =
-  Prigh_ui.Fuzzy.rank ~query sessions ~key:(fun (s : Session_summary.t) ->
-    String.concat
-      ~sep:" "
-      ([ title s; Option.value s.first_prompt ~default:""; s.cwd ]
-       @ Option.to_list (Prigh_ui.Session_worktrees.place s)
-       @ List.map s.worktrees ~f:Session_worktree.label))
+let filter ?content sessions ~query =
+  List.map (results ?content sessions ~query) ~f:(fun r -> r.session)
 ;;
 
 let dom_id id = "session-" ^ id
 
-let sections sessions ~query =
-  List.partition_tf (filter sessions ~query) ~f:(fun (s : Session_summary.t) ->
-    not s.archived)
+let sections ?content sessions ~query =
+  List.partition_tf
+    (results ?content sessions ~query)
+    ~f:(fun (r : Session_search.Result.t) -> not r.session.archived)
 ;;
 
 let archived_shown ~query ~archived_open =
   archived_open || not (String.is_empty (String.strip query))
 ;;
 
-let shown sessions ~query ~archived_open =
-  let active, archived = sections sessions ~query in
-  if archived_shown ~query ~archived_open then active @ archived else active
+let shown ?content sessions ~query ~archived_open =
+  let active, archived = sections ?content sessions ~query in
+  List.map
+    (if archived_shown ~query ~archived_open then active @ archived else active)
+    ~f:(fun r -> r.session)
 ;;

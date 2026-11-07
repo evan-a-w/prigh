@@ -554,6 +554,13 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
           ()
       in
       inject (App.Action.Dismiss_toast id)
+    | Search_sessions_later { search; after_ms } ->
+      let%bind.Effect () =
+        Effect.of_deferred_fun
+          (fun () -> Clock_ns.after (Time_ns.Span.of_int_ms after_ms))
+          ()
+      in
+      inject (App.Action.Search_sessions search)
     | Focus id -> Effect.of_sync_fun focus id
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Place_popover -> Effect.of_sync_fun place_popover ()

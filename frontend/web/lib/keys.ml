@@ -425,10 +425,12 @@ let resize_key h t : Resize.Action.t option =
 ;;
 
 (* The sidebar is a picker: ↓ ↑ move from the search through the sessions,
-   Enter opens one (from the search, the best match), Esc goes back to the
-   editor. *)
-let session_search_key t : App.Action.t option =
+   Enter opens one (from the search, the best match), Esc clears the
+   search, then goes back to the editor. *)
+let session_search_key (m : App.Model.t) t : App.Action.t option =
   match t.key with
+  | "Escape" when not (String.is_empty m.session_query) ->
+    Some (Set_session_query "")
   | "ArrowDown" when plain t -> Some (Session_nav { from = None; by = 1 })
   | "Enter" when plain t -> Some Open_first_session
   | "Escape" -> Some Leave_sidebar
@@ -643,7 +645,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
        (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
-        | None, Session_search -> session_search_key t
+        | None, Session_search -> session_search_key m t
         | None, Session id -> session_key m t id
         | None, Worktree { session; path } -> worktree_key m t ~session ~path
         | None, Files ->
