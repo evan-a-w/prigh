@@ -135,6 +135,7 @@ module Reply_tag = struct
         ; draft : string
         }
     | Sessions
+    | Session_hits of int
     | Models
     | Reload_state
     | Subagent of string (** the [subagent] call or agent id *)
@@ -281,6 +282,10 @@ module Command = struct
     | Set_url_session of string
     | Expire_toast of
         { id : int
+        ; after_ms : int
+        }
+    | Search_sessions_later of
+        { search : int
         ; after_ms : int
         }
     | Focus of string
@@ -555,6 +560,7 @@ module Action = struct
         ; error : bool
         }
     | Dismiss_toast of int
+    | Search_sessions of int
     | Update_ready
     | Apply_update
     | Dismiss_update
@@ -674,6 +680,8 @@ module Model = struct
     ; status_tray : bool
     ; scrolled_up : bool
     ; session_query : string
+    ; session_hits : Session_hits.t option
+    ; session_search : int
     ; archived_open : bool
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
@@ -917,6 +925,7 @@ module Model = struct
       let order =
         let shown =
           Session_list.shown
+            ?content:t.session_hits
             t.sessions
             ~query:t.session_query
             ~archived_open:t.archived_open
@@ -987,6 +996,8 @@ let init =
   ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
+  ; session_hits = None
+  ; session_search = 0
   ; archived_open = false
   ; agents = Agents.empty
   ; verbosity = Normal
@@ -2150,9 +2161,20 @@ let not_moving (m : Model.t) (switch_to : Switch_to.t) =
   if ours then { m with pending = { m.pending with session = None } } else m
 ;;
 
+(* Titles match at once; the messages, searched by the backend, once the
+   typing pauses. *)
+let set_session_query (m : Model.t) session_query =
+  let search = m.session_search + 1 in
+  let m = { m with session_query; session_search = search } in
+  if List.is_empty (Prigh_ui.Session_search.words session_query)
+  then { m with session_hits = None }, []
+  else m, [ Command.Search_sessions_later { search; after_ms = 150 } ]
+;;
+
 (* The sidebar's sessions in the order it shows them. *)
 let shown_sessions (m : Model.t) =
   Session_list.shown
+    ?content:m.session_hits
     m.sessions
     ~query:m.session_query
     ~archived_open:m.archived_open
@@ -4085,6 +4107,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
+    ; session_hits = None
     ; confirms = []
     ; confirm_reason = None
     ; questions = []
@@ -7728,6 +7751,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Hidden_messages { path; entry }, result ->
     hidden_messages m ~path ~entry result
   | _, Error "backend closed" -> m, []
+  (* A backend without content search: the titles still are. *)
+  | Session_hits _, Error _ -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
     { m with pending = In_flight.answered m.pending ~failed:None }, []
@@ -7875,6 +7900,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
             Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
         }
       , [] ))
+  | Session_hits search, Ok json ->
+    if search = m.session_search
+    then
+      decode m json Session_hits.of_json ~f:(fun hits ->
+        { m with session_hits = Some hits }, [])
+    else m, []
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
@@ -9460,7 +9491,17 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match find_session_by_path m path with
      | Some s -> set_archived m s ~archived
      | None -> m, [])
-  | Set_session_query session_query -> { m with session_query }, []
+  | Set_session_query session_query -> set_session_query m session_query
+  | Search_sessions search ->
+    if search = m.session_search
+    then
+      ( m
+      , [ rpc
+            "search_sessions"
+            [ "query", Json.str m.session_query; "limit", Json.int 50 ]
+            ~tag:(Session_hits search)
+        ] )
+    else m, []
   | Toggle_archived -> { m with archived_open = not m.archived_open }, []
   | Open_sessions -> open_sessions m
   | Session_nav { from; by } -> session_nav m ~from ~by
