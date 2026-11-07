@@ -66,6 +66,23 @@ pub fn plan(os: Os, env: &Env, find: impl Fn(&str) -> Option<String>) -> Result<
     }
 }
 
+/// The computer-use helper bundled next to the app (`prigh-computer` beside
+/// its executable, as the macOS bundle has it), for `$PRIGH_COMPUTER` when
+/// it is not set: `prigh desktop -computer` then finds it without it being
+/// on the PATH. Not on Windows, where prigh runs in WSL.
+pub fn bundled_computer(
+    os: Os,
+    exe: Option<&std::path::Path>,
+    env_computer: Option<&str>,
+    is_executable: impl Fn(&std::path::Path) -> bool,
+) -> Option<std::path::PathBuf> {
+    if os == Os::Windows || env_computer.is_some_and(|c| !c.is_empty()) {
+        return None;
+    }
+    let helper = exe?.parent()?.join("prigh-computer");
+    is_executable(&helper).then_some(helper)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,6 +117,27 @@ mod tests {
             plan(Os::Unix, &env, find),
             Err(Error::BadArgs("$PRIGH_DESKTOP_ARGS: unterminated ' in \"-cwd 'x\"".into()))
         );
+    }
+
+    #[test]
+    fn computer() {
+        use std::path::Path;
+        let exe = Path::new("/Applications/prigh.app/Contents/MacOS/prigh-desktop");
+        let bundled = |p: &Path| p == Path::new("/Applications/prigh.app/Contents/MacOS/prigh-computer");
+        assert_eq!(
+            bundled_computer(Os::Unix, Some(exe), None, bundled),
+            Some("/Applications/prigh.app/Contents/MacOS/prigh-computer".into())
+        );
+        assert_eq!(
+            bundled_computer(Os::Unix, Some(exe), Some(""), bundled),
+            Some("/Applications/prigh.app/Contents/MacOS/prigh-computer".into())
+        );
+        // $PRIGH_COMPUTER wins
+        assert_eq!(bundled_computer(Os::Unix, Some(exe), Some("/nix/bin/prigh-computer"), bundled), None);
+        // none bundled (Linux packages, Nix)
+        assert_eq!(bundled_computer(Os::Unix, Some(exe), None, |_| false), None);
+        assert_eq!(bundled_computer(Os::Unix, None, None, bundled), None);
+        assert_eq!(bundled_computer(Os::Windows, Some(exe), None, |_| true), None);
     }
 
     #[test]
