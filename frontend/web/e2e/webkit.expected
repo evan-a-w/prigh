@@ -2661,28 +2661,44 @@ after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === webkit: filter: errors ===
 none
 === webkit: search: a title and a reply ===
-[Port] the tmux tests
+-- Pinned 2 --
+📌 [Port] the tmux tests
+📌 Deploy checklist
+    That the [port] stays configurable, and the certificates are fresh.
+-- Recent 1 --
 where does the server listen?
     …can make the listen [port] configurable through the config file: add a `[port]` key.
 === webkit: search: the messages, once typing pauses ===
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
 where does the server listen?
     …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 === webkit: search: nothing matches ===
 No sessions match “zebra quokka”. Search looks in titles and messages.
 === webkit: search: Esc clears the search ===
-query: ""; rows: 3
+query: ""; rows: 4
 === webkit: search: 390x844 ===
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
 where does the server listen?
     …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false
 sidebar overflows sideways: false
-snippet inside the screen: true
+snippets inside the screen: true
 === webkit: search: 320x640 ===
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
 where does the server listen?
     …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false
 sidebar overflows sideways: false
-snippet inside the screen: true
+snippets inside the screen: true
 === webkit: search: errors ===
 none
 === webkit: viewer: desktop: fit ===
