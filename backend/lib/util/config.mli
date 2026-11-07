@@ -59,6 +59,9 @@ type t =
   ; mask_observations : bool
     (** replace old tool outputs with placeholders before summarising the
         conversation ({!Observation_mask}; default true) *)
+  ; computer_screenshots : int
+    (** how many of the latest [computer] screenshots requests carry as
+        images; older ones are sent as ["[screenshot omitted]"] (default 3) *)
   ; compact_at_tokens : int
     (** compact a conversation once its context exceeds this many tokens,
         or 80% of the model's window if that comes first (default 200000; 0:

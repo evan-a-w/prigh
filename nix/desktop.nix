@@ -5,7 +5,8 @@
 # from another nixpkgs, WebKitGTK may fall back to drawing on the CPU.
 #
 # `unwrapped` finds prigh on the PATH; `wrapped` points it at `prigh` and
-# takes `.override { backend; ui; window; browser; extraArgs; disableDmabuf; }`.
+# takes `.override { backend; ui; window; browser; extraArgs; disableDmabuf;
+# computerUse; }`.
 { pkgs, prigh }:
 let
   lib = pkgs.lib;
@@ -24,18 +25,38 @@ let
     pkgs.gst_all_1.gst-plugins-base
     pkgs.gst_all_1.gst-plugins-good
   ];
+  # The workspace: the app, its logic and the computer-use helper.
+  src = lib.fileset.toSource {
+    root = ../desktop;
+    fileset = lib.fileset.unions [
+      ../desktop/Cargo.toml
+      ../desktop/Cargo.lock
+      ../desktop/core
+      ../desktop/computer/Cargo.toml
+      ../desktop/computer/src
+      (lib.fileset.difference ../desktop/app (lib.fileset.maybeMissing ../desktop/app/gen))
+    ];
+  };
+  # The computer-use helper (desktop/computer): `prigh tool-host -computer`
+  # and `prigh desktop -computer` run it (PRIGH_COMPUTER) for the computer
+  # tool. Pure Rust (its Wayland and X11 clients speak the protocols
+  # themselves): no libraries to link.
+  prighComputer = pkgs.rustPlatform.buildRustPackage {
+    pname = "prigh-computer";
+    version = desktopVersion;
+    inherit src;
+    cargoLock.lockFile = ../desktop/Cargo.lock;
+    buildAndTestSubdir = "computer";
+    meta = {
+      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, X11)";
+      mainProgram = "prigh-computer";
+      platforms = lib.platforms.linux;
+    };
+  };
   prighDesktopUnwrapped = pkgs.rustPlatform.buildRustPackage {
     pname = "prigh-desktop-unwrapped";
     version = desktopVersion;
-    src = lib.fileset.toSource {
-      root = ../desktop;
-      fileset = lib.fileset.unions [
-        ../desktop/Cargo.toml
-        ../desktop/Cargo.lock
-        ../desktop/core
-        (lib.fileset.difference ../desktop/app (lib.fileset.maybeMissing ../desktop/app/gen))
-      ];
-    };
+    inherit src;
     cargoLock.lockFile = ../desktop/Cargo.lock;
     buildAndTestSubdir = "app";
     nativeBuildInputs = [
@@ -57,7 +78,7 @@ let
       platforms = lib.platforms.linux ++ lib.platforms.darwin;
     };
   };
-  # `.override { backend; ui; window; browser; extraArgs; disableDmabuf; }` is what
+  # `.override { backend; ui; window; browser; extraArgs; disableDmabuf; computerUse; }` is what
   # programs.prigh.desktop in the Home Manager module uses.
   prighDesktop = lib.makeOverridable (
     {
@@ -72,6 +93,10 @@ let
       browser ? null,
       extraArgs ? [ ],
       disableDmabuf ? false,
+      # Let the agent see and drive this desktop (`prigh desktop -computer`),
+      # through prighComputer (PRIGH_COMPUTER). Linux (wlroots Wayland, X11).
+      computerUse ? false,
+      computer ? prighComputer,
     }:
     let
       args =
@@ -79,7 +104,8 @@ let
           "-ui"
           ui
         ]
-        ++ extraArgs;
+        ++ extraArgs
+        ++ lib.optional computerUse "-computer";
       env = {
         PRIGH_DESKTOP_BACKEND = "${backend}/bin/prigh";
       }
@@ -88,7 +114,8 @@ let
       // lib.optionalAttrs (browser != null) {
         PRIGH_DESKTOP_BROWSER = if lib.isDerivation browser then lib.getExe browser else toString browser;
       }
-      // lib.optionalAttrs disableDmabuf { WEBKIT_DISABLE_DMABUF_RENDERER = "1"; };
+      // lib.optionalAttrs disableDmabuf { WEBKIT_DISABLE_DMABUF_RENDERER = "1"; }
+      // lib.optionalAttrs computerUse { PRIGH_COMPUTER = lib.getExe computer; };
       wrapFlags = lib.concatLists (
         lib.mapAttrsToList (name: value: [
           "--set-default"
@@ -150,5 +177,6 @@ in
 {
   unwrapped = prighDesktopUnwrapped;
   wrapped = prighDesktop;
+  computer = prighComputer;
   version = desktopVersion;
 }

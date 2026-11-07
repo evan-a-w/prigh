@@ -330,6 +330,7 @@ let host_tools () =
 
 let execute
       ~mcp:hub
+      ?computer
       ~env
       ?stdin
       ?(files = File_access.local)
@@ -348,7 +349,9 @@ let execute
        | _ -> Or_error.errorf "missing %S" key)
     | _ -> Or_error.errorf "missing %S" key
   in
-  if String.equal name resolve_dir_op
+  if String.equal name Tool_computer.name
+  then Tool_computer.execute computer ~cancel arguments
+  else if String.equal name resolve_dir_op
   then (
     match string_arg "path" with
     | Ok path -> resolve_dir ~cwd path

@@ -4,6 +4,7 @@
 #   programs.prigh.enable = true;          # prigh on the PATH
 #   programs.prigh.desktop.enable = true;  # and the desktop app in the menus
 #   programs.prigh.desktop.ui = "local";   # prigh-web from this prigh (default: the backend's)
+#   programs.prigh.desktop.computerUse = true;  # the agent may drive this desktop
 self:
 {
   config,
@@ -35,6 +36,7 @@ let
           browser
           extraArgs
           disableDmabuf
+          computerUse
           ;
       }
     else
@@ -164,6 +166,19 @@ in
           readable by every user of the machine. Sign in from the app
           instead: the connection is saved in ~/.prigh/tui-connection.sexp
           (shared with prigh-tui), or set PRIGH_TOKEN outside Nix.
+        '';
+      };
+
+      computerUse = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Let the agent see and drive this desktop: `prigh desktop
+          -computer` offers the computer tool (screenshots, the mouse and
+          the keyboard) through prigh-computer (PRIGH_COMPUTER). Linux:
+          wlroots compositors (Hyprland, sway) and X11; GNOME and KDE on
+          Wayland are not supported yet. prigh-web shows a banner while the
+          agent has control; moving the mouse yourself stops it.
         '';
       };
 

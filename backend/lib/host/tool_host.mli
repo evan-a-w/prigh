@@ -48,6 +48,9 @@ module Worker : sig
     -> sw:Switch.t
     -> terminals:Terminals.t Lazy.t
     -> mcp:Mcp_hub.t
+    -> ?computer:Computer_helper.t
+         (** runs the [computer] tool; without it, the tool says computer
+             use is off *)
     -> default_cwd:string
     -> ?files:
          (session_id:string option -> call_id:string option -> File_access.t)
@@ -72,6 +75,7 @@ val features : string list
 val run
   :  env:Env.t
   -> ?terminals:Terminals.t Lazy.t
+  -> ?computer:Computer_helper.t
   -> input:_ Eio.Flow.source
   -> output:_ Eio.Flow.sink
   -> unit
@@ -102,6 +106,8 @@ val connect
   -> ?heartbeat_interval:float
   -> ?heartbeat_timeout:float
   -> ?on_connect:(unit -> unit) (** after each accepted [hello] *)
+  -> ?computer:Computer_helper.t
+       (** runs the [computer] tool, said in [hello] *)
   -> ?signin:
        (why:string
         -> Backend_address.t

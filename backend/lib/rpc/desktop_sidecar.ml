@@ -68,6 +68,7 @@ module Config = struct
     ; host_id : string
     ; cwd : string
     ; listen : Web_connect.Listen.t
+    ; computer : Computer_helper.t option
     ; root : string
     ; save : Saved_connection.t -> unit Or_error.t
     ; remember_signin :
@@ -229,6 +230,7 @@ let connected
           ; name = t.config.name
           ; host_id = t.config.host_id
           ; cwd = t.config.cwd
+          ; computer = t.config.computer
           }
       with
       | `Connected ->

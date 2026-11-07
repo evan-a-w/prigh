@@ -301,6 +301,8 @@ module Client = struct
     ; mutable kind : Client_kind.t
       (** [hello]'s [client]: its prompts are from this kind of client *)
     ; mutable tools : bool
+    ; mutable computer : Computer_info.t option
+      (** [hello]'s [computer], with the [computer] feature *)
     ; mutable features : string list
       (** [hello]'s [features]: what the host supports beyond the basics
           ([exec_input]: [tool_exec_input]; [terminal_kill]: the
@@ -629,6 +631,7 @@ let host_of (client : Client.t) =
   ; home = client.home
   ; exec_input = List.mem client.features "exec_input" ~equal:String.equal
   ; git_location = List.mem client.features "git_location" ~equal:String.equal
+  ; computer = client.computer
   }
 ;;
 
@@ -1031,6 +1034,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; kind = Other
     ; tools = false
     ; features = []
+    ; computer = None
     ; cwd = None
     ; home = None
     ; prefer_host = None
@@ -1618,6 +1622,16 @@ let hello t (client : Client.t) params =
                 | `String feature -> Some feature
                 | _ -> None)
             | _ -> []);
+        client.computer
+        <- (match param params "computer" with
+            | Some json
+              when tools
+                   && List.mem
+                        client.features
+                        Computer_info.feature
+                        ~equal:String.equal ->
+              Result.ok (Computer_info.of_json json)
+            | _ -> None);
         let agent =
           match param params "session", string "temporary_key" with
           | Some (`String session), Some key -> find_temporary t ~session ~key

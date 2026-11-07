@@ -83,6 +83,7 @@ module Worker = struct
     ; sw : Switch.t
     ; terminals : Terminals.t Lazy.t
     ; mcp : Mcp_hub.t
+    ; computer : Computer_helper.t option
     ; default_cwd : string
     ; files : session_id:string option -> call_id:string option -> File_access.t
     ; send : Reply.t -> unit
@@ -96,6 +97,7 @@ module Worker = struct
         ~sw
         ~terminals
         ~mcp
+        ?computer
         ~default_cwd
         ?(files = fun ~session_id:_ ~call_id:_ -> File_access.local)
         ~send
@@ -105,6 +107,7 @@ module Worker = struct
     ; sw
     ; terminals
     ; mcp
+    ; computer
     ; default_cwd
     ; files
     ; send
@@ -151,6 +154,7 @@ module Worker = struct
           match
             Host_ops.execute
               ~mcp:(Some t.mcp)
+              ?computer:t.computer
               ~env:t.env
               ?stdin
               ~files
@@ -377,7 +381,7 @@ let read_lines flow ~f =
   loop ()
 ;;
 
-let run ~env ?terminals ~input ~output () =
+let run ~env ?terminals ?computer ~input ~output () =
   Switch.run
   @@ fun sw ->
   let owned = Option.is_none terminals in
@@ -395,6 +399,7 @@ let run ~env ?terminals ~input ~output () =
       ~sw
       ~terminals
       ~mcp
+      ?computer
       ~default_cwd:(Core_unix.getcwd ())
       ~send:(fun reply ->
         Outbox.send
@@ -420,6 +425,7 @@ let features = [ "exec_input"; "terminal_kill"; "git_location" ]
    what it runs outlive it. *)
 let serve_connection
       ~clock
+      ~computer
       ~heartbeat:(interval, timeout)
       ~worker
       ~link
@@ -466,12 +472,21 @@ let serve_connection
                  ; Option.map (Sys.getenv "HOME") ~f:(fun home ->
                      "home", `String home)
                  ; Some ("tools", `True)
+                 ; Option.map computer ~f:(fun helper ->
+                     ( "computer"
+                     , Computer_info.to_json (Computer_helper.info helper) ))
                  ; Some ("host_id", `String host_id)
                  ; Some
                      ( "features"
                      , `Array
-                         (List.map (features @ [ "heartbeat" ]) ~f:(fun f ->
-                            `String f)) )
+                         (List.map
+                            (features
+                             @ [ "heartbeat" ]
+                             @ Option.value_map
+                                 computer
+                                 ~default:[]
+                                 ~f:(fun _ -> [ Computer_info.feature ]))
+                            ~f:(fun f -> `String f)) )
                  ; Some
                      ( "running_execs"
                      , `Array
@@ -584,6 +599,7 @@ let connect
       ?(heartbeat_interval = 10.)
       ?(heartbeat_timeout = 30.)
       ?(on_connect = fun () -> ())
+      ?computer
       ?signin
       ~backend
       ~token
@@ -606,6 +622,7 @@ let connect
       ~sw
       ~terminals
       ~mcp
+      ?computer
       ~default_cwd:cwd
       ~send:(Link.send link)
       ()
@@ -624,6 +641,7 @@ let connect
         ~finally:(fun () -> Backend_socket.close socket)
         ~f:(fun () ->
           serve_connection
+            ~computer
             ~clock:(Eio.Stdenv.clock env)
             ~heartbeat:(heartbeat_interval, heartbeat_timeout)
             ~worker

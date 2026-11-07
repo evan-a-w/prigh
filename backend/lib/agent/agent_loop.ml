@@ -378,13 +378,18 @@ let run
       @@ fun () ->
       (* Images over the model's limit are sent downscaled. *)
       let fit_images () =
+        let messages =
+          Computer_screenshots.keep_last
+            config.compaction.computer_screenshots
+            !messages
+        in
         let limit =
           Image_limit.for_request
             config.model
-            ~images:(Image_fit.count !messages)
+            ~images:(Image_fit.count messages)
         in
         if not config.model.supports_images
-        then !messages, limit, { Image_fit.Outcome.downscaled = 0; unfit = [] }
+        then messages, limit, { Image_fit.Outcome.downscaled = 0; unfit = [] }
         else (
           let sent, outcome =
             Image_fit.messages
@@ -392,7 +397,7 @@ let run
               ~cancel
               ?search_path:image_tools
               limit
-              !messages
+              messages
           in
           sent, limit, outcome)
       in

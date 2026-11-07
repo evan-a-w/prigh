@@ -3166,6 +3166,57 @@ composer cleared: true
 48x48
 === firefox: images (small): errors ===
 none
+=== firefox: computer (desktop): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== firefox: computer (desktop): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== firefox: computer (desktop): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 28px tall
+fits the width
+Stop: abort sent
+=== firefox: computer (desktop): stopped ===
+banner: 0
+=== firefox: computer (desktop): errors ===
+none
+=== firefox: computer (phone): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== firefox: computer (phone): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== firefox: computer (phone): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 44px tall
+fits the width
+Stop: abort sent
+=== firefox: computer (phone): stopped ===
+banner: 0
+=== firefox: computer (phone): errors ===
+none
+=== firefox: computer (small): cards ===
+computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
+computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters
+fits the width
+=== firefox: computer (small): the screenshot in the viewer ===
+opened: 1280x800
+closed
+=== firefox: computer (small): controlling ===
+prigh is controlling <HOST> Stop
+the host is the composer's: true
+Stop: in view, 44px tall
+fits the width
+Stop: abort sent
+=== firefox: computer (small): stopped ===
+banner: 0
+=== firefox: computer (small): errors ===
+none
 === firefox: ui: drawn ===
 charts 8: line 1, area 1, bar 1, stacked 1, horizontal 1, pie 1, donut 1, scatter 1
 stats 3, tables 1, progress 1, callouts 1

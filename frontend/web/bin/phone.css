@@ -496,3 +496,4 @@
 @media (max-width: 359px) {
   .composer-controls .model-chip > .chevron { display: none; }
 }
+.app.narrow .computer-banner .btn.computer-banner-stop { height: var(--tap); min-width: var(--tap); }

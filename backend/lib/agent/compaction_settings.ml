@@ -5,10 +5,17 @@ type t =
   { max_tokens : int option
   ; model : Model.t option
   ; mask_observations : bool
+  ; computer_screenshots : int
   }
 [@@deriving sexp_of]
 
-let window_only = { max_tokens = None; model = None; mask_observations = true }
+let window_only =
+  { max_tokens = None
+  ; model = None
+  ; mask_observations = true
+  ; computer_screenshots = 3
+  }
+;;
 
 let threshold t (model : Model.t) =
   let window = model.context_window * 4 / 5 in

@@ -21,6 +21,9 @@ code. Put a new module in the group it belongs to:
 - `forge/` — git hosting: GitHub and Forgejo sign-ins, their REST APIs,
   pull requests (`Forges`)
 - `mcp/` — MCP client, config, hub and tools
+- `computer/` — computer use: `Computer_action`, `Computer_info`, the
+  `prigh-computer` client (`Computer_helper`, `Computer_fake` for tests),
+  `Tool_computer`, `Computer_screenshots`
 - `rpc/` — `Rpc_server`, `Rpc_router`, `Rpc_json`, namespaces and access,
   `Web_server`, `Websocket`, static and file HTTP
 - `acp/` — `prigh acp`, the Agent Client Protocol for editors: `Acp`

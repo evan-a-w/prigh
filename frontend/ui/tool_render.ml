@@ -93,6 +93,8 @@ let arg (call : P.Tool_call.t) =
     | "pull_request" -> Tool_summary.pull_request args
     | "issue" -> Tool_summary.issue args
     | "repo" -> Tool_summary.repo args
+    | "computer" ->
+      Option.map (Computer_action.of_call call) ~f:Computer_action.compact
     | "apply_patch" ->
       (match
          Patch.parse
@@ -649,6 +651,14 @@ let render_step
          in
          let chips, body = generic (Some { r with text = fetched.body }) in
          chip fetched.details :: chips, redirected @ body)
+    | "computer", Some ({ is_error = false; _ } as r) ->
+      (* The screenshot is for the model (and prigh-web): one line here. *)
+      ( (match Computer_action.screenshot_size r.text with
+         | Some (w, h) -> [ chip (sprintf "→ screenshot %d×%d" w h) ]
+         | None -> images_chip r.images)
+      , (match verbosity with
+         | Verbose -> output ~head:all r.text
+         | Quiet | Normal -> []) )
     | "job_input", _ ->
       let chips, body = generic result in
       ( (if Tool_summary.closes_stdin args then [ chip "close stdin" ] else [])
