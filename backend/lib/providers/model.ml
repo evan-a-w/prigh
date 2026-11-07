@@ -27,7 +27,7 @@ type t =
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   ; supports_images : bool
-  ; native_computer : Native_computer.t option
+  ; native_computer : Native_computer.t option [@sexp.option]
   }
 [@@deriving sexp_of]
 
