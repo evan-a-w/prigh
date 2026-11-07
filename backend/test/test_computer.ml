@@ -719,3 +719,61 @@ let%expect_test "pruning keeps every request's prefix until the next cut" =
     20    3       1  20                   18     18         18
     |}]
 ;;
+
+let%expect_test
+    "native calls run on the host; a batch stops at the first failed action"
+  =
+  let toolset name input =
+    Computer_native.of_anthropic
+      ~toolset:true
+      ~name
+      (Or_error.ok_exn (Json.parse input))
+  in
+  with_agent
+    [ Reply.tool_calls
+        [ "a1", "computer", toolset "left_click" {|{"coordinate":[640,312]}|}
+        ; "a2", "computer", {|{"action":"bogus"}|}
+        ; "a3", "computer", toolset "type" {|{"text":"never"}|}
+        ]
+    ; Reply.tool_call
+        ~id:"o1"
+        ~name:"computer"
+        ~arguments:
+          (Computer_native.of_openai
+             ~item_id:"cu_1"
+             ~safety_checks:
+               [ Or_error.ok_exn
+                   (Json.parse
+                      {|{"id":"sc_1","code":"malicious_instructions","message":"Careful"}|})
+               ]
+             (Or_error.ok_exn (Json.parse {|{"type":"type","text":"ok"}|})))
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun ~set_computer:_ fake agent ->
+  Or_error.ok_exn (Agent.prompt agent "do it");
+  Agent.wait_idle agent;
+  print_endline "--- input on the screen";
+  List.iter (Computer_fake.log fake) ~f:print_endline;
+  [%expect
+    {|
+    notice: tools now run on desk in $DIR
+    --- request
+    assistant:
+    --- request
+      sees a1: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+      sees a2: unknown action "bogus": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
+      sees a3: Not executed: an earlier computer action in this turn failed.
+    assistant:
+    --- request
+      sees a1: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+      sees a2: unknown action "bogus": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
+      sees a3: Not executed: an earlier computer action in this turn failed.
+      sees o1: OpenAI safety checks acknowledged: malicious_instructions: Careful | type “ok” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+    assistant: done
+    --- input on the screen
+    move 1280,624
+    click left×1
+    type ok
+    |}]
+;;
