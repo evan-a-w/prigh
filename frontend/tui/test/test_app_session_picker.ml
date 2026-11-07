@@ -608,8 +608,8 @@ let pinned_sessions_json =
 ;;
 
 let%expect_test
-    "pinned sessions first under their own divider, in the list's order; \
-     Alt+T pins and unpins, pinning unarchives"
+    "pinned sessions first under their own divider, in the list's order; Alt+T \
+     pins and unpins, pinning unarchives"
   =
   let h = Test_app.connected ~width:100 ~height:18 () in
   H.keys h "/sessions";
@@ -634,7 +634,8 @@ let%expect_test
   (* Unpinning the highlighted one moves it among the others. *)
   H.key h (Key.alt (Char "t"));
   rows h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_pinned)
       (params (
@@ -661,7 +662,8 @@ let%expect_test
   H.key h (Key.plain End);
   H.key h (Key.alt (Char "t"));
   rows h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_pinned)
       (params (
@@ -686,7 +688,8 @@ let%expect_test
     h
     (Pin_done { name = "session \"build fix\""; pinned = true })
     "no such session \"/s/1.jsonl\"";
-  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}]
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}]
 ;;
 
 let%expect_test "/pin and /unpin: the current session, or one by name or id" =
@@ -694,7 +697,8 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
   let run command = Test_app.run h command in
   run "/pin";
   run "/unpin";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_pinned)
       (params (
@@ -709,10 +713,14 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
       (tag (Notice_on_success "unpinned this session")))
     |}];
   run "/pin deploy";
-  H.reply h (Session_to_pin { arg = "deploy"; pinned = true }) pinned_sessions_json;
+  H.reply
+    h
+    (Session_to_pin { arg = "deploy"; pinned = true })
+    pinned_sessions_json;
   run "/unpin 5";
   H.reply h (Session_to_pin { arg = "5"; pinned = false }) pinned_sessions_json;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ list_sessions)
       (params ())
@@ -746,7 +754,8 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
     (Session_to_pin { arg = "nothing-like-it"; pinned = true })
     pinned_sessions_json;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ list_sessions)
       (params ())
@@ -778,7 +787,8 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
     (Session_to_pin { arg = "alpha"; pinned = true })
     (list [ session "a" "alpha" ]);
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     (Rpc
       (method_ list_sessions)
@@ -810,7 +820,8 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
   H.key h (Key.ctrl 'u');
   H.keys h "/unpin ";
   rows h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer

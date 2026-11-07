@@ -140,7 +140,9 @@ let set_archived t ~path ~archived =
           { s with
             archived
           ; pinned =
-              (if archived then Option.map s.pinned ~f:(fun _ -> false) else s.pinned)
+              (if archived
+               then Option.map s.pinned ~f:(fun _ -> false)
+               else s.pinned)
           }
         else s)
   }
@@ -151,7 +153,8 @@ let set_pinned t ~path ~pinned =
     sessions =
       List.map t.sessions ~f:(fun s ->
         if String.equal s.path path
-        then { s with pinned = Some pinned; archived = s.archived && not pinned }
+        then
+          { s with pinned = Some pinned; archived = s.archived && not pinned }
         else s)
   }
 ;;

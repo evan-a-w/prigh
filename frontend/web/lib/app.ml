@@ -2256,7 +2256,11 @@ let set_pinned (m : Model.t) (s : Session_summary.t) ~pinned =
         sessions =
           List.map m.sessions ~f:(fun (x : Session_summary.t) ->
             if String.equal x.path s.path
-            then { x with pinned = Some pinned; archived = x.archived && not pinned }
+            then
+              { x with
+                pinned = Some pinned
+              ; archived = x.archived && not pinned
+              }
             else x)
       }
     , [ call

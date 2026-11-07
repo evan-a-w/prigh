@@ -394,12 +394,12 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                     ((if Session_list.is_pinned s
                       then
                         [ Node.span
-                           ~attrs:
-                             [ Attr.class_ "session-pin"
-                             ; Attr.role "img"
-                             ; Attr.create "aria-label" "Pinned"
-                             ; Attr.title "Pinned to the top (P unpins)"
-                             ]
+                            ~attrs:
+                              [ Attr.class_ "session-pin"
+                              ; Attr.role "img"
+                              ; Attr.create "aria-label" "Pinned"
+                              ; Attr.title "Pinned to the top (P unpins)"
+                              ]
                             [ icon Pin ]
                         ]
                       else [])
@@ -712,11 +712,11 @@ let view (m : App.Model.t) ~inject =
               (group_heading "Pinned" pinned
                :: List.map pinned ~f:(session m ~inject ~current))
               @
-              (match active with
-               | [] -> []
-               | active ->
-                 group_heading "Recent" active
-                 :: List.map active ~f:(session m ~inject ~current)))
+                (match active with
+                | [] -> []
+                | active ->
+                  group_heading "Recent" active
+                  :: List.map active ~f:(session m ~inject ~current)))
            @
              (match archived with
              | [] -> []

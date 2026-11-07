@@ -1902,7 +1902,8 @@ let%expect_test "Alt+T on a backend that cannot pin says so" =
   let h = sessions_open () in
   H.key h (Key.alt (Char "t"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
