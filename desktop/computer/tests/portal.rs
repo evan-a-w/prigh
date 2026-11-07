@@ -99,7 +99,7 @@ type Shared = Arc<Mutex<Fake>>;
 fn show(o: &HashMap<String, OwnedValue>) -> String {
     let mut v: Vec<String> = o
         .iter()
-        .map(|(k, v)| if k.ends_with("handle_token") { format!("{k}=…") } else { format!("{k}={}", &**v) })
+        .map(|(k, v)| if k.ends_with("handle_token") { format!("{k}=…") } else { format!("{k}={}", **v) })
         .collect();
     v.sort();
     format!("{{{}}}", v.join(" "))
