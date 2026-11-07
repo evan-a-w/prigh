@@ -44,6 +44,15 @@ let
     ]
     ++ lib.optionals isLinux [ pkgs.wrapGAppsHook3 ];
     buildInputs = lib.optionals isLinux desktopLinuxDeps;
+    # The deb's icons are Tauri's few (256px under a nonstandard
+    # 256x256@2): the hicolor theme gets every size and the SVG instead.
+    postInstall = lib.optionalString isLinux ''
+      rm -rf "$out/share/icons/hicolor"
+      for s in 16 24 32 48 64 96 128 256 512; do
+        install -Dm644 app/icons/''${s}x''${s}.png "$out/share/icons/hicolor/''${s}x''${s}/apps/prigh-desktop.png"
+      done
+      install -Dm644 app/icons/icon.svg "$out/share/icons/hicolor/scalable/apps/prigh-desktop.svg"
+    '';
     # The logic is in prigh-desktop-core; the app's own crate has no
     # tests.
     checkPhase = ''
