@@ -236,6 +236,7 @@ let%expect_test "cancelled mid-tool: every span still ends, marked cancelled" =
         ; destructive = Never
         ; on_host = false
         ; freeform = None
+        ; native = None
         }
     ; run =
         (fun context _ ->

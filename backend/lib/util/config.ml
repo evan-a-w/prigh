@@ -385,8 +385,8 @@ let of_json json =
       | Some `False -> Ok false
       | Some _ ->
         Or_error.error_string
-          "config.computer_native must be a boolean (false: always use \
-           prigh's own computer tool, not the model's built-in one)"
+          "config.computer_native must be a boolean (false: always use prigh's \
+           own computer tool, not the model's built-in one)"
     in
     let%bind snippets =
       Snippet.list_of_json (Option.value (find "snippets") ~default:`Null)

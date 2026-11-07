@@ -42,6 +42,7 @@ let gate_tool name =
         ; destructive = Never
         ; on_host = false
         ; freeform = None
+        ; native = None
         }
     ; run =
         (fun _ _ ->
