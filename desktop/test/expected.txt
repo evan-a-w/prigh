@@ -30,6 +30,47 @@ fake: GET / webkit=True
 fake: GET /pixel.gif webkit=True
 fake: backend GET /
 fake: eof
+== a sign-in proxy: the window signs in there, and is back on the site: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: showing the backend's prigh-web at http://localhost:PORT/
+prigh-desktop: the window went to http://127.0.0.1:PORT on its own (a sign-in?): it stays there until it is back
+prigh-desktop: the window is back from http://127.0.0.1:PORT
+prigh-desktop: the page's Quit: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=True
+fake: GET /pixel.gif webkit=True
+fake: site: GET /: to the login
+fake: login: GET /start?state=1&next=/authorize
+fake: login: POST /login
+fake: login: GET /callback: back to the site
+fake: site: /outpost/callback?code=c0de: sets the cookie
+fake: site: GET / with the cookie: the page
+fake: eof
+== a sign-in proxy: signed in with the default browser, the cookie lands in the window; expired, the sidecar's sign-in page: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening http://localhost:PORT/ in the system browser to sign in
+prigh-desktop: showing the backend's prigh-web at http://localhost:PORT/
+prigh-desktop: gave the window the cookie proxy for localhost
+prigh-desktop: the backend's site wants a sign-in: showing prigh's sign-in page
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=True
+fake: GET /pixel.gif webkit=True
+fake: signing in through the browser
+fake: grant: state right, cookie ['proxy=ok']
+fake: site: GET / with the cookie: the page
+fake: site: GET / with an expired cookie: to the login
+fake: GET / webkit=True
+fake: GET /pixel.gif webkit=True
+fake: the page is at #desktop=0123abcd&signin=1
+fake: exiting: the sign-in page
+default browser: http://localhost:PORT/#cli-signin=PORT.5747e&program=desktop
+default browser: allowed
 == the sidecar fails after it was ready: exit 4
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
@@ -264,6 +305,47 @@ default browser: http://localhost:PORT/away
 default browser: http://localhost:PORT/new-window
 prigh's page loaded: 2 times; Chromium's windows: http://127.0.0.1:PORT/
 exit 0; left running: 0
+== real Chromium: a sign-in proxy: the window signs in there, and is back on the site: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in chromium's app window (WORK/chromium)
+prigh-desktop: showing the backend's prigh-web at http://localhost:PORT/
+prigh-desktop: prigh's window went to http://127.0.0.1:PORT on its own (a sign-in?): it stays there until it is back
+prigh-desktop: prigh's window is back from http://127.0.0.1:PORT
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: 1 GET / webkit=True
+fake: 1 GET /pixel.gif webkit=True
+fake: 1 eof
+fake: 1 login: GET /callback: back to the site
+fake: 1 login: GET /start?state=1&next=/authorize
+fake: 1 login: POST /login
+fake: 1 site: /outpost/callback?code=c0de: sets the cookie
+fake: 1 site: GET / with the cookie: the page
+fake: 1 site: GET /: to the login
+left running: 0
+== real Chromium: a sign-in proxy: signed in with the default browser; expired, the sign-in page: exit 0
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: opening the page in chromium's app window (WORK/chromium)
+prigh-desktop: opening http://localhost:PORT/ in the system browser to sign in
+prigh-desktop: showing the backend's prigh-web at http://localhost:PORT/
+prigh-desktop: prigh's window went to http://127.0.0.1:PORT: http://localhost:PORT wants a sign-in, showing prigh's
+prigh-desktop: prigh's window is back from http://127.0.0.1:PORT
+prigh-desktop: the browser window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: 2 GET / webkit=True
+fake: 2 GET /pixel.gif webkit=True
+fake: 1 eof
+fake: 1 grant: state right, cookie ['proxy=ok']
+fake: 1 login: GET /start?state=1&next=/authorize
+fake: 1 signing in through the browser
+fake: 1 site: GET / with an expired cookie: to the login
+fake: 1 site: GET / with the cookie: the page
+fake: 1 the page is at #desktop=0123abcd&signin=1
+left running: 0
+default browser: http://localhost:PORT/#cli-signin=PORT.5747e&program=desktop
+default browser: allowed
 == real Chromium: the window is an app's
 Open in new window: Chromium's windows:
   http://127.0.0.1:PORT/
