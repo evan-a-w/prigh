@@ -34,21 +34,45 @@ let
       ../desktop/core
       ../desktop/computer/Cargo.toml
       ../desktop/computer/src
+      ../desktop/computer/tests
       (lib.fileset.difference ../desktop/app (lib.fileset.maybeMissing ../desktop/app/gen))
     ];
   };
   # The computer-use helper (desktop/computer): `prigh tool-host -computer`
   # and `prigh desktop -computer` run it (PRIGH_COMPUTER) for the computer
-  # tool. Pure Rust (its Wayland and X11 clients speak the protocols
-  # themselves): no libraries to link.
+  # tool. Its Wayland and X11 clients speak the protocols themselves; the
+  # xdg-desktop-portal backend (GNOME, KDE) links libpipewire for the
+  # screen cast (D-Bus is zbus, pure Rust).
   prighComputer = pkgs.rustPlatform.buildRustPackage {
     pname = "prigh-computer";
     version = desktopVersion;
     inherit src;
     cargoLock.lockFile = ../desktop/Cargo.lock;
     buildAndTestSubdir = "computer";
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.rustPlatform.bindgenHook
+    ];
+    buildInputs = [ pkgs.pipewire ];
+    # tests/portal.rs runs a fake portal on a private bus; tests/screencast.rs
+    # a private PipeWire (with wireplumber) and a GStreamer test screen
+    nativeCheckInputs = [
+      pkgs.dbus
+      pkgs.pipewire
+      pkgs.wireplumber
+      pkgs.gst_all_1.gstreamer
+    ];
+    env = {
+      PRIGH_REQUIRE_DBUS = "1";
+      PRIGH_REQUIRE_PIPEWIRE = "1";
+      GST_PLUGIN_SYSTEM_PATH_1_0 = lib.makeSearchPath "lib/gstreamer-1.0" [
+        pkgs.pipewire
+        pkgs.gst_all_1.gstreamer.out
+        pkgs.gst_all_1.gst-plugins-base
+      ];
+    };
     meta = {
-      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, X11)";
+      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, xdg-desktop-portal, X11)";
       mainProgram = "prigh-computer";
       platforms = lib.platforms.linux;
     };

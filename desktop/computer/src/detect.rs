@@ -1,17 +1,22 @@
 //! Which backend drives this desktop. On Linux: a Wayland compositor with
 //! wlroots' virtual-pointer and screencopy protocols (Hyprland, sway,
 //! river, ...) is driven through them; otherwise an X11 session through
-//! XTEST. On macOS: ScreenCaptureKit and Quartz events ([crate::macos]).
-//! On Windows: DXGI or GDI, SendInput ([crate::windows]). GNOME and KDE on
-//! Wayland need xdg-desktop-portal (RemoteDesktop and ScreenCast): a
-//! follow-up.
+//! XTEST; other Wayland compositors (GNOME, KDE) through xdg-desktop-portal's
+//! RemoteDesktop and ScreenCast. On macOS: ScreenCaptureKit and Quartz
+//! events ([crate::macos]). On Windows: DXGI or GDI, SendInput
+//! ([crate::windows]).
 
 use crate::backend::Backend;
+
+/// What to do when the portal is missing.
+pub const PORTAL_INSTALL: &str = "install xdg-desktop-portal with your desktop's backend (xdg-desktop-portal-gnome on \
+                                  GNOME, xdg-desktop-portal-kde on KDE Plasma) and log in again";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Fake,
     Wlroots,
+    Portal,
     X11,
     Macos,
     Windows,
@@ -23,10 +28,11 @@ impl Kind {
             "auto" => Ok(None),
             "fake" => Ok(Some(Kind::Fake)),
             "wlroots" => Ok(Some(Kind::Wlroots)),
+            "portal" => Ok(Some(Kind::Portal)),
             "x11" => Ok(Some(Kind::X11)),
             "macos" => Ok(Some(Kind::Macos)),
             "windows" => Ok(Some(Kind::Windows)),
-            other => Err(format!("--backend {other:?}: use auto, wlroots, x11, macos, windows or fake")),
+            other => Err(format!("--backend {other:?}: use auto, wlroots, portal, x11, macos, windows or fake")),
         }
     }
 }
@@ -41,6 +47,10 @@ pub struct Environment {
     /// Whether the Wayland compositor offers wlroots' virtual pointer and
     /// screencopy; `None` when it could not be asked (no compositor).
     pub wlroots_globals: Option<Result<bool, String>>,
+    /// Whether xdg-desktop-portal's RemoteDesktop answers on the session bus
+    /// (its version), asked only when the compositor lacks the wlroots
+    /// protocols.
+    pub portal: Option<Result<u32, String>>,
 }
 
 pub fn decide(env: &Environment) -> Result<Kind, String> {
@@ -56,12 +66,20 @@ pub fn decide(env: &Environment) -> Result<Kind, String> {
             Some(Ok(true)) => return Ok(Kind::Wlroots),
             Some(Ok(false)) => {
                 let named = if desktop.is_empty() { "this compositor".to_string() } else { desktop.clone() };
-                return Err(format!(
-                    "{named} on Wayland lacks the wlroots virtual-pointer and screencopy protocols that prigh-computer \
-                     uses (Hyprland, sway and other wlroots compositors have them). GNOME and KDE need \
-                     xdg-desktop-portal's RemoteDesktop, which a follow-up adds; meanwhile log in to an X11 session, \
-                     or force X11 (only XWayland windows) with --backend x11"
-                ));
+                return match &env.portal {
+                    Some(Ok(_)) => Ok(Kind::Portal),
+                    Some(Err(e)) => Err(format!(
+                        "{named} on Wayland lacks the wlroots virtual-pointer and screencopy protocols, and \
+                         xdg-desktop-portal's RemoteDesktop (which GNOME, KDE and others offer instead) is missing: \
+                         {e}. To fix it, {PORTAL_INSTALL}; or log in to an X11 session, or force X11 (only XWayland \
+                         windows) with --backend x11"
+                    )),
+                    None => Err(format!(
+                        "{named} on Wayland lacks the wlroots virtual-pointer and screencopy protocols that \
+                         prigh-computer uses, and xdg-desktop-portal could not be asked: log in to an X11 session, or \
+                         force X11 (only XWayland windows) with --backend x11"
+                    )),
+                };
             }
             Some(Err(e)) if env.display.is_none() => {
                 return Err(format!(
@@ -93,13 +111,15 @@ pub fn open(kind: Option<Kind>, options: &Options) -> Result<Box<dyn Backend>, S
         #[cfg(target_os = "linux")]
         Kind::Wlroots => Ok(Box::new(crate::wlroots::Wlroots::connect()?)),
         #[cfg(target_os = "linux")]
+        Kind::Portal => Ok(Box::new(crate::portal::open()?)),
+        #[cfg(target_os = "linux")]
         Kind::X11 => Ok(Box::new(crate::x11::X11::connect()?)),
         #[cfg(target_os = "macos")]
         Kind::Macos => Ok(Box::new(crate::macos::Macos::connect()?)),
         #[cfg(windows)]
         Kind::Windows => Ok(Box::new(crate::windows::Windows::connect()?)),
         #[cfg(not(target_os = "linux"))]
-        Kind::Wlroots | Kind::X11 => Err(unavailable(kind)),
+        Kind::Wlroots | Kind::Portal | Kind::X11 => Err(unavailable(kind)),
         #[cfg(not(target_os = "macos"))]
         Kind::Macos => Err(unavailable(kind)),
         #[cfg(not(windows))]
@@ -112,6 +132,7 @@ pub fn open(kind: Option<Kind>, options: &Options) -> Result<Box<dyn Backend>, S
 fn unavailable(kind: Kind) -> String {
     let (name, os) = match kind {
         Kind::Wlroots => ("wlroots", "Linux"),
+        Kind::Portal => ("portal", "Linux"),
         Kind::X11 => ("x11", "Linux"),
         Kind::Macos => ("macos", "macOS"),
         Kind::Windows => ("windows", "Windows"),
@@ -127,12 +148,18 @@ pub fn current() -> Environment {
     let wlroots_globals = wayland_display.as_ref().map(|_| crate::wlroots::has_globals());
     #[cfg(not(target_os = "linux"))]
     let wlroots_globals = None;
+    #[cfg(target_os = "linux")]
+    let portal = matches!(wlroots_globals, Some(Ok(false)))
+        .then(|| crate::portal::bus(None).and_then(|c| crate::portal::available(&c)));
+    #[cfg(not(target_os = "linux"))]
+    let portal = None;
     Environment {
         os: std::env::consts::OS,
         wayland_display,
         display: var("DISPLAY"),
         current_desktop: var("XDG_CURRENT_DESKTOP"),
         wlroots_globals,
+        portal,
     }
 }
 
@@ -147,6 +174,7 @@ mod tests {
             display: display.then(|| ":0".into()),
             current_desktop: desktop.map(str::to_string),
             wlroots_globals: globals,
+            portal: None,
         }
     }
 
@@ -155,10 +183,21 @@ mod tests {
         assert_eq!(decide(&env(true, true, Some("Hyprland"), Some(Ok(true)))), Ok(Kind::Wlroots));
         assert_eq!(decide(&env(true, false, Some("sway"), Some(Ok(true)))), Ok(Kind::Wlroots));
         assert_eq!(decide(&env(false, true, None, None)), Ok(Kind::X11));
-        // GNOME on Wayland has XWayland's $DISPLAY, but X11 would see only its windows
-        let gnome = decide(&env(true, true, Some("GNOME"), Some(Ok(false)))).unwrap_err();
-        assert!(gnome.starts_with("GNOME on Wayland lacks"), "{gnome}");
-        assert!(gnome.contains("xdg-desktop-portal"));
+        // GNOME on Wayland has XWayland's $DISPLAY, but X11 would see only its
+        // windows: the portal drives it
+        let gnome = |portal| Environment { portal, ..env(true, true, Some("GNOME"), Some(Ok(false))) };
+        assert_eq!(decide(&gnome(Some(Ok(2)))), Ok(Kind::Portal));
+        let missing = decide(&gnome(Some(Err("org.freedesktop.portal.Desktop was not provided".into())))).unwrap_err();
+        assert_eq!(
+            missing,
+            "GNOME on Wayland lacks the wlroots virtual-pointer and screencopy protocols, and xdg-desktop-portal's \
+             RemoteDesktop (which GNOME, KDE and others offer instead) is missing: org.freedesktop.portal.Desktop was \
+             not provided. To fix it, install xdg-desktop-portal with your desktop's backend \
+             (xdg-desktop-portal-gnome on GNOME, xdg-desktop-portal-kde on KDE Plasma) and log in again; or log in \
+             to an X11 session, or force X11 (only XWayland windows) with --backend x11"
+        );
+        assert!(decide(&gnome(None)).unwrap_err().contains("could not be asked"));
+        assert_eq!(Kind::parse("portal"), Ok(Some(Kind::Portal)));
         // a stale $WAYLAND_DISPLAY falls back to X11
         assert_eq!(decide(&env(true, true, None, Some(Err("refused".into())))), Ok(Kind::X11));
         assert!(decide(&env(true, false, None, Some(Err("refused".into())))).unwrap_err().contains("refused"));
