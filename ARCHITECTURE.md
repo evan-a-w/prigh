@@ -1874,7 +1874,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
-  `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
+  `new_session`, `switch_session`, `list_sessions`, `search_sessions`
+  (`{query, limit}`: the listed sessions by name and what the user and
+  assistant wrote, best first, each with a snippet and its match ranges;
+  `Session_search` keeps an inverted index in memory, re-reading only the
+  files that changed), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
