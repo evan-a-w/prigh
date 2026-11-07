@@ -158,7 +158,21 @@ let%expect_test "network tool host: abort ends the turn and kills the command" =
   @@ fun t agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {| |}]
+  [%expect {|
+    connected to 127.0.0.1:PORT as client-2
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    started: true
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    turn_end
+    agent_end
+    processes killed: true
+    survived: false
+    |}]
 ;;
 
 let%expect_test "network tool host: abort skips the reply's other calls" =
@@ -172,7 +186,24 @@ let%expect_test "network tool host: abort skips the reply's other calls" =
   @@ fun t agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep twice"}|} "prompt";
   abort_and_show ~tags:[ ""; "2" ] t h agent;
-  [%expect {| |}]
+  [%expect {|
+    connected to 127.0.0.1:PORT as client-2
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    started: true
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    message_start
+    message_end
+    turn_end
+    agent_end
+    processes killed: true
+    survived: false
+    command2 never started
+    |}]
 ;;
 
 (* The backend's own tool host runs the command in-process. *)
@@ -181,7 +212,19 @@ let%expect_test "backend tool host: abort ends the turn and kills the command" =
   @@ fun t ~sw:_ agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {| |}]
+  [%expect {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    started: true
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    turn_end
+    agent_end
+    processes killed: true
+    survived: false
+    |}]
 ;;
 
 (* A host that never answers the cancel (hung, or its connection is dead but
@@ -238,5 +281,72 @@ let%expect_test "silent tool host: abort ends the turn without its answer" =
          | Message.Tool_result r -> Some r.text
          | _ -> None)
        : string list)];
-  [%expect {| |}]
+  [%expect {|
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/mute","created":false}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (host answered $instructions)
+    host runs: bash
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    turn_end
+    agent_end
+    host told: tool_exec_cancel (same exec: true)
+    {"type":"response","id":"late","ok":false,"error":"no tool execution \"<id>/c1-1\""}
+    ([cancelled])
+    |}]
+;;
+
+(* [timeout] (as models often write) puts itself in its own process group,
+   out of reach of a kill of the shell's group, and keeps the output open. *)
+let escaping t ~id =
+  Reply.tool_call
+    ~id
+    ~name:"bash"
+    ~arguments:
+      (sprintf
+         {|{"command":"echo $$ > %s/shell.pid; timeout 60 sh -c 'echo $$ > %s/sleep.pid; exec sleep 30'; touch %s/survived"}|}
+         t.dir
+         t.dir
+         t.dir)
+    ()
+;;
+
+let%expect_test "backend tool host: abort kills a command in its own group" =
+  with_server (fun t -> [ escaping t ~id:"c1"; Reply.text "unreachable" ])
+  @@ fun t ~sw:_ agent h ->
+  Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
+  abort_and_show t h agent;
+  [%expect {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    started: true
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: false
+    processes killed: false
+    survived: false
+    |}]
+;;
+
+let%expect_test "network tool host: abort kills a command in its own group" =
+  with_network_host (fun t -> [ escaping t ~id:"c1"; Reply.text "unreachable" ])
+  @@ fun t agent h ->
+  Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
+  abort_and_show t h agent;
+  [%expect {|
+    connected to 127.0.0.1:PORT as client-2
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    started: true
+    {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    turn_end
+    agent_end
+    processes killed: false
+    survived: false
+    |}]
 ;;
