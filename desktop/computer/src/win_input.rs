@@ -87,10 +87,16 @@ pub fn scan_modifiers(state: u8) -> Vec<u16> {
 /// One keyboard event of typed text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextEvent {
-    Vk { vk: u16, up: bool },
+    Vk {
+        vk: u16,
+        up: bool,
+    },
     /// A UTF-16 unit (`KEYEVENTF_UNICODE`); characters beyond the BMP are
     /// two, each pressed and released.
-    Unicode { unit: u16, up: bool },
+    Unicode {
+        unit: u16,
+        up: bool,
+    },
 }
 
 /// Typing `text`: newlines and tabs as their keys (so they act in every
