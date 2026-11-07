@@ -11,7 +11,10 @@ pub mod fake;
 pub mod keymap;
 pub mod keysym;
 pub mod scale;
+pub mod win_input;
 #[cfg(target_os = "linux")]
 pub mod wlroots;
 #[cfg(target_os = "linux")]
 pub mod x11;
+#[cfg(windows)]
+pub mod windows;
