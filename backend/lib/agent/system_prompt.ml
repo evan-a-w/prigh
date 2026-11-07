@@ -93,9 +93,7 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
      ; "- Ask before destructive or irreversible actions."
      ]
-     @ (if has Tool_computer.name
-        then [ "- " ^ Tool_computer.guidance ]
-        else [])
+     @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
      @ (if has "worktree"
         then
           [ ("- To work on a separate branch, use the worktree tool"

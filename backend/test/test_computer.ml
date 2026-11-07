@@ -34,7 +34,8 @@ let%expect_test "actions: parsed, described, canonical" =
     ; {|{"action":"zoom","region":[0,0,100,50]}|}
     ; {|{"action":"cursor_position"}|}
     ];
-  [%expect {|
+  [%expect
+    {|
     screenshot -> {"action":"screenshot"}
     click (640, 312) -> {"action":"click","x":640,"y":312,"button":"left","count":1}
     ctrl+right double-click (1, 2) -> {"action":"click","x":1,"y":2,"button":"right","count":2,"keys":"ctrl"}
@@ -76,7 +77,8 @@ let%expect_test "actions: errors say what to send" =
     ; {|{"action":"zoom","region":[10,10,5,20]}|}
     ; {|{"action":"zoom","region":[1,2,3]}|}
     ];
-  [%expect {|
+  [%expect
+    {|
     error: the arguments must be an object with "action"
     error: missing "action": one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
     error: unknown action "clik": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
@@ -129,10 +131,13 @@ let%expect_test "info: the screenshot's size and real coordinates" =
          (Json.of_string
             {|{"backend":"x11","platform":"linux","width":100,"height":50,"scaled_width":100,"scaled_height":50,"future":1}|})
        : Computer_info.t Or_error.t)];
-  List.iter [ 0, 0; 640, 312; 1279, 799; 5000, 5000 ] ~f:(fun (x, y) ->
-    let rx, ry = Computer_info.to_real info ~x ~y in
-    printf "(%d, %d) -> (%d, %d)\n" x y rx ry);
-  [%expect {|
+  List.iter
+    [ 0, 0; 640, 312; 1279, 799; 5000, 5000 ]
+    ~f:(fun (x, y) ->
+      let rx, ry = Computer_info.to_real info ~x ~y in
+      printf "(%d, %d) -> (%d, %d)\n" x y rx ry);
+  [%expect
+    {|
     2560x1600 -> 1280x800
     2560x1440 -> 1280x720
     1280x720 -> 1280x720
@@ -190,7 +195,8 @@ let%expect_test "helper: actions through the protocol, respawn, kill switch" =
   run {|{"action":"click","x":1,"y":2,"button":"top"}|};
   printf "starts: %d\n" !starts;
   List.iter (Computer_fake.log fake) ~f:print_endline;
-  [%expect {|
+  [%expect
+    {|
     > {"action":"screenshot"}
     screenshot
     cursor at (640, 400)
@@ -234,7 +240,8 @@ let%expect_test "helper: actions through the protocol, respawn, kill switch" =
   (* The user moves the mouse: the action is refused. *)
   Computer_fake.user_move fake ~x:5 ~y:5;
   run {|{"action":"click","x":640,"y":312}|};
-  [%expect {|
+  [%expect
+    {|
     > {"action":"click","x":640,"y":312}
     error: [interrupted] you moved the mouse: stopped (computer use paused until the next prompt)
     |}];
@@ -242,7 +249,8 @@ let%expect_test "helper: actions through the protocol, respawn, kill switch" =
   Computer_fake.crash fake;
   run {|{"action":"key","combo":"ctrl+l"}|};
   printf "starts: %d\n" !starts;
-  [%expect {|
+  [%expect
+    {|
     > {"action":"key","combo":"ctrl+l"}
     key ctrl+l
     cursor at (3, 3)
@@ -254,10 +262,14 @@ let%expect_test "helper: actions through the protocol, respawn, kill switch" =
   let cancel = Cancellation.create () in
   Cancellation.cancel cancel;
   show_result
-    (Computer_helper.run helper ~cancel (Json.of_string {|{"action":"screenshot"}|}));
+    (Computer_helper.run
+       helper
+       ~cancel
+       (Json.of_string {|{"action":"screenshot"}|}));
   run {|{"action":"screenshot"}|};
   printf "starts: %d\n" !starts;
-  [%expect {|
+  [%expect
+    {|
     error: [cancelled]
     > {"action":"screenshot"}
     screenshot
@@ -274,7 +286,8 @@ let%expect_test "a host without computer use says how to turn it on" =
        None
        ~cancel:Cancellation.never
        (Json.of_string {|{"action":"screenshot"}|}));
-  [%expect {| error: computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager) |}]
+  [%expect
+    {| error: computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager) |}]
 ;;
 
 (* An agent whose tools run on a tool host ([Host_ops.execute], as the
@@ -312,8 +325,7 @@ let with_agent ?(computer = true) ?(show_tools = false) replies f =
           "  sees %s: %s%s\n"
           m.tool_call_id
           (String.concat ~sep:" | " (String.split_lines m.text))
-          (String.concat
-             (List.map m.images ~f:(fun _ -> " <screenshot>")))
+          (String.concat (List.map m.images ~f:(fun _ -> " <screenshot>")))
       | _ -> ())
   in
   let agent =
@@ -395,7 +407,8 @@ let%expect_test "the tool is offered only while the host runs it" =
   Or_error.ok_exn (Agent.prompt agent "c");
   Agent.wait_idle agent;
   print_s [%sexp (List.drop (user_texts agent) 1 : string list)];
-  [%expect {|
+  [%expect
+    {|
     notice: tools now run on desk in $DIR
     --- request
     tools: bash read
@@ -415,8 +428,9 @@ let%expect_test "the tool is offered only while the host runs it" =
     |}]
 ;;
 
-let%expect_test "a sequence of actions: real coordinates, older screenshots \
-                 omitted" =
+let%expect_test
+    "a sequence of actions: real coordinates, older screenshots omitted"
+  =
   let call id args = Reply.tool_call ~id ~name:"computer" ~arguments:args () in
   with_agent
     [ call "s1" {|{"action":"screenshot"}|}
@@ -432,7 +446,8 @@ let%expect_test "a sequence of actions: real coordinates, older screenshots \
   Agent.wait_idle agent;
   print_endline "--- input on the screen";
   List.iter (Computer_fake.log fake) ~f:print_endline;
-  [%expect {|
+  [%expect
+    {|
     notice: tools now run on desk in $DIR
     --- request
     assistant:
@@ -496,7 +511,8 @@ let%expect_test "the user taking over stops the run" =
   print_endline "--- the user says go on";
   Or_error.ok_exn (Agent.prompt agent "go on");
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     notice: tools now run on desk in $DIR
     --- request
     assistant:

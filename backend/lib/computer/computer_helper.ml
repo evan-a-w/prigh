@@ -44,7 +44,8 @@ let string_field json name =
 
 let int_field json name =
   match field json name with
-  | Some (`Number n) -> Option.map (Float.of_string_opt n) ~f:Float.iround_nearest_exn
+  | Some (`Number n) ->
+    Option.map (Float.of_string_opt n) ~f:Float.iround_nearest_exn
   | _ -> None
 ;;
 
@@ -59,9 +60,9 @@ let point_field json name =
 
 let not_found prog =
   sprintf
-    "%s not found: install prigh-computer (the Nix package prigh-computer, \
-     or `cargo build -p prigh-computer` in prigh's desktop/) and put it on \
-     PATH, or point $PRIGH_COMPUTER at it"
+    "%s not found: install prigh-computer (the Nix package prigh-computer, or \
+     `cargo build -p prigh-computer` in prigh's desktop/) and put it on PATH, \
+     or point $PRIGH_COMPUTER at it"
     prog
 ;;
 
@@ -77,17 +78,25 @@ let probe ~env =
   with
   | exception Eio.Io (Eio.Process.E (Executable_not_found _), _) ->
     Or_error.error_string (not_found prog)
-  | exception exn -> Or_error.errorf "cannot run %s: %s" prog (Exn.to_string exn)
+  | exception exn ->
+    Or_error.errorf "cannot run %s: %s" prog (Exn.to_string exn)
   | { exit; stdout; stderr } ->
     if Process.Exit.is_success exit
     then (
       match Json.parse (String.strip stdout) with
       | Ok json -> Computer_info.of_json json
       | Error _ ->
-        Or_error.errorf "%s --probe printed no screen information: %S" prog stdout)
+        Or_error.errorf
+          "%s --probe printed no screen information: %S"
+          prog
+          stdout)
     else (
       match String.strip stderr with
-      | "" -> Or_error.errorf "%s --probe failed (%s)" prog (Sexp.to_string (Process.Exit.sexp_of_t exit))
+      | "" ->
+        Or_error.errorf
+          "%s --probe failed (%s)"
+          prog
+          (Sexp.to_string (Process.Exit.sexp_of_t exit))
       | message -> Or_error.error_string message)
 ;;
 
@@ -193,8 +202,8 @@ let request t ~cancel json =
       | None -> Error "prigh-computer exited"
       | Some line ->
         (match Json.parse line with
-         | Ok json when Option.equal Int.equal (int_field json "id") (Some id) ->
-           Ok json
+         | Ok json when Option.equal Int.equal (int_field json "id") (Some id)
+           -> Ok json
          | Ok _ | Error _ -> reply ())
     in
     reply ()
@@ -270,7 +279,8 @@ let run t ~cancel arguments =
         request
           t
           ~cancel
-          (`Object [ "op", `String "act"; "action", Computer_action.to_json action ])
+          (`Object
+              [ "op", `String "act"; "action", Computer_action.to_json action ])
       with
       | Ok reply -> result_of_reply action reply
       | Error "[cancelled]" -> Tool_result.error "[cancelled]"

@@ -65,7 +65,8 @@ type t =
       ; keys : string option
       }
   | Type of string
-  | Key of string (** combos like ["ctrl+shift+t"], several separated by spaces *)
+  | Key of string
+  (** combos like ["ctrl+shift+t"], several separated by spaces *)
   | Hold_key of
       { combo : string
       ; duration : float (** seconds, at most 10 *)
