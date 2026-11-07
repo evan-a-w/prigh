@@ -131,9 +131,9 @@ const rows = () => page.locator(".sessions .session").evaluateAll(es => es.map(e
   const snippet = marked(e.querySelector(".session-snippet"));
   return snippet ? `${title}\n    ${snippet}` : title;
 }).join("\n"));
-const search = async query => {
-  await page.locator("#session-search").fill(query);
-  await page.waitForFunction(q => document.querySelector("#session-search").value === q, query);
+const search = async (query, options = {}) => {
+  await page.locator("#session-search").fill(query, options);
+  await page.waitForFunction(q => document.querySelector("#session-search")?.value === q, query, options);
 };
 
 const query = "configurable port";
@@ -181,8 +181,17 @@ try {
     await page.getByRole("button", { name: "Sessions" }).first().tap();
     await page.locator("#session-search").waitFor();
     await page.locator(".session", { hasText: "Release notes" }).waitFor();
-    await search(query);
-    await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor();
+    // Just signed in, the page may still reset the search box once as the
+    // session's state arrives (it may reload): type again until the passage shows.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await search(query, { timeout: 4000 });
+        await page.locator(".session-snippet mark", { hasText: "configurable" }).waitFor({ timeout: 4000 });
+        break;
+      } catch (e) {
+        if (attempt >= 3) throw e;
+      }
+    }
     section(`${w}x${h}`);
     console.log(await rows());
     console.log(await page.evaluate(() => {
