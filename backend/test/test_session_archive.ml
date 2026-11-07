@@ -282,6 +282,6 @@ let%expect_test "pins are not copied by fork" =
   ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
   let forked = Or_error.ok_exn (Session.fork t ~dir) in
   print_s
-    [%sexp (summary t ~dir).pinned, ((summary forked ~dir).pinned : bool)];
+    [%sexp ((summary t ~dir).pinned : bool), ((summary forked ~dir).pinned : bool)];
   [%expect {| (true false) |}]
 ;;
