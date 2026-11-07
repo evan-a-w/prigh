@@ -388,10 +388,22 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                [ span
-                    ~cls:"session-title"
-                    ~attrs:[ Attr.create "dir" "auto" ]
-                    title
+                [ Node.span
+                    ~attrs:
+                      [ Attr.class_ "session-title"; Attr.create "dir" "auto" ]
+                    [ (if Session_list.is_pinned s
+                       then
+                         Node.span
+                           ~attrs:
+                             [ Attr.class_ "session-pin"
+                             ; Attr.role "img"
+                             ; Attr.create "aria-label" "Pinned"
+                             ; Attr.title "Pinned to the top (P unpins)"
+                             ]
+                           [ icon Pin ]
+                       else Node.none)
+                    ; Node.text title
+                    ]
                 ; div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
@@ -537,6 +549,20 @@ let selection_bar (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* A faint rule naming a group of sessions, with its count. *)
+let group_heading label sessions =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "sessions-divider sessions-group"
+      ; Attr.role "heading"
+      ; Attr.create "aria-level" "3"
+      ]
+    [ span ~cls:"divider-label" label
+    ; span ~cls:"divider-count" (Int.to_string (List.length sessions))
+    ; Node.span ~attrs:[ Attr.class_ "divider-rule" ] []
+    ]
+;;
+
 (* A faint rule with the count, folding the archived sessions away. *)
 let archived_divider ~inject ~shown archived =
   Node.button
@@ -672,7 +698,7 @@ let view (m : App.Model.t) ~inject =
                [ Node.textf "Nothing matches “%s”." m.session_query ]
            ]
          | _, _ ->
-           let active, archived =
+           let { Session_list.Sections.pinned; active; archived } =
              Session_list.sections m.sessions ~query:m.session_query
            in
            let shown =
@@ -680,7 +706,17 @@ let view (m : App.Model.t) ~inject =
                ~query:m.session_query
                ~archived_open:m.archived_open
            in
-           List.map active ~f:(session m ~inject ~current)
+           (match pinned with
+            | [] -> List.map active ~f:(session m ~inject ~current)
+            | pinned ->
+              (group_heading "Pinned" pinned
+               :: List.map pinned ~f:(session m ~inject ~current))
+              @
+              (match active with
+               | [] -> []
+               | active ->
+                 group_heading "Recent" active
+                 :: List.map active ~f:(session m ~inject ~current)))
            @
              (match archived with
              | [] -> []

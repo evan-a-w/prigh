@@ -19,6 +19,8 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Copy_path | Copy_id -> Copy
   | Archive -> Archive
   | Unarchive -> Unarchive
+  | Pin -> Pin
+  | Unpin -> Pin_off
   | Delete | Remove -> Trash
   | Copy_message -> Copy
   | Select_text -> Lines
@@ -146,7 +148,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
     | Rename | Fork | New_worktree | Create_pr | Trim_before | Trim_after -> 1
     | Review | Files | Terminal -> 2
     | Copy_path | Copy_id | Copy_message | Select_text -> 3
-    | Archive | Unarchive | Delete | Remove -> 4
+    | Pin | Unpin | Archive | Unarchive | Delete | Remove -> 4
     | Approve_files | Unapprove_files -> 0
     | Stage_files | Unstage_files | Commit_files -> 1
     | Select_files | Unselect_files -> 2

@@ -65,6 +65,8 @@ module Icon : sig
     | Clock
     | Archive
     | Unarchive
+    | Pin
+    | Pin_off
     | Bell
     | Bell_off
     | Shield

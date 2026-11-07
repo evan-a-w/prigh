@@ -197,6 +197,17 @@ let every =
       "unarchive"
       "unarchive a session (this one without an argument)"
   ; c
+      ~argument:Session
+      ~args:"[session]"
+      "pin"
+      "pin a session to the top of the sidebar (this one without an \
+       argument): pinned sessions are never archived for being idle"
+  ; c
+      ~argument:Session
+      ~args:"[session]"
+      "unpin"
+      "unpin a session (this one without an argument)"
+  ; c
       ~argument:Delete
       ~args:"[undo|session...]"
       "delete"
