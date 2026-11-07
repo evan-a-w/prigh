@@ -11,18 +11,21 @@ let copy_button =
     [ Node.text "Copy" ]
 ;;
 
-let code_block ~lang ~text ~closed =
+let code_block ?title ~lang ~text ~closed () =
   Node.div
     ~attrs:
       [ Attr.classes ([ "code"; "copyable" ] @ if closed then [] else [ "open" ])
       ]
     [ Node.div
         ~attrs:(cls "code-head")
-        [ Node.span
-            ~attrs:(cls "code-lang")
-            [ Node.text (if String.is_empty lang then "text" else lang) ]
-        ; copy_button
-        ]
+        (Option.to_list
+           (Option.map title ~f:(fun title ->
+              Node.span ~attrs:(cls "code-title") [ Node.text title ]))
+         @ [ Node.span
+               ~attrs:(cls "code-lang")
+               [ Node.text (if String.is_empty lang then "text" else lang) ]
+           ; copy_button
+           ])
     ; Node.pre
         ~attrs:(cls "copy-text")
         [ Node.code
@@ -81,7 +84,7 @@ let rec block ?(tight = false) (b : Block.t) =
     h ~attrs:auto (inlines l)
   | Math tex | Code { lang = "math"; text = tex; closed = true } ->
     Math_view.render ~display:true tex
-  | Code { lang; text; closed } -> code_block ~lang ~text ~closed
+  | Code { lang; text; closed } -> code_block ~lang ~text ~closed ()
   | Quote blocks -> Node.blockquote ~attrs:auto (List.map blocks ~f:block)
   | Rule -> Node.hr ()
   | List { start; tight; items } ->

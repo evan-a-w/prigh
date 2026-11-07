@@ -47,7 +47,11 @@ module Settings = struct
   ;;
 
   let hello t ~session =
-    [ "name", `String "prigh-web"; "tools", `False; "tab", `String tab ]
+    [ "name", `String "prigh-web"
+    ; "client", `String "web"
+    ; "tools", `False
+    ; "tab", `String tab
+    ]
     @ Login.hello_fields t.login
     @ Option.value_map t.prefer_host ~default:[] ~f:(fun host ->
       [ "prefer_host", `String host ])

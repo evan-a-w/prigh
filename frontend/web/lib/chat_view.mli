@@ -37,7 +37,8 @@ end
     landmark of [Jump] or a message of the context left out keeps an empty
     [.filtered] with its attributes in its place (no menu). *)
 val view
-  :  ?fold:Fold.t
+  :  ?ui:Ui_context.Page.t (** the [render_ui] components' state *)
+  -> ?fold:Fold.t
   -> ?menu:Menu.t
   -> ?index:Message_index.t
   -> ?deleting:Int.Set.t

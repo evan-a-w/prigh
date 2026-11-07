@@ -6,7 +6,7 @@ prints the captured panes.
   === after the backend was killed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ before
     faux reply
   ───────────────────────────────────────────────────────────────────── reconnected to the backend ───
@@ -15,7 +15,7 @@ prints the captured panes.
   === prompt works again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ before
     faux reply
   
@@ -37,7 +37,7 @@ prints the captured panes.
   === handed over
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     error: HTTP 429: The usage limit has been reached (usage limit reached)
     deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
@@ -52,7 +52,7 @@ prints the captured panes.
   === typing the reason
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     asking
   … bash $ make deploy
@@ -66,7 +66,7 @@ prints the captured panes.
   === reconnected: the dialog closed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     asking
   … bash $ make deploy
@@ -77,7 +77,7 @@ prints the captured panes.
   === the picker, a confirmation waiting behind it
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     waiting
   ✓ bash $ sleep 2
@@ -93,7 +93,7 @@ prints the captured panes.
   === switched: no dialog from the other session
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ hello
     in the first session
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ prints the captured panes.
   === back: its confirmation again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     waiting
   ✓ bash $ sleep 2
@@ -121,7 +121,7 @@ prints the captured panes.
   === answered
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ go
     waiting
   ✓ bash $ sleep 2

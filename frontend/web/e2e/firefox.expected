@@ -93,8 +93,8 @@ Reminder r1 removed
 Reminder r2 removed
 status: no reminders
 === firefox: bash run ===
-•
-Using another client
+▢
+Using prigh-web
 count some lines
 <TIME>
 let me look
@@ -344,8 +344,8 @@ Cancel
 Create folder and switch
 created on the host: true
 === firefox: an environment note above the prompt ===
-client closed: •
-Using another client
+client closed: ▢
+Using prigh-web
 cwd closed: ⌂
 Working directory is now <CWD>/sub
 === firefox: the prompt shows only what was typed ===
@@ -3165,4 +3165,50 @@ composer cleared: true
 843x3
 48x48
 === firefox: images (small): errors ===
+none
+=== firefox: ui: drawn ===
+charts 8: line 1, area 1, bar 1, stacked 1, horizontal 1, pie 1, donut 1, scatter 1
+stats 3, tables 1, progress 1, callouts 1
+calculators 1, quizzes 1, flashcards 0, tabs 1, accordions 1
+forms 1, choices 1, checklists 1, images 2
+failed render_ui cards 0
+page fits: true; overflowing: 0
+Build health | Builds got 18% faster since dune 3.22.
+=== firefox: ui: table sorting ===
+as given: 31.2, 18.0, 9.5, 22.7
+descending: 31.2, 22.7, 18.0, 9.5
+ascending: 9.5, 18.0, 22.7, 31.2
+=== firefox: ui: chart tooltips ===
+hover: W4 | main | 51 s | PRs | 60 s
+focus: Link | 9 | 18.0%
+=== firefox: ui: calculator ===
+Hours a month | 30.0 h | Worth it | 1
+Hours a month | 90.0 h | Worth it | 1
+slider follows: 120
+Hours a month | — | enter a number for Minutes saved | Worth it | — | enter a number for Minutes saved
+Hours a month | 90.0 h | Worth it | 1
+=== firefox: ui: quiz, flashcards, tabs, accordion ===
+OCaml | 1 / 2 correct | Retry | 1 | Which tool formats OCaml? | A | ocamlformat | ✓ | B | prettier | ✗ | C | gofmt | Not quite. | ocamlformat, with the project's .ocamlformat. | 2 | What does Eio use for concurrency? | A | threads | B | effects | ✓ | Correct.
+flipped: Card 1 of 2: back. Flip
+Profile | Cache deps | Use the nix binary cache | Split e2e | Old runner | Started | <TIME> | Regression found | <TIME> | in the tmux tests | Fixed | <TIME>
+accordion open: The command,The change
+=== firefox: ui: images ===
+before.png 160x100, after.png 160x100
+viewer: 1 / 2
+=== firefox: ui: a choice sent ===
+What next? | ✓ Sent | Cache deps | the fastest win | Split e2e | more parallel
+buttons disabled: 2
+note: ↵ | Sent "What next?": Cache deps | <TIME>
+=== firefox: ui: after a reload ===
+What next? | ✓ Sent | Cache deps | the fastest win | Split e2e | more parallel
+form still open: 1
+=== firefox: ui: phone 390x844 ===
+page fits: true; overflowing: 0
+tap shows a tooltip: true
+=== firefox: ui: phone 320x640 ===
+page fits: true; overflowing: 0
+tap shows a tooltip: true
+=== firefox: ui: phone 390x844 pwa ===
+page fits: true; overflowing: 0
+=== firefox: ui: errors ===
 none
