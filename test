@@ -107,9 +107,9 @@ rm -rf "$root"/frontend/_build/default/tui/e2e/e2e.actual \
 step "backend tests" dune build --root "$root/backend" @runtest "${force[@]}"
 step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
 # The desktop app's logic and the computer-use helper (their windows and
-# desktops run in the flake's desktop-window and computer-use checks); they
-# need only cargo, not the webview's libraries.
-step "desktop tests" nix shell --accept-flake-config --inputs-from "$root" nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc \
+# desktops run in the flake's desktop-window and computer-use checks), in the
+# desktop dev shell: the helper's portal backend links PipeWire.
+step "desktop tests" nix develop --accept-flake-config "$root#desktop" \
 	-c cargo test --locked --manifest-path "$root/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer
 
 if wait "$web"; then
