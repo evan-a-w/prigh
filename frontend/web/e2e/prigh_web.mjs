@@ -1198,15 +1198,15 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".sidebar .session").length === 3);
   const hello = page.locator(".sidebar .session", { hasText: "hello again" });
   // Pinning one (its ⋯ menu) moves it into a Pinned group at the top, with a
-  // pin; P on it unpins it.
-  const counting = page.locator(".sidebar .session", { hasText: "count some lines" });
-  await counting.hover();
-  await counting.locator(".more").click();
+  // pin; P on it unpins it (the newest, so that the order stays).
+  const newest = page.locator(".sidebar .session", { hasText: "one more" });
+  await newest.hover();
+  await newest.locator(".more").click();
   await page.locator(".context-menu.placed [data-item=pin]").click();
   await page.locator(".sessions-group", { hasText: "Pinned" }).waitFor();
   section("pinned");
   console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
-  console.log(`pin: ${await counting.locator(".session-pin").getAttribute("aria-label")}`);
+  console.log(`pin: ${await newest.locator(".session-pin").getAttribute("aria-label")}`);
   await page.mouse.move(700, 400);
   await screenshot("pinned");
   for (const [width, height] of [[390, 844], [320, 640]]) {
@@ -1222,7 +1222,7 @@ try {
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
-  await counting.locator(".session-open").focus();
+  await newest.locator(".session-open").focus();
   await page.keyboard.press("p");
   await page.waitForSelector(".sessions-group", { state: "detached" });
   section("unpinned");
