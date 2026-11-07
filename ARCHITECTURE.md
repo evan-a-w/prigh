@@ -2065,7 +2065,26 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   handoff: once connected (at start, or from the form, whose answers then
   carry `remote`) it prints a second line, the backend's own prigh-web
   (`Backend_address.web_url`) with `#app=desktop&host=ID` and
-  `"remote":true`, and the window goes there.
+  `"remote":true`, and the window goes there. Before that it checks
+  whether the site is behind a sign-in proxy (`Site_probe`: a `GET` of the
+  site with the saved proxy cookie; a redirect to another host, 401, 403
+  or 407), as `Check` does for `/ws` (`Signin_required`); either way the
+  state becomes `Signin` (the remote, the credentials, the tool host
+  started or not, a `Browser_signin` under way, the error, whether it
+  expired) instead of the window looping through the proxy's login.
+  `/desktop/status` then answers `{"state":"signin","site","login",
+  "waiting","error","expired"}` and `/desktop/signin` (`"how"`:
+  `"browser"`, `"again"`, `"cancel"`, `"here"`) chooses: `browser` prints
+  `{"url":…#cli-signin=…,"external":true}` for the shell to open in the
+  default browser, waits for the grant, remembers its cookie
+  (`remember_signin`: `Backend_choice.remember_signin`), starts the tool
+  host with it if `/ws` needed it, and answers `remote`; `here` goes to
+  the site without a cookie (`"here":true`). Every `"remote"` line carries
+  `"signin"` (the local `#desktop=KEY&signin=1`) and the proxy's
+  `"cookie"` when there is one (the shell sends it to the site); the shell
+  sends the window to `signin` when the site redirects it to the login
+  again, whose `/desktop/status` with `"signin": true` goes back to
+  `Signin` (`expired`), keeping the tool host.
 - `Local_site` — what `prigh web`'s and `prigh desktop`'s sites
   (`Web_server.listen ~local:true`) accept: they relay to a backend and run
   this machine's tool host, so another page reaching them could run
@@ -3373,7 +3392,10 @@ terminal frontend and `web/` prigh-web, the browser one.
     panel). `Web_main.run`: under `prigh desktop` (`#desktop=KEY`, or the
     key kept in sessionStorage after a reload: `Desktop_page`,
     `Desktop_link`) it asks `/desktop/status` and either shows the connect
-    form (whose submit `POST`s `/desktop/connect`) or signs in with the
+    form (whose submit `POST`s `/desktop/connect`), the sign-in proxy's
+    choice (`Desktop_link.Signin_page`; its buttons `POST`
+    `/desktop/signin`; `#desktop=KEY&signin=1` asks with `"signin": true`)
+    or signs in with the
     handoff code it is given, then runs the app with `Set_desktop true`
     (Quit prigh in the account menu and the ⋯ sheet, `/quit` and Ctrl+Q
     issue `Command.Quit_desktop`, which `POST`s `/desktop/quit`); else,
@@ -3529,7 +3551,11 @@ The sidecar contract (the shell's only coupling to the backend):
   first must be http(s) on a loopback host, anything else ends the app with
   a dialog); later lines `{"url":"https://…","remote":true}` send the
   window to the backend's own prigh-web, whose origin then counts as the
-  app's too; stderr is its log, of which the shell keeps the last 30 lines
+  app's too, with `"cookie"` (the sign-in proxy's, to send to that site),
+  `"signin"` (the sidecar's page to go back to when the site sends the
+  window to its proxy's login again) and `"here":true` (signing in to the
+  proxy in the window); `{"url":…,"external":true}` is to open in the
+  default browser, not the window; stderr is its log, of which the shell keeps the last 30 lines
   for the error dialog;
 - it exits 0 when its stdin closes or the page's Quit is used, nonzero on a
   failure.
