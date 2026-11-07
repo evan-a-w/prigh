@@ -23,6 +23,9 @@ module Kind : sig
     | Review (** [/review] *)
     | Init (** [/init] *)
     | Review_comments (** the user's review comments, sent together *)
+    | Client (** the user changed client (prigh-web, the TUI, ...) *)
+    | Ui_action
+    (** the user answered through a [render_ui] component ({!Ui_action}) *)
     | Other of string
   [@@deriving sexp_of, equal]
 
