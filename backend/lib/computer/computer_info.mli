@@ -41,3 +41,7 @@ val scaled_size
 
 (** "wlroots (Hyprland), 2560×1440 shown as 1280×720" *)
 val to_string_hum : t -> string
+
+(** ["computer"]: said in [hello]'s [features] (with its [computer], this) by
+    a tool host that runs the [computer] tool. *)
+val feature : string

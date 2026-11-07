@@ -419,7 +419,6 @@ let run ~env ?terminals ?computer ~input ~output () =
 ;;
 
 let features = [ "exec_input"; "terminal_kill"; "git_location" ]
-let computer_feature = "computer"
 
 (* One connection: [`Served] once [hello] succeeded, [`Refused] when the
    backend rejected the credentials, else why it did not. The [worker] and
@@ -483,7 +482,7 @@ let serve_connection
                             (features
                              @ [ "heartbeat" ]
                              @ Option.value_map computer ~default:[] ~f:(fun _ ->
-                               [ computer_feature ]))
+                               [ Computer_info.feature ]))
                             ~f:(fun f ->
                             `String f)) )
                  ; Some

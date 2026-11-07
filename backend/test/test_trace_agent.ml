@@ -484,6 +484,7 @@ let%expect_test "a call forwarded to a tool host times its round trip" =
        ; home = Some t.dir
        ; exec_input = false
        ; git_location = false
+       ; computer = None
        }
      ];
    Or_error.ok_exn (Agent.prompt agent "go");
