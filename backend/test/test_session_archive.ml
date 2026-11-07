@@ -214,7 +214,9 @@ let show_pinned ?(active = false) t ~dir =
     (Session.Summary.is_archived s ~now ~archive_after_days:7. ~active)
 ;;
 
-let%expect_test "pinned: never archived by age; archiving unpins, pinning unarchives" =
+let%expect_test
+    "pinned: never archived by age; archiving unpins, pinning unarchives"
+  =
   with_dir
   @@ fun dir ->
   let t = Session.create ~dir ~cwd:"/proj" () in
@@ -233,7 +235,10 @@ let%expect_test "pinned: never archived by age; archiving unpins, pinning unarch
   let reload () = Or_error.ok_exn (Session.load (Session.path t)) in
   print_s [%sexp (Session.pinned (reload ()) : bool)];
   ignore
-    (Session.append_message t ~at:(now -. (20. *. day)) (Message.user "less old")
+    (Session.append_message
+       t
+       ~at:(now -. (20. *. day))
+       (Message.user "less old")
      : Session.Entry.t);
   show_pinned t ~dir;
   [%expect
@@ -282,6 +287,7 @@ let%expect_test "pins are not copied by fork" =
   ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
   let forked = Or_error.ok_exn (Session.fork t ~dir) in
   print_s
-    [%sexp ((summary t ~dir).pinned : bool), ((summary forked ~dir).pinned : bool)];
+    [%sexp
+      ((summary t ~dir).pinned : bool), ((summary forked ~dir).pinned : bool)];
   [%expect {| (true false) |}]
 ;;
