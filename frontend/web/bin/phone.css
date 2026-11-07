@@ -103,6 +103,7 @@
   border-width: 1px 0 0;
   padding-bottom: max(8px, var(--safe-b));
   padding-left: max(8px, var(--safe-l));
+  scroll-padding-bottom: max(8px, var(--safe-b));
   padding-right: max(8px, var(--safe-r));
   overflow-y: auto;
   overscroll-behavior: contain;
