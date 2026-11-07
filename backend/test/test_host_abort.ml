@@ -24,7 +24,8 @@ let alive pid =
 let exists t name = Sys_unix.file_exists_exn (Filename.concat t.dir name)
 
 let read_pid t name =
-  Int.of_string (String.strip (In_channel.read_all (Filename.concat t.dir name)))
+  Int.of_string
+    (String.strip (In_channel.read_all (Filename.concat t.dir name)))
 ;;
 
 (* Writes the shell's and its child's pids next to [DIR], and [survived]
@@ -154,11 +155,13 @@ let with_network_host replies f =
 ;;
 
 let%expect_test "network tool host: abort ends the turn and kills the command" =
-  with_network_host (fun t -> [ tool_call t ~id:"c1"; Reply.text "unreachable" ])
+  with_network_host (fun t ->
+    [ tool_call t ~id:"c1"; Reply.text "unreachable" ])
   @@ fun t agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {|
+  [%expect
+    {|
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -186,7 +189,8 @@ let%expect_test "network tool host: abort skips the reply's other calls" =
   @@ fun t agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep twice"}|} "prompt";
   abort_and_show ~tags:[ ""; "2" ] t h agent;
-  [%expect {|
+  [%expect
+    {|
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -212,7 +216,8 @@ let%expect_test "backend tool host: abort ends the turn and kills the command" =
   @@ fun t ~sw:_ agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     started: true
     {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
@@ -281,7 +286,8 @@ let%expect_test "silent tool host: abort ends the turn without its answer" =
          | Message.Tool_result r -> Some r.text
          | _ -> None)
        : string list)];
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"/mute","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
@@ -319,12 +325,18 @@ let%expect_test "backend tool host: abort kills a command in its own group" =
   @@ fun t ~sw:_ agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     started: true
     {"type":"response","id":"r1","ok":true,"result":{"restored":[]}}
-    turn ended within 1s: false
-    processes killed: false
+    turn ended within 1s: true
+    tool_end "[cancelled]" is_error=true
+    message_start
+    message_end
+    turn_end
+    agent_end
+    processes killed: true
     survived: false
     |}]
 ;;
@@ -334,7 +346,8 @@ let%expect_test "network tool host: abort kills a command in its own group" =
   @@ fun t agent h ->
   Test_rpc.call t h ~params:{|{"text": "sleep"}|} "prompt";
   abort_and_show t h agent;
-  [%expect {|
+  [%expect
+    {|
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -346,7 +359,7 @@ let%expect_test "network tool host: abort kills a command in its own group" =
     message_end
     turn_end
     agent_end
-    processes killed: false
+    processes killed: true
     survived: false
     |}]
 ;;

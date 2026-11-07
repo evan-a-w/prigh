@@ -256,3 +256,114 @@ let%expect_test
     background grandchild gone: true
     |}]
 ;;
+
+let%expect_test "process tree: descendants of a pid" =
+  let p = Pid.of_int in
+  let parents =
+    [ p 10, p 1; p 11, p 10; p 12, p 11; p 13, p 10; p 20, p 1; p 21, p 20 ]
+  in
+  print_s [%sexp (Process_tree.descendants parents ~root:(p 10) : Pid.t list)];
+  print_s [%sexp (Process_tree.descendants parents ~root:(p 12) : Pid.t list)];
+  [%expect
+    {|
+    (11 12 13)
+    ()
+    |}];
+  Eio_main.run
+  @@ fun env ->
+  let parents = Option.value_exn (Process_tree.parents ~env) in
+  print_s
+    [%sexp
+      (List.exists parents ~f:(fun (pid, ppid) ->
+         Pid.equal pid (Core_unix.getpid ())
+         && Pid.equal ppid (Core_unix.getppid_exn ()))
+       : bool)];
+  [%expect {| true |}]
+;;
+
+let alive pid =
+  match Signal_unix.send Signal.zero (`Pid pid) with
+  | `Ok -> true
+  | `No_such_process -> false
+;;
+
+let read_pid dir name =
+  Pid.of_string (String.strip (In_channel.read_all (Filename.concat dir name)))
+;;
+
+(* Whether [f] holds within 5s. *)
+let within_5s ~env f =
+  let clock = Eio.Stdenv.clock env in
+  let deadline = Eio.Time.now clock +. 5. in
+  let rec go () =
+    f ()
+    || (Float.( < ) (Eio.Time.now clock) deadline
+        &&
+        (Eio.Time.sleep clock 0.01;
+         go ()))
+  in
+  go ()
+;;
+
+(* Cancels [script] once it wrote [pid] in [dir]; prints how it ended and
+   whether that took under 2s. *)
+let cancel_once_started ~env ~dir script =
+  let cancel = Cancellation.create () in
+  let clock = Eio.Stdenv.clock env in
+  let cancelled_at = ref 0. in
+  let out = ref None in
+  Eio.Fiber.both
+    (fun () -> out := Some (sh ~env ~cwd:dir ~cancel script))
+    (fun () ->
+       let rec wait () =
+         if not (Sys_unix.file_exists_exn (Filename.concat dir "pid"))
+         then (
+           Eio.Time.sleep clock 0.01;
+           wait ())
+       in
+       wait ();
+       cancelled_at := Eio.Time.now clock;
+       Cancellation.cancel cancel);
+  let under_2s = Float.( < ) (Eio.Time.now clock -. !cancelled_at) 2. in
+  print_s
+    [%sexp
+      (Option.map !out ~f:(fun o -> o.exit) : Process.Exit.t option)
+    , ~~(under_2s : bool)]
+;;
+
+let%expect_test "cancel kills what left the process group" =
+  Eio_main.run
+  @@ fun env ->
+  let dir = Filename_unix.temp_dir "prigh" "" in
+  (* [timeout] leads a group of its own. *)
+  cancel_once_started
+    ~env
+    ~dir
+    "timeout 60 sh -c 'echo $$ > pid; exec sleep 30'; touch survived";
+  let pid = read_pid dir "pid" in
+  let killed = within_5s ~env (fun () -> not (alive pid)) in
+  print_s [%sexp ~~(killed : bool)];
+  print_s
+    [%sexp (Sys_unix.file_exists_exn (Filename.concat dir "survived") : bool)];
+  [%expect
+    {|
+    ((Cancelled) (under_2s true))
+    (killed true)
+    false
+    |}]
+;;
+
+let%expect_test "cancel does not wait for a daemon holding the output" =
+  Eio_main.run
+  @@ fun env ->
+  let dir = Filename_unix.temp_dir "prigh" "" in
+  (* Reparented to init before the cancel: out of the tree's reach. *)
+  cancel_once_started
+    ~env
+    ~dir
+    "(setsid sh -c 'echo $$ > daemon; exec sleep 30' &); until [ -s daemon ]; \
+     do sleep 0.01; done; echo > pid; sleep 30";
+  let daemon = read_pid dir "daemon" in
+  Signal_unix.send_i Signal.kill (`Pid daemon);
+  [%expect {| ((Cancelled) (under_2s true)) |}]
+;;
