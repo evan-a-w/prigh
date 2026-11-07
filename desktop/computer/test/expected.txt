@@ -1,0 +1,41 @@
+== wlroots (headless sway)
+{"id":1,"info":{"backend":"wlroots","detail":"…","height":720,"output":"HEADLESS-1","platform":"linux","scale":1.0,"scaled_height":360,"scaled_width":640,"width":1280},"ok":true}
+{"cursor":{"x":320,"y":180},"id":2,"ok":true,"real":{"x":640,"y":360},"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"clicked left at (320, 180)"}
+{"cursor":{"x":320,"y":180},"id":3,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"typed 8 characters"}
+{"cursor":{"x":320,"y":180},"id":4,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed ctrl+a"}
+{"cursor":{"x":100,"y":50},"id":5,"ok":true,"real":{"x":200,"y":100},"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"scrolled 0,2 at (100, 50)"}
+{"cursor":{"x":100,"y":50},"id":6,"ok":true,"screenshot":{"data":"…","height":72,"mime_type":"image/png","width":128},"text":"zoomed into [0, 0, 64, 36]"}
+-- wev received:
+button left pressed at 640, 360
+button left released at 640, 360
+key h
+key e
+key l
+key l
+key o
+key space
+key eacute
+key U2192
+key Control+a
+wheel (axis, value120) (0, 240)
+== x11 (Xvfb)
+{"id":1,"info":{"backend":"x11","detail":"…","height":720,"output":"screen","platform":"linux","scale":1.0,"scaled_height":360,"scaled_width":640,"width":1280},"ok":true}
+{"cursor":{"x":320,"y":180},"id":2,"ok":true,"real":{"x":640,"y":360},"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"clicked left at (320, 180)"}
+{"cursor":{"x":320,"y":180},"id":3,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"typed 8 characters"}
+{"cursor":{"x":320,"y":180},"id":4,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed ctrl+a"}
+{"cursor":{"x":100,"y":50},"id":5,"ok":true,"real":{"x":200,"y":100},"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"scrolled 0,2 at (100, 50)"}
+{"cursor":{"x":100,"y":50},"id":6,"ok":true,"screenshot":{"data":"…","height":72,"mime_type":"image/png","width":128},"text":"zoomed into [0, 0, 64, 36]"}
+-- xev received:
+button 1 at 640,360 state 0x0
+key h state 0x0
+key e state 0x0
+key l state 0x0
+key l state 0x0
+key o state 0x0
+key space state 0x0
+key eacute state 0x0
+key U2192 state 0x0
+key Control_L state 0x0
+key a state 0x4
+button 5 at 200,100 state 0x0
+button 5 at 200,100 state 0x0
