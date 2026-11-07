@@ -125,8 +125,8 @@ let local ~env =
         Process.run
           ~env
           ~extra_env:[ "LC_ALL", "C" ]
+          ~merge_stderr:true
           ~on_stdout:(Nix_gc_output.Splitter.feed splitter)
-          ~on_stderr:(Nix_gc_output.Splitter.feed splitter)
           ~prog
           ~args
           ()
