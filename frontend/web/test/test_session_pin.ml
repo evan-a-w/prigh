@@ -97,6 +97,7 @@ let%expect_test "a search keeps the groups, best match first in each" =
   sidebar h;
   [%expect
     {|
+    (Search_sessions_later (search 1) (after_ms 150))
     Pinned 1
     (Long-running notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1

@@ -2352,7 +2352,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / 2025▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
     ▸  ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -2386,7 +2386,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / 2025▏
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
