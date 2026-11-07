@@ -328,6 +328,7 @@ let%expect_test
       "auto_background_seconds": 30,
       "generate_model": null,
       "mask_observations": true,
+      "computer_screenshots": 3,
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
