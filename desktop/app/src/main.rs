@@ -650,7 +650,7 @@ fn sidecar_path() -> String {
 
 /// `prigh-computer.exe` next to the app (the Windows installers bundle
 /// it), for computer use from WSL.
-fn bundled_computer() -> Option<String> {
+fn bundled_windows_computer() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let helper = exe.parent()?.join("prigh-computer.exe");
     helper.is_file().then(|| helper.to_string_lossy().into_owned())
@@ -686,7 +686,7 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
             backend: std::env::var("PRIGH_DESKTOP_BACKEND").ok(),
             args: std::env::var("PRIGH_DESKTOP_ARGS").ok(),
             wsl_distro: std::env::var("PRIGH_DESKTOP_WSL_DISTRO").ok(),
-            bundled_computer: if OS == Os::Windows { bundled_computer() } else { None },
+            bundled_computer: if OS == Os::Windows { bundled_windows_computer() } else { None },
             computer: std::env::var("PRIGH_COMPUTER").ok(),
             wslenv: std::env::var("WSLENV").ok(),
         };
@@ -708,6 +708,13 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
         }
         if let Ok(home) = std::env::var("HOME") {
             cmd.current_dir(home);
+        }
+        let exe = std::env::current_exe().ok();
+        let computer = std::env::var("PRIGH_COMPUTER").ok();
+        if let Some(helper) =
+            launch::bundled_computer(OS, exe.as_deref(), computer.as_deref(), |p| p.to_str().is_some_and(is_executable))
+        {
+            cmd.env("PRIGH_COMPUTER", helper);
         }
         #[cfg(windows)]
         {

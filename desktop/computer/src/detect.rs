@@ -1,9 +1,10 @@
 //! Which backend drives this desktop. On Linux: a Wayland compositor with
 //! wlroots' virtual-pointer and screencopy protocols (Hyprland, sway,
 //! river, ...) is driven through them; otherwise an X11 session through
-//! XTEST. On Windows, the Windows backend ([crate::windows]: DXGI or GDI,
-//! SendInput). GNOME and KDE on Wayland need xdg-desktop-portal
-//! (RemoteDesktop and ScreenCast), and macOS its own backend: follow-ups.
+//! XTEST. On macOS: ScreenCaptureKit and Quartz events ([crate::macos]).
+//! On Windows: DXGI or GDI, SendInput ([crate::windows]). GNOME and KDE on
+//! Wayland need xdg-desktop-portal (RemoteDesktop and ScreenCast): a
+//! follow-up.
 
 use crate::backend::Backend;
 
@@ -12,6 +13,7 @@ pub enum Kind {
     Fake,
     Wlroots,
     X11,
+    Macos,
     Windows,
 }
 
@@ -22,8 +24,9 @@ impl Kind {
             "fake" => Ok(Some(Kind::Fake)),
             "wlroots" => Ok(Some(Kind::Wlroots)),
             "x11" => Ok(Some(Kind::X11)),
+            "macos" => Ok(Some(Kind::Macos)),
             "windows" => Ok(Some(Kind::Windows)),
-            other => Err(format!("--backend {other:?}: use auto, wlroots, x11, windows or fake")),
+            other => Err(format!("--backend {other:?}: use auto, wlroots, x11, macos, windows or fake")),
         }
     }
 }
@@ -43,11 +46,7 @@ pub struct Environment {
 pub fn decide(env: &Environment) -> Result<Kind, String> {
     match env.os {
         "linux" | "freebsd" | "openbsd" | "netbsd" => {}
-        "macos" => {
-            return Err("computer use on macOS is not supported yet (it is planned: a follow-up adds a \
-                        ScreenCaptureKit and CGEvent backend)"
-                .into())
-        }
+        "macos" => return Ok(Kind::Macos),
         "windows" => return Ok(Kind::Windows),
         os => return Err(format!("computer use is not supported on {os}")),
     }
@@ -95,15 +94,30 @@ pub fn open(kind: Option<Kind>, options: &Options) -> Result<Box<dyn Backend>, S
         Kind::Wlroots => Ok(Box::new(crate::wlroots::Wlroots::connect()?)),
         #[cfg(target_os = "linux")]
         Kind::X11 => Ok(Box::new(crate::x11::X11::connect()?)),
+        #[cfg(target_os = "macos")]
+        Kind::Macos => Ok(Box::new(crate::macos::Macos::connect()?)),
         #[cfg(windows)]
         Kind::Windows => Ok(Box::new(crate::windows::Windows::connect()?)),
         #[cfg(not(target_os = "linux"))]
-        Kind::Wlroots | Kind::X11 => Err(format!("the {kind:?} backend is only on Linux")),
+        Kind::Wlroots | Kind::X11 => Err(unavailable(kind)),
+        #[cfg(not(target_os = "macos"))]
+        Kind::Macos => Err(unavailable(kind)),
         #[cfg(not(windows))]
-        Kind::Windows => {
-            Err("the Windows backend is only on Windows (from WSL, run the Windows build, prigh-computer.exe)".into())
-        }
+        Kind::Windows => Err(format!("{} (from WSL, run the Windows build, prigh-computer.exe)", unavailable(kind))),
     }
+}
+
+/// A backend this build lacks, asked for with --backend.
+#[allow(dead_code)]
+fn unavailable(kind: Kind) -> String {
+    let (name, os) = match kind {
+        Kind::Wlroots => ("wlroots", "Linux"),
+        Kind::X11 => ("x11", "Linux"),
+        Kind::Macos => ("macos", "macOS"),
+        Kind::Windows => ("windows", "Windows"),
+        Kind::Fake => ("fake", "every system"),
+    };
+    format!("--backend {name} works only on {os}, not on {}", std::env::consts::OS)
 }
 
 pub fn current() -> Environment {
@@ -150,12 +164,13 @@ mod tests {
         assert!(decide(&env(true, false, None, Some(Err("refused".into())))).unwrap_err().contains("refused"));
         assert!(decide(&env(false, false, None, None)).unwrap_err().starts_with("no desktop to control"));
         let mac = Environment { os: "macos", ..Default::default() };
-        assert!(decide(&mac).unwrap_err().contains("macOS is not supported yet"));
+        assert_eq!(decide(&mac), Ok(Kind::Macos));
         let win = Environment { os: "windows", ..Default::default() };
         assert_eq!(decide(&win), Ok(Kind::Windows));
         assert_eq!(Kind::parse("windows"), Ok(Some(Kind::Windows)));
         assert_eq!(Kind::parse("auto"), Ok(None));
         assert_eq!(Kind::parse("x11"), Ok(Some(Kind::X11)));
+        assert_eq!(Kind::parse("macos"), Ok(Some(Kind::Macos)));
         assert!(Kind::parse("mac").is_err());
     }
 }
