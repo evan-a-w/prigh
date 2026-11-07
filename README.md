@@ -543,7 +543,8 @@ chooses, Esc closes it and changes nothing. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
 with their directory. A search (Ctrl+K) finds sessions by title, prompt,
 directory, repository, branch or their worktrees' branches, the archived
-ones too. Where a session is in git is found on its
+ones too, and by what was said in them: see "Searching sessions" under Keys.
+Esc clears it, then goes back to the editor. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
 older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
@@ -1866,6 +1867,24 @@ removes a reminder,
 and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
+
+**Searching sessions.** prigh-web's sidebar search and the TUI's `/sessions` filter work the
+same way. The query is split into words, and a session matches when every
+word matches, in any order and in any of its fields: its name, its first
+prompt, its description, its directory, repository and branches, and
+(searched by the backend, `search_sessions`) the text of all its messages,
+yours and the agent's (not tool output). A word matches a word of the
+session exactly, as its start, inside it (3+ letters), with one typo (4+
+letters: `reconect`, `sesion`) or as its letters in order from its first
+(`cfg` for `configure`), best first; never across words, so short queries
+match little rather than everything. A match in the name counts more than
+one in the first prompt, then the other text, then where it works; ties go
+to the most recently updated. Titles match as you type; the messages
+follow once typing pauses, each session found there with the passage that
+matched under its title, the matched words marked (in titles too). The
+backend keeps an index of every session's words in memory, updated as
+sessions change, so a search of thousands of sessions takes tens of
+milliseconds (the first one reads them all).
 
 `/sessions` lists the active sessions first, most recent first, each with
 its repository and branch (`prigh ⎇ main`) and, beside its directory, the

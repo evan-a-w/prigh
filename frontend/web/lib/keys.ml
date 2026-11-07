@@ -72,7 +72,9 @@ let help =
     , "trim the model's context before the highlighted message (confirmed \
        first; /trim undo brings it back)" )
   ; "PageUp / PageDown", "scroll the transcript"
-  ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
+  ; ( "Ctrl+K"
+    , "search sessions by words of their titles and messages (↓ ↑ through \
+       them, Enter opens, Delete deletes, Esc clears)" )
   ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
     , "start a new session in the highlighted worktree / review its changes / \
        remove it" )
