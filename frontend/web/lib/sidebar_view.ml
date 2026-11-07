@@ -391,19 +391,19 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                 [ Node.span
                     ~attrs:
                       [ Attr.class_ "session-title"; Attr.create "dir" "auto" ]
-                    [ (if Session_list.is_pinned s
-                       then
-                         Node.span
+                    ((if Session_list.is_pinned s
+                      then
+                        [ Node.span
                            ~attrs:
                              [ Attr.class_ "session-pin"
                              ; Attr.role "img"
                              ; Attr.create "aria-label" "Pinned"
                              ; Attr.title "Pinned to the top (P unpins)"
                              ]
-                           [ icon Pin ]
-                       else Node.none)
-                    ; Node.text title
-                    ]
+                            [ icon Pin ]
+                        ]
+                      else [])
+                     @ [ Node.text title ])
                 ; div
                     ~cls:"session-meta"
                     [ span ~cls:"session-age" age
