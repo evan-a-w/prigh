@@ -1,4 +1,4 @@
-// render_ui's components (the Intelligent UI): the faux model calls the real
+// render_ui's components: the faux model calls the real
 // tool with every component (ui_specs.mjs); the page draws them, and they
 // work: a sorted table, chart tooltips on hover and keyboard focus, the
 // calculator, quiz, flashcards, tabs, accordion, images opening in the
